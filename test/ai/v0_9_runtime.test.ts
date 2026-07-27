@@ -29,6 +29,7 @@ import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { V08_URGENT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import {
     StrategyV0_9,
+    buildV09HardGuardSummary,
     commitV09TargetMemoryOverride,
     createV09OfflineResearchStrategy,
     selectV09RankedCandidate,
@@ -384,6 +385,66 @@ describe("v0.9 fixed-point runtime", () => {
 
         expect(v09CandidatePassesHardGuards(0, protectorCharge, [protectorCharge], protector, context)).toBe(false);
         expect(v09CandidatePassesHardGuards(0, wardCharge, [wardCharge], ward, context)).toBe(false);
+    });
+
+    test("keeps a forced-displacement Abomination hold safe when no catch-up route exists", () => {
+        const combat = createCombatTestContext();
+        const protector = createTestUnit({
+            team: LOWER,
+            name: "Abomination",
+            attackType: MELEE,
+            auraEffects: ["Flesh Shield"],
+            auraRanges: [1],
+            auraIsBuff: [true],
+        });
+        const ward = createTestUnit({
+            team: LOWER,
+            name: "Protected Healer",
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 8,
+            damageMax: 20,
+            amountAlive: 5,
+        });
+        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, protector, { x: 1, y: 1 });
+        placeUnit(combat.grid, combat.unitsHolder, ward, { x: 5, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 12, y: 12 });
+        protector.setWebMovementLocked(true);
+        const context: IDecisionContext = {
+            grid: combat.grid,
+            matrix: combat.grid.getMatrix(),
+            unitsHolder: combat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: combat.attackHandler,
+            fightProperties: FightStateManager.getInstance().getFightProperties(),
+        };
+        const wait: IEnumeratedCandidate = {
+            kind: "incumbent",
+            actions: [{ type: "wait_turn", unitId: protector.getId() }],
+            features: { ...features, moraleDelta: -3, hourglassSpent: 1 },
+        };
+        const defend: IEnumeratedCandidate = {
+            kind: "defend",
+            actions: [{ type: "defend_turn", unitId: protector.getId() }],
+            features: { ...features, moraleDelta: -2, luckDelta: 3 },
+        };
+        const rush: IEnumeratedCandidate = {
+            kind: "move",
+            actions: [{ type: "move_unit", unitId: protector.getId(), path: [{ x: 0, y: 0 }] }],
+            targetCell: { x: 0, y: 0 },
+            features,
+        };
+        const candidates = [wait, defend, rush];
+        const summary = buildV09HardGuardSummary(candidates, protector, context);
+        const eligible = candidates.map((candidate, index) =>
+            v09CandidatePassesHardGuards(index, candidate, candidates, protector, context, summary),
+        );
+
+        expect(summary.backlineProtectorIntent?.ward).toBe(ward);
+        expect(summary.backlineProtectorHasCatchUpRoute).toBe(false);
+        expect(summary.productiveExists).toBe(false);
+        expect(eligible).toEqual([true, true, false]);
+        expect(selectV09RankedCandidate([10, 5, 20], eligible, 1).fallbackReason).toBe("hard_guard");
     });
 
     test("rejects a visible declared shot when authoritative trajectory evaluation hits no unit", () => {

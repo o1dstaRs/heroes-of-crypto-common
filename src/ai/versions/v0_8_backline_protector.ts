@@ -399,6 +399,24 @@ export const v08BacklineProtectorHasCatchUpRoute = (
 ): boolean => !!followWard(intent, unit, context);
 
 /**
+ * Exact runtime boundary for a protector candidate. The normal contract is strict coverage preservation.
+ * Forced displacement is the sole exception: when no legal catch-up route exists, native v0.8 retains a useful
+ * in-place action (or its final wait/defend hold) instead of inventing a charge that abandons every ward.
+ *
+ * Callers evaluating a candidate set should calculate `hasCatchUpRoute` once and pass it to every candidate.
+ */
+export function isV08BacklineProtectorRuntimeDecisionAllowed(
+    intent: IV08BacklineProtectorIntent,
+    unit: Unit,
+    context: IDecisionContext,
+    decision: readonly GameAction[],
+    hasCatchUpRoute = v08BacklineProtectorHasCatchUpRoute(intent, unit, context),
+): boolean {
+    if (preservesV08BacklineProtectorIntent(intent, unit, context, decision)) return true;
+    return !hasCatchUpRoute && sameFootprint(unit.getCells(), decisionDestinationCells(unit, decision));
+}
+
+/**
  * Native v0.8 protector policy. Preserve protection-compatible attacks/casts; otherwise follow a displaced
  * ward, or spend this activation holding the exact screen rather than rushing toward the enemy.
  */

@@ -18,6 +18,7 @@ import {
     isV08BacklineProtectionBeneficiary,
     isV08BacklineProtectorDecisionAllowed,
     isV08BacklineProtectorPureMoveMeaningful,
+    isV08BacklineProtectorRuntimeDecisionAllowed,
     isV08BacklineWardPureMoveMeaningful,
     preservesV08BacklineProtectorIntent,
     preservesV08BacklineWardIntent,
@@ -347,6 +348,14 @@ describe("v0.8 back-line protector intent", () => {
         ];
 
         expect(isV08BacklineProtectorDecisionAllowed(protector, context, inPlaceAttack)).toBe(false);
+        expect(
+            isV08BacklineProtectorRuntimeDecisionAllowed(
+                buildV08BacklineProtectorIntent(protector, context)!,
+                protector,
+                context,
+                inPlaceAttack,
+            ),
+        ).toBe(true);
         expect(prioritizeV08BacklineProtector(protector, context, inPlaceAttack, false)).toBe(inPlaceAttack);
     });
 

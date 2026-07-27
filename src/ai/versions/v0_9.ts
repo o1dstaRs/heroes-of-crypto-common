@@ -26,8 +26,9 @@ import { isV08StrongerRangedPostureWait, StrategyV0_8 } from "./v0_8";
 import {
     buildV08BacklineProtectorIntent,
     buildV08BacklineWardIntent,
-    preservesV08BacklineProtectorIntent,
+    isV08BacklineProtectorRuntimeDecisionAllowed,
     preservesV08BacklineWardIntent,
+    v08BacklineProtectorHasCatchUpRoute,
     type IV08BacklineProtectorIntent,
     type IV08BacklineWardIntent,
 } from "./v0_8_backline_protector";
@@ -122,6 +123,7 @@ export interface IV09HardGuardSummary {
     readonly finishActive: boolean;
     readonly requiredFinishPressure: number;
     readonly backlineProtectorIntent: IV08BacklineProtectorIntent | undefined;
+    readonly backlineProtectorHasCatchUpRoute: boolean;
     readonly backlineWardIntent: IV08BacklineWardIntent | undefined;
 }
 
@@ -130,13 +132,20 @@ const v09CandidatePassesBaseSafety = (
     unit: Unit,
     context: IDecisionContext,
     backlineProtectorIntent: IV08BacklineProtectorIntent | undefined,
+    backlineProtectorHasCatchUpRoute: boolean,
     backlineWardIntent: IV08BacklineWardIntent | undefined,
 ): boolean => {
     if (!candidate.actions.length || attacksForbiddenTarget(unit, candidate)) return false;
     if (!v09HasResolvedVisibleShot(unit, context, candidate)) return false;
     if (
         backlineProtectorIntent &&
-        !preservesV08BacklineProtectorIntent(backlineProtectorIntent, unit, context, candidate.actions)
+        !isV08BacklineProtectorRuntimeDecisionAllowed(
+            backlineProtectorIntent,
+            unit,
+            context,
+            candidate.actions,
+            backlineProtectorHasCatchUpRoute,
+        )
     ) {
         return false;
     }
@@ -157,9 +166,19 @@ export function buildV09HardGuardSummary(
         context.fightProperties?.getCurrentLap() ?? 0,
     );
     const backlineProtectorIntent = buildV08BacklineProtectorIntent(unit, context);
+    const backlineProtectorHasCatchUpRoute = backlineProtectorIntent
+        ? v08BacklineProtectorHasCatchUpRoute(backlineProtectorIntent, unit, context)
+        : false;
     const backlineWardIntent = buildV08BacklineWardIntent(unit, context);
     const baseSafeCandidates = candidates.filter((candidate) =>
-        v09CandidatePassesBaseSafety(candidate, unit, context, backlineProtectorIntent, backlineWardIntent),
+        v09CandidatePassesBaseSafety(
+            candidate,
+            unit,
+            context,
+            backlineProtectorIntent,
+            backlineProtectorHasCatchUpRoute,
+            backlineWardIntent,
+        ),
     );
     return {
         productiveExists: baseSafeCandidates.some(v09CandidateIsProductive),
@@ -171,6 +190,7 @@ export function buildV09HardGuardSummary(
               )
             : 0,
         backlineProtectorIntent,
+        backlineProtectorHasCatchUpRoute,
         backlineWardIntent,
     };
 }
@@ -195,6 +215,7 @@ export function v09CandidatePassesHardGuards(
             unit,
             context,
             guardSummary.backlineProtectorIntent,
+            guardSummary.backlineProtectorHasCatchUpRoute,
             guardSummary.backlineWardIntent,
         )
     ) {
@@ -211,11 +232,22 @@ export function v09CandidatePassesHardGuards(
         return false;
     }
     if (hasWait) {
-        // The IL-v4 waitEligible feature and the shipped v0.8 posture use the same predicate. A model may retain
-        // that intentional ranged-superiority wait, but it cannot invent a new passive posture.
+        // A model may retain the same intentional ranged-superiority wait as v0.8. It may also retain v0.8's
+        // exact protector hold when every role-compatible active candidate is unavailable; it cannot invent a
+        // new passive posture or use the exception to leave the ward.
         const lap = context.fightProperties?.getCurrentLap() ?? 0;
         const waitEligible = isV08StrongerRangedPostureWait(unit, context.unitsHolder, lap, candidate.actions);
-        if (!waitEligible) return false;
+        const protectorHoldEligible =
+            !!guardSummary.backlineProtectorIntent &&
+            !guardSummary.productiveExists &&
+            isV08BacklineProtectorRuntimeDecisionAllowed(
+                guardSummary.backlineProtectorIntent,
+                unit,
+                context,
+                candidate.actions,
+                guardSummary.backlineProtectorHasCatchUpRoute,
+            );
+        if (!waitEligible && !protectorHoldEligible) return false;
     }
     if (guardSummary.finishActive) {
         if (
