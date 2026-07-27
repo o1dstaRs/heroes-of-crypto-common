@@ -10,6 +10,7 @@ import { createV09OfflineResearchStrategy } from "../../src/ai/versions/v0_9";
 import type { IV09ModelArtifact } from "../../src/ai/versions/v0_9_model";
 import { runMatch, type IV09ServerPreflightTimingObservation } from "../../src/simulation/battle_engine";
 import { buildMirrorRoster } from "../../src/simulation/measure_mirror_cohorts";
+import { withScopedAIEnvironment } from "../../src/simulation/v0_8_a13_search";
 import {
     buildV09CampaignManifest,
     buildV09SeedLedger,
@@ -487,21 +488,34 @@ describe("v0.9 offline qualification", () => {
             maxLaps: 8,
             roster,
         } as const;
-        const baseline = runMatch({
-            ...base,
-            greenStrategyOverride: createV09OfflineResearchStrategy(artifact),
-        });
-        const timings: IV09ServerPreflightTimingObservation[] = [];
-        const measured = runMatch({
-            ...base,
-            greenStrategyOverride: createV09OfflineResearchStrategy(artifact),
-            v09ServerPreflightObserver: (observation) => timings.push(observation),
-        });
-        expect(measured).toEqual(baseline);
-        expect(timings.length).toBeGreaterThan(0);
-        expect(timings.every((timing) => timing.failure === null)).toBe(true);
-        expect(timings.every((timing) => timing.totalMicros >= timing.decisionMicros)).toBe(true);
-        expect(timings.every((timing) => timing.totalMicros >= timing.preflightMicros)).toBe(true);
+        // This isolates preflight rollback from the production v0.8+a13 opponent's wall-clock deadline.
+        // Qualification exercises that bounded SearchDriver separately; two sequential deadline-bound games
+        // are not byte-identical when host load makes either decision cross its 175 ms fallback boundary.
+        withScopedAIEnvironment(
+            {
+                V08_A13_SEARCH: "0",
+                V07_SEARCH: undefined,
+                Q2_WAIT_ABLATION: undefined,
+                Q2_ORACLE: undefined,
+            },
+            () => {
+                const baseline = runMatch({
+                    ...base,
+                    greenStrategyOverride: createV09OfflineResearchStrategy(artifact),
+                });
+                const timings: IV09ServerPreflightTimingObservation[] = [];
+                const measured = runMatch({
+                    ...base,
+                    greenStrategyOverride: createV09OfflineResearchStrategy(artifact),
+                    v09ServerPreflightObserver: (observation) => timings.push(observation),
+                });
+                expect(measured).toEqual(baseline);
+                expect(timings.length).toBeGreaterThan(0);
+                expect(timings.every((timing) => timing.failure === null)).toBe(true);
+                expect(timings.every((timing) => timing.totalMicros >= timing.decisionMicros)).toBe(true);
+                expect(timings.every((timing) => timing.totalMicros >= timing.preflightMicros)).toBe(true);
+            },
+        );
     });
 
     it("partitions exact ordinals and rejects tampered, duplicate, or missing shards", () => {
