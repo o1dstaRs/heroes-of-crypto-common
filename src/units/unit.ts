@@ -3014,14 +3014,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ? this.initialUnitProperties.magic_resist +
               this.initialUnitProperties.magic_resist / madeOfFireBuff.getPower()
             : this.initialUnitProperties.magic_resist;
-        // The Armor augment hardens MAGIC armor by the same percentage it adds to physical armor (see the
-        // base_armor block above — identical shape: a % of the unit's own stat). Applied to the base here,
-        // BEFORE the independent ability rolls below, so it composes with Magic Shield / Wardguard / Warding
-        // Mane exactly the way the physical half composes with the armor multipliers.
+        // The Armor augment hardens MAGIC armor by adding its points STRAIGHT ONTO the base — a level 4
+        // creature's 15 becomes 15 + 21 = 36 at augment level 3. Deliberately NOT a percentage of the unit's
+        // own magic armor the way the physical half works: base magic armor is 0/5/10/15 by creature level,
+        // so a percentage gave a level 1 unit 21% of nothing and a level 2 unit barely one point. Applied to
+        // the base here, BEFORE the independent ability rolls below, so Magic Shield / Wardguard / Warding
+        // Mane still compose on top of the raised figure.
         const armorAugmentMagicBuff = this.getBuff("Armor Augment");
         if (armorAugmentMagicBuff) {
-            this.unitProperties.magic_resist += roundUnitStat(
-                (this.unitProperties.magic_resist / 100) * armorAugmentMagicBuff.getPower(),
+            this.unitProperties.magic_resist = roundUnitStat(
+                this.unitProperties.magic_resist + armorAugmentMagicBuff.getPower(),
                 2,
             );
         }

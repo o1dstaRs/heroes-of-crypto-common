@@ -1,7 +1,9 @@
 /*
  * -----------------------------------------------------------------------------
- * The Armor augment hardens MAGIC armor by the same percentage it adds to physical
- * armor — one purchase, both defences, identical shape (a % of the unit's own stat).
+ * The Armor augment hardens MAGIC armor by adding its POINTS onto the base — one purchase, both defences,
+ * but they land differently. Physical armor gains a percentage of the unit's own stat; magic armor gains
+ * the number outright, because base magic armor is 0/5/10/15 by creature level and a percentage handed a
+ * level 1 creature 21% of nothing.
  * -----------------------------------------------------------------------------
  */
 
@@ -38,29 +40,45 @@ const withAndWithout = (level: ArmorAugment, magicResist: number, armor: number)
 describe("Armor augment grants magic armor too", () => {
     afterEach(() => setDeterministicRandomSource(undefined));
 
-    it("raises magic resist by the augment's own percentage, at every level", () => {
+    it("adds the augment's points straight onto magic armor, at every level", () => {
         for (const level of [ArmorAugment.LEVEL_1, ArmorAugment.LEVEL_2, ArmorAugment.LEVEL_3]) {
-            const { plain, augmented } = withAndWithout(level, 20, 12);
-            const expected = 20 + (20 / 100) * getArmorPower(level);
+            const { plain, augmented } = withAndWithout(level, 15, 12);
 
-            expect(plain.getMagicResist()).toBeCloseTo(20, 1);
-            expect(augmented.getMagicResist()).toBeCloseTo(expected, 1);
+            expect(plain.getMagicResist()).toBeCloseTo(15, 1);
+            expect(augmented.getMagicResist()).toBeCloseTo(15 + getArmorPower(level), 1);
         }
     });
 
-    it("uses the SAME percentage on both defences", () => {
-        const { plain, augmented } = withAndWithout(ArmorAugment.LEVEL_3, 20, 12);
+    // The headline case: a level 4 creature's 15 becomes 36 under a level 3 augment.
+    it("takes a level 4 creature's 15 magic armor to 36", () => {
+        const { augmented } = withAndWithout(ArmorAugment.LEVEL_3, 15, 12);
 
-        const magicGain = augmented.getMagicResist() / plain.getMagicResist();
-        const armorGain = augmented.getBaseArmor() / plain.getBaseArmor();
-        expect(magicGain).toBeCloseTo(armorGain, 3);
-        expect(magicGain).toBeCloseTo(1 + getArmorPower(ArmorAugment.LEVEL_3) / 100, 3);
+        expect(augmented.getMagicResist()).toBeCloseTo(36, 1);
     });
 
-    it("leaves a unit with no magic resist at zero — it is a percentage, not a flat grant", () => {
+    // Base magic armor by creature level: 0 / 5 / 10 / 15. Every tier gains the full points.
+    it("gives the same points whatever the creature's level started at", () => {
+        for (const base of [0, 5, 10, 15]) {
+            const { augmented } = withAndWithout(ArmorAugment.LEVEL_2, base, 12);
+
+            expect(augmented.getMagicResist()).toBeCloseTo(base + getArmorPower(ArmorAugment.LEVEL_2), 1);
+        }
+    });
+
+    it("keeps physical armor on the percentage — only the magic half is flat", () => {
+        const { plain, augmented } = withAndWithout(ArmorAugment.LEVEL_3, 20, 12);
+        const power = getArmorPower(ArmorAugment.LEVEL_3);
+
+        expect(augmented.getBaseArmor() / plain.getBaseArmor()).toBeCloseTo(1 + power / 100, 3);
+        expect(augmented.getMagicResist() - plain.getMagicResist()).toBeCloseTo(power, 3);
+    });
+
+    // This is the case the percentage silently missed: a level 1 creature starts at 0 magic armor, so a
+    // percentage of it was always 0 and the augment bought that unit nothing at all.
+    it("arms a creature that started with no magic armor at all", () => {
         const { augmented } = withAndWithout(ArmorAugment.LEVEL_3, 0, 12);
 
-        expect(augmented.getMagicResist()).toBe(0);
+        expect(augmented.getMagicResist()).toBeCloseTo(getArmorPower(ArmorAugment.LEVEL_3), 1);
     });
 
     it("still composes with an independent Magic Shield roll instead of replacing it", () => {
