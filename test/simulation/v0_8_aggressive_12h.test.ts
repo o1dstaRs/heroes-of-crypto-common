@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
     assertV08CampaignCommittedValidationRoundCensus,
+    assertV08CampaignDecisionQualityPrecedesValidation,
     assertV08CampaignResumeHasNoLiveJobs,
     acquireV08CampaignOutputLease,
     buildV08CampaignBaseGenomes,
@@ -48,8 +49,12 @@ import {
     selectValidationCandidateIds,
     summarizeV08CampaignArmageddonJsonl,
     validateV08CampaignPostA13CoverageSummary,
+    validateV08CampaignBlockCenterQualificationSummary,
+    validateV08CampaignPassiveQualificationSummary,
     type IJobDurationSample,
     V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION,
+    V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_DEFAULT_GAMES,
+    V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_REQUIRED_GATES,
     V08_CAMPAIGN_CHILD_ENVIRONMENT_POLICY_VERSION,
     V08_CAMPAIGN_CHILD_ENVIRONMENT_STRATEGY,
     V08_CAMPAIGN_DEFAULT_LANES,
@@ -58,6 +63,9 @@ import {
     V08_CAMPAIGN_EXACT_ANCHOR_INDEX,
     V08_CAMPAIGN_EXACT_ANCHOR_REQUIRED_FINISH_MUTATIONS,
     V08_CAMPAIGN_INACTIVE_CONTROL_IDS,
+    V08_CAMPAIGN_PASSIVE_QUALIFICATION_DEFAULT_GAMES,
+    V08_CAMPAIGN_PASSIVE_QUALIFICATION_DEFAULT_MIN_CREATURE_APPEARANCES,
+    V08_CAMPAIGN_PASSIVE_QUALIFICATION_REQUIRED_GATES,
     V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION,
     V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT,
     V08_CAMPAIGN_POST_A13_COVERAGE_LANES,
@@ -76,6 +84,24 @@ import {
     type IV08AlignedV1CandidateBinding,
 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_protocol";
 import { fingerprintV08PostA13CoveragePlan, V08_POST_A13_LIVE_MAPS } from "../../src/simulation/v0_8_post_a13_coverage";
+import {
+    emptyV08PassiveTurnMetrics,
+    fingerprintV08PassiveTurnPanelPlan,
+    planV08PassiveTurnPanelGame,
+    summarizeV08PassiveTurnPanel,
+    V08_PASSIVE_TURN_PANEL_SCHEMA,
+    type IV08PassiveTurnPanelOptions,
+    type IV08PassiveTurnPanelRecord,
+} from "../../src/simulation/v0_8_passive_turn_panel";
+import {
+    emptyV08BlockCenterMetrics,
+    fingerprintV08BlockCenterActionPlan,
+    planV08BlockCenterActionGame,
+    summarizeV08BlockCenterActionPanel,
+    V08_BLOCK_CENTER_ACTION_PANEL_SCHEMA,
+    type IV08BlockCenterActionPanelOptions,
+    type IV08BlockCenterActionRecord,
+} from "../../src/simulation/v0_8_block_center_action_panel";
 
 const flushMicrotasks = async (): Promise<void> => {
     for (let index = 0; index < 6; index += 1) await Promise.resolve();
@@ -171,6 +197,90 @@ const postA13Strength = ({
     postA13CoverageEvidenceSha256: evidenceSha256,
     postA13ArmageddonRate: armageddonRate,
 });
+
+const QUALIFICATION_SOURCE = "1".repeat(40);
+
+const passiveQualificationFixture = () => {
+    const options: IV08PassiveTurnPanelOptions = {
+        candidateVersion: "v0.8s",
+        opponentVersion: "v0.7",
+        games: 2,
+        baseSeed: 101,
+        minCreatureAppearances: 0,
+        sourceCommit: QUALIFICATION_SOURCE,
+        sourceDirty: false,
+        inheritCandidateEnvironment: true,
+    };
+    const records: IV08PassiveTurnPanelRecord[] = [0, 1].map((game) => {
+        const plan = planV08PassiveTurnPanelGame(options, game);
+        const candidateRoster = plan.candidateSide === "green" ? plan.greenRoster : plan.redRoster;
+        const opponentRoster = plan.candidateSide === "green" ? plan.redRoster : plan.greenRoster;
+        return {
+            schema: V08_PASSIVE_TURN_PANEL_SCHEMA,
+            sourceCommit: options.sourceCommit ?? null,
+            sourceDirty: false,
+            game,
+            pair: plan.pair,
+            seed: plan.seed,
+            mapType: plan.mapType,
+            candidateVersion: options.candidateVersion,
+            opponentVersion: options.opponentVersion,
+            inheritCandidateEnvironment: true,
+            candidateSide: plan.candidateSide,
+            candidateRoster: candidateRoster.map(({ creatureName }) => creatureName),
+            opponentRoster: opponentRoster.map(({ creatureName }) => creatureName),
+            winner: "draw",
+            laps: 1,
+            endReason: "elimination",
+            candidateEngineRejections: 0,
+            metrics: emptyV08PassiveTurnMetrics(),
+            byCreature: {},
+            passiveFailureSamples: [],
+        };
+    });
+    return { options, summary: summarizeV08PassiveTurnPanel(options, records) };
+};
+
+const blockCenterQualificationFixture = () => {
+    const options: IV08BlockCenterActionPanelOptions = {
+        candidateVersion: "v0.8s",
+        opponentVersion: "v0.7",
+        games: 2,
+        baseSeed: 202,
+        sourceCommit: QUALIFICATION_SOURCE,
+        sourceDirty: false,
+        inheritCandidateEnvironment: true,
+    };
+    const records: IV08BlockCenterActionRecord[] = [0, 1].map((game) => {
+        const plan = planV08BlockCenterActionGame(options, game);
+        const candidateRoster = plan.candidateSide === "green" ? plan.greenRoster : plan.redRoster;
+        const opponentRoster = plan.candidateSide === "green" ? plan.redRoster : plan.greenRoster;
+        return {
+            schema: V08_BLOCK_CENTER_ACTION_PANEL_SCHEMA,
+            sourceCommit: options.sourceCommit ?? null,
+            sourceDirty: options.sourceDirty === true,
+            game,
+            pair: plan.pair,
+            seed: plan.seed,
+            mapType: plan.mapType,
+            candidateVersion: options.candidateVersion,
+            opponentVersion: options.opponentVersion,
+            inheritCandidateEnvironment: true,
+            candidateSide: plan.candidateSide,
+            candidateRoster: candidateRoster.map(({ creatureName }) => creatureName),
+            opponentRoster: opponentRoster.map(({ creatureName }) => creatureName),
+            winner: "draw",
+            laps: 1,
+            endReason: "elimination",
+            candidateEngineRejections: 0,
+            metrics: emptyV08BlockCenterMetrics(),
+            byCreature: {},
+            mountainStates: { both_intact: 0, left_only: 0, right_only: 0, cleared: 0 },
+            failureSamples: [],
+        };
+    });
+    return { options, summary: summarizeV08BlockCenterActionPanel(options, records) };
+};
 
 describe("v0.8 aggressive campaign orchestration", () => {
     it("treats concurrency as one host-wide worker budget", () => {
@@ -622,6 +732,27 @@ describe("v0.8 aggressive campaign orchestration", () => {
         expect(unbounded.SEARCH_CIRCUIT_BREAKER_MS).toBe("");
         expect(unbounded.SEARCH_GATE).toBe("0.025");
         expect(unbounded.V08_AGGRESSIVE).toBe("1");
+
+        const exactAnchor = {
+            ...binding,
+            genomeSha256: V08_A13_GENOME_SHA256,
+        } as IV08AlignedV1CandidateBinding;
+        expect(effectiveBehaviorEnvironment(exactAnchor, "audit.jsonl", false).SEARCH_WAIT_DEADLINE_POLICY).toBe(
+            "operation_bounded",
+        );
+        expect(bounded.SEARCH_WAIT_DEADLINE_POLICY).toBe("operation_bounded");
+
+        const adaptiveChild = {
+            ...binding,
+            genomeSha256: "1".repeat(64),
+            behaviorEnvironment: {
+                ...binding.behaviorEnvironment,
+                SEARCH_WAIT_DEADLINE_POLICY: "profile",
+            },
+        } as IV08AlignedV1CandidateBinding;
+        expect(effectiveBehaviorEnvironment(adaptiveChild, "audit.jsonl", false).SEARCH_WAIT_DEADLINE_POLICY).toBe(
+            "operation_bounded",
+        );
     });
 
     it("denies hostile ambient roster and experiment variables and binds the exact child base environment", () => {
@@ -754,6 +885,10 @@ describe("v0.8 aggressive campaign orchestration", () => {
             allUnitCoveragePassed: true,
             hasAllUnitQualificationEvidence: true,
             allUnitQualificationPassed: true,
+            hasPassiveQualificationEvidence: true,
+            passiveQualificationPassed: true,
+            hasBlockCenterQualificationEvidence: true,
+            blockCenterQualificationPassed: true,
             armageddonRate: 0,
             level4ArmageddonRate: 0,
             postA13ArmageddonRate: 0,
@@ -780,6 +915,18 @@ describe("v0.8 aggressive campaign orchestration", () => {
             isV08CampaignPromotionEligible({ ...cleanBounded, hasAllUnitQualificationEvidence: false }, anchor),
         ).toBe(false);
         expect(isV08CampaignPromotionEligible({ ...cleanBounded, allUnitQualificationPassed: false }, anchor)).toBe(
+            false,
+        );
+        expect(
+            isV08CampaignPromotionEligible({ ...cleanBounded, hasPassiveQualificationEvidence: false }, anchor),
+        ).toBe(false);
+        expect(isV08CampaignPromotionEligible({ ...cleanBounded, passiveQualificationPassed: false }, anchor)).toBe(
+            false,
+        );
+        expect(
+            isV08CampaignPromotionEligible({ ...cleanBounded, hasBlockCenterQualificationEvidence: false }, anchor),
+        ).toBe(false);
+        expect(isV08CampaignPromotionEligible({ ...cleanBounded, blockCenterQualificationPassed: false }, anchor)).toBe(
             false,
         );
         expect(isV08CampaignPromotionEligible({ ...cleanBounded, postA13CandidateWinRate: 0.49 }, anchor)).toBe(false);
@@ -829,7 +976,7 @@ describe("v0.8 aggressive campaign orchestration", () => {
         ).toBe(false);
     });
 
-    it("accepts only schema-v10/generator-v7 A13, all-unit gates, and immutable-source provenance", () => {
+    it("accepts only schema-v12/generator-v7 A13, decision-quality gates, and immutable-source provenance", () => {
         const sourceUnsigned = {
             branch: "main" as const,
             gitHead: "1".repeat(40),
@@ -867,10 +1014,11 @@ describe("v0.8 aggressive campaign orchestration", () => {
             },
         };
 
-        expect(V08_CAMPAIGN_SCHEMA).toBe("hoc.v0_8_aggressive_campaign.v10");
+        expect(V08_CAMPAIGN_SCHEMA).toBe("hoc.v0_8_aggressive_campaign.v12");
         expect(V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION).toBe(7);
         expect(V08_CAMPAIGN_SCHEDULER_VERSION).toBe(1);
         expect(V08_CAMPAIGN_SELECTION_VERSION).toBe(3);
+        expect(V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION).toBe(2);
         expect(isV08CampaignSourceIdentityCurrent(sourceIdentity)).toBe(true);
         expect(isV08CampaignManifestProvenanceCurrent(current)).toBe(true);
         expect(isV08CampaignManifestProvenanceCurrent({ ...current, childEnvironmentPolicy: undefined })).toBe(false);
@@ -948,10 +1096,14 @@ describe("v0.8 aggressive campaign orchestration", () => {
         expect(jobWorkUnits({ kind: "post_a13_coverage", pairsPerLane: 3 })).toBe(144);
         expect(jobWorkUnits({ kind: "all_unit_coverage", pairsPerMap: 4 })).toBe(2_688);
         expect(jobWorkUnits({ kind: "all_unit_qualification", pairsPerMap: 8 })).toBe(5_376);
+        expect(jobWorkUnits({ kind: "passive_qualification", games: 4_096 })).toBe(4_096);
+        expect(jobWorkUnits({ kind: "block_center_qualification", games: 50_000 })).toBe(50_000);
         expect(() => jobWorkUnits({ kind: "level4", games: 16 })).toThrow("pairsPerLane");
         expect(() => jobWorkUnits({ kind: "post_a13_coverage", games: 144 })).toThrow("pairsPerLane");
         expect(() => jobWorkUnits({ kind: "all_unit_coverage", games: 2_688 })).toThrow("pairsPerMap");
         expect(() => jobWorkUnits({ kind: "all_unit_qualification", pairsPerLane: 8 })).toThrow("pairsPerMap");
+        expect(() => jobWorkUnits({ kind: "passive_qualification", pairsPerMap: 8 })).toThrow("games");
+        expect(() => jobWorkUnits({ kind: "block_center_qualification", pairsPerLane: 8 })).toThrow("games");
         expect(() => jobWorkUnits({ kind: "adaptive", pairsPerLane: 2 })).toThrow("games");
     });
 
@@ -1000,35 +1152,143 @@ describe("v0.8 aggressive campaign orchestration", () => {
         }
     });
 
-    it("keeps level-4, post-A13, shallow all-unit, and deep all-unit CLI controls distinct", () => {
+    it("keeps coverage, decision-quality, and validation CLI controls distinct", () => {
         const defaults = parseV08CampaignCli([]);
         expect(defaults.level4PairsPerLane).toBe(16);
         expect(defaults.coveragePairsPerLane).toBe(3);
         expect(defaults.allUnitPairsPerMap).toBe(4);
         expect(defaults.allUnitQualificationPairsPerMap).toBe(8);
+        expect(defaults.passiveQualificationGames).toBe(V08_CAMPAIGN_PASSIVE_QUALIFICATION_DEFAULT_GAMES);
+        expect(defaults.passiveQualificationMinCreatureAppearances).toBe(
+            V08_CAMPAIGN_PASSIVE_QUALIFICATION_DEFAULT_MIN_CREATURE_APPEARANCES,
+        );
+        expect(defaults.blockCenterQualificationGames).toBe(V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_DEFAULT_GAMES);
         expect(defaults.level4Seed).toBe(30_260_719);
         expect(defaults.coverageSeed).toBe(35_260_719);
         expect(defaults.allUnitSeed).toBe(37_260_731);
         expect(defaults.allUnitQualificationSeed).toBe(38_260_724);
+        expect(defaults.passiveQualificationSeed).toBe(39_260_719);
+        expect(defaults.blockCenterQualificationSeed).toBe(39_760_719);
 
         const configured = parseV08CampaignCli([
             "--l4-pairs=7",
             "--coverage-pairs=5",
             "--all-unit-pairs=3",
             "--all-unit-qualification-pairs=9",
+            "--passive-qualification-games=12",
+            "--passive-min-appearances=0",
+            "--block-center-qualification-games=14",
             "--level4-seed=11",
             "--coverage-seed=13",
             "--all-unit-seed=17",
             "--all-unit-qualification-seed=19",
+            "--passive-qualification-seed=23",
+            "--block-center-qualification-seed=29",
         ]);
         expect(configured.level4PairsPerLane).toBe(7);
         expect(configured.coveragePairsPerLane).toBe(5);
         expect(configured.allUnitPairsPerMap).toBe(3);
         expect(configured.allUnitQualificationPairsPerMap).toBe(9);
+        expect(configured.passiveQualificationGames).toBe(12);
+        expect(configured.passiveQualificationMinCreatureAppearances).toBe(0);
+        expect(configured.blockCenterQualificationGames).toBe(14);
         expect(configured.level4Seed).toBe(11);
         expect(configured.coverageSeed).toBe(13);
         expect(configured.allUnitSeed).toBe(17);
         expect(configured.allUnitQualificationSeed).toBe(19);
+        expect(configured.passiveQualificationSeed).toBe(23);
+        expect(configured.blockCenterQualificationSeed).toBe(29);
+    });
+
+    it("binds both decision-quality artifacts to the exact source, schedule, and complete gate schema", () => {
+        const passive = passiveQualificationFixture();
+        expect(Object.keys(passive.summary.gates.checks)).toEqual([
+            ...V08_CAMPAIGN_PASSIVE_QUALIFICATION_REQUIRED_GATES,
+        ]);
+        expect(() =>
+            validateV08CampaignPassiveQualificationSummary(passive.summary, {
+                sourceCommit: QUALIFICATION_SOURCE,
+                baseSeed: passive.options.baseSeed,
+                games: passive.options.games,
+                minCreatureAppearances: passive.options.minCreatureAppearances!,
+            }),
+        ).not.toThrow();
+        expect(() =>
+            validateV08CampaignPassiveQualificationSummary(
+                { ...passive.summary, sourceCommit: "2".repeat(40) },
+                {
+                    sourceCommit: QUALIFICATION_SOURCE,
+                    baseSeed: passive.options.baseSeed,
+                    games: passive.options.games,
+                    minCreatureAppearances: passive.options.minCreatureAppearances!,
+                },
+            ),
+        ).toThrow("Invalid passive qualification");
+        const sealedPassiveOptions = {
+            ...passive.options,
+            inheritCandidateEnvironment: false,
+        } satisfies IV08PassiveTurnPanelOptions;
+        expect(() =>
+            validateV08CampaignPassiveQualificationSummary(
+                {
+                    ...passive.summary,
+                    options: {
+                        ...passive.summary.options,
+                        inheritCandidateEnvironment: false,
+                    },
+                    planSha256: fingerprintV08PassiveTurnPanelPlan(sealedPassiveOptions),
+                },
+                {
+                    sourceCommit: QUALIFICATION_SOURCE,
+                    baseSeed: passive.options.baseSeed,
+                    games: passive.options.games,
+                    minCreatureAppearances: passive.options.minCreatureAppearances!,
+                },
+            ),
+        ).toThrow("Invalid passive qualification");
+
+        const block = blockCenterQualificationFixture();
+        expect(Object.keys(block.summary.gates.checks)).toEqual([
+            ...V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_REQUIRED_GATES,
+        ]);
+        expect(() =>
+            validateV08CampaignBlockCenterQualificationSummary(block.summary, {
+                sourceCommit: QUALIFICATION_SOURCE,
+                baseSeed: block.options.baseSeed,
+                games: block.options.games,
+            }),
+        ).not.toThrow();
+        expect(() =>
+            validateV08CampaignBlockCenterQualificationSummary(
+                { ...block.summary, sourceDirty: true },
+                {
+                    sourceCommit: QUALIFICATION_SOURCE,
+                    baseSeed: block.options.baseSeed,
+                    games: block.options.games,
+                },
+            ),
+        ).toThrow("Invalid BLOCK_CENTER qualification");
+        const sealedBlockOptions = {
+            ...block.options,
+            inheritCandidateEnvironment: false,
+        } satisfies IV08BlockCenterActionPanelOptions;
+        expect(() =>
+            validateV08CampaignBlockCenterQualificationSummary(
+                {
+                    ...block.summary,
+                    options: {
+                        ...block.summary.options,
+                        inheritCandidateEnvironment: false,
+                    },
+                    planSha256: fingerprintV08BlockCenterActionPlan(sealedBlockOptions),
+                },
+                {
+                    sourceCommit: QUALIFICATION_SOURCE,
+                    baseSeed: block.options.baseSeed,
+                    games: block.options.games,
+                },
+            ),
+        ).toThrow("Invalid BLOCK_CENTER qualification");
     });
 
     it("accepts only the exact 12-unit, 24-lane post-A13 census", () => {
@@ -1483,6 +1743,79 @@ describe("v0.8 aggressive campaign orchestration", () => {
         ).not.toThrow();
     });
 
+    it("requires the exact decision-quality census to finish before any validation evidence", () => {
+        const candidateIds = ["c48", "c38"];
+        const completedAt = new Date(4_000).toISOString();
+        const quality = candidateIds.flatMap((candidateId) => [
+            {
+                id: `passive-qualification-${candidateId}`,
+                kind: "passive_qualification" as const,
+                candidateId,
+                games: 1_024,
+                baseSeed: 11,
+                startedAtMs: 1_000,
+                completedAt,
+            },
+            {
+                id: `block-center-qualification-${candidateId}`,
+                kind: "block_center_qualification" as const,
+                candidateId,
+                games: 1_024,
+                baseSeed: 13,
+                startedAtMs: 2_000,
+                completedAt,
+            },
+        ]);
+        const validation = {
+            id: "validation-r000-c48",
+            kind: "validation" as const,
+            candidateId: "c48",
+            games: 1_024,
+            baseSeed: 17,
+            startedAtMs: 5_000,
+            completedAt: new Date(6_000).toISOString(),
+        };
+        const input = {
+            candidateIds,
+            passiveGames: 1_024,
+            passiveSeed: 11,
+            blockCenterGames: 1_024,
+            blockCenterSeed: 13,
+        };
+
+        expect(() =>
+            assertV08CampaignDecisionQualityPrecedesValidation({ ...input, completed: quality }),
+        ).not.toThrow();
+        expect(() =>
+            assertV08CampaignDecisionQualityPrecedesValidation({
+                ...input,
+                completed: [...quality, validation],
+            }),
+        ).not.toThrow();
+        expect(() =>
+            assertV08CampaignDecisionQualityPrecedesValidation({
+                ...input,
+                completed: [...quality.slice(1), validation],
+            }),
+        ).toThrow("missing passive_qualification");
+        expect(() =>
+            assertV08CampaignDecisionQualityPrecedesValidation({
+                ...input,
+                completed: [{ ...quality[0]!, baseSeed: 99 }, ...quality.slice(1), validation],
+            }),
+        ).toThrow("immutable qualification plan");
+        expect(() =>
+            assertV08CampaignDecisionQualityPrecedesValidation({
+                ...input,
+                completed: [
+                    { ...quality[0]!, completedAt: new Date(7_000).toISOString() },
+                    ...quality.slice(1),
+                    validation,
+                ],
+            }),
+        ).toThrow("did not precede validation");
+    });
+
     it("keeps the persisted selection source stable after a completed validation round and resume", () => {
         const preValidation = [
             { id: "screen-c48", kind: "screen" as const },
@@ -1494,6 +1827,8 @@ describe("v0.8 aggressive campaign orchestration", () => {
         ];
         const resumedAfterRound = [
             ...preValidation,
+            { id: "passive-qualification-c48", kind: "passive_qualification" as const },
+            { id: "block-center-qualification-c48", kind: "block_center_qualification" as const },
             { id: "validation-r000-c48", kind: "validation" as const },
             { id: "validation-r000-c38", kind: "validation" as const },
         ];

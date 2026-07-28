@@ -17,7 +17,7 @@
  * search profile to `v0.8`; the rebound is qualified independently on current
  * source and must not be confused with the frozen source binding below.
  */
-export const V08_A13_PROFILE_SCHEMA = "hoc.v0_8_a13_production_profile.v1" as const;
+export const V08_A13_PROFILE_SCHEMA = "hoc.v0_8_a13_production_profile.v2" as const;
 export const V08_A13_CANDIDATE_ID = "a13" as const;
 export const V08_A13_SOURCE_VERSION = "v0.8s" as const;
 export const V08_A13_PRODUCTION_VERSION = "v0.8" as const;
@@ -33,6 +33,8 @@ export const V08_A13_SOURCE_BINDING_SHA256 =
     "e68485b177e98f4fb98228a6595e29b08c50726ef4882ee44ea53652a4613459" as const;
 export const V08_A13_SOURCE_BEHAVIOR_ENVIRONMENT_SHA256 =
     "0f2489977d6c3a2dcefeebc82199e6e67ce16055ec6aa56451dd756b50b9ebbf" as const;
+export const V08_A13_PRODUCTION_BEHAVIOR_ENVIRONMENT_SHA256 =
+    "9343986ab1e2d716e241434229161dcb979590633efd74fedaa3d712b7c81dd0" as const;
 
 export const V08_A13_VALUE_LEAF = Object.freeze({
     b: 0.06534069459644987,
@@ -64,6 +66,7 @@ export const V08_A13_SEARCH = Object.freeze({
     activeChallengers: true,
     shortlist: 2,
     decisionDeadlineMs: 175,
+    waitDeadlinePolicy: "operation_bounded" as const,
     circuitBreakerMs: 275,
     lateRangedFinishWeight: 0,
     pureRangedTerminalWeight: 0,
@@ -115,7 +118,7 @@ export const V08_A13_GENOME = Object.freeze({
  * baked into StrategyV0_8 so they remain active after this construction scope ends.
  */
 export function buildV08A13SearchEnvironment(
-    version = V08_A13_PRODUCTION_VERSION,
+    version: typeof V08_A13_PRODUCTION_VERSION | typeof V08_A13_SOURCE_VERSION = V08_A13_PRODUCTION_VERSION,
 ): Readonly<Record<string, string | undefined>> {
     if (version !== V08_A13_PRODUCTION_VERSION && version !== V08_A13_SOURCE_VERSION) {
         throw new Error(`v0.8 a13 profile cannot target strategy ${version}`);
@@ -129,6 +132,7 @@ export function buildV08A13SearchEnvironment(
         SEARCH_CHALLENGER_KINDS: undefined,
         SEARCH_CIRCUIT_BREAKER_MS: String(V08_A13_SEARCH.circuitBreakerMs),
         SEARCH_DECISION_DEADLINE_MS: String(V08_A13_SEARCH.decisionDeadlineMs),
+        SEARCH_WAIT_DEADLINE_POLICY: V08_A13_SEARCH.waitDeadlinePolicy,
         SEARCH_GATE: String(V08_A13_SEARCH.gate),
         SEARCH_HORIZON: String(V08_A13_SEARCH.horizon),
         SEARCH_INCLUDE_MOVES: "1",
@@ -160,11 +164,40 @@ export function buildV08A13SearchEnvironment(
         SEARCH_SHORTLIST: String(V08_A13_SEARCH.shortlist),
         SEARCH_VALIDATION_ROLLOUTS: undefined,
         SEARCH_VERSIONS: version,
+        // Runtime experiment switches inherited through StrategyV0_8's v0.4-v0.7 call graph. Undefined is
+        // each strategy's shipped default; listing every dynamic read lets a scoped production run delete a
+        // hostile research-shell value for the whole decision, not only while SearchDriver is constructed.
+        V04_FHUNT2: undefined,
+        V04_TROLL: undefined,
+        V05_BUFFWAIT: undefined,
+        V05_BUFFWAIT_LAPS: undefined,
+        V05_BUFFWAIT_POW: undefined,
+        V05_DBLPUNCH: undefined,
+        V05_DBLSHOT: undefined,
+        V05_FLYERMIN: undefined,
+        V05_HG_RANGED: undefined,
+        V05_HOURGLASS: undefined,
+        V05_HOURGLASS_FM: undefined,
+        V05_NOMELEE_RETREAT: undefined,
+        V05_OPP: undefined,
+        V05_OPP_IDLE: undefined,
+        V05_PLACEMENT: undefined,
+        V05_PLACE_WEIGHTS: undefined,
+        V05_RANGED_DISENGAGE: undefined,
+        V06_AREA_THROW: undefined,
+        V06_AREA_THROW_VERSIONS: undefined,
+        V06_DISPERSE_TEAM: undefined,
+        V06_KITE: undefined,
+        V06_LEGACY_MINE: undefined,
         V06_MELEE_DIMS: `${V08_A13_POLICY.meleeRapidChargeWeight},${V08_A13_POLICY.meleeRangedTargetWeight}`,
         V06_MELEE_DIMS_VERSIONS: version,
+        V06_RIDER_EV: undefined,
+        V06_RIDER_EV_VERSIONS: undefined,
         V07_AURA_CASTER_ROUTER: "off",
         V07_AURA_CASTER_ROUTER_VERSIONS: version,
         V07_AURA_CASTER_SPELLS: "",
+        V07_CASTER_EXTRA: undefined,
+        V07_CASTER_EXTRA_VERSIONS: undefined,
         V07_DENSE_MM_SALVAGE_ISOLATION: "0",
         V07_DENSE_MM_SALVAGE_ISOLATION_VERSIONS: version,
         V07_PLACEMENT_REVEAL: "on",
@@ -172,7 +205,23 @@ export function buildV08A13SearchEnvironment(
         V07_SEARCH: "1",
         V07_VALUE_WEIGHTS: undefined,
         V07_VALUE_WEIGHTS_V2: JSON.stringify(V08_A13_VALUE_LEAF),
+        V07_WAIT_GUARD: undefined,
+        V07_WAIT_WEIGHTS: undefined,
+        V07_WAIT_WEIGHTS_V2: undefined,
+        V07_WAIT_WEIGHTS_V3: undefined,
         V08_AGGRESSIVE: "1",
+        // StrategyV0_8 reads these research switches on every decision rather than snapshotting them in the
+        // SearchDriver constructor. Explicitly deleting them inside a production scope prevents an inherited
+        // experiment shell from changing the sealed a13 policy after construction.
+        V08_CASTLING_ROUTER_VERSIONS: undefined,
+        V08_RANGED_POSITION_MODE: undefined,
+        V08_RANGED_POSITION_VERSIONS: undefined,
+        V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: undefined,
+        V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS: undefined,
+        V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY: undefined,
+        V08_SUPPORTED_RANGED_DELTA_VERSIONS: undefined,
+        V08_VISIBLE_EDGE_SCREEN_PRESSURE: undefined,
+        V08_VISIBLE_EDGE_SCREEN_PRESSURE_VERSIONS: undefined,
         // Research-only post-catalog vetoes for the shipped protected-advance catalog. Production remains
         // sealed default-off; the paired runner supplies all three gates together for its live-root arm.
         V08_PROTECTED_ADVANCE_GUARDRAILS: "0",
@@ -212,6 +261,7 @@ export const V08_A13_PROFILE = Object.freeze({
     genomeSha256: V08_A13_GENOME_SHA256,
     sourceBindingSha256: V08_A13_SOURCE_BINDING_SHA256,
     sourceBehaviorEnvironmentSha256: V08_A13_SOURCE_BEHAVIOR_ENVIRONMENT_SHA256,
+    productionBehaviorEnvironmentSha256: V08_A13_PRODUCTION_BEHAVIOR_ENVIRONMENT_SHA256,
     genome: V08_A13_GENOME,
     valueLeaf: V08_A13_VALUE_LEAF,
     search: V08_A13_SEARCH,

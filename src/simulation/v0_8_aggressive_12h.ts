@@ -24,7 +24,7 @@ import {
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { V08_A13_GENOME, V08_A13_GENOME_SHA256 } from "../ai/versions/v0_8_a13_profile";
+import { V08_A13_GENOME, V08_A13_GENOME_SHA256, V08_A13_SEARCH } from "../ai/versions/v0_8_a13_profile";
 import type { ITournamentSummary } from "./tournament";
 import {
     buildV08AlignedV1ProductionCandidateCatalog,
@@ -66,6 +66,22 @@ import {
     type IV08AllUnitCoverageRecord,
     type IV08AllUnitCoverageSummary,
 } from "./v0_8_all_unit_coverage";
+import {
+    fingerprintV08PassiveTurnPanelPlan,
+    summarizeV08PassiveTurnPanel,
+    V08_PASSIVE_TURN_PANEL_SCHEMA,
+    type IV08PassiveTurnPanelOptions,
+    type IV08PassiveTurnPanelRecord,
+    type IV08PassiveTurnPanelSummary,
+} from "./v0_8_passive_turn_panel";
+import {
+    fingerprintV08BlockCenterActionPlan,
+    summarizeV08BlockCenterActionPanel,
+    V08_BLOCK_CENTER_ACTION_PANEL_SCHEMA,
+    type IV08BlockCenterActionPanelOptions,
+    type IV08BlockCenterActionRecord,
+    type IV08BlockCenterActionSummary,
+} from "./v0_8_block_center_action_panel";
 
 /**
  * Research-only, resumable v0.8s aggressive-policy campaign.
@@ -78,13 +94,15 @@ import {
  *     --hours 8 --concurrency 16 --lanes 3 --unbounded-search
  */
 
-export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v10" as const;
+export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v12" as const;
 const SCHEMA = V08_CAMPAIGN_SCHEMA;
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 const TOURNAMENT_RUNNER = join(REPOSITORY_ROOT, "src/simulation/run_tournament.ts");
 const LEVEL4_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_l4_coverage.ts");
 const POST_A13_COVERAGE_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_post_a13_coverage.ts");
 const ALL_UNIT_COVERAGE_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_all_unit_coverage.ts");
+const PASSIVE_TURN_QUALIFICATION_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_passive_turn_panel.ts");
+const BLOCK_CENTER_QUALIFICATION_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_block_center_action_panel.ts");
 export const V08_CAMPAIGN_POST_A13_COVERAGE_SCHEMA = V08_POST_A13_COVERAGE_SCHEMA;
 export const V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT = 24 as const;
 export const V08_CAMPAIGN_POST_A13_COVERAGE_LANES = V08_POST_A13_COVERAGE_LANES;
@@ -94,6 +112,12 @@ export const V08_CAMPAIGN_ALL_UNIT_COVERAGE_LANE_COUNT = V08_ALL_UNIT_COVERAGE_L
 export const V08_CAMPAIGN_ALL_UNIT_COVERAGE_DEFAULT_PAIRS_PER_MAP = V08_ALL_UNIT_COVERAGE_DEFAULT_PAIRS_PER_MAP;
 export const V08_CAMPAIGN_ALL_UNIT_QUALIFICATION_DEFAULT_PAIRS_PER_MAP =
     V08_ALL_UNIT_COVERAGE_DEFAULT_PAIRS_PER_MAP * 2;
+// The promotion shortlist gets a broad, all-creature qualification without consuming the campaign's final
+// validation window. Standalone release evidence remains deeper: 4,096 passive games and 50,000 BLOCK_CENTER
+// games with their panel-native defaults.
+export const V08_CAMPAIGN_PASSIVE_QUALIFICATION_DEFAULT_GAMES = 1_024;
+export const V08_CAMPAIGN_PASSIVE_QUALIFICATION_DEFAULT_MIN_CREATURE_APPEARANCES = 50;
+export const V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_DEFAULT_GAMES = 1_024;
 /**
  * Intrinsic spell kits introduced after the A13 source boundary.
  *
@@ -144,7 +168,7 @@ export const V08_CAMPAIGN_RESERVE_ELIGIBILITY = Object.freeze({
     minimumDecisiveWinRate: 0.5,
 });
 export const V08_CAMPAIGN_SELECTION_VERSION = 3 as const;
-export const V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION = 1 as const;
+export const V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION = 2 as const;
 export const V08_CAMPAIGN_CHILD_ENVIRONMENT_POLICY_VERSION = 1 as const;
 export const V08_CAMPAIGN_CHILD_ENVIRONMENT_STRATEGY = "deny-by-default-exact-base-plus-candidate" as const;
 
@@ -171,11 +195,16 @@ interface ICli {
     coveragePairsPerLane: number;
     allUnitPairsPerMap: number;
     allUnitQualificationPairsPerMap: number;
+    passiveQualificationGames: number;
+    passiveQualificationMinCreatureAppearances: number;
+    blockCenterQualificationGames: number;
     screenSeed: number;
     level4Seed: number;
     coverageSeed: number;
     allUnitSeed: number;
     allUnitQualificationSeed: number;
+    passiveQualificationSeed: number;
+    blockCenterQualificationSeed: number;
     validationSeed: number;
     unboundedSearch: boolean;
 }
@@ -240,7 +269,7 @@ interface IManifest {
     promotionComparison: {
         version: typeof V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION;
         exactAnchorCandidateId: typeof V08_CAMPAIGN_EXACT_ANCHOR_ID;
-        evidence: "fully-committed-common-random-validation-rounds";
+        evidence: "fully-committed-validation-plus-decision-quality-qualification";
         minimumCandidateWinRateDelta: 0;
         minimumDecisiveWinRateDelta: 0;
     };
@@ -274,6 +303,8 @@ export type JobKind =
     | "post_a13_coverage"
     | "all_unit_coverage"
     | "all_unit_qualification"
+    | "passive_qualification"
+    | "block_center_qualification"
     | "validation";
 const JOB_KINDS: ReadonlySet<JobKind> = new Set([
     "screen",
@@ -282,6 +313,8 @@ const JOB_KINDS: ReadonlySet<JobKind> = new Set([
     "post_a13_coverage",
     "all_unit_coverage",
     "all_unit_qualification",
+    "passive_qualification",
+    "block_center_qualification",
     "validation",
 ]);
 const VALIDATION_SELECTION_SOURCE_KINDS: ReadonlySet<JobKind> = new Set(V08_CAMPAIGN_VALIDATION_SELECTION_SOURCE_KINDS);
@@ -470,6 +503,7 @@ interface ICheckpoint {
         | "post_a13_coverage"
         | "all_unit_coverage"
         | "all_unit_qualification"
+        | "decision_quality_qualification"
         | "validation"
         | "complete";
     validationRound: number;
@@ -574,6 +608,16 @@ interface IRankedCandidate {
     allUnitQualificationPassed: boolean;
     allUnitQualificationEvidenceSha256: string | null;
     allUnitQualificationSummaryPaths: string[];
+    passiveQualificationGames: number;
+    hasPassiveQualificationEvidence: boolean;
+    passiveQualificationPassed: boolean;
+    passiveQualificationEvidenceSha256: string | null;
+    passiveQualificationSummaryPaths: string[];
+    blockCenterQualificationGames: number;
+    hasBlockCenterQualificationEvidence: boolean;
+    blockCenterQualificationPassed: boolean;
+    blockCenterQualificationEvidenceSha256: string | null;
+    blockCenterQualificationSummaryPaths: string[];
     passesPostA13StrengthGate: boolean;
     postA13UnitOutcomes: IV08CampaignPostA13UnitOutcome[];
     passesArmageddonGate: boolean;
@@ -614,6 +658,12 @@ const positiveNumber = (raw: string | undefined, fallback: number, name: string)
 const positiveInteger = (raw: string | undefined, fallback: number, name: string): number => {
     const value = positiveNumber(raw, fallback, name);
     if (!Number.isSafeInteger(value)) throw new Error(`${name} must be an integer`);
+    return value;
+};
+
+const nonnegativeInteger = (raw: string | undefined, fallback: number, name: string): number => {
+    const value = raw === undefined ? fallback : Number(raw);
+    if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${name} must be a nonnegative integer`);
     return value;
 };
 
@@ -945,8 +995,12 @@ export function parseV08CampaignCli(argv: readonly string[]): ICli {
                 `[--lanes ${V08_CAMPAIGN_DEFAULT_LANES}] [--top ${V08_CAMPAIGN_DEFAULT_TOP_CANDIDATES}] ` +
                 `[--l4-pairs 16] [--coverage-pairs 3] [--all-unit-pairs ${V08_CAMPAIGN_ALL_UNIT_COVERAGE_DEFAULT_PAIRS_PER_MAP}] ` +
                 `[--all-unit-qualification-pairs ${V08_CAMPAIGN_ALL_UNIT_QUALIFICATION_DEFAULT_PAIRS_PER_MAP}] ` +
+                `[--passive-qualification-games ${V08_CAMPAIGN_PASSIVE_QUALIFICATION_DEFAULT_GAMES}] ` +
+                `[--passive-min-appearances ${V08_CAMPAIGN_PASSIVE_QUALIFICATION_DEFAULT_MIN_CREATURE_APPEARANCES}] ` +
+                `[--block-center-qualification-games ${V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_DEFAULT_GAMES}] ` +
                 "[--screen-seed N] [--level4-seed N] [--coverage-seed N] " +
                 "[--all-unit-seed N] [--all-unit-qualification-seed N] " +
+                "[--passive-qualification-seed N] [--block-center-qualification-seed N] " +
                 "[--validation-seed N] [--unbounded-search]",
         );
         process.exit(0);
@@ -958,7 +1012,19 @@ export function parseV08CampaignCli(argv: readonly string[]): ICli {
     const concurrency = positiveInteger(flagValue(argv, "--concurrency"), 16, "--concurrency");
     const screenGames = positiveInteger(flagValue(argv, "--screen-games"), 256, "--screen-games");
     const validationGames = positiveInteger(flagValue(argv, "--validation-games"), 1024, "--validation-games");
-    if (screenGames % 2 || validationGames % 2) throw new Error("Tournament game counts must be even for seat pairs");
+    const passiveQualificationGames = positiveInteger(
+        flagValue(argv, "--passive-qualification-games"),
+        V08_CAMPAIGN_PASSIVE_QUALIFICATION_DEFAULT_GAMES,
+        "--passive-qualification-games",
+    );
+    const blockCenterQualificationGames = positiveInteger(
+        flagValue(argv, "--block-center-qualification-games"),
+        V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_DEFAULT_GAMES,
+        "--block-center-qualification-games",
+    );
+    if (screenGames % 2 || validationGames % 2 || passiveQualificationGames % 2 || blockCenterQualificationGames % 2) {
+        throw new Error("Tournament and qualification game counts must be even for seat pairs");
+    }
     const lanes = positiveInteger(flagValue(argv, "--lanes"), V08_CAMPAIGN_DEFAULT_LANES, "--lanes");
     const workerPlan = buildWorkerPlan(concurrency, lanes);
     return {
@@ -983,6 +1049,13 @@ export function parseV08CampaignCli(argv: readonly string[]): ICli {
             V08_CAMPAIGN_ALL_UNIT_QUALIFICATION_DEFAULT_PAIRS_PER_MAP,
             "--all-unit-qualification-pairs",
         ),
+        passiveQualificationGames,
+        passiveQualificationMinCreatureAppearances: nonnegativeInteger(
+            flagValue(argv, "--passive-min-appearances"),
+            V08_CAMPAIGN_PASSIVE_QUALIFICATION_DEFAULT_MIN_CREATURE_APPEARANCES,
+            "--passive-min-appearances",
+        ),
+        blockCenterQualificationGames,
         screenSeed: uint32Integer(flagValue(argv, "--screen-seed"), ADAPTIVE_SCREEN_SEED, "--screen-seed"),
         level4Seed: uint32Integer(flagValue(argv, "--level4-seed"), 30_260_719, "--level4-seed"),
         coverageSeed: uint32Integer(flagValue(argv, "--coverage-seed"), 35_260_719, "--coverage-seed"),
@@ -994,6 +1067,16 @@ export function parseV08CampaignCli(argv: readonly string[]): ICli {
             flagValue(argv, "--all-unit-qualification-seed"),
             38_260_724,
             "--all-unit-qualification-seed",
+        ),
+        passiveQualificationSeed: uint32Integer(
+            flagValue(argv, "--passive-qualification-seed"),
+            39_260_719,
+            "--passive-qualification-seed",
+        ),
+        blockCenterQualificationSeed: uint32Integer(
+            flagValue(argv, "--block-center-qualification-seed"),
+            39_760_719,
+            "--block-center-qualification-seed",
         ),
         validationSeed: uint32Integer(flagValue(argv, "--validation-seed"), 40_260_719, "--validation-seed"),
         unboundedSearch: argv.includes("--unbounded-search"),
@@ -1134,7 +1217,7 @@ export function buildV08CampaignBaseGenomes(): IV08AlignedV1CandidateGenome[] {
         throw new Error(`Expected exact ${PRODUCTION_CANDIDATE_COUNT}-candidate production catalog`);
     }
     const exactAnchor = normalizeV08AlignedV1CandidateGenome(
-        structuredClone(V08_A13_GENOME) as IV08AlignedV1CandidateGenome,
+        structuredClone(V08_A13_GENOME) as unknown as IV08AlignedV1CandidateGenome,
     );
     const exactAnchorHash = fingerprintV08AlignedV1CandidateGenome(exactAnchor);
     const productionHashes = production.map(fingerprintV08AlignedV1CandidateGenome);
@@ -1162,6 +1245,9 @@ export function effectiveBehaviorEnvironment(
         SEARCH_AUDIT: auditPath,
         V08_AGGRESSIVE: "1",
         LIVETWIN: "1",
+        // This is the campaign-wide operational timing policy, not a genome gene. Keeping it constant makes
+        // base candidates, adaptive children, and the exact production anchor comparable under contention.
+        SEARCH_WAIT_DEADLINE_POLICY: V08_A13_SEARCH.waitDeadlinePolicy,
     };
     if (unboundedSearch) {
         // Fitness must be reproducible across hosts. Wall-clock fallbacks are validated later as an operational
@@ -1258,7 +1344,11 @@ function latestJobRecords(directory: string, kind: JobKind): string {
               ? "v08_post_a13_v0.8s_vs_v0.7_"
               : kind === "all_unit_coverage" || kind === "all_unit_qualification"
                 ? "v08_all_unit_v0.8s_vs_v0.7_"
-                : "v0.8s_vs_v0.7_";
+                : kind === "passive_qualification"
+                  ? "v08_passive_v0.8s_vs_v0.7_"
+                  : kind === "block_center_qualification"
+                    ? "v08_block_center_v0.8s_vs_v0.7_"
+                    : "v0.8s_vs_v0.7_";
     const files = readdirSync(directory)
         .filter((name) => name.startsWith(prefix) && name.endsWith(".jsonl"))
         .map((name) => join(directory, name))
@@ -1894,6 +1984,10 @@ export interface IV08CampaignPromotionEvidence
     allUnitCoveragePassed: boolean;
     hasAllUnitQualificationEvidence: boolean;
     allUnitQualificationPassed: boolean;
+    hasPassiveQualificationEvidence: boolean;
+    passiveQualificationPassed: boolean;
+    hasBlockCenterQualificationEvidence: boolean;
+    blockCenterQualificationPassed: boolean;
     armageddonRate: number;
     level4ArmageddonRate: number;
 }
@@ -1991,6 +2085,10 @@ export function isV08CampaignPromotionEligible(
         evidence.allUnitCoveragePassed &&
         evidence.hasAllUnitQualificationEvidence &&
         evidence.allUnitQualificationPassed &&
+        evidence.hasPassiveQualificationEvidence &&
+        evidence.passiveQualificationPassed &&
+        evidence.hasBlockCenterQualificationEvidence &&
+        evidence.blockCenterQualificationPassed &&
         isV08CampaignPostA13StrengthQualified(evidence, exactAnchor) &&
         isV08CampaignPromotionStrengthQualified(evidence, exactAnchor) &&
         Number.isFinite(evidence.armageddonRate) &&
@@ -2515,6 +2613,206 @@ export function validateV08CampaignAllUnitCoverageSummary(
     return summary as IV08AllUnitCoverageSummary;
 }
 
+export const V08_CAMPAIGN_PASSIVE_QUALIFICATION_REQUIRED_GATES = Object.freeze([
+    "source_commit_bound",
+    "exact_game_count",
+    "unique_games",
+    "balanced_candidate_seats",
+    "all_live_maps_present",
+    "crashes_zero",
+    "stuck_zero",
+    "turn_caps_zero",
+    "engine_rejections_zero",
+    "raw_end_turn_zero",
+    "chosen_end_turn_zero",
+    "strategy_rejections_zero",
+    "recovery_turns_zero",
+    "recovery_attempts_zero",
+    "recovery_rejections_zero",
+    "incomplete_turns_zero",
+    "observer_pairing_faults_zero",
+    "candidate_enumeration_uncapped",
+    "introduced_defends_zero",
+    "avoidable_defends_zero",
+    "raw_avoidable_defends_repaired",
+    "final_defend_share",
+    "missed_wait_reactivations_zero",
+    "repeated_same_lap_waits_zero",
+    "retained_passive_with_better_shortlisted_productive_action_zero",
+    "retained_passive_better_shortlisted_action_accounted",
+    "avoidable_waits_zero",
+    "avoidable_luck_shields_zero",
+    "avoidable_mountain_turns_zero",
+    "wait_deadline_fallbacks_zero",
+    "retained_passive_evidence_complete",
+    "terminal_avoidable_passive_streaks_zero",
+    "eligible_wait_reactivation_rate",
+    "enabled_creature_appearances",
+    "abomination_faults_zero",
+    "arachna_queen_faults_zero",
+] as const);
+
+export function validateV08CampaignPassiveQualificationSummary(
+    value: unknown,
+    expected: {
+        sourceCommit: string;
+        baseSeed: number;
+        games: number;
+        minCreatureAppearances: number;
+    },
+    path = "<passive-qualification-summary>",
+): IV08PassiveTurnPanelSummary {
+    const summary = value as Partial<IV08PassiveTurnPanelSummary>;
+    const options: IV08PassiveTurnPanelOptions = {
+        candidateVersion: "v0.8s",
+        opponentVersion: "v0.7",
+        games: expected.games,
+        baseSeed: expected.baseSeed,
+        amountMode: "expBudget",
+        liveSetup: true,
+        maxLaps: 60,
+        minCreatureAppearances: expected.minCreatureAppearances,
+        sourceCommit: expected.sourceCommit,
+        sourceDirty: false,
+        inheritCandidateEnvironment: true,
+    };
+    const checks = summary.gates?.checks;
+    if (
+        summary.schema !== V08_PASSIVE_TURN_PANEL_SCHEMA ||
+        summary.sourceCommit !== expected.sourceCommit ||
+        summary.sourceDirty !== false ||
+        summary.candidateVersion !== "v0.8s" ||
+        summary.opponentVersion !== "v0.7" ||
+        summary.options?.games !== expected.games ||
+        summary.options?.baseSeed !== expected.baseSeed ||
+        summary.options?.amountMode !== "expBudget" ||
+        summary.options?.liveSetup !== true ||
+        summary.options?.maxLaps !== 60 ||
+        summary.options?.minCreatureAppearances !== expected.minCreatureAppearances ||
+        summary.options?.inheritCandidateEnvironment !== true ||
+        summary.planSha256 !== fingerprintV08PassiveTurnPanelPlan(options) ||
+        summary.games !== expected.games ||
+        summary.candidateSeats?.green !== expected.games / 2 ||
+        summary.candidateSeats?.red !== expected.games / 2 ||
+        typeof summary.gates?.pass !== "boolean" ||
+        !Array.isArray(summary.gates.failed) ||
+        !checks ||
+        fingerprintV08AlignedV1(Object.keys(checks)) !==
+            fingerprintV08AlignedV1(V08_CAMPAIGN_PASSIVE_QUALIFICATION_REQUIRED_GATES) ||
+        V08_CAMPAIGN_PASSIVE_QUALIFICATION_REQUIRED_GATES.some((name) => {
+            const check = checks[name];
+            return (
+                !check ||
+                typeof check.pass !== "boolean" ||
+                (typeof check.actual !== "number" && typeof check.actual !== "string") ||
+                typeof check.expected !== "string"
+            );
+        })
+    ) {
+        throw new Error(`Invalid passive qualification result summary: ${path}`);
+    }
+    const failed = Object.entries(checks)
+        .filter(([, check]) => !check.pass)
+        .map(([name]) => name);
+    if (
+        summary.gates.pass !== (failed.length === 0) ||
+        fingerprintV08AlignedV1(summary.gates.failed) !== fingerprintV08AlignedV1(failed)
+    ) {
+        throw new Error(`Passive qualification result has inconsistent qualification gates: ${path}`);
+    }
+    return summary as IV08PassiveTurnPanelSummary;
+}
+
+export const V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_REQUIRED_GATES = Object.freeze([
+    "source_commit_bound",
+    "exact_game_count",
+    "unique_games",
+    "balanced_candidate_seats",
+    "block_center_only",
+    "mountain_state_coverage",
+    "crashes_zero",
+    "stuck_zero",
+    "turn_caps_zero",
+    "engine_rejections_zero",
+    "observer_pairing_faults_zero",
+    "shared_catalog_enumeration_not_truncated",
+    "oracle_probe_rejections_zero",
+    "catalog_probe_rejections_zero",
+    "urgent_catalog_misses_zero",
+    "urgent_direct_action_misses_zero",
+    "urgent_mountain_adjacent_misses_zero",
+    "urgent_repeated_non_progress_with_direct_option_zero",
+    "urgent_combat_droughts_zero",
+] as const);
+
+export function validateV08CampaignBlockCenterQualificationSummary(
+    value: unknown,
+    expected: {
+        sourceCommit: string;
+        baseSeed: number;
+        games: number;
+    },
+    path = "<block-center-qualification-summary>",
+): IV08BlockCenterActionSummary {
+    const summary = value as Partial<IV08BlockCenterActionSummary>;
+    const options: IV08BlockCenterActionPanelOptions = {
+        candidateVersion: "v0.8s",
+        opponentVersion: "v0.7",
+        games: expected.games,
+        baseSeed: expected.baseSeed,
+        amountMode: "expBudget",
+        liveSetup: true,
+        maxLaps: 60,
+        sourceCommit: expected.sourceCommit,
+        sourceDirty: false,
+        inheritCandidateEnvironment: true,
+    };
+    const checks = summary.gates?.checks;
+    if (
+        summary.schema !== V08_BLOCK_CENTER_ACTION_PANEL_SCHEMA ||
+        summary.sourceCommit !== expected.sourceCommit ||
+        summary.sourceDirty !== false ||
+        summary.candidateVersion !== "v0.8s" ||
+        summary.opponentVersion !== "v0.7" ||
+        summary.options?.games !== expected.games ||
+        summary.options?.baseSeed !== expected.baseSeed ||
+        summary.options?.amountMode !== "expBudget" ||
+        summary.options?.liveSetup !== true ||
+        summary.options?.maxLaps !== 60 ||
+        summary.options?.inheritCandidateEnvironment !== true ||
+        summary.planSha256 !== fingerprintV08BlockCenterActionPlan(options) ||
+        summary.games !== expected.games ||
+        summary.candidateSeats?.green !== expected.games / 2 ||
+        summary.candidateSeats?.red !== expected.games / 2 ||
+        typeof summary.gates?.pass !== "boolean" ||
+        !Array.isArray(summary.gates.failed) ||
+        !checks ||
+        fingerprintV08AlignedV1(Object.keys(checks)) !==
+            fingerprintV08AlignedV1(V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_REQUIRED_GATES) ||
+        V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_REQUIRED_GATES.some((name) => {
+            const check = checks[name];
+            return (
+                !check ||
+                typeof check.pass !== "boolean" ||
+                (typeof check.actual !== "number" && typeof check.actual !== "string") ||
+                typeof check.expected !== "string"
+            );
+        })
+    ) {
+        throw new Error(`Invalid BLOCK_CENTER qualification result summary: ${path}`);
+    }
+    const failed = Object.entries(checks)
+        .filter(([, check]) => !check.pass)
+        .map(([name]) => name);
+    if (
+        summary.gates.pass !== (failed.length === 0) ||
+        fingerprintV08AlignedV1(summary.gates.failed) !== fingerprintV08AlignedV1(failed)
+    ) {
+        throw new Error(`BLOCK_CENTER qualification result has inconsistent qualification gates: ${path}`);
+    }
+    return summary as IV08BlockCenterActionSummary;
+}
+
 /** Minimal version header check used before accepting any resumable manifest. */
 export function isV08CampaignManifestProvenanceCurrent(value: unknown): boolean {
     const manifest = value as {
@@ -2740,11 +3038,16 @@ function buildManifest(
         coveragePairsPerLane: cli.coveragePairsPerLane,
         allUnitPairsPerMap: cli.allUnitPairsPerMap,
         allUnitQualificationPairsPerMap: cli.allUnitQualificationPairsPerMap,
+        passiveQualificationGames: cli.passiveQualificationGames,
+        passiveQualificationMinCreatureAppearances: cli.passiveQualificationMinCreatureAppearances,
+        blockCenterQualificationGames: cli.blockCenterQualificationGames,
         screenSeed: cli.screenSeed,
         level4Seed: cli.level4Seed,
         coverageSeed: cli.coverageSeed,
         allUnitSeed: cli.allUnitSeed,
         allUnitQualificationSeed: cli.allUnitQualificationSeed,
+        passiveQualificationSeed: cli.passiveQualificationSeed,
+        blockCenterQualificationSeed: cli.blockCenterQualificationSeed,
         validationSeed: cli.validationSeed,
         workersPerJob: cli.workersPerJob,
         maxWorkers: cli.maxWorkers,
@@ -2782,7 +3085,7 @@ function buildManifest(
         promotionComparison: {
             version: V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION as typeof V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION,
             exactAnchorCandidateId: V08_CAMPAIGN_EXACT_ANCHOR_ID,
-            evidence: "fully-committed-common-random-validation-rounds" as const,
+            evidence: "fully-committed-validation-plus-decision-quality-qualification" as const,
             minimumCandidateWinRateDelta: 0 as const,
             minimumDecisiveWinRateDelta: 0 as const,
         },
@@ -2832,11 +3135,16 @@ function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding
         coveragePairsPerLane: cli.coveragePairsPerLane,
         allUnitPairsPerMap: cli.allUnitPairsPerMap,
         allUnitQualificationPairsPerMap: cli.allUnitQualificationPairsPerMap,
+        passiveQualificationGames: cli.passiveQualificationGames,
+        passiveQualificationMinCreatureAppearances: cli.passiveQualificationMinCreatureAppearances,
+        blockCenterQualificationGames: cli.blockCenterQualificationGames,
         screenSeed: cli.screenSeed,
         level4Seed: cli.level4Seed,
         coverageSeed: cli.coverageSeed,
         allUnitSeed: cli.allUnitSeed,
         allUnitQualificationSeed: cli.allUnitQualificationSeed,
+        passiveQualificationSeed: cli.passiveQualificationSeed,
+        blockCenterQualificationSeed: cli.blockCenterQualificationSeed,
         validationSeed: cli.validationSeed,
         workersPerJob: cli.workersPerJob,
         maxWorkers: cli.maxWorkers,
@@ -2862,7 +3170,7 @@ function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding
         manifest.selection.minimumValidationCandidates !== 2 ||
         fingerprintV08AlignedV1(manifest.selection.inactiveControlCandidateIds) !==
             fingerprintV08AlignedV1(V08_CAMPAIGN_INACTIVE_CONTROL_IDS) ||
-        manifest.promotionComparison.evidence !== "fully-committed-common-random-validation-rounds" ||
+        manifest.promotionComparison.evidence !== "fully-committed-validation-plus-decision-quality-qualification" ||
         manifest.promotionComparison.minimumCandidateWinRateDelta !== 0 ||
         manifest.promotionComparison.minimumDecisiveWinRateDelta !== 0 ||
         manifest.scheduler.discipline !== "work-conserving-fifo" ||
@@ -2995,6 +3303,72 @@ export function isV08CampaignValidationEvidenceCommitted(
     const round = Number(match[1]);
     if (!Number.isSafeInteger(round)) throw new Error(`Validation job ${job.id} has an invalid round`);
     return round < nextValidationRound;
+}
+
+export interface IV08CampaignDecisionQualityCensusInput {
+    completed: readonly Pick<
+        ICompletedJob,
+        "id" | "kind" | "candidateId" | "games" | "baseSeed" | "startedAtMs" | "completedAt"
+    >[];
+    candidateIds: readonly string[];
+    passiveGames: number;
+    passiveSeed: number;
+    blockCenterGames: number;
+    blockCenterSeed: number;
+}
+
+/**
+ * A validation result is meaningful only if its exact persisted shortlist had already completed both immutable
+ * decision-quality panels. This also prevents a resumed/edited checkpoint from backfilling diagnostics after
+ * seeing validation outcomes.
+ */
+export function assertV08CampaignDecisionQualityPrecedesValidation({
+    completed,
+    candidateIds,
+    passiveGames,
+    passiveSeed,
+    blockCenterGames,
+    blockCenterSeed,
+}: IV08CampaignDecisionQualityCensusInput): void {
+    const candidateSet = new Set(candidateIds);
+    const seen = new Map<string, (typeof completed)[number]>();
+    const qualityKinds = new Set<JobKind>(["passive_qualification", "block_center_qualification"]);
+    const validations = completed.filter(({ kind }) => kind === "validation");
+    for (const job of completed) {
+        if (!qualityKinds.has(job.kind)) continue;
+        if (!candidateSet.has(job.candidateId)) {
+            throw new Error(`Decision-quality job ${job.id} is outside the persisted validation shortlist`);
+        }
+        const passive = job.kind === "passive_qualification";
+        const expectedId = `${passive ? "passive-qualification" : "block-center-qualification"}-${job.candidateId}`;
+        const expectedGames = passive ? passiveGames : blockCenterGames;
+        const expectedSeed = passive ? passiveSeed : blockCenterSeed;
+        const key = `${job.kind}:${job.candidateId}`;
+        if (job.id !== expectedId || job.games !== expectedGames || job.baseSeed !== expectedSeed || seen.has(key)) {
+            throw new Error(`Decision-quality job ${job.id} is outside the immutable qualification plan`);
+        }
+        seen.set(key, job);
+    }
+    if (!validations.length) return;
+    if (candidateIds.length < 2) {
+        throw new Error("Validation evidence requires a persisted decision-quality shortlist");
+    }
+    const firstValidationStart = Math.min(...validations.map(({ startedAtMs }) => startedAtMs));
+    if (!Number.isSafeInteger(firstValidationStart)) {
+        throw new Error("Validation evidence has an invalid start timestamp");
+    }
+    for (const candidateId of candidateIds) {
+        for (const kind of ["passive_qualification", "block_center_qualification"] as const) {
+            const quality = seen.get(`${kind}:${candidateId}`);
+            if (!quality) {
+                throw new Error(`Validation evidence is missing ${kind} for ${candidateId}`);
+            }
+            const completedAtMs = Date.parse(quality.completedAt);
+            if (!Number.isSafeInteger(completedAtMs) || completedAtMs > firstValidationStart) {
+                throw new Error(`Decision-quality job ${quality.id} did not precede validation`);
+            }
+        }
+    }
 }
 
 export function classifyV08CampaignValidationRoundState({
@@ -3217,6 +3591,71 @@ function validateResultArtifact(manifest: IManifest, job: ICompletedJob, verifyS
         }
         return result;
     }
+    if (job.kind === "passive_qualification") {
+        const expected = {
+            sourceCommit: manifest.sourceIdentity.gitHead,
+            baseSeed: job.baseSeed,
+            games: job.games!,
+            minCreatureAppearances: manifest.config.passiveQualificationMinCreatureAppearances,
+        };
+        validateV08CampaignPassiveQualificationSummary(result.summary, expected, job.summaryPath);
+        if (verifySource) {
+            const options: IV08PassiveTurnPanelOptions = {
+                candidateVersion: "v0.8s",
+                opponentVersion: "v0.7",
+                games: job.games!,
+                baseSeed: job.baseSeed,
+                amountMode: "expBudget",
+                liveSetup: true,
+                maxLaps: 60,
+                minCreatureAppearances: manifest.config.passiveQualificationMinCreatureAppearances,
+                sourceCommit: manifest.sourceIdentity.gitHead,
+                inheritCandidateEnvironment: true,
+            };
+            const records = readJsonl<IV08PassiveTurnPanelRecord>(paths.recordsPath);
+            const recomputed = summarizeV08PassiveTurnPanel(options, records);
+            if (
+                fingerprintV08AlignedV1(readJson<unknown>(paths.summaryPath)) !==
+                    fingerprintV08AlignedV1(result.summary) ||
+                fingerprintV08AlignedV1(recomputed) !== fingerprintV08AlignedV1(result.summary)
+            ) {
+                throw new Error(`Passive qualification result ${job.id} does not match its source artifacts`);
+            }
+        }
+        return result;
+    }
+    if (job.kind === "block_center_qualification") {
+        const expected = {
+            sourceCommit: manifest.sourceIdentity.gitHead,
+            baseSeed: job.baseSeed,
+            games: job.games!,
+        };
+        validateV08CampaignBlockCenterQualificationSummary(result.summary, expected, job.summaryPath);
+        if (verifySource) {
+            const options: IV08BlockCenterActionPanelOptions = {
+                candidateVersion: "v0.8s",
+                opponentVersion: "v0.7",
+                games: job.games!,
+                baseSeed: job.baseSeed,
+                amountMode: "expBudget",
+                liveSetup: true,
+                maxLaps: 60,
+                sourceCommit: manifest.sourceIdentity.gitHead,
+                sourceDirty: false,
+                inheritCandidateEnvironment: true,
+            };
+            const records = readJsonl<IV08BlockCenterActionRecord>(paths.recordsPath);
+            const recomputed = summarizeV08BlockCenterActionPanel(options, records);
+            if (
+                fingerprintV08AlignedV1(readJson<unknown>(paths.summaryPath)) !==
+                    fingerprintV08AlignedV1(result.summary) ||
+                fingerprintV08AlignedV1(recomputed) !== fingerprintV08AlignedV1(result.summary)
+            ) {
+                throw new Error(`BLOCK_CENTER qualification result ${job.id} does not match its source artifacts`);
+            }
+        }
+        return result;
+    }
     const summary = tournamentSummary(result.summary, job.summaryPath);
     if (summary.games !== job.games || summary.baseSeed !== job.baseSeed) {
         throw new Error(`Tournament result ${job.id} has the wrong game count or seed`);
@@ -3299,6 +3738,7 @@ function loadCheckpoint(manifest: IManifest): ICheckpoint {
             "post_a13_coverage",
             "all_unit_coverage",
             "all_unit_qualification",
+            "decision_quality_qualification",
             "validation",
             "complete",
         ].includes(checkpoint.phase) ||
@@ -3328,6 +3768,14 @@ function loadCheckpoint(manifest: IManifest): ICheckpoint {
         candidateIds: checkpoint.validationSelection?.candidateIds ?? [],
         validationGames: manifest.config.validationGames,
         validationSeed: manifest.config.validationSeed,
+    });
+    assertV08CampaignDecisionQualityPrecedesValidation({
+        completed: checkpoint.completed,
+        candidateIds: checkpoint.validationSelection?.candidateIds ?? [],
+        passiveGames: manifest.config.passiveQualificationGames,
+        passiveSeed: manifest.config.passiveQualificationSeed,
+        blockCenterGames: manifest.config.blockCenterQualificationGames,
+        blockCenterSeed: manifest.config.blockCenterQualificationSeed,
     });
     for (const [id, active] of Object.entries(checkpoint.activeJobs)) {
         if (
@@ -3368,6 +3816,14 @@ function collectLeaderboard(
         validationGames: manifest.config.validationGames,
         validationSeed: manifest.config.validationSeed,
     });
+    assertV08CampaignDecisionQualityPrecedesValidation({
+        completed: checkpoint.completed,
+        candidateIds: checkpoint.validationSelection?.candidateIds ?? [],
+        passiveGames: manifest.config.passiveQualificationGames,
+        passiveSeed: manifest.config.passiveQualificationSeed,
+        blockCenterGames: manifest.config.blockCenterQualificationGames,
+        blockCenterSeed: manifest.config.blockCenterQualificationSeed,
+    });
     const metadata = candidateMetadata(manifest, adaptive);
     const byCandidate = new Map<string, ITournamentSummaryWithReached[]>();
     const validationByCandidate = new Map<string, ITournamentSummaryWithReached[]>();
@@ -3381,6 +3837,14 @@ function collectLeaderboard(
     const allUnitQualificationByCandidate = new Map<
         string,
         Array<{ path: string; summary: IV08AllUnitCoverageSummary; job: ICompletedJob }>
+    >();
+    const passiveQualificationByCandidate = new Map<
+        string,
+        Array<{ path: string; summary: IV08PassiveTurnPanelSummary; job: ICompletedJob }>
+    >();
+    const blockCenterQualificationByCandidate = new Map<
+        string,
+        Array<{ path: string; summary: IV08BlockCenterActionSummary; job: ICompletedJob }>
     >();
     for (const job of checkpoint.completed) {
         if (options.kinds && !options.kinds.has(job.kind)) continue;
@@ -3437,6 +3901,43 @@ function collectLeaderboard(
                 job,
             });
             target.set(job.candidateId, summaries);
+            continue;
+        }
+        if (job.kind === "passive_qualification") {
+            const summaries = passiveQualificationByCandidate.get(job.candidateId) ?? [];
+            summaries.push({
+                path: job.summaryPath,
+                summary: validateV08CampaignPassiveQualificationSummary(
+                    result.summary,
+                    {
+                        sourceCommit: manifest.sourceIdentity.gitHead,
+                        baseSeed: job.baseSeed,
+                        games: job.games!,
+                        minCreatureAppearances: manifest.config.passiveQualificationMinCreatureAppearances,
+                    },
+                    job.summaryPath,
+                ),
+                job,
+            });
+            passiveQualificationByCandidate.set(job.candidateId, summaries);
+            continue;
+        }
+        if (job.kind === "block_center_qualification") {
+            const summaries = blockCenterQualificationByCandidate.get(job.candidateId) ?? [];
+            summaries.push({
+                path: job.summaryPath,
+                summary: validateV08CampaignBlockCenterQualificationSummary(
+                    result.summary,
+                    {
+                        sourceCommit: manifest.sourceIdentity.gitHead,
+                        baseSeed: job.baseSeed,
+                        games: job.games!,
+                    },
+                    job.summaryPath,
+                ),
+                job,
+            });
+            blockCenterQualificationByCandidate.set(job.candidateId, summaries);
             continue;
         }
         const summary = tournamentSummary(result.summary, job.summaryPath);
@@ -3630,6 +4131,50 @@ function collectLeaderboard(
                       .sort((left, right) => left.jobId.localeCompare(right.jobId)),
               )
             : null;
+        const passiveQualificationEntries = passiveQualificationByCandidate.get(id) ?? [];
+        const passiveQualificationGames = passiveQualificationEntries.reduce(
+            (sum, { summary }) => sum + summary.games,
+            0,
+        );
+        const hasPassiveQualificationEvidence = passiveQualificationEntries.length === 1;
+        const passiveQualificationPassed =
+            hasPassiveQualificationEvidence && passiveQualificationEntries.every(({ summary }) => summary.gates.pass);
+        const passiveQualificationEvidenceSha256 = passiveQualificationEntries.length
+            ? fingerprintV08AlignedV1(
+                  passiveQualificationEntries
+                      .map(({ summary, job }) => ({
+                          jobId: job.id,
+                          baseSeed: summary.options.baseSeed,
+                          games: summary.games,
+                          minCreatureAppearances: summary.options.minCreatureAppearances,
+                          planSha256: summary.planSha256,
+                          summarySha256: job.summarySha256,
+                      }))
+                      .sort((left, right) => left.jobId.localeCompare(right.jobId)),
+              )
+            : null;
+        const blockCenterQualificationEntries = blockCenterQualificationByCandidate.get(id) ?? [];
+        const blockCenterQualificationGames = blockCenterQualificationEntries.reduce(
+            (sum, { summary }) => sum + summary.games,
+            0,
+        );
+        const hasBlockCenterQualificationEvidence = blockCenterQualificationEntries.length === 1;
+        const blockCenterQualificationPassed =
+            hasBlockCenterQualificationEvidence &&
+            blockCenterQualificationEntries.every(({ summary }) => summary.gates.pass);
+        const blockCenterQualificationEvidenceSha256 = blockCenterQualificationEntries.length
+            ? fingerprintV08AlignedV1(
+                  blockCenterQualificationEntries
+                      .map(({ summary, job }) => ({
+                          jobId: job.id,
+                          baseSeed: summary.options.baseSeed,
+                          games: summary.games,
+                          planSha256: summary.planSha256,
+                          summarySha256: job.summarySha256,
+                      }))
+                      .sort((left, right) => left.jobId.localeCompare(right.jobId)),
+              )
+            : null;
         const games = tournamentGames + postA13CoverageGames;
         const winsA = tournamentWinsA + postA13CandidateWins;
         const winsB = tournamentWinsB + postA13OpponentWins;
@@ -3705,6 +4250,16 @@ function collectLeaderboard(
             allUnitQualificationPassed,
             allUnitQualificationEvidenceSha256,
             allUnitQualificationSummaryPaths: allUnitQualificationEntries.map(({ path }) => path),
+            passiveQualificationGames,
+            hasPassiveQualificationEvidence,
+            passiveQualificationPassed,
+            passiveQualificationEvidenceSha256,
+            passiveQualificationSummaryPaths: passiveQualificationEntries.map(({ path }) => path),
+            blockCenterQualificationGames,
+            hasBlockCenterQualificationEvidence,
+            blockCenterQualificationPassed,
+            blockCenterQualificationEvidenceSha256,
+            blockCenterQualificationSummaryPaths: blockCenterQualificationEntries.map(({ path }) => path),
             passesPostA13StrengthGate: false,
             postA13UnitOutcomes,
             passesArmageddonGate,
@@ -4392,7 +4947,9 @@ async function runJob(
     );
     const logPath = join(manifest.output, "logs", `${spec.id}.log`);
     const isAllUnitJob = spec.kind === "all_unit_coverage" || spec.kind === "all_unit_qualification";
-    const isCoverageJob = spec.kind === "level4" || spec.kind === "post_a13_coverage" || isAllUnitJob;
+    const isDecisionQualityJob = spec.kind === "passive_qualification" || spec.kind === "block_center_qualification";
+    const isCoverageJob =
+        spec.kind === "level4" || spec.kind === "post_a13_coverage" || isAllUnitJob || isDecisionQualityJob;
     const runner =
         spec.kind === "level4"
             ? LEVEL4_RUNNER
@@ -4400,39 +4957,84 @@ async function runJob(
               ? POST_A13_COVERAGE_RUNNER
               : isAllUnitJob
                 ? ALL_UNIT_COVERAGE_RUNNER
-                : TOURNAMENT_RUNNER;
-    const args = isAllUnitJob
-        ? [
-              runner,
-              "v0.8s",
-              "v0.7",
-              String(spec.pairsPerMap),
-              String(spec.baseSeed),
-              directory,
-              String(manifest.config.workersPerJob),
-              manifest.sourceIdentity.gitHead,
-          ]
-        : isCoverageJob
-          ? [
-                runner,
-                "v0.8s",
-                "v0.7",
-                String(spec.pairsPerLane),
-                String(spec.baseSeed),
-                directory,
-                String(manifest.config.workersPerJob),
-            ]
-          : [
-                runner,
-                "v0.8s",
-                "v0.7",
-                String(spec.games),
-                String(spec.baseSeed),
-                directory,
-                String(manifest.config.workersPerJob),
-                `--maps=${LIVE_MAPS}`,
-                "--livetwin",
-            ];
+                : spec.kind === "passive_qualification"
+                  ? PASSIVE_TURN_QUALIFICATION_RUNNER
+                  : spec.kind === "block_center_qualification"
+                    ? BLOCK_CENTER_QUALIFICATION_RUNNER
+                    : TOURNAMENT_RUNNER;
+    const args =
+        spec.kind === "passive_qualification"
+            ? [
+                  runner,
+                  "--candidate",
+                  "v0.8s",
+                  "--opponent",
+                  "v0.7",
+                  "--games",
+                  String(spec.games),
+                  "--seed",
+                  String(spec.baseSeed),
+                  "--concurrency",
+                  String(manifest.config.workersPerJob),
+                  "--out-dir",
+                  directory,
+                  "--min-appearances",
+                  String(manifest.config.passiveQualificationMinCreatureAppearances),
+                  "--source-commit",
+                  manifest.sourceIdentity.gitHead,
+                  "--inherit-candidate-environment",
+              ]
+            : spec.kind === "block_center_qualification"
+              ? [
+                    runner,
+                    "--candidate",
+                    "v0.8s",
+                    "--opponent",
+                    "v0.7",
+                    "--games",
+                    String(spec.games),
+                    "--seed",
+                    String(spec.baseSeed),
+                    "--concurrency",
+                    String(manifest.config.workersPerJob),
+                    "--out-dir",
+                    directory,
+                    "--source-commit",
+                    manifest.sourceIdentity.gitHead,
+                    "--inherit-candidate-environment",
+                ]
+              : isAllUnitJob
+                ? [
+                      runner,
+                      "v0.8s",
+                      "v0.7",
+                      String(spec.pairsPerMap),
+                      String(spec.baseSeed),
+                      directory,
+                      String(manifest.config.workersPerJob),
+                      manifest.sourceIdentity.gitHead,
+                  ]
+                : isCoverageJob
+                  ? [
+                        runner,
+                        "v0.8s",
+                        "v0.7",
+                        String(spec.pairsPerLane),
+                        String(spec.baseSeed),
+                        directory,
+                        String(manifest.config.workersPerJob),
+                    ]
+                  : [
+                        runner,
+                        "v0.8s",
+                        "v0.7",
+                        String(spec.games),
+                        String(spec.baseSeed),
+                        directory,
+                        String(manifest.config.workersPerJob),
+                        `--maps=${LIVE_MAPS}`,
+                        "--livetwin",
+                    ];
     const startedAtMs = Date.now();
     const startedAt = new Date(startedAtMs).toISOString();
     checkpoint.activeJobs[spec.id] = { spec, startedAt, startedAtMs, pid: null };
@@ -4462,7 +5064,7 @@ async function runJob(
                     saveCheckpoint(manifest, checkpoint);
                 }
             },
-            isAllUnitJob,
+            isAllUnitJob || isDecisionQualityJob,
         );
     } finally {
         delete checkpoint.activeJobs[spec.id];
@@ -4836,8 +5438,6 @@ async function runCampaign(cli: ICli): Promise<void> {
         outputName: "validation-selection-source-leaderboard.json",
     });
 
-    checkpoint.phase = "validation";
-    saveCheckpoint(manifest, checkpoint);
     leaderboard = collectLeaderboard(manifest, checkpoint, adaptive);
     if (checkpoint.validationSelection === null) {
         checkpoint.validationSelection = buildValidationSelection(
@@ -4852,6 +5452,81 @@ async function runCampaign(cli: ICli): Promise<void> {
     }
     const validationSelection = checkpoint.validationSelection;
     if (validationSelection === null) throw new Error("Validation selection was not persisted");
+
+    // Strength selection is frozen before this phase, so these diagnostics cannot improve research rank or
+    // change shortlist membership. Every finalist must nevertheless complete both source-bound panels before
+    // validation starts: the passive counterfactual proves that retained waits/Luck Shields/mountain turns did
+    // not hide a better productive action, while the independent BLOCK_CENTER oracle detects legal combat that
+    // the production candidate catalog or pathing policy omitted. Failed gates remain committed evidence and
+    // block promotion; they do not disappear merely because the child exits with its qualification status.
+    checkpoint.phase = "decision_quality_qualification";
+    saveCheckpoint(manifest, checkpoint);
+    {
+        const selectedRows = new Map(leaderboard.map((row) => [row.candidateId, row]));
+        const specs: IJobSpec[] = validationSelection.candidateIds.flatMap((candidateId) => {
+            const row = selectedRows.get(candidateId);
+            if (!row) throw new Error(`Decision-quality candidate ${candidateId} is missing from the leaderboard`);
+            return [
+                {
+                    id: `passive-qualification-${candidateId}`,
+                    kind: "passive_qualification" as const,
+                    candidateId,
+                    candidateIndex: row.candidateIndex,
+                    games: manifest.config.passiveQualificationGames,
+                    baseSeed: manifest.config.passiveQualificationSeed,
+                },
+                {
+                    id: `block-center-qualification-${candidateId}`,
+                    kind: "block_center_qualification" as const,
+                    candidateId,
+                    candidateIndex: row.candidateIndex,
+                    games: manifest.config.blockCenterQualificationGames,
+                    baseSeed: manifest.config.blockCenterQualificationSeed,
+                },
+            ];
+        });
+        for (const spec of specs) reconcileJobResult(manifest, checkpoint, registry, spec);
+        const completedIds = new Set(checkpoint.completed.map(({ id }) => id));
+        const pending = specs.filter(({ id }) => !completedIds.has(id));
+        const estimatedDurationMs = estimateDynamicQueueDurationMs(
+            pending,
+            checkpoint.completed,
+            manifest.config.workersPerJob,
+            manifest.config.lanes,
+        );
+        if (
+            pending.length > 0 &&
+            Date.now() + estimatedDurationMs + ADMISSION_SAFETY_MARGIN_MS > manifest.deadlineAtMs
+        ) {
+            appendFileSync(
+                join(manifest.output, "logs", "orchestrator.jsonl"),
+                `${JSON.stringify({
+                    at: new Date().toISOString(),
+                    event: "decision-quality-qualification-admission-deferred",
+                    schedulerVersion: V08_CAMPAIGN_SCHEDULER_VERSION,
+                    jobIds: pending.map(({ id }) => id),
+                    estimatedDurationMs,
+                    safetyMarginMs: ADMISSION_SAFETY_MARGIN_MS,
+                    deadlineAtMs: manifest.deadlineAtMs,
+                })}\n`,
+            );
+            console.log(
+                `[defer] complete decision-quality qualification needs about ${Math.ceil(estimatedDurationMs / 1_000)}s`,
+            );
+            finishIncompletePhase();
+            return;
+        }
+        const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs, {
+            admissionReserved: true,
+        });
+        if (!ok) {
+            finishIncompletePhase();
+            return;
+        }
+    }
+
+    checkpoint.phase = "validation";
+    saveCheckpoint(manifest, checkpoint);
     let validationLaunchesAllowed = true;
     for (;;) {
         leaderboard = collectLeaderboard(manifest, checkpoint, adaptive);

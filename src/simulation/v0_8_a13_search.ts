@@ -19,9 +19,11 @@ const SEARCH_MODE_ENVIRONMENT_KEYS = ["V07_SEARCH", "Q2_WAIT_ABLATION", "Q2_ORAC
 
 /**
  * Run a synchronous constructor under an exact environment and restore every
- * process variable before returning. SearchDriver snapshots all behavior-bearing
- * search settings in its constructor; StrategyV0_8 independently bakes the a13
- * controls that are consulted later during decideTurn/placement.
+ * process variable before returning. SearchDriver snapshots its settings in its
+ * constructor, while inherited strategy experiment switches remain dynamic; a
+ * caller sealing an entire match must therefore keep this scope around the match,
+ * as the standalone qualification panels do. Module-import-time legacy switches
+ * still require the panel worker/process to start from a clean environment.
  */
 export function withScopedAIEnvironment<T>(environment: Readonly<Record<string, string | undefined>>, run: () => T): T {
     const saved = new Map<string, string | undefined>();

@@ -16,12 +16,16 @@ import {
     V08_A13_GENOME,
     V08_A13_GENOME_SHA256,
     V08_A13_POLICY,
+    V08_A13_PRODUCTION_BEHAVIOR_ENVIRONMENT_SHA256,
     V08_A13_SEARCH,
     V08_A13_SOURCE_VERSION,
     V08_A13_VALUE_LEAF,
 } from "../../src/ai/versions/v0_8_a13_profile";
 import type { ILookaheadDeps } from "../../src/simulation/lookahead";
-import { fingerprintV08AlignedV1CandidateGenome } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_protocol";
+import {
+    fingerprintV08AlignedV1,
+    fingerprintV08AlignedV1CandidateGenome,
+} from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_protocol";
 import {
     createV08A13SearchDriver,
     shouldUseDefaultV08A13Search,
@@ -43,6 +47,7 @@ const ENV_KEYS = [
     "SEARCH_MOVE_SHOT_VERSIONS",
     "SEARCH_SHORTLIST",
     "SEARCH_DECISION_DEADLINE_MS",
+    "SEARCH_WAIT_DEADLINE_POLICY",
     "SEARCH_CIRCUIT_BREAKER_MS",
     "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE",
     "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS",
@@ -105,6 +110,7 @@ describe("v0.8 a13 production profile", () => {
             // Tuned from the campaign's 3 on 2026-07-23 (4efb68b): no measured strength loss, ~27% faster.
             shortlist: 2,
             decisionDeadlineMs: 175,
+            waitDeadlinePolicy: "operation_bounded",
             circuitBreakerMs: 275,
         });
         expect(V08_A13_POLICY).toMatchObject({
@@ -136,6 +142,7 @@ describe("v0.8 a13 production profile", () => {
             SEARCH_ACTIVE_CHALLENGERS: "1",
             SEARCH_SHORTLIST: "2",
             SEARCH_DECISION_DEADLINE_MS: "175",
+            SEARCH_WAIT_DEADLINE_POLICY: "operation_bounded",
             SEARCH_CIRCUIT_BREAKER_MS: "275",
             SEARCH_PURE_RANGED_NO_MELEE_PRESSURE: "0",
             SEARCH_PURE_RANGED_DEADLINE_FINISHER: "0",
@@ -169,6 +176,7 @@ describe("v0.8 a13 production profile", () => {
             V08_AGGRESSIVE: "1",
         });
         expect(JSON.parse(production.V07_VALUE_WEIGHTS_V2!)).toEqual(V08_A13_VALUE_LEAF);
+        expect(fingerprintV08AlignedV1(production)).toBe(V08_A13_PRODUCTION_BEHAVIOR_ENVIRONMENT_SHA256);
         expect(source.SEARCH_VERSIONS).toBe("v0.8s");
         expect(source.SEARCH_MAX_MOVE_SHOTS).toBe("0");
         expect(source.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.8s");
@@ -191,6 +199,7 @@ describe("v0.8 a13 production profile", () => {
         process.env.SEARCH_VERSIONS = "v0.4";
         process.env.SEARCH_MAX_MOVE_SHOTS = "2";
         process.env.SEARCH_MOVE_SHOT_VERSIONS = "v0.7";
+        process.env.SEARCH_WAIT_DEADLINE_POLICY = "profile";
         process.env.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE = "1";
         process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER = "1";
         process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS = "1";
@@ -236,6 +245,7 @@ describe("v0.8 a13 production profile", () => {
             aggressiveV08: boolean;
             shortlist: number | null;
             decisionDeadlineMs: number | null;
+            waitDeadlinePolicy: string;
             circuitBreakerMs: number | null;
             pureRangedNoMeleePressure: boolean;
             pureRangedDeadlineFinisher: boolean;
@@ -266,6 +276,7 @@ describe("v0.8 a13 production profile", () => {
             aggressiveV08: true,
             shortlist: 2,
             decisionDeadlineMs: 175,
+            waitDeadlinePolicy: "operation_bounded",
             circuitBreakerMs: 275,
             pureRangedNoMeleePressure: false,
             pureRangedDeadlineFinisher: false,
@@ -291,6 +302,7 @@ describe("v0.8 a13 production profile", () => {
         expect(process.env.SEARCH_VERSIONS).toBe("v0.4");
         expect(process.env.SEARCH_MAX_MOVE_SHOTS).toBe("2");
         expect(process.env.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.7");
+        expect(process.env.SEARCH_WAIT_DEADLINE_POLICY).toBe("profile");
         expect(process.env.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE).toBe("1");
         expect(process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER).toBe("1");
         expect(process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS).toBe("1");

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { IEnumeratedCandidate } from "../../src/ai/candidates";
+import type { DecisionPathCatalog, IDecisionPathCatalogStats } from "../../src/ai/decision_path_catalog";
 import type { GameAction } from "../../src/engine/actions";
 import type { GameEvent } from "../../src/engine/events";
 import {
@@ -19,8 +20,10 @@ import {
     fingerprintV08PassiveTurnPanelPlan,
     isV08PassiveForceTierProductiveCandidate,
     planV08PassiveTurnPanelGame,
+    requiresV08PassiveProductiveProbe,
     runV08PassiveTurnPanelGame,
     summarizeV08PassiveTurnPanel,
+    withV08PassiveCandidateEnvironment,
     V08PassiveTurnAuditor,
     V08_PASSIVE_TURN_PANEL_MAPS,
     V08_PASSIVE_TURN_PANEL_SCHEMA,
@@ -34,7 +37,8 @@ const OPTIONS: IV08PassiveTurnPanelOptions = {
     games: 6,
     baseSeed: 0x1234_5678,
     minCreatureAppearances: 0,
-    sourceCommit: "test-source",
+    sourceCommit: "a".repeat(40),
+    sourceDirty: false,
 };
 
 const PRODUCTION_REGRESSION_OPTIONS: IV08PassiveTurnPanelOptions = {
@@ -44,6 +48,7 @@ const PRODUCTION_REGRESSION_OPTIONS: IV08PassiveTurnPanelOptions = {
     baseSeed: 2_607_270_813,
     minCreatureAppearances: 250,
     sourceCommit: "ea4b2591bd95056990839226bbb7ba930839d9ab",
+    sourceDirty: false,
 };
 
 const features = (expectedDamage = 0): IEnumeratedCandidate["features"] => ({
@@ -126,7 +131,43 @@ const move = (unitId: string): GameAction => ({
 });
 const defend = (unitId: string): GameAction => ({ type: "defend_turn", unitId });
 const wait = (unitId: string): GameAction => ({ type: "wait_turn", unitId });
+const mountain = (unitId: string): GameAction => ({
+    type: "obstacle_attack",
+    attackerId: unitId,
+    targetPosition: { x: 7, y: 7 },
+});
 const end = (unitId: string): GameAction => ({ type: "end_turn", unitId });
+
+const productiveProbe = (
+    unitId: string,
+    overrides: Partial<ISearchPassiveProductiveProbe> = {},
+): ISearchPassiveProductiveProbe => ({
+    unitId,
+    lap: 1,
+    incumbentKind: "luck_shield",
+    selectedKind: "defend",
+    retainedPassive: true,
+    hasEngineValidProductiveAlternative: false,
+    engineValidShortlistedProductiveAlternatives: 0,
+    productiveComparisonScope: "search_shortlist",
+    bestShortlistedProductiveKind: null,
+    incumbentScore: 0.5,
+    bestShortlistedProductiveScore: null,
+    shortlistedProductiveScoreDelta: null,
+    betterShortlistedProductiveAlternative: false,
+    scoreComparisonComplete: true,
+    evidenceComplete: true,
+    productiveTierRequired: true,
+    productiveOverrideGate: 0.03,
+    strongerRangedPostureWait: false,
+    backlineProtectorIntent: false,
+    backlineWardIntent: false,
+    circuitOpenAtDecision: false,
+    circuitWaitRetry: false,
+    decisionMs: 1,
+    resolution: "scored",
+    ...overrides,
+});
 
 const fixtureRecord = (game: number): IV08PassiveTurnPanelRecord => {
     const plan = planV08PassiveTurnPanelGame(OPTIONS, game);
@@ -141,12 +182,15 @@ const fixtureRecord = (game: number): IV08PassiveTurnPanelRecord => {
     }
     return {
         schema: V08_PASSIVE_TURN_PANEL_SCHEMA,
+        sourceCommit: OPTIONS.sourceCommit ?? null,
+        sourceDirty: false,
         game,
         pair: plan.pair,
         seed: plan.seed,
         mapType: plan.mapType,
         candidateVersion: OPTIONS.candidateVersion,
         opponentVersion: OPTIONS.opponentVersion,
+        inheritCandidateEnvironment: false,
         candidateSide: plan.candidateSide,
         candidateRoster: candidateRoster.map(({ creatureName }) => creatureName),
         opponentRoster: opponentRoster.map(({ creatureName }) => creatureName),
@@ -156,10 +200,70 @@ const fixtureRecord = (game: number): IV08PassiveTurnPanelRecord => {
         candidateEngineRejections: 0,
         metrics,
         byCreature,
+        passiveFailureSamples: [],
+        passiveDecisionTimings: [],
     };
 };
 
 describe("v0.8 random-roster passive-turn panel", () => {
+    test("inherits a campaign environment only when requested and otherwise seals dynamic strategy gates", () => {
+        const capKey = "SEARCH_MAX_MOVE_SHOTS";
+        const dynamicKey = "V08_RANGED_POSITION_MODE";
+        const versionsKey = "V08_RANGED_POSITION_VERSIONS";
+        const inheritedWaitKey = "V07_WAIT_WEIGHTS_V3";
+        const previous = new Map(
+            [capKey, dynamicKey, versionsKey, inheritedWaitKey].map((key) => [key, process.env[key]] as const),
+        );
+        process.env[capKey] = "campaign-sentinel";
+        process.env[dynamicKey] = "hostile-mode";
+        process.env[versionsKey] = "hostile";
+        process.env[inheritedWaitKey] = "hostile-wait-vector";
+        try {
+            const inherited = withV08PassiveCandidateEnvironment(
+                { candidateVersion: "v0.8", inheritCandidateEnvironment: true },
+                () => ({
+                    cap: process.env[capKey],
+                    dynamic: process.env[dynamicKey],
+                    inheritedWait: process.env[inheritedWaitKey],
+                    versions: process.env[versionsKey],
+                }),
+            );
+            expect(inherited).toEqual({
+                cap: "campaign-sentinel",
+                dynamic: "hostile-mode",
+                inheritedWait: "hostile-wait-vector",
+                versions: "hostile",
+            });
+
+            for (const candidateVersion of ["v0.8", "v0.8s"] as const) {
+                const sealed = withV08PassiveCandidateEnvironment(
+                    { candidateVersion, inheritCandidateEnvironment: false },
+                    () => ({
+                        cap: process.env[capKey],
+                        dynamic: process.env[dynamicKey],
+                        inheritedWait: process.env[inheritedWaitKey],
+                        versions: process.env[versionsKey],
+                    }),
+                );
+                expect(sealed).toEqual({
+                    cap: "0",
+                    dynamic: undefined,
+                    inheritedWait: undefined,
+                    versions: undefined,
+                });
+                expect(process.env[capKey]).toBe("campaign-sentinel");
+                expect(process.env[dynamicKey]).toBe("hostile-mode");
+                expect(process.env[inheritedWaitKey]).toBe("hostile-wait-vector");
+                expect(process.env[versionsKey]).toBe("hostile");
+            }
+        } finally {
+            for (const [key, value] of previous) {
+                if (value === undefined) delete process.env[key];
+                else process.env[key] = value;
+            }
+        }
+    });
+
     test("uses deterministic random physical rosters, adjacent seat swaps, and all live maps", () => {
         const firstFingerprint = fingerprintV08PassiveTurnPanelPlan(OPTIONS);
         const previousForced = process.env.FORCE_CREATURES;
@@ -170,6 +274,13 @@ describe("v0.8 random-roster passive-turn panel", () => {
             if (previousForced === undefined) delete process.env.FORCE_CREATURES;
             else process.env.FORCE_CREATURES = previousForced;
         }
+        expect(firstFingerprint).not.toBe(
+            fingerprintV08PassiveTurnPanelPlan({ ...OPTIONS, inheritCandidateEnvironment: true }),
+        );
+        expect(firstFingerprint).not.toBe(
+            fingerprintV08PassiveTurnPanelPlan({ ...OPTIONS, sourceCommit: "b".repeat(40) }),
+        );
+        expect(firstFingerprint).not.toBe(fingerprintV08PassiveTurnPanelPlan({ ...OPTIONS, sourceDirty: true }));
 
         for (let pair = 0; pair < OPTIONS.games / 2; pair += 1) {
             const even = planV08PassiveTurnPanelGame(OPTIONS, pair * 2);
@@ -232,10 +343,7 @@ describe("v0.8 random-roster passive-turn panel", () => {
             defendClass: "avoidable",
             requiresProductiveProbe: true,
         });
-        rejectedMirror.observeProductiveProbe({
-            unitId: "invalid",
-            hasEngineValidProductiveAlternative: false,
-        });
+        rejectedMirror.observeProductiveProbe(productiveProbe("invalid"));
         rejectedMirror.observeExecution(
             execution({
                 unitId: "invalid",
@@ -258,10 +366,18 @@ describe("v0.8 random-roster passive-turn panel", () => {
             defendClass: "avoidable",
             requiresProductiveProbe: true,
         });
-        acceptedMirror.observeProductiveProbe({
-            unitId: "valid",
-            hasEngineValidProductiveAlternative: true,
-        });
+        acceptedMirror.observeProductiveProbe(
+            productiveProbe("valid", {
+                selectedKind: "move",
+                retainedPassive: false,
+                hasEngineValidProductiveAlternative: true,
+                engineValidShortlistedProductiveAlternatives: 1,
+                bestShortlistedProductiveKind: "move",
+                bestShortlistedProductiveScore: 0.6,
+                shortlistedProductiveScoreDelta: 0.1,
+                betterShortlistedProductiveAlternative: true,
+            }),
+        );
         acceptedMirror.observeExecution(
             execution({
                 unitId: "valid",
@@ -294,6 +410,78 @@ describe("v0.8 random-roster passive-turn panel", () => {
         expect(missingProbe.metrics.rawAvoidableDefendTurns).toBe(0);
         expect(missingProbe.metrics.forcedDefendTurns).toBe(1);
         expect(missingProbe.metrics.observerPairingFaults).toBe(1);
+
+        expect(requiresV08PassiveProductiveProbe("v0.8s", [defend("alias-missing")])).toBe(true);
+        expect(requiresV08PassiveProductiveProbe("v0.1", [defend("mindless")])).toBe(false);
+        const missingAliasProbe = new V08PassiveTurnAuditor("green");
+        missingAliasProbe.observePreparedDecision({
+            unitId: "alias-missing",
+            creatureName: "Peasant",
+            lap: 1,
+            rawIncumbent: [defend("alias-missing")],
+            defendClass: "avoidable",
+            requiresProductiveProbe: requiresV08PassiveProductiveProbe("v0.8s", [defend("alias-missing")]),
+        });
+        missingAliasProbe.observeExecution(
+            execution({
+                unitId: "alias-missing",
+                strategyVersion: "v0.8s",
+                raw: [defend("alias-missing")],
+                chosen: [defend("alias-missing")],
+            }),
+        );
+        missingAliasProbe.finish();
+        expect(missingAliasProbe.metrics.forcedDefendTurns).toBe(1);
+        expect(missingAliasProbe.metrics.observerPairingFaults).toBe(1);
+    });
+
+    test("pairs post-search productive probes that arrive before decisions and counts duplicates or orphans", () => {
+        const early = new V08PassiveTurnAuditor("green");
+        early.observeProductiveProbe(productiveProbe("early"));
+        early.observePreparedDecision({
+            unitId: "early",
+            creatureName: "Peasant",
+            lap: 1,
+            rawIncumbent: [defend("early")],
+            defendClass: "forced",
+            requiresProductiveProbe: true,
+        });
+        early.observeExecution(
+            execution({
+                unitId: "early",
+                raw: [defend("early")],
+                chosen: [defend("early")],
+            }),
+        );
+        early.finish();
+        expect(early.metrics.observerPairingFaults).toBe(0);
+        expect(early.metrics.passiveEvidenceTurns).toBe(1);
+
+        const duplicate = new V08PassiveTurnAuditor("green");
+        duplicate.observeProductiveProbe(productiveProbe("duplicate"));
+        duplicate.observeProductiveProbe(productiveProbe("duplicate"));
+        duplicate.observePreparedDecision({
+            unitId: "duplicate",
+            creatureName: "Peasant",
+            lap: 1,
+            rawIncumbent: [defend("duplicate")],
+            defendClass: "forced",
+            requiresProductiveProbe: true,
+        });
+        duplicate.observeExecution(
+            execution({
+                unitId: "duplicate",
+                raw: [defend("duplicate")],
+                chosen: [defend("duplicate")],
+            }),
+        );
+        duplicate.finish();
+        expect(duplicate.metrics.observerPairingFaults).toBe(1);
+
+        const orphan = new V08PassiveTurnAuditor("green");
+        orphan.observeProductiveProbe(productiveProbe("orphan"));
+        orphan.finish();
+        expect(orphan.metrics.observerPairingFaults).toBe(1);
     });
 
     test("keeps the production probe detached and bit-for-bit inert", () => {
@@ -337,6 +525,200 @@ describe("v0.8 random-roster passive-turn panel", () => {
 
         expect(probes.length).toBeGreaterThan(0);
         expect(observed).toEqual(control);
+    });
+
+    test("keeps post-search passive diagnostics out of the live path catalog and search outcome", () => {
+        const plan = planV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 73);
+        const setup = liveTwinSetup();
+        const run = (diagnostics: boolean) => {
+            const auditor = diagnostics ? new V08PassiveTurnAuditor(plan.candidateSide) : undefined;
+            const catalogs: DecisionPathCatalog[] = [];
+            const callbackStats: Array<{
+                before: IDecisionPathCatalogStats;
+                after: IDecisionPathCatalogStats;
+            }> = [];
+            const choices: GameAction[][] = [];
+            const passiveOutcomes: Array<Omit<ISearchPassiveProductiveProbe, "decisionMs">> = [];
+            const result = withScopedAIEnvironment({ [V08_A13_SEARCH_OVERRIDE_ENV]: "1" }, () =>
+                runMatch({
+                    greenVersion:
+                        plan.candidateSide === "green"
+                            ? PRODUCTION_REGRESSION_OPTIONS.candidateVersion
+                            : PRODUCTION_REGRESSION_OPTIONS.opponentVersion,
+                    redVersion:
+                        plan.candidateSide === "green"
+                            ? PRODUCTION_REGRESSION_OPTIONS.opponentVersion
+                            : PRODUCTION_REGRESSION_OPTIONS.candidateVersion,
+                    roster: plan.greenRoster,
+                    redRoster: plan.redRoster,
+                    seed: plan.seed,
+                    gridType: plan.mapType,
+                    greenPerk: setup.perk,
+                    redPerk: setup.perk,
+                    greenAugments: setup.augments,
+                    redAugments: setup.augments,
+                    placementAugmentTiming: "setup-before-placement",
+                    decisionObserver: (observation) => {
+                        const catalog = observation.context.decisionPathCatalog;
+                        if (!catalog) {
+                            auditor?.observeDecision(observation);
+                            return;
+                        }
+                        const before = catalog.getStats();
+                        auditor?.observeDecision(observation);
+                        const after = catalog.getStats();
+                        catalogs.push(catalog);
+                        callbackStats.push({ before, after });
+                    },
+                    searchPassiveProductiveProbeObserver: (probe) => {
+                        const outcome = { ...probe };
+                        delete (outcome as Partial<ISearchPassiveProductiveProbe>).decisionMs;
+                        passiveOutcomes.push(outcome);
+                        auditor?.observeProductiveProbe(probe);
+                    },
+                    turnExecutionObserver: (observation) => {
+                        choices.push(structuredClone([...observation.chosenDecision]));
+                        auditor?.observeExecution(observation);
+                    },
+                    turnActivationObserver: (events) => auditor?.observeEvents(events),
+                }),
+            );
+            auditor?.finish();
+            return {
+                result,
+                choices,
+                passiveOutcomes,
+                callbackStats,
+                finalCatalogStats: catalogs.map((catalog) => catalog.getStats()),
+            };
+        };
+
+        // Both arms install the callback so BattleEngine creates the same stats-enabled catalog. The only
+        // difference is whether the qualification auditor performs its pre-search enumeration.
+        const control = run(false);
+        const observed = run(true);
+
+        expect(observed.callbackStats.length).toBeGreaterThan(0);
+        expect(
+            observed.callbackStats.every(({ before, after }) => JSON.stringify(before) === JSON.stringify(after)),
+        ).toBe(true);
+        expect(observed.result).toEqual(control.result);
+        expect(observed.choices).toEqual(control.choices);
+        expect(observed.passiveOutcomes.length).toBeGreaterThan(0);
+        expect(observed.passiveOutcomes).toEqual(control.passiveOutcomes);
+        expect(observed.finalCatalogStats).toEqual(control.finalCatalogStats);
+    });
+
+    test("records scored avoidable passives, explicit exemptions, and a terminal avoidable streak", () => {
+        const auditor = new V08PassiveTurnAuditor("green");
+        const retain = (
+            unitId: string,
+            lap: number,
+            action: GameAction,
+            probeOverrides: Partial<ISearchPassiveProductiveProbe>,
+            defendClass: "forced" | "protected" | "avoidable" = "avoidable",
+        ): void => {
+            auditor.observePreparedDecision({
+                unitId,
+                creatureName: "Peasant",
+                lap,
+                rawIncumbent: [action],
+                defendClass,
+                requiresProductiveProbe: true,
+            });
+            auditor.observeProductiveProbe(
+                productiveProbe(unitId, {
+                    lap,
+                    selectedKind:
+                        action.type === "wait_turn" ? "wait" : action.type === "defend_turn" ? "defend" : "mine",
+                    retainedPassive: true,
+                    ...probeOverrides,
+                }),
+            );
+            auditor.observeExecution(execution({ unitId, raw: [action], chosen: [action] }));
+        };
+
+        for (const lap of [1, 2]) {
+            retain("mountain", lap, mountain("mountain"), {
+                incumbentKind: "mountain",
+                hasEngineValidProductiveAlternative: true,
+                engineValidShortlistedProductiveAlternatives: 1,
+                bestShortlistedProductiveKind: "move",
+                incumbentScore: 0.4,
+                bestShortlistedProductiveScore: 0.5,
+                shortlistedProductiveScoreDelta: 0.1,
+                betterShortlistedProductiveAlternative: true,
+                productiveTierRequired: true,
+            });
+        }
+        retain("initiative", 1, wait("initiative"), {
+            incumbentKind: "wait",
+            hasEngineValidProductiveAlternative: true,
+            engineValidShortlistedProductiveAlternatives: 1,
+            bestShortlistedProductiveKind: "shot",
+            incumbentScore: 0.5,
+            bestShortlistedProductiveScore: 0.52,
+            shortlistedProductiveScoreDelta: 0.02,
+            betterShortlistedProductiveAlternative: false,
+            productiveTierRequired: false,
+            strongerRangedPostureWait: true,
+        });
+        retain("deadline-initiative", 1, wait("deadline-initiative"), {
+            incumbentKind: "wait",
+            hasEngineValidProductiveAlternative: true,
+            engineValidShortlistedProductiveAlternatives: 1,
+            bestShortlistedProductiveKind: "shot",
+            incumbentScore: 0.5,
+            bestShortlistedProductiveScore: 0.6,
+            shortlistedProductiveScoreDelta: 0.1,
+            betterShortlistedProductiveAlternative: true,
+            productiveTierRequired: false,
+            strongerRangedPostureWait: true,
+            resolution: "deadline_fallback",
+        });
+        retain(
+            "protector",
+            1,
+            defend("protector"),
+            {
+                backlineProtectorIntent: true,
+            },
+            "protected",
+        );
+        retain("forced", 1, mountain("forced"), {
+            incumbentKind: "mountain",
+        });
+        auditor.finish();
+
+        expect(auditor.metrics.passiveEvidenceTurns).toBe(6);
+        expect(auditor.metrics.retainedPassiveWithBetterShortlistedProductiveActionTurns).toBe(3);
+        expect(auditor.metrics.exemptRetainedPassiveWithBetterShortlistedProductiveActionTurns).toBe(0);
+        expect(auditor.metrics.avoidableRetainedPassiveTurns).toBe(3);
+        expect(auditor.metrics.avoidableMountainTurns).toBe(2);
+        expect(auditor.metrics.avoidableWaitTurns).toBe(1);
+        expect(auditor.metrics.strongerRangedWaitExemptions).toBe(1);
+        expect(auditor.metrics.protectedRetainedPassiveTurns).toBe(1);
+        expect(auditor.metrics.protectorIntentPassiveExemptions).toBe(1);
+        expect(auditor.metrics.forcedRetainedPassiveTurns).toBe(1);
+        expect(auditor.metrics.terminalPassiveStreaks).toBe(1);
+        expect(auditor.metrics.terminalAvoidablePassiveStreaks).toBe(1);
+        expect(auditor.metrics.terminalAvoidablePassiveStreakTurns).toBe(2);
+        expect(auditor.metrics.observerPairingFaults).toBe(0);
+        expect(auditor.failureSamples).toHaveLength(3);
+        expect(auditor.failureSamples[0]).toMatchObject({
+            issue: "avoidable_retained_mountain",
+            unitId: "mountain",
+            creatureName: "Peasant",
+            lap: 1,
+            incumbentKind: "mountain",
+            retainedKind: "mountain",
+            selectedKind: "mine",
+            bestShortlistedProductiveKind: "move",
+            incumbentScore: 0.4,
+            bestShortlistedProductiveScore: 0.5,
+            shortlistedProductiveScoreDelta: 0.1,
+            resolution: "scored",
+        });
     });
 
     test("counts the candidate physical side even when a Berserker/Boar turn is pinned to v0.1", () => {
@@ -505,9 +887,21 @@ describe("v0.8 random-roster passive-turn panel", () => {
     test("exposes every hard gate, including enabled-creature and Abomination/Queen fault gates", () => {
         const records = Array.from({ length: OPTIONS.games }, (_, game) => fixtureRecord(game));
         const passing = summarizeV08PassiveTurnPanel(OPTIONS, records);
+        expect(summarizeV08PassiveTurnPanel(OPTIONS, [...records].reverse())).toEqual(passing);
         expect(passing.gates.pass).toBe(true);
         expect(passing.gates.failed).toEqual([]);
         expect(passing.planSha256).toBe(fingerprintV08PassiveTurnPanelPlan(OPTIONS));
+        expect(passing.options.inheritCandidateEnvironment).toBe(false);
+        expect(passing.sourceCommit).toBe(OPTIONS.sourceCommit);
+        expect(passing.sourceDirty).toBe(false);
+
+        const dirtyOptions = { ...OPTIONS, sourceDirty: true };
+        const dirty = summarizeV08PassiveTurnPanel(
+            dirtyOptions,
+            records.map((record) => ({ ...record, sourceDirty: true })),
+        );
+        expect(dirty.gates.failed).toEqual(["source_commit_bound"]);
+        expect(dirty.sourceDirty).toBe(true);
 
         const failing = records.map((record) => ({
             ...record,
@@ -518,8 +912,43 @@ describe("v0.8 random-roster passive-turn panel", () => {
         }));
         failing[0].metrics.rawEndTurnTurns = 1;
         failing[0].metrics.avoidableDefendTurns = 1;
+        failing[0].metrics.retainedPassiveWithBetterShortlistedProductiveActionTurns = 1;
+        failing[0].metrics.avoidableRetainedPassiveTurns = 1;
+        failing[0].metrics.avoidableWaitTurns = 1;
+        failing[0].metrics.avoidableLuckShieldTurns = 1;
+        failing[0].metrics.avoidableMountainTurns = 1;
+        failing[0].metrics.deadlineWaitResolutions = 1;
+        failing[0].metrics.deadlineWaitRetentions = 1;
+        failing[0].metrics.retainedPassiveEvidenceIncompleteTurns = 1;
+        failing[0].metrics.terminalAvoidablePassiveStreaks = 1;
         failing[0].metrics.missedSameLapWaitReactivations = 1;
         failing[0].metrics.strategyRejectedActions = 1;
+        failing[0].passiveFailureSamples = [
+            {
+                issue: "avoidable_retained_wait",
+                unitId: "sample-unit",
+                creatureName: "Peasant",
+                lap: 4,
+                incumbentKind: "wait",
+                retainedKind: "wait",
+                selectedKind: "wait",
+                bestShortlistedProductiveKind: "move",
+                incumbentScore: 0.4,
+                bestShortlistedProductiveScore: 0.5,
+                shortlistedProductiveScoreDelta: 0.1,
+                resolution: "circuit_fallback",
+                strongerRangedPostureWait: false,
+                backlineProtectorIntent: false,
+                backlineWardIntent: false,
+                circuitOpenAtDecision: true,
+                circuitWaitRetry: false,
+                decisionMs: 12.5,
+            },
+        ];
+        failing[0].passiveDecisionTimings = [
+            { decisionMs: 2, circuitOpenWait: false, circuitWaitRetry: false },
+            { decisionMs: 12.5, circuitOpenWait: true, circuitWaitRetry: false },
+        ];
         failing[0].byCreature.Abomination = emptyV08PassiveTurnMetrics();
         failing[0].byCreature.Abomination.rawEndTurnTurns = 1;
         failing[1].byCreature["Arachna Queen"] = emptyV08PassiveTurnMetrics();
@@ -529,6 +958,47 @@ describe("v0.8 random-roster passive-turn panel", () => {
         expect(summary.gates.failed).toContain("raw_end_turn_zero");
         expect(summary.gates.failed).toContain("strategy_rejections_zero");
         expect(summary.gates.failed).toContain("avoidable_defends_zero");
+        expect(summary.gates.failed).toContain("retained_passive_with_better_shortlisted_productive_action_zero");
+        expect(summary.gates.failed).toContain("avoidable_waits_zero");
+        expect(summary.gates.failed).toContain("avoidable_luck_shields_zero");
+        expect(summary.gates.failed).toContain("avoidable_mountain_turns_zero");
+        expect(summary.gates.failed).toContain("wait_deadline_fallbacks_zero");
+        expect(summary.gates.failed).toContain("retained_passive_evidence_complete");
+        expect(summary.gates.failed).toContain("terminal_avoidable_passive_streaks_zero");
+        expect(summary.failureSamples[0]).toMatchObject({
+            game: 0,
+            issue: "avoidable_retained_wait",
+            unitId: "sample-unit",
+            creatureName: "Peasant",
+            lap: 4,
+            incumbentKind: "wait",
+            bestShortlistedProductiveKind: "move",
+            incumbentScore: 0.4,
+            bestShortlistedProductiveScore: 0.5,
+            shortlistedProductiveScoreDelta: 0.1,
+            resolution: "circuit_fallback",
+            circuitOpenAtDecision: true,
+            decisionMs: 12.5,
+        });
+        expect(summary.passiveDecisionTiming).toEqual({ count: 2, meanMs: 7.25, p95Ms: 12.5, maxMs: 12.5 });
+        expect(summary.circuitOpenWaitTiming).toEqual({
+            count: 1,
+            meanMs: 12.5,
+            p95Ms: 12.5,
+            maxMs: 12.5,
+        });
+        expect(summary.circuitOpenWaitRetryTiming).toEqual({
+            count: 0,
+            meanMs: 0,
+            p95Ms: 0,
+            maxMs: 0,
+        });
+        expect(summary.circuitOpenWaitDeferredTiming).toEqual({
+            count: 1,
+            meanMs: 12.5,
+            p95Ms: 12.5,
+            maxMs: 12.5,
+        });
         expect(summary.gates.failed).toContain("missed_wait_reactivations_zero");
         expect(summary.gates.failed).toContain("abomination_faults_zero");
         expect(summary.gates.failed).toContain("arachna_queen_faults_zero");
@@ -564,6 +1034,7 @@ describe("v0.8 random-roster passive-turn panel", () => {
         expect(record.endReason).toBe("turn_cap");
         expect(record.crash).toBeUndefined();
         expect(record.candidateSide).toBe("green");
+        expect(record.inheritCandidateEnvironment).toBe(false);
         expect(record.metrics.appearances).toBe(6);
         expect(record.metrics.turns).toBeGreaterThan(0);
         expect(record.metrics.observerPairingFaults).toBe(0);

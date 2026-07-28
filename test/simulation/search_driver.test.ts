@@ -58,7 +58,13 @@ import { ilActionSignature, parseIlGameRow, parseIlRow } from "../../src/simulat
 import { buildMirrorRoster } from "../../src/simulation/measure_mirror_cohorts";
 import { parsePhaseBQ2Row } from "../../src/simulation/phase_b_dataset";
 import { MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES } from "../../src/simulation/pure_ranged_pareto_no_melee_focus";
-import { classifyActions, SearchDriver, SearchRollbackError } from "../../src/simulation/search_driver";
+import {
+    classifyActions,
+    SearchDriver,
+    SearchRollbackError,
+    type ISearchPassiveProductiveProbe,
+    type SearchPassiveProductiveProbeObserver,
+} from "../../src/simulation/search_driver";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
 import { VALUE_FEATURE_NAMES_V2 } from "../../src/simulation/value_features";
 import { Unit } from "../../src/units/unit";
@@ -87,6 +93,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_OBSERVE_ONLY",
     "SEARCH_SHORTLIST",
     "SEARCH_DECISION_DEADLINE_MS",
+    "SEARCH_WAIT_DEADLINE_POLICY",
     "SEARCH_CIRCUIT_BREAKER_MS",
     "SEARCH_LATE_RANGED_FINISH_WEIGHT",
     "SEARCH_PURE_RANGED_NO_MELEE_PRESSURE",
@@ -172,7 +179,7 @@ interface Harness {
     unitsHolder: UnitsHolder;
     fightProperties: ReturnType<FightStateManager["getFightProperties"]>;
     /** Construct a driver AFTER the desired env is set (the driver reads env in its constructor). */
-    makeDriver: () => SearchDriver;
+    makeDriver: (passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver) => SearchDriver;
     activeUnit: () => Unit | undefined;
     setActiveUnitId: (id: string) => void;
     failNextActiveUnitRestore: () => void;
@@ -408,7 +415,13 @@ function buildBattle(
         grid,
         unitsHolder,
         fightProperties,
-        makeDriver: () => new SearchDriver(deps, { seed, greenVersion: version, redVersion: version }),
+        makeDriver: (passiveProductiveProbeObserver) =>
+            new SearchDriver(
+                deps,
+                { seed, greenVersion: version, redVersion: version },
+                undefined,
+                passiveProductiveProbeObserver,
+            ),
         activeUnit: ensureActive,
         setActiveUnitId: (id) => {
             currentActiveUnitId = id;
@@ -1426,7 +1439,16 @@ describe("search driver — gating, hygiene, determinism", () => {
             "SEARCH_DECISION_DEADLINE_MS must be below SEARCH_CIRCUIT_BREAKER_MS",
         );
 
-        setEnv({ SEARCH_DECISION_DEADLINE_MS: "invalid" });
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_WAIT_DEADLINE_POLICY: "unbounded",
+        });
+        expect(() => buildBattle(85, "v0.8").makeDriver()).toThrow(
+            "SEARCH_WAIT_DEADLINE_POLICY must be profile or operation_bounded",
+        );
+
+        setEnv({ SEARCH_DECISION_DEADLINE_MS: "invalid", SEARCH_WAIT_DEADLINE_POLICY: "invalid" });
         expect(buildBattle(85, "v0.6").makeDriver().enabled).toBe(false);
     });
 
@@ -2429,6 +2451,218 @@ describe("search driver — gating, hygiene, determinism", () => {
         });
     });
 
+    it("keeps circuit-open operation-bounded wait arbitration and behavior counters observer-invariant", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_CIRCUIT_BREAKER_MS: "0.0001",
+            SEARCH_HORIZON: "1",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_INCLUDE_MOVES: "1",
+            SEARCH_MAX_MOVES: "1",
+            SEARCH_MAX_MELEE: "2",
+            SEARCH_MAX_SHOTS: "2",
+            SEARCH_MAX_THROWS: "1",
+            SEARCH_ACTIVE_CHALLENGERS: "1",
+            SEARCH_WAIT_DEADLINE_POLICY: "operation_bounded",
+            V08_AGGRESSIVE: "1",
+        });
+        const h = buildBattle(10_319, "v0.8");
+        const unit = h.activeUnit()!;
+        const probes: ISearchPassiveProductiveProbe[] = [];
+        const control = h.makeDriver() as unknown as {
+            circuitOpen: boolean;
+            counters: Record<string, unknown>;
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        const observed = h.makeDriver((probe) => probes.push({ ...probe })) as unknown as {
+            circuitOpen: boolean;
+            counters: Record<string, unknown>;
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        const behaviorCounters = (counters: Record<string, unknown>): Record<string, unknown> => {
+            const behavior = { ...counters };
+            delete behavior.msTotal;
+            return behavior;
+        };
+        const opening: GameAction[] = [{ type: "end_turn", unitId: unit.getId(), reason: "skip" }];
+        control.chooseDecision(unit, "v0.8", opening);
+        observed.chooseDecision(unit, "v0.8", opening);
+        expect(control.circuitOpen).toBe(true);
+        expect(observed.circuitOpen).toBe(true);
+        expect(behaviorCounters(observed.counters)).toEqual(behaviorCounters(control.counters));
+
+        control.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
+        observed.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
+        const passive: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const controlChoice = control.chooseDecision(unit, "v0.8", passive);
+        const observedChoice = observed.chooseDecision(unit, "v0.8", passive);
+        expect(observedChoice).toEqual(controlChoice);
+        expect(controlChoice).not.toBe(passive);
+        expect(hasProductiveAction(controlChoice)).toBe(true);
+        expect(behaviorCounters(observed.counters)).toEqual(behaviorCounters(control.counters));
+        expect(probes).toHaveLength(1);
+        expect(probes[0]).toMatchObject({
+            unitId: unit.getId(),
+            incumbentKind: "wait",
+            retainedPassive: false,
+            betterShortlistedProductiveAlternative: true,
+            evidenceComplete: true,
+            circuitOpenAtDecision: true,
+            circuitWaitRetry: true,
+            resolution: "scored",
+        });
+
+        const secondControlWait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const secondObservedWait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        expect(control.chooseDecision(unit, "v0.8", secondControlWait)).toBe(secondControlWait);
+        expect(observed.chooseDecision(unit, "v0.8", secondObservedWait)).toBe(secondObservedWait);
+        expect(behaviorCounters(observed.counters)).toEqual(behaviorCounters(control.counters));
+        expect(control.counters).toMatchObject({ circuitWaitRetries: 1, circuitSkipped: 1 });
+        expect(observed.counters).toMatchObject({ circuitWaitRetries: 1, circuitSkipped: 1 });
+        expect(probes).toHaveLength(2);
+        expect(probes[1]).toMatchObject({
+            unitId: unit.getId(),
+            incumbentKind: "wait",
+            retainedPassive: true,
+            circuitOpenAtDecision: true,
+            circuitWaitRetry: false,
+            resolution: "circuit_fallback",
+        });
+
+        const fresh = h.makeDriver() as unknown as {
+            circuitOpen: boolean;
+            counters: Record<string, unknown>;
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        fresh.chooseDecision(unit, "v0.8", opening);
+        expect(fresh.circuitOpen).toBe(true);
+        fresh.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
+        const freshWait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        expect(fresh.chooseDecision(unit, "v0.8", freshWait)).not.toBe(freshWait);
+        expect(fresh.counters).toMatchObject({ circuitWaitRetries: 1, circuitSkipped: 0 });
+    });
+
+    it("freezes passive behavior time before diagnostic aggregation can affect the circuit or later decisions", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_CIRCUIT_BREAKER_MS: "10",
+            SEARCH_HORIZON: "1",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_INCLUDE_MOVES: "1",
+            SEARCH_MAX_MOVES: "1",
+            SEARCH_MAX_MELEE: "2",
+            SEARCH_MAX_SHOTS: "2",
+            SEARCH_MAX_THROWS: "1",
+            SEARCH_ACTIVE_CHALLENGERS: "1",
+            V08_AGGRESSIVE: "1",
+        });
+        const h = buildBattle(10_320, "v0.8");
+        const unit = h.activeUnit()!;
+        const probes: ISearchPassiveProductiveProbe[] = [];
+        type CapturePassiveProbe = (
+            audit: unknown,
+            actor: Unit,
+            selectedActions: readonly GameAction[],
+            resolution: string,
+            candidates?: readonly IEnumeratedCandidate[],
+            means?: readonly number[],
+            productiveFallback?: IEnumeratedCandidate,
+        ) => void;
+        type TimedDriver = {
+            circuitOpen: boolean;
+            counters: { msTotal: number };
+            scoreCandidates(
+                actor: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+            ): number[];
+            capturePassiveProductiveProbe: CapturePassiveProbe;
+            chooseDecision(actor: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        const control = h.makeDriver() as unknown as TimedDriver;
+        const observed = h.makeDriver((probe) => probes.push({ ...probe })) as unknown as TimedDriver;
+        control.scoreCandidates = (_actor, candidates) => candidates.map(() => 0.5);
+        observed.scoreCandidates = (_actor, candidates) => candidates.map(() => 0.5);
+
+        let fakeNow = 0;
+        const realNow = performance.now;
+        Object.defineProperty(performance, "now", { configurable: true, value: () => fakeNow });
+        try {
+            const originalCapture = observed.capturePassiveProductiveProbe.bind(observed);
+            observed.capturePassiveProductiveProbe = (
+                audit,
+                actor,
+                selectedActions,
+                resolution,
+                candidates = [],
+                means = [],
+                productiveFallback,
+            ): void => {
+                const diagnosticCandidates = candidates.map(
+                    (candidate) =>
+                        new Proxy(candidate, {
+                            get(target, property, receiver) {
+                                if (property === "kind") fakeNow = 100;
+                                return Reflect.get(target, property, receiver);
+                            },
+                        }),
+                );
+                originalCapture(
+                    audit,
+                    actor,
+                    selectedActions,
+                    resolution,
+                    diagnosticCandidates,
+                    means,
+                    productiveFallback,
+                );
+            };
+
+            const firstControlWait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+            const firstObservedWait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+            const firstControl = control.chooseDecision(unit, "v0.8", firstControlWait);
+            const firstObserved = observed.chooseDecision(unit, "v0.8", firstObservedWait);
+            expect(firstObserved).toEqual(firstControl);
+            expect(fakeNow).toBe(100);
+            expect(control.circuitOpen).toBe(false);
+            expect(observed.circuitOpen).toBe(false);
+            expect(observed.counters.msTotal).toBe(control.counters.msTotal);
+            expect(probes).toHaveLength(1);
+            expect(probes[0].decisionMs).toBe(0);
+
+            const secondControlWait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+            const secondObservedWait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+            expect(observed.chooseDecision(unit, "v0.8", secondObservedWait)).toEqual(
+                control.chooseDecision(unit, "v0.8", secondControlWait),
+            );
+            expect(control.circuitOpen).toBe(false);
+            expect(observed.circuitOpen).toBe(false);
+        } finally {
+            Object.defineProperty(performance, "now", { configurable: true, value: realNow });
+        }
+    });
+
     it("bounds the Pareto engine probe by the ordinary decision deadline", () => {
         const audit = join(mkdtempSync(join(tmpdir(), "hoc-pareto-deadline-")), "search.jsonl");
         setEnv({
@@ -3054,33 +3288,68 @@ describe("search driver — gating, hygiene, determinism", () => {
             V07_SEARCH: "1",
             SEARCH_VERSIONS: "v0.8s",
             SEARCH_GATE: "0.1",
+            SEARCH_DECISION_DEADLINE_MS: "1",
+            SEARCH_WAIT_DEADLINE_POLICY: "operation_bounded",
             V08_AGGRESSIVE: "1",
         });
         const tied = buildStrongPosture();
         const tiedDriver = tied.harness.makeDriver() as unknown as {
+            decisionDeadlineMs: number | null;
             counters: { strongerRangedPostureWaits: number };
             scoreCandidates(
                 unit: Unit,
                 candidates: readonly IEnumeratedCandidate[],
                 seedBase: number,
                 mode: string,
+                rolloutCount?: number,
+                deadlineAt?: number | null,
             ): number[];
             chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
         };
-        tiedDriver.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
+        tiedDriver.decisionDeadlineMs = 0;
+        const tiedDeadlines: Array<number | null> = [];
+        tiedDriver.scoreCandidates = (_unit, candidates, _seedBase, _mode, _rolloutCount, deadlineAt = null) => {
+            tiedDeadlines.push(deadlineAt);
+            return candidates.map(() => 0.5);
+        };
         expect(tiedDriver.chooseDecision(tied.unit, "v0.8s", tied.wait)).toBe(tied.wait);
+        expect(tiedDeadlines.length).toBeGreaterThan(0);
+        expect(tiedDeadlines.every((deadline) => deadline === null)).toBe(true);
         expect(tiedDriver.counters.strongerRangedPostureWaits).toBe(1);
 
-        const better = buildStrongPosture();
-        const betterDriver = better.harness.makeDriver() as unknown as {
+        const circuitTied = buildStrongPosture();
+        const circuitTiedDriver = circuitTied.harness.makeDriver() as unknown as {
+            circuitOpen: boolean;
+            counters: { circuitWaitRetries: number };
             scoreCandidates(
                 unit: Unit,
                 candidates: readonly IEnumeratedCandidate[],
                 seedBase: number,
                 mode: string,
+                rolloutCount?: number,
+                deadlineAt?: number | null,
             ): number[];
             chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
         };
+        circuitTiedDriver.circuitOpen = true;
+        circuitTiedDriver.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
+        expect(circuitTiedDriver.chooseDecision(circuitTied.unit, "v0.8s", circuitTied.wait)).toBe(circuitTied.wait);
+        expect(circuitTiedDriver.counters.circuitWaitRetries).toBe(1);
+
+        const better = buildStrongPosture();
+        const betterDriver = better.harness.makeDriver() as unknown as {
+            decisionDeadlineMs: number | null;
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+                rolloutCount?: number,
+                deadlineAt?: number | null,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        betterDriver.decisionDeadlineMs = 0;
         betterDriver.scoreCandidates = (_unit, candidates) =>
             candidates.map(({ kind }) => (kind === "incumbent" ? 0.1 : 0.9));
         const betterChoice = betterDriver.chooseDecision(better.unit, "v0.8s", better.wait);
@@ -3592,6 +3861,105 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.chooseDecision(unit, "v0.8s", wait)).toBe(wait);
         expect(driver.chooseDecision(unit, "v0.8s", wait)).toBe(wait);
         expect(counters).toMatchObject({ decisions: 1, deadlineFallbacks: 1, circuitSkipped: 1 });
+    });
+
+    it("never blindly replaces an aggressive ordinary wait when its value comparison times out", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_HORIZON: "1",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_INCLUDE_MOVES: "1",
+            SEARCH_MAX_MOVES: "1",
+            SEARCH_MAX_MELEE: "1",
+            SEARCH_MAX_SHOTS: "1",
+            SEARCH_MAX_THROWS: "1",
+            V08_AGGRESSIVE: "1",
+        });
+        const h = buildBattle(13_131, "v0.8");
+        const unit = [...h.unitsHolder.getAllUnits().values()].find(
+            (candidate) => !candidate.isDead() && !candidate.isRangeCapable() && candidate.canMove(),
+        )!;
+        expect(unit).toBeDefined();
+        h.setActiveUnitId(unit.getId());
+        unit.refreshPossibleAttackTypes(true);
+        const wait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const probes: ISearchPassiveProductiveProbe[] = [];
+        const driver = h.makeDriver((probe) => probes.push({ ...probe })) as unknown as {
+            decisionDeadlineMs: number | null;
+            counters: { deadlineFallbacks: number; msTotal: number };
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        // Inject after validation so the live comparison deterministically reaches the timeout. The detached
+        // counterfactual may prove a productive action exists, but it cannot retroactively alter behavior.
+        driver.decisionDeadlineMs = 0;
+
+        expect(driver.chooseDecision(unit, "v0.8", wait)).toBe(wait);
+        expect(driver.counters.deadlineFallbacks).toBe(1);
+        expect(probes).toHaveLength(1);
+        expect(probes[0]).toMatchObject({
+            incumbentKind: "wait",
+            retainedPassive: true,
+            hasEngineValidProductiveAlternative: true,
+            scoreComparisonComplete: true,
+            evidenceComplete: true,
+            resolution: "deadline_fallback",
+        });
+        expect(probes[0].incumbentScore).toBeNumber();
+        expect(probes[0].bestShortlistedProductiveScore).toBeNumber();
+        expect(driver.counters.msTotal).toBe(probes[0].decisionMs);
+    });
+
+    it("completes an operation-bounded aggressive wait comparison despite an expired profile deadline", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_DECISION_DEADLINE_MS: "1",
+            SEARCH_WAIT_DEADLINE_POLICY: "operation_bounded",
+            SEARCH_HORIZON: "1",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_INCLUDE_MOVES: "1",
+            SEARCH_MAX_MOVES: "1",
+            SEARCH_MAX_MELEE: "1",
+            SEARCH_MAX_SHOTS: "1",
+            SEARCH_MAX_THROWS: "1",
+            V08_AGGRESSIVE: "1",
+        });
+        const h = buildBattle(13_132, "v0.8");
+        const unit = [...h.unitsHolder.getAllUnits().values()].find(
+            (candidate) => !candidate.isDead() && !candidate.isRangeCapable() && candidate.canMove(),
+        )!;
+        h.setActiveUnitId(unit.getId());
+        unit.refreshPossibleAttackTypes(true);
+        const wait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const deadlines: Array<number | null> = [];
+        const driver = h.makeDriver() as unknown as {
+            decisionDeadlineMs: number | null;
+            counters: { deadlineFallbacks: number };
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+                rolloutCount?: number,
+                deadlineAt?: number | null,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        driver.decisionDeadlineMs = 0;
+        driver.scoreCandidates = (_unit, candidates, _seedBase, _mode, _rolloutCount, deadlineAt = null) => {
+            deadlines.push(deadlineAt);
+            return candidates.map(({ kind }) => (kind === "incumbent" ? 0.1 : 0.9));
+        };
+
+        const choice = driver.chooseDecision(unit, "v0.8", wait);
+
+        expect(choice).not.toBe(wait);
+        expect(hasProductiveAction(choice)).toBe(true);
+        expect(deadlines.length).toBeGreaterThan(0);
+        expect(deadlines.every((deadline) => deadline === null)).toBe(true);
+        expect(driver.counters.deadlineFallbacks).toBe(0);
+        expectEngineAcceptsProductiveDecision(h, choice);
     });
 
     it("skips a rejected productive probe and preserves a true no-productive fallback", () => {

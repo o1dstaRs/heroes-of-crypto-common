@@ -31,9 +31,10 @@ const UPPER = PBTypes.TeamVals.UPPER;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 
-// A cell just left of the 4x4 center mountain (center is cells 6..9 on a 16-grid), so a unit standing
-// here is adjacent to the mountain's outer ring and can strike it in place.
-const NEXT_TO_MOUNTAIN: XY = { x: 5, y: 7 };
+// BLOCK_CENTER is two independent 2x2 mountains:
+// left x∈{5,6}, right x∈{9,10}, both y∈{7,8}; x∈{7,8}, y∈{7,8} is the corridor.
+// This walkable cell touches the exposed west edge of the left mountain.
+const NEXT_TO_LEFT_MOUNTAIN: XY = { x: 4, y: 7 };
 
 function setupMountain(hitsLeft?: number): CombatTestContext {
     const ctx = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
@@ -51,6 +52,29 @@ function act(ctx: CombatTestContext, unit: Unit): AIActionType | undefined {
 }
 
 describe("AI mountain (BLOCK_CENTER) strategy", () => {
+    it("pins the two 2x2 mountains and their walkable corridor exactly", () => {
+        const ctx = setupMountain();
+
+        expect(ctx.grid.getCenterCells(true)).toEqual([
+            { x: 5, y: 7 },
+            { x: 5, y: 8 },
+            { x: 6, y: 7 },
+            { x: 6, y: 8 },
+            { x: 9, y: 7 },
+            { x: 9, y: 8 },
+            { x: 10, y: 7 },
+            { x: 10, y: 8 },
+        ]);
+        for (const corridorCell of [
+            { x: 7, y: 7 },
+            { x: 7, y: 8 },
+            { x: 8, y: 7 },
+            { x: 8, y: 8 },
+        ]) {
+            expect(ctx.grid.getOccupantUnitId(corridorCell)).toBe("");
+        }
+    });
+
     it("skips a cheaper mountain route whose large-unit footprint is occupied", () => {
         const ctx = setupMountain();
         const large = createTestUnit({ team: LOWER, attackType: MELEE, size: PBTypes.UnitSizeVals.LARGE });
@@ -84,7 +108,7 @@ describe("AI mountain (BLOCK_CENTER) strategy", () => {
     it("we out-range the enemy → idle melee breaks the mountain", () => {
         const ctx = setupMountain();
         const melee = createTestUnit({ team: LOWER, attackType: MELEE, name: "Knight" });
-        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_MOUNTAIN);
+        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_LEFT_MOUNTAIN);
         // A strong ranged ally makes us out-range them; enemy has no ranged firepower.
         const rangedAlly = createTestUnit({
             team: LOWER,
@@ -103,9 +127,9 @@ describe("AI mountain (BLOCK_CENTER) strategy", () => {
     it("they out-range us but we can clear it in a single lap (grouped) → break it", () => {
         const ctx = setupMountain(2); // only 2 hits left
         const melee = createTestUnit({ team: LOWER, attackType: MELEE, name: "Knight" });
-        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_MOUNTAIN);
+        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_LEFT_MOUNTAIN);
         const meleeAlly = createTestUnit({ team: LOWER, attackType: MELEE, name: "Squire" });
-        placeUnit(ctx.grid, ctx.unitsHolder, meleeAlly, { x: 5, y: 8 }); // grouped + also reaches mountain
+        placeUnit(ctx.grid, ctx.unitsHolder, meleeAlly, { x: 4, y: 8 }); // grouped + also reaches mountain
         // Enemy out-ranges us (we have no ranged), placed far so they aren't pressing.
         const enemyRanged = createTestUnit({
             team: UPPER,
@@ -122,7 +146,7 @@ describe("AI mountain (BLOCK_CENTER) strategy", () => {
     it("they out-range us and our units are spread out → do NOT mine (advance/regroup)", () => {
         const ctx = setupMountain(2);
         const melee = createTestUnit({ team: LOWER, attackType: MELEE, name: "Knight" });
-        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_MOUNTAIN);
+        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_LEFT_MOUNTAIN);
         const farAlly = createTestUnit({ team: LOWER, attackType: MELEE, name: "Straggler" });
         placeUnit(ctx.grid, ctx.unitsHolder, farAlly, { x: 1, y: 1 }); // spread out, can't reach mountain
         const enemyRanged = createTestUnit({
@@ -140,7 +164,7 @@ describe("AI mountain (BLOCK_CENTER) strategy", () => {
     it("ranged units never mine (they hold/shoot)", () => {
         const ctx = setupMountain();
         const ranged = createTestUnit({ team: LOWER, attackType: RANGE, rangeShots: 5, damageMax: 10, name: "Archer" });
-        placeUnit(ctx.grid, ctx.unitsHolder, ranged, NEXT_TO_MOUNTAIN);
+        placeUnit(ctx.grid, ctx.unitsHolder, ranged, NEXT_TO_LEFT_MOUNTAIN);
         const enemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Orc" });
         placeUnit(ctx.grid, ctx.unitsHolder, enemy, { x: 12, y: 12 });
 
@@ -150,7 +174,7 @@ describe("AI mountain (BLOCK_CENTER) strategy", () => {
     it("no mountain on the map → never mine", () => {
         const ctx = createCombatTestContext(PBTypes.GridVals.NORMAL);
         const melee = createTestUnit({ team: LOWER, attackType: MELEE, name: "Knight" });
-        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_MOUNTAIN);
+        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_LEFT_MOUNTAIN);
         const enemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Orc" });
         placeUnit(ctx.grid, ctx.unitsHolder, enemy, { x: 12, y: 12 });
 
@@ -160,7 +184,7 @@ describe("AI mountain (BLOCK_CENTER) strategy", () => {
     it("enemies pressing → engage/advance instead of mining", () => {
         const ctx = setupMountain();
         const melee = createTestUnit({ team: LOWER, attackType: MELEE, name: "Knight" });
-        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_MOUNTAIN);
+        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_LEFT_MOUNTAIN);
         const rangedAlly = createTestUnit({
             team: LOWER,
             attackType: RANGE,
@@ -179,7 +203,7 @@ describe("AI mountain (BLOCK_CENTER) strategy", () => {
     it("a live forced target prevents an engine-rejected mountain strike", () => {
         const ctx = setupMountain();
         const melee = createTestUnit({ team: LOWER, attackType: MELEE, name: "Griffin" });
-        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_MOUNTAIN);
+        placeUnit(ctx.grid, ctx.unitsHolder, melee, NEXT_TO_LEFT_MOUNTAIN);
         const rangedAlly = createTestUnit({
             team: LOWER,
             attackType: RANGE,

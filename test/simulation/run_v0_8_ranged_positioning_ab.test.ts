@@ -101,10 +101,20 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             V08_RANGED_POSITION_VERSIONS: "v0.8s",
             HOSTILE_EXPERIMENT: "1",
         });
+        const runnerOwnedKeys = new Set([
+            "V08_RANGED_POSITION_MODE",
+            "V08_RANGED_POSITION_VERSIONS",
+            "V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS",
+            "V08_SUPPORTED_RANGED_DELTA_FUNNEL_VERSIONS",
+            "V08_SUPPORTED_RANGED_DELTA_LIVE_ONLY",
+            "V08_SUPPORTED_RANGED_DELTA_VERSIONS",
+        ]);
 
         for (const [key, value] of Object.entries(canonical)) {
             if (value === undefined) {
-                expect(environment[key]).toBeUndefined();
+                if (!runnerOwnedKeys.has(key)) {
+                    expect(environment[key]).toBeUndefined();
+                }
             } else if (
                 [
                     "SEARCH_VERSIONS",

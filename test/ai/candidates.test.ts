@@ -27,6 +27,7 @@ import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
+    getCellsAroundCell,
     getPositionForCells,
     getRangeAttackSideCenter,
     isRangeAttackSideObservable,
@@ -733,6 +734,13 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(explicitOff).toEqual(baseline);
         expect(baseline.some(hasMoveAndShot)).toBe(false);
 
+        const discoveryWithOpenLine = enumerateCandidates(shooter, context, incumbent, {
+            maxMoveShotComposites: 2,
+            discoverMoveShotTargetsAfterMove: true,
+        });
+        expect(discoveryWithOpenLine.candidates).toEqual(baseline);
+        expect(discoveryWithOpenLine.candidates.some(hasMoveAndShot)).toBe(false);
+
         const enabled = enumerateCandidates(shooter, context, incumbent, {
             maxMoveShotComposites: 99,
         });
@@ -777,6 +785,276 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
         const engine = startActionEngine(c, shooter, context);
         expect(composites[0].actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
+    });
+
+    it("move-shots: terminal discovery opens a new BLOCK_CENTER line only when explicitly enabled", () => {
+        const fixture = (abilities: string[] = [], speed = 4) => {
+            const c = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+            const shooter = createTestUnit({
+                team: LOWER,
+                name: "Blocked-line archer",
+                attackType: RANGE,
+                rangeShots: 8,
+                shotDistance: 3,
+                speed,
+                damageMin: 10,
+                damageMax: 10,
+                amountAlive: 5,
+                maxHp: 10,
+                abilities,
+            });
+            const target = createTestUnit({
+                team: UPPER,
+                name: "Blocked-line target",
+                attackType: MELEE,
+                amountAlive: 10,
+                maxHp: 10,
+            });
+            placeUnit(c.grid, c.unitsHolder, shooter, { x: 4, y: 7 });
+            placeUnit(c.grid, c.unitsHolder, target, { x: 9, y: 12 });
+            shooter.refreshPossibleAttackTypes(true);
+            return { c, shooter, target, context: ctxFor(c, true) };
+        };
+        const hasMoveAndShot = (candidate: IEnumeratedCandidate): boolean =>
+            candidate.actions.some((action) => action.type === "move_unit") &&
+            candidate.actions.some((action) => action.type === "range_attack");
+
+        const live = fixture();
+        const incumbent = endTurn(live.shooter);
+        const baseline = enumerateCandidates(live.shooter, live.context, incumbent);
+        const capOnly = enumerateCandidates(live.shooter, live.context, incumbent, {
+            maxMoveShotComposites: 1,
+        });
+        expect(capOnly).toEqual(baseline);
+        expect(capOnly.candidates.some(hasMoveAndShot)).toBe(false);
+        const rollout = enumerateCandidates(live.shooter, { ...live.context, decisionOrigin: "rollout" }, incumbent, {
+            maxMoveShotComposites: 1,
+            discoverMoveShotTargetsAfterMove: true,
+        });
+        expect(rollout).toEqual(capOnly);
+
+        const discovered = enumerateCandidates(live.shooter, live.context, incumbent, {
+            maxMoveShotComposites: 1,
+            discoverMoveShotTargetsAfterMove: true,
+        });
+        const composite = discovered.candidates.find(hasMoveAndShot);
+        expect(composite).toBeDefined();
+        expect(composite).toMatchObject({
+            kind: "shot",
+            targetId: live.target.getId(),
+            features: { spendsRangeShot: 1, expectedDamage: 25 },
+        });
+        expect(composite!.actions).toEqual([
+            expect.objectContaining({
+                type: "move_unit",
+                unitId: live.shooter.getId(),
+                path: [
+                    { x: 4, y: 7 },
+                    { x: 4, y: 8 },
+                    { x: 4, y: 9 },
+                ],
+            }),
+            expect.objectContaining({
+                type: "range_attack",
+                attackerId: live.shooter.getId(),
+                targetId: live.target.getId(),
+                aimCell: { x: 9, y: 12 },
+                aimSide: 0,
+            }),
+        ]);
+        const engine = startActionEngine(live.c, live.shooter, live.context);
+        expect(composite!.actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
+
+        const constrained = fixture();
+        const other = createTestUnit({
+            team: UPPER,
+            name: "Unforced target",
+            attackType: MELEE,
+            amountAlive: 1,
+            maxHp: 10,
+        });
+        placeUnit(constrained.c.grid, constrained.c.unitsHolder, other, { x: 9, y: 2 });
+        constrained.shooter.setTarget(constrained.target.getId());
+        const forced = enumerateCandidates(constrained.shooter, constrained.context, endTurn(constrained.shooter), {
+            maxMoveShotComposites: 1,
+            discoverMoveShotTargetsAfterMove: true,
+        }).candidates.filter(hasMoveAndShot);
+        expect(forced.length).toBeGreaterThan(0);
+        expect(
+            forced.every((candidate) =>
+                candidate.actions.some(
+                    (action) => action.type === "range_attack" && action.targetId === constrained.target.getId(),
+                ),
+            ),
+        ).toBe(true);
+
+        constrained.shooter.applyDebuff(
+            new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }),
+        );
+        const cowardly = enumerateCandidates(constrained.shooter, constrained.context, endTurn(constrained.shooter), {
+            maxMoveShotComposites: 1,
+            discoverMoveShotTargetsAfterMove: true,
+        }).candidates;
+        expect(cowardly.some(hasMoveAndShot)).toBe(false);
+
+        const sniper = fixture(["Sniper"]);
+        const sniperCapOnly = enumerateCandidates(sniper.shooter, sniper.context, endTurn(sniper.shooter), {
+            maxMoveShotComposites: 1,
+        });
+        expect(sniperCapOnly.candidates.some(hasMoveAndShot)).toBe(false);
+        const sniperDiscovered = enumerateCandidates(sniper.shooter, sniper.context, endTurn(sniper.shooter), {
+            maxMoveShotComposites: 1,
+            discoverMoveShotTargetsAfterMove: true,
+        }).candidates.find(hasMoveAndShot);
+        expect(sniperDiscovered).toBeDefined();
+        const sniperEngine = startActionEngine(sniper.c, sniper.shooter, sniper.context);
+        expect(sniperDiscovered!.actions.map((action) => sniperEngine.apply(action).completed)).toEqual([true, true]);
+
+        const withoutWall = fixture();
+        withoutWall.target.setAmountAlive(4);
+        withoutWall.shooter.applyDebuff(
+            new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }),
+        );
+        const withoutWallComposites = enumerateCandidates(
+            withoutWall.shooter,
+            withoutWall.context,
+            endTurn(withoutWall.shooter),
+            {
+                maxMoveShotComposites: 2,
+                discoverMoveShotTargetsAfterMove: true,
+            },
+        ).candidates.filter(hasMoveAndShot);
+        expect(
+            withoutWallComposites.some((candidate) =>
+                candidate.actions.some(
+                    (action) => action.type === "move_unit" && action.path.some((cell) => cell.x === 4 && cell.y === 8),
+                ),
+            ),
+        ).toBe(true);
+
+        const throughWall = fixture();
+        throughWall.target.setAmountAlive(4);
+        throughWall.shooter.applyDebuff(
+            new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }),
+        );
+        throughWall.context.fightProperties!.getFireWalls().add({ x: 4, y: 8 });
+        const throughWallComposites = enumerateCandidates(
+            throughWall.shooter,
+            throughWall.context,
+            endTurn(throughWall.shooter),
+            {
+                maxMoveShotComposites: 2,
+                discoverMoveShotTargetsAfterMove: true,
+            },
+        ).candidates.filter(hasMoveAndShot);
+        expect(
+            throughWallComposites.some((candidate) =>
+                candidate.actions.some(
+                    (action) => action.type === "move_unit" && action.path.some((cell) => cell.x === 4 && cell.y === 8),
+                ),
+            ),
+        ).toBe(false);
+        expect(throughWallComposites.length).toBeGreaterThan(0);
+        const fireWallEngine = startActionEngine(throughWall.c, throughWall.shooter, throughWall.context);
+        expect(throughWallComposites[0].actions.map((action) => fireWallEngine.apply(action).completed)).toEqual([
+            true,
+            true,
+        ]);
+
+        const projectedDamage = fixture([], 1);
+        projectedDamage.target.applyDamage(78, 0, new SceneLogMock());
+        expect(projectedDamage.target.getCumulativeHp()).toBe(22);
+        for (const cell of getCellsAroundCell(testGridSettings, projectedDamage.shooter.getBaseCell())) {
+            projectedDamage.context.fightProperties!.getFireWalls().add(cell);
+        }
+        const projectedComposite = enumerateCandidates(
+            projectedDamage.shooter,
+            projectedDamage.context,
+            endTurn(projectedDamage.shooter),
+            {
+                maxMoveShotComposites: 1,
+                discoverMoveShotTargetsAfterMove: true,
+            },
+        ).candidates.find(hasMoveAndShot);
+        expect(projectedComposite).toBeDefined();
+        expect(projectedComposite).toMatchObject({
+            features: { expectedDamage: 20, expectedKill: 0 },
+        });
+        const enrichedProjected = enumerateCandidates(
+            projectedDamage.shooter,
+            projectedDamage.context,
+            projectedComposite!.actions,
+            {
+                maxMoveShotComposites: 0,
+                enrichIncumbentMetadata: true,
+            },
+        ).candidates[0];
+        expect(enrichedProjected).toMatchObject({
+            kind: "incumbent",
+            targetId: projectedDamage.target.getId(),
+            features: { expectedDamage: 20, expectedKill: 0 },
+        });
+        const projectedMove = projectedComposite!.actions.find((action) => action.type === "move_unit");
+        expect(
+            projectedMove?.type === "move_unit" &&
+                projectedMove.path.some((cell) => projectedDamage.context.fightProperties!.getFireWalls().has(cell)),
+        ).toBe(true);
+        const targetHpBefore = projectedDamage.target.getCumulativeHp();
+        const projectedDamageEngine = startActionEngine(
+            projectedDamage.c,
+            projectedDamage.shooter,
+            projectedDamage.context,
+        );
+        expect(projectedComposite!.actions.map((action) => projectedDamageEngine.apply(action).completed)).toEqual([
+            true,
+            true,
+        ]);
+        expect(targetHpBefore - projectedDamage.target.getCumulativeHp()).toBe(20);
+        expect(projectedDamage.target.getCumulativeHp()).toBe(2);
+
+        const rejectedSuffix = fixture([], 1);
+        rejectedSuffix.target.setAmountAlive(4);
+        const preWallComposite = enumerateCandidates(
+            rejectedSuffix.shooter,
+            rejectedSuffix.context,
+            endTurn(rejectedSuffix.shooter),
+            {
+                maxMoveShotComposites: 1,
+                discoverMoveShotTargetsAfterMove: true,
+            },
+        ).candidates.find(hasMoveAndShot);
+        expect(preWallComposite).toBeDefined();
+        const preWallMove = preWallComposite!.actions.find((action) => action.type === "move_unit");
+        if (preWallMove?.type !== "move_unit") throw new Error("expected move-shot incumbent");
+        const enteredCell = preWallMove.path.find((cell) => {
+            const base = rejectedSuffix.shooter.getBaseCell();
+            return cell.x !== base.x || cell.y !== base.y;
+        });
+        expect(enteredCell).toBeDefined();
+        rejectedSuffix.context.fightProperties!.getFireWalls().add(enteredCell!);
+        rejectedSuffix.shooter.applyDebuff(
+            new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }),
+        );
+        const rejectedAnchor = enumerateCandidates(
+            rejectedSuffix.shooter,
+            rejectedSuffix.context,
+            preWallComposite!.actions,
+            {
+                maxMoveShotComposites: 0,
+                enrichIncumbentMetadata: true,
+            },
+        ).candidates[0];
+        expect(rejectedAnchor).toMatchObject({
+            kind: "incumbent",
+            features: { expectedDamage: 0, expectedKill: 0 },
+        });
+        expect(rejectedAnchor.targetId).toBeUndefined();
+        expect(rejectedAnchor.shotFeatures).toBeUndefined();
+        const rejectedEngine = startActionEngine(rejectedSuffix.c, rejectedSuffix.shooter, rejectedSuffix.context);
+        expect(preWallComposite!.actions.map((action) => rejectedEngine.apply(action).completed)).toEqual([
+            true,
+            false,
+        ]);
     });
 
     it("move-shots: enriches only an exact incumbent at cap zero without adding or reordering challengers", () => {
@@ -1352,6 +1630,31 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(cluster).toBeDefined();
         expect(cleanShot).toBeDefined();
         expect(cluster!.features.expectedDamage).toBeLessThan(cleanShot!.features.expectedDamage);
+    });
+
+    it("area_throw: Terrifying Gaze excludes a forbidden engine-primary even when another enemy is splashed", () => {
+        const c = createCombatTestContext();
+        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        const enemyA = createTestUnit({ team: UPPER, name: "Enemy A", attackType: MELEE, amountAlive: 20 });
+        const enemyB = createTestUnit({ team: UPPER, name: "Enemy B", attackType: MELEE, amountAlive: 20 });
+        placeLarge(c, garg, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, enemyA, { x: 10, y: 9 });
+        placeUnit(c.grid, c.unitsHolder, enemyB, { x: 10, y: 11 });
+
+        const before = ofKind(enumerateCandidates(garg, ctxFor(c), endTurn(garg)).candidates, "area_throw");
+        const forbiddenPrimaryThrow = before.find(
+            (candidate) => candidate.targetCell?.x === 10 && candidate.targetCell.y === 10,
+        );
+        expect(forbiddenPrimaryThrow).toBeDefined();
+        expect([enemyA.getId(), enemyB.getId()]).toContain(forbiddenPrimaryThrow!.targetId!);
+        const otherSplashVictim = forbiddenPrimaryThrow!.targetId === enemyA.getId() ? enemyB.getId() : enemyA.getId();
+        expect(otherSplashVictim).not.toBe(forbiddenPrimaryThrow!.targetId);
+
+        garg.setForbiddenTarget(forbiddenPrimaryThrow!.targetId!);
+        const after = ofKind(enumerateCandidates(garg, ctxFor(c), endTurn(garg)).candidates, "area_throw");
+
+        expect(after.some((candidate) => candidate.targetCell?.x === 10 && candidate.targetCell.y === 10)).toBe(false);
+        expect(after.every((candidate) => candidate.targetId !== forbiddenPrimaryThrow!.targetId)).toBe(true);
     });
 
     it("AOE damage estimates use the engine's miss, artifact, and physical-resistance modifiers", () => {

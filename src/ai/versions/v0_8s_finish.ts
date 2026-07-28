@@ -206,6 +206,10 @@ export function prioritizeV08A13FinishDecision(
         maxMeleePairs: 8,
         maxShotAims: 6,
         maxAreaThrowCells: 4,
+        // The terminal sprint gets one exact live move-then-shot escape hatch. Hypothetical rollout turns retain
+        // the historical catalog: rediscovering every post-move ray there is both redundant and expensive.
+        maxMoveShotComposites: context.decisionOrigin === "rollout" ? 0 : 1,
+        discoverMoveShotTargetsAfterMove: context.decisionOrigin !== "rollout",
         enrichIncumbentMetadata: true,
         preserveAttackTargetCoverage: true,
     }).candidates;

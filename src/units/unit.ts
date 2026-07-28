@@ -238,6 +238,7 @@ interface IDamager {
         synergyAbilityPowerIncrease: number,
         divisor: number,
         abilityMultiplier: number,
+        amountAliveOverride?: number,
     ): number;
 
     calculateAttackDamageMax(
@@ -247,6 +248,7 @@ interface IDamager {
         synergyAbilityPowerIncrease: number,
         divisor: number,
         abilityMultiplier: number,
+        amountAliveOverride?: number,
     ): number;
 
     calculateAttackDamage(
@@ -2155,6 +2157,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         synergyAbilityPowerIncrease: number,
         divisor = 1,
         abilityMultiplier = 1,
+        amountAliveOverride?: number,
     ): number {
         if (divisor <= 0) {
             divisor = 1;
@@ -2163,7 +2166,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Math.max(
             1,
             Math.ceil(
-                ((((this.unitProperties.attack_damage_min * attackRate * this.unitProperties.amount_alive) /
+                ((((this.unitProperties.attack_damage_min *
+                    attackRate *
+                    (amountAliveOverride ?? this.unitProperties.amount_alive)) /
                     this.getEnemyArmor(enemyUnit, isRangeAttack, synergyAbilityPowerIncrease)) *
                     (1 - enemyUnit.getLuck() / 100)) /
                     divisor) *
@@ -2179,6 +2184,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         synergyAbilityPowerIncrease: number,
         divisor = 1,
         abilityMultiplier = 1,
+        amountAliveOverride?: number,
     ): number {
         if (divisor <= 0) {
             divisor = 1;
@@ -2186,7 +2192,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Math.max(
             1,
             Math.ceil(
-                ((((this.unitProperties.attack_damage_max * attackRate * this.unitProperties.amount_alive) /
+                ((((this.unitProperties.attack_damage_max *
+                    attackRate *
+                    (amountAliveOverride ?? this.unitProperties.amount_alive)) /
                     this.getEnemyArmor(enemyUnit, isRangeAttack, synergyAbilityPowerIncrease)) *
                     (1 - enemyUnit.getLuck() / 100)) /
                     divisor) *

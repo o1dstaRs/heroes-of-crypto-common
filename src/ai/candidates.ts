@@ -213,6 +213,11 @@ export interface IEnumerateOptions {
      * class completely so every existing consumer retains byte-identical actions and candidate ordering.
      */
     maxMoveShotComposites?: number;
+    /**
+     * Let the bounded move-shot probe discover a newly opened line when no stationary shot exists. The ordinary
+     * probe only repositions an existing exact aim; this opt-in is reserved for the lap-9 terminal finisher.
+     */
+    discoverMoveShotTargetsAfterMove?: boolean;
     /** Cap on area-throw target cells, kept by expected damage (0/undefined = all relevant). */
     maxAreaThrowCells?: number;
     /**
@@ -596,7 +601,7 @@ class CandidateGenerator {
                 ))
         );
     }
-    private moveAction(route: IReadonlyWeightedRoute): GameAction {
+    private moveAction(route: IReadonlyWeightedRoute): Extract<GameAction, { type: "move_unit" }> {
         return {
             type: "move_unit",
             unitId: this.unit.getId(),
@@ -1058,14 +1063,10 @@ class CandidateGenerator {
         const movePath = this.movePath();
         if (!movePath) return;
         let route: IReadonlyWeightedRoute | undefined;
+        let postMoveActor: ReturnType<typeof projectPostMoveActorAvailability> | undefined;
         for (const routeList of movePath.knownPaths.values()) {
             const candidateRoute = routeList[0];
-            if (
-                !candidateRoute?.route.length ||
-                candidateRoute.hasLavaCell ||
-                candidateRoute.hasWaterCell ||
-                !this.actorAvailableAfterMove(candidateRoute)
-            ) {
+            if (!candidateRoute?.route.length || candidateRoute.hasLavaCell || candidateRoute.hasWaterCell) {
                 continue;
             }
             const exactMove = this.moveAction(candidateRoute);
@@ -1077,11 +1078,20 @@ class CandidateGenerator {
                 move.hasWaterCell === exactMove.hasWaterCell &&
                 this.footprintOk(candidateRoute.cell)
             ) {
+                const projected = projectPostMoveActorAvailability(
+                    this.unit,
+                    decisionFireWalls(this.context),
+                    exactMove,
+                );
+                if (!projected.availableAfterMove || projected.resurrected) return;
                 route = candidateRoute;
+                postMoveActor = projected;
                 break;
             }
         }
-        if (!route) return;
+        if (!route || !postMoveActor) return;
+        const postMoveCumulativeHp =
+            (postMoveActor.stack.amountAlive - 1) * postMoveActor.stack.maxHp + Math.max(0, postMoveActor.stack.hp);
 
         const target = this.context.unitsHolder.getAllUnits().get(shot.targetId);
         if (
@@ -1090,7 +1100,7 @@ class CandidateGenerator {
             target.getTeam() !== this.enemyTeam ||
             isHidden(target) ||
             (forcedTargetId !== undefined && target.getId() !== forcedTargetId) ||
-            (this.unit.hasStatusApplied("Cowardice") && this.unit.getCumulativeHp() < target.getCumulativeHp()) ||
+            (this.unit.hasStatusApplied("Cowardice") && postMoveCumulativeHp < target.getCumulativeHp()) ||
             !target.getCells().some((cell) => cell.x === shot.aimCell!.x && cell.y === shot.aimCell!.y) ||
             !RANGE_ATTACK_CELL_SIDES.includes(shot.aimSide as RangeAttackCellSide) ||
             !isRangeAttackSideObservable(
@@ -1145,7 +1155,14 @@ class CandidateGenerator {
         ) {
             return;
         }
-        const damage = this.shotDamage(evaluation, target.getId(), shots, false);
+        const damage = this.shotDamage(
+            evaluation,
+            target.getId(),
+            shots,
+            false,
+            target.getId(),
+            postMoveActor.stack.amountAlive,
+        );
         this.enrichIncumbentCandidate({
             kind: "shot",
             actions: incumbent.actions,
@@ -1181,6 +1198,7 @@ class CandidateGenerator {
         shots: number,
         isAOE: boolean,
         aimTargetId = primaryTargetId,
+        attackerAmountAlive = this.unit.getAmountAlive(),
     ): {
         value: number;
         kill: 0 | 1;
@@ -1221,6 +1239,8 @@ class CandidateGenerator {
                     true,
                     attackerAbilityPower,
                     divisor,
+                    1,
+                    attackerAmountAlive,
                 );
                 const maxRaw = this.unit.calculateAttackDamageMax(
                     this.unit.getAttack(),
@@ -1228,6 +1248,8 @@ class CandidateGenerator {
                     true,
                     attackerAbilityPower,
                     divisor,
+                    1,
+                    attackerAmountAlive,
                 );
                 const applyEngineAoeModifiers = (rawDamage: number): number => {
                     if (!isAOE) {
@@ -1460,14 +1482,25 @@ class CandidateGenerator {
         }
 
         const moveShotCap = Math.min(2, Math.max(0, Math.floor(this.options.maxMoveShotComposites ?? 0)));
+        const moveShotDiscoveryRequested = this.options.discoverMoveShotTargetsAfterMove === true;
+        // A missing origin is a direct/live library call. Only explicit hypothetical rollout contexts suppress
+        // this terminal root escape hatch.
+        const discoverMoveShotTargetsAfterMove =
+            moveShotDiscoveryRequested && this.context.decisionOrigin !== "rollout";
         this.enrichIncumbentMoveShot(attackHandler, shots, forcedTargetId);
         if (
             moveShotCap === 0 ||
             isAOE ||
             isThroughShot ||
-            this.unit.hasAbilityActive("Sniper") ||
+            (moveShotDiscoveryRequested && !discoverMoveShotTargetsAfterMove) ||
+            (this.unit.hasAbilityActive("Sniper") && !discoverMoveShotTargetsAfterMove) ||
             !this.unit.canMove()
         ) {
+            return;
+        }
+        // Discovery is an escape hatch for a genuinely closed stationary line. It must not silently opt the
+        // terminal finisher into the legacy "move for more damage" candidate class when a shot already exists.
+        if (discoverMoveShotTargetsAfterMove && kept.length > 0) {
             return;
         }
         const movePath = this.movePath();
@@ -1493,11 +1526,23 @@ class CandidateGenerator {
                 (route.cell.x === base.x && route.cell.y === base.y) ||
                 route.hasLavaCell ||
                 route.hasWaterCell ||
-                !this.footprintOk(route.cell) ||
-                !this.actorAvailableAfterMove(route)
+                !this.footprintOk(route.cell)
             ) {
                 continue;
             }
+            const postMoveActor = projectPostMoveActorAvailability(
+                this.unit,
+                decisionFireWalls(this.context),
+                this.moveAction(route),
+            );
+            // Resurrection also resets effects in the engine. That post-revival attack state is intentionally
+            // outside this cheap projection, so do not advertise a suffix whose exact damage/legality is unknown.
+            if (!postMoveActor.availableAfterMove || postMoveActor.resurrected) continue;
+            const postMoveCumulativeHp =
+                postMoveActor.stack.amountAlive <= 0
+                    ? 0
+                    : (postMoveActor.stack.amountAlive - 1) * postMoveActor.stack.maxHp +
+                      Math.max(0, postMoveActor.stack.hp);
             const footprint = this.footprintForCell(route.cell);
             const origin = getPositionForCells(gs, footprint);
             if (
@@ -1510,11 +1555,80 @@ class CandidateGenerator {
             ) {
                 continue;
             }
+            if (discoverMoveShotTargetsAfterMove) {
+                const routeHitSets = new Set<string>();
+                for (const enemy of this.enemies) {
+                    if (isHidden(enemy) || this.unit.cannotAttackUnitId(enemy.getId())) continue;
+                    for (const cell of enemy.getCells()) {
+                        for (const side of RANGE_ATTACK_CELL_SIDES) {
+                            if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, false)) continue;
+                            const to = getRangeAttackSideCenter(gs, cell, side, origin);
+                            const evaluation = attackHandler.evaluateRangeAttack(
+                                allUnits,
+                                this.unit,
+                                origin,
+                                to,
+                                false,
+                                false,
+                                false,
+                            );
+                            const primaryHit = evaluation.affectedUnits[0]?.[0];
+                            if (
+                                !primaryHit ||
+                                evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length ||
+                                primaryHit.isDead() ||
+                                primaryHit.getTeam() !== this.enemyTeam ||
+                                primaryHit.getId() !== enemy.getId() ||
+                                isHidden(primaryHit) ||
+                                (forcedTargetId !== undefined && primaryHit.getId() !== forcedTargetId) ||
+                                (this.unit.hasDebuffActive("Cowardice") &&
+                                    postMoveCumulativeHp < primaryHit.getCumulativeHp())
+                            ) {
+                                continue;
+                            }
+                            const hitUnitSignature = evaluation.affectedUnits
+                                .map((group) => group.map((candidate) => candidate.getId()).join(","))
+                                .join(";");
+                            const hitSignature = `${enemy.getId()}#${evaluation.rangeAttackDivisors.join(",")}#${hitUnitSignature}`;
+                            if (routeHitSets.has(hitSignature)) continue;
+                            routeHitSets.add(hitSignature);
+                            const damage = this.shotDamage(
+                                evaluation,
+                                primaryHit.getId(),
+                                shots,
+                                false,
+                                enemy.getId(),
+                                postMoveActor.stack.amountAlive,
+                            );
+                            if (!(damage.value > 0)) continue;
+                            moveShots.push({
+                                shot: {
+                                    target: primaryHit,
+                                    targetId: primaryHit.getId(),
+                                    aimTargetId: enemy.getId(),
+                                    aimCell: { x: cell.x, y: cell.y },
+                                    aimSide: side,
+                                    value: 0,
+                                    kill: 0,
+                                    shotFeatures: this.shotFeatures(primaryHit, damage),
+                                    hitUnitSignature,
+                                },
+                                route,
+                                value: damage.value,
+                                kill: damage.kill,
+                                shotFeatures: this.shotFeatures(primaryHit, damage),
+                                improvement: damage.value,
+                                sourceIndex: sourceIndex++,
+                            });
+                        }
+                    }
+                }
+                continue;
+            }
             for (const shot of kept) {
                 if (
                     (forcedTargetId && shot.targetId !== forcedTargetId) ||
-                    (this.unit.hasStatusApplied("Cowardice") &&
-                        this.unit.getCumulativeHp() < shot.target.getCumulativeHp())
+                    (this.unit.hasStatusApplied("Cowardice") && postMoveCumulativeHp < shot.target.getCumulativeHp())
                 ) {
                     continue;
                 }
@@ -1541,7 +1655,14 @@ class CandidateGenerator {
                 ) {
                     continue;
                 }
-                const damage = this.shotDamage(evaluation, shot.targetId, shots, false);
+                const damage = this.shotDamage(
+                    evaluation,
+                    shot.targetId,
+                    shots,
+                    false,
+                    shot.aimTargetId,
+                    postMoveActor.stack.amountAlive,
+                );
                 if (!(damage.value > shot.value)) {
                     continue;
                 }
@@ -1669,7 +1790,11 @@ class CandidateGenerator {
             const affectedCells = [...getCellsAroundCell(gs, projected), projected];
             const affectedUnits = evaluateAffectedUnits(affectedCells, unitsHolder, grid) ?? [];
             const primaryTargetId = affectedUnits[0]?.[0]?.getId();
-            if (!primaryTargetId || (forcedTargetId && forcedTargetId !== primaryTargetId)) {
+            if (
+                !primaryTargetId ||
+                this.unit.cannotAttackUnitId(primaryTargetId) ||
+                (forcedTargetId && forcedTargetId !== primaryTargetId)
+            ) {
                 continue; // AttackHandler enforces the same first-affected-unit forced-target check.
             }
             // An interceptor can be allied even though the same legal splash deals positive net enemy damage.

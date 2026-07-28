@@ -187,12 +187,29 @@ function resolveRangeAttackPrimary(
     ).affectedUnits[0]?.[0];
 }
 
-/** Synchronous, read-only view of one strategy decision before search or recovery modifies its execution. */
+/** Authoritative result from applying a diagnostics-only proposal and rolling its state back. */
+export interface IDecisionActionProbeResult {
+    /** Null only when every substantive action through turn completion was accepted by the real engine. */
+    readonly failure: string | null;
+    /** Completed non-selector action types in engine order. */
+    readonly completedActionTypes: readonly GameAction["type"][];
+}
+
+/**
+ * Synchronous, read-only view emitted after optional search has committed its choice and restored live state,
+ * but before execution or recovery. `incumbent` remains the native strategy proposal so diagnostics can compare
+ * it with the detached chosen decision later.
+ */
 export interface IDecisionObservation {
     unit: Unit;
     context: IDecisionContext;
     incumbent: readonly GameAction[];
     strategyVersion: string;
+    /**
+     * Diagnostics-only authoritative dry run. The callback snapshots all mutable battle/RNG state, applies the
+     * supplied actions through this match's real GameActionEngine, then restores the exact decision epoch.
+     */
+    probeActions?: (actions: readonly GameAction[]) => IDecisionActionProbeResult;
 }
 
 /**
@@ -679,12 +696,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
 
     const engine = new GameActionEngine(engineContext);
     const turnEngine = new TurnEngine(engineContext);
-    const preflightV09Decision = (
+    const preflightDecisionActions = (
         decided: readonly GameAction[],
         actingUnitId: string,
-    ): { preflightMicros: number; failure: string | null } => {
+    ): { preflightMicros: number; failure: string | null; completedActionTypes: GameAction["type"][] } => {
         const startedAt = performance.now();
         const activeUnitIdSnapshot = currentActiveUnitId;
+        const completedActionTypes: GameAction["type"][] = [];
         let battleSnapshot: ReturnType<typeof snapshotBattle>;
         let damageSnapshot: IDamageStatistic[];
         let summonedUnitSequenceSnapshot: number;
@@ -698,6 +716,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             return {
                 preflightMicros: Math.max(0, Math.round((performance.now() - startedAt) * 1000)),
                 failure: "preflight_snapshot_error",
+                completedActionTypes,
             };
         }
 
@@ -724,6 +743,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 }
                 if (action.type !== "select_attack_type") {
                     productiveActionApplied = true;
+                    completedActionTypes.push(action.type);
                 }
                 if (result.events.some((event) => event.type === "turn_completed" || event.type === "fight_finished")) {
                     break;
@@ -765,11 +785,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             }
         }
         if (cleanupErrors.length) {
-            throw new AggregateError(cleanupErrors, "v0.9 qualification preflight rollback failed");
+            throw new AggregateError(cleanupErrors, "authoritative decision-action probe rollback failed");
         }
         return {
             preflightMicros: Math.max(0, Math.round((performance.now() - startedAt) * 1000)),
             failure,
+            completedActionTypes,
         };
     };
 
@@ -1196,7 +1217,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 throw new Error("v0.9 server preflight timing requires a native policy decision without search");
             }
             const decisionCompletedAt = performance.now();
-            const preflight = preflightV09Decision(decided0, actingUnitId);
+            const preflight = preflightDecisionActions(decided0, actingUnitId);
             v09ServerPreflightObservation = {
                 unitId: actingUnitId,
                 team: unit.getTeam(),
@@ -1210,14 +1231,6 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         }
         const targetMemoryAfterIncumbent =
             config.searchShadowOnly && searchApplies ? captureAITargetMemory(unitsHolder) : undefined;
-        if (config.decisionObserver) {
-            config.decisionObserver({
-                unit,
-                context: decisionContext,
-                incumbent: decided0,
-                strategyVersion: strategy.version,
-            });
-        }
         if (v09ServerPreflightObservation) {
             config.v09ServerPreflightObserver!(v09ServerPreflightObservation);
         }
@@ -1240,6 +1253,24 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const decided = trajectorySearchApplies
             ? v08A13TrajectorySearch!.chooseDecision(unit, strategy.version, decided0, decisionContext)
             : shadowDecision;
+        // Diagnostics run only after every timed selector has committed its result, keeping observer CPU outside
+        // SearchDriver's wall-clock deadline/circuit accounting. Search and lookahead restore the exact decision
+        // epoch before returning, so the authoritative probe still observes pre-action engine state.
+        if (config.decisionObserver) {
+            config.decisionObserver({
+                unit,
+                context: decisionContext,
+                incumbent: decided0,
+                strategyVersion: strategy.version,
+                probeActions: (proposal) => {
+                    const probe = preflightDecisionActions(proposal, actingUnitId);
+                    return {
+                        failure: probe.failure,
+                        completedActionTypes: probe.completedActionTypes,
+                    };
+                },
+            });
+        }
         if (decided === decided0 && config.policyEventObserver) {
             for (const event of incumbentPolicyEvents!) {
                 config.policyEventObserver(event);

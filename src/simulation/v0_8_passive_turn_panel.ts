@@ -9,14 +9,16 @@
  * -----------------------------------------------------------------------------
  */
 
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
 
 import { AI_VERSIONS } from "../ai";
 import { enumerateCandidates, type CandidateKind, type IEnumeratedCandidate } from "../ai/candidates";
+import type { IDecisionContext } from "../ai/ai_strategy";
 import {
     buildV08BacklineProtectorIntent,
     buildV08BacklineWardIntent,
@@ -25,6 +27,7 @@ import {
     preservesV08BacklineProtectorIntent,
     preservesV08BacklineWardIntent,
 } from "../ai/versions/v0_8_backline_protector";
+import { buildV08A13SearchEnvironment } from "../ai/versions/v0_8_a13_profile";
 import { isV08DirectCombatDecision } from "../ai/versions/v0_8_dominant_finish";
 import type { GameAction } from "../engine/actions";
 import type { GameEvent } from "../engine/events";
@@ -47,10 +50,10 @@ import {
     type Side,
 } from "./battle_engine";
 import { liveTwinSetup } from "./livetwin";
-import type { ISearchPassiveProductiveProbe } from "./search_driver";
-import { V08_A13_SEARCH_OVERRIDE_ENV, withScopedAIEnvironment } from "./v0_8_a13_search";
+import type { ISearchPassiveProductiveProbe, SearchPassiveActionKind } from "./search_driver";
+import { withScopedAIEnvironment } from "./v0_8_a13_search";
 
-export const V08_PASSIVE_TURN_PANEL_SCHEMA = "hoc.v0_8_passive_turn_panel.v1" as const;
+export const V08_PASSIVE_TURN_PANEL_SCHEMA = "hoc.v0_8_passive_turn_panel.v3" as const;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_GAMES = 4096;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_SEED = 2_607_270_813;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_CONCURRENCY = 12;
@@ -64,6 +67,7 @@ export const V08_PASSIVE_TURN_PANEL_MAPS: readonly number[] = Object.freeze([
 ]);
 
 const PRODUCTIVE_ACTION_KINDS = new Set<CandidateKind>(["move", "melee", "shot", "area_throw", "spell"]);
+const PASSIVE_PROBE_STRATEGY_VERSIONS = new Set(["v0.8", "v0.8s"]);
 const PRODUCTIVE_ACTION_TYPES = new Set<GameAction["type"]>([
     "move_unit",
     "melee_attack",
@@ -92,6 +96,18 @@ const RANDOM_ROSTER_ENVIRONMENT_KEYS = [
     "ROSTER_CASTER_MIN",
     "ROSTER_CASTER_MAX",
 ] as const;
+const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
+const SOURCE_SHA_PATTERN = /^[0-9a-f]{40}$/;
+
+/**
+ * BattleEngine invokes qualification after SearchDriver commits, but intentionally exposes the same decision
+ * context. Keep diagnostic enumeration out of that mutable one-shot path catalog so the observer cannot alter
+ * its cache or counters; every other live reference remains identical.
+ */
+const observerLocalDecisionContext = (context: IDecisionContext): IDecisionContext => ({
+    ...context,
+    decisionPathCatalog: undefined,
+});
 
 export type V08PassiveDefendClass = "forced" | "protected" | "avoidable";
 
@@ -105,11 +121,18 @@ export interface IV08PassiveTurnPanelOptions {
     amountMode?: StackAmountMode;
     /** Defaults true: SEE_NONE plus the shipped blind Armor/Might/Sniper setup. */
     liveSetup?: boolean;
+    /**
+     * Defaults false. Standalone v0.8/v0.8s runs seal the promoted A13 profile; campaign children set true
+     * to preserve the exact candidate environment they already installed.
+     */
+    inheritCandidateEnvironment?: boolean;
     maxLaps?: number;
     /** Defaults 250 for the 4,096-game qualification panel. */
     minCreatureAppearances?: number;
-    /** Optional provenance copied into the summary. */
+    /** Exact source checkout used by the process. A production pass requires a clean 40-character SHA. */
     sourceCommit?: string;
+    /** Set by the CLI from git status; a dirty source is recorded but can never pass qualification. */
+    sourceDirty?: boolean;
 }
 
 export interface IV08PassiveTurnPanelGamePlan {
@@ -150,6 +173,30 @@ export interface IV08PassiveTurnMetrics {
     waitsSkippedByEffectBeforeReactivation: number;
     waitsKilledBeforeReactivation: number;
     waitsCensoredByMatchEnd: number;
+    passiveEvidenceTurns: number;
+    retainedPassiveTurns: number;
+    retainedPassiveWithBetterShortlistedProductiveActionTurns: number;
+    exemptRetainedPassiveWithBetterShortlistedProductiveActionTurns: number;
+    avoidableRetainedPassiveTurns: number;
+    avoidableWaitTurns: number;
+    avoidableLuckShieldTurns: number;
+    avoidableMountainTurns: number;
+    retainedPassiveEvidenceIncompleteTurns: number;
+    forcedRetainedPassiveTurns: number;
+    protectedRetainedPassiveTurns: number;
+    strongerRangedWaitExemptions: number;
+    protectorIntentPassiveExemptions: number;
+    wardIntentPassiveExemptions: number;
+    terminalPassiveStreaks: number;
+    terminalPassiveStreakTurns: number;
+    terminalAvoidablePassiveStreaks: number;
+    terminalAvoidablePassiveStreakTurns: number;
+    circuitOpenWaitArbitrations: number;
+    circuitOpenWaitOverrides: number;
+    circuitOpenWaitDeferred: number;
+    deadlineWaitResolutions: number;
+    deadlineWaitRetentions: number;
+    deadlineWaitOverrides: number;
 }
 
 export interface IV08PassivePreparedDecision {
@@ -166,7 +213,7 @@ export interface IV08PassivePreparedDecision {
 
 interface IPendingDecision extends IV08PassivePreparedDecision {
     reactivatedFromWait: boolean;
-    engineValidProductiveAlternative?: boolean;
+    productiveProbe?: ISearchPassiveProductiveProbe;
 }
 
 interface IPendingWait {
@@ -176,14 +223,64 @@ interface IPendingWait {
     isDead?: () => boolean;
 }
 
+type V08RetainedPassiveClass = "avoidable" | "forced" | "protected" | "scored" | "stronger_ranged";
+
+interface IPassiveStreak {
+    unitId: string;
+    creatureName: string;
+    turns: number;
+    avoidableTurns: number;
+}
+
+export interface IV08PassiveDecisionFailureSample {
+    issue:
+        | "avoidable_retained_wait"
+        | "avoidable_retained_luck_shield"
+        | "avoidable_retained_mountain"
+        | "retained_passive_evidence_incomplete";
+    unitId: string;
+    creatureName: string;
+    lap: number;
+    incumbentKind: SearchPassiveActionKind;
+    retainedKind: SearchPassiveActionKind;
+    selectedKind: string;
+    bestShortlistedProductiveKind: string | null;
+    incumbentScore: number | null;
+    bestShortlistedProductiveScore: number | null;
+    shortlistedProductiveScoreDelta: number | null;
+    resolution: ISearchPassiveProductiveProbe["resolution"];
+    strongerRangedPostureWait: boolean;
+    backlineProtectorIntent: boolean;
+    backlineWardIntent: boolean;
+    circuitOpenAtDecision: boolean;
+    circuitWaitRetry: boolean;
+    decisionMs: number;
+}
+
+export interface IV08PassiveDecisionTimingSample {
+    decisionMs: number;
+    circuitOpenWait: boolean;
+    circuitWaitRetry: boolean;
+}
+
+export interface IV08PassiveDecisionTimingSummary {
+    count: number;
+    meanMs: number;
+    p95Ms: number;
+    maxMs: number;
+}
+
 export interface IV08PassiveTurnPanelRecord {
     schema: typeof V08_PASSIVE_TURN_PANEL_SCHEMA;
+    sourceCommit: string | null;
+    sourceDirty: boolean;
     game: number;
     pair: number;
     seed: number;
     mapType: number;
     candidateVersion: string;
     opponentVersion: string;
+    inheritCandidateEnvironment: boolean;
     candidateSide: Side;
     candidateRoster: string[];
     opponentRoster: string[];
@@ -194,6 +291,9 @@ export interface IV08PassiveTurnPanelRecord {
     candidateEngineRejections: number;
     metrics: IV08PassiveTurnMetrics;
     byCreature: Record<string, IV08PassiveTurnMetrics>;
+    passiveFailureSamples: IV08PassiveDecisionFailureSample[];
+    /** Optional so a partially written worker row remains diagnosable instead of crashing the summary reducer. */
+    passiveDecisionTimings?: IV08PassiveDecisionTimingSample[];
 }
 
 export interface IV08PassiveTurnGate {
@@ -205,6 +305,7 @@ export interface IV08PassiveTurnGate {
 export interface IV08PassiveTurnPanelSummary {
     schema: typeof V08_PASSIVE_TURN_PANEL_SCHEMA;
     sourceCommit: string | null;
+    sourceDirty: boolean;
     candidateVersion: string;
     opponentVersion: string;
     options: {
@@ -212,6 +313,7 @@ export interface IV08PassiveTurnPanelSummary {
         baseSeed: number;
         amountMode: StackAmountMode;
         liveSetup: boolean;
+        inheritCandidateEnvironment: boolean;
         maxLaps: number;
         minCreatureAppearances: number;
     };
@@ -230,6 +332,10 @@ export interface IV08PassiveTurnPanelSummary {
     allWaitReactivationRate: number;
     abominationFaults: number;
     arachnaQueenFaults: number;
+    passiveDecisionTiming: IV08PassiveDecisionTimingSummary;
+    circuitOpenWaitTiming: IV08PassiveDecisionTimingSummary;
+    circuitOpenWaitRetryTiming: IV08PassiveDecisionTimingSummary;
+    circuitOpenWaitDeferredTiming: IV08PassiveDecisionTimingSummary;
     gates: {
         pass: boolean;
         failed: string[];
@@ -241,6 +347,20 @@ export interface IV08PassiveTurnPanelSummary {
         mapType: number;
         candidateSide: Side;
         issue: string;
+        unitId?: string;
+        creatureName?: string;
+        lap?: number;
+        incumbentKind?: SearchPassiveActionKind;
+        retainedKind?: SearchPassiveActionKind;
+        selectedKind?: string;
+        bestShortlistedProductiveKind?: string | null;
+        incumbentScore?: number | null;
+        bestShortlistedProductiveScore?: number | null;
+        shortlistedProductiveScoreDelta?: number | null;
+        resolution?: ISearchPassiveProductiveProbe["resolution"];
+        circuitOpenAtDecision?: boolean;
+        circuitWaitRetry?: boolean;
+        decisionMs?: number;
     }>;
 }
 
@@ -272,6 +392,30 @@ const METRIC_KEYS = [
     "waitsSkippedByEffectBeforeReactivation",
     "waitsKilledBeforeReactivation",
     "waitsCensoredByMatchEnd",
+    "passiveEvidenceTurns",
+    "retainedPassiveTurns",
+    "retainedPassiveWithBetterShortlistedProductiveActionTurns",
+    "exemptRetainedPassiveWithBetterShortlistedProductiveActionTurns",
+    "avoidableRetainedPassiveTurns",
+    "avoidableWaitTurns",
+    "avoidableLuckShieldTurns",
+    "avoidableMountainTurns",
+    "retainedPassiveEvidenceIncompleteTurns",
+    "forcedRetainedPassiveTurns",
+    "protectedRetainedPassiveTurns",
+    "strongerRangedWaitExemptions",
+    "protectorIntentPassiveExemptions",
+    "wardIntentPassiveExemptions",
+    "terminalPassiveStreaks",
+    "terminalPassiveStreakTurns",
+    "terminalAvoidablePassiveStreaks",
+    "terminalAvoidablePassiveStreakTurns",
+    "circuitOpenWaitArbitrations",
+    "circuitOpenWaitOverrides",
+    "circuitOpenWaitDeferred",
+    "deadlineWaitResolutions",
+    "deadlineWaitRetentions",
+    "deadlineWaitOverrides",
 ] as const satisfies readonly (keyof IV08PassiveTurnMetrics)[];
 
 export const emptyV08PassiveTurnMetrics = (): IV08PassiveTurnMetrics => ({
@@ -302,6 +446,30 @@ export const emptyV08PassiveTurnMetrics = (): IV08PassiveTurnMetrics => ({
     waitsSkippedByEffectBeforeReactivation: 0,
     waitsKilledBeforeReactivation: 0,
     waitsCensoredByMatchEnd: 0,
+    passiveEvidenceTurns: 0,
+    retainedPassiveTurns: 0,
+    retainedPassiveWithBetterShortlistedProductiveActionTurns: 0,
+    exemptRetainedPassiveWithBetterShortlistedProductiveActionTurns: 0,
+    avoidableRetainedPassiveTurns: 0,
+    avoidableWaitTurns: 0,
+    avoidableLuckShieldTurns: 0,
+    avoidableMountainTurns: 0,
+    retainedPassiveEvidenceIncompleteTurns: 0,
+    forcedRetainedPassiveTurns: 0,
+    protectedRetainedPassiveTurns: 0,
+    strongerRangedWaitExemptions: 0,
+    protectorIntentPassiveExemptions: 0,
+    wardIntentPassiveExemptions: 0,
+    terminalPassiveStreaks: 0,
+    terminalPassiveStreakTurns: 0,
+    terminalAvoidablePassiveStreaks: 0,
+    terminalAvoidablePassiveStreakTurns: 0,
+    circuitOpenWaitArbitrations: 0,
+    circuitOpenWaitOverrides: 0,
+    circuitOpenWaitDeferred: 0,
+    deadlineWaitResolutions: 0,
+    deadlineWaitRetentions: 0,
+    deadlineWaitOverrides: 0,
 });
 
 const increment = (record: Record<string, number>, key: string, amount = 1): void => {
@@ -310,6 +478,18 @@ const increment = (record: Record<string, number>, key: string, amount = 1): voi
 
 const hasAction = (actions: readonly Readonly<GameAction>[], type: GameAction["type"]): boolean =>
     actions.some((action) => action.type === type);
+
+const passiveActionKind = (actions: readonly Readonly<GameAction>[]): SearchPassiveActionKind | undefined => {
+    if (hasAction(actions, "wait_turn")) return "wait";
+    if (hasAction(actions, "defend_turn")) return "luck_shield";
+    if (hasAction(actions, "obstacle_attack")) return "mountain";
+    return undefined;
+};
+
+export const requiresV08PassiveProductiveProbe = (
+    strategyVersion: string,
+    actions: readonly Readonly<GameAction>[],
+): boolean => PASSIVE_PROBE_STRATEGY_VERSIONS.has(strategyVersion) && passiveActionKind(actions) !== undefined;
 
 const isPureMoveCandidate = (candidate: Pick<IEnumeratedCandidate, "actions">): boolean =>
     candidate.actions.length > 0 && candidate.actions.every((action) => action.type === "move_unit");
@@ -366,8 +546,12 @@ const destroyedUnitIds = (events: readonly GameEvent[]): Set<string> => {
 export class V08PassiveTurnAuditor {
     public readonly metrics = emptyV08PassiveTurnMetrics();
     public readonly byCreature: Record<string, IV08PassiveTurnMetrics> = {};
+    public readonly failureSamples: IV08PassiveDecisionFailureSample[] = [];
+    public readonly decisionTimings: IV08PassiveDecisionTimingSample[] = [];
     private readonly pendingDecisions = new Map<string, IPendingDecision>();
+    private readonly productiveProbesBeforeDecision = new Map<string, ISearchPassiveProductiveProbe[]>();
     private readonly pendingWaits = new Map<string, IPendingWait>();
+    private readonly passiveStreaks = new Map<string, IPassiveStreak>();
     private readonly destroyed = new Set<string>();
     public constructor(public readonly candidateSide: Side) {}
     private creatureMetrics(creatureName: string): IV08PassiveTurnMetrics {
@@ -413,10 +597,24 @@ export class V08PassiveTurnAuditor {
         if (prepared.enumerationTruncations) {
             this.add(prepared.creatureName, "enumerationTruncations", prepared.enumerationTruncations);
         }
+        const buffered = this.productiveProbesBeforeDecision.get(prepared.unitId);
+        if (buffered?.length) {
+            this.productiveProbesBeforeDecision.delete(prepared.unitId);
+            if (buffered.length > 1) {
+                this.add(prepared.creatureName, "observerPairingFaults", buffered.length - 1);
+            }
+            this.attachProductiveProbe(this.pendingDecisions.get(prepared.unitId)!, buffered[0]!);
+        }
     }
     public observeDecision(observation: IDecisionObservation): void {
-        if (sideForUnit(observation.unit) !== this.candidateSide) return;
-        const { unit, context } = observation;
+        if (sideForUnit(observation.unit) !== this.candidateSide) {
+            // Search emits the productive probe before this post-search decision observation for both physical
+            // sides. Opponent evidence is outside this panel; discard it only once ownership is known.
+            this.productiveProbesBeforeDecision.delete(observation.unit.getId());
+            return;
+        }
+        const { unit } = observation;
+        const context = observerLocalDecisionContext(observation.context);
         const candidateSet = enumerateCandidates(unit, context, [...observation.incumbent], {
             // Uncapped enumeration still needs duplicate-generated melee/throw/spell metadata copied onto
             // candidate zero; otherwise a positive incumbent attack retains expectedDamage=0 and is falsely
@@ -449,22 +647,33 @@ export class V08PassiveTurnAuditor {
             lap: context.fightProperties?.getCurrentLap() ?? 0,
             rawIncumbent: observation.incumbent,
             defendClass,
-            requiresProductiveProbe:
-                observation.strategyVersion === "v0.8" &&
-                defendClass === "avoidable" &&
-                hasAction(observation.incumbent, "defend_turn"),
+            requiresProductiveProbe: requiresV08PassiveProductiveProbe(
+                observation.strategyVersion,
+                observation.incumbent,
+            ),
             enumerationTruncations: candidateSet.truncated.length,
             isDead: () => unit.isDead(),
         });
     }
-    public observeProductiveProbe(probe: ISearchPassiveProductiveProbe): void {
-        const pending = this.pendingDecisions.get(probe.unitId);
-        // The shared SearchDriver also probes the opponent. Candidate-side decisions alone have pending rows.
-        if (!pending) return;
-        if (pending.engineValidProductiveAlternative !== undefined) {
+    private attachProductiveProbe(pending: IPendingDecision, probe: ISearchPassiveProductiveProbe): void {
+        if (pending.productiveProbe !== undefined) {
             this.add(pending.creatureName, "observerPairingFaults");
         }
-        pending.engineValidProductiveAlternative = probe.hasEngineValidProductiveAlternative;
+        const expectedKind = passiveActionKind(pending.rawIncumbent);
+        if (expectedKind === undefined || probe.incumbentKind !== expectedKind || probe.lap !== pending.lap) {
+            this.add(pending.creatureName, "observerPairingFaults");
+        }
+        pending.productiveProbe = { ...probe };
+    }
+    public observeProductiveProbe(probe: ISearchPassiveProductiveProbe): void {
+        const pending = this.pendingDecisions.get(probe.unitId);
+        if (pending) {
+            this.attachProductiveProbe(pending, probe);
+            return;
+        }
+        const buffered = this.productiveProbesBeforeDecision.get(probe.unitId) ?? [];
+        buffered.push({ ...probe });
+        this.productiveProbesBeforeDecision.set(probe.unitId, buffered);
     }
     public observeEvents(events: readonly GameEvent[]): void {
         for (const event of events) {
@@ -475,6 +684,7 @@ export class V08PassiveTurnAuditor {
         }
         for (const unitId of destroyedUnitIds(events)) {
             this.destroyed.add(unitId);
+            this.passiveStreaks.delete(unitId);
             const wait = this.pendingWaits.get(unitId);
             if (wait) this.resolveWait(wait, "killed");
         }
@@ -497,10 +707,12 @@ export class V08PassiveTurnAuditor {
         const chosenDefend = hasAction(observation.chosenDecision, "defend_turn");
         let defendClass = pending.defendClass;
         if (pending.requiresProductiveProbe) {
-            if (pending.engineValidProductiveAlternative === undefined) {
+            if (pending.productiveProbe === undefined) {
                 this.add(observation.creatureName, "observerPairingFaults");
             }
-            if (pending.engineValidProductiveAlternative !== true) defendClass = "forced";
+            if (pending.productiveProbe?.hasEngineValidProductiveAlternative !== true && defendClass !== "protected") {
+                defendClass = "forced";
+            }
         }
         if (rawEnd) this.add(creature, "rawEndTurnTurns");
         if (chosenEnd) this.add(creature, "chosenEndTurnTurns");
@@ -550,18 +762,151 @@ export class V08PassiveTurnAuditor {
             else if (defendClass === "protected") this.add(creature, "protectedDefendTurns");
             else this.add(creature, "avoidableDefendTurns");
         }
+
+        const completedActions = [
+            ...completedStrategy.map(({ action }) => action),
+            ...completedRecovery.flatMap(({ action }) => (action ? [action] : [])),
+        ];
+        const finalPassiveKind = passiveActionKind(completedActions);
+        const probe = pending.productiveProbe;
+        if (probe) {
+            this.add(creature, "passiveEvidenceTurns");
+            const circuitOpenWait = probe.incumbentKind === "wait" && probe.circuitOpenAtDecision;
+            this.decisionTimings.push({
+                decisionMs: probe.decisionMs,
+                circuitOpenWait,
+                circuitWaitRetry: probe.circuitWaitRetry,
+            });
+            if (circuitOpenWait) {
+                if (probe.circuitWaitRetry) {
+                    this.add(creature, "circuitOpenWaitArbitrations");
+                    if (!probe.retainedPassive) this.add(creature, "circuitOpenWaitOverrides");
+                } else {
+                    this.add(creature, "circuitOpenWaitDeferred");
+                }
+            }
+            if (probe.incumbentKind === "wait" && probe.resolution === "deadline_fallback") {
+                this.add(creature, "deadlineWaitResolutions");
+                this.add(creature, probe.retainedPassive ? "deadlineWaitRetentions" : "deadlineWaitOverrides");
+            }
+            if (probe.retainedPassive !== (passiveActionKind(observation.chosenDecision) !== undefined)) {
+                this.add(creature, "observerPairingFaults");
+            }
+        }
+        if (finalPassiveKind && probe?.retainedPassive) {
+            this.add(creature, "retainedPassiveTurns");
+            const evidenceIncomplete = !probe.evidenceComplete;
+            if (evidenceIncomplete) {
+                this.add(creature, "retainedPassiveEvidenceIncompleteTurns");
+            }
+            if (probe.betterShortlistedProductiveAlternative) {
+                this.add(creature, "retainedPassiveWithBetterShortlistedProductiveActionTurns");
+            }
+
+            let passiveClass: V08RetainedPassiveClass;
+            const scoredStrongerRangedGateExemption =
+                finalPassiveKind === "wait" &&
+                probe.strongerRangedPostureWait &&
+                probe.resolution === "scored" &&
+                probe.shortlistedProductiveScoreDelta !== null &&
+                probe.shortlistedProductiveScoreDelta >= 0 &&
+                probe.shortlistedProductiveScoreDelta < probe.productiveOverrideGate;
+            if (scoredStrongerRangedGateExemption) {
+                passiveClass = "stronger_ranged";
+                this.add(creature, "strongerRangedWaitExemptions");
+                if (probe.betterShortlistedProductiveAlternative) {
+                    this.add(creature, "exemptRetainedPassiveWithBetterShortlistedProductiveActionTurns");
+                }
+            } else if (
+                !probe.hasEngineValidProductiveAlternative &&
+                pending.defendClass === "protected" &&
+                (probe.backlineProtectorIntent || probe.backlineWardIntent)
+            ) {
+                passiveClass = "protected";
+                this.add(creature, "protectedRetainedPassiveTurns");
+                if (probe.backlineProtectorIntent) this.add(creature, "protectorIntentPassiveExemptions");
+                if (probe.backlineWardIntent) this.add(creature, "wardIntentPassiveExemptions");
+            } else if (probe.betterShortlistedProductiveAlternative) {
+                passiveClass = "avoidable";
+                this.add(creature, "avoidableRetainedPassiveTurns");
+                if (finalPassiveKind === "wait") this.add(creature, "avoidableWaitTurns");
+                else if (finalPassiveKind === "luck_shield") this.add(creature, "avoidableLuckShieldTurns");
+                else this.add(creature, "avoidableMountainTurns");
+            } else if (!probe.hasEngineValidProductiveAlternative) {
+                passiveClass = "forced";
+                this.add(creature, "forcedRetainedPassiveTurns");
+            } else {
+                passiveClass = "scored";
+            }
+
+            const previous = this.passiveStreaks.get(observation.unitId);
+            this.passiveStreaks.set(observation.unitId, {
+                unitId: observation.unitId,
+                creatureName: creature,
+                turns: (previous?.turns ?? 0) + 1,
+                avoidableTurns: (previous?.avoidableTurns ?? 0) + (passiveClass === "avoidable" ? 1 : 0),
+            });
+            if ((evidenceIncomplete || passiveClass === "avoidable") && this.failureSamples.length < 20) {
+                this.failureSamples.push({
+                    issue: evidenceIncomplete
+                        ? "retained_passive_evidence_incomplete"
+                        : finalPassiveKind === "wait"
+                          ? "avoidable_retained_wait"
+                          : finalPassiveKind === "luck_shield"
+                            ? "avoidable_retained_luck_shield"
+                            : "avoidable_retained_mountain",
+                    unitId: observation.unitId,
+                    creatureName: creature,
+                    lap: pending.lap,
+                    incumbentKind: probe.incumbentKind,
+                    retainedKind: finalPassiveKind,
+                    selectedKind: probe.selectedKind,
+                    bestShortlistedProductiveKind: probe.bestShortlistedProductiveKind,
+                    incumbentScore: probe.incumbentScore,
+                    bestShortlistedProductiveScore: probe.bestShortlistedProductiveScore,
+                    shortlistedProductiveScoreDelta: probe.shortlistedProductiveScoreDelta,
+                    resolution: probe.resolution,
+                    strongerRangedPostureWait: probe.strongerRangedPostureWait,
+                    backlineProtectorIntent: probe.backlineProtectorIntent,
+                    backlineWardIntent: probe.backlineWardIntent,
+                    circuitOpenAtDecision: probe.circuitOpenAtDecision,
+                    circuitWaitRetry: probe.circuitWaitRetry,
+                    decisionMs: probe.decisionMs,
+                });
+            }
+        } else if (
+            completedActions.some((action) => PRODUCTIVE_ACTION_TYPES.has(action.type) || action.type === "end_turn")
+        ) {
+            this.passiveStreaks.delete(observation.unitId);
+        }
     }
     public finish(): void {
         for (const pending of this.pendingDecisions.values()) {
             this.add(pending.creatureName, "observerPairingFaults");
         }
         this.pendingDecisions.clear();
+        // A probe that never received a same-unit decision observation is an orphan. Unit ownership is unknown
+        // at this point, so retain the global hard-gate count without manufacturing an "Unknown" creature row.
+        for (const probes of this.productiveProbesBeforeDecision.values()) {
+            this.metrics.observerPairingFaults += probes.length;
+        }
+        this.productiveProbesBeforeDecision.clear();
         for (const wait of [...this.pendingWaits.values()]) {
             this.resolveWait(
                 wait,
                 this.destroyed.has(wait.unitId) || wait.isDead?.() === true ? "killed" : "match_end",
             );
         }
+        for (const streak of this.passiveStreaks.values()) {
+            if (streak.turns < 2 || this.destroyed.has(streak.unitId)) continue;
+            this.add(streak.creatureName, "terminalPassiveStreaks");
+            this.add(streak.creatureName, "terminalPassiveStreakTurns", streak.turns);
+            if (streak.avoidableTurns > 0) {
+                this.add(streak.creatureName, "terminalAvoidablePassiveStreaks");
+                this.add(streak.creatureName, "terminalAvoidablePassiveStreakTurns", streak.turns);
+            }
+        }
+        this.passiveStreaks.clear();
     }
 }
 
@@ -590,6 +935,15 @@ const validateOptions = (options: IV08PassiveTurnPanelOptions): void => {
     }
     if (options.minCreatureAppearances !== undefined && options.minCreatureAppearances < 0) {
         throw new RangeError("Passive-turn panel minCreatureAppearances must be nonnegative");
+    }
+    if (options.inheritCandidateEnvironment !== undefined && typeof options.inheritCandidateEnvironment !== "boolean") {
+        throw new TypeError("Passive-turn panel inheritCandidateEnvironment must be boolean");
+    }
+    if (options.sourceDirty !== undefined && typeof options.sourceDirty !== "boolean") {
+        throw new TypeError("Passive-turn panel sourceDirty must be boolean");
+    }
+    if (options.sourceCommit !== undefined && typeof options.sourceCommit !== "string") {
+        throw new TypeError("Passive-turn panel sourceCommit must be a string");
     }
 };
 
@@ -637,7 +991,29 @@ export function fingerprintV08PassiveTurnPanelPlan(options: IV08PassiveTurnPanel
     const identities = Array.from({ length: options.games }, (_, game) =>
         scheduleIdentity(planV08PassiveTurnPanelGame(options, game)),
     );
-    return createHash("sha256").update(JSON.stringify(identities)).digest("hex");
+    return createHash("sha256")
+        .update(
+            JSON.stringify({
+                inheritCandidateEnvironment: options.inheritCandidateEnvironment === true,
+                sourceCommit: options.sourceCommit ?? null,
+                sourceDirty: options.sourceDirty === true,
+                identities,
+            }),
+        )
+        .digest("hex");
+}
+
+export function withV08PassiveCandidateEnvironment<T>(
+    options: Pick<IV08PassiveTurnPanelOptions, "candidateVersion" | "inheritCandidateEnvironment">,
+    run: () => T,
+): T {
+    if (options.inheritCandidateEnvironment === true) {
+        return run();
+    }
+    if (options.candidateVersion === "v0.8" || options.candidateVersion === "v0.8s") {
+        return withScopedAIEnvironment(buildV08A13SearchEnvironment(options.candidateVersion), run);
+    }
+    return run();
 }
 
 /** Run one production v0.8+a13 random-roster match with read-only decision and execution observers. */
@@ -670,19 +1046,23 @@ export function runV08PassiveTurnPanelGame(
         turnActivationObserver: (events) => auditor.observeEvents(events),
     };
     try {
-        // Fail closed against an inherited research shell: the panel always measures the promoted, sealed A13
-        // driver for a production v0.8 seat, even when the caller has V07_SEARCH/Q2 variables in its environment.
-        const result = withScopedAIEnvironment({ [V08_A13_SEARCH_OVERRIDE_ENV]: "1" }, () => runMatch(config));
+        const execute = (): ReturnType<typeof runMatch> => runMatch(config);
+        // Standalone runs fail closed against an inherited research shell. Campaign children explicitly opt out
+        // because their candidate-specific environment is itself the subject under qualification.
+        const result = withV08PassiveCandidateEnvironment(options, execute);
         auditor.finish();
         const candidateIsGreen = plan.candidateSide === "green";
         return {
             schema: V08_PASSIVE_TURN_PANEL_SCHEMA,
+            sourceCommit: options.sourceCommit ?? null,
+            sourceDirty: options.sourceDirty === true,
             game,
             pair: plan.pair,
             seed: plan.seed,
             mapType: plan.mapType,
             candidateVersion: options.candidateVersion,
             opponentVersion: options.opponentVersion,
+            inheritCandidateEnvironment: options.inheritCandidateEnvironment === true,
             candidateSide: plan.candidateSide,
             candidateRoster: rosterNames(candidateRoster),
             opponentRoster: rosterNames(opponentRoster),
@@ -692,17 +1072,22 @@ export function runV08PassiveTurnPanelGame(
             candidateEngineRejections: candidateIsGreen ? (result.rejectedGreen ?? 0) : (result.rejectedRed ?? 0),
             metrics: auditor.metrics,
             byCreature: auditor.byCreature,
+            passiveFailureSamples: auditor.failureSamples,
+            passiveDecisionTimings: auditor.decisionTimings,
         };
     } catch (error) {
         auditor.finish();
         return {
             schema: V08_PASSIVE_TURN_PANEL_SCHEMA,
+            sourceCommit: options.sourceCommit ?? null,
+            sourceDirty: options.sourceDirty === true,
             game,
             pair: plan.pair,
             seed: plan.seed,
             mapType: plan.mapType,
             candidateVersion: options.candidateVersion,
             opponentVersion: options.opponentVersion,
+            inheritCandidateEnvironment: options.inheritCandidateEnvironment === true,
             candidateSide: plan.candidateSide,
             candidateRoster: rosterNames(candidateRoster),
             opponentRoster: rosterNames(opponentRoster),
@@ -713,6 +1098,8 @@ export function runV08PassiveTurnPanelGame(
             candidateEngineRejections: 0,
             metrics: auditor.metrics,
             byCreature: auditor.byCreature,
+            passiveFailureSamples: auditor.failureSamples,
+            passiveDecisionTimings: auditor.decisionTimings,
         };
     }
 }
@@ -736,6 +1123,9 @@ export function v08PassiveCreatureFaults(metrics: IV08PassiveTurnMetrics | undef
         metrics.enumerationTruncations +
         metrics.introducedDefendTurns +
         metrics.avoidableDefendTurns +
+        metrics.avoidableRetainedPassiveTurns +
+        metrics.retainedPassiveEvidenceIncompleteTurns +
+        metrics.terminalAvoidablePassiveStreaks +
         metrics.missedSameLapWaitReactivations +
         metrics.repeatedSameLapWaits
     );
@@ -743,6 +1133,19 @@ export function v08PassiveCreatureFaults(metrics: IV08PassiveTurnMetrics | undef
 
 const ratio = (numerator: number, denominator: number, emptyValue: number): number =>
     denominator > 0 ? Number((numerator / denominator).toFixed(6)) : emptyValue;
+
+const summarizeDecisionTimings = (values: readonly number[]): IV08PassiveDecisionTimingSummary => {
+    const sorted = values.filter((value) => Number.isFinite(value) && value >= 0).sort((a, b) => a - b);
+    if (!sorted.length) return { count: 0, meanMs: 0, p95Ms: 0, maxMs: 0 };
+    const meanMs = sorted.reduce((sum, value) => sum + value, 0) / sorted.length;
+    const p95Index = Math.max(0, Math.ceil(sorted.length * 0.95) - 1);
+    return {
+        count: sorted.length,
+        meanMs: Number(meanMs.toFixed(3)),
+        p95Ms: Number(sorted[p95Index].toFixed(3)),
+        maxMs: Number(sorted[sorted.length - 1].toFixed(3)),
+    };
+};
 
 const gate = (pass: boolean, actual: number | string, expected: string): IV08PassiveTurnGate => ({
     pass,
@@ -767,9 +1170,15 @@ export function summarizeV08PassiveTurnPanel(
     const endReasons: Record<string, number> = {};
     const seenGames = new Set<number>();
     const failureSamples: IV08PassiveTurnPanelSummary["failureSamples"] = [];
+    const passiveDecisionMs: number[] = [];
+    const circuitOpenWaitDecisionMs: number[] = [];
+    const circuitOpenWaitRetryDecisionMs: number[] = [];
+    const circuitOpenWaitDeferredDecisionMs: number[] = [];
     let candidateEngineRejections = 0;
 
-    for (const record of records) {
+    // Worker completion order is scheduler-dependent. Game-order aggregation keeps capped failure samples,
+    // by-creature insertion order, and the serialized summary stable across worker counts and hosts.
+    for (const record of [...records].sort((left, right) => left.game - right.game)) {
         if (seenGames.has(record.game)) throw new Error(`Duplicate passive-turn panel game ${record.game}`);
         seenGames.add(record.game);
         const expected = planV08PassiveTurnPanelGame(options, record.game);
@@ -777,8 +1186,11 @@ export function summarizeV08PassiveTurnPanel(
         const opponentRoster = expected.candidateSide === "green" ? expected.redRoster : expected.greenRoster;
         if (
             record.schema !== V08_PASSIVE_TURN_PANEL_SCHEMA ||
+            record.sourceCommit !== (options.sourceCommit ?? null) ||
+            record.sourceDirty !== (options.sourceDirty === true) ||
             record.candidateVersion !== options.candidateVersion ||
             record.opponentVersion !== options.opponentVersion ||
+            record.inheritCandidateEnvironment !== (options.inheritCandidateEnvironment === true) ||
             record.pair !== expected.pair ||
             record.seed !== expected.seed ||
             record.mapType !== expected.mapType ||
@@ -796,6 +1208,40 @@ export function summarizeV08PassiveTurnPanel(
         for (const [creatureName, source] of Object.entries(record.byCreature)) {
             mergeMetrics((byCreature[creatureName] ??= emptyV08PassiveTurnMetrics()), source);
         }
+        for (const timing of record.passiveDecisionTimings ?? []) {
+            if (!Number.isFinite(timing.decisionMs) || timing.decisionMs < 0) continue;
+            passiveDecisionMs.push(timing.decisionMs);
+            if (timing.circuitOpenWait) {
+                circuitOpenWaitDecisionMs.push(timing.decisionMs);
+                (timing.circuitWaitRetry ? circuitOpenWaitRetryDecisionMs : circuitOpenWaitDeferredDecisionMs).push(
+                    timing.decisionMs,
+                );
+            }
+        }
+        for (const sample of record.passiveFailureSamples) {
+            if (failureSamples.length >= 40) break;
+            failureSamples.push({
+                game: record.game,
+                seed: record.seed,
+                mapType: record.mapType,
+                candidateSide: record.candidateSide,
+                issue: sample.issue,
+                unitId: sample.unitId,
+                creatureName: sample.creatureName,
+                lap: sample.lap,
+                incumbentKind: sample.incumbentKind,
+                retainedKind: sample.retainedKind,
+                selectedKind: sample.selectedKind,
+                bestShortlistedProductiveKind: sample.bestShortlistedProductiveKind,
+                incumbentScore: sample.incumbentScore,
+                bestShortlistedProductiveScore: sample.bestShortlistedProductiveScore,
+                shortlistedProductiveScoreDelta: sample.shortlistedProductiveScoreDelta,
+                resolution: sample.resolution,
+                circuitOpenAtDecision: sample.circuitOpenAtDecision,
+                circuitWaitRetry: sample.circuitWaitRetry,
+                decisionMs: sample.decisionMs,
+            });
+        }
         const issues = [
             record.crash ? `crash: ${record.crash.split("\n")[0]}` : "",
             record.endReason === "stuck" ? "stuck" : "",
@@ -805,7 +1251,7 @@ export function summarizeV08PassiveTurnPanel(
                 ? `${v08PassiveCreatureFaults(record.metrics)} passive fault(s)`
                 : "",
         ].filter(Boolean);
-        if (issues.length && failureSamples.length < 40) {
+        if (issues.length && failureSamples.length < 40 && record.passiveFailureSamples.length === 0) {
             failureSamples.push({
                 game: record.game,
                 seed: record.seed,
@@ -830,7 +1276,16 @@ export function summarizeV08PassiveTurnPanel(
     const allWaitReactivationRate = ratio(metrics.sameLapWaitReactivations, metrics.waitTurns, 1);
     const abominationFaults = v08PassiveCreatureFaults(byCreature.Abomination);
     const arachnaQueenFaults = v08PassiveCreatureFaults(byCreature["Arachna Queen"]);
+    const sourceBound =
+        options.sourceDirty !== true &&
+        options.sourceCommit !== undefined &&
+        SOURCE_SHA_PATTERN.test(options.sourceCommit);
     const checks: Record<string, IV08PassiveTurnGate> = {
+        source_commit_bound: gate(
+            sourceBound,
+            options.sourceDirty ? `${options.sourceCommit ?? "missing"} (dirty)` : (options.sourceCommit ?? "missing"),
+            "clean 40-character source SHA",
+        ),
         exact_game_count: gate(records.length === options.games, records.length, `= ${options.games}`),
         unique_games: gate(seenGames.size === records.length, seenGames.size, `= ${records.length}`),
         balanced_candidate_seats: gate(
@@ -878,6 +1333,44 @@ export function summarizeV08PassiveTurnPanel(
             "= 0",
         ),
         repeated_same_lap_waits_zero: gate(metrics.repeatedSameLapWaits === 0, metrics.repeatedSameLapWaits, "= 0"),
+        retained_passive_with_better_shortlisted_productive_action_zero: gate(
+            metrics.avoidableRetainedPassiveTurns === 0,
+            metrics.avoidableRetainedPassiveTurns,
+            "= 0",
+        ),
+        retained_passive_better_shortlisted_action_accounted: gate(
+            metrics.retainedPassiveWithBetterShortlistedProductiveActionTurns ===
+                metrics.avoidableRetainedPassiveTurns +
+                    metrics.exemptRetainedPassiveWithBetterShortlistedProductiveActionTurns,
+            `${metrics.avoidableRetainedPassiveTurns} avoidable + ${metrics.exemptRetainedPassiveWithBetterShortlistedProductiveActionTurns} exempt / ${metrics.retainedPassiveWithBetterShortlistedProductiveActionTurns} raw`,
+            "avoidable + explicit exemptions = raw",
+        ),
+        avoidable_waits_zero: gate(metrics.avoidableWaitTurns === 0, metrics.avoidableWaitTurns, "= 0"),
+        avoidable_luck_shields_zero: gate(
+            metrics.avoidableLuckShieldTurns === 0,
+            metrics.avoidableLuckShieldTurns,
+            "= 0",
+        ),
+        avoidable_mountain_turns_zero: gate(
+            metrics.avoidableMountainTurns === 0,
+            metrics.avoidableMountainTurns,
+            "= 0",
+        ),
+        wait_deadline_fallbacks_zero: gate(
+            metrics.deadlineWaitResolutions === 0,
+            metrics.deadlineWaitResolutions,
+            "= 0",
+        ),
+        retained_passive_evidence_complete: gate(
+            metrics.retainedPassiveEvidenceIncompleteTurns === 0,
+            metrics.retainedPassiveEvidenceIncompleteTurns,
+            "= 0",
+        ),
+        terminal_avoidable_passive_streaks_zero: gate(
+            metrics.terminalAvoidablePassiveStreaks === 0,
+            metrics.terminalAvoidablePassiveStreaks,
+            "= 0",
+        ),
         eligible_wait_reactivation_rate: gate(
             eligibleWaitReactivationRate >= V08_PASSIVE_TURN_PANEL_MIN_WAIT_REACTIVATION_RATE,
             eligibleWaitReactivationRate,
@@ -897,6 +1390,7 @@ export function summarizeV08PassiveTurnPanel(
     return {
         schema: V08_PASSIVE_TURN_PANEL_SCHEMA,
         sourceCommit: options.sourceCommit ?? null,
+        sourceDirty: options.sourceDirty === true,
         candidateVersion: options.candidateVersion,
         opponentVersion: options.opponentVersion,
         options: {
@@ -904,6 +1398,7 @@ export function summarizeV08PassiveTurnPanel(
             baseSeed: options.baseSeed,
             amountMode: options.amountMode ?? "expBudget",
             liveSetup: options.liveSetup !== false,
+            inheritCandidateEnvironment: options.inheritCandidateEnvironment === true,
             maxLaps: options.maxLaps ?? 60,
             minCreatureAppearances: minAppearances,
         },
@@ -922,6 +1417,10 @@ export function summarizeV08PassiveTurnPanel(
         allWaitReactivationRate,
         abominationFaults,
         arachnaQueenFaults,
+        passiveDecisionTiming: summarizeDecisionTimings(passiveDecisionMs),
+        circuitOpenWaitTiming: summarizeDecisionTimings(circuitOpenWaitDecisionMs),
+        circuitOpenWaitRetryTiming: summarizeDecisionTimings(circuitOpenWaitRetryDecisionMs),
+        circuitOpenWaitDeferredTiming: summarizeDecisionTimings(circuitOpenWaitDeferredDecisionMs),
         gates: { pass: failed.length === 0, failed, checks },
         failureSamples,
     };
@@ -941,15 +1440,19 @@ export function runV08PassiveTurnPanelConcurrent(
     }
     return new Promise((resolve, reject) => {
         const records: IV08PassiveTurnPanelRecord[] = [];
-        const workers: Worker[] = [];
+        const callbackBuffer = new Map<number, IV08PassiveTurnPanelRecord>();
+        const liveWorkers = new Set<Worker>();
         let dispatched = 0;
         let completed = 0;
+        let nextCallbackGame = 0;
         let settled = false;
-        const cleanup = (): void => workers.forEach((worker) => void worker.terminate());
+        const stopWorkers = (): void => {
+            for (const worker of liveWorkers) worker.postMessage({ type: "stop" });
+        };
         const fail = (error: unknown): void => {
             if (settled) return;
             settled = true;
-            cleanup();
+            stopWorkers();
             reject(error instanceof Error ? error : new Error(String(error)));
         };
         const dispatch = (worker: Worker): void => {
@@ -959,10 +1462,20 @@ export function runV08PassiveTurnPanelConcurrent(
             }
             worker.postMessage({ type: "game", game: dispatched++ });
         };
+        const emitReadyRecords = (record: IV08PassiveTurnPanelRecord): void => {
+            if (!onGame) return;
+            callbackBuffer.set(record.game, record);
+            while (callbackBuffer.has(nextCallbackGame)) {
+                const ready = callbackBuffer.get(nextCallbackGame)!;
+                callbackBuffer.delete(nextCallbackGame);
+                onGame(ready);
+                nextCallbackGame += 1;
+            }
+        };
         const workerUrl = new URL("./v0_8_passive_turn_panel_worker.ts", import.meta.url);
         for (let index = 0; index < poolSize; index += 1) {
             const worker = new Worker(workerUrl, { workerData: { options } });
-            workers.push(worker);
+            liveWorkers.add(worker);
             worker.on(
                 "message",
                 (message: { type: "ready" } | { type: "result"; record: IV08PassiveTurnPanelRecord }) => {
@@ -972,17 +1485,36 @@ export function runV08PassiveTurnPanelConcurrent(
                         return;
                     }
                     records.push(message.record);
-                    onGame?.(message.record);
                     completed += 1;
+                    try {
+                        emitReadyRecords(message.record);
+                    } catch (error) {
+                        fail(error);
+                        return;
+                    }
                     if (completed === options.games) {
-                        settled = true;
-                        cleanup();
-                        resolve(summarizeV08PassiveTurnPanel(options, records));
+                        stopWorkers();
+                        try {
+                            const summary = summarizeV08PassiveTurnPanel(options, records);
+                            settled = true;
+                            resolve(summary);
+                        } catch (error) {
+                            fail(error);
+                        }
                     } else {
                         dispatch(worker);
                     }
                 },
             );
+            worker.on("exit", (code) => {
+                liveWorkers.delete(worker);
+                if (settled) return;
+                if (code !== 0) {
+                    fail(new Error(`Passive-turn panel worker exited with code ${code}`));
+                } else if (liveWorkers.size === 0 && completed < options.games) {
+                    fail(new Error(`All passive-turn panel workers exited after ${completed}/${options.games} games`));
+                }
+            });
             worker.on("error", fail);
         }
     });
@@ -996,16 +1528,34 @@ const readFlag = (args: readonly string[], name: string): string | undefined => 
     return value;
 };
 
+const captureSource = (): { commit: string; dirty: boolean } => {
+    const commit = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: REPOSITORY_ROOT,
+        encoding: "utf8",
+    }).trim();
+    const status = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
+        cwd: REPOSITORY_ROOT,
+        encoding: "utf8",
+    }).trim();
+    return { commit, dirty: status.length > 0 };
+};
+
 async function main(): Promise<void> {
     const args = process.argv.slice(2);
     if (args.includes("--help")) {
         console.log(
-            "usage: bun src/simulation/v0_8_passive_turn_panel.ts [--candidate v0.8] [--opponent v0.7] [--games 4096] [--seed 2607270813] [--concurrency 12] [--out-dir sim-out] [--min-appearances 250] [--source-commit SHA]",
+            "usage: bun src/simulation/v0_8_passive_turn_panel.ts [--candidate v0.8] [--opponent v0.7] [--games 4096] [--seed 2607270813] [--concurrency 12] [--out-dir sim-out] [--min-appearances 250] [--source-commit 40SHA] [--inherit-candidate-environment]",
         );
         return;
     }
     const candidateVersion = readFlag(args, "--candidate") ?? "v0.8";
     const opponentVersion = readFlag(args, "--opponent") ?? "v0.7";
+    const source = captureSource();
+    const requestedSource =
+        readFlag(args, "--source-commit") ?? process.env.PASSIVE_PANEL_SOURCE_COMMIT ?? source.commit;
+    if (requestedSource !== source.commit) {
+        throw new Error(`--source-commit ${requestedSource} does not match checked-out HEAD ${source.commit}`);
+    }
     if (!AI_VERSIONS.includes(candidateVersion) || !AI_VERSIONS.includes(opponentVersion)) {
         throw new Error(`Unknown AI version; known versions: ${AI_VERSIONS.join(", ")}`);
     }
@@ -1017,7 +1567,9 @@ async function main(): Promise<void> {
         minCreatureAppearances: Number(
             readFlag(args, "--min-appearances") ?? V08_PASSIVE_TURN_PANEL_DEFAULT_MIN_CREATURE_APPEARANCES,
         ),
-        sourceCommit: readFlag(args, "--source-commit") ?? process.env.PASSIVE_PANEL_SOURCE_COMMIT,
+        inheritCandidateEnvironment: args.includes("--inherit-candidate-environment"),
+        sourceCommit: source.commit,
+        sourceDirty: source.dirty,
     };
     validateOptions(options);
     const concurrency = Math.min(

@@ -162,10 +162,13 @@ import {
  * challengers. K includes the incumbent and must be >=2. Unset keeps the original full-candidate search.
  * SEARCH_DECISION_DEADLINE_MS=<positive ms> is an opt-in fail-closed rollout-comparison deadline. It is checked
  * between candidates, rollout actions, and simulated turns; an incomplete comparison restores the battle.
- * Historical versions and ordinary v0.8 waits return the exact incumbent. A v0.8 hard passive or dominant-finish
- * turn first runs one bounded immediate-action validity probe and returns that prevalidated fallback when one
- * exists. The probe is outside the comparison deadline but inside the circuit timer. The deadline must be
- * strictly below the circuit breaker, leaving restore and call-site headroom.
+ * Historical versions return the exact incumbent. A v0.8 hard passive or dominant-finish turn first runs one
+ * bounded immediate-action validity probe and returns that prevalidated fallback when one exists. The probe is
+ * outside the comparison deadline but inside the circuit timer. The deadline must be strictly below the circuit
+ * breaker, leaving restore and call-site headroom. SEARCH_WAIT_DEADLINE_POLICY=operation_bounded disables only
+ * the wall-clock comparison deadline for aggressive v0.8/v0.8s wait incumbents; their finite shortlist, rollout
+ * count, and turn horizon remain the deterministic operation bound. The default `profile` preserves all prior
+ * versions and research configurations.
  * SEARCH_LATE_RANGED_FINISH_WEIGHT=<0..16> is a default-zero research overlay on the leaf logit. It rewards
  * late damage to the enemy's original army in proportion to the post-setup board's HP-weighted rangedness,
  * ramping from zero through lap 3 to full strength at the first Armageddon lap. Summons are excluded.
@@ -206,9 +209,11 @@ import {
  * SEARCH_MOVE_SHOT_VERSIONS=<csv> scopes that probe to selected seats (for example `v0.8` while an identical
  * `v0.8s` seat remains the control). Unset defaults to SEARCH_VERSIONS; it is ignored while the max is zero.
  * SEARCH_CIRCUIT_BREAKER_MS=<positive ms> provides a lower-bound research emulation of the ranked server's
- * outer per-match circuit: the first over-budget result still applies, then historical versions and strategic
- * v0.8 waits retain each later incumbent. v0.8 still engine-validates a bounded fallback for no-ops, Luck Shields,
- * mountain attacks, and dominant-finish turns. The live wrapper adds call-site overhead outside this timer.
+ * outer per-match circuit: the first over-budget result still applies, then historical versions retain each later
+ * incumbent. Under the operation-bounded wait policy, one later aggressive v0.8/v0.8s wait (ordinary or
+ * stronger-ranged) gets one complete scored retry per match; later waits retain. v0.8 still engine-validates a
+ * bounded fallback for no-ops, Luck Shields, mountain attacks, and dominant-finish turns. The live wrapper adds
+ * call-site overhead outside this timer.
  * v0.8 additionally treats a legal direct attack as lexicographically stronger than every non-combat action from
  * lap 9 onward while its living, non-summoned army has at least twice the enemy's HP. This narrow dominant-finish
  * tier bypasses probability saturation but still uses normal rollouts to choose among legal attacks.
@@ -294,6 +299,7 @@ const MIXED_SUPPORTED_PARETO_AUDIT_SCHEMA = "hoc.search.pareto_focus.v13";
 type SearchMode = "off" | "search" | "ablation" | "oracle";
 type HorizonMode = "leaf" | "turns" | "reply" | "lap";
 type IncumbentKind = "idle" | "defend" | "wait" | "move" | "melee" | "shot" | "area_throw" | "spell" | "mine";
+type WaitDeadlinePolicy = "profile" | "operation_bounded";
 
 /** The slice of a candidate the rollout scorer actually consumes (lets the oracle skip enumeration). */
 type ISearchCandidate = Pick<IEnumeratedCandidate, "kind" | "actions">;
@@ -382,6 +388,16 @@ const PRODUCTIVE_ACTION_TYPES = new Set<GameAction["type"]>([
     "cast_spell",
 ]);
 const PASSIVE_ACTION_TYPES = new Set<GameAction["type"]>(["wait_turn", "defend_turn", "obstacle_attack"]);
+export type SearchPassiveActionKind = "wait" | "luck_shield" | "mountain";
+export type SearchPassiveProbeResolution =
+    "scored" | "deadline_fallback" | "circuit_fallback" | "single_force_tier" | "single_candidate";
+
+const searchPassiveActionKind = (actions: readonly Readonly<GameAction>[]): SearchPassiveActionKind | undefined => {
+    if (actions.some((action) => action.type === "wait_turn")) return "wait";
+    if (actions.some((action) => action.type === "defend_turn")) return "luck_shield";
+    if (actions.some((action) => action.type === "obstacle_attack")) return "mountain";
+    return undefined;
+};
 
 /**
  * Classify whether a candidate completes real activity without also consuming the turn on a passive action.
@@ -496,6 +512,8 @@ interface ISearchCounters {
     scoredCandidatesTotal: number;
     /** Searches abandoned before every shortlisted candidate received a comparable full score. */
     deadlineFallbacks: number;
+    /** At most one fresh scored wait comparison after the per-match timing circuit has opened. */
+    circuitWaitRetries: number;
     /** v0.8 turns that entered the fixed late two-to-one-HP finish window. */
     dominantFinishTurns: number;
     /** Normal searched turns where the finish tier replaced a non-combat incumbent with direct combat. */
@@ -663,6 +681,7 @@ const emptyCounters = (): ISearchCounters => ({
     candidatesTotal: 0,
     scoredCandidatesTotal: 0,
     deadlineFallbacks: 0,
+    circuitWaitRetries: 0,
     dominantFinishTurns: 0,
     dominantFinishCombatOverrides: 0,
     dominantFinishCombatFallbacks: 0,
@@ -802,13 +821,70 @@ export interface ISearchScoredDecision {
 
 export type SearchScoredDecisionObserver = (decision: ISearchScoredDecision) => void;
 
-/** Exact authoritative result of the production hard-passive probe used by qualification diagnostics. */
+/**
+ * Detached, scalar-only evidence for one production passive incumbent.
+ *
+ * The observer runs after every simulation has rolled back, the live RNG/active unit have been restored, and
+ * circuit-breaker time has been captured. Consequently observing (or even mutating) this record cannot affect
+ * the chosen action or a later decision. A finite score is an authoritative real-engine completion: rejected
+ * candidates are represented internally by -Infinity and never appear as an engine-valid alternative here.
+ */
 export interface ISearchPassiveProductiveProbe {
     readonly unitId: string;
+    readonly lap: number;
+    readonly incumbentKind: SearchPassiveActionKind;
+    readonly selectedKind: string;
+    readonly retainedPassive: boolean;
+    /** Any productive action proven executable, including a lexicographic fallback outside the score shortlist. */
     readonly hasEngineValidProductiveAlternative: boolean;
+    /** SEARCH_SHORTLIST members that completed through the engine and received a comparable score. */
+    readonly engineValidShortlistedProductiveAlternatives: number;
+    readonly productiveComparisonScope: "search_shortlist";
+    readonly bestShortlistedProductiveKind: string | null;
+    readonly incumbentScore: number | null;
+    readonly bestShortlistedProductiveScore: number | null;
+    readonly shortlistedProductiveScoreDelta: number | null;
+    /**
+     * Whether the best scored shortlist member clears the applicable value threshold: zero for aggressive
+     * ordinary waits and productiveOverrideGate for stronger-ranged waits. Hard-passive lexicographic evidence is
+     * represented separately by productiveTierRequired plus hasEngineValidProductiveAlternative.
+     */
+    readonly betterShortlistedProductiveAlternative: boolean;
+    readonly scoreComparisonComplete: boolean;
+    /**
+     * True when either comparable scores exist or an authoritative hard-passive/single-candidate probe makes a
+     * score unnecessary. A retained passive with false here is an unresolved qualification failure.
+     */
+    readonly evidenceComplete: boolean;
+    readonly productiveTierRequired: boolean;
+    /** General (non-lexicographic) rollout delta required to override the incumbent. */
+    readonly productiveOverrideGate: number;
+    readonly strongerRangedPostureWait: boolean;
+    readonly backlineProtectorIntent: boolean;
+    readonly backlineWardIntent: boolean;
+    readonly circuitOpenAtDecision: boolean;
+    readonly circuitWaitRetry: boolean;
+    /** Live behavior time only; diagnostic counterfactual work is excluded. */
+    readonly decisionMs: number;
+    readonly resolution: SearchPassiveProbeResolution;
 }
 
 export type SearchPassiveProductiveProbeObserver = (probe: ISearchPassiveProductiveProbe) => void;
+
+interface ISearchPassiveAuditContext {
+    readonly incumbentKind: SearchPassiveActionKind;
+    readonly productiveTierRequired: boolean;
+    readonly productiveOverrideGate: number;
+    readonly strongerRangedPostureWait: boolean;
+    readonly backlineProtectorIntent: boolean;
+    readonly backlineWardIntent: boolean;
+    readonly circuitOpenAtDecision: boolean;
+    readonly circuitWaitRetry: boolean;
+    /** Freeze live decision timing before diagnostic-only work begins. */
+    readonly beforeCounterfactual: () => void;
+    readonly decisionElapsedMs: () => number;
+    readonly capture: (probe: ISearchPassiveProductiveProbe) => void;
+}
 
 export class SearchDriver {
     public readonly enabled: boolean;
@@ -832,6 +908,7 @@ export class SearchDriver {
     private readonly validationRollouts: number | null;
     private readonly shortlist: number | null;
     private readonly decisionDeadlineMs: number | null;
+    private readonly waitDeadlinePolicy: WaitDeadlinePolicy;
     private readonly lateRangedFinishWeight: number;
     private readonly pureRangedTerminalWeight: number;
     private readonly pureRangedNoMeleePressure: boolean;
@@ -994,6 +1071,12 @@ export class SearchDriver {
             }
             this.decisionDeadlineMs = decisionDeadlineMs;
         }
+        const rawWaitDeadlinePolicy =
+            this.mode === "search" ? process.env.SEARCH_WAIT_DEADLINE_POLICY?.trim() || "profile" : "profile";
+        if (rawWaitDeadlinePolicy !== "profile" && rawWaitDeadlinePolicy !== "operation_bounded") {
+            throw new Error("SEARCH_WAIT_DEADLINE_POLICY must be profile or operation_bounded");
+        }
+        this.waitDeadlinePolicy = rawWaitDeadlinePolicy;
         const circuitBreakerMs = Number(process.env.SEARCH_CIRCUIT_BREAKER_MS);
         this.circuitBreakerMs =
             this.mode === "search" && Number.isFinite(circuitBreakerMs) && circuitBreakerMs > 0
@@ -1307,6 +1390,7 @@ export class SearchDriver {
             return incumbent;
         }
         const incumbentKind = classifyActions(incumbent);
+        const passiveIncumbentKind = searchPassiveActionKind(incumbent);
         const isV08Search = this.mode === "search" && V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version);
         const isAggressiveV08 = this.aggressiveV08 && V08_AGGRESSIVE_VERSIONS.has(version);
         if (this.incumbentKinds && !this.incumbentKinds.has(incumbentKind)) {
@@ -1341,6 +1425,8 @@ export class SearchDriver {
             this.counters.strongerRangedPostureWaits += 1;
         }
         const aggressiveWaitComparison = isAggressiveV08 && incumbentKind === "wait" && !strongerRangedPostureWait;
+        const operationBoundedWaitComparison =
+            isAggressiveV08 && incumbentKind === "wait" && this.waitDeadlinePolicy === "operation_bounded";
         const prioritizeDominantFinish =
             isV08Search && v08DominantFinishState(this.deps.unitsHolder, unit.getTeam(), currentLap).dominant;
         const prioritizeV08SUrgency =
@@ -1431,9 +1517,29 @@ export class SearchDriver {
             pureRangedJitNoMeleeFocusLapEligible(currentLap) &&
             isPureRangedJitNoMeleeFocusStationaryIncumbent(unit, incumbent);
         const pureRangedDirectInterventionBoard = pureRangedNoMeleePressureBoard || pureRangedDeadlineFinisherBoard;
-        // Historical, observe-only, and ordinary-wait searches preserve the exact fail-closed incumbent after a
-        // circuit opens. Hard v0.8 passives and dominant-finish turns still probe an engine-valid fallback.
-        if (this.circuitOpen && !useProductiveFallback && !pureRangedDirectInterventionBoard) {
+        // Historical and observe-only searches preserve the exact fail-closed incumbent after a circuit opens.
+        // A13 may complete one operation-bounded wait retry; hard v0.8 passives and dominant-finish turns still
+        // probe an engine-valid fallback.
+        const arbitrateCircuitWait =
+            this.circuitOpen &&
+            !useProductiveFallback &&
+            !pureRangedDirectInterventionBoard &&
+            operationBoundedWaitComparison &&
+            this.counters.circuitWaitRetries === 0;
+        const auditCircuitPassiveReturn =
+            this.circuitOpen &&
+            !useProductiveFallback &&
+            !pureRangedDirectInterventionBoard &&
+            !arbitrateCircuitWait &&
+            this.passiveProductiveProbeObserver !== undefined &&
+            passiveIncumbentKind !== undefined;
+        if (
+            this.circuitOpen &&
+            !useProductiveFallback &&
+            !pureRangedDirectInterventionBoard &&
+            !arbitrateCircuitWait &&
+            !auditCircuitPassiveReturn
+        ) {
             this.counters.circuitSkipped += 1;
             return incumbent;
         }
@@ -1441,6 +1547,15 @@ export class SearchDriver {
         const savedSource = getDeterministicRandomSource();
         const savedActive = this.deps.getActiveUnitId();
         const seedBase = this.simSeed(unit);
+        let pendingPassiveProductiveProbe: ISearchPassiveProductiveProbe | undefined;
+        // A later circuit-open wait returns before enumeration in production. Observer mode may enumerate and
+        // score a detached counterfactual, but none of that diagnostic work belongs to live decision timing.
+        let behaviorElapsedMs: number | undefined = auditCircuitPassiveReturn ? performance.now() - t0 : undefined;
+        // Consume the match-lifetime retry before enumeration begins. An enumeration failure must not permit a
+        // second attempt, and the retry's deadline below is measured from this same pre-enumeration timestamp.
+        if (arbitrateCircuitWait) {
+            this.counters.circuitWaitRetries += 1;
+        }
         // Swap the tournament's seeded RNG to a PRIVATE stream around the WHOLE search (enumeration
         // included) and restore the exact source reference in `finally` — identical hygiene to
         // lookahead.ts, so V07_SEARCH off/on stay individually reproducible and paired A/Bs stay paired.
@@ -1485,6 +1600,32 @@ export class SearchDriver {
                 pureRangedJitNoMeleeFocusCatalogBoard;
             const backlineProtectorIntent = isV08Search ? buildV08BacklineProtectorIntent(unit, context) : undefined;
             const backlineWardIntent = isV08Search ? buildV08BacklineWardIntent(unit, context) : undefined;
+            const passiveAudit: ISearchPassiveAuditContext | undefined =
+                this.passiveProductiveProbeObserver && passiveIncumbentKind
+                    ? {
+                          incumbentKind: passiveIncumbentKind,
+                          productiveTierRequired: prioritizeProductiveActions,
+                          productiveOverrideGate: this.gate,
+                          strongerRangedPostureWait,
+                          backlineProtectorIntent: backlineProtectorIntent !== undefined,
+                          backlineWardIntent: backlineWardIntent !== undefined,
+                          circuitOpenAtDecision: this.circuitOpen,
+                          circuitWaitRetry: arbitrateCircuitWait,
+                          beforeCounterfactual: (): void => {
+                              behaviorElapsedMs ??= performance.now() - t0;
+                          },
+                          decisionElapsedMs: (): number => {
+                              behaviorElapsedMs ??= performance.now() - t0;
+                              return behaviorElapsedMs;
+                          },
+                          capture: (probe): void => {
+                              if (pendingPassiveProductiveProbe) {
+                                  throw new Error(`Duplicate passive productive probe for ${probe.unitId}`);
+                              }
+                              pendingPassiveProductiveProbe = { ...probe };
+                          },
+                      }
+                    : undefined;
             const preservesBacklineIntent = (candidate: Pick<IEnumeratedCandidate, "actions">): boolean =>
                 (!backlineProtectorIntent ||
                     preservesV08BacklineProtectorIntent(backlineProtectorIntent, unit, context, candidate.actions)) &&
@@ -1579,7 +1720,7 @@ export class SearchDriver {
                     prioritizeV08SUrgency,
                     true,
                 );
-                if (!boundedProductiveFallback) {
+                if (!boundedProductiveFallback && prioritizeProductiveActions) {
                     this.counters.passiveCatalogExpansions += 1;
                     const expandedCandidates = enumerateCandidates(unit, context, incumbent, {
                         maxMoveShotComposites: this.moveShotCapForVersion(version),
@@ -1609,11 +1750,52 @@ export class SearchDriver {
                         candidates = [...candidates, expandedProductiveFallback];
                     }
                 }
-                this.passiveProductiveProbeObserver?.({
-                    unitId: unit.getId(),
-                    hasEngineValidProductiveAlternative:
-                        boundedProductiveFallback !== undefined || expandedProductiveFallback !== undefined,
-                });
+            }
+            if (arbitrateCircuitWait) {
+                // Give the first circuit-open A13 wait one complete, finite operation-bounded comparison. Later
+                // waits return immediately. The retry is consumed before enumeration so a fault cannot grant a
+                // second attempt.
+                this.counters.decisions += 1;
+                return this.search(
+                    unit,
+                    candidates,
+                    incumbent,
+                    seedBase,
+                    t0,
+                    false,
+                    boundedProductiveFallback,
+                    prioritizeDominantFinish,
+                    aggressiveWaitComparison,
+                    prioritizeV08STargetPressure,
+                    prioritizeV08SUrgency,
+                    passiveAudit,
+                    "operation_bounded",
+                );
+            }
+            if (auditCircuitPassiveReturn) {
+                // The original live path returned the incumbent at the pre-enumeration circuit check above.
+                // Diagnostic mode reaches only far enough to build the same bounded catalog and score its
+                // counterfactual; it must return here before any JIT/focus/deadline intervention can alter play.
+                this.counters.circuitSkipped += 1;
+                const counterfactual = this.scorePassiveCounterfactual(
+                    passiveAudit,
+                    unit,
+                    candidates,
+                    seedBase,
+                    prioritizeProductiveActions,
+                    prioritizeDominantFinish,
+                    prioritizeV08STargetPressure,
+                    prioritizeV08SUrgency,
+                );
+                this.capturePassiveProductiveProbe(
+                    passiveAudit,
+                    unit,
+                    incumbent,
+                    "circuit_fallback",
+                    counterfactual?.candidates ?? [],
+                    counterfactual?.means ?? [],
+                );
+                return incumbent;
             }
             if (mixedSupportedParetoFunnelProbe?.failedStage === null) {
                 if (pureRangedParetoNoMeleeFocusCatalogBoard) {
@@ -2031,11 +2213,31 @@ export class SearchDriver {
                       : undefined;
             if (this.circuitOpen) {
                 this.counters.circuitSkipped += 1;
-                this.counters.msTotal += performance.now() - t0;
+                this.counters.msTotal += passiveAudit?.decisionElapsedMs() ?? performance.now() - t0;
                 if (isDominantFinishCombatReplacement(prioritizeDominantFinish, productiveFallback, incumbent)) {
                     this.counters.dominantFinishCombatFallbacks += 1;
                 }
-                return productiveFallback?.actions ?? incumbent;
+                const fallbackActions = productiveFallback?.actions ?? incumbent;
+                const counterfactual = this.scorePassiveCounterfactual(
+                    passiveAudit,
+                    unit,
+                    candidates,
+                    seedBase,
+                    prioritizeProductiveActions,
+                    prioritizeDominantFinish,
+                    prioritizeV08STargetPressure,
+                    prioritizeV08SUrgency,
+                );
+                this.capturePassiveProductiveProbe(
+                    passiveAudit,
+                    unit,
+                    fallbackActions,
+                    "circuit_fallback",
+                    counterfactual?.candidates ?? [],
+                    counterfactual?.means ?? [],
+                    productiveFallback,
+                );
+                return fallbackActions;
             }
             // A hard passive with exactly one engine-valid force-tier alternative has no search decision left:
             // the lexicographic gate below must select that action regardless of rollout value. Returning the
@@ -2048,12 +2250,21 @@ export class SearchDriver {
             ) {
                 this.counters.decisions += 1;
                 this.counters.singleForceTierFastPaths += 1;
-                this.counters.msTotal += performance.now() - t0;
+                this.counters.msTotal += passiveAudit?.decisionElapsedMs() ?? performance.now() - t0;
                 if (productiveFallback.actions !== incumbent) {
                     this.counters.overrides += 1;
                     bump(this.counters.overridesByIncumbentKind, incumbentKind);
                     bump(this.counters.overridesToKind, productiveFallback.kind);
                 }
+                this.capturePassiveProductiveProbe(
+                    passiveAudit,
+                    unit,
+                    productiveFallback.actions,
+                    "single_force_tier",
+                    [],
+                    [],
+                    productiveFallback,
+                );
                 return productiveFallback.actions;
             }
             this.counters.decisions += 1;
@@ -2062,7 +2273,17 @@ export class SearchDriver {
             }
             if (candidates.length <= 1) {
                 this.counters.singleCandidate += 1;
-                return productiveFallback?.actions ?? incumbent;
+                const fallbackActions = productiveFallback?.actions ?? incumbent;
+                this.capturePassiveProductiveProbe(
+                    passiveAudit,
+                    unit,
+                    fallbackActions,
+                    "single_candidate",
+                    [],
+                    [],
+                    productiveFallback,
+                );
+                return fallbackActions;
             }
             return this.search(
                 unit,
@@ -2076,9 +2297,14 @@ export class SearchDriver {
                 aggressiveWaitComparison,
                 prioritizeV08STargetPressure,
                 prioritizeV08SUrgency,
+                passiveAudit,
+                operationBoundedWaitComparison ? "operation_bounded" : "profile",
             );
         } finally {
-            if (this.circuitBreakerMs !== null && performance.now() - t0 > this.circuitBreakerMs) {
+            if (
+                this.circuitBreakerMs !== null &&
+                (behaviorElapsedMs ?? performance.now() - t0) > this.circuitBreakerMs
+            ) {
                 this.circuitOpen = true;
             }
             const cleanupErrors: unknown[] = [];
@@ -2095,6 +2321,9 @@ export class SearchDriver {
             this.finishedSim = false;
             this.rolloutEnemyTeam = null;
             if (cleanupErrors.length) throw new SearchRollbackError(cleanupErrors);
+            if (pendingPassiveProductiveProbe) {
+                this.passiveProductiveProbeObserver?.({ ...pendingPassiveProductiveProbe });
+            }
         }
     }
     /** Flush the per-game audit summary (one JSONL line + any buffered per-turn rows) and the datasets. */
@@ -2184,6 +2413,8 @@ export class SearchDriver {
             shortlist: this.shortlist,
             decisionDeadlineMs: this.decisionDeadlineMs,
             deadlineFallbacks: c.deadlineFallbacks,
+            waitDeadlinePolicy: this.waitDeadlinePolicy,
+            circuitWaitRetries: c.circuitWaitRetries,
             passiveCatalogExpansions: c.passiveCatalogExpansions,
             passiveCatalogExpansionRecoveries: c.passiveCatalogExpansionRecoveries,
             singleForceTierFastPaths: c.singleForceTierFastPaths,
@@ -2391,6 +2622,113 @@ export class SearchDriver {
             decisionOrdinal,
         };
     }
+    private capturePassiveProductiveProbe(
+        audit: ISearchPassiveAuditContext | undefined,
+        unit: Unit,
+        selectedActions: readonly GameAction[],
+        resolution: SearchPassiveProbeResolution,
+        candidates: readonly IEnumeratedCandidate[] = [],
+        means: readonly number[] = [],
+        productiveFallback?: IEnumeratedCandidate,
+    ): void {
+        if (!audit) return;
+        // Freeze behavior before building detached diagnostic evidence. Probe aggregation and observer delivery
+        // must not inflate decision timing or tip the per-match circuit breaker.
+        audit.beforeCounterfactual();
+        const legalProductive = candidates
+            .map((candidate, index) => ({ candidate, index, score: means[index] }))
+            .filter(
+                ({ candidate, score }) =>
+                    isForceTierProductiveCandidate(candidate) && Number.isFinite(score) && score !== -Infinity,
+            );
+        let best = legalProductive[0];
+        for (const alternative of legalProductive.slice(1)) {
+            if (alternative.score > best.score) best = alternative;
+        }
+        const fallbackRepresented =
+            productiveFallback !== undefined &&
+            legalProductive.some(({ candidate }) => candidate === productiveFallback);
+        const engineValidShortlistedProductiveAlternatives = legalProductive.length;
+        const incumbentScore = Number.isFinite(means[0]) && means[0] !== -Infinity ? (means[0] as number) : null;
+        const bestShortlistedProductiveScore = best ? best.score : null;
+        const shortlistedProductiveScoreDelta =
+            incumbentScore !== null && bestShortlistedProductiveScore !== null
+                ? bestShortlistedProductiveScore - incumbentScore
+                : null;
+        const bestShortlistedProductiveKind = best?.candidate.kind ?? null;
+        const hasEngineValidProductiveAlternative =
+            engineValidShortlistedProductiveAlternatives > 0 ||
+            (productiveFallback !== undefined && !fallbackRepresented);
+        const scoreComparisonComplete = means.length > 0 && incumbentScore !== null;
+        const retainedPassive = searchPassiveActionKind(selectedActions) !== undefined;
+        audit.capture({
+            unitId: unit.getId(),
+            lap: this.deps.fightProperties.getCurrentLap(),
+            incumbentKind: audit.incumbentKind,
+            selectedKind: classifyActions(selectedActions),
+            retainedPassive,
+            hasEngineValidProductiveAlternative,
+            engineValidShortlistedProductiveAlternatives,
+            productiveComparisonScope: "search_shortlist",
+            bestShortlistedProductiveKind,
+            incumbentScore,
+            bestShortlistedProductiveScore,
+            shortlistedProductiveScoreDelta,
+            betterShortlistedProductiveAlternative:
+                shortlistedProductiveScoreDelta !== null &&
+                shortlistedProductiveScoreDelta >= (audit.strongerRangedPostureWait ? audit.productiveOverrideGate : 0),
+            scoreComparisonComplete,
+            evidenceComplete:
+                scoreComparisonComplete ||
+                audit.productiveTierRequired ||
+                !retainedPassive ||
+                (resolution === "single_candidate" && !hasEngineValidProductiveAlternative),
+            productiveTierRequired: audit.productiveTierRequired,
+            productiveOverrideGate: audit.productiveOverrideGate,
+            strongerRangedPostureWait: audit.strongerRangedPostureWait,
+            backlineProtectorIntent: audit.backlineProtectorIntent,
+            backlineWardIntent: audit.backlineWardIntent,
+            circuitOpenAtDecision: audit.circuitOpenAtDecision,
+            circuitWaitRetry: audit.circuitWaitRetry,
+            decisionMs: Math.max(0, audit.decisionElapsedMs()),
+            resolution,
+        });
+    }
+    private scorePassiveCounterfactual(
+        audit: ISearchPassiveAuditContext | undefined,
+        unit: Unit,
+        candidates: IEnumeratedCandidate[],
+        seedBase: number,
+        prioritizeProductiveActions: boolean,
+        prioritizeDominantFinish: boolean,
+        prioritizeV08STargetPressure: boolean,
+        prioritizeV08SUrgency: boolean,
+    ): { candidates: readonly IEnumeratedCandidate[]; means: readonly number[] } | undefined {
+        if (!audit) return undefined;
+        audit.beforeCounterfactual();
+        const countersBefore = structuredClone(this.counters);
+        try {
+            const scoredCandidates = this.shortlistCandidates(
+                unit,
+                candidates,
+                seedBase,
+                null,
+                prioritizeProductiveActions,
+                prioritizeDominantFinish,
+                prioritizeV08STargetPressure,
+                prioritizeV08SUrgency,
+            );
+            const means = this.scoreCandidates(unit, scoredCandidates, seedBase, "turns", this.rollouts, null);
+            return { candidates: scoredCandidates, means };
+        } catch (error) {
+            if (error instanceof SearchRollbackError) throw error;
+            // Qualification reports the incomplete evidence as a hard-gate failure. A diagnostic observer must
+            // never turn an otherwise executable live decision into a match crash.
+            return undefined;
+        } finally {
+            Object.assign(this.counters, countersBefore);
+        }
+    }
     private search(
         unit: Unit,
         candidates: IEnumeratedCandidate[],
@@ -2403,6 +2741,8 @@ export class SearchDriver {
         aggressiveWaitComparison = false,
         prioritizeV08STargetPressure = false,
         prioritizeV08SUrgency = false,
+        passiveAudit?: ISearchPassiveAuditContext,
+        deadlinePolicy: WaitDeadlinePolicy = "profile",
     ): GameAction[] {
         const incumbentKind = classifyActions(incumbent);
         this.counters.searched += 1;
@@ -2423,7 +2763,10 @@ export class SearchDriver {
               }
             : undefined;
 
-        const deadlineAt = this.decisionDeadlineMs === null ? null : t0 + this.decisionDeadlineMs;
+        const deadlineAt =
+            deadlinePolicy === "operation_bounded" || this.decisionDeadlineMs === null
+                ? null
+                : t0 + this.decisionDeadlineMs;
         let scoredCandidates: readonly IEnumeratedCandidate[];
         let means: number[];
         let bestIdx = 0;
@@ -2532,13 +2875,30 @@ export class SearchDriver {
         } catch (error) {
             if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;
             this.counters.deadlineFallbacks += 1;
-            const fallbackActions = productiveFallback?.actions ?? incumbent;
-            if (isDominantFinishCombatReplacement(prioritizeDominantFinish, productiveFallback, incumbent)) {
+            const counterfactual = this.scorePassiveCounterfactual(
+                passiveAudit,
+                unit,
+                candidates,
+                seedBase,
+                prioritizeProductiveActions,
+                prioritizeDominantFinish,
+                prioritizeV08STargetPressure,
+                prioritizeV08SUrgency,
+            );
+            // A timeout contains no value comparison. Ordinary tactical waits therefore fail closed even when
+            // an engine-valid action exists; only an independently established lexicographic finish/passive tier
+            // may force the valid fallback. Qualification scores the wait/action pair after behavior is frozen.
+            const forceProductiveFallback =
+                prioritizeProductiveActions || prioritizeDominantFinish || prioritizeV08SUrgency;
+            const selectedFallback =
+                aggressiveWaitComparison && !forceProductiveFallback ? undefined : productiveFallback;
+            const fallbackActions = selectedFallback?.actions ?? incumbent;
+            if (isDominantFinishCombatReplacement(prioritizeDominantFinish, selectedFallback, incumbent)) {
                 this.counters.dominantFinishCombatFallbacks += 1;
             }
             const fallbackKind =
-                productiveFallback?.kind === "incumbent" ? incumbentKind : (productiveFallback?.kind ?? incumbentKind);
-            const ms = performance.now() - t0;
+                selectedFallback?.kind === "incumbent" ? incumbentKind : (selectedFallback?.kind ?? incumbentKind);
+            const ms = passiveAudit?.decisionElapsedMs() ?? performance.now() - t0;
             this.counters.msTotal += ms;
             if (this.auditPath && this.auditTurns) {
                 this.turnRows.push(
@@ -2558,7 +2918,7 @@ export class SearchDriver {
                         d: null,
                         ms: Math.round(ms * 10) / 10,
                         deadlineFallback: 1,
-                        productiveFallback: Number(productiveFallback !== undefined),
+                        productiveFallback: Number(selectedFallback !== undefined),
                         ...(this.observeOnly
                             ? {
                                   observeOnly: 1,
@@ -2571,6 +2931,15 @@ export class SearchDriver {
                     }),
                 );
             }
+            this.capturePassiveProductiveProbe(
+                passiveAudit,
+                unit,
+                fallbackActions,
+                "deadline_fallback",
+                counterfactual?.candidates ?? [],
+                counterfactual?.means ?? [],
+                productiveFallback,
+            );
             return fallbackActions;
         }
         const incumbentIllegal = means[0] === -Infinity;
@@ -2674,7 +3043,7 @@ export class SearchDriver {
                 }),
             );
         }
-        const ms = performance.now() - t0;
+        const ms = passiveAudit?.decisionElapsedMs() ?? performance.now() - t0;
         this.counters.msTotal += ms;
         if (this.auditPath && this.auditTurns) {
             this.turnRows.push(
@@ -2712,7 +3081,17 @@ export class SearchDriver {
                 }),
             );
         }
-        return overridden ? scoredCandidates[bestIdx].actions : incumbent;
+        const selectedActions = overridden ? scoredCandidates[bestIdx].actions : incumbent;
+        this.capturePassiveProductiveProbe(
+            passiveAudit,
+            unit,
+            selectedActions,
+            "scored",
+            scoredCandidates,
+            means,
+            productiveFallback,
+        );
+        return selectedActions;
     }
     /**
      * Return the first productive candidate that completes through the real action engine. The immediate-leaf

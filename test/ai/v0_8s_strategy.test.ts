@@ -25,12 +25,19 @@ import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { StrategyV0_8S } from "../../src/ai/versions/v0_8s";
 import { selectV08STargetPressureCandidate, V08S_URGENT_FINISH_START_LAP } from "../../src/ai/versions/v0_8s_finish";
 import { getSpellConfig } from "../../src/configuration/config_provider";
+import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { buildRoster, makeRng } from "../../src/simulation/army";
-import { runMatch } from "../../src/simulation/battle_engine";
+import {
+    planV08BlockCenterActionGame,
+    V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_SEED,
+    withV08BlockCenterCandidateEnvironment,
+} from "../../src/simulation/v0_8_block_center_action_panel";
+import { GREEN_TEAM, runMatch } from "../../src/simulation/battle_engine";
+import { liveTwinSetup } from "../../src/simulation/livetwin";
 import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
@@ -395,6 +402,77 @@ describe("v0.8 search measurement alias", () => {
         const urgent = new StrategyV0_8S().decideTurn(screen, context);
         expect(urgent.some((action) => action.type === "wait_turn")).toBe(false);
         expect(urgent.some((action) => action.type === "move_unit")).toBe(true);
+    });
+
+    it("opens the exact BLOCK_CENTER Elf firing line before advancing in the lap-9 sprint", () => {
+        const options = {
+            candidateVersion: "v0.8s",
+            opponentVersion: "v0.7",
+            games: 16,
+            baseSeed: V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_SEED,
+            sourceCommit: "a".repeat(40),
+            sourceDirty: false,
+        } as const;
+        const plan = planV08BlockCenterActionGame(options, 14);
+        const setup = liveTwinSetup();
+        let nativeDecision: GameAction[] | undefined;
+        let chosenDecision: GameAction[] | undefined;
+        let lap9ElfId: string | undefined;
+        withV08BlockCenterCandidateEnvironment(options, () =>
+            runMatch({
+                greenVersion: "v0.8s",
+                redVersion: "v0.7",
+                roster: plan.greenRoster,
+                redRoster: plan.redRoster,
+                seed: plan.seed,
+                gridType: plan.mapType,
+                maxLaps: 60,
+                greenPerk: setup.perk,
+                redPerk: setup.perk,
+                greenAugments: setup.augments,
+                redAugments: setup.augments,
+                placementAugmentTiming: "setup-before-placement",
+                decisionObserver: (observation) => {
+                    if (
+                        observation.unit.getTeam() === GREEN_TEAM &&
+                        observation.unit.getName() === "Elf" &&
+                        observation.context.fightProperties?.getCurrentLap() === 9
+                    ) {
+                        lap9ElfId = observation.unit.getId();
+                        nativeDecision = structuredClone(observation.incumbent);
+                    }
+                },
+                turnExecutionObserver: (observation) => {
+                    if (observation.unitId === lap9ElfId) {
+                        chosenDecision = structuredClone(observation.chosenDecision);
+                    }
+                },
+            }),
+        );
+
+        expect(plan.seed).toBe(4_008_461_184);
+        const expected: GameAction[] = [
+            {
+                type: "move_unit",
+                unitId: "7387b7a9-d3fc-521d-9b2d-308555ec02e1",
+                path: [
+                    { x: 4, y: 7 },
+                    { x: 3, y: 8 },
+                ],
+                targetCells: [{ x: 3, y: 8 }],
+                hasLavaCell: false,
+                hasWaterCell: false,
+            },
+            {
+                type: "range_attack",
+                attackerId: "7387b7a9-d3fc-521d-9b2d-308555ec02e1",
+                targetId: "71018232-c495-53db-83ae-634434548c91",
+                aimCell: { x: 9, y: 12 },
+                aimSide: 0,
+            },
+        ];
+        expect(nativeDecision).toEqual(expected);
+        expect(chosenDecision).toEqual(expected);
     });
 
     it("closes on a sole surviving enemy summon in the lap-9 sprint", () => {

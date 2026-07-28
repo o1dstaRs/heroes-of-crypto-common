@@ -11,21 +11,21 @@
 
 import { parentPort, workerData } from "node:worker_threads";
 
-import { runV08PassiveTurnPanelGame, type IV08PassiveTurnPanelOptions } from "./v0_8_passive_turn_panel";
+import {
+    runV08BlockCenterActionPanelGame,
+    type IV08BlockCenterActionPanelOptions,
+} from "./v0_8_block_center_action_panel";
 
-if (!parentPort) {
-    throw new Error("v0_8_passive_turn_panel_worker must run as a worker thread");
-}
+if (!parentPort) throw new Error("v0_8_block_center_action_panel_worker must run as a worker thread");
 
-process.env.SIM_NO_ACTIONS = "1";
-const options = (workerData as { options: IV08PassiveTurnPanelOptions }).options;
+const options = (workerData as { options: IV08BlockCenterActionPanelOptions }).options;
 
 parentPort.on("message", (message: { type: "game"; game: number } | { type: "stop" }) => {
     if (message.type === "stop") {
         parentPort!.close();
         process.exit(0);
     }
-    parentPort!.postMessage({ type: "result", record: runV08PassiveTurnPanelGame(options, message.game) });
+    parentPort!.postMessage({ type: "result", record: runV08BlockCenterActionPanelGame(options, message.game) });
 });
 
 parentPort.postMessage({ type: "ready" });
