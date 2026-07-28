@@ -135,6 +135,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         let bestCell = base;
         let bestRoute: IReadonlyWeightedRoute | undefined;
@@ -206,6 +207,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const meleeAllies = unitsHolder
             .getAllAllies(unit.getTeam())

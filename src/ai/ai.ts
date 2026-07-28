@@ -1502,6 +1502,7 @@ function doFindTarget(
         unit.canFly(),
         unit.isSmallSize(),
         unit.canTraverseLava(),
+        unit.hasAbilityActive("In Its Own World"),
     );
 
     const actualMovePath = pathHelper.getMovePath(
@@ -1514,6 +1515,7 @@ function doFindTarget(
         unit.canFly(),
         unit.isSmallSize(),
         unit.canTraverseLava(),
+        unit.hasAbilityActive("In Its Own World"),
     );
 
     let movePath = infiniteMovePath;

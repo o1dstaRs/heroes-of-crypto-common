@@ -337,6 +337,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const nearest = (cell: XY): number => Math.min(...enemies.map((e) => getDistance(cell, e.getBaseCell())));
         let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
@@ -605,6 +606,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const baseTarget = unitsHolder.getAllUnits().get(strike.targetId);
         const baseReach = baseTarget ? chainReach(baseTarget) : 1;
@@ -681,6 +683,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const baseCount = adjEnemies(strike.attackFrom ?? unit.getBaseCell()).length;
         const cands: { cell: XY; route?: IReadonlyWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
@@ -757,6 +760,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const nearest = (cell: XY): number => Math.min(...ranges.map((t) => getDistance(cell, t.getBaseCell())));
         let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
@@ -831,6 +835,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const baseTarget = unitsHolder.getAllUnits().get(strike.targetId);
         const baseHits = baseTarget ? lineHits(strike.attackFrom ?? unit.getBaseCell(), baseTarget) : 1;
@@ -1136,6 +1141,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const adjToTarget = (cell: XY): boolean => target.getCells().some((tc) => isAdjacentCell(tc, cell));
         let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
@@ -1257,6 +1263,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const adjToTarget = (cell: XY): boolean => target.getCells().some((tc) => isAdjacentCell(tc, cell));
         let best: { cell: XY; cover: number; weight: number } | undefined;
@@ -1378,6 +1385,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const nearestSiegeDist = (cell: XY): number =>
             Math.min(...siege.map((s) => getDistance(cell, s.getBaseCell())));

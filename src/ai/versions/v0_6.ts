@@ -239,6 +239,7 @@ export class StrategyV0_6 extends StrategyV0_5 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         if (!movePath.knownPaths.size) {
             return decision;

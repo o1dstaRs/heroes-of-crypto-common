@@ -420,6 +420,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const plan = planAuraMove(unit, movePath.knownPaths, gridSettings, matrix, unitsHolder);
         if (!plan) {
@@ -1025,6 +1026,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const coverage = (cell: XY): number =>
             enemyRanged.filter((r) => getDistance(cell, r.getBaseCell()) <= auraR).length;
@@ -1118,6 +1120,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         if (!movePath.knownPaths.size) {
             return undefined;

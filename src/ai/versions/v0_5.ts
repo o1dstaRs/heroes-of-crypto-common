@@ -237,6 +237,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         if (!movePath.knownPaths.size) {
             return decision;
@@ -609,6 +610,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const bc = unit.getBaseCell();
         const v4from = strike.attackFrom ?? bc;
@@ -829,6 +831,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         for (const routes of movePath.knownPaths.values()) {
             const route = routes[0];
@@ -1039,6 +1042,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const plan = planAuraMove(unit, movePath.knownPaths, gridSettings, matrix, unitsHolder, this.auraWeight);
         // 1) A reachable cell covers more allies -> reposition there (stay in support).
@@ -1233,6 +1237,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 unit.canFly(),
                 unit.isSmallSize(),
                 unit.canTraverseLava(),
+                unit.hasAbilityActive("In Its Own World"),
             );
             for (const routes of movePath.knownPaths.values()) {
                 const route = routes[0];
@@ -1519,6 +1524,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         // A candidate's full footprint must be occupiable — getMovePath keys on the anchor, but a large
         // unit's footprint can still clip an occupied cell. Mirror v0.4's moveIsBlocked guard exactly so we

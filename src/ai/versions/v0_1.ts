@@ -564,6 +564,7 @@ export class StrategyV0_1 implements IAIStrategy {
             unit.canFly(),
             unit.isSmallSize(),
             unit.canTraverseLava(),
+            unit.hasAbilityActive("In Its Own World"),
         );
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead());
         if (!enemies.length || !movePath.knownPaths.size) {
