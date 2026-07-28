@@ -41,11 +41,9 @@ import {
 } from "./optimizer/v0_8_aligned_96h_v1_protocol";
 import {
     V07_ALIGNED_V2_AURA_CASTER_MODES,
-    V07_ALIGNED_V2_FORBIDDEN_RUNTIME_ENV,
     V07_ALIGNED_V2_LATE_RANGED_FINISH_WEIGHTS,
     V07_ALIGNED_V2_MELEE_RANGED_TARGET_WEIGHTS,
     V07_ALIGNED_V2_PURE_RANGED_TERMINAL_WEIGHTS,
-    isV07AlignedV2BehaviorEnvironmentKey,
 } from "./optimizer/v0_7_aligned_96h_v2_protocol";
 import {
     fingerprintV08PostA13CoveragePlan,
@@ -54,6 +52,20 @@ import {
     V08_POST_A13_COVERAGE_UNITS,
     V08_POST_A13_LIVE_MAPS,
 } from "./v0_8_post_a13_coverage";
+import {
+    fingerprintV08AllUnitCoveragePlan,
+    summarizeV08AllUnitCoverage,
+    V08_ALL_UNIT_CATALOG,
+    V08_ALL_UNIT_CATALOG_SHA256,
+    V08_ALL_UNIT_COVERAGE_DEFAULT_PAIRS_PER_MAP,
+    V08_ALL_UNIT_COVERAGE_LANES,
+    V08_ALL_UNIT_COVERAGE_SCHEMA,
+    V08_ALL_UNIT_EXPECTED_CATALOG_SHA256,
+    V08_ALL_UNIT_LIVE_MAPS,
+    type IV08AllUnitCoverageOptions,
+    type IV08AllUnitCoverageRecord,
+    type IV08AllUnitCoverageSummary,
+} from "./v0_8_all_unit_coverage";
 
 /**
  * Research-only, resumable v0.8s aggressive-policy campaign.
@@ -66,16 +78,22 @@ import {
  *     --hours 8 --concurrency 16 --lanes 3 --unbounded-search
  */
 
-export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v9" as const;
+export const V08_CAMPAIGN_SCHEMA = "hoc.v0_8_aggressive_campaign.v10" as const;
 const SCHEMA = V08_CAMPAIGN_SCHEMA;
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 const TOURNAMENT_RUNNER = join(REPOSITORY_ROOT, "src/simulation/run_tournament.ts");
 const LEVEL4_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_l4_coverage.ts");
 const POST_A13_COVERAGE_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_post_a13_coverage.ts");
+const ALL_UNIT_COVERAGE_RUNNER = join(REPOSITORY_ROOT, "src/simulation/v0_8_all_unit_coverage.ts");
 export const V08_CAMPAIGN_POST_A13_COVERAGE_SCHEMA = V08_POST_A13_COVERAGE_SCHEMA;
 export const V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT = 24 as const;
 export const V08_CAMPAIGN_POST_A13_COVERAGE_LANES = V08_POST_A13_COVERAGE_LANES;
 export const V08_CAMPAIGN_POST_A13_COVERAGE_UNITS = V08_POST_A13_COVERAGE_UNITS;
+export const V08_CAMPAIGN_ALL_UNIT_COVERAGE_SCHEMA = V08_ALL_UNIT_COVERAGE_SCHEMA;
+export const V08_CAMPAIGN_ALL_UNIT_COVERAGE_LANE_COUNT = V08_ALL_UNIT_COVERAGE_LANES.length;
+export const V08_CAMPAIGN_ALL_UNIT_COVERAGE_DEFAULT_PAIRS_PER_MAP = V08_ALL_UNIT_COVERAGE_DEFAULT_PAIRS_PER_MAP;
+export const V08_CAMPAIGN_ALL_UNIT_QUALIFICATION_DEFAULT_PAIRS_PER_MAP =
+    V08_ALL_UNIT_COVERAGE_DEFAULT_PAIRS_PER_MAP * 2;
 /**
  * Intrinsic spell kits introduced after the A13 source boundary.
  *
@@ -104,8 +122,10 @@ export const V08_CAMPAIGN_VALIDATION_SELECTION_SOURCE_KINDS = [
     "adaptive",
     "level4",
     "post_a13_coverage",
+    "all_unit_coverage",
+    "all_unit_qualification",
 ] as const;
-export const V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION = 6;
+export const V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION = 7;
 const ADAPTIVE_GENERATOR_VERSION = V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION;
 const ADAPTIVE_PARENT_COUNT = 4;
 const ADAPTIVE_CHILD_TARGET = 24;
@@ -123,8 +143,18 @@ export const V08_CAMPAIGN_RESERVE_ELIGIBILITY = Object.freeze({
     minimumCandidateWinRate: 0.5,
     minimumDecisiveWinRate: 0.5,
 });
-export const V08_CAMPAIGN_SELECTION_VERSION = 2 as const;
+export const V08_CAMPAIGN_SELECTION_VERSION = 3 as const;
 export const V08_CAMPAIGN_PROMOTION_COMPARISON_VERSION = 1 as const;
+export const V08_CAMPAIGN_CHILD_ENVIRONMENT_POLICY_VERSION = 1 as const;
+export const V08_CAMPAIGN_CHILD_ENVIRONMENT_STRATEGY = "deny-by-default-exact-base-plus-candidate" as const;
+
+export interface IV08CampaignChildEnvironmentPolicy {
+    version: typeof V08_CAMPAIGN_CHILD_ENVIRONMENT_POLICY_VERSION;
+    strategy: typeof V08_CAMPAIGN_CHILD_ENVIRONMENT_STRATEGY;
+    inheritedKeys: readonly ["HOME"];
+    baseEnvironment: Record<string, string>;
+    baseEnvironmentSha256: string;
+}
 
 interface ICli {
     output: string;
@@ -139,9 +169,13 @@ interface ICli {
     topCandidates: number;
     level4PairsPerLane: number;
     coveragePairsPerLane: number;
+    allUnitPairsPerMap: number;
+    allUnitQualificationPairsPerMap: number;
     screenSeed: number;
     level4Seed: number;
     coverageSeed: number;
+    allUnitSeed: number;
+    allUnitQualificationSeed: number;
     validationSeed: number;
     unboundedSearch: boolean;
 }
@@ -190,6 +224,7 @@ interface IManifest {
     repositoryRoot: string;
     bun: string;
     sourceIdentity: IV08CampaignSourceIdentity;
+    childEnvironmentPolicy: IV08CampaignChildEnvironmentPolicy;
     config: Omit<ICli, "output">;
     liveMaps: typeof LIVE_MAPS;
     armageddonRateGate: typeof ARMAGEDDON_RATE_GATE;
@@ -232,8 +267,23 @@ interface IManifest {
     fingerprint: string;
 }
 
-export type JobKind = "screen" | "adaptive" | "level4" | "post_a13_coverage" | "validation";
-const JOB_KINDS: ReadonlySet<JobKind> = new Set(["screen", "adaptive", "level4", "post_a13_coverage", "validation"]);
+export type JobKind =
+    | "screen"
+    | "adaptive"
+    | "level4"
+    | "post_a13_coverage"
+    | "all_unit_coverage"
+    | "all_unit_qualification"
+    | "validation";
+const JOB_KINDS: ReadonlySet<JobKind> = new Set([
+    "screen",
+    "adaptive",
+    "level4",
+    "post_a13_coverage",
+    "all_unit_coverage",
+    "all_unit_qualification",
+    "validation",
+]);
 const VALIDATION_SELECTION_SOURCE_KINDS: ReadonlySet<JobKind> = new Set(V08_CAMPAIGN_VALIDATION_SELECTION_SOURCE_KINDS);
 
 /** The immutable pre-validation evidence scope used to create and verify a resumable shortlist. */
@@ -313,7 +363,7 @@ interface IAdaptiveCheckpoint {
 }
 
 interface IValidationSelection {
-    schema: "hoc.v0_8_aggressive_validation_selection.v2";
+    schema: "hoc.v0_8_aggressive_validation_selection.v3";
     version: typeof V08_CAMPAIGN_SELECTION_VERSION;
     manifestFingerprint: string;
     sourceEvidenceSha256: string;
@@ -334,6 +384,7 @@ export interface ICompletedJob {
     candidateIndex: number;
     games?: number;
     pairsPerLane?: number;
+    pairsPerMap?: number;
     baseSeed: number;
     genomeSha256: string;
     bindingSha256: string;
@@ -412,7 +463,15 @@ interface ICheckpoint {
     schema: typeof SCHEMA;
     kind: "checkpoint";
     manifestFingerprint: string;
-    phase: "screen" | "adaptive" | "level4" | "post_a13_coverage" | "validation" | "complete";
+    phase:
+        | "screen"
+        | "adaptive"
+        | "level4"
+        | "post_a13_coverage"
+        | "all_unit_coverage"
+        | "all_unit_qualification"
+        | "validation"
+        | "complete";
     validationRound: number;
     completed: ICompletedJob[];
     adaptiveCatalog: IAdaptiveCheckpoint | null;
@@ -505,6 +564,16 @@ interface IRankedCandidate {
     hasPostA13CoverageEvidence: boolean;
     postA13CoveragePassed: boolean;
     postA13SpellExercisePassed: boolean;
+    allUnitCoverageGames: number;
+    hasAllUnitCoverageEvidence: boolean;
+    allUnitCoveragePassed: boolean;
+    allUnitCoverageEvidenceSha256: string | null;
+    allUnitCoverageSummaryPaths: string[];
+    allUnitQualificationGames: number;
+    hasAllUnitQualificationEvidence: boolean;
+    allUnitQualificationPassed: boolean;
+    allUnitQualificationEvidenceSha256: string | null;
+    allUnitQualificationSummaryPaths: string[];
     passesPostA13StrengthGate: boolean;
     postA13UnitOutcomes: IV08CampaignPostA13UnitOutcome[];
     passesArmageddonGate: boolean;
@@ -576,26 +645,53 @@ export interface IJobDurationSample {
     kind: JobKind;
     games?: number;
     pairsPerLane?: number;
+    pairsPerMap?: number;
     durationMs: number;
 }
 
-type JobWork = Pick<IJobSpec, "kind" | "games" | "pairsPerLane">;
+type JobWork = Pick<IJobSpec, "kind" | "games" | "pairsPerLane" | "pairsPerMap">;
 
 /** Convert every runner shape to actual simulated games so duration samples are comparable. */
 export function jobWorkUnits(job: JobWork): number {
     if (job.kind === "level4") {
-        if (!Number.isSafeInteger(job.pairsPerLane) || (job.pairsPerLane ?? 0) < 1 || job.games !== undefined) {
+        if (
+            !Number.isSafeInteger(job.pairsPerLane) ||
+            (job.pairsPerLane ?? 0) < 1 ||
+            job.games !== undefined ||
+            job.pairsPerMap !== undefined
+        ) {
             throw new Error("A level-4 job must specify only a positive pairsPerLane count");
         }
         return job.pairsPerLane! * 16;
     }
     if (job.kind === "post_a13_coverage") {
-        if (!Number.isSafeInteger(job.pairsPerLane) || (job.pairsPerLane ?? 0) < 1 || job.games !== undefined) {
+        if (
+            !Number.isSafeInteger(job.pairsPerLane) ||
+            (job.pairsPerLane ?? 0) < 1 ||
+            job.games !== undefined ||
+            job.pairsPerMap !== undefined
+        ) {
             throw new Error("A post-A13 coverage job must specify only a positive pairsPerLane count");
         }
         return job.pairsPerLane! * V08_CAMPAIGN_POST_A13_COVERAGE_LANE_COUNT * 2;
     }
-    if (!Number.isSafeInteger(job.games) || (job.games ?? 0) < 1 || job.pairsPerLane !== undefined) {
+    if (job.kind === "all_unit_coverage" || job.kind === "all_unit_qualification") {
+        if (
+            !Number.isSafeInteger(job.pairsPerMap) ||
+            (job.pairsPerMap ?? 0) < 1 ||
+            job.games !== undefined ||
+            job.pairsPerLane !== undefined
+        ) {
+            throw new Error("An all-unit job must specify only a positive pairsPerMap count");
+        }
+        return job.pairsPerMap! * V08_CAMPAIGN_ALL_UNIT_COVERAGE_LANE_COUNT * V08_ALL_UNIT_LIVE_MAPS.length * 2;
+    }
+    if (
+        !Number.isSafeInteger(job.games) ||
+        (job.games ?? 0) < 1 ||
+        job.pairsPerLane !== undefined ||
+        job.pairsPerMap !== undefined
+    ) {
         throw new Error("A tournament job must specify only a positive games count");
     }
     return job.games!;
@@ -616,10 +712,24 @@ function estimatedMillisecondsPerWorkUnit(
         throw new Error("workersPerJob must be a positive integer");
     }
     const fallback = ADMISSION_FALLBACK_CPU_MS_PER_GAME / workersPerJob;
+    const durationFamily = (jobKind: JobKind): string =>
+        jobKind === "all_unit_coverage" || jobKind === "all_unit_qualification" ? "all_unit" : jobKind;
     const rates = completed
-        .filter((job) => job.kind === kind && Number.isFinite(job.durationMs) && job.durationMs >= 0)
+        .filter(
+            (job) =>
+                durationFamily(job.kind) === durationFamily(kind) &&
+                Number.isFinite(job.durationMs) &&
+                job.durationMs >= 0,
+        )
         .map((job) => job.durationMs / jobWorkUnits(job));
     if (!rates.length) return fallback;
+    if (durationFamily(kind) === "all_unit" && rates.length >= ADMISSION_MIN_DURATION_SAMPLES) {
+        // The deterministic all-unit runner produces thousands of homogeneous games per sample. Once three
+        // same-family jobs have completed, their p95 is substantially stronger evidence than the generic
+        // cold-start floor; retaining that floor would reserve roughly nine hours for a fast deep panel and
+        // incorrectly defer it near the end of a bounded campaign.
+        return Math.max(1, percentile95(rates));
+    }
     // Until there is enough history for a meaningful percentile, retain the slowest observation. Once the
     // cohort is populated, p95 avoids one pathological interruption making every later batch inadmissible.
     const observed = rates.length < ADMISSION_MIN_DURATION_SAMPLES ? Math.max(...rates) : percentile95(rates);
@@ -833,8 +943,10 @@ export function parseV08CampaignCli(argv: readonly string[]): ICli {
             "Usage: bun src/simulation/v0_8_aggressive_12h.ts [--output DIR] [--hours 12] " +
                 "[--concurrency TOTAL_WORKERS] [--screen-games 256] [--validation-games 1024] " +
                 `[--lanes ${V08_CAMPAIGN_DEFAULT_LANES}] [--top ${V08_CAMPAIGN_DEFAULT_TOP_CANDIDATES}] ` +
-                "[--l4-pairs 16] [--coverage-pairs 3] [--screen-seed N] " +
-                "[--level4-seed N] [--coverage-seed N] " +
+                `[--l4-pairs 16] [--coverage-pairs 3] [--all-unit-pairs ${V08_CAMPAIGN_ALL_UNIT_COVERAGE_DEFAULT_PAIRS_PER_MAP}] ` +
+                `[--all-unit-qualification-pairs ${V08_CAMPAIGN_ALL_UNIT_QUALIFICATION_DEFAULT_PAIRS_PER_MAP}] ` +
+                "[--screen-seed N] [--level4-seed N] [--coverage-seed N] " +
+                "[--all-unit-seed N] [--all-unit-qualification-seed N] " +
                 "[--validation-seed N] [--unbounded-search]",
         );
         process.exit(0);
@@ -861,9 +973,28 @@ export function parseV08CampaignCli(argv: readonly string[]): ICli {
         topCandidates: positiveInteger(flagValue(argv, "--top"), V08_CAMPAIGN_DEFAULT_TOP_CANDIDATES, "--top"),
         level4PairsPerLane: positiveInteger(flagValue(argv, "--l4-pairs"), 16, "--l4-pairs"),
         coveragePairsPerLane: positiveInteger(flagValue(argv, "--coverage-pairs"), 3, "--coverage-pairs"),
+        allUnitPairsPerMap: positiveInteger(
+            flagValue(argv, "--all-unit-pairs"),
+            V08_CAMPAIGN_ALL_UNIT_COVERAGE_DEFAULT_PAIRS_PER_MAP,
+            "--all-unit-pairs",
+        ),
+        allUnitQualificationPairsPerMap: positiveInteger(
+            flagValue(argv, "--all-unit-qualification-pairs"),
+            V08_CAMPAIGN_ALL_UNIT_QUALIFICATION_DEFAULT_PAIRS_PER_MAP,
+            "--all-unit-qualification-pairs",
+        ),
         screenSeed: uint32Integer(flagValue(argv, "--screen-seed"), ADAPTIVE_SCREEN_SEED, "--screen-seed"),
         level4Seed: uint32Integer(flagValue(argv, "--level4-seed"), 30_260_719, "--level4-seed"),
         coverageSeed: uint32Integer(flagValue(argv, "--coverage-seed"), 35_260_719, "--coverage-seed"),
+        // These deterministic coverage seeds retain the broad random roster panel while guaranteeing at least
+        // one naturally legal, conservative Harpy Castling turn under the exact c48 environment. That makes the
+        // 14/14 remaining-native-caster gate executable instead of silently exempting a conditional spell.
+        allUnitSeed: uint32Integer(flagValue(argv, "--all-unit-seed"), 37_260_731, "--all-unit-seed"),
+        allUnitQualificationSeed: uint32Integer(
+            flagValue(argv, "--all-unit-qualification-seed"),
+            38_260_724,
+            "--all-unit-qualification-seed",
+        ),
         validationSeed: uint32Integer(flagValue(argv, "--validation-seed"), 40_260_719, "--validation-seed"),
         unboundedSearch: argv.includes("--unbounded-search"),
     };
@@ -878,6 +1009,13 @@ function atomicJson(path: string, value: unknown): void {
 
 function readJson<T>(path: string): T {
     return JSON.parse(readFileSync(path, "utf8")) as T;
+}
+
+function readJsonl<T>(path: string): T[] {
+    return readFileSync(path, "utf8")
+        .split(/\r?\n/)
+        .filter((line) => line.trim().length > 0)
+        .map((line) => JSON.parse(line) as T);
 }
 
 const OUTPUT_LEASE_SCHEMA = "hoc.v0_8_aggressive_output_lease.v1" as const;
@@ -1034,23 +1172,68 @@ export function effectiveBehaviorEnvironment(
     return environment;
 }
 
-function childEnvironment(
+/**
+ * Build the only ambient environment admitted to campaign children.
+ *
+ * HOME is retained because Bun and operating-system facilities may use it for runtime lookup. Every other
+ * value is fixed from campaign/runtime identity. In particular, roster, cohort, simulation, AI, Node, Bun,
+ * and experiment variables from the launching shell are denied by construction instead of being maintained
+ * in an inevitably incomplete blocklist.
+ */
+export function buildV08CampaignChildEnvironmentPolicy(
+    sourceEnvironment: NodeJS.ProcessEnv = process.env,
+    bunPath = process.execPath,
+): IV08CampaignChildEnvironmentPolicy {
+    const home = sourceEnvironment.HOME;
+    if (!home) throw new Error("Campaign child environment requires HOME");
+    const baseEnvironment = {
+        HOME: home,
+        PATH: `${dirname(bunPath)}:/usr/bin:/bin`,
+        TMPDIR: "/tmp",
+        LANG: "C",
+        LC_ALL: "C",
+        TZ: "UTC",
+    };
+    return {
+        version: V08_CAMPAIGN_CHILD_ENVIRONMENT_POLICY_VERSION,
+        strategy: V08_CAMPAIGN_CHILD_ENVIRONMENT_STRATEGY,
+        inheritedKeys: ["HOME"],
+        baseEnvironment,
+        baseEnvironmentSha256: fingerprintV08AlignedV1(baseEnvironment),
+    };
+}
+
+/** Validate a persisted policy without consulting ambient process state. */
+export function isV08CampaignChildEnvironmentPolicyValid(value: unknown): value is IV08CampaignChildEnvironmentPolicy {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const policy = value as Partial<IV08CampaignChildEnvironmentPolicy>;
+    const base = policy?.baseEnvironment;
+    return (
+        policy.version === V08_CAMPAIGN_CHILD_ENVIRONMENT_POLICY_VERSION &&
+        policy.strategy === V08_CAMPAIGN_CHILD_ENVIRONMENT_STRATEGY &&
+        Array.isArray(policy.inheritedKeys) &&
+        policy.inheritedKeys.length === 1 &&
+        policy.inheritedKeys[0] === "HOME" &&
+        !!base &&
+        typeof base === "object" &&
+        !Array.isArray(base) &&
+        Object.keys(base).sort().join(",") === "HOME,LANG,LC_ALL,PATH,TMPDIR,TZ" &&
+        Object.values(base).every((entry) => typeof entry === "string" && entry.length > 0) &&
+        typeof policy.baseEnvironmentSha256 === "string" &&
+        policy.baseEnvironmentSha256 === fingerprintV08AlignedV1(base)
+    );
+}
+
+export function buildV08CampaignChildEnvironment(
+    policy: IV08CampaignChildEnvironmentPolicy,
     binding: IV08AlignedV1CandidateBinding,
     auditPath: string,
     unboundedSearch: boolean,
 ): NodeJS.ProcessEnv {
-    const environment: NodeJS.ProcessEnv = { ...process.env };
-    for (const key of Object.keys(environment)) {
-        if (
-            isV07AlignedV2BehaviorEnvironmentKey(key) ||
-            key.startsWith("V08_") ||
-            key.includes("LIGHTWEIGHT") ||
-            V07_ALIGNED_V2_FORBIDDEN_RUNTIME_ENV.includes(key as (typeof V07_ALIGNED_V2_FORBIDDEN_RUNTIME_ENV)[number])
-        ) {
-            delete environment[key];
-        }
+    if (!isV08CampaignChildEnvironmentPolicyValid(policy)) {
+        throw new Error("Campaign child environment policy is invalid");
     }
-    delete environment.SIM_NO_ACTIONS;
+    const environment: NodeJS.ProcessEnv = { ...policy.baseEnvironment };
     Object.assign(environment, effectiveBehaviorEnvironment(binding, auditPath, unboundedSearch));
     environment.V08_AGGRESSIVE = "1";
     environment.LIVETWIN = "1";
@@ -1073,7 +1256,9 @@ function latestJobRecords(directory: string, kind: JobKind): string {
             ? "v08_l4_v0.8s_vs_v0.7_"
             : kind === "post_a13_coverage"
               ? "v08_post_a13_v0.8s_vs_v0.7_"
-              : "v0.8s_vs_v0.7_";
+              : kind === "all_unit_coverage" || kind === "all_unit_qualification"
+                ? "v08_all_unit_v0.8s_vs_v0.7_"
+                : "v0.8s_vs_v0.7_";
     const files = readdirSync(directory)
         .filter((name) => name.startsWith(prefix) && name.endsWith(".jsonl"))
         .map((name) => join(directory, name))
@@ -1285,7 +1470,7 @@ function assertExactAnchorMutationCoverage(proposals: readonly IV08CampaignAdapt
     }
 }
 
-/** Select the exact unique child mutations used by generator v6, including c48's reserved finish coverage. */
+/** Select the exact unique child mutations used by generator v7, including c48's reserved finish coverage. */
 export function selectV08CampaignAdaptiveChildProposals(
     parent: IV08CampaignAdaptiveProposalParent,
     parents: readonly IV08CampaignAdaptiveProposalParent[],
@@ -1480,7 +1665,7 @@ export function rankV08CampaignResearchCandidates<T extends IV08CampaignResearch
 
 export function selectV08CampaignAdaptiveParents<
     T extends IV08CampaignResearchCandidate &
-        Pick<IRankedCandidate, "postA13CoveragePassed" | "postA13SpellExercisePassed">,
+        Pick<IRankedCandidate, "postA13CoveragePassed" | "postA13SpellExercisePassed" | "allUnitCoveragePassed">,
 >(rows: readonly T[]): T[] {
     const exactAnchor = rows.find(({ candidateId }) => candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID);
     if (!exactAnchor) throw new Error("Adaptive generation requires the exact c48 anchor");
@@ -1489,6 +1674,9 @@ export function selectV08CampaignAdaptiveParents<
     }
     if (!exactAnchor.postA13SpellExercisePassed) {
         throw new Error("Exact c48 anchor must exercise every intrinsic post-A13 spell kit before adaptive generation");
+    }
+    if (!exactAnchor.allUnitCoveragePassed) {
+        throw new Error("Exact c48 anchor must pass exact all-unit coverage before adaptive generation");
     }
     const eligible = rows.filter(isV08CampaignPostA13SelectionEligible);
     const leaders = rankV08CampaignResearchCandidates(
@@ -1513,9 +1701,11 @@ export function isV08CampaignPostA13SelectionEligible(row: {
     candidateId: string;
     postA13CoveragePassed: boolean;
     postA13SpellExercisePassed: boolean;
+    allUnitCoveragePassed: boolean;
 }): boolean {
     return (
         row.postA13CoveragePassed &&
+        row.allUnitCoveragePassed &&
         (V08_CAMPAIGN_INACTIVE_CONTROL_IDS.some((id) => id === row.candidateId) || row.postA13SpellExercisePassed)
     );
 }
@@ -1537,15 +1727,27 @@ export function selectV08CampaignLevel4CandidateIds<
     T extends IV08CampaignResearchCandidate &
         Pick<
             IRankedCandidate,
-            "armageddonRate" | "decisiveWinRate" | "postA13CoveragePassed" | "postA13SpellExercisePassed"
+            | "armageddonRate"
+            | "decisiveWinRate"
+            | "postA13CoveragePassed"
+            | "postA13SpellExercisePassed"
+            | "allUnitCoveragePassed"
         >,
 >(rows: readonly T[], count: number): string[] {
     if (!Number.isSafeInteger(count) || count < 1) throw new Error("level-4 reserve count must be positive");
     const eligible = rows.filter(isV08CampaignPostA13SelectionEligible);
-    const targetCount = Math.min(eligible.length, Math.max(2, count));
+    const targetCount = Math.min(eligible.length, Math.max(3, count));
     const anchor = eligible.find(({ candidateId }) => candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID);
     if (!anchor) throw new Error("Level-4 reserve requires the exact c48 anchor");
     const inactiveControl = selectV08CampaignInactiveControl(eligible);
+    const alternateInactiveControl = eligible.find(
+        ({ candidateId }) =>
+            V08_CAMPAIGN_INACTIVE_CONTROL_IDS.some((id) => id === candidateId) &&
+            candidateId !== inactiveControl.candidateId,
+    );
+    if (!alternateInactiveControl) {
+        throw new Error("Level-4 reserve requires both inactive-challenger controls c37/c38");
+    }
     const selected: T[] = [];
     const seen = new Set<string>();
     const add = (row: T): void => {
@@ -1555,12 +1757,13 @@ export function selectV08CampaignLevel4CandidateIds<
     };
     add(anchor);
     add(inactiveControl);
+    add(alternateInactiveControl);
 
     const remainingSlots = Math.max(0, targetCount - selected.length);
     const strengthSlots = Math.ceil(remainingSlots / 2);
     const strength = rankV08CampaignResearchCandidates(eligible);
     for (const row of strength) {
-        if (selected.length >= 2 + strengthSlots) break;
+        if (selected.length >= 3 + strengthSlots) break;
         add(row);
     }
     const armReserve = eligible
@@ -1586,6 +1789,10 @@ export function selectValidationCandidateIds(
             | "hasPostA13CoverageEvidence"
             | "postA13CoveragePassed"
             | "postA13SpellExercisePassed"
+            | "hasAllUnitCoverageEvidence"
+            | "allUnitCoveragePassed"
+            | "hasAllUnitQualificationEvidence"
+            | "allUnitQualificationPassed"
         >)[],
     count: number,
 ): string[] {
@@ -1593,8 +1800,14 @@ export function selectValidationCandidateIds(
     const targetCount = Math.max(2, count);
     const covered = rows.filter(
         (row) =>
+            row.hasLevel4Evidence &&
             row.level4CoveragePassed &&
+            row.hasPostA13CoverageEvidence &&
             row.postA13CoveragePassed &&
+            row.hasAllUnitCoverageEvidence &&
+            row.allUnitCoveragePassed &&
+            row.hasAllUnitQualificationEvidence &&
+            row.allUnitQualificationPassed &&
             (V08_CAMPAIGN_INACTIVE_CONTROL_IDS.some((id) => id === row.candidateId) || row.postA13SpellExercisePassed),
     );
     const anchor = rows.find(({ candidateId }) => candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID);
@@ -1607,14 +1820,20 @@ export function selectValidationCandidateIds(
     if (!anchor.postA13SpellExercisePassed) {
         throw new Error("Exact c48 anchor must exercise every candidate-owned post-A13 spell kit");
     }
-    const screenedInactiveControl = selectV08CampaignInactiveControl(rows);
-    if (!screenedInactiveControl.hasLevel4Evidence || !screenedInactiveControl.level4CoveragePassed) {
-        throw new Error("Best screened inactive-challenger control must pass its level-4 job");
+    if (!anchor.hasAllUnitCoverageEvidence || !anchor.allUnitCoveragePassed) {
+        throw new Error("Exact c48 anchor must pass its exact all-unit coverage job before validation");
     }
-    if (!screenedInactiveControl.hasPostA13CoverageEvidence || !screenedInactiveControl.postA13CoveragePassed) {
-        throw new Error("Best screened inactive-challenger control must pass its post-A13 coverage job");
+    if (!anchor.hasAllUnitQualificationEvidence || !anchor.allUnitQualificationPassed) {
+        throw new Error("Exact c48 anchor must pass its deep all-unit qualification job before validation");
     }
-    const inactiveControl = screenedInactiveControl;
+    selectV08CampaignInactiveControl(rows);
+    const qualifiedInactiveControls = rankV08CampaignResearchCandidates(
+        covered.filter(({ candidateId }) => V08_CAMPAIGN_INACTIVE_CONTROL_IDS.some((id) => id === candidateId)),
+    );
+    const inactiveControl = qualifiedInactiveControls[0];
+    if (!inactiveControl) {
+        throw new Error("At least one inactive-challenger control must pass level-4 and all-unit qualification");
+    }
     const selected: Array<(typeof rows)[number]> = [];
     const seen = new Set<string>();
     const add = (row: (typeof covered)[number]): void => {
@@ -1671,6 +1890,10 @@ export interface IV08CampaignPromotionEvidence
     level4CoveragePassed: boolean;
     postA13CoveragePassed: boolean;
     postA13SpellExercisePassed: boolean;
+    hasAllUnitCoverageEvidence: boolean;
+    allUnitCoveragePassed: boolean;
+    hasAllUnitQualificationEvidence: boolean;
+    allUnitQualificationPassed: boolean;
     armageddonRate: number;
     level4ArmageddonRate: number;
 }
@@ -1764,6 +1987,10 @@ export function isV08CampaignPromotionEligible(
         evidence.level4CoveragePassed &&
         evidence.postA13CoveragePassed &&
         evidence.postA13SpellExercisePassed &&
+        evidence.hasAllUnitCoverageEvidence &&
+        evidence.allUnitCoveragePassed &&
+        evidence.hasAllUnitQualificationEvidence &&
+        evidence.allUnitQualificationPassed &&
         isV08CampaignPostA13StrengthQualified(evidence, exactAnchor) &&
         isV08CampaignPromotionStrengthQualified(evidence, exactAnchor) &&
         Number.isFinite(evidence.armageddonRate) &&
@@ -1784,6 +2011,7 @@ async function runChild(
     logPath: string,
     deadlineAtMs: number,
     onSpawn: (pid: number | null) => void,
+    allowQualificationFailure = false,
 ): Promise<"completed" | "deadline"> {
     if (Date.now() >= deadlineAtMs || stopRequested) return "deadline";
     mkdirSync(dirname(logPath), { recursive: true });
@@ -1824,7 +2052,7 @@ async function runChild(
         activeChildren.delete(child);
     }
     if (deadlineKilled || stopRequested) return "deadline";
-    if (result.code !== 0) {
+    if (result.code !== 0 && !(allowQualificationFailure && result.code === 1)) {
         throw new Error(`Child failed (${result.code ?? result.signal ?? "unknown"}); see ${logPath}`);
     }
     return "completed";
@@ -2162,12 +2390,138 @@ export function validateV08CampaignPostA13CoverageSummary(
     return summary as IPostA13CoverageSummary;
 }
 
+const V08_CAMPAIGN_ALL_UNIT_REQUIRED_GATES = Object.freeze([
+    "exact_catalog",
+    "exact_schedule_count",
+    "exact_lane_census",
+    "exact_map_census",
+    "balanced_physical_seats",
+    "exact_target_appearances",
+    "crashes_zero",
+    "stuck_zero",
+    "turn_caps_zero",
+    "candidate_engine_rejections_zero",
+    "candidate_target_strategy_rejections_zero",
+    "candidate_target_recovery_zero",
+    "candidate_target_raw_no_op_zero",
+    "candidate_target_incomplete_turns_zero",
+    "candidate_target_productivity",
+    "remaining_intrinsic_casters_exercised",
+] as const);
+
+export function validateV08CampaignAllUnitCoverageSummary(
+    value: unknown,
+    expected: {
+        sourceCommit: string;
+        baseSeed: number;
+        pairsPerMap: number;
+        games: number;
+    },
+    path = "<all-unit-coverage-summary>",
+): IV08AllUnitCoverageSummary {
+    const summary = value as Partial<IV08AllUnitCoverageSummary>;
+    const options: IV08AllUnitCoverageOptions = {
+        candidateVersion: "v0.8s",
+        opponentVersion: "v0.7",
+        pairsPerMap: expected.pairsPerMap,
+        baseSeed: expected.baseSeed,
+        amountMode: "expBudget",
+        liveSetup: true,
+        maxLaps: 60,
+        sourceCommit: expected.sourceCommit,
+    };
+    if (
+        summary.schema !== V08_CAMPAIGN_ALL_UNIT_COVERAGE_SCHEMA ||
+        summary.sourceCommit !== expected.sourceCommit ||
+        summary.catalogSha256 !== V08_ALL_UNIT_CATALOG_SHA256 ||
+        summary.expectedCatalogSha256 !== V08_ALL_UNIT_EXPECTED_CATALOG_SHA256 ||
+        fingerprintV08AlignedV1(summary.catalog) !== fingerprintV08AlignedV1(V08_ALL_UNIT_CATALOG) ||
+        summary.candidateVersion !== "v0.8s" ||
+        summary.opponentVersion !== "v0.7" ||
+        summary.options?.pairsPerMap !== expected.pairsPerMap ||
+        summary.options?.baseSeed !== expected.baseSeed ||
+        summary.options?.amountMode !== "expBudget" ||
+        summary.options?.liveSetup !== true ||
+        summary.options?.maxLaps !== 60 ||
+        fingerprintV08AlignedV1(summary.maps) !== fingerprintV08AlignedV1(V08_ALL_UNIT_LIVE_MAPS) ||
+        summary.planSha256 !== fingerprintV08AllUnitCoveragePlan(options) ||
+        summary.games !== expected.games ||
+        !Array.isArray(summary.lanes) ||
+        summary.lanes.length !== V08_CAMPAIGN_ALL_UNIT_COVERAGE_LANE_COUNT ||
+        typeof summary.gates?.pass !== "boolean" ||
+        !Array.isArray(summary.gates.failed) ||
+        !summary.gates.checks ||
+        V08_CAMPAIGN_ALL_UNIT_REQUIRED_GATES.some((name) => {
+            const check = summary.gates!.checks[name];
+            return (
+                !check ||
+                typeof check.pass !== "boolean" ||
+                (typeof check.actual !== "number" && typeof check.actual !== "string") ||
+                typeof check.expected !== "string"
+            );
+        })
+    ) {
+        throw new Error(`Invalid all-unit coverage result summary: ${path}`);
+    }
+    const failedGates = V08_CAMPAIGN_ALL_UNIT_REQUIRED_GATES.filter(
+        (name) => summary.gates!.checks[name]!.pass === false,
+    );
+    if (
+        summary.gates.pass !== (failedGates.length === 0) ||
+        fingerprintV08AlignedV1(summary.gates.failed) !== fingerprintV08AlignedV1(failedGates)
+    ) {
+        throw new Error(`All-unit coverage result has inconsistent qualification gates: ${path}`);
+    }
+    const expectedLanes = new Map(V08_ALL_UNIT_COVERAGE_LANES.map((lane) => [`${lane.unit}:${lane.owner}`, lane]));
+    const seen = new Set<string>();
+    const expectedLaneGames = expected.pairsPerMap * V08_ALL_UNIT_LIVE_MAPS.length * 2;
+    for (const lane of summary.lanes) {
+        const key = `${lane?.lane?.unit}:${lane?.lane?.owner}`;
+        const expectedLane = expectedLanes.get(key);
+        if (
+            !expectedLane ||
+            seen.has(key) ||
+            fingerprintV08AlignedV1(lane.lane) !== fingerprintV08AlignedV1(expectedLane) ||
+            lane.games !== expectedLaneGames ||
+            lane.candidateGreenGames !== expectedLaneGames / 2 ||
+            lane.candidateRedGames !== expectedLaneGames / 2 ||
+            lane.appearances !== lane.games ||
+            !Number.isSafeInteger(lane.actingTurns) ||
+            lane.actingTurns < 1 ||
+            !Array.isArray(lane.mapCensus) ||
+            lane.mapCensus.length !== V08_ALL_UNIT_LIVE_MAPS.length
+        ) {
+            throw new Error(`Invalid all-unit coverage lane ${key}: ${path}`);
+        }
+        const byMap = new Map(lane.mapCensus.map((cell) => [cell.mapType, cell]));
+        if (
+            V08_ALL_UNIT_LIVE_MAPS.some((mapType) => {
+                const cell = byMap.get(mapType);
+                return (
+                    !cell ||
+                    cell.games !== expected.pairsPerMap * 2 ||
+                    cell.candidateGreenGames !== expected.pairsPerMap ||
+                    cell.candidateRedGames !== expected.pairsPerMap
+                );
+            })
+        ) {
+            throw new Error(`Invalid all-unit map census for ${key}: ${path}`);
+        }
+        seen.add(key);
+    }
+    if (seen.size !== expectedLanes.size) {
+        throw new Error(`All-unit coverage summary has an incomplete lane census: ${path}`);
+    }
+    return summary as IV08AllUnitCoverageSummary;
+}
+
 /** Minimal version header check used before accepting any resumable manifest. */
 export function isV08CampaignManifestProvenanceCurrent(value: unknown): boolean {
     const manifest = value as {
         schema?: unknown;
         kind?: unknown;
         sourceIdentity?: unknown;
+        childEnvironmentPolicy?: unknown;
         adaptive?: { generatorVersion?: unknown };
         scheduler?: { version?: unknown };
         campaignBaseIdentity?: {
@@ -2182,6 +2536,7 @@ export function isV08CampaignManifestProvenanceCurrent(value: unknown): boolean 
         manifest?.schema === V08_CAMPAIGN_SCHEMA &&
         manifest.kind === "manifest" &&
         isV08CampaignSourceIdentityCurrent(manifest.sourceIdentity) &&
+        isV08CampaignChildEnvironmentPolicyValid(manifest.childEnvironmentPolicy) &&
         manifest.adaptive?.generatorVersion === V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION &&
         manifest.scheduler?.version === V08_CAMPAIGN_SCHEDULER_VERSION &&
         manifest.campaignBaseIdentity?.campaignCandidateCount === BASE_CANDIDATE_COUNT &&
@@ -2202,7 +2557,7 @@ export interface IV08CampaignAdaptiveCatalogProvenanceExpectation {
     campaignBaseIdentitySha256: string;
 }
 
-/** Minimal resume header check binding generator v6 to the full production-48-plus-A13 campaign base. */
+/** Minimal resume header check binding generator v7 to the full production-48-plus-A13 campaign base. */
 export function isV08CampaignAdaptiveCatalogProvenanceCurrent(
     value: unknown,
     expected: IV08CampaignAdaptiveCatalogProvenanceExpectation,
@@ -2383,15 +2738,20 @@ function buildManifest(
         topCandidates: Math.min(cli.topCandidates, bindings.length),
         level4PairsPerLane: cli.level4PairsPerLane,
         coveragePairsPerLane: cli.coveragePairsPerLane,
+        allUnitPairsPerMap: cli.allUnitPairsPerMap,
+        allUnitQualificationPairsPerMap: cli.allUnitQualificationPairsPerMap,
         screenSeed: cli.screenSeed,
         level4Seed: cli.level4Seed,
         coverageSeed: cli.coverageSeed,
+        allUnitSeed: cli.allUnitSeed,
+        allUnitQualificationSeed: cli.allUnitQualificationSeed,
         validationSeed: cli.validationSeed,
         workersPerJob: cli.workersPerJob,
         maxWorkers: cli.maxWorkers,
         unboundedSearch: cli.unboundedSearch,
     };
     const candidates = campaignCandidateDescriptors(bindings, cli.unboundedSearch);
+    const childEnvironmentPolicy = buildV08CampaignChildEnvironmentPolicy();
     const unsigned = {
         schema: SCHEMA,
         kind: "manifest" as const,
@@ -2406,6 +2766,7 @@ function buildManifest(
         repositoryRoot: REPOSITORY_ROOT,
         bun: process.execPath,
         sourceIdentity,
+        childEnvironmentPolicy,
         config,
         liveMaps: LIVE_MAPS as typeof LIVE_MAPS,
         armageddonRateGate: ARMAGEDDON_RATE_GATE as typeof ARMAGEDDON_RATE_GATE,
@@ -2469,9 +2830,13 @@ function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding
         topCandidates: Math.min(cli.topCandidates, bindings.length),
         level4PairsPerLane: cli.level4PairsPerLane,
         coveragePairsPerLane: cli.coveragePairsPerLane,
+        allUnitPairsPerMap: cli.allUnitPairsPerMap,
+        allUnitQualificationPairsPerMap: cli.allUnitQualificationPairsPerMap,
         screenSeed: cli.screenSeed,
         level4Seed: cli.level4Seed,
         coverageSeed: cli.coverageSeed,
+        allUnitSeed: cli.allUnitSeed,
+        allUnitQualificationSeed: cli.allUnitQualificationSeed,
         validationSeed: cli.validationSeed,
         workersPerJob: cli.workersPerJob,
         maxWorkers: cli.maxWorkers,
@@ -2480,6 +2845,7 @@ function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding
     const expectedCatalog = buildV08AlignedV1ProductionCatalogIdentity();
     const expectedCandidates = campaignCandidateDescriptors(bindings, cli.unboundedSearch);
     const expectedCampaignBaseIdentity = buildCampaignBaseIdentity(expectedCandidates);
+    const expectedChildEnvironmentPolicy = buildV08CampaignChildEnvironmentPolicy();
     if (
         !isV08CampaignManifestProvenanceCurrent(manifest) ||
         manifest.fingerprint !== fingerprintV08AlignedV1({ ...manifest, fingerprint: undefined }) ||
@@ -2487,6 +2853,8 @@ function loadOrCreateManifest(cli: ICli, bindings: IV08AlignedV1CandidateBinding
         manifest.catalogIdentity.catalogSha256 !== expectedCatalog.catalogSha256 ||
         fingerprintV08AlignedV1(manifest.campaignBaseIdentity) !==
             fingerprintV08AlignedV1(expectedCampaignBaseIdentity) ||
+        fingerprintV08AlignedV1(manifest.childEnvironmentPolicy) !==
+            fingerprintV08AlignedV1(expectedChildEnvironmentPolicy) ||
         manifest.researchRanking !== V08_CAMPAIGN_RESEARCH_RANKING ||
         fingerprintV08AlignedV1(manifest.reserveEligibility) !==
             fingerprintV08AlignedV1(V08_CAMPAIGN_RESERVE_ELIGIBILITY) ||
@@ -2522,6 +2890,7 @@ function normalizedJobSpec(job: IJobSpec): Record<string, unknown> {
         candidateIndex: job.candidateIndex,
         games: job.games ?? null,
         pairsPerLane: job.pairsPerLane ?? null,
+        pairsPerMap: job.pairsPerMap ?? null,
         baseSeed: job.baseSeed,
     };
 }
@@ -2534,6 +2903,7 @@ function completedJobSpec(job: ICompletedJob): IJobSpec {
         candidateIndex: job.candidateIndex,
         ...(job.games === undefined ? {} : { games: job.games }),
         ...(job.pairsPerLane === undefined ? {} : { pairsPerLane: job.pairsPerLane }),
+        ...(job.pairsPerMap === undefined ? {} : { pairsPerMap: job.pairsPerMap }),
         baseSeed: job.baseSeed,
     };
 }
@@ -2816,6 +3186,37 @@ function validateResultArtifact(manifest: IManifest, job: ICompletedJob, verifyS
         }
         return result;
     }
+    if (job.kind === "all_unit_coverage" || job.kind === "all_unit_qualification") {
+        const expected = {
+            sourceCommit: manifest.sourceIdentity.gitHead,
+            baseSeed: job.baseSeed,
+            pairsPerMap: job.pairsPerMap!,
+            games: jobWorkUnits(job),
+        };
+        validateV08CampaignAllUnitCoverageSummary(result.summary, expected, job.summaryPath);
+        if (verifySource) {
+            const options: IV08AllUnitCoverageOptions = {
+                candidateVersion: "v0.8s",
+                opponentVersion: "v0.7",
+                pairsPerMap: job.pairsPerMap!,
+                baseSeed: job.baseSeed,
+                amountMode: "expBudget",
+                liveSetup: true,
+                maxLaps: 60,
+                sourceCommit: manifest.sourceIdentity.gitHead,
+            };
+            const records = readJsonl<IV08AllUnitCoverageRecord>(paths.recordsPath);
+            const recomputed = summarizeV08AllUnitCoverage(options, records);
+            if (
+                fingerprintV08AlignedV1(readJson<unknown>(paths.summaryPath)) !==
+                    fingerprintV08AlignedV1(result.summary) ||
+                fingerprintV08AlignedV1(recomputed) !== fingerprintV08AlignedV1(result.summary)
+            ) {
+                throw new Error(`All-unit result ${job.id} does not match its source records and summary`);
+            }
+        }
+        return result;
+    }
     const summary = tournamentSummary(result.summary, job.summaryPath);
     if (summary.games !== job.games || summary.baseSeed !== job.baseSeed) {
         throw new Error(`Tournament result ${job.id} has the wrong game count or seed`);
@@ -2837,7 +3238,7 @@ function assertValidationSelectionHeader(selection: IValidationSelection, manife
         ({ id }) => id === selection.inactiveControlCandidateId,
     );
     if (
-        selection.schema !== "hoc.v0_8_aggressive_validation_selection.v2" ||
+        selection.schema !== "hoc.v0_8_aggressive_validation_selection.v3" ||
         selection.version !== V08_CAMPAIGN_SELECTION_VERSION ||
         selection.manifestFingerprint !== manifest.fingerprint ||
         selection.exactAnchorCandidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
@@ -2891,7 +3292,16 @@ function loadCheckpoint(manifest: IManifest): ICheckpoint {
         checkpoint.schema !== SCHEMA ||
         checkpoint.kind !== "checkpoint" ||
         checkpoint.manifestFingerprint !== manifest.fingerprint ||
-        !["screen", "adaptive", "level4", "post_a13_coverage", "validation", "complete"].includes(checkpoint.phase) ||
+        ![
+            "screen",
+            "adaptive",
+            "level4",
+            "post_a13_coverage",
+            "all_unit_coverage",
+            "all_unit_qualification",
+            "validation",
+            "complete",
+        ].includes(checkpoint.phase) ||
         !Number.isSafeInteger(checkpoint.validationRound) ||
         checkpoint.validationRound < 0 ||
         !Array.isArray(checkpoint.completed) ||
@@ -2964,6 +3374,14 @@ function collectLeaderboard(
     const validationEvidenceByCandidate = new Map<string, Array<{ round: number; games: number; baseSeed: number }>>();
     const level4ByCandidate = new Map<string, Array<{ path: string; summary: ILevel4CoverageSummary }>>();
     const postA13CoverageByCandidate = new Map<string, Array<{ path: string; summary: IPostA13CoverageSummary }>>();
+    const allUnitCoverageByCandidate = new Map<
+        string,
+        Array<{ path: string; summary: IV08AllUnitCoverageSummary; job: ICompletedJob }>
+    >();
+    const allUnitQualificationByCandidate = new Map<
+        string,
+        Array<{ path: string; summary: IV08AllUnitCoverageSummary; job: ICompletedJob }>
+    >();
     for (const job of checkpoint.completed) {
         if (options.kinds && !options.kinds.has(job.kind)) continue;
         const candidate = metadata.get(job.candidateId);
@@ -2998,6 +3416,27 @@ function collectLeaderboard(
                 ),
             });
             postA13CoverageByCandidate.set(job.candidateId, summaries);
+            continue;
+        }
+        if (job.kind === "all_unit_coverage" || job.kind === "all_unit_qualification") {
+            const target =
+                job.kind === "all_unit_coverage" ? allUnitCoverageByCandidate : allUnitQualificationByCandidate;
+            const summaries = target.get(job.candidateId) ?? [];
+            summaries.push({
+                path: job.summaryPath,
+                summary: validateV08CampaignAllUnitCoverageSummary(
+                    result.summary,
+                    {
+                        sourceCommit: manifest.sourceIdentity.gitHead,
+                        baseSeed: job.baseSeed,
+                        pairsPerMap: job.pairsPerMap!,
+                        games: jobWorkUnits(job),
+                    },
+                    job.summaryPath,
+                ),
+                job,
+            });
+            target.set(job.candidateId, summaries);
             continue;
         }
         const summary = tournamentSummary(result.summary, job.summaryPath);
@@ -3150,6 +3589,47 @@ function collectLeaderboard(
                         ? outcome.candidateWins / (outcome.candidateWins + outcome.opponentWins)
                         : 0.5,
             }));
+        const allUnitCoverageEntries = allUnitCoverageByCandidate.get(id) ?? [];
+        const allUnitCoverageGames = allUnitCoverageEntries.reduce((sum, { summary }) => sum + summary.games, 0);
+        const hasAllUnitCoverageEvidence = allUnitCoverageEntries.length === 1;
+        const allUnitCoveragePassed =
+            hasAllUnitCoverageEvidence && allUnitCoverageEntries.every(({ summary }) => summary.gates.pass);
+        const allUnitCoverageEvidenceSha256 = allUnitCoverageEntries.length
+            ? fingerprintV08AlignedV1(
+                  allUnitCoverageEntries
+                      .map(({ summary, job }) => ({
+                          jobId: job.id,
+                          baseSeed: summary.options.baseSeed,
+                          pairsPerMap: summary.options.pairsPerMap,
+                          games: summary.games,
+                          planSha256: summary.planSha256,
+                          summarySha256: job.summarySha256,
+                      }))
+                      .sort((left, right) => left.jobId.localeCompare(right.jobId)),
+              )
+            : null;
+        const allUnitQualificationEntries = allUnitQualificationByCandidate.get(id) ?? [];
+        const allUnitQualificationGames = allUnitQualificationEntries.reduce(
+            (sum, { summary }) => sum + summary.games,
+            0,
+        );
+        const hasAllUnitQualificationEvidence = allUnitQualificationEntries.length === 1;
+        const allUnitQualificationPassed =
+            hasAllUnitQualificationEvidence && allUnitQualificationEntries.every(({ summary }) => summary.gates.pass);
+        const allUnitQualificationEvidenceSha256 = allUnitQualificationEntries.length
+            ? fingerprintV08AlignedV1(
+                  allUnitQualificationEntries
+                      .map(({ summary, job }) => ({
+                          jobId: job.id,
+                          baseSeed: summary.options.baseSeed,
+                          pairsPerMap: summary.options.pairsPerMap,
+                          games: summary.games,
+                          planSha256: summary.planSha256,
+                          summarySha256: job.summarySha256,
+                      }))
+                      .sort((left, right) => left.jobId.localeCompare(right.jobId)),
+              )
+            : null;
         const games = tournamentGames + postA13CoverageGames;
         const winsA = tournamentWinsA + postA13CandidateWins;
         const winsB = tournamentWinsB + postA13OpponentWins;
@@ -3215,6 +3695,16 @@ function collectLeaderboard(
             hasPostA13CoverageEvidence,
             postA13CoveragePassed,
             postA13SpellExercisePassed,
+            allUnitCoverageGames,
+            hasAllUnitCoverageEvidence,
+            allUnitCoveragePassed,
+            allUnitCoverageEvidenceSha256,
+            allUnitCoverageSummaryPaths: allUnitCoverageEntries.map(({ path }) => path),
+            allUnitQualificationGames,
+            hasAllUnitQualificationEvidence,
+            allUnitQualificationPassed,
+            allUnitQualificationEvidenceSha256,
+            allUnitQualificationSummaryPaths: allUnitQualificationEntries.map(({ path }) => path),
             passesPostA13StrengthGate: false,
             postA13UnitOutcomes,
             passesArmageddonGate,
@@ -3320,6 +3810,14 @@ function validationSelectionEvidenceSha256(
             hasPostA13CoverageEvidence: row.hasPostA13CoverageEvidence,
             postA13CoveragePassed: row.postA13CoveragePassed,
             postA13SpellExercisePassed: row.postA13SpellExercisePassed,
+            allUnitCoverageGames: row.allUnitCoverageGames,
+            hasAllUnitCoverageEvidence: row.hasAllUnitCoverageEvidence,
+            allUnitCoveragePassed: row.allUnitCoveragePassed,
+            allUnitCoverageEvidenceSha256: row.allUnitCoverageEvidenceSha256,
+            allUnitQualificationGames: row.allUnitQualificationGames,
+            hasAllUnitQualificationEvidence: row.hasAllUnitQualificationEvidence,
+            allUnitQualificationPassed: row.allUnitQualificationPassed,
+            allUnitQualificationEvidenceSha256: row.allUnitQualificationEvidenceSha256,
             postA13UnitOutcomes: row.postA13UnitOutcomes,
         }));
     return fingerprintV08AlignedV1({
@@ -3345,7 +3843,7 @@ function buildValidationSelection(
         throw new Error("Validation selection did not retain the inactive-challenger control in slot 2");
     }
     const unsigned = {
-        schema: "hoc.v0_8_aggressive_validation_selection.v2" as const,
+        schema: "hoc.v0_8_aggressive_validation_selection.v3" as const,
         version: V08_CAMPAIGN_SELECTION_VERSION as typeof V08_CAMPAIGN_SELECTION_VERSION,
         manifestFingerprint: manifest.fingerprint,
         sourceEvidenceSha256: validationSelectionEvidenceSha256(manifest, checkpoint, rows),
@@ -3384,6 +3882,10 @@ function validateValidationSelection(
                 !row.level4CoveragePassed ||
                 !row.hasPostA13CoverageEvidence ||
                 !row.postA13CoveragePassed ||
+                !row.hasAllUnitCoverageEvidence ||
+                !row.allUnitCoveragePassed ||
+                !row.hasAllUnitQualificationEvidence ||
+                !row.allUnitQualificationPassed ||
                 (!V08_CAMPAIGN_INACTIVE_CONTROL_IDS.some((controlId) => controlId === id) &&
                     !row.postA13SpellExercisePassed)
             );
@@ -3396,22 +3898,29 @@ function validateValidationSelection(
 function baseParentEvidenceSha256(manifest: IManifest, checkpoint: ICheckpoint): string {
     const relevant = checkpoint.completed.filter(
         (job) =>
-            job.candidateIndex < BASE_CANDIDATE_COUNT && (job.kind === "screen" || job.kind === "post_a13_coverage"),
+            job.candidateIndex < BASE_CANDIDATE_COUNT &&
+            (job.kind === "screen" || job.kind === "post_a13_coverage" || job.kind === "all_unit_coverage"),
     );
-    if (relevant.length !== BASE_CANDIDATE_COUNT * 2) {
+    if (relevant.length !== BASE_CANDIDATE_COUNT * 3) {
         throw new Error(
-            `Adaptive generation requires screen and post-A13 evidence for all ${BASE_CANDIDATE_COUNT} base candidates`,
+            `Adaptive generation requires screen, post-A13, and exact all-unit evidence for all ${BASE_CANDIDATE_COUNT} base candidates`,
         );
     }
-    const byCandidate = new Map<string, { screen?: ICompletedJob; coverage?: ICompletedJob }>();
+    const byCandidate = new Map<
+        string,
+        { screen?: ICompletedJob; coverage?: ICompletedJob; allUnitCoverage?: ICompletedJob }
+    >();
     for (const job of relevant) {
         const pair = byCandidate.get(job.candidateId) ?? {};
         if (job.kind === "screen") {
             if (pair.screen) throw new Error(`Duplicate base screen evidence for ${job.candidateId}`);
             pair.screen = job;
-        } else {
+        } else if (job.kind === "post_a13_coverage") {
             if (pair.coverage) throw new Error(`Duplicate base post-A13 evidence for ${job.candidateId}`);
             pair.coverage = job;
+        } else {
+            if (pair.allUnitCoverage) throw new Error(`Duplicate base all-unit evidence for ${job.candidateId}`);
+            pair.allUnitCoverage = job;
         }
         byCandidate.set(job.candidateId, pair);
     }
@@ -3419,26 +3928,35 @@ function baseParentEvidenceSha256(manifest: IManifest, checkpoint: ICheckpoint):
         const pair = byCandidate.get(candidate.id);
         const screen = pair?.screen;
         const coverage = pair?.coverage;
+        const allUnitCoverage = pair?.allUnitCoverage;
         if (
             !screen ||
             !coverage ||
+            !allUnitCoverage ||
             screen.id !== `screen-${candidate.id}` ||
             coverage.id !== `post-a13-coverage-${candidate.id}` ||
+            allUnitCoverage.id !== `all-unit-coverage-${candidate.id}` ||
             screen.candidateIndex !== candidate.index ||
             coverage.candidateIndex !== candidate.index ||
+            allUnitCoverage.candidateIndex !== candidate.index ||
             screen.genomeSha256 !== candidate.genomeSha256 ||
             coverage.genomeSha256 !== candidate.genomeSha256 ||
+            allUnitCoverage.genomeSha256 !== candidate.genomeSha256 ||
             screen.bindingSha256 !== candidate.bindingSha256 ||
             coverage.bindingSha256 !== candidate.bindingSha256 ||
+            allUnitCoverage.bindingSha256 !== candidate.bindingSha256 ||
             screen.games !== manifest.config.screenGames ||
             screen.baseSeed !== manifest.config.screenSeed ||
             coverage.pairsPerLane !== manifest.config.coveragePairsPerLane ||
-            coverage.baseSeed !== manifest.config.coverageSeed
+            coverage.baseSeed !== manifest.config.coverageSeed ||
+            allUnitCoverage.pairsPerMap !== manifest.config.allUnitPairsPerMap ||
+            allUnitCoverage.baseSeed !== manifest.config.allUnitSeed
         ) {
             throw new Error(`Base parent evidence for ${candidate.id} has invalid provenance`);
         }
         validateResultArtifact(manifest, screen, false);
         validateResultArtifact(manifest, coverage, false);
+        validateResultArtifact(manifest, allUnitCoverage, false);
         return {
             candidateId: candidate.id,
             candidateIndex: candidate.index,
@@ -3455,6 +3973,12 @@ function baseParentEvidenceSha256(manifest: IManifest, checkpoint: ICheckpoint):
                 baseSeed: coverage.baseSeed,
                 summarySha256: coverage.summarySha256,
             },
+            allUnitCoverage: {
+                pairsPerMap: allUnitCoverage.pairsPerMap,
+                games: jobWorkUnits(allUnitCoverage),
+                baseSeed: allUnitCoverage.baseSeed,
+                summarySha256: allUnitCoverage.summarySha256,
+            },
         };
     });
     return fingerprintV08AlignedV1({
@@ -3466,7 +3990,7 @@ function baseParentEvidenceSha256(manifest: IManifest, checkpoint: ICheckpoint):
 
 function selectBaseAdaptiveParents(manifest: IManifest, checkpoint: ICheckpoint): IRankedCandidate[] {
     const baseRows = collectLeaderboard(manifest, checkpoint, null, {
-        kinds: new Set<JobKind>(["screen", "post_a13_coverage"]),
+        kinds: new Set<JobKind>(["screen", "post_a13_coverage", "all_unit_coverage"]),
         outputName: "base-parent-leaderboard.json",
     });
     if (baseRows.length !== BASE_CANDIDATE_COUNT) {
@@ -3647,7 +4171,7 @@ function validateAdaptiveCatalog(
             })),
         ) !== fingerprintV08AlignedV1(expectedChildren)
     ) {
-        throw new Error("Adaptive catalog children do not match generator v6's deterministic mutation plan");
+        throw new Error("Adaptive catalog children do not match generator v7's deterministic mutation plan");
     }
     const seen = new Set(baseHashes);
     for (const [offset, child] of adaptive.children.entries()) {
@@ -3860,36 +4384,55 @@ async function runJob(
     const resultPath = join(directory, "result.json");
     mkdirSync(directory, { recursive: true });
     const auditPath = join(directory, "search-audit.jsonl");
-    const environment = childEnvironment(candidate.binding, auditPath, manifest.config.unboundedSearch);
+    const environment = buildV08CampaignChildEnvironment(
+        manifest.childEnvironmentPolicy,
+        candidate.binding,
+        auditPath,
+        manifest.config.unboundedSearch,
+    );
     const logPath = join(manifest.output, "logs", `${spec.id}.log`);
-    const isCoverageJob = spec.kind === "level4" || spec.kind === "post_a13_coverage";
+    const isAllUnitJob = spec.kind === "all_unit_coverage" || spec.kind === "all_unit_qualification";
+    const isCoverageJob = spec.kind === "level4" || spec.kind === "post_a13_coverage" || isAllUnitJob;
     const runner =
         spec.kind === "level4"
             ? LEVEL4_RUNNER
             : spec.kind === "post_a13_coverage"
               ? POST_A13_COVERAGE_RUNNER
-              : TOURNAMENT_RUNNER;
-    const args = isCoverageJob
+              : isAllUnitJob
+                ? ALL_UNIT_COVERAGE_RUNNER
+                : TOURNAMENT_RUNNER;
+    const args = isAllUnitJob
         ? [
               runner,
               "v0.8s",
               "v0.7",
-              String(spec.pairsPerLane),
+              String(spec.pairsPerMap),
               String(spec.baseSeed),
               directory,
               String(manifest.config.workersPerJob),
+              manifest.sourceIdentity.gitHead,
           ]
-        : [
-              runner,
-              "v0.8s",
-              "v0.7",
-              String(spec.games),
-              String(spec.baseSeed),
-              directory,
-              String(manifest.config.workersPerJob),
-              `--maps=${LIVE_MAPS}`,
-              "--livetwin",
-          ];
+        : isCoverageJob
+          ? [
+                runner,
+                "v0.8s",
+                "v0.7",
+                String(spec.pairsPerLane),
+                String(spec.baseSeed),
+                directory,
+                String(manifest.config.workersPerJob),
+            ]
+          : [
+                runner,
+                "v0.8s",
+                "v0.7",
+                String(spec.games),
+                String(spec.baseSeed),
+                directory,
+                String(manifest.config.workersPerJob),
+                `--maps=${LIVE_MAPS}`,
+                "--livetwin",
+            ];
     const startedAtMs = Date.now();
     const startedAt = new Date(startedAtMs).toISOString();
     checkpoint.activeJobs[spec.id] = { spec, startedAt, startedAtMs, pid: null };
@@ -3907,13 +4450,20 @@ async function runJob(
     console.log(`[start] ${spec.id}`);
     let status: "completed" | "deadline";
     try {
-        status = await runChild(args, environment, logPath, manifest.deadlineAtMs, (pid) => {
-            const active = checkpoint.activeJobs[spec.id];
-            if (active?.startedAtMs === startedAtMs) {
-                active.pid = pid;
-                saveCheckpoint(manifest, checkpoint);
-            }
-        });
+        status = await runChild(
+            args,
+            environment,
+            logPath,
+            manifest.deadlineAtMs,
+            (pid) => {
+                const active = checkpoint.activeJobs[spec.id];
+                if (active?.startedAtMs === startedAtMs) {
+                    active.pid = pid;
+                    saveCheckpoint(manifest, checkpoint);
+                }
+            },
+            isAllUnitJob,
+        );
     } finally {
         delete checkpoint.activeJobs[spec.id];
         saveCheckpoint(manifest, checkpoint);
@@ -4108,6 +4658,27 @@ async function runCampaign(cli: ICli): Promise<void> {
         }
     }
 
+    // The post-A13 panel exercises new spell kits deeply; this orthogonal deterministic panel fails closed
+    // unless every enabled creature is productive and rejection-free on both ownership sides, all live maps,
+    // and both physical seats. Its outcomes are qualification evidence only and never enter research fitness.
+    checkpoint.phase = "all_unit_coverage";
+    saveCheckpoint(manifest, checkpoint);
+    {
+        const specs: IJobSpec[] = baseBindings.map((_binding, index) => ({
+            id: `all-unit-coverage-${candidateId(index)}`,
+            kind: "all_unit_coverage" as const,
+            candidateId: candidateId(index),
+            candidateIndex: index,
+            pairsPerMap: manifest.config.allUnitPairsPerMap,
+            baseSeed: manifest.config.allUnitSeed,
+        }));
+        const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
+        if (!ok) {
+            finishIncompletePhase();
+            return;
+        }
+    }
+
     adaptive = loadOrCreateAdaptiveCatalog(manifest, checkpoint, baseGenomes);
     registry = buildCandidateRegistry(manifest, baseBindings, adaptive);
     checkpoint.phase = "adaptive";
@@ -4147,8 +4718,26 @@ async function runCampaign(cli: ICli): Promise<void> {
         }
     }
 
+    checkpoint.phase = "all_unit_coverage";
+    saveCheckpoint(manifest, checkpoint);
+    {
+        const specs: IJobSpec[] = adaptive.children.map((child) => ({
+            id: `all-unit-coverage-${child.id}`,
+            kind: "all_unit_coverage" as const,
+            candidateId: child.id,
+            candidateIndex: child.index,
+            pairsPerMap: manifest.config.allUnitPairsPerMap,
+            baseSeed: manifest.config.allUnitSeed,
+        }));
+        const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs);
+        if (!ok) {
+            finishIncompletePhase();
+            return;
+        }
+    }
+
     const preLevel4 = collectLeaderboard(manifest, checkpoint, adaptive, {
-        kinds: new Set<JobKind>(["screen", "adaptive", "post_a13_coverage"]),
+        kinds: new Set<JobKind>(["screen", "adaptive", "post_a13_coverage", "all_unit_coverage"]),
         outputName: "pre-level4-leaderboard.json",
     });
     const preLevel4Eligible = preLevel4.filter(isV08CampaignPostA13SelectionEligible);
@@ -4187,6 +4776,61 @@ async function runCampaign(cli: ICli): Promise<void> {
             return;
         }
     }
+
+    // Persist the complete deep reserve through the deterministic level-4 selection, then reserve enough
+    // makespan for every pending all-unit qualification job before launching any of them. A deadline cannot
+    // leave a selectively qualified shortlist whose membership depends on queue order.
+    checkpoint.phase = "all_unit_qualification";
+    saveCheckpoint(manifest, checkpoint);
+    {
+        const specs: IJobSpec[] = level4Queue.map((row) => ({
+            id: `all-unit-qualification-${row.candidateId}`,
+            kind: "all_unit_qualification" as const,
+            candidateId: row.candidateId,
+            candidateIndex: row.candidateIndex,
+            pairsPerMap: manifest.config.allUnitQualificationPairsPerMap,
+            baseSeed: manifest.config.allUnitQualificationSeed,
+        }));
+        for (const spec of specs) reconcileJobResult(manifest, checkpoint, registry, spec);
+        const completedIds = new Set(checkpoint.completed.map(({ id }) => id));
+        const pending = specs.filter(({ id }) => !completedIds.has(id));
+        const estimatedDurationMs = estimateDynamicQueueDurationMs(
+            pending,
+            checkpoint.completed,
+            manifest.config.workersPerJob,
+            manifest.config.lanes,
+        );
+        if (
+            pending.length > 0 &&
+            Date.now() + estimatedDurationMs + ADMISSION_SAFETY_MARGIN_MS > manifest.deadlineAtMs
+        ) {
+            appendFileSync(
+                join(manifest.output, "logs", "orchestrator.jsonl"),
+                `${JSON.stringify({
+                    at: new Date().toISOString(),
+                    event: "all-unit-qualification-admission-deferred",
+                    schedulerVersion: V08_CAMPAIGN_SCHEDULER_VERSION,
+                    jobIds: pending.map(({ id }) => id),
+                    estimatedDurationMs,
+                    safetyMarginMs: ADMISSION_SAFETY_MARGIN_MS,
+                    deadlineAtMs: manifest.deadlineAtMs,
+                })}\n`,
+            );
+            console.log(
+                `[defer] complete all-unit qualification reserve needs about ${Math.ceil(estimatedDurationMs / 1_000)}s`,
+            );
+            finishIncompletePhase();
+            return;
+        }
+        const ok = await runJobQueue(manifest, checkpoint, registry, adaptive, specs, {
+            admissionReserved: true,
+        });
+        if (!ok) {
+            finishIncompletePhase();
+            return;
+        }
+    }
+
     const validationSelectionSource = collectLeaderboard(manifest, checkpoint, adaptive, {
         kinds: VALIDATION_SELECTION_SOURCE_KINDS,
         outputName: "validation-selection-source-leaderboard.json",

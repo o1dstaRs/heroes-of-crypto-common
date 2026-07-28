@@ -21,7 +21,9 @@ import {
 } from "../../src/ai/versions/caster_router";
 import { StrategyV0_6 } from "../../src/ai/versions/v0_6";
 import { StrategyV0_4 } from "../../src/ai/versions/v0_4";
-import { isAuraSaturatedArmy, StrategyV0_7 } from "../../src/ai/versions/v0_7";
+import { casterPolicyWithExtras, isAuraSaturatedArmy, StrategyV0_7 } from "../../src/ai/versions/v0_7";
+import { StrategyV0_8, V08_CASTER_ROUTER_POLICY, V08_CASTLING_ROUTER_VERSIONS_ENV } from "../../src/ai/versions/v0_8";
+import { StrategyV0_8S } from "../../src/ai/versions/v0_8s";
 import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import type { GameAction } from "../../src/engine/actions";
@@ -120,6 +122,7 @@ afterEach(() => {
     delete process.env.V07_AURA_CASTER_SPELLS;
     delete process.env.V07_CASTER_EXTRA;
     delete process.env.V07_CASTER_EXTRA_VERSIONS;
+    delete process.env[V08_CASTLING_ROUTER_VERSIONS_ENV];
 });
 
 describe("v0.6 universal MELEE_MAGIC caster router", () => {
@@ -668,5 +671,101 @@ describe("v0.7 baked caster salvage", () => {
             ),
         ).toBe(false);
         expect(castSpell(routed)?.spellName).toBe("Resurrection");
+    });
+});
+
+describe("v0.8 baked Castling salvage", () => {
+    class ExposedV08 extends StrategyV0_8 {
+        public route(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+            return this.routeCasterDecision(unit, context, decision);
+        }
+    }
+
+    class ExposedV08S extends StrategyV0_8S {
+        public route(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+            return this.routeCasterDecision(unit, context, decision);
+        }
+    }
+
+    it("adds only Castling to the frozen v0.7 policy and preserves scoped research extras", () => {
+        expect(V07_CASTER_ROUTER_POLICY.spells).toEqual(["resurrection", "windflow"]);
+        expect(V08_CASTER_ROUTER_POLICY).toEqual({
+            spells: ["resurrection", "windflow", "castling"],
+            resurrectionPreemptsCommitted: false,
+        });
+
+        process.env.V07_CASTER_EXTRA = "summonwolves,reswiden";
+        expect(casterPolicyWithExtras("v0.8", V08_CASTER_ROUTER_POLICY).spells).toEqual([
+            "resurrection",
+            "windflow",
+            "castling",
+            "summonwolves",
+            "reswiden",
+        ]);
+    });
+
+    it("routes a supported forward ranged target in v0.8/v0.8s while keeping v0.7 frozen", () => {
+        const combat = createCombatTestContext();
+        const harpy = makeReal(LOWER, "Might", "Harpy");
+        harpy.setStackPower(5);
+        const support = createTestUnit({ team: LOWER, name: "Local support", attackType: MELEE });
+        const shooter = createTestUnit({
+            team: UPPER,
+            name: "Forward shooter",
+            attackType: RANGE,
+            amountAlive: 10,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, harpy, { x: 2, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, support, { x: 1, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 5, y: 5 });
+        const context = contextFor(combat);
+        const incumbent = fallback(harpy);
+
+        expect(routeUniversalCasterWithPolicy(harpy, context, incumbent, V07_CASTER_ROUTER_POLICY)).toBe(incumbent);
+        for (const routed of [
+            new ExposedV08().route(harpy, context, incumbent),
+            new ExposedV08S().route(harpy, context, incumbent),
+        ]) {
+            expect(castSpell(routed)).toMatchObject({
+                spellName: "Castling",
+                targetId: shooter.getId(),
+                targetCell: shooter.getBaseCell(),
+            });
+        }
+    });
+
+    it("supports a true version-scoped ablation and never replaces a committed attack", () => {
+        const combat = createCombatTestContext();
+        const harpy = makeReal(LOWER, "Might", "Harpy");
+        harpy.setStackPower(5);
+        const support = createTestUnit({ team: LOWER, name: "Local support", attackType: MELEE });
+        const shooter = createTestUnit({
+            team: UPPER,
+            name: "Forward shooter",
+            attackType: RANGE,
+            amountAlive: 10,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, harpy, { x: 2, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, support, { x: 1, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 5, y: 5 });
+        const context = contextFor(combat);
+        const incumbent = fallback(harpy);
+
+        process.env[V08_CASTLING_ROUTER_VERSIONS_ENV] = "v0.8s";
+        expect(new ExposedV08().route(harpy, context, incumbent)).toBe(incumbent);
+        expect(castSpell(new ExposedV08S().route(harpy, context, incumbent))?.spellName).toBe("Castling");
+
+        const attack: GameAction[] = [
+            {
+                type: "melee_attack",
+                attackerId: harpy.getId(),
+                targetId: shooter.getId(),
+                attackFrom: harpy.getBaseCell(),
+            },
+        ];
+        expect(new ExposedV08S().route(harpy, context, attack)).toBe(attack);
+
+        process.env[V08_CASTLING_ROUTER_VERSIONS_ENV] = "";
+        expect(new ExposedV08S().route(harpy, context, incumbent)).toBe(incumbent);
     });
 });

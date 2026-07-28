@@ -20,8 +20,9 @@ import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { enumerateCandidates, type CandidateKind, type IEnumeratedCandidate } from "../candidates";
 import { otherTeam } from "./v0_1";
+import { type ICasterRouterPolicy, routeUniversalCasterWithPolicy, V07_CASTER_ROUTER_POLICY } from "./caster_router";
 import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
-import { StrategyV0_7 } from "./v0_7";
+import { casterPolicyWithExtras, StrategyV0_7 } from "./v0_7";
 import {
     buildV08BacklineWardIntent,
     preservesV08BacklineWardIntent,
@@ -42,6 +43,18 @@ const V08_POSTURE_PROTECTED_ACTION_TYPES = new Set<GameAction["type"]>([
     "obstacle_attack",
     "cast_spell",
 ]);
+
+/** v0.8 closes Harpy's deterministic Castling omission without changing frozen v0.7 behavior. */
+export const V08_CASTER_ROUTER_POLICY = Object.freeze({
+    spells: Object.freeze([...V07_CASTER_ROUTER_POLICY.spells, "castling"] as const),
+    resurrectionPreemptsCommitted: V07_CASTER_ROUTER_POLICY.resurrectionPreemptsCommitted,
+}) satisfies ICasterRouterPolicy;
+
+/**
+ * Optional exact-version scope for paired ablations. Absent means every v0.8-family caller; explicitly empty
+ * disables the v0.8 Castling addition while retaining the inherited v0.7 policy.
+ */
+export const V08_CASTLING_ROUTER_VERSIONS_ENV = "V08_CASTLING_ROUTER_VERSIONS";
 
 const nonnegativeFinite = (value: number): number => (Number.isFinite(value) ? Math.max(0, value) : 0);
 
@@ -386,6 +399,30 @@ export class StrategyV0_8 extends StrategyV0_7 {
                 process.env.V08_VISIBLE_EDGE_SCREEN_PRESSURE_VERSIONS ?? "v0.8",
             ) &&
             context.grid.getGridType() === PBTypes.GridVals.NORMAL
+        );
+    }
+    /**
+     * Harpy otherwise spends every legal Castling turn moving, waiting, or walking into melee. Reuse the
+     * conservative universal rule: only a forward SMALL ranged/magic target, only with nearby allied support,
+     * and never over a committed attack, wait, defend, or cast. The optional scope supports a true v0.8s/v0.8
+     * paired ablation; production leaves it absent and therefore enabled for both aliases.
+     */
+    protected override routeCasterDecision(
+        unit: Unit,
+        context: IDecisionContext,
+        decision: GameAction[],
+    ): GameAction[] {
+        const basePolicy = strategyVersionMatchesExperimentScope(
+            this.version,
+            process.env[V08_CASTLING_ROUTER_VERSIONS_ENV],
+        )
+            ? V08_CASTER_ROUTER_POLICY
+            : V07_CASTER_ROUTER_POLICY;
+        return routeUniversalCasterWithPolicy(
+            unit,
+            context,
+            decision,
+            casterPolicyWithExtras(this.version, basePolicy),
         );
     }
     /** a13 uses living-stack ranged output, not the historical per-creature proxy. */

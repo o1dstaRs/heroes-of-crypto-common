@@ -148,10 +148,13 @@ export const auraCasterRouterEnabled = (strategyVersion?: string): boolean =>
  */
 const EXTRA_CASTER_TOKENS: readonly CasterRouterSpell[] = ["summonwolves", "reswait", "reswiden"];
 
-function casterPolicyWithExtras(version: string): ICasterRouterPolicy {
+export function casterPolicyWithExtras(
+    version: string,
+    basePolicy: ICasterRouterPolicy = V07_CASTER_ROUTER_POLICY,
+): ICasterRouterPolicy {
     const raw = process.env.V07_CASTER_EXTRA;
     if (!raw) {
-        return V07_CASTER_ROUTER_POLICY;
+        return basePolicy;
     }
     const scope = process.env.V07_CASTER_EXTRA_VERSIONS;
     if (scope) {
@@ -160,17 +163,17 @@ function casterPolicyWithExtras(version: string): ICasterRouterPolicy {
             .map((entry) => entry.trim())
             .filter(Boolean);
         if (!allowed.includes(version)) {
-            return V07_CASTER_ROUTER_POLICY;
+            return basePolicy;
         }
     }
     const requested = new Set(raw.split(",").map((token) => token.trim().toLowerCase()));
-    const extras = EXTRA_CASTER_TOKENS.filter((token) => requested.has(token));
+    const extras = EXTRA_CASTER_TOKENS.filter((token) => requested.has(token) && !basePolicy.spells.includes(token));
     if (!extras.length) {
-        return V07_CASTER_ROUTER_POLICY;
+        return basePolicy;
     }
     return {
-        spells: [...V07_CASTER_ROUTER_POLICY.spells, ...extras],
-        resurrectionPreemptsCommitted: V07_CASTER_ROUTER_POLICY.resurrectionPreemptsCommitted,
+        spells: [...basePolicy.spells, ...extras],
+        resurrectionPreemptsCommitted: basePolicy.resurrectionPreemptsCommitted,
     };
 }
 

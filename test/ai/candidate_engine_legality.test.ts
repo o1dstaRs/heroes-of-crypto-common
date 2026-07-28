@@ -19,6 +19,7 @@ import {
     type CandidateKind,
     type IEnumeratedCandidate,
 } from "../../src/ai/candidates";
+import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import { GameActionEngine } from "../../src/engine/action_engine";
@@ -549,5 +550,59 @@ describe("enumerated candidate engine legality", () => {
 
         expect(windFlow).toHaveLength(1);
         expectCandidatesToApply(massHarness, windFlow);
+    });
+
+    it("applies the exact conservative Castling action selected by v0.8 and emits both swap animations", () => {
+        class ExposedV08 extends StrategyV0_8 {
+            public route(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+                return this.routeCasterDecision(unit, context, decision);
+            }
+        }
+
+        const combat = createCombatTestContext();
+        const harpy = makeReal(LOWER, "Might", "Harpy");
+        harpy.setStackPower(5);
+        const support = createTestUnit({ team: LOWER, name: "Local support", attackType: MELEE });
+        const shooter = createTestUnit({
+            team: UPPER,
+            name: "Forward shooter",
+            attackType: RANGE,
+            amountAlive: 5,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, harpy, { x: 2, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, support, { x: 1, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 5, y: 5 });
+        const harness = activate(combat, harpy);
+        const harpyStart = { ...harpy.getBaseCell() };
+        const shooterStart = { ...shooter.getBaseCell() };
+        const decision = new ExposedV08().route(harpy, harness.context, incumbentFor(harpy));
+        const cast = decision.find(
+            (action): action is Extract<GameAction, { type: "cast_spell" }> => action.type === "cast_spell",
+        );
+
+        expect(cast).toMatchObject({
+            spellName: "Castling",
+            targetId: shooter.getId(),
+            targetCell: shooterStart,
+        });
+        const result = harness.engine.apply(cast!);
+
+        expect(result.completed).toBe(true);
+        expect(result.rejectionReason).toBeUndefined();
+        expect(harpy.getBaseCell()).toEqual(shooterStart);
+        expect(shooter.getBaseCell()).toEqual(harpyStart);
+        expect(harpy.hasSpellRemaining("Castling")).toBe(false);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "spell_cast",
+                casterId: harpy.getId(),
+                spellName: "Castling",
+                targetId: shooter.getId(),
+                animations: expect.arrayContaining([
+                    expect.objectContaining({ affectedUnitId: harpy.getId() }),
+                    expect.objectContaining({ affectedUnitId: shooter.getId() }),
+                ]),
+            }),
+        );
     });
 });

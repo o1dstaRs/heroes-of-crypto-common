@@ -15,6 +15,8 @@ import {
     assertV08CampaignResumeHasNoLiveJobs,
     acquireV08CampaignOutputLease,
     buildV08CampaignBaseGenomes,
+    buildV08CampaignChildEnvironment,
+    buildV08CampaignChildEnvironmentPolicy,
     buildWorkerPlan,
     canAdmitJobBatches,
     classifyV08CampaignValidationRoundState,
@@ -23,6 +25,7 @@ import {
     estimateDynamicQueueDurationMs,
     estimateJobBatchesDurationMs,
     isV08CampaignAdaptiveCatalogProvenanceCurrent,
+    isV08CampaignChildEnvironmentPolicyValid,
     isV08CampaignManifestProvenanceCurrent,
     isV08CampaignPostA13LaneBehaviorQualified,
     isV08CampaignPostA13SelectionEligible,
@@ -47,6 +50,8 @@ import {
     validateV08CampaignPostA13CoverageSummary,
     type IJobDurationSample,
     V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION,
+    V08_CAMPAIGN_CHILD_ENVIRONMENT_POLICY_VERSION,
+    V08_CAMPAIGN_CHILD_ENVIRONMENT_STRATEGY,
     V08_CAMPAIGN_DEFAULT_LANES,
     V08_CAMPAIGN_DEFAULT_TOP_CANDIDATES,
     V08_CAMPAIGN_EXACT_ANCHOR_ID,
@@ -88,6 +93,10 @@ const researchRow = ({
     hasPostA13CoverageEvidence = true,
     postA13CoveragePassed = true,
     postA13SpellExercisePassed = true,
+    hasAllUnitCoverageEvidence = true,
+    allUnitCoveragePassed = true,
+    hasAllUnitQualificationEvidence = true,
+    allUnitQualificationPassed = true,
 }: {
     candidateId: string;
     candidateIndex: number;
@@ -100,6 +109,10 @@ const researchRow = ({
     hasPostA13CoverageEvidence?: boolean;
     postA13CoveragePassed?: boolean;
     postA13SpellExercisePassed?: boolean;
+    hasAllUnitCoverageEvidence?: boolean;
+    allUnitCoveragePassed?: boolean;
+    hasAllUnitQualificationEvidence?: boolean;
+    allUnitQualificationPassed?: boolean;
 }) => ({
     candidateId,
     candidateIndex,
@@ -113,6 +126,10 @@ const researchRow = ({
     hasPostA13CoverageEvidence,
     postA13CoveragePassed,
     postA13SpellExercisePassed,
+    hasAllUnitCoverageEvidence,
+    allUnitCoveragePassed,
+    hasAllUnitQualificationEvidence,
+    allUnitQualificationPassed,
 });
 
 const validationStrength = ({
@@ -199,6 +216,12 @@ describe("v0.8 aggressive campaign orchestration", () => {
                 candidateWinRate: 0.99,
                 postA13SpellExercisePassed: false,
             }),
+            researchRow({
+                candidateId: "failed-all-unit",
+                candidateIndex: 14,
+                candidateWinRate: 0.98,
+                allUnitCoveragePassed: false,
+            }),
         ];
 
         expect(selectV08CampaignAdaptiveParents(rows).map(({ candidateId }) => candidateId)).toEqual([
@@ -220,9 +243,14 @@ describe("v0.8 aggressive campaign orchestration", () => {
                 rows.map((row) => (row.candidateId === "c48" ? { ...row, postA13SpellExercisePassed: false } : row)),
             ),
         ).toThrow("every intrinsic post-A13 spell kit");
+        expect(() =>
+            selectV08CampaignAdaptiveParents(
+                rows.map((row) => (row.candidateId === "c48" ? { ...row, allUnitCoveragePassed: false } : row)),
+            ),
+        ).toThrow("all-unit coverage");
     });
 
-    it("excludes failed post-A13 behavior or spell exercise before research selection", () => {
+    it("excludes failed post-A13 behavior, spell exercise, or exact all-unit coverage before research selection", () => {
         expect(
             isV08CampaignPostA13SelectionEligible(
                 researchRow({
@@ -230,6 +258,16 @@ describe("v0.8 aggressive campaign orchestration", () => {
                     candidateIndex: 1,
                     candidateWinRate: 1,
                     postA13CoveragePassed: false,
+                }),
+            ),
+        ).toBe(false);
+        expect(
+            isV08CampaignPostA13SelectionEligible(
+                researchRow({
+                    candidateId: "candidate",
+                    candidateIndex: 1,
+                    candidateWinRate: 1,
+                    allUnitCoveragePassed: false,
                 }),
             ),
         ).toBe(false);
@@ -293,7 +331,7 @@ describe("v0.8 aggressive campaign orchestration", () => {
         expect(new Set(proposals.map(({ genome }) => fingerprintV08AlignedV1CandidateGenome(genome))).size).toBe(6);
     });
 
-    it("forces c48 and the stronger inactive control through level-4 even when top is one", () => {
+    it("forces c48 and both inactive controls through level-4 even when top is one", () => {
         const rows = [
             researchRow({ candidateId: "c48", candidateIndex: 48, candidateWinRate: 0.4 }),
             researchRow({ candidateId: "c37", candidateIndex: 37, candidateWinRate: 0.55 }),
@@ -302,7 +340,7 @@ describe("v0.8 aggressive campaign orchestration", () => {
         ];
 
         expect(selectV08CampaignInactiveControl(rows).candidateId).toBe("c38");
-        expect(selectV08CampaignLevel4CandidateIds(rows, 1)).toEqual(["c48", "c38"]);
+        expect(selectV08CampaignLevel4CandidateIds(rows, 1)).toEqual(["c48", "c38", "c37"]);
         expect(() => selectV08CampaignInactiveControl(rows.filter(({ candidateId }) => candidateId !== "c37"))).toThrow(
             "c37/c38",
         );
@@ -338,7 +376,7 @@ describe("v0.8 aggressive campaign orchestration", () => {
             researchRow({ candidateId: "eligible", candidateIndex: 3, candidateWinRate: 0.9 }),
         ];
 
-        expect(selectV08CampaignLevel4CandidateIds(rows, 4)).toEqual(["c48", "c38", "eligible", "c37"]);
+        expect(selectV08CampaignLevel4CandidateIds(rows, 4)).toEqual(["c48", "c38", "c37", "eligible"]);
     });
 
     it("stratifies top-eight validation across anchor, control, strength, and lowest total Armageddon", () => {
@@ -373,7 +411,17 @@ describe("v0.8 aggressive campaign orchestration", () => {
                 level4CoveragePassed: false,
             }),
         ];
-        const expected = [
+        const level4Expected = [
+            "c48",
+            "c38",
+            "c37",
+            "strength-1",
+            "strength-2",
+            "strength-3",
+            "low-arm-1",
+            "low-arm-2",
+        ];
+        const validationExpected = [
             "c48",
             "c38",
             "strength-1",
@@ -389,13 +437,13 @@ describe("v0.8 aggressive campaign orchestration", () => {
                 rows.filter(({ candidateId }) => candidateId !== "uncovered-superstar"),
                 8,
             ),
-        ).toEqual(expected);
-        expect(selectValidationCandidateIds(rows, 8)).toEqual(expected);
-        expect(selectValidationCandidateIds(rows, 8)).toEqual(expected);
+        ).toEqual(level4Expected);
+        expect(selectValidationCandidateIds(rows, 8)).toEqual(validationExpected);
+        expect(selectValidationCandidateIds(rows, 8)).toEqual(validationExpected);
         expect(selectValidationCandidateIds(rows, 1)).toEqual(["c48", "c38"]);
-        expect(expected.every((id) => rows.find(({ candidateId }) => candidateId === id)?.hasLevel4Evidence)).toBe(
-            true,
-        );
+        expect(
+            validationExpected.every((id) => rows.find(({ candidateId }) => candidateId === id)?.hasLevel4Evidence),
+        ).toBe(true);
         expect(isV08CampaignReserveEligible(rows.find(({ candidateId }) => candidateId === "low-arm-1")!)).toBe(true);
         expect(
             isV08CampaignReserveEligible(rows.find(({ candidateId }) => candidateId === "ineligible-lucky-zero")!),
@@ -423,12 +471,34 @@ describe("v0.8 aggressive campaign orchestration", () => {
                 8,
             ),
         ).toThrow("c48 anchor");
-        expect(() =>
+        expect(
             selectValidationCandidateIds(
                 rows.map((row) => (row.candidateId === "c38" ? { ...row, hasLevel4Evidence: false } : row)),
                 8,
+            )[1],
+        ).toBe("c37");
+        expect(() =>
+            selectValidationCandidateIds(
+                rows.map((row) =>
+                    row.candidateId === "c37" || row.candidateId === "c38"
+                        ? { ...row, allUnitQualificationPassed: false }
+                        : row,
+                ),
+                8,
             ),
         ).toThrow("inactive-challenger control");
+        expect(() =>
+            selectValidationCandidateIds(
+                rows.map((row) => (row.candidateId === "c48" ? { ...row, allUnitCoveragePassed: false } : row)),
+                8,
+            ),
+        ).toThrow("all-unit coverage");
+        expect(() =>
+            selectValidationCandidateIds(
+                rows.map((row) => (row.candidateId === "c48" ? { ...row, allUnitQualificationPassed: false } : row)),
+                8,
+            ),
+        ).toThrow("all-unit qualification");
     });
 
     it("ranks the exact c31 outcome above c39 instead of inflating decisive rate with draws", () => {
@@ -554,6 +624,81 @@ describe("v0.8 aggressive campaign orchestration", () => {
         expect(unbounded.V08_AGGRESSIVE).toBe("1");
     });
 
+    it("denies hostile ambient roster and experiment variables and binds the exact child base environment", () => {
+        const hostileAmbient = {
+            HOME: "/safe-home",
+            FIGHT_MELEE_ROSTERS: "1",
+            COHORT: "melee_only",
+            FORCE_CREATURES: "Zombie",
+            ROSTER_RANGED_MIN: "99",
+            ROSTER_FLYER_MAX: "0",
+            SIM_NO_ACTIONS: "1",
+            AI_VERSION: "v0.1",
+            V08_AGGRESSIVE: "hostile",
+            SEARCH_GATE: "0.99",
+            NODE_OPTIONS: "--inspect",
+            BUN_OPTIONS: "--smol",
+        };
+        const policy = buildV08CampaignChildEnvironmentPolicy(hostileAmbient, "/opt/bun/bin/bun");
+        const binding = {
+            behaviorEnvironment: {
+                SEARCH_GATE: "0.025",
+                SEARCH_DECISION_DEADLINE_MS: "150",
+                SEARCH_CIRCUIT_BREAKER_MS: "275",
+            },
+        } as unknown as IV08AlignedV1CandidateBinding;
+        const child = buildV08CampaignChildEnvironment(policy, binding, "/evidence/search-audit.jsonl", true);
+
+        expect(policy).toEqual({
+            version: V08_CAMPAIGN_CHILD_ENVIRONMENT_POLICY_VERSION,
+            strategy: V08_CAMPAIGN_CHILD_ENVIRONMENT_STRATEGY,
+            inheritedKeys: ["HOME"],
+            baseEnvironment: {
+                HOME: "/safe-home",
+                PATH: "/opt/bun/bin:/usr/bin:/bin",
+                TMPDIR: "/tmp",
+                LANG: "C",
+                LC_ALL: "C",
+                TZ: "UTC",
+            },
+            baseEnvironmentSha256: fingerprintV08AlignedV1({
+                HOME: "/safe-home",
+                PATH: "/opt/bun/bin:/usr/bin:/bin",
+                TMPDIR: "/tmp",
+                LANG: "C",
+                LC_ALL: "C",
+                TZ: "UTC",
+            }),
+        });
+        expect(isV08CampaignChildEnvironmentPolicyValid(policy)).toBe(true);
+        expect(
+            isV08CampaignChildEnvironmentPolicyValid({
+                ...policy,
+                baseEnvironment: { ...policy.baseEnvironment, COHORT: "contaminated" },
+            }),
+        ).toBe(false);
+        for (const key of [
+            "FIGHT_MELEE_ROSTERS",
+            "COHORT",
+            "FORCE_CREATURES",
+            "ROSTER_RANGED_MIN",
+            "ROSTER_FLYER_MAX",
+            "SIM_NO_ACTIONS",
+            "AI_VERSION",
+            "NODE_OPTIONS",
+            "BUN_OPTIONS",
+        ]) {
+            expect(child[key]).toBeUndefined();
+        }
+        expect(child.HOME).toBe("/safe-home");
+        expect(child.SEARCH_GATE).toBe("0.025");
+        expect(child.SEARCH_DECISION_DEADLINE_MS).toBe("");
+        expect(child.SEARCH_CIRCUIT_BREAKER_MS).toBe("");
+        expect(child.SEARCH_AUDIT).toBe("/evidence/search-audit.jsonl");
+        expect(child.V08_AGGRESSIVE).toBe("1");
+        expect(child.LIVETWIN).toBe("1");
+    });
+
     it("compares promotion strength only on identical committed validation rounds and seeds", () => {
         const anchor = validationStrength({ candidateWinRate: 0.48, decisiveWinRate: 0.49 });
         const nonRegressing = validationStrength({ candidateWinRate: 0.48, decisiveWinRate: 0.49 });
@@ -605,6 +750,10 @@ describe("v0.8 aggressive campaign orchestration", () => {
             level4CoveragePassed: true,
             postA13CoveragePassed: true,
             postA13SpellExercisePassed: true,
+            hasAllUnitCoverageEvidence: true,
+            allUnitCoveragePassed: true,
+            hasAllUnitQualificationEvidence: true,
+            allUnitQualificationPassed: true,
             armageddonRate: 0,
             level4ArmageddonRate: 0,
             postA13ArmageddonRate: 0,
@@ -621,6 +770,16 @@ describe("v0.8 aggressive campaign orchestration", () => {
         expect(isV08CampaignPromotionEligible({ ...cleanBounded, level4CoveragePassed: false }, anchor)).toBe(false);
         expect(isV08CampaignPromotionEligible({ ...cleanBounded, postA13CoveragePassed: false }, anchor)).toBe(false);
         expect(isV08CampaignPromotionEligible({ ...cleanBounded, postA13SpellExercisePassed: false }, anchor)).toBe(
+            false,
+        );
+        expect(isV08CampaignPromotionEligible({ ...cleanBounded, hasAllUnitCoverageEvidence: false }, anchor)).toBe(
+            false,
+        );
+        expect(isV08CampaignPromotionEligible({ ...cleanBounded, allUnitCoveragePassed: false }, anchor)).toBe(false);
+        expect(
+            isV08CampaignPromotionEligible({ ...cleanBounded, hasAllUnitQualificationEvidence: false }, anchor),
+        ).toBe(false);
+        expect(isV08CampaignPromotionEligible({ ...cleanBounded, allUnitQualificationPassed: false }, anchor)).toBe(
             false,
         );
         expect(isV08CampaignPromotionEligible({ ...cleanBounded, postA13CandidateWinRate: 0.49 }, anchor)).toBe(false);
@@ -670,7 +829,7 @@ describe("v0.8 aggressive campaign orchestration", () => {
         ).toBe(false);
     });
 
-    it("accepts only schema-v9/generator-v6 A13 and immutable-source provenance", () => {
+    it("accepts only schema-v10/generator-v7 A13, all-unit gates, and immutable-source provenance", () => {
         const sourceUnsigned = {
             branch: "main" as const,
             gitHead: "1".repeat(40),
@@ -687,6 +846,10 @@ describe("v0.8 aggressive campaign orchestration", () => {
             schema: V08_CAMPAIGN_SCHEMA,
             kind: "manifest",
             sourceIdentity,
+            childEnvironmentPolicy: buildV08CampaignChildEnvironmentPolicy(
+                { HOME: "/campaign-home" },
+                "/campaign/bin/bun",
+            ),
             adaptive: { generatorVersion: V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION },
             scheduler: { version: V08_CAMPAIGN_SCHEDULER_VERSION },
             campaignBaseIdentity: {
@@ -704,12 +867,13 @@ describe("v0.8 aggressive campaign orchestration", () => {
             },
         };
 
-        expect(V08_CAMPAIGN_SCHEMA).toBe("hoc.v0_8_aggressive_campaign.v9");
-        expect(V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION).toBe(6);
+        expect(V08_CAMPAIGN_SCHEMA).toBe("hoc.v0_8_aggressive_campaign.v10");
+        expect(V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION).toBe(7);
         expect(V08_CAMPAIGN_SCHEDULER_VERSION).toBe(1);
-        expect(V08_CAMPAIGN_SELECTION_VERSION).toBe(2);
+        expect(V08_CAMPAIGN_SELECTION_VERSION).toBe(3);
         expect(isV08CampaignSourceIdentityCurrent(sourceIdentity)).toBe(true);
         expect(isV08CampaignManifestProvenanceCurrent(current)).toBe(true);
+        expect(isV08CampaignManifestProvenanceCurrent({ ...current, childEnvironmentPolicy: undefined })).toBe(false);
         expect(isV08CampaignManifestProvenanceCurrent({ ...current, schema: "hoc.v0_8_aggressive_campaign.v8" })).toBe(
             false,
         );
@@ -782,8 +946,12 @@ describe("v0.8 aggressive campaign orchestration", () => {
         expect(jobWorkUnits({ kind: "validation", games: 1_024 })).toBe(1_024);
         expect(jobWorkUnits({ kind: "level4", pairsPerLane: 16 })).toBe(256);
         expect(jobWorkUnits({ kind: "post_a13_coverage", pairsPerLane: 3 })).toBe(144);
+        expect(jobWorkUnits({ kind: "all_unit_coverage", pairsPerMap: 4 })).toBe(2_688);
+        expect(jobWorkUnits({ kind: "all_unit_qualification", pairsPerMap: 8 })).toBe(5_376);
         expect(() => jobWorkUnits({ kind: "level4", games: 16 })).toThrow("pairsPerLane");
         expect(() => jobWorkUnits({ kind: "post_a13_coverage", games: 144 })).toThrow("pairsPerLane");
+        expect(() => jobWorkUnits({ kind: "all_unit_coverage", games: 2_688 })).toThrow("pairsPerMap");
+        expect(() => jobWorkUnits({ kind: "all_unit_qualification", pairsPerLane: 8 })).toThrow("pairsPerMap");
         expect(() => jobWorkUnits({ kind: "adaptive", pairsPerLane: 2 })).toThrow("games");
     });
 
@@ -832,23 +1000,35 @@ describe("v0.8 aggressive campaign orchestration", () => {
         }
     });
 
-    it("keeps legacy level-4 and post-A13 coverage CLI controls distinct", () => {
+    it("keeps level-4, post-A13, shallow all-unit, and deep all-unit CLI controls distinct", () => {
         const defaults = parseV08CampaignCli([]);
         expect(defaults.level4PairsPerLane).toBe(16);
         expect(defaults.coveragePairsPerLane).toBe(3);
+        expect(defaults.allUnitPairsPerMap).toBe(4);
+        expect(defaults.allUnitQualificationPairsPerMap).toBe(8);
         expect(defaults.level4Seed).toBe(30_260_719);
         expect(defaults.coverageSeed).toBe(35_260_719);
+        expect(defaults.allUnitSeed).toBe(37_260_731);
+        expect(defaults.allUnitQualificationSeed).toBe(38_260_724);
 
         const configured = parseV08CampaignCli([
             "--l4-pairs=7",
             "--coverage-pairs=5",
+            "--all-unit-pairs=3",
+            "--all-unit-qualification-pairs=9",
             "--level4-seed=11",
             "--coverage-seed=13",
+            "--all-unit-seed=17",
+            "--all-unit-qualification-seed=19",
         ]);
         expect(configured.level4PairsPerLane).toBe(7);
         expect(configured.coveragePairsPerLane).toBe(5);
+        expect(configured.allUnitPairsPerMap).toBe(3);
+        expect(configured.allUnitQualificationPairsPerMap).toBe(9);
         expect(configured.level4Seed).toBe(11);
         expect(configured.coverageSeed).toBe(13);
+        expect(configured.allUnitSeed).toBe(17);
+        expect(configured.allUnitQualificationSeed).toBe(19);
     });
 
     it("accepts only the exact 12-unit, 24-lane post-A13 census", () => {
@@ -1057,6 +1237,15 @@ describe("v0.8 aggressive campaign orchestration", () => {
         }));
         populated.push({ ...validation, durationMs: 500_000 });
         expect(estimateBatchDurationMs([validation], populated, 4)).toBe(60_000);
+
+        const deepAllUnit = { kind: "all_unit_qualification" as const, pairsPerMap: 1 };
+        const shallowAllUnit: IJobDurationSample[] = [10, 12, 11].map((millisecondsPerGame) => ({
+            kind: "all_unit_coverage" as const,
+            pairsPerMap: 1,
+            durationMs: 672 * millisecondsPerGame,
+        }));
+        expect(estimateBatchDurationMs([deepAllUnit], [], 4)).toBe(336_000);
+        expect(estimateBatchDurationMs([deepAllUnit], shallowAllUnit, 4)).toBe(8_064);
     });
 
     it("admits an entire validation round, not merely its first parallel batch", () => {
@@ -1300,6 +1489,8 @@ describe("v0.8 aggressive campaign orchestration", () => {
             { id: "adaptive-a00", kind: "adaptive" as const },
             { id: "level4-c48", kind: "level4" as const },
             { id: "post-a13-coverage-c48", kind: "post_a13_coverage" as const },
+            { id: "all-unit-coverage-c48", kind: "all_unit_coverage" as const },
+            { id: "all-unit-qualification-c48", kind: "all_unit_qualification" as const },
         ];
         const resumedAfterRound = [
             ...preValidation,
@@ -1312,6 +1503,8 @@ describe("v0.8 aggressive campaign orchestration", () => {
             "adaptive",
             "level4",
             "post_a13_coverage",
+            "all_unit_coverage",
+            "all_unit_qualification",
         ]);
         expect(resumedAfterRound.filter(isV08CampaignValidationSelectionSourceJob)).toEqual(preValidation);
     });

@@ -297,6 +297,7 @@ describe("v0.8 candidate policy", () => {
             "constructor",
             "requireResolvedPrimaryRangeTarget",
             "visibleEdgeScreenPressureEnabled",
+            "routeCasterDecision",
             "rangedOutput",
             "applyMeleeDims",
             "placeArmy",
