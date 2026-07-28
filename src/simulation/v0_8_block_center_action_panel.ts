@@ -80,7 +80,7 @@ import {
 import { liveTwinSetup } from "./livetwin";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
 
-export const V08_BLOCK_CENTER_ACTION_PANEL_SCHEMA = "hoc.v0_8_block_center_action_panel.v1" as const;
+export const V08_BLOCK_CENTER_ACTION_PANEL_SCHEMA = "hoc.v0_8_block_center_action_panel.v2" as const;
 export const V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_GAMES = 50_000;
 export const V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_SEED = 2_607_280_041;
 export const V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_CONCURRENCY = 12;
@@ -110,6 +110,7 @@ const URGENT_SAMPLE_ISSUES = new Set<V08BlockCenterIssue>([
     "noncombat_with_direct_option",
     "mountain_adjacent_missed_attack",
     "non_progress_move",
+    "urgent_mountain_terminal_jitter",
     "eligible_combat_drought",
     "lap9_direct_action_miss",
 ]);
@@ -134,6 +135,7 @@ export type V08BlockCenterIssue =
     | "mountain_adjacent_missed_attack"
     | "non_progress_move"
     | "aba_oscillation"
+    | "urgent_mountain_terminal_jitter"
     | "eligible_combat_drought"
     | "lap9_direct_action_miss";
 
@@ -195,6 +197,7 @@ export interface IV08BlockCenterMetrics {
     pureMoveTurns: number;
     nonProgressMoves: number;
     urgentRepeatedNonProgressWithDirectOption: number;
+    urgentMountainTerminalJitter: number;
     abaOscillations: number;
     eligibleCombatMisses: number;
     eligibleCombatDroughts: number;
@@ -317,6 +320,7 @@ interface IV08BlockCenterMovementHistory {
     footprints: string[];
     eligibleCombatMisses: number;
     consecutiveNonDamageTurns: number;
+    consecutiveUnproductiveMountainMoves: number;
 }
 
 const METRIC_KEYS = [
@@ -338,6 +342,7 @@ const METRIC_KEYS = [
     "pureMoveTurns",
     "nonProgressMoves",
     "urgentRepeatedNonProgressWithDirectOption",
+    "urgentMountainTerminalJitter",
     "abaOscillations",
     "eligibleCombatMisses",
     "eligibleCombatDroughts",
@@ -368,6 +373,7 @@ export const emptyV08BlockCenterMetrics = (): IV08BlockCenterMetrics => ({
     pureMoveTurns: 0,
     nonProgressMoves: 0,
     urgentRepeatedNonProgressWithDirectOption: 0,
+    urgentMountainTerminalJitter: 0,
     abaOscillations: 0,
     eligibleCombatMisses: 0,
     eligibleCombatDroughts: 0,
@@ -423,6 +429,30 @@ export function isV08BlockCenterABAOscillation(history: readonly string[], nextF
     const a = history[history.length - 2];
     const b = history[history.length - 1];
     return a !== b && nextFootprint === a;
+}
+
+/**
+ * A hard late-game stall signal independent of direct-action reachability. Requiring two consecutive
+ * non-progressing pure moves by a melee-only stack, while an obstacle remains, rejects lateral jitter behind
+ * BLOCK_CENTER without treating a single pathfinding sidestep as a policy failure. Role-preserving protector or
+ * ward relocation and every move that closes enemy distance reset the sequence before this predicate is called.
+ */
+export function isV08BlockCenterUrgentMountainTerminalJitter(
+    lap: number,
+    mountainState: V08BlockCenterMountainState,
+    meleeOnly: boolean,
+    meaningfulRoleMove: boolean,
+    nonProgress: boolean,
+    precedingUnproductiveMountainMoves: number,
+): boolean {
+    return (
+        lap >= V08_BLOCK_CENTER_ACTION_PANEL_LATE_LAP &&
+        mountainState !== "cleared" &&
+        meleeOnly &&
+        !meaningfulRoleMove &&
+        nonProgress &&
+        precedingUnproductiveMountainMoves >= 1
+    );
 }
 
 export const isV08BlockCenterNonDamagingSpellTurnExempt = (lap: number): boolean =>
@@ -1478,6 +1508,7 @@ export class V08BlockCenterActionAuditor {
             footprints: [footprintKey(pending.actorCells)],
             eligibleCombatMisses: 0,
             consecutiveNonDamageTurns: 0,
+            consecutiveUnproductiveMountainMoves: 0,
         };
         const nonDamagingSpellIsExempt = nonDamagingSpell && isV08BlockCenterNonDamagingSpellTurnExempt(pending.lap);
         const directMiss = directAvailable && !directAction && !nonDamagingSpellIsExempt;
@@ -1559,7 +1590,8 @@ export class V08BlockCenterActionAuditor {
                     `enemy distance ${v08BlockCenterFootprintDistance(pending.actorCells, pending.enemyCells)} -> ${v08BlockCenterFootprintDistance(after, pending.enemyCells)}`,
                 );
             }
-            if (isV08BlockCenterABAOscillation(history.footprints, afterKey)) {
+            const abaOscillation = isV08BlockCenterABAOscillation(history.footprints, afterKey);
+            if (abaOscillation) {
                 this.bump(pending.creatureName, "abaOscillations");
                 this.sample(
                     pending,
@@ -1568,10 +1600,35 @@ export class V08BlockCenterActionAuditor {
                     `${history.footprints.at(-2)} -> ${history.footprints.at(-1)} -> ${afterKey}`,
                 );
             }
+            if (
+                isV08BlockCenterUrgentMountainTerminalJitter(
+                    pending.lap,
+                    pending.mountainState,
+                    pending.meleeOnly,
+                    meaningfulRoleMove,
+                    nonProgress,
+                    history.consecutiveUnproductiveMountainMoves,
+                )
+            ) {
+                this.bump(pending.creatureName, "urgentMountainTerminalJitter");
+                this.sample(
+                    pending,
+                    "urgent_mountain_terminal_jitter",
+                    observation.chosenDecision,
+                    `${history.consecutiveUnproductiveMountainMoves + 1} consecutive non-progress mountain moves; enemy distance ${v08BlockCenterFootprintDistance(pending.actorCells, pending.enemyCells)} -> ${v08BlockCenterFootprintDistance(after, pending.enemyCells)}${abaOscillation ? "; A-B-A footprint return" : ""}`,
+                );
+            }
+            if (pending.mountainState !== "cleared" && pending.meleeOnly && !meaningfulRoleMove && nonProgress) {
+                history.consecutiveUnproductiveMountainMoves += 1;
+            } else {
+                history.consecutiveUnproductiveMountainMoves = 0;
+            }
             if (history.footprints.at(-1) !== afterKey) {
                 history.footprints.push(afterKey);
                 if (history.footprints.length > 3) history.footprints.shift();
             }
+        } else {
+            history.consecutiveUnproductiveMountainMoves = 0;
         }
         if (directAction || nonDamagingSpellIsExempt) {
             history.consecutiveNonDamageTurns = 0;
@@ -1783,6 +1840,9 @@ export function summarizeV08BlockCenterActionPanel(
     const urgentFailureSamples: IV08BlockCenterFailureSample[] = [];
     const diagnosticFailureSamples: IV08BlockCenterFailureSample[] = [];
     let candidateEngineRejections = 0;
+    let recordsWithObservations = 0;
+    let recordsWithConsistentMountainTurns = 0;
+    let recordsWithConsistentCreatureTurns = 0;
     // Worker completion order is scheduling-dependent. Game-order aggregation makes the capped reproduction
     // sample set and serialized summary stable across concurrency levels.
     for (const record of [...records].sort((left, right) => left.game - right.game)) {
@@ -1811,6 +1871,14 @@ export function summarizeV08BlockCenterActionPanel(
         increment(maps, String(record.mapType));
         increment(endReasons, record.endReason);
         candidateEngineRejections += record.candidateEngineRejections;
+        const recordMountainTurns = Object.values(record.mountainStates).reduce((sum, count) => sum + count, 0);
+        const recordCreatureTurns = Object.values(record.byCreature).reduce(
+            (sum, creatureMetrics) => sum + creatureMetrics.observedTurns,
+            0,
+        );
+        if (record.metrics.observedTurns > 0) recordsWithObservations += 1;
+        if (recordMountainTurns === record.metrics.observedTurns) recordsWithConsistentMountainTurns += 1;
+        if (recordCreatureTurns === record.metrics.observedTurns) recordsWithConsistentCreatureTurns += 1;
         mergeMetrics(metrics, record.metrics);
         for (const [creatureName, source] of Object.entries(record.byCreature)) {
             mergeMetrics((byCreature[creatureName] ??= emptyV08BlockCenterMetrics()), source);
@@ -1834,6 +1902,11 @@ export function summarizeV08BlockCenterActionPanel(
         options.sourceDirty !== true &&
         options.sourceCommit !== undefined &&
         SOURCE_SHA_PATTERN.test(options.sourceCommit);
+    const mountainStateTurns = Object.values(mountainStates).reduce((sum, count) => sum + count, 0);
+    const creatureObservedTurns = Object.values(byCreature).reduce(
+        (sum, creatureMetrics) => sum + creatureMetrics.observedTurns,
+        0,
+    );
     const checks: Record<string, IV08BlockCenterActionGate> = {
         source_commit_bound: gate(
             sourceBound,
@@ -1852,12 +1925,43 @@ export function summarizeV08BlockCenterActionPanel(
             JSON.stringify(maps),
             `only map ${PBTypes.GridVals.BLOCK_CENTER}`,
         ),
+        observed_turns_positive: gate(metrics.observedTurns > 0, metrics.observedTurns, "> 0"),
+        every_record_has_observations: gate(
+            recordsWithObservations === records.length,
+            recordsWithObservations,
+            `= ${records.length}`,
+        ),
+        mountain_state_turn_integrity: gate(
+            recordsWithConsistentMountainTurns === records.length && mountainStateTurns === metrics.observedTurns,
+            `${recordsWithConsistentMountainTurns}/${records.length} records; ${mountainStateTurns}/${metrics.observedTurns} total`,
+            "every record and aggregate mountain-state sum = observed turns",
+        ),
+        creature_turn_integrity: gate(
+            recordsWithConsistentCreatureTurns === records.length && creatureObservedTurns === metrics.observedTurns,
+            `${recordsWithConsistentCreatureTurns}/${records.length} records; ${creatureObservedTurns}/${metrics.observedTurns} total`,
+            "every record and aggregate by-creature observed turns = observed turns",
+        ),
         mountain_state_coverage: gate(
             Object.values(mountainStates).every((count) => count > 0),
             Object.entries(mountainStates)
                 .map(([state, count]) => `${state}:${count}`)
                 .join(","),
             "every intact/partial/cleared state > 0",
+        ),
+        oracle_direct_exposure_positive: gate(
+            metrics.oracleDirectEligibleTurns > 0,
+            metrics.oracleDirectEligibleTurns,
+            "> 0",
+        ),
+        mountain_adjacent_direct_exposure_positive: gate(
+            metrics.mountainAdjacentDirectEligibleTurns > 0,
+            metrics.mountainAdjacentDirectEligibleTurns,
+            "> 0",
+        ),
+        late_direct_exposure_positive: gate(
+            metrics.lateDirectEligibleTurns > 0,
+            metrics.lateDirectEligibleTurns,
+            "> 0",
         ),
         crashes_zero: gate((endReasons.crash ?? 0) === 0, endReasons.crash ?? 0, "= 0"),
         stuck_zero: gate((endReasons.stuck ?? 0) === 0, endReasons.stuck ?? 0, "= 0"),
@@ -1889,6 +1993,11 @@ export function summarizeV08BlockCenterActionPanel(
         urgent_repeated_non_progress_with_direct_option_zero: gate(
             metrics.urgentRepeatedNonProgressWithDirectOption === 0,
             metrics.urgentRepeatedNonProgressWithDirectOption,
+            "= 0",
+        ),
+        urgent_mountain_terminal_jitter_zero: gate(
+            metrics.urgentMountainTerminalJitter === 0,
+            metrics.urgentMountainTerminalJitter,
             "= 0",
         ),
         urgent_combat_droughts_zero: gate(metrics.urgentCombatDroughts === 0, metrics.urgentCombatDroughts, "= 0"),

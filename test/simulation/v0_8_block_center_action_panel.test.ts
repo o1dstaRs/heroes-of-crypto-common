@@ -33,6 +33,7 @@ import {
     isV08BlockCenterABAOscillation,
     isV08BlockCenterNonDamagingSpellTurnExempt,
     isV08BlockCenterNonProgressMove,
+    isV08BlockCenterUrgentMountainTerminalJitter,
     planV08BlockCenterActionGame,
     runV08BlockCenterActionPanelGame,
     summarizeV08BlockCenterActionPanel,
@@ -140,6 +141,13 @@ const recordFor = (game: number): IV08BlockCenterActionRecord => {
     const plan = planV08BlockCenterActionGame(OPTIONS, game);
     const candidateRoster = plan.candidateSide === "green" ? plan.greenRoster : plan.redRoster;
     const opponentRoster = plan.candidateSide === "green" ? plan.redRoster : plan.greenRoster;
+    const metrics = emptyV08BlockCenterMetrics();
+    metrics.observedTurns = 4;
+    metrics.oracleDirectEligibleTurns = 1;
+    metrics.mountainAdjacentDirectEligibleTurns = 1;
+    metrics.lateDirectEligibleTurns = 1;
+    const fixtureCreatureMetrics = emptyV08BlockCenterMetrics();
+    fixtureCreatureMetrics.observedTurns = metrics.observedTurns;
     return {
         schema: V08_BLOCK_CENTER_ACTION_PANEL_SCHEMA,
         sourceCommit: OPTIONS.sourceCommit ?? null,
@@ -158,8 +166,8 @@ const recordFor = (game: number): IV08BlockCenterActionRecord => {
         laps: 5,
         endReason: "elimination",
         candidateEngineRejections: 0,
-        metrics: emptyV08BlockCenterMetrics(),
-        byCreature: {},
+        metrics,
+        byCreature: { "Fixture Creature": fixtureCreatureMetrics },
         mountainStates: {
             both_intact: 1,
             left_only: 1,
@@ -699,7 +707,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
                 events: [],
             })),
             recoveryAttempts: [],
-            recovery: { source: "none", completed: false },
+            recovery: { source: "none", completed: false, events: [] },
             events: [],
         });
         auditor.finish();
@@ -829,7 +837,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
                 chosenDecision: [move],
                 strategyActions: [{ action: move, completed: true, events: [] }],
                 recoveryAttempts: [],
-                recovery: { source: "none", completed: false },
+                recovery: { source: "none", completed: false, events: [] },
                 events: [
                     {
                         type: "unit_moved",
@@ -873,6 +881,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
                 urgentMountainAdjacentMisses: 2,
                 nonProgressMoves: 2,
                 urgentRepeatedNonProgressWithDirectOption: 1,
+                urgentMountainTerminalJitter: 1,
                 lateDirectActionMisses: 2,
                 observerPairingFaults: 0,
             });
@@ -889,8 +898,89 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
                 "urgent_direct_action_misses_zero",
                 "urgent_mountain_adjacent_misses_zero",
                 "urgent_repeated_non_progress_with_direct_option_zero",
+                "urgent_mountain_terminal_jitter_zero",
             ]),
         );
+    });
+
+    test("gates repeated urgent mountain jitter without requiring a direct action", () => {
+        const plan = planV08BlockCenterActionGame(OPTIONS, 0);
+        const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        const actor = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            name: "Blocked Walker",
+            attackType: PBTypes.AttackVals.MELEE,
+            speed: 1,
+        });
+        const target = createTestUnit({
+            team: PBTypes.TeamVals.UPPER,
+            name: "Distant target",
+        });
+        placeUnit(combat.grid, combat.unitsHolder, actor, { x: 1, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 13, y: 7 });
+        const { context } = activatedActionEngine(combat, actor);
+        while (context.fightProperties!.getCurrentLap() < 9) context.fightProperties!.flipLap();
+
+        const move: GameAction = {
+            type: "move_unit",
+            unitId: actor.getId(),
+            path: [
+                { x: 1, y: 7 },
+                { x: 1, y: 8 },
+            ],
+            targetCells: [{ x: 1, y: 8 }],
+        };
+        const auditor = new V08BlockCenterActionAuditor(plan);
+        const observeDecision = (): void =>
+            auditor.observeDecision({
+                unit: actor,
+                context,
+                incumbent: [move],
+                strategyVersion: "v0.8",
+                probeActions: (actions) => ({
+                    failure: null,
+                    completedActionTypes: actions
+                        .filter((action) => action.type !== "select_attack_type")
+                        .map((action) => action.type),
+                }),
+            });
+        const observeExecution = (): void =>
+            auditor.observeExecution({
+                unitId: actor.getId(),
+                creatureName: actor.getName(),
+                side: "green",
+                strategyVersion: "v0.8",
+                rawIncumbent: [move],
+                chosenDecision: [move],
+                strategyActions: [{ action: move, completed: true, events: [] }],
+                recoveryAttempts: [],
+                recovery: { source: "none", completed: false, events: [] },
+                events: [
+                    {
+                        type: "unit_moved",
+                        unitId: actor.getId(),
+                        from: { x: 1, y: 7 },
+                        to: { x: 1, y: 8 },
+                        path: move.path,
+                        targetCells: [{ x: 1, y: 8 }],
+                    },
+                ],
+            });
+
+        observeDecision();
+        observeExecution();
+        observeDecision();
+        observeExecution();
+        auditor.finish();
+
+        expect(auditor.metrics).toMatchObject({
+            observedTurns: 2,
+            oracleDirectEligibleTurns: 0,
+            nonProgressMoves: 2,
+            urgentRepeatedNonProgressWithDirectOption: 0,
+            urgentMountainTerminalJitter: 1,
+        });
+        expect(auditor.failureSamples.some(({ issue }) => issue === "urgent_mountain_terminal_jitter")).toBe(true);
     });
 
     test("classifies enemy-distance progress and A-B-A movement independently of AI scores", () => {
@@ -900,6 +990,13 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         expect(isV08BlockCenterNonProgressMove([{ x: 4, y: 7 }], [{ x: 4, y: 8 }], enemy)).toBe(true);
         expect(isV08BlockCenterABAOscillation(["4,7", "4,8"], "4,7")).toBe(true);
         expect(isV08BlockCenterABAOscillation(["4,7", "4,8"], "5,8")).toBe(false);
+        expect(isV08BlockCenterUrgentMountainTerminalJitter(9, "both_intact", true, false, true, 1)).toBe(true);
+        expect(isV08BlockCenterUrgentMountainTerminalJitter(8, "both_intact", true, false, true, 1)).toBe(false);
+        expect(isV08BlockCenterUrgentMountainTerminalJitter(9, "cleared", true, false, true, 1)).toBe(false);
+        expect(isV08BlockCenterUrgentMountainTerminalJitter(9, "both_intact", false, false, true, 1)).toBe(false);
+        expect(isV08BlockCenterUrgentMountainTerminalJitter(9, "both_intact", true, true, true, 1)).toBe(false);
+        expect(isV08BlockCenterUrgentMountainTerminalJitter(9, "both_intact", true, false, false, 1)).toBe(false);
+        expect(isV08BlockCenterUrgentMountainTerminalJitter(9, "both_intact", true, false, true, 0)).toBe(false);
         expect(isV08BlockCenterNonDamagingSpellTurnExempt(8)).toBe(true);
         expect(isV08BlockCenterNonDamagingSpellTurnExempt(9)).toBe(false);
     });
@@ -948,6 +1045,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         records[0]!.metrics.lateDirectActionMisses = 1;
         records[0]!.metrics.urgentMountainAdjacentMisses = 1;
         records[0]!.metrics.urgentRepeatedNonProgressWithDirectOption = 1;
+        records[0]!.metrics.urgentMountainTerminalJitter = 1;
         records[0]!.metrics.urgentCombatDroughts = 1;
         records[0]!.metrics.sharedCatalogEnumerationTruncations = 1;
         const failing = summarizeV08BlockCenterActionPanel(
@@ -962,8 +1060,65 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
                 "urgent_direct_action_misses_zero",
                 "urgent_mountain_adjacent_misses_zero",
                 "urgent_repeated_non_progress_with_direct_option_zero",
+                "urgent_mountain_terminal_jitter_zero",
                 "urgent_combat_droughts_zero",
             ]),
         );
+    });
+
+    test("fails closed when records silently omit decision observations or qualification exposure", () => {
+        const records = Array.from({ length: OPTIONS.games }, (_, game) => recordFor(game));
+        records[0]!.metrics.observedTurns = 0;
+        records[0]!.byCreature = {};
+        records[0]!.mountainStates = {
+            both_intact: 0,
+            left_only: 0,
+            right_only: 0,
+            cleared: 0,
+        };
+        const missingRecord = summarizeV08BlockCenterActionPanel(OPTIONS, records);
+        expect(missingRecord.gates.failed).toContain("every_record_has_observations");
+        expect(missingRecord.gates.checks.mountain_state_turn_integrity.pass).toBe(true);
+        expect(missingRecord.gates.checks.creature_turn_integrity.pass).toBe(true);
+
+        for (const record of records) {
+            record.metrics = emptyV08BlockCenterMetrics();
+            record.byCreature = {};
+            record.mountainStates = {
+                both_intact: 0,
+                left_only: 0,
+                right_only: 0,
+                cleared: 0,
+            };
+        }
+        const silentPanel = summarizeV08BlockCenterActionPanel(OPTIONS, records);
+        expect(silentPanel.gates.failed).toEqual(
+            expect.arrayContaining([
+                "observed_turns_positive",
+                "every_record_has_observations",
+                "mountain_state_coverage",
+                "oracle_direct_exposure_positive",
+                "mountain_adjacent_direct_exposure_positive",
+                "late_direct_exposure_positive",
+            ]),
+        );
+    });
+
+    test("fails closed when mountain-state or by-creature observation totals are inconsistent", () => {
+        const mountainRecords = Array.from({ length: OPTIONS.games }, (_, game) => recordFor(game));
+        mountainRecords[0]!.mountainStates.both_intact += 1;
+        const mountainMismatch = summarizeV08BlockCenterActionPanel(OPTIONS, mountainRecords);
+        expect(mountainMismatch.gates.checks.mountain_state_turn_integrity).toMatchObject({
+            pass: false,
+            actual: "3/4 records; 17/16 total",
+        });
+
+        const creatureRecords = Array.from({ length: OPTIONS.games }, (_, game) => recordFor(game));
+        creatureRecords[1]!.byCreature["Fixture Creature"]!.observedTurns += 1;
+        const creatureMismatch = summarizeV08BlockCenterActionPanel(OPTIONS, creatureRecords);
+        expect(creatureMismatch.gates.checks.creature_turn_integrity).toMatchObject({
+            pass: false,
+            actual: "3/4 records; 17/16 total",
+        });
     });
 });

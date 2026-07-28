@@ -1215,6 +1215,37 @@ describe("v0.8 aggressive campaign orchestration", () => {
         ).not.toThrow();
         expect(() =>
             validateV08CampaignPassiveQualificationSummary(
+                { ...passive.summary, schema: "hoc.v0_8_passive_turn_panel.v4" },
+                {
+                    sourceCommit: QUALIFICATION_SOURCE,
+                    baseSeed: passive.options.baseSeed,
+                    games: passive.options.games,
+                    minCreatureAppearances: passive.options.minCreatureAppearances!,
+                },
+            ),
+        ).toThrow("Invalid passive qualification");
+        for (const missingGate of [
+            "observed_turns_positive",
+            "passive_evidence_turns_positive",
+            "every_game_observed_turns",
+            "turn_totals_consistent",
+        ]) {
+            const checks = { ...passive.summary.gates.checks };
+            delete checks[missingGate];
+            expect(() =>
+                validateV08CampaignPassiveQualificationSummary(
+                    { ...passive.summary, gates: { ...passive.summary.gates, checks } },
+                    {
+                        sourceCommit: QUALIFICATION_SOURCE,
+                        baseSeed: passive.options.baseSeed,
+                        games: passive.options.games,
+                        minCreatureAppearances: passive.options.minCreatureAppearances!,
+                    },
+                ),
+            ).toThrow("Invalid passive qualification");
+        }
+        expect(() =>
+            validateV08CampaignPassiveQualificationSummary(
                 { ...passive.summary, sourceCommit: "2".repeat(40) },
                 {
                     sourceCommit: QUALIFICATION_SOURCE,
@@ -1258,6 +1289,39 @@ describe("v0.8 aggressive campaign orchestration", () => {
                 games: block.options.games,
             }),
         ).not.toThrow();
+        expect(() =>
+            validateV08CampaignBlockCenterQualificationSummary(
+                { ...block.summary, schema: "hoc.v0_8_block_center_action_panel.v1" },
+                {
+                    sourceCommit: QUALIFICATION_SOURCE,
+                    baseSeed: block.options.baseSeed,
+                    games: block.options.games,
+                },
+            ),
+        ).toThrow("Invalid BLOCK_CENTER qualification");
+        for (const missingGate of [
+            "observed_turns_positive",
+            "every_record_has_observations",
+            "mountain_state_turn_integrity",
+            "creature_turn_integrity",
+            "oracle_direct_exposure_positive",
+            "mountain_adjacent_direct_exposure_positive",
+            "late_direct_exposure_positive",
+            "urgent_mountain_terminal_jitter_zero",
+        ]) {
+            const checks = { ...block.summary.gates.checks };
+            delete checks[missingGate];
+            expect(() =>
+                validateV08CampaignBlockCenterQualificationSummary(
+                    { ...block.summary, gates: { ...block.summary.gates, checks } },
+                    {
+                        sourceCommit: QUALIFICATION_SOURCE,
+                        baseSeed: block.options.baseSeed,
+                        games: block.options.games,
+                    },
+                ),
+            ).toThrow("Invalid BLOCK_CENTER qualification");
+        }
         expect(() =>
             validateV08CampaignBlockCenterQualificationSummary(
                 { ...block.summary, sourceDirty: true },

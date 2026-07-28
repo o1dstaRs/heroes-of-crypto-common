@@ -53,7 +53,7 @@ import { liveTwinSetup } from "./livetwin";
 import type { ISearchPassiveProductiveProbe, SearchPassiveActionKind } from "./search_driver";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
 
-export const V08_PASSIVE_TURN_PANEL_SCHEMA = "hoc.v0_8_passive_turn_panel.v4" as const;
+export const V08_PASSIVE_TURN_PANEL_SCHEMA = "hoc.v0_8_passive_turn_panel.v5" as const;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_GAMES = 4096;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_SEED = 2_607_270_813;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_CONCURRENCY = 12;
@@ -319,6 +319,9 @@ export interface IV08PassiveTurnPanelSummary {
     };
     planSha256: string;
     games: number;
+    recordsWithoutObservedTurns: number;
+    recordTurnTotalMismatches: number;
+    byCreatureTurns: number;
     candidateSeats: Record<Side, number>;
     maps: Record<string, number>;
     endReasons: Record<string, number>;
@@ -793,6 +796,7 @@ export class V08PassiveTurnAuditor {
                 this.add(creature, "observerPairingFaults");
             }
         }
+        let retainedPassiveClass: V08RetainedPassiveClass | undefined;
         if (finalPassiveKind && probe?.retainedPassive) {
             this.add(creature, "retainedPassiveTurns");
             const evidenceIncomplete = !probe.evidenceComplete;
@@ -803,7 +807,6 @@ export class V08PassiveTurnAuditor {
                 this.add(creature, "retainedPassiveWithBetterShortlistedProductiveActionTurns");
             }
 
-            let passiveClass: V08RetainedPassiveClass;
             const scoredStrongerRangedGateExemption =
                 finalPassiveKind === "wait" &&
                 probe.strongerRangedPostureWait &&
@@ -812,7 +815,7 @@ export class V08PassiveTurnAuditor {
                 probe.shortlistedProductiveScoreDelta >= 0 &&
                 probe.shortlistedProductiveScoreDelta < probe.productiveOverrideGate;
             if (scoredStrongerRangedGateExemption) {
-                passiveClass = "stronger_ranged";
+                retainedPassiveClass = "stronger_ranged";
                 this.add(creature, "strongerRangedWaitExemptions");
                 if (probe.betterShortlistedProductiveAlternative) {
                     this.add(creature, "exemptRetainedPassiveWithBetterShortlistedProductiveActionTurns");
@@ -822,31 +825,24 @@ export class V08PassiveTurnAuditor {
                 pending.defendClass === "protected" &&
                 (probe.backlineProtectorIntent || probe.backlineWardIntent)
             ) {
-                passiveClass = "protected";
+                retainedPassiveClass = "protected";
                 this.add(creature, "protectedRetainedPassiveTurns");
                 if (probe.backlineProtectorIntent) this.add(creature, "protectorIntentPassiveExemptions");
                 if (probe.backlineWardIntent) this.add(creature, "wardIntentPassiveExemptions");
             } else if (probe.betterShortlistedProductiveAlternative) {
-                passiveClass = "avoidable";
+                retainedPassiveClass = "avoidable";
                 this.add(creature, "avoidableRetainedPassiveTurns");
                 if (finalPassiveKind === "wait") this.add(creature, "avoidableWaitTurns");
                 else if (finalPassiveKind === "luck_shield") this.add(creature, "avoidableLuckShieldTurns");
                 else this.add(creature, "avoidableMountainTurns");
             } else if (!probe.hasEngineValidProductiveAlternative) {
-                passiveClass = "forced";
+                retainedPassiveClass = "forced";
                 this.add(creature, "forcedRetainedPassiveTurns");
             } else {
-                passiveClass = "scored";
+                retainedPassiveClass = "scored";
             }
 
-            const previous = this.passiveStreaks.get(observation.unitId);
-            this.passiveStreaks.set(observation.unitId, {
-                unitId: observation.unitId,
-                creatureName: creature,
-                turns: (previous?.turns ?? 0) + 1,
-                avoidableTurns: (previous?.avoidableTurns ?? 0) + (passiveClass === "avoidable" ? 1 : 0),
-            });
-            if ((evidenceIncomplete || passiveClass === "avoidable") && this.failureSamples.length < 20) {
+            if ((evidenceIncomplete || retainedPassiveClass === "avoidable") && this.failureSamples.length < 20) {
                 this.failureSamples.push({
                     issue: evidenceIncomplete
                         ? "retained_passive_evidence_incomplete"
@@ -874,6 +870,18 @@ export class V08PassiveTurnAuditor {
                     decisionMs: probe.decisionMs,
                 });
             }
+        }
+        if (finalPassiveKind) {
+            // Candidate ownership follows the physical side, including Berserker/Boar turns delegated to v0.1.
+            // Those strategies do not emit SearchDriver probes, so keep their terminal passive streaks visible
+            // without guessing that a legitimate wait/shield/protector/ward posture was avoidable.
+            const previous = this.passiveStreaks.get(observation.unitId);
+            this.passiveStreaks.set(observation.unitId, {
+                unitId: observation.unitId,
+                creatureName: creature,
+                turns: (previous?.turns ?? 0) + 1,
+                avoidableTurns: (previous?.avoidableTurns ?? 0) + (retainedPassiveClass === "avoidable" ? 1 : 0),
+            });
         } else if (
             completedActions.some((action) => PRODUCTIVE_ACTION_TYPES.has(action.type) || action.type === "end_turn")
         ) {
@@ -1175,6 +1183,8 @@ export function summarizeV08PassiveTurnPanel(
     const circuitOpenWaitArbitrationDecisionMs: number[] = [];
     const circuitOpenWaitDeferredDecisionMs: number[] = [];
     let candidateEngineRejections = 0;
+    let recordsWithoutObservedTurns = 0;
+    let recordTurnTotalMismatches = 0;
 
     // Worker completion order is scheduler-dependent. Game-order aggregation keeps capped failure samples,
     // by-creature insertion order, and the serialized summary stable across worker counts and hosts.
@@ -1204,6 +1214,14 @@ export function summarizeV08PassiveTurnPanel(
         increment(maps, String(record.mapType));
         increment(endReasons, record.endReason);
         candidateEngineRejections += record.candidateEngineRejections;
+        const recordByCreatureTurns = Object.values(record.byCreature).reduce(
+            (total, creatureMetrics) => total + creatureMetrics.turns,
+            0,
+        );
+        if (!Number.isSafeInteger(record.metrics.turns) || record.metrics.turns <= 0) {
+            recordsWithoutObservedTurns += 1;
+        }
+        if (recordByCreatureTurns !== record.metrics.turns) recordTurnTotalMismatches += 1;
         mergeMetrics(metrics, record.metrics);
         for (const [creatureName, source] of Object.entries(record.byCreature)) {
             mergeMetrics((byCreature[creatureName] ??= emptyV08PassiveTurnMetrics()), source);
@@ -1277,6 +1295,10 @@ export function summarizeV08PassiveTurnPanel(
     const allWaitReactivationRate = ratio(metrics.sameLapWaitReactivations, metrics.waitTurns, 1);
     const abominationFaults = v08PassiveCreatureFaults(byCreature.Abomination);
     const arachnaQueenFaults = v08PassiveCreatureFaults(byCreature["Arachna Queen"]);
+    const byCreatureTurns = Object.values(byCreature).reduce(
+        (total, creatureMetrics) => total + creatureMetrics.turns,
+        0,
+    );
     const sourceBound =
         options.sourceDirty !== true &&
         options.sourceCommit !== undefined &&
@@ -1289,6 +1311,26 @@ export function summarizeV08PassiveTurnPanel(
         ),
         exact_game_count: gate(records.length === options.games, records.length, `= ${options.games}`),
         unique_games: gate(seenGames.size === records.length, seenGames.size, `= ${records.length}`),
+        observed_turns_positive: gate(
+            Number.isSafeInteger(metrics.turns) && metrics.turns > 0,
+            metrics.turns,
+            "positive safe integer",
+        ),
+        passive_evidence_turns_positive: gate(
+            Number.isSafeInteger(metrics.passiveEvidenceTurns) && metrics.passiveEvidenceTurns > 0,
+            metrics.passiveEvidenceTurns,
+            "positive safe integer",
+        ),
+        every_game_observed_turns: gate(
+            recordsWithoutObservedTurns === 0,
+            recordsWithoutObservedTurns,
+            "= 0 games without observed candidate turns",
+        ),
+        turn_totals_consistent: gate(
+            recordTurnTotalMismatches === 0 && byCreatureTurns === metrics.turns,
+            `${byCreatureTurns}/${metrics.turns} aggregate; ${recordTurnTotalMismatches} record mismatch(es)`,
+            "by-creature/global turns equal in every record and aggregate",
+        ),
         balanced_candidate_seats: gate(
             candidateSeats.green === candidateSeats.red,
             `${candidateSeats.green}:${candidateSeats.red}`,
@@ -1405,6 +1447,9 @@ export function summarizeV08PassiveTurnPanel(
         },
         planSha256: fingerprintV08PassiveTurnPanelPlan(options),
         games: records.length,
+        recordsWithoutObservedTurns,
+        recordTurnTotalMismatches,
+        byCreatureTurns,
         candidateSeats,
         maps,
         endReasons,

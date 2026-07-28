@@ -15,7 +15,13 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { getAIStrategy, type IAIStrategy, type IDecisionContext, type IEnumeratedCandidate } from "../../src/ai";
+import {
+    enumerateCandidates,
+    getAIStrategy,
+    type IAIStrategy,
+    type IDecisionContext,
+    type IEnumeratedCandidate,
+} from "../../src/ai";
 import { isV08StrongerRangedPostureWait } from "../../src/ai/versions/v0_8";
 import { V08_DOMINANT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import { V08S_URGENT_FINISH_START_LAP, V08_TARGET_PRESSURE_START_LAP } from "../../src/ai/versions/v0_8s_finish";
@@ -35,6 +41,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { Grid } from "../../src/grid/grid";
 import { getPositionForCell } from "../../src/grid/grid_math";
+import type { GridType } from "../../src/grid/grid_type";
 import { PathHelper } from "../../src/grid/path_helper";
 import { PlacementPositionType } from "../../src/grid/placement_properties";
 import { RectanglePlacement } from "../../src/grid/rectangle_placement";
@@ -65,6 +72,7 @@ import {
     type ISearchPassiveProductiveProbe,
     type SearchPassiveProductiveProbeObserver,
 } from "../../src/simulation/search_driver";
+import { runV08BlockCenterActionPanelGame } from "../../src/simulation/v0_8_block_center_action_panel";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
 import { VALUE_FEATURE_NAMES_V2 } from "../../src/simulation/value_features";
 import { Unit } from "../../src/units/unit";
@@ -178,6 +186,8 @@ interface Harness {
     grid: Grid;
     unitsHolder: UnitsHolder;
     fightProperties: ReturnType<FightStateManager["getFightProperties"]>;
+    pathHelper: PathHelper;
+    attackHandler: AttackHandler;
     /** Construct a driver AFTER the desired env is set (the driver reads env in its constructor). */
     makeDriver: (passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver) => SearchDriver;
     activeUnit: () => Unit | undefined;
@@ -195,20 +205,22 @@ function buildBattle(
     rolloutStrategy?: IAIStrategy,
     rosterOverride?: readonly IArmyUnitSpec[],
     failDamageRestore = false,
+    gridType: GridType = PBTypes.GridVals.NORMAL,
 ): Harness {
     FightStateManager.getInstance();
     setDeterministicRandomSource(makeRng((seed ^ 0x6d2b79f5) >>> 0));
 
     const gridSettings = simulationGridSettings();
     FightStateManager.getInstance().reset();
-    const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+    const fightProperties = FightStateManager.getInstance().getFightProperties();
+    fightProperties.setGridType(gridType);
+    const grid = new Grid(gridSettings, gridType);
     const unitsHolder = new UnitsHolder(grid);
     const sceneLog = new SceneLogMock();
     const damageStat = new DamageStatHolder();
     const attackHandler = new AttackHandler(gridSettings, grid, sceneLog, damageStat);
     const moveHandler = new MoveHandler(gridSettings, grid, unitsHolder);
     const pathHelper = new PathHelper(gridSettings);
-    const fightProperties = FightStateManager.getInstance().getFightProperties();
     const clock = { tick: 0 };
     const runtime = { ...createDefaultGameRuntime(), clock: { nowMillis: () => (clock.tick += 1) } };
     const { abilityFactory, effectFactory } = createCombatFactories();
@@ -415,6 +427,8 @@ function buildBattle(
         grid,
         unitsHolder,
         fightProperties,
+        pathHelper,
+        attackHandler,
         makeDriver: (passiveProductiveProbeObserver) =>
             new SearchDriver(
                 deps,
@@ -1172,6 +1186,341 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(
             smokeDriver.firstEngineValidProductiveCandidate(smokeCaster, [smoke, smokeMove], 123, false, true, true),
         ).toBe(smokeMove);
+    });
+
+    const terminalMountainFixture = (
+        actorBase: XY,
+        destinationBase: XY,
+        lap = V08S_URGENT_FINISH_START_LAP,
+    ): { harness: Harness; actor: Unit; incumbent: GameAction[] } => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_HORIZON: "1",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_SHORTLIST: "2",
+            SEARCH_MAX_MOVES: "1",
+        });
+        const harness = buildBattle(
+            927,
+            "v0.8s",
+            undefined,
+            [
+                { faction: "Chaos", creatureName: "Abomination", level: 4, size: 2, amount: 1 },
+                { faction: "Life", creatureName: "Squire", level: 1, size: 1, amount: 1 },
+            ],
+            false,
+            PBTypes.GridVals.BLOCK_CENTER,
+        );
+        const named = (team: TeamType, name: string): Unit =>
+            harness.unitsHolder
+                .getAllAllies(team)
+                .find((candidate) => !candidate.isDead() && candidate.getName() === name)!;
+        const actor = named(GREEN_TEAM, "Abomination");
+        const enemy = named(RED_TEAM, "Squire");
+        harness.unitsHolder.deleteUnitById(named(GREEN_TEAM, "Squire").getId());
+        harness.unitsHolder.deleteUnitById(named(RED_TEAM, "Abomination").getId());
+        const relocate = (unit: Unit, base: XY): void => {
+            harness.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
+            const position = getPositionForCell(
+                base,
+                harness.grid.getSettings().getMinX(),
+                harness.grid.getSettings().getStep(),
+                harness.grid.getSettings().getHalfStep(),
+            );
+            const largeOffset = unit.isSmallSize() ? 0 : harness.grid.getSettings().getHalfStep();
+            unit.setPosition(position.x - largeOffset, position.y - largeOffset);
+            expect(
+                harness.grid.occupyCells(
+                    footprint(unit, base),
+                    unit.getId(),
+                    unit.getTeam(),
+                    unit.getAttackRange(),
+                    unit.hasAbilityActive("Made of Fire"),
+                    unit.hasAbilityActive("Made of Water"),
+                ),
+            ).toBe(true);
+        };
+        relocate(actor, actorBase);
+        relocate(enemy, { x: 7, y: 7 });
+        actor.resetTarget();
+        harness.setActiveUnitId(actor.getId());
+        while (harness.fightProperties.getCurrentLap() < lap) harness.fightProperties.flipLap();
+        return {
+            harness,
+            actor,
+            incumbent: [
+                {
+                    type: "move_unit",
+                    unitId: actor.getId(),
+                    path: [{ ...actorBase }, { ...destinationBase }],
+                    targetCells: footprint(actor, destinationBase),
+                    hasLavaCell: false,
+                    hasWaterCell: false,
+                },
+            ],
+        };
+    };
+
+    it("orders positive damage and strict footprint-closing movement ahead of a stationary finish mountain", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s" });
+        const harness = buildBattle(926, "v0.8s");
+        const unit = harness.activeUnit()!;
+        const enemy = harness.unitsHolder.getAllEnemyUnits(unit.getTeam()).find((candidate) => !candidate.isDead())!;
+        const id = unit.getId();
+        const damage = {
+            kind: "melee",
+            actions: [
+                { type: "melee_attack", attackerId: id, targetId: enemy.getId(), attackFrom: unit.getBaseCell() },
+            ],
+            targetId: enemy.getId(),
+            features: { expectedDamage: 10, expectedKill: 0 },
+        } as IEnumeratedCandidate;
+        const advance = {
+            kind: "move",
+            actions: [{ type: "move_unit", unitId: id, path: [{ x: 4, y: 4 }] }],
+        } as IEnumeratedCandidate;
+        const closingMove = {
+            kind: "move",
+            actions: [
+                {
+                    type: "move_unit",
+                    unitId: id,
+                    path: [{ ...enemy.getBaseCell() }],
+                    targetCells: enemy.getCells().map((cell) => ({ ...cell })),
+                },
+            ],
+        } as IEnumeratedCandidate;
+        const mountain = {
+            kind: "mine",
+            actions: [
+                {
+                    type: "obstacle_attack",
+                    attackerId: id,
+                    targetPosition: { x: 0, y: 0 },
+                    attackFrom: unit.getBaseCell(),
+                },
+            ],
+        } as IEnumeratedCandidate;
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ): number[];
+            firstEngineValidLateStationaryMountainCandidate(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                stationaryMountain: IEnumeratedCandidate,
+                seed: number,
+            ): IEnumeratedCandidate | undefined;
+        };
+        const probes: string[] = [];
+        let damageScore = 0.5;
+        let closingScore = 0.5;
+        driver.scoreCandidates = (_unit, candidates) =>
+            candidates.map((candidate) => {
+                probes.push(candidate.kind);
+                return candidate === damage
+                    ? damageScore
+                    : candidate === closingMove
+                      ? closingScore
+                      : candidate === mountain
+                        ? 0.5
+                        : -Infinity;
+            });
+
+        expect(
+            driver.firstEngineValidLateStationaryMountainCandidate(unit, [advance, closingMove, damage], mountain, 123),
+        ).toBeUndefined();
+        expect(probes).toEqual(["melee"]);
+
+        probes.length = 0;
+        damageScore = -Infinity;
+        expect(
+            driver.firstEngineValidLateStationaryMountainCandidate(unit, [advance, closingMove, damage], mountain, 123),
+        ).toBe(closingMove);
+        expect(probes).toEqual(["melee", "move"]);
+
+        probes.length = 0;
+        closingScore = -Infinity;
+        expect(
+            driver.firstEngineValidLateStationaryMountainCandidate(unit, [advance, closingMove, damage], mountain, 123),
+        ).toBe(mountain);
+        expect(probes).toEqual(["melee", "move", "mine"]);
+
+        probes.length = 0;
+        driver.scoreCandidates = (_unit, candidates) =>
+            candidates.map((candidate) => {
+                probes.push(candidate.kind);
+                return -Infinity;
+            });
+        expect(
+            driver.firstEngineValidLateStationaryMountainCandidate(unit, [advance, damage], mountain, 123),
+        ).toBeUndefined();
+        expect(probes).toEqual(["melee", "mine"]);
+    });
+
+    it("uses the same prevalidated stationary finish hit after the search circuit opens", () => {
+        const { harness, actor, incumbent } = terminalMountainFixture({ x: 5, y: 10 }, { x: 5, y: 10 });
+        expect(
+            (incumbent[0]?.type === "move_unit" ? (incumbent[0].targetCells ?? []) : [])
+                .map(cellKey)
+                .sort((left, right) => left - right),
+        ).toEqual(
+            actor
+                .getCells()
+                .map(cellKey)
+                .sort((left, right) => left - right),
+        );
+        const mountain = enumerateCandidates(
+            actor,
+            {
+                grid: harness.grid,
+                matrix: harness.grid.getMatrix(),
+                unitsHolder: harness.unitsHolder,
+                pathHelper: harness.pathHelper,
+                attackHandler: harness.attackHandler,
+                fightProperties: harness.fightProperties,
+            },
+            incumbent,
+            { includeMountainAttacks: true },
+        ).candidates.find((candidate) => candidate.kind === "mine");
+        expect(mountain).toBeDefined();
+        expect(mountain?.actions[0]).toMatchObject({
+            type: "obstacle_attack",
+            attackFrom: actor.getBaseCell(),
+        });
+        expect(mountain?.actions[0]?.type === "obstacle_attack" ? mountain.actions[0].path : undefined).toBeUndefined();
+        const driver = harness.makeDriver() as unknown as {
+            circuitOpen: boolean;
+            appliesTo(version: string): boolean;
+            firstEngineValidLateStationaryMountainCandidate(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                stationaryMountain: IEnumeratedCandidate,
+                seed: number,
+            ): IEnumeratedCandidate | undefined;
+            search(): never;
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        expect(harness.fightProperties.getCurrentLap()).toBe(V08S_URGENT_FINISH_START_LAP);
+        expect(driver.appliesTo("v0.8s")).toBe(true);
+        driver.circuitOpen = true;
+        let invoked = false;
+        let expandedCandidates: readonly IEnumeratedCandidate[] = [];
+        driver.firstEngineValidLateStationaryMountainCandidate = (_unit, candidates, stationaryMountain) => {
+            invoked = true;
+            expandedCandidates = candidates;
+            return stationaryMountain;
+        };
+        driver.search = () => {
+            throw new Error("stationary finish mountain reached horizon search");
+        };
+
+        const selected = driver.chooseDecision(actor, "v0.8s", incumbent);
+        expect(invoked).toBe(true);
+        const expandedMoves = expandedCandidates.filter((candidate) => candidate.kind === "move");
+        expect(expandedMoves.length).toBeGreaterThan(1);
+        const enemyCells = harness.unitsHolder
+            .getAllEnemyUnits(actor.getTeam())
+            .filter((enemy) => !enemy.isDead())
+            .flatMap((enemy) => enemy.getCells());
+        const distance = (cells: readonly XY[]): number =>
+            Math.min(
+                ...cells.flatMap((cell) =>
+                    enemyCells.map((enemy) => Math.max(Math.abs(cell.x - enemy.x), Math.abs(cell.y - enemy.y))),
+                ),
+            );
+        expect(
+            expandedMoves.some((candidate) => {
+                const move = candidate.actions.at(-1);
+                return (
+                    move?.type === "move_unit" &&
+                    !!move.targetCells?.length &&
+                    distance(move.targetCells) < distance(actor.getCells())
+                );
+            }),
+        ).toBe(true);
+        expect(selected[0]?.type).toBe("obstacle_attack");
+        expect(selected).toHaveLength(1);
+        expect(selected[0]).toMatchObject({
+            type: "obstacle_attack",
+            attackerId: actor.getId(),
+            attackFrom: actor.getBaseCell(),
+        });
+        expect(selected[0]?.type === "obstacle_attack" ? selected[0].path : undefined).toBeUndefined();
+        const hitsBefore = harness.fightProperties.getObstacleHitsLeft();
+        expect(harness.engine.apply(selected[0]!).completed).toBe(true);
+        expect(harness.fightProperties.getObstacleHitsLeft()).toBeLessThan(hitsBefore);
+    });
+
+    it("does not promote move-to-mountain mining or alter the qualified lap-7/8 dominant window", () => {
+        const assertFallsThrough = (actorBase: XY, lap: number, expectMoveMountain: boolean): void => {
+            const { harness, actor, incumbent } = terminalMountainFixture(actorBase, { x: 2, y: 12 }, lap);
+            const mountain = enumerateCandidates(
+                actor,
+                {
+                    grid: harness.grid,
+                    matrix: harness.grid.getMatrix(),
+                    unitsHolder: harness.unitsHolder,
+                    pathHelper: harness.pathHelper,
+                    attackHandler: harness.attackHandler,
+                    fightProperties: harness.fightProperties,
+                },
+                incumbent,
+                { includeMountainAttacks: true },
+            ).candidates.find((candidate) => candidate.kind === "mine");
+            expect(mountain).toBeDefined();
+            const obstacle = mountain?.actions.find((action) => action.type === "obstacle_attack");
+            expect(!!obstacle?.path?.length).toBe(expectMoveMountain);
+            const driver = harness.makeDriver() as unknown as {
+                search(unit: Unit, candidates: IEnumeratedCandidate[], incumbent: GameAction[]): GameAction[];
+                chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+            };
+            let searched = false;
+            driver.search = (_unit, _candidates, current) => {
+                searched = true;
+                return current;
+            };
+            expect(driver.chooseDecision(actor, "v0.8s", incumbent)).toBe(incumbent);
+            expect(searched).toBe(true);
+        };
+
+        // From here the generated mountain candidate needs a route, so it cannot enter the stationary fast path.
+        assertFallsThrough({ x: 3, y: 12 }, V08S_URGENT_FINISH_START_LAP, true);
+        // Even an adjacent 2:1 leader retains the already-qualified dominant-window behavior before lap nine.
+        assertFallsThrough({ x: 5, y: 10 }, V08S_URGENT_FINISH_START_LAP - 1, false);
+    });
+
+    it("pins BLOCK_CENTER game 407: released Abomination mines instead of repeating a lateral finish move", () => {
+        const record = runV08BlockCenterActionPanelGame(
+            {
+                candidateVersion: "v0.8",
+                opponentVersion: "v0.7",
+                games: 512,
+                baseSeed: 2_607_280_041,
+                sourceDirty: true,
+            },
+            407,
+        );
+
+        expect(record).toMatchObject({
+            game: 407,
+            pair: 203,
+            seed: 291_860_228,
+            candidateSide: "red",
+            endReason: "elimination",
+            laps: 10,
+        });
+        expect(record.candidateRoster).toContain("Abomination");
+        expect(record.byCreature.Abomination).toMatchObject({
+            nonProgressMoves: 0,
+            urgentMountainTerminalJitter: 0,
+            strategyRejectedActions: 0,
+            recoveryTurns: 0,
+        });
     });
 
     it("scopes the dominant-finish window to v0.8 while leaving v0.7 search unchanged", () => {

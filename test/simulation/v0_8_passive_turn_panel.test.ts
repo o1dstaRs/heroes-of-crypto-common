@@ -181,6 +181,11 @@ const fixtureRecord = (game: number): IV08PassiveTurnPanelRecord => {
         const creatureMetrics = (byCreature[creatureName] ??= emptyV08PassiveTurnMetrics());
         creatureMetrics.appearances += 1;
     }
+    const observedCreature = candidateRoster[0]!.creatureName;
+    metrics.turns = 1;
+    metrics.passiveEvidenceTurns = 1;
+    byCreature[observedCreature]!.turns = 1;
+    byCreature[observedCreature]!.passiveEvidenceTurns = 1;
     return {
         schema: V08_PASSIVE_TURN_PANEL_SCHEMA,
         sourceCommit: OPTIONS.sourceCommit ?? null,
@@ -745,6 +750,42 @@ describe("v0.8 random-roster passive-turn panel", () => {
         expect(auditor.metrics.observerPairingFaults).toBe(0);
     });
 
+    test("keeps terminal wait and mountain streaks visible for candidate units pinned to v0.1", () => {
+        const auditor = new V08PassiveTurnAuditor("green");
+        const retainPinnedPassive = (unitId: string, creatureName: string, lap: number, action: GameAction): void => {
+            auditor.observePreparedDecision({
+                unitId,
+                creatureName,
+                lap,
+                rawIncumbent: [action],
+                defendClass: "avoidable",
+            });
+            auditor.observeExecution(
+                execution({
+                    unitId,
+                    creatureName,
+                    strategyVersion: "v0.1",
+                    raw: [action],
+                    chosen: [action],
+                }),
+            );
+        };
+
+        retainPinnedPassive("berserker", "Berserker", 1, wait("berserker"));
+        retainPinnedPassive("berserker", "Berserker", 2, wait("berserker"));
+        retainPinnedPassive("boar", "Boar", 1, mountain("boar"));
+        retainPinnedPassive("boar", "Boar", 2, mountain("boar"));
+        auditor.finish();
+
+        expect(auditor.metrics.passiveEvidenceTurns).toBe(0);
+        expect(auditor.metrics.terminalPassiveStreaks).toBe(2);
+        expect(auditor.metrics.terminalPassiveStreakTurns).toBe(4);
+        expect(auditor.metrics.terminalAvoidablePassiveStreaks).toBe(0);
+        expect(auditor.byCreature.Berserker.terminalPassiveStreakTurns).toBe(2);
+        expect(auditor.byCreature.Boar.terminalPassiveStreakTurns).toBe(2);
+        expect(auditor.metrics.observerPairingFaults).toBe(0);
+    });
+
     test("audits end-turn, rejection, recovery, incomplete, introduced shield, and repaired raw shield gates", () => {
         const auditor = new V08PassiveTurnAuditor("green");
 
@@ -895,6 +936,9 @@ describe("v0.8 random-roster passive-turn panel", () => {
         expect(passing.options.inheritCandidateEnvironment).toBe(false);
         expect(passing.sourceCommit).toBe(OPTIONS.sourceCommit);
         expect(passing.sourceDirty).toBe(false);
+        expect(passing.recordsWithoutObservedTurns).toBe(0);
+        expect(passing.recordTurnTotalMismatches).toBe(0);
+        expect(passing.byCreatureTurns).toBe(OPTIONS.games);
 
         const dirtyOptions = { ...OPTIONS, sourceDirty: true };
         const dirty = summarizeV08PassiveTurnPanel(
@@ -1007,6 +1051,49 @@ describe("v0.8 random-roster passive-turn panel", () => {
         const appearanceGate = summarizeV08PassiveTurnPanel({ ...OPTIONS, minCreatureAppearances: 1 }, records);
         expect(appearanceGate.gates.checks.enabled_creature_appearances.pass).toBe(false);
         expect(appearanceGate.underrepresentedCreatures.length).toBeGreaterThan(0);
+    });
+
+    test("fails closed when records contain no observations or disagree with their by-creature turn totals", () => {
+        const records = Array.from({ length: OPTIONS.games }, (_, game) => fixtureRecord(game));
+        const silent = records.map((record) => ({
+            ...record,
+            metrics: {
+                ...record.metrics,
+                turns: 0,
+                passiveEvidenceTurns: 0,
+            },
+            byCreature: Object.fromEntries(
+                Object.entries(record.byCreature).map(([creatureName, metrics]) => [
+                    creatureName,
+                    {
+                        ...metrics,
+                        turns: 0,
+                        passiveEvidenceTurns: 0,
+                    },
+                ]),
+            ),
+        }));
+        const silentSummary = summarizeV08PassiveTurnPanel(OPTIONS, silent);
+        expect(silentSummary.gates.pass).toBe(false);
+        expect(silentSummary.gates.failed).toContain("observed_turns_positive");
+        expect(silentSummary.gates.failed).toContain("passive_evidence_turns_positive");
+        expect(silentSummary.gates.failed).toContain("every_game_observed_turns");
+        expect(silentSummary.gates.checks.turn_totals_consistent.pass).toBe(true);
+        expect(silentSummary.recordsWithoutObservedTurns).toBe(OPTIONS.games);
+
+        const inconsistent = records.map((record) => ({
+            ...record,
+            metrics: { ...record.metrics },
+            byCreature: Object.fromEntries(
+                Object.entries(record.byCreature).map(([creatureName, metrics]) => [creatureName, { ...metrics }]),
+            ),
+        }));
+        inconsistent[0]!.metrics.turns += 1;
+        const inconsistentSummary = summarizeV08PassiveTurnPanel(OPTIONS, inconsistent);
+        expect(inconsistentSummary.gates.failed).toContain("turn_totals_consistent");
+        expect(inconsistentSummary.recordTurnTotalMismatches).toBe(1);
+        expect(inconsistentSummary.byCreatureTurns).toBe(OPTIONS.games);
+        expect(inconsistentSummary.metrics.turns).toBe(OPTIONS.games + 1);
     });
 
     test("smokes the real production v0.8+a13 dual-hook path", () => {

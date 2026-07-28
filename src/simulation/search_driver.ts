@@ -489,6 +489,54 @@ function isPureMoveCandidate(candidate: Pick<IEnumeratedCandidate, "actions">): 
     return candidate.actions.length > 0 && candidate.actions.every((action) => action.type === "move_unit");
 }
 
+const footprintDistance = (
+    left: readonly Readonly<{ x: number; y: number }>[],
+    right: readonly Readonly<{ x: number; y: number }>[],
+): number => {
+    let distance = Infinity;
+    for (const a of left) {
+        for (const b of right) {
+            distance = Math.min(distance, Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)));
+        }
+    }
+    return distance;
+};
+
+/**
+ * Immediate geometric progress for a pure move. The terminal mountain fallback uses footprint distance rather
+ * than route length: a lateral route around BLOCK_CENTER that finishes no closer to any living enemy is exactly
+ * the non-progress class that can alternate forever, while a genuinely closing move remains authoritative.
+ */
+function isEnemyClosingPureMove(
+    unit: Unit,
+    unitsHolder: ILookaheadDeps["unitsHolder"],
+    candidate: Pick<IEnumeratedCandidate, "actions">,
+): boolean {
+    if (!isPureMoveCandidate(candidate)) return false;
+    const move = candidate.actions.at(-1);
+    if (move?.type !== "move_unit" || !move.targetCells?.length) return false;
+    const enemyCells = unitsHolder
+        .getAllEnemyUnits(unit.getTeam())
+        .filter((enemy) => !enemy.isDead())
+        .flatMap((enemy) => enemy.getCells());
+    if (!enemyCells.length) return false;
+    return footprintDistance(move.targetCells, enemyCells) < footprintDistance(unit.getCells(), enemyCells);
+}
+
+/** Exact generated in-place mountain action; move-to-mountain candidates are deliberately excluded. */
+function isStationaryMountainCandidate(unit: Unit, candidate: Pick<IEnumeratedCandidate, "kind" | "actions">): boolean {
+    if (candidate.kind !== "mine" || candidate.actions.length !== 1) return false;
+    const obstacle = candidate.actions[0];
+    const base = unit.getBaseCell();
+    return (
+        obstacle?.type === "obstacle_attack" &&
+        obstacle.attackerId === unit.getId() &&
+        obstacle.attackFrom?.x === base.x &&
+        obstacle.attackFrom.y === base.y &&
+        !obstacle.path?.length
+    );
+}
+
 function isDominantFinishCombatReplacement(
     prioritizeDominantFinish: boolean,
     selected: Pick<IEnumeratedCandidate, "actions"> | undefined,
@@ -1752,9 +1800,40 @@ export class SearchDriver {
                 }
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             };
-            let candidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates.filter(
-                keepCandidate,
-            );
+            const enumeratedCandidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates;
+            const stationaryFinishMountain =
+                prioritizeV08SUrgency &&
+                isPureMoveCandidate({ actions: incumbent }) &&
+                !isEnemyClosingPureMove(unit, this.deps.unitsHolder, { actions: incumbent })
+                    ? enumeratedCandidates.find((candidate) => isStationaryMountainCandidate(unit, candidate))
+                    : undefined;
+            let candidates = enumeratedCandidates.filter(keepCandidate);
+            if (stationaryFinishMountain && !this.observeOnly) {
+                // The normal move cap is ranked by base-cell Manhattan distance. That is a useful broad search
+                // heuristic but cannot prove strict footprint progress for a LARGE unit around BLOCK_CENTER.
+                // This rare lap-9+, already-adjacent path privately removes only the move cap; no extra candidate
+                // leaks into rollout search, and the engine probe below still selects at most one action.
+                const terminalFallbackCandidates = enumerateCandidates(unit, context, incumbent, {
+                    ...enumerationOptions,
+                    maxMoveDestinations: 0,
+                }).candidates.filter(keepCandidate);
+                const fallback = this.firstEngineValidLateStationaryMountainCandidate(
+                    unit,
+                    terminalFallbackCandidates,
+                    stationaryFinishMountain,
+                    seedBase,
+                );
+                if (fallback) {
+                    this.counters.decisions += 1;
+                    this.counters.msTotal += performance.now() - t0;
+                    if (fallback.actions !== incumbent) {
+                        this.counters.overrides += 1;
+                        bump(this.counters.overridesByIncumbentKind, incumbentKind);
+                        bump(this.counters.overridesToKind, fallback.kind);
+                    }
+                    return fallback.actions;
+                }
+            }
             // Movement applies the role gate before its generic top-K cap, so the normal bounded catalog keeps
             // the nearest meaningful route instead of capping to screen jitter or a screen-breaking route.
             // A semantic candidate can still be rejected by the real action engine. Probe the bounded catalog
@@ -3280,6 +3359,38 @@ export class SearchDriver {
             if (score !== -Infinity) return candidate;
         }
         return undefined;
+    }
+    /**
+     * Break a released late-finish mountain oscillation without turning mining into a general challenger.
+     * Positive enemy damage wins first, then an engine-valid move that strictly closes footprint distance. Only
+     * when neither executes do we validate and return the already-generated in-place strike ahead of lateral or
+     * retreating movement; walking sideways around the blocking rock is the cycle source.
+     */
+    private firstEngineValidLateStationaryMountainCandidate(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        stationaryMountain: IEnumeratedCandidate,
+        seedBase: number,
+    ): IEnumeratedCandidate | undefined {
+        const damageCandidates = candidates.filter((candidate) => isPositiveV08UrgentDamageCandidate(unit, candidate));
+        const preferredDamage = selectV08UrgentDamageCandidate(
+            unit,
+            this.deps.unitsHolder,
+            damageCandidates,
+            this.deps.fightProperties.getCurrentLap(),
+        );
+        const orderedDamage = preferredDamage
+            ? [preferredDamage, ...damageCandidates.filter((candidate) => candidate !== preferredDamage)]
+            : damageCandidates;
+        if (this.firstEngineValidCandidate(unit, orderedDamage, seedBase)) return undefined;
+
+        const closingMoves = candidates.filter((candidate) =>
+            isEnemyClosingPureMove(unit, this.deps.unitsHolder, candidate),
+        );
+        const closingMove = this.firstEngineValidCandidate(unit, closingMoves, seedBase);
+        if (closingMove) return closingMove;
+
+        return this.firstEngineValidCandidate(unit, [stationaryMountain], seedBase);
     }
     /** Immediate-leaf pre-pass used only when SEARCH_SHORTLIST is explicitly configured. */
     private shortlistCandidates(
