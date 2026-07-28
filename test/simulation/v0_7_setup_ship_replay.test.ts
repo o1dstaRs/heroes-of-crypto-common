@@ -88,7 +88,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned after L1/L2 auto-bans went 5 -> 6 (LIVE_AUTO_BANS_BY_LEVEL), the two 16-creature pools. This is
 // the mirror image of every catalog growth above — one fewer creature drafted from each pool shifts the same
 // deterministic roster draws. Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "1c71d9b0c7974b8ff911ba81c26394f0961c50b3a7b469f1b96bc4b762d7fb04";
+// Re-pinned after the Battle Mage traded armour for health (14/11 -> 26/10). It survives exchanges it used
+// to lose, so every seeded trace containing one diverges from that point on — the digest moving is the
+// change landing, not a regression. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "9246b8cf7352f2100d166ff5570b730ffd971db1d812244c134d3d33845b5f58";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

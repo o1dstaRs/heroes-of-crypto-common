@@ -145,11 +145,15 @@ describe("Phase-B dataset contract", () => {
         const dir = mkdtempSync(join(tmpdir(), "phase-b-value-"));
         const v2Path = join(dir, "v2.jsonl");
         const legacyPath = join(dir, "legacy.jsonl");
-        const roster = buildRoster(makeRng(123));
+        // Re-seeded 123 -> 124 when the Battle Mage gained 12 health: the old roster now survives to the
+        // 60-lap cap and draws, and this case needs a DECISIVE match to have rows worth asserting on. The
+        // seed is arbitrary — only "does not draw" matters here — so the cheapest honest fix is a seed that
+        // still resolves rather than loosening the assertion to accept draws.
+        const roster = buildRoster(makeRng(124));
         process.env.VALUE_DATA = v2Path;
         process.env.VALUE_DATA_FEATURES = "v2";
         process.env.PHASE_B_RUN_FINGERPRINT = FINGERPRINT;
-        const config = { greenVersion: "v0.1", redVersion: "v0.1", roster, seed: 123, maxLaps: 60 };
+        const config = { greenVersion: "v0.1", redVersion: "v0.1", roster, seed: 124, maxLaps: 60 };
         expect(runMatch(config).winner).not.toBe("draw");
         const v2Rows = readFileSync(v2Path, "utf8")
             .trim()
@@ -163,7 +167,7 @@ describe("Phase-B dataset contract", () => {
                 ),
             );
         expect(v2Rows.length).toBeGreaterThan(0);
-        expect(v2Rows.every((row) => row.seed === 123 && row.greenVersion === "v0.1")).toBe(true);
+        expect(v2Rows.every((row) => row.seed === 124 && row.greenVersion === "v0.1")).toBe(true);
 
         process.env.VALUE_DATA = legacyPath;
         delete process.env.VALUE_DATA_FEATURES;
