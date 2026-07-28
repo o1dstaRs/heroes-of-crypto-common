@@ -98,7 +98,8 @@
             "desc": [
                 "Hurls a vine at an enemy in line of sight, leaving it across every cell on the way.",
                 "A non-flying creature pays 1 extra step to cross a vined cell.",
-                "The struck creature also loses 1.5 steps.",
+                "The struck creature also loses 1.5 steps, unless its magic armor shrugs the snare off.",
+                "The vine lands on the cells either way.",
                 "Lasts 2 laps."
             ],
             "target": "ANY_ENEMY",

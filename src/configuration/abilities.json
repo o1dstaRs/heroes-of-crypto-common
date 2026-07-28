@@ -1138,7 +1138,8 @@
         "desc": [
             "When cast, hurls a vine at an enemy in line of sight, leaving it across every cell on the way.",
             "A non-flying creature pays 1 extra step to cross a vined cell.",
-            "Any enemy that ends its move standing in the vine loses {} steps, as does the creature struck"
+            "Any enemy that ends its move standing in the vine loses {} steps, as does the creature struck",
+            "Magic armor can shrug the snare off the struck creature, but never stops the vine landing"
         ],
         "power": 1.5,
         "power_type": "VINE_THROW",
