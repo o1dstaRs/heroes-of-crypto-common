@@ -85,7 +85,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned after Winged Boots started granting flyers +1 armour alongside their +1 movement: every seeded
 // fight with a flyer under the boots takes damage differently, so the traces legitimately move. Two isolated
 // runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "8559cd84d843b3ccb71a439a43af38dfccb15839b626e91d6c9d111416abab97";
+// Re-pinned after L1/L2 auto-bans went 5 -> 6 (LIVE_AUTO_BANS_BY_LEVEL), the two 16-creature pools. This is
+// the mirror image of every catalog growth above — one fewer creature drafted from each pool shifts the same
+// deterministic roster draws. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "1c71d9b0c7974b8ff911ba81c26394f0961c50b3a7b469f1b96bc4b762d7fb04";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

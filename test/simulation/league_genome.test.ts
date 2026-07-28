@@ -288,12 +288,12 @@ describe("B1 full-game league genome", () => {
         // leaks known opponent creatures). Re-pinned 54 -> 71 after Wyvern (51) and Trent (52) grew that
         // pool 13 -> 15, shifting it again; 71 is the lowest surviving seed. Re-pinned 71 -> 645 after the
         // Manticore (53) took that pool 15 -> 16 and shifted it once more; 645 is again the lowest
-        // survivor. Re-pinned 645 -> 591 after the Battle Mage (55) took that pool 16 -> 17; the other
-        // qualifying seeds are 738, 1787, 3997, 4135 and 4727. The binding assertion is the empty
-        // known-creature list — it stays RARE with this pool (6 of the first 5000 seeds clear it), while
-        // SEE_NONE and "tight" still hold broadly. The search stays out of the test so it cannot pass
-        // tautologically.
-        const noVision = resolveLeaguePick(591, alternative, opponent, true);
+        // survivor. Re-pinned 645 -> 591 after the Battle Mage (55) took that pool 16 -> 17. Re-pinned
+        // 591 -> 75 after L1/L2 auto-bans went 5 -> 6 (LIVE_AUTO_BANS_BY_LEVEL): removing one more
+        // creature from each pool shifts every seeded draft draw. 75 is the lowest survivor, of 45 in the
+        // first 5000 seeds. The binding assertion is the empty known-creature list — SEE_NONE and "tight"
+        // hold broadly. The search stays out of the test so it cannot pass tautologically.
+        const noVision = resolveLeaguePick(75, alternative, opponent, true);
         expect(getKnownOpponentCreatures(noVision.state, PBTypes.TeamVals.LOWER)).toEqual([]);
         expect(noVision.state.lower.perk).toBe(Perk.SEE_NONE);
         expect(noVision.lowerPlacement).toBe("tight");

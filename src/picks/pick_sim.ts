@@ -18,7 +18,18 @@ export type PickTeam = typeof PBTypes.TeamVals.LOWER | typeof PBTypes.TeamVals.U
 export type PickBundle = readonly [level1Creature: number, level2Creature: number, tier1Artifact: number];
 export type PickRandomInt = (maxExclusive: number) => number;
 
-export const LIVE_AUTO_BANS_BY_LEVEL = [5, 5, 3, 5] as const;
+/**
+ * How many creatures the draft removes at each level before anyone picks, level 1 first.
+ *
+ * L1 and L2 ban 6 rather than 5 because those tiers carry 16 creatures each — the widest pools in the
+ * game — and every creature left unbanned is one more slot a player can safely settle into. Taking a
+ * sixth keeps 10 available against the 4 the two teams actually fill, which is still far more than the
+ * draft needs while making the two heavy-traffic tiers meaningfully more contested.
+ *
+ * MIRRORED by the ranked server (config.game.banCreaturesLevelN) — generateNewPick asserts the two
+ * agree and refuses to build a pick if they drift, so these move together or not at all.
+ */
+export const LIVE_AUTO_BANS_BY_LEVEL = [6, 6, 3, 5] as const;
 export const LIVE_TIER1_ARTIFACT_COUNT = 12;
 export const LIVE_TIER2_ARTIFACT_COUNT = 12;
 export const LIVE_TIER2_OFFER_SIZE = 3;

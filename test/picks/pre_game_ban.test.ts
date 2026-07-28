@@ -125,7 +125,7 @@ describe("pre-game unit ban", () => {
         state = accept(state, { type: "propose_ban", team: LOWER, creatureId: target });
         const resolved = finishPerks(state);
 
-        // The player steered one of that level's bans; it did not add a sixth.
+        // The player steered one of that level's bans rather than adding one on top.
         expect(bansPerLevel(resolved)).toEqual(baseline);
         expect(resolved.creaturesBanned).toContain(target);
         expect(resolved.creaturesBanned.length).toBe(baseline.reduce((sum, count) => sum + count, 0));

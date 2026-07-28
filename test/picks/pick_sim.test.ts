@@ -51,7 +51,7 @@ const finishBundlePhase = (state: IPickSimState): IPickSimState => {
 };
 
 describe("pick_sim", () => {
-    it("generates the live bundles, offers, and 5/5/3/5 auto-bans in server RNG order", () => {
+    it("generates the live bundles, offers, and 6/6/3/5 auto-bans in server RNG order", () => {
         const drawPoolSizes: number[] = [];
         const state = createPickSimState((maxExclusive) => {
             drawPoolSizes.push(maxExclusive);
@@ -68,7 +68,9 @@ describe("pick_sim", () => {
         ]);
         expect(state.lower.tier2Offers).toEqual([1, 2, 3]);
         expect(state.upper.tier2Offers).toEqual([1, 2, 3]);
-        expect(state.creaturesBanned).toEqual([12, 13, 21, 22, 23, 15, 16, 24, 25, 26, 7, 8, 17, 9, 10, 19, 20, 29]);
+        expect(state.creaturesBanned).toEqual([
+            12, 13, 21, 22, 23, 31, 15, 16, 24, 25, 26, 34, 7, 8, 17, 9, 10, 19, 20, 29,
+        ]);
         expect(drawPoolSizes).toEqual([
             16,
             15,
@@ -92,12 +94,14 @@ describe("pick_sim", () => {
             11,
             10,
             9,
-            8, // L1 bans after excluding all four offers (16-creature pool)
+            8,
+            7, // six L1 bans after excluding all four offers (16-creature pool)
             12,
             11,
             10,
             9,
-            8, // L2 bans after excluding all four offers (16-creature pool: Battle Mage in, Zena out to L3)
+            8,
+            7, // six L2 bans after excluding all four offers (16-creature pool: Battle Mage in, Zena out to L3)
             12,
             11,
             10, // L3 bans (12-creature pool: the Life Monk, the Chaos Nightmare, Zena up from L2, Pegasus down from L4)
