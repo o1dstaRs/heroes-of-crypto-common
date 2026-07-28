@@ -12,6 +12,7 @@
 import { describe, expect, spyOn, test } from "bun:test";
 
 import type { IDecisionContext } from "../../src/ai/ai_strategy";
+import { enumerateCandidates } from "../../src/ai/candidates";
 import type { DecisionPathCatalog, IDecisionPathCatalogStats } from "../../src/ai/decision_path_catalog";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine } from "../../src/engine/action_engine";
@@ -63,6 +64,32 @@ const DEEP_PANEL_OPTIONS: IV08BlockCenterActionPanelOptions = {
     sourceCommit: "a".repeat(40),
     sourceDirty: false,
 };
+
+const DEEP_BLOCK_CENTER_REGRESSIONS = [
+    { game: 432, pair: 216, seed: 439_786_753, candidateSide: "green" },
+    { game: 474, pair: 237, seed: 348_362_886, candidateSide: "green" },
+    { game: 489, pair: 244, seed: 1_749_544_029, candidateSide: "red" },
+    { game: 551, pair: 275, seed: 2_432_673_996, candidateSide: "red" },
+    { game: 917, pair: 458, seed: 2_863_113_811, candidateSide: "red" },
+    { game: 932, pair: 466, seed: 2_623_763_419, candidateSide: "green" },
+    {
+        game: 1_069,
+        pair: 534,
+        seed: 2_736_768_735,
+        candidateSide: "red",
+        candidateRoster: ["Berserker", "Berserker", "Valkyrie", "Trent", "Cyclops", "Tsar Cannon"],
+        opponentRoster: ["Peasant", "Blacksmith", "Valkyrie", "Elf", "Crusader", "Frenzied Boar"],
+    },
+    { game: 1_294, pair: 647, seed: 2_040_299_008, candidateSide: "green" },
+    {
+        game: 1_589,
+        pair: 794,
+        seed: 1_400_331_939,
+        candidateSide: "red",
+        candidateRoster: ["Fairy", "Troglodyte", "Harpy", "Pikeman", "Efreet", "Tsar Cannon"],
+        opponentRoster: ["Leprechaun", "Centaur", "Pikeman", "Trent", "Cyclops", "Gargantuan"],
+    },
+] as const;
 
 const activatedActionEngine = (
     combat: ReturnType<typeof createCombatTestContext>,
@@ -144,47 +171,23 @@ const recordFor = (game: number): IV08BlockCenterActionRecord => {
 };
 
 describe("v0.8 BLOCK_CENTER action oracle panel", () => {
-    test("keeps deep game 1069 free of the pinned Berserker direct-action drought", () => {
-        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 1_069);
+    for (const regression of DEEP_BLOCK_CENTER_REGRESSIONS) {
+        test(`keeps deep game ${regression.game} free of urgent BLOCK_CENTER action misses`, () => {
+            const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, regression.game);
 
-        expect(record).toMatchObject({
-            game: 1_069,
-            pair: 534,
-            seed: 2_736_768_735,
-            candidateSide: "red",
-            candidateRoster: ["Berserker", "Berserker", "Valkyrie", "Trent", "Cyclops", "Tsar Cannon"],
-            opponentRoster: ["Peasant", "Blacksmith", "Valkyrie", "Elf", "Crusader", "Frenzied Boar"],
-            candidateEngineRejections: 0,
+            expect(record).toMatchObject({
+                ...regression,
+                candidateEngineRejections: 0,
+            });
+            expect(record.metrics).toMatchObject({
+                urgentCatalogMisses: 0,
+                urgentMountainAdjacentMisses: 0,
+                urgentRepeatedNonProgressWithDirectOption: 0,
+                urgentCombatDroughts: 0,
+                lateDirectActionMisses: 0,
+            });
         });
-        expect(record.metrics).toMatchObject({
-            urgentCatalogMisses: 0,
-            urgentMountainAdjacentMisses: 0,
-            urgentRepeatedNonProgressWithDirectOption: 0,
-            urgentCombatDroughts: 0,
-            lateDirectActionMisses: 0,
-        });
-    });
-
-    test("keeps deep game 1589 free of the Tsar Cannon mountain action stall", () => {
-        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 1_589);
-
-        expect(record).toMatchObject({
-            game: 1_589,
-            pair: 794,
-            seed: 1_400_331_939,
-            candidateSide: "red",
-            candidateRoster: ["Fairy", "Troglodyte", "Harpy", "Pikeman", "Efreet", "Tsar Cannon"],
-            opponentRoster: ["Leprechaun", "Centaur", "Pikeman", "Trent", "Cyclops", "Gargantuan"],
-            candidateEngineRejections: 0,
-        });
-        expect(record.metrics).toMatchObject({
-            urgentCatalogMisses: 0,
-            urgentMountainAdjacentMisses: 0,
-            urgentRepeatedNonProgressWithDirectOption: 0,
-            urgentCombatDroughts: 0,
-            lateDirectActionMisses: 0,
-        });
-    });
+    }
 
     test("uses deterministic random rosters and exact adjacent seat swaps on BLOCK_CENTER", () => {
         const fingerprint = fingerprintV08BlockCenterActionPlan(OPTIONS);
@@ -482,6 +485,234 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
                 targetCell: { x: 10, y: 6 },
             }).completed,
         ).toBe(false);
+    });
+
+    test("does not advertise an Area Throw when allied splash outweighs its enemy damage", () => {
+        const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
+        const actor = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            name: "Harmful area thrower",
+            attackType: PBTypes.AttackVals.RANGE,
+            attack: 10,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 50,
+            rangeShots: 5,
+            shotDistance: 30,
+            abilities: ["Area Throw"],
+        });
+        const tinyEnemy = createTestUnit({
+            team: PBTypes.TeamVals.UPPER,
+            name: "Tiny splash enemy",
+            amountAlive: 1,
+            maxHp: 1,
+        });
+        const largeAlly = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            name: "Large splash ally",
+            amountAlive: 100,
+            maxHp: 1_000,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, tinyEnemy, { x: 10, y: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, largeAlly, { x: 10, y: 9 });
+        actor.refreshPossibleAttackTypes(true);
+        const { context } = activatedActionEngine(combat, actor);
+        const rangeEvaluation = spyOn(combat.attackHandler, "evaluateRangeAttack").mockReturnValue({
+            affectedUnits: [[tinyEnemy, largeAlly]],
+            affectedCells: [[tinyEnemy.getBaseCell(), largeAlly.getBaseCell()]],
+            rangeAttackDivisors: [1],
+        });
+        const areaProjection = spyOn(combat.attackHandler, "projectAreaThrowTargetCell").mockReturnValue({
+            x: 10,
+            y: 10,
+        });
+        try {
+            const candidates = enumerateCandidates(
+                actor,
+                context,
+                [{ type: "end_turn", unitId: actor.getId(), reason: "manual" }],
+                { preserveAttackTargetCoverage: true },
+            ).candidates;
+            const throws = candidates.filter((candidate) => candidate.kind === "area_throw");
+            expect(throws.length).toBeGreaterThan(0);
+            expect(throws.every((candidate) => candidate.features.expectedDamage < 0)).toBe(true);
+            expect(findIndependentV08BlockCenterDirectOption(actor, context)).toBeUndefined();
+            expect(areaProjection).toHaveBeenCalled();
+        } finally {
+            areaProjection.mockRestore();
+            rangeEvaluation.mockRestore();
+        }
+    });
+
+    test("does not advertise a Ring of Fire whose allied damage exceeds its enemy damage", () => {
+        const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
+        const caster = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            name: "Careful fire caster",
+            attackType: PBTypes.AttackVals.MELEE_MAGIC,
+            amountAlive: 1,
+            stackPower: 4,
+            speed: 1,
+            spells: ["Nature:Ring of Fire"],
+        });
+        const aimTarget = createTestUnit({
+            team: PBTypes.TeamVals.UPPER,
+            name: "Ring aim",
+            amountAlive: 100,
+            maxHp: 100,
+        });
+        const tinyEnemy = createTestUnit({
+            team: PBTypes.TeamVals.UPPER,
+            name: "Tiny ring enemy",
+            amountAlive: 1,
+            maxHp: 1,
+        });
+        tinyEnemy.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Hidden"), amount: 1 }));
+        const largeAlly = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            name: "Large ring ally",
+            amountAlive: 100,
+            maxHp: 1_000,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, caster, { x: 2, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, aimTarget, { x: 10, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, tinyEnemy, { x: 10, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, largeAlly, { x: 10, y: 1 });
+        caster.refreshPossibleAttackTypes(false);
+        const { context, engine } = activatedActionEngine(combat, caster);
+
+        expect(findIndependentV08BlockCenterDirectOption(caster, context)).toBeUndefined();
+
+        const enemyHpBefore = tinyEnemy.getCumulativeHp();
+        const allyHpBefore = largeAlly.getCumulativeHp();
+        expect(
+            engine.apply({
+                type: "cast_spell",
+                casterId: caster.getId(),
+                spellName: "Ring of Fire",
+                targetId: aimTarget.getId(),
+            }).completed,
+        ).toBe(true);
+        const enemyDamage = enemyHpBefore - tinyEnemy.getCumulativeHp();
+        const alliedDamage = allyHpBefore - largeAlly.getCumulativeHp();
+        expect(enemyDamage).toBeGreaterThan(0);
+        expect(alliedDamage).toBeGreaterThan(enemyDamage);
+    });
+
+    test("treats display-only Rangebane as a hard ranged-action gate", () => {
+        const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
+        const actor = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            name: "Display-rangebaned shooter",
+            attackType: PBTypes.AttackVals.RANGE,
+            damageMin: 10,
+            damageMax: 10,
+            amountAlive: 10,
+            rangeShots: 5,
+            shotDistance: 30,
+        });
+        const target = createTestUnit({
+            team: PBTypes.TeamVals.UPPER,
+            name: "Range target",
+            amountAlive: 100,
+            maxHp: 100,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 10, y: 2 });
+        actor.refreshPossibleAttackTypes(true);
+        const { context, engine } = activatedActionEngine(combat, actor);
+        const available = findIndependentV08BlockCenterDirectOption(actor, context);
+        expect(available).toMatchObject({ kind: "shot", targetId: target.getId() });
+
+        actor.getUnitProperties().applied_debuffs.push("Rangebane");
+        expect(actor.hasDebuffActive("Rangebane")).toBe(false);
+        expect(actor.hasStatusApplied("Rangebane")).toBe(true);
+        expect(findIndependentV08BlockCenterDirectOption(actor, context)).toBeUndefined();
+        expect(available!.actions.map((action) => engine.apply(action).completed).at(-1)).toBe(false);
+    });
+
+    test("keeps positive-scored Smoke out of direct and urgent catalog eligibility", () => {
+        const plan = planV08BlockCenterActionGame(OPTIONS, 0);
+        const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        const caster = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            name: "Smoke caster",
+            attackType: PBTypes.AttackVals.MELEE_MAGIC,
+            stackPower: 4,
+            speed: 1,
+            spells: ["Chaos:Smoke"],
+        });
+        const ally = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            name: "Smoke ally",
+            amountAlive: 10,
+        });
+        const enemyRanger = createTestUnit({
+            team: PBTypes.TeamVals.UPPER,
+            name: "Enemy ranger",
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            amountAlive: 10,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, caster, { x: 2, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, ally, { x: 3, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, enemyRanger, { x: 12, y: 2 });
+        caster.refreshPossibleAttackTypes(false);
+        const { context } = activatedActionEngine(combat, caster);
+        while (context.fightProperties!.getCurrentLap() < 9) context.fightProperties!.flipLap();
+        const smokeCandidate = enumerateCandidates(
+            caster,
+            context,
+            [{ type: "end_turn", unitId: caster.getId(), reason: "manual" }],
+            { enrichIncumbentMetadata: true },
+        ).candidates.find((candidate) =>
+            candidate.actions.some((action) => action.type === "cast_spell" && action.spellName === "Smoke"),
+        );
+        expect(smokeCandidate).toBeDefined();
+        expect(smokeCandidate!.features.expectedDamage).toBeGreaterThan(0);
+
+        const auditor = new V08BlockCenterActionAuditor(plan);
+        auditor.observeDecision({
+            unit: caster,
+            context,
+            incumbent: smokeCandidate!.actions,
+            strategyVersion: "v0.8",
+            probeActions: (actions) => ({
+                failure: null,
+                completedActionTypes: actions
+                    .filter((action) => action.type !== "select_attack_type")
+                    .map((action) => action.type),
+            }),
+        });
+        auditor.observeExecution({
+            unitId: caster.getId(),
+            creatureName: caster.getName(),
+            side: "green",
+            strategyVersion: "v0.8",
+            rawIncumbent: smokeCandidate!.actions,
+            chosenDecision: smokeCandidate!.actions,
+            strategyActions: smokeCandidate!.actions.map((action) => ({
+                action,
+                completed: true,
+                events: [],
+            })),
+            recoveryAttempts: [],
+            recovery: { source: "none", completed: false },
+            events: [],
+        });
+        auditor.finish();
+
+        expect(auditor.metrics).toMatchObject({
+            observedTurns: 1,
+            oracleDirectEligibleTurns: 0,
+            sharedCatalogDirectEligibleTurns: 0,
+            catalogMissedEngineValidCombat: 0,
+            urgentCatalogMisses: 0,
+            noncombatWithDirectOptionTurns: 0,
+            lateDirectActionMisses: 0,
+        });
     });
 
     test("keeps BLOCK_CENTER diagnostics out of the live path catalog and chosen actions", () => {

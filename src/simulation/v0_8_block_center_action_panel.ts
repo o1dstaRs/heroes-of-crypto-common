@@ -18,7 +18,12 @@ import { Worker } from "node:worker_threads";
 
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { AI_VERSIONS } from "../ai";
-import { enumerateCandidates, type ICandidateSet, type IEnumeratedCandidate } from "../ai/candidates";
+import {
+    enumerateCandidates,
+    evaluateRangeCandidateDamage,
+    type ICandidateSet,
+    type IEnumeratedCandidate,
+} from "../ai/candidates";
 import { decisionFireWalls } from "../ai/decision_fight_state";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../ai/decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "../ai/melee_attack_type";
@@ -33,6 +38,7 @@ import {
     type IV08BacklineWardIntent,
 } from "../ai/versions/v0_8_backline_protector";
 import { buildV08A13SearchEnvironment } from "../ai/versions/v0_8_a13_profile";
+import { selectV08DamageSpellCandidate } from "../ai/versions/v0_8";
 import type { IDecisionContext } from "../ai/ai_strategy";
 import type { GameAction } from "../engine/actions";
 import { projectPostMoveActorAvailability } from "../engine/post_move_actor_availability";
@@ -40,6 +46,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import {
     getCellsAroundCell,
     getCellsAroundFootprint,
+    getPositionForCell,
     getPositionForCells,
     getRangeAttackSideCenter,
     isCellWithinGrid,
@@ -646,6 +653,7 @@ interface IIndependentRangeOrigin {
     position: XY;
     route?: IReadonlyWeightedRoute;
     cumulativeHp: number;
+    amountAlive: number;
 }
 
 type V08BlockCenterDirectOptionAcceptance = (option: IV08BlockCenterDirectOption) => boolean;
@@ -666,14 +674,18 @@ function findIndependentRangeOption(
         !unit.isRangeCapable() ||
         unit.getRangeShots() <= 0 ||
         unit.hasDebuffActive("Range Null Field Aura") ||
-        unit.hasDebuffActive("Rangebane")
+        unit.hasStatusApplied("Rangebane")
     ) {
         return undefined;
     }
     const enemyAggression = context.grid.getEnemyAggrMatrixByUnitId(unit.getId());
     const origins: IIndependentRangeOrigin[] = [];
     if (attackHandler.canLandRangeAttack(unit, enemyAggression)) {
-        origins.push({ position: unit.getPosition(), cumulativeHp: unit.getCumulativeHp() });
+        origins.push({
+            position: unit.getPosition(),
+            cumulativeHp: unit.getCumulativeHp(),
+            amountAlive: unit.getAmountAlive(),
+        });
     }
     const base = unit.getBaseCell();
     for (const route of routes) {
@@ -684,7 +696,12 @@ function findIndependentRangeOption(
         if (!projected) continue;
         const position = getPositionForCells(context.grid.getSettings(), footprintForBase(unit, route.cell));
         if (position && !attackHandler.canBeAttackedByMelee(position, unit.isSmallSize(), enemyAggression)) {
-            origins.push({ position, route, cumulativeHp: projectedCumulativeHp(projected) });
+            origins.push({
+                position,
+                route,
+                cumulativeHp: projectedCumulativeHp(projected),
+                amountAlive: projected.stack.amountAlive,
+            });
         }
     }
     if (!origins.length) return undefined;
@@ -692,6 +709,7 @@ function findIndependentRangeOption(
     const forcedTargetId = liveForcedTargetId(unit, context);
     const isThrough = unit.hasAbilityActive("Through Shot");
     const isArea = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
+    const shots = unit.getAbility("Double Shot") || unit.getAbility("Crafted Double Shot") ? 2 : 1;
     const prefix: GameAction[] =
         unit.getAttackTypeSelection() === RANGE
             ? []
@@ -735,6 +753,17 @@ function findIndependentRangeOption(
                     }
                     const divisor = evaluation.rangeAttackDivisors[0] ?? 1;
                     if (!physicalDamageCanLand(unit, primary, true, context, divisor)) continue;
+                    const damage = evaluateRangeCandidateDamage(
+                        unit,
+                        context,
+                        evaluation,
+                        primary.getId(),
+                        shots,
+                        isArea,
+                        aimedEnemy.getId(),
+                        origin.amountAlive,
+                    );
+                    if (!(damage.value > 0)) continue;
                     const actions: GameAction[] = [];
                     if (origin.route) actions.push(routeMoveAction(unit, origin.route));
                     actions.push(...prefix, {
@@ -775,6 +804,7 @@ function findIndependentAreaThrowOption(
         unit.getAttackTypeSelection() === RANGE
             ? []
             : [{ type: "select_attack_type", unitId: unit.getId(), attackType: RANGE }];
+    const shots = unit.getAbility("Double Shot") || unit.getAbility("Crafted Double Shot") ? 2 : 1;
     const forcedTargetId = liveForcedTargetId(unit, context);
     for (let x = 0; x < settings.getGridSize(); x += 1) {
         for (let y = 0; y < settings.getGridSize(); y += 1) {
@@ -808,6 +838,22 @@ function findIndependentAreaThrowOption(
                         physicalDamageCanLand(unit, target, true, context),
                 );
             if (!enemy) continue;
+            const targetPosition = getPositionForCell(
+                projected,
+                settings.getMinX(),
+                settings.getStep(),
+                settings.getHalfStep(),
+            );
+            const divisor = attackHandler.getRangeAttackDivisor(unit, targetPosition);
+            const damage = evaluateRangeCandidateDamage(
+                unit,
+                context,
+                { affectedUnits: affected, rangeAttackDivisors: affected.map(() => divisor) },
+                primary.getId(),
+                shots,
+                true,
+            );
+            if (!(damage.value > 0)) continue;
             const actions: GameAction[] = [
                 ...prefix,
                 { type: "area_throw_attack", attackerId: unit.getId(), targetCell: { ...targetCell } },
@@ -866,19 +912,25 @@ const canTargetOffensiveSpell = (caster: Unit, target: Unit, spell: Spell, conte
     );
 };
 
-const ringOfFireHasEnemyVictim = (caster: Unit, target: Unit, spell: Spell, context: IDecisionContext): boolean => {
+const ringOfFireNetDamage = (
+    caster: Unit,
+    target: Unit,
+    spell: Spell,
+    context: IDecisionContext,
+): number | undefined => {
     const cells = getCellsAroundFootprint(
         context.grid.getSettings(),
         target.isSmallSize() ? [target.getBaseCell()] : target.getCells(),
     );
-    return (evaluateAffectedUnits(cells, context.unitsHolder, context.grid)?.[0] ?? []).some(
-        (victim) =>
-            victim.getId() !== caster.getId() &&
-            victim.getId() !== target.getId() &&
-            victim.getTeam() !== caster.getTeam() &&
-            !victim.isDead() &&
-            spellDamage(caster, spell, victim) > 0,
+    const caught = (evaluateAffectedUnits(cells, context.unitsHolder, context.grid)?.[0] ?? []).filter(
+        (victim) => !victim.isDead() && victim.getId() !== caster.getId() && victim.getId() !== target.getId(),
     );
+    if (!caught.length) return undefined;
+    const enemyTeam = caster.getTeam() === LOWER ? UPPER : LOWER;
+    return caught.reduce((value, victim) => {
+        const damage = Math.min(spellDamage(caster, spell, victim), victim.getCumulativeHp());
+        return value + (victim.getTeam() === enemyTeam ? damage : -damage);
+    }, 0);
 };
 
 function findMeteorOption(
@@ -943,11 +995,10 @@ function findIndependentSpellOption(
             for (const target of context.unitsHolder
                 .getAllEnemyUnits(unit.getTeam())
                 .sort((left, right) => left.getId().localeCompare(right.getId()))) {
-                if (
-                    !canTargetOffensiveSpell(unit, target, spell, context) ||
-                    spellDamage(unit, spell, target) <= 0 ||
-                    (spell.getName() === "Ring of Fire" && !ringOfFireHasEnemyVictim(unit, target, spell, context))
-                ) {
+                if (!canTargetOffensiveSpell(unit, target, spell, context)) continue;
+                if (spell.getName() === "Ring of Fire") {
+                    if ((ringOfFireNetDamage(unit, target, spell, context) ?? 0) <= 0) continue;
+                } else if (spellDamage(unit, spell, target) <= 0) {
                     continue;
                 }
                 const actions: GameAction[] = [
@@ -1023,16 +1074,24 @@ export function findIndependentV08BlockCenterDirectOption(
     );
 }
 
-const isCatalogDirectCandidate = (candidate: IEnumeratedCandidate): boolean => {
-    if (
-        candidate.actions.some(
-            (action) =>
-                action.type === "melee_attack" || action.type === "range_attack" || action.type === "area_throw_attack",
-        )
-    ) {
-        return true;
-    }
-    return candidate.actions.some((action) => action.type === "cast_spell") && candidate.features.expectedDamage > 0;
+const hasConcreteCatalogDamageEstimate = (candidate: IEnumeratedCandidate): boolean =>
+    candidate.kind !== "incumbent" ||
+    candidate.targetId !== undefined ||
+    candidate.pressureTargetId !== undefined ||
+    candidate.shotFeatures !== undefined;
+
+const isKnownNonPositiveCatalogDamage = (candidate: IEnumeratedCandidate): boolean =>
+    hasConcreteCatalogDamageEstimate(candidate) &&
+    Number.isFinite(candidate.features.expectedDamage) &&
+    candidate.features.expectedDamage <= 0;
+
+const isCatalogDirectCandidate = (unit: Unit, candidate: IEnumeratedCandidate): boolean => {
+    const physical = candidate.actions.some(
+        (action) =>
+            action.type === "melee_attack" || action.type === "range_attack" || action.type === "area_throw_attack",
+    );
+    if (physical) return !isKnownNonPositiveCatalogDamage(candidate);
+    return selectV08DamageSpellCandidate(unit, [candidate]) === candidate;
 };
 
 function sharedCatalogDirectCandidates(
@@ -1049,7 +1108,7 @@ function sharedCatalogDirectCandidates(
         set,
         direct: set.candidates.filter(
             (candidate) =>
-                isCatalogDirectCandidate(candidate) && preservesRole(intents, unit, context, candidate.actions),
+                isCatalogDirectCandidate(unit, candidate) && preservesRole(intents, unit, context, candidate.actions),
         ),
     };
 }
@@ -1305,10 +1364,10 @@ export class V08BlockCenterActionAuditor {
             }
             return pass;
         };
+        const catalog = sharedCatalogDirectCandidates(unit, context, observation.incumbent, intents);
         const independent = findIndependentV08BlockCenterDirectOption(unit, context, (option) =>
             probeOption("oracle", option),
         );
-        const catalog = sharedCatalogDirectCandidates(unit, context, observation.incumbent, intents);
         let catalogOption: IV08BlockCenterDirectOption | undefined;
         for (const candidate of catalog.direct) {
             const option = catalogCandidateAsDirectOption(candidate);

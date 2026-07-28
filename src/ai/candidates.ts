@@ -168,6 +168,151 @@ export interface IShotCandidateFeatures {
     targetFocusFire: number;
 }
 
+export interface IRangeCandidateDamage {
+    value: number;
+    kill: 0 | 1;
+    enemyDamage: number;
+    friendlyFireDamage: number;
+    primaryTargetDamage: number;
+    aimTargetDamage: number;
+}
+
+/**
+ * Deterministic expected net damage for one authoritative ranged-ray evaluation. Candidate enumeration and
+ * independent action qualification share this exact calculation so an engine-valid AOE with greater allied
+ * splash is never mislabeled as productive merely because its primary enemy takes damage.
+ */
+export function evaluateRangeCandidateDamage(
+    unit: Unit,
+    context: IDecisionContext,
+    evaluation: { affectedUnits: Array<Unit[]>; rangeAttackDivisors: number[] },
+    primaryTargetId: string | undefined,
+    shots: number,
+    isAOE: boolean,
+    aimTargetId = primaryTargetId,
+    attackerAmountAlive = unit.getAmountAlive(),
+): IRangeCandidateDamage {
+    let value = 0;
+    let kill: 0 | 1 = 0;
+    let enemyDamage = 0;
+    let friendlyFireDamage = 0;
+    let primaryTargetDamage = 0;
+    let aimTargetDamage = 0;
+    const counted = new Set<string>();
+    const fightProperties = context.fightProperties;
+    const attackerAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(unit.getTeam()) ?? 0;
+    // Through Shot owns the ranged attack outright when active; Large Caliber / Area Throw use the
+    // separate splash tail. Both are physical AOE for damage purposes, but only the latter applies
+    // Broken Aegis' incoming-damage reduction. Keep this order identical to the authoritative handlers:
+    // ability (and Paralysis), Giant's Maul, target-specific Aegis where applicable, then status resist.
+    const throughShotAbility = unit.getAbility("Through Shot");
+    const aoeAbility =
+        !throughShotAbility && isAOE ? (unit.getAbility("Area Throw") ?? unit.getAbility("Large Caliber")) : undefined;
+    const specialAbility = throughShotAbility ?? aoeAbility;
+    const isPhysicalAoe = !!throughShotAbility || !!aoeAbility;
+    let sharedAbilityMultiplier = specialAbility
+        ? unit.calculateAbilityMultiplier(specialAbility, attackerAbilityPower)
+        : 1;
+    const paralysis = unit.getEffect("Paralysis");
+    if (paralysis) {
+        sharedAbilityMultiplier *= (100 - paralysis.getPower()) / 100;
+    }
+    const giantsMaul = isPhysicalAoe ? unit.getBuff("Giants Maul") : undefined;
+    const doubleShotAbility =
+        shots > 1 ? (unit.getAbility("Double Shot") ?? unit.getAbility("Crafted Double Shot")) : undefined;
+    // Large Caliber / Area Throw's authoritative AOE tail repeats the same full splash when Double Shot
+    // exists. Ordinary and Through shots scale their second volley by the Double/Crafted ability and
+    // Dual Strike Charm. Through then folds that into its own stack-powered line multiplier.
+    const secondVolleyMultiplier = doubleShotAbility
+        ? aoeAbility
+            ? 1
+            : withDualStrikeCharm(unit.calculateAbilityMultiplier(doubleShotAbility, attackerAbilityPower), unit)
+        : 0;
+    // Only Through Shot traverses and damages every ray group. Ordinary attacks and Large Caliber resolve
+    // the first impact group; Large Caliber's group already contains its complete 3x3 splash. Counting later
+    // screened groups manufactures damage the engine never applies.
+    const groupCount = throughShotAbility
+        ? evaluation.affectedUnits.length
+        : Math.min(1, evaluation.affectedUnits.length);
+    for (let i = 0; i < groupCount; i += 1) {
+        const divisor = evaluation.rangeAttackDivisors[i] ?? 1;
+        for (const target of evaluation.affectedUnits[i]) {
+            if (counted.has(target.getId())) {
+                continue;
+            }
+            counted.add(target.getId());
+            const minRaw = unit.calculateAttackDamageMin(
+                unit.getAttack(),
+                target,
+                true,
+                attackerAbilityPower,
+                divisor,
+                1,
+                attackerAmountAlive,
+            );
+            const maxRaw = unit.calculateAttackDamageMax(
+                unit.getAttack(),
+                target,
+                true,
+                attackerAbilityPower,
+                divisor,
+                1,
+                attackerAmountAlive,
+            );
+            const applyEngineVolleyModifiers = (rawDamage: number, volleyMultiplier = 1): number => {
+                let adjusted = Math.floor(rawDamage * sharedAbilityMultiplier * volleyMultiplier);
+                if (isPhysicalAoe) {
+                    if (giantsMaul) {
+                        adjusted = Math.floor(adjusted * (1 + giantsMaul.getPower() / 100));
+                    }
+                    if (aoeAbility) {
+                        const brokenAegis = target.getBuff("Broken Aegis");
+                        if (brokenAegis) {
+                            adjusted = Math.floor(adjusted * (1 - brokenAegis.getPower() / 100));
+                        }
+                    }
+                    adjusted = Math.floor(adjusted * target.getPhysicalAoeDamageMultiplier());
+                }
+                return adjusted;
+            };
+            const firstMin = applyEngineVolleyModifiers(minRaw);
+            const firstMax = applyEngineVolleyModifiers(maxRaw);
+            const secondMin = secondVolleyMultiplier ? applyEngineVolleyModifiers(minRaw, secondVolleyMultiplier) : 0;
+            const secondMax = secondVolleyMultiplier ? applyEngineVolleyModifiers(maxRaw, secondVolleyMultiplier) : 0;
+            const hp = target.getCumulativeHp();
+            const firstConditionalDamage = (firstMin + firstMax) / 2;
+            const secondConditionalDamage = (secondMin + secondMax) / 2;
+            const defenderAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(target.getTeam()) ?? 0;
+            const hitChance =
+                1 - Math.min(100, Math.max(0, unit.calculateMissChance(target, defenderAbilityPower))) / 100;
+            const missChance = 1 - hitChance;
+            const effective =
+                secondVolleyMultiplier > 0
+                    ? hitChance * missChance * Math.min(firstConditionalDamage, hp) +
+                      missChance * hitChance * Math.min(secondConditionalDamage, hp) +
+                      hitChance * hitChance * Math.min(firstConditionalDamage + secondConditionalDamage, hp)
+                    : hitChance * Math.min(firstConditionalDamage, hp);
+            if (target.getTeam() === otherTeam(unit.getTeam())) {
+                value += effective;
+                enemyDamage += effective;
+                if (primaryTargetId && target.getId() === primaryTargetId && effective >= hp) {
+                    kill = 1;
+                }
+                if (primaryTargetId && target.getId() === primaryTargetId) {
+                    primaryTargetDamage = effective;
+                }
+                if (aimTargetId && target.getId() === aimTargetId) {
+                    aimTargetDamage = effective;
+                }
+            } else {
+                value -= effective;
+                friendlyFireDamage += effective;
+            }
+        }
+    }
+    return { value, kill, enemyDamage, friendlyFireDamage, primaryTargetDamage, aimTargetDamage };
+}
+
 export interface IEnumeratedCandidate {
     kind: CandidateKind;
     /** Ordered engine actions implementing the candidate (same convention as IAIStrategy.decideTurn). */
@@ -1008,12 +1153,7 @@ class CandidateGenerator {
     ): void {
         const isThroughShot = this.unit.hasAbilityActive("Through Shot");
         const isLargeCaliber = this.unit.hasAbilityActive("Large Caliber");
-        if (
-            !this.options.enrichIncumbentMetadata ||
-            this.unit.hasAbilityActive("Sniper") ||
-            this.unit.hasAbilityActive("Area Throw") ||
-            !this.unit.canMove()
-        ) {
+        if (!this.options.enrichIncumbentMetadata || this.unit.hasAbilityActive("Area Throw") || !this.unit.canMove()) {
             return;
         }
         const incumbent = this.candidates[0];
@@ -1196,144 +1336,17 @@ class CandidateGenerator {
         isAOE: boolean,
         aimTargetId = primaryTargetId,
         attackerAmountAlive = this.unit.getAmountAlive(),
-    ): {
-        value: number;
-        kill: 0 | 1;
-        enemyDamage: number;
-        friendlyFireDamage: number;
-        primaryTargetDamage: number;
-        aimTargetDamage: number;
-    } {
-        let value = 0;
-        let kill: 0 | 1 = 0;
-        let enemyDamage = 0;
-        let friendlyFireDamage = 0;
-        let primaryTargetDamage = 0;
-        let aimTargetDamage = 0;
-        const counted = new Set<string>();
-        const fightProperties = this.context.fightProperties;
-        const attackerAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(this.unit.getTeam()) ?? 0;
-        // Through Shot owns the ranged attack outright when active; Large Caliber / Area Throw use the
-        // separate splash tail. Both are physical AOE for damage purposes, but only the latter applies
-        // Broken Aegis' incoming-damage reduction. Keep this order identical to the authoritative handlers:
-        // ability (and Paralysis), Giant's Maul, target-specific Aegis where applicable, then status resist.
-        const throughShotAbility = this.unit.getAbility("Through Shot");
-        const aoeAbility =
-            !throughShotAbility && isAOE
-                ? (this.unit.getAbility("Area Throw") ?? this.unit.getAbility("Large Caliber"))
-                : undefined;
-        const specialAbility = throughShotAbility ?? aoeAbility;
-        const isPhysicalAoe = !!throughShotAbility || !!aoeAbility;
-        let sharedAbilityMultiplier = specialAbility
-            ? this.unit.calculateAbilityMultiplier(specialAbility, attackerAbilityPower)
-            : 1;
-        const paralysis = this.unit.getEffect("Paralysis");
-        if (paralysis) {
-            sharedAbilityMultiplier *= (100 - paralysis.getPower()) / 100;
-        }
-        const giantsMaul = isPhysicalAoe ? this.unit.getBuff("Giants Maul") : undefined;
-        const doubleShotAbility =
-            shots > 1
-                ? (this.unit.getAbility("Double Shot") ?? this.unit.getAbility("Crafted Double Shot"))
-                : undefined;
-        // Large Caliber / Area Throw's authoritative AOE tail repeats the same full splash when Double Shot
-        // exists. Ordinary and Through shots scale their second volley by the Double/Crafted ability and
-        // Dual Strike Charm. Through then folds that into its own stack-powered line multiplier.
-        const secondVolleyMultiplier = doubleShotAbility
-            ? aoeAbility
-                ? 1
-                : withDualStrikeCharm(
-                      this.unit.calculateAbilityMultiplier(doubleShotAbility, attackerAbilityPower),
-                      this.unit,
-                  )
-            : 0;
-        // Only Through Shot traverses and damages every ray group. Ordinary attacks and Large Caliber resolve
-        // the first impact group; Large Caliber's group already contains its complete 3x3 splash. Counting later
-        // screened groups manufactures damage the engine never applies.
-        const groupCount = throughShotAbility
-            ? evaluation.affectedUnits.length
-            : Math.min(1, evaluation.affectedUnits.length);
-        for (let i = 0; i < groupCount; i += 1) {
-            const divisor = evaluation.rangeAttackDivisors[i] ?? 1;
-            for (const target of evaluation.affectedUnits[i]) {
-                if (counted.has(target.getId())) {
-                    continue;
-                }
-                counted.add(target.getId());
-                const minRaw = this.unit.calculateAttackDamageMin(
-                    this.unit.getAttack(),
-                    target,
-                    true,
-                    attackerAbilityPower,
-                    divisor,
-                    1,
-                    attackerAmountAlive,
-                );
-                const maxRaw = this.unit.calculateAttackDamageMax(
-                    this.unit.getAttack(),
-                    target,
-                    true,
-                    attackerAbilityPower,
-                    divisor,
-                    1,
-                    attackerAmountAlive,
-                );
-                const applyEngineVolleyModifiers = (rawDamage: number, volleyMultiplier = 1): number => {
-                    let adjusted = Math.floor(rawDamage * sharedAbilityMultiplier * volleyMultiplier);
-                    if (isPhysicalAoe) {
-                        if (giantsMaul) {
-                            adjusted = Math.floor(adjusted * (1 + giantsMaul.getPower() / 100));
-                        }
-                        if (aoeAbility) {
-                            const brokenAegis = target.getBuff("Broken Aegis");
-                            if (brokenAegis) {
-                                adjusted = Math.floor(adjusted * (1 - brokenAegis.getPower() / 100));
-                            }
-                        }
-                        adjusted = Math.floor(adjusted * target.getPhysicalAoeDamageMultiplier());
-                    }
-                    return adjusted;
-                };
-                const firstMin = applyEngineVolleyModifiers(minRaw);
-                const firstMax = applyEngineVolleyModifiers(maxRaw);
-                const secondMin = secondVolleyMultiplier
-                    ? applyEngineVolleyModifiers(minRaw, secondVolleyMultiplier)
-                    : 0;
-                const secondMax = secondVolleyMultiplier
-                    ? applyEngineVolleyModifiers(maxRaw, secondVolleyMultiplier)
-                    : 0;
-                const hp = target.getCumulativeHp();
-                const firstConditionalDamage = (firstMin + firstMax) / 2;
-                const secondConditionalDamage = (secondMin + secondMax) / 2;
-                const defenderAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(target.getTeam()) ?? 0;
-                const hitChance =
-                    1 - Math.min(100, Math.max(0, this.unit.calculateMissChance(target, defenderAbilityPower))) / 100;
-                const missChance = 1 - hitChance;
-                const effective =
-                    secondVolleyMultiplier > 0
-                        ? hitChance * missChance * Math.min(firstConditionalDamage, hp) +
-                          missChance * hitChance * Math.min(secondConditionalDamage, hp) +
-                          hitChance * hitChance * Math.min(firstConditionalDamage + secondConditionalDamage, hp)
-                        : hitChance * Math.min(firstConditionalDamage, hp);
-                if (target.getTeam() === this.enemyTeam) {
-                    value += effective;
-                    enemyDamage += effective;
-                    if (primaryTargetId && target.getId() === primaryTargetId && effective >= hp) {
-                        kill = 1;
-                    }
-                    if (primaryTargetId && target.getId() === primaryTargetId) {
-                        primaryTargetDamage = effective;
-                    }
-                    if (aimTargetId && target.getId() === aimTargetId) {
-                        aimTargetDamage = effective;
-                    }
-                } else {
-                    value -= effective;
-                    friendlyFireDamage += effective;
-                }
-            }
-        }
-        return { value, kill, enemyDamage, friendlyFireDamage, primaryTargetDamage, aimTargetDamage };
+    ): IRangeCandidateDamage {
+        return evaluateRangeCandidateDamage(
+            this.unit,
+            this.context,
+            evaluation,
+            primaryTargetId,
+            shots,
+            isAOE,
+            aimTargetId,
+            attackerAmountAlive,
+        );
     }
     /** Target-local signals already used by v0.5's shot scorer, exposed without changing that scorer. */
     private shotFeatures(

@@ -1020,6 +1020,160 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(calls[0]).toEqual({ mode: "leaf", kinds: ["shot"] });
     });
 
+    it("keeps urgent positive-damage spells ahead of movement in scored and bounded fallback paths", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8s",
+            SEARCH_GATE: "1",
+            SEARCH_SHORTLIST: "2",
+        });
+        const harness = buildBattle(924, "v0.8s", undefined, [
+            { faction: "Life", creatureName: "Battle Mage", level: 2, size: 1, amount: 20 },
+            { faction: "Life", creatureName: "Squire", level: 1, size: 1, amount: 50 },
+        ]);
+        const unit = harness.unitsHolder
+            .getAllAllies(GREEN_TEAM)
+            .find((candidate) => candidate.getName() === "Battle Mage")!;
+        harness.setActiveUnitId(unit.getId());
+        const id = unit.getId();
+        const incumbentMove: GameAction[] = [{ type: "move_unit", unitId: id, path: [{ x: 3, y: 4 }] }];
+        const challengerMove: GameAction[] = [{ type: "move_unit", unitId: id, path: [{ x: 4, y: 4 }] }];
+        const meteorite: GameAction[] = [{ type: "cast_spell", casterId: id, spellName: "Meteorite" }];
+        const candidates = [
+            { kind: "incumbent", actions: incumbentMove },
+            { kind: "move", actions: challengerMove },
+            {
+                kind: "spell",
+                actions: meteorite,
+                features: { expectedDamage: 82, expectedKill: 0 },
+            },
+        ] as unknown as IEnumeratedCandidate[];
+        const calls: Array<{ mode: string; kinds: string[] }> = [];
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                mode: string,
+            ): number[];
+            search(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+                productiveFallback?: IEnumeratedCandidate,
+                prioritizeDominantFinish?: boolean,
+                aggressiveWaitComparison?: boolean,
+                prioritizeV08STargetPressure?: boolean,
+                prioritizeV08SUrgency?: boolean,
+            ): GameAction[];
+            firstEngineValidProductiveCandidate(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seed: number,
+                prioritizeDominantFinish?: boolean,
+                prioritizeV08STargetPressure?: boolean,
+                prioritizeV08SUrgency?: boolean,
+            ): IEnumeratedCandidate | undefined;
+        };
+        driver.scoreCandidates = (_unit, scored, _seed, mode) => {
+            calls.push({ mode, kinds: scored.map(({ kind }) => kind) });
+            return scored.map(({ kind }) => (kind === "move" ? 0.99 : kind === "spell" ? 0.01 : 0.9));
+        };
+
+        expect(
+            driver.search(
+                unit,
+                candidates,
+                incumbentMove,
+                123,
+                performance.now(),
+                false,
+                undefined,
+                false,
+                false,
+                true,
+                true,
+            ),
+        ).toEqual(meteorite);
+        expect(calls).toEqual([
+            { mode: "leaf", kinds: ["incumbent", "move", "spell"] },
+            { mode: "turns", kinds: ["incumbent", "spell"] },
+        ]);
+
+        calls.length = 0;
+        expect(driver.firstEngineValidProductiveCandidate(unit, candidates, 123, false, true, true)).toBe(
+            candidates[2],
+        );
+        expect(calls).toEqual([{ mode: "leaf", kinds: ["spell"] }]);
+
+        calls.length = 0;
+        const nativeSpellCandidates = [
+            { ...candidates[2], kind: "incumbent" },
+            candidates[1],
+        ] as IEnumeratedCandidate[];
+        expect(
+            driver.search(
+                unit,
+                nativeSpellCandidates,
+                meteorite,
+                123,
+                performance.now(),
+                false,
+                undefined,
+                false,
+                false,
+                true,
+                true,
+            ),
+        ).toEqual(meteorite);
+        expect(driver.firstEngineValidProductiveCandidate(unit, nativeSpellCandidates, 123, false, true, true)).toBe(
+            nativeSpellCandidates[0],
+        );
+
+        const smokeHarness = buildBattle(925, "v0.8s", undefined, [
+            { faction: "Chaos", creatureName: "Ash Moth", level: 1, size: 1, amount: 50 },
+            { faction: "Life", creatureName: "Squire", level: 1, size: 1, amount: 50 },
+        ]);
+        const smokeCaster = smokeHarness.unitsHolder
+            .getAllAllies(GREEN_TEAM)
+            .find((candidate) => candidate.getName() === "Ash Moth")!;
+        smokeHarness.setActiveUnitId(smokeCaster.getId());
+        const smoke: IEnumeratedCandidate = {
+            kind: "incumbent",
+            actions: [{ type: "cast_spell", casterId: smokeCaster.getId(), spellName: "Smoke" }],
+            features: { expectedDamage: 120, expectedKill: 0 },
+        } as IEnumeratedCandidate;
+        const smokeMove: IEnumeratedCandidate = {
+            kind: "move",
+            actions: [{ type: "move_unit", unitId: smokeCaster.getId(), path: [{ x: 4, y: 4 }] }],
+        } as IEnumeratedCandidate;
+        const smokeDriver = smokeHarness.makeDriver() as unknown as typeof driver;
+        smokeDriver.scoreCandidates = (_unit, scored, _seed, mode) => {
+            return scored.map(({ kind }) => (kind === "incumbent" ? 0.99 : mode === "leaf" ? 0.1 : 0.01));
+        };
+        expect(
+            smokeDriver.search(
+                smokeCaster,
+                [smoke, smokeMove],
+                smoke.actions,
+                123,
+                performance.now(),
+                false,
+                undefined,
+                false,
+                false,
+                true,
+                true,
+            ),
+        ).toEqual(smokeMove.actions);
+        expect(
+            smokeDriver.firstEngineValidProductiveCandidate(smokeCaster, [smoke, smokeMove], 123, false, true, true),
+        ).toBe(smokeMove);
+    });
+
     it("scopes the dominant-finish window to v0.8 while leaving v0.7 search unchanged", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.7", SEARCH_INCLUDE_MOVES: "1" });
         const harness = buildBattle(93, "v0.8s");

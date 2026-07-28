@@ -28,6 +28,7 @@ import {
 } from "../ai/versions/wait_scorer";
 import {
     isV08StrongerRangedPostureWait,
+    selectV08DamageSpellCandidate,
     selectV08DirectCombatCandidate,
     selectV08VineThrowCandidate,
     v08TeamRangedOutput,
@@ -420,6 +421,58 @@ function isPositiveDirectCombatCandidate(candidate: Pick<IEnumeratedCandidate, "
         Number.isFinite(candidate.features?.expectedDamage) &&
         (candidate.features?.expectedDamage ?? 0) > 0
     );
+}
+
+function isPositiveV08DamageSpellCandidate(unit: Unit, candidate: IEnumeratedCandidate): boolean {
+    if (
+        !candidate.actions.some((action) => action.type === "cast_spell") ||
+        !Number.isFinite(candidate.features?.expectedDamage) ||
+        (candidate.features?.expectedDamage ?? 0) <= 0
+    ) {
+        return false;
+    }
+    return selectV08DamageSpellCandidate(unit, [candidate]) === candidate;
+}
+
+function isPositiveV08UrgentDamageCandidate(unit: Unit, candidate: IEnumeratedCandidate): boolean {
+    return isPositiveDirectCombatCandidate(candidate) || isPositiveV08DamageSpellCandidate(unit, candidate);
+}
+
+/**
+ * The final sprint keeps physical target-pressure scheduling authoritative. If no schedulable physical
+ * delivery exists, retain any positive physical hit whose exact target metadata is incomplete, then spend the
+ * strongest immediately damaging spell. This is an urgent eligibility order, not a general spell-vs-attack
+ * value policy: the native v0.8 router has already made that broader finite-charge decision.
+ */
+function selectV08UrgentDamageCandidate(
+    unit: Unit,
+    unitsHolder: ILookaheadDeps["unitsHolder"],
+    candidates: readonly IEnumeratedCandidate[],
+    currentLap: number,
+): IEnumeratedCandidate | undefined {
+    const physical = candidates.filter(isPositiveDirectCombatCandidate);
+    const pressured = selectV08STargetPressureCandidate(unit, unitsHolder, physical, currentLap);
+    if (pressured) return pressured;
+
+    let fallbackPhysical: IEnumeratedCandidate | undefined;
+    for (const candidate of physical) {
+        const candidateMoves = candidate.actions.some((action) => action.type === "move_unit");
+        const fallbackMoves = fallbackPhysical?.actions.some((action) => action.type === "move_unit") ?? false;
+        if (
+            !fallbackPhysical ||
+            candidate.features.expectedKill > fallbackPhysical.features.expectedKill ||
+            (candidate.features.expectedKill === fallbackPhysical.features.expectedKill &&
+                (candidate.features.expectedDamage > fallbackPhysical.features.expectedDamage ||
+                    (candidate.features.expectedDamage === fallbackPhysical.features.expectedDamage &&
+                        fallbackMoves &&
+                        !candidateMoves)))
+        ) {
+            fallbackPhysical = candidate;
+        }
+    }
+    if (fallbackPhysical) return fallbackPhysical;
+
+    return selectV08DamageSpellCandidate(unit, candidates);
 }
 
 /** Productive work that a forced active tier may choose without turning self-damage or a miss into progress. */
@@ -2795,6 +2848,11 @@ export class SearchDriver {
             const legalDirectCombatIndices = legalProductiveIndices.filter((index) =>
                 isDirectCombatCandidate(scoredCandidates[index]),
             );
+            const legalUrgentDamageIndices = prioritizeV08SUrgency
+                ? legalProductiveIndices.filter((index) =>
+                      isPositiveV08UrgentDamageCandidate(unit, scoredCandidates[index]),
+                  )
+                : [];
             const legalAdvanceIndices = legalProductiveIndices.filter((index) =>
                 isPureMoveCandidate(scoredCandidates[index]),
             );
@@ -2812,6 +2870,17 @@ export class SearchDriver {
             );
             const preferredV08STargetIndex = preferredV08STarget ? scoredCandidates.indexOf(preferredV08STarget) : -1;
             hasPreferredV08STarget = preferredV08STargetIndex >= 0;
+            const preferredUrgentDamage = prioritizeV08SUrgency
+                ? selectV08UrgentDamageCandidate(
+                      unit,
+                      this.deps.unitsHolder,
+                      legalUrgentDamageIndices.map((index) => scoredCandidates[index]),
+                      this.deps.fightProperties.getCurrentLap(),
+                  )
+                : undefined;
+            const preferredUrgentDamageIndex = preferredUrgentDamage
+                ? scoredCandidates.indexOf(preferredUrgentDamage)
+                : -1;
             const dominantFinishIndices =
                 preferredFinishingAttackIndex >= 0
                     ? [preferredFinishingAttackIndex]
@@ -2819,25 +2888,27 @@ export class SearchDriver {
                       ? legalAdvanceIndices
                       : legalForceTierProductiveIndices;
             const selectionIndices =
-                prioritizeV08STargetPressure && preferredV08STargetIndex >= 0
-                    ? prioritizeV08SUrgency
-                        ? [preferredV08STargetIndex]
-                        : preferredV08STargetIndex === 0
-                          ? [0]
-                          : [0, preferredV08STargetIndex]
-                    : prioritizeV08SUrgency
-                      ? legalAdvanceIndices.length
-                          ? legalAdvanceIndices
+                prioritizeV08SUrgency && preferredUrgentDamageIndex >= 0
+                    ? [preferredUrgentDamageIndex]
+                    : prioritizeV08STargetPressure && preferredV08STargetIndex >= 0
+                      ? prioritizeV08SUrgency
+                          ? [preferredV08STargetIndex]
+                          : preferredV08STargetIndex === 0
+                            ? [0]
+                            : [0, preferredV08STargetIndex]
+                      : prioritizeV08SUrgency
+                        ? legalAdvanceIndices.length
+                            ? legalAdvanceIndices
+                            : prioritizeProductiveActions && legalForceTierProductiveIndices.length
+                              ? legalForceTierProductiveIndices
+                              : [0]
+                        : prioritizeDominantFinish && dominantFinishIndices.length
+                          ? dominantFinishIndices
                           : prioritizeProductiveActions && legalForceTierProductiveIndices.length
                             ? legalForceTierProductiveIndices
-                            : [0]
-                      : prioritizeDominantFinish && dominantFinishIndices.length
-                        ? dominantFinishIndices
-                        : prioritizeProductiveActions && legalForceTierProductiveIndices.length
-                          ? legalForceTierProductiveIndices
-                          : aggressiveWaitComparison
-                            ? [0, ...legalProductiveIndices.filter((index) => index > 0)]
-                            : scoredCandidates.map((_candidate, index) => index);
+                            : aggressiveWaitComparison
+                              ? [0, ...legalProductiveIndices.filter((index) => index > 0)]
+                              : scoredCandidates.map((_candidate, index) => index);
             bestIdx = selectionIndices[0];
             for (const index of selectionIndices) {
                 if (
@@ -3111,6 +3182,23 @@ export class SearchDriver {
         const forceTierProductiveCandidates = productiveCandidates.filter(isForceTierProductiveCandidate);
         const directCombatCandidates = productiveCandidates.filter(isDirectCombatCandidate);
         const forceTierDirectCombatCandidates = directCombatCandidates.filter(isPositiveDirectCombatCandidate);
+        const urgentDamageCandidates = prioritizeV08SUrgency
+            ? productiveCandidates.filter((candidate) => isPositiveV08UrgentDamageCandidate(unit, candidate))
+            : [];
+        const preferredUrgentDamage = prioritizeV08SUrgency
+            ? selectV08UrgentDamageCandidate(
+                  unit,
+                  this.deps.unitsHolder,
+                  urgentDamageCandidates,
+                  this.deps.fightProperties.getCurrentLap(),
+              )
+            : undefined;
+        const orderedUrgentDamage = preferredUrgentDamage
+            ? [
+                  preferredUrgentDamage,
+                  ...urgentDamageCandidates.filter((candidate) => candidate !== preferredUrgentDamage),
+              ]
+            : urgentDamageCandidates;
         const preferredV08STarget = selectV08STargetPressureCandidate(
             unit,
             this.deps.unitsHolder,
@@ -3133,13 +3221,16 @@ export class SearchDriver {
         const orderedCandidates = prioritizeV08STargetPressure
             ? prioritizeV08SUrgency
                 ? [
-                      ...orderedV08SDirectCombat,
+                      ...orderedUrgentDamage,
                       ...productiveCandidates.filter(
-                          (candidate) => !isDirectCombatCandidate(candidate) && isPureMoveCandidate(candidate),
+                          (candidate) =>
+                              !isPositiveV08UrgentDamageCandidate(unit, candidate) && isPureMoveCandidate(candidate),
                       ),
                       ...(prioritizeProductiveActions
-                          ? productiveCandidates.filter(
-                                (candidate) => !isDirectCombatCandidate(candidate) && !isPureMoveCandidate(candidate),
+                          ? forceTierProductiveCandidates.filter(
+                                (candidate) =>
+                                    !isPositiveV08UrgentDamageCandidate(unit, candidate) &&
+                                    !isPureMoveCandidate(candidate),
                             )
                           : []),
                   ]
@@ -3216,6 +3307,24 @@ export class SearchDriver {
         const v08sDirectCombat = prioritizeV08STargetPressure
             ? rankedChallengers.filter(({ index }) => isPositiveDirectCombatCandidate(candidates[index]))
             : [];
+        const v08sUrgentDamage = prioritizeV08SUrgency
+            ? rankedChallengers.filter(({ index }) => isPositiveV08UrgentDamageCandidate(unit, candidates[index]))
+            : [];
+        const preferredUrgentDamage = prioritizeV08SUrgency
+            ? selectV08UrgentDamageCandidate(
+                  unit,
+                  this.deps.unitsHolder,
+                  v08sUrgentDamage.map(({ index }) => candidates[index]),
+                  this.deps.fightProperties.getCurrentLap(),
+              )
+            : undefined;
+        if (preferredUrgentDamage) {
+            v08sUrgentDamage.sort((left, right) => {
+                const leftPreferred = candidates[left.index] === preferredUrgentDamage;
+                const rightPreferred = candidates[right.index] === preferredUrgentDamage;
+                return leftPreferred === rightPreferred ? 0 : leftPreferred ? -1 : 1;
+            });
+        }
         const preferredV08STarget = selectV08STargetPressureCandidate(
             unit,
             this.deps.unitsHolder,
@@ -3249,28 +3358,35 @@ export class SearchDriver {
             prioritizeProductiveActions || prioritizeDominantFinish
                 ? rankedChallengers.filter(({ index }) => isForceTierProductiveCandidate(candidates[index]))
                 : [];
-        const ordered = v08sDirectCombat.length
+        const ordered = v08sUrgentDamage.length
             ? [
-                  ...v08sDirectCombat,
-                  ...rankedChallengers.filter(({ index }) => !isDirectCombatCandidate(candidates[index])),
+                  ...v08sUrgentDamage,
+                  ...rankedChallengers.filter(
+                      ({ index }) => !isPositiveV08UrgentDamageCandidate(unit, candidates[index]),
+                  ),
               ]
-            : v08sAdvances.length
-              ? [...v08sAdvances, ...rankedChallengers.filter(({ index }) => !isPureMoveCandidate(candidates[index]))]
-              : directCombat.length
-                ? [
-                      ...directCombat,
-                      ...rankedChallengers.filter(({ index }) => !isDirectCombatCandidate(candidates[index])),
-                  ]
-                : advances.length
-                  ? [...advances, ...rankedChallengers.filter(({ index }) => !isPureMoveCandidate(candidates[index]))]
-                  : forceTierProductive.length
-                    ? [
-                          ...forceTierProductive,
-                          ...rankedChallengers.filter(
-                              ({ index }) => !isForceTierProductiveCandidate(candidates[index]),
-                          ),
-                      ]
-                    : rankedChallengers;
+            : v08sDirectCombat.length
+              ? [
+                    ...v08sDirectCombat,
+                    ...rankedChallengers.filter(({ index }) => !isDirectCombatCandidate(candidates[index])),
+                ]
+              : v08sAdvances.length
+                ? [...v08sAdvances, ...rankedChallengers.filter(({ index }) => !isPureMoveCandidate(candidates[index]))]
+                : directCombat.length
+                  ? [
+                        ...directCombat,
+                        ...rankedChallengers.filter(({ index }) => !isDirectCombatCandidate(candidates[index])),
+                    ]
+                  : advances.length
+                    ? [...advances, ...rankedChallengers.filter(({ index }) => !isPureMoveCandidate(candidates[index]))]
+                    : forceTierProductive.length
+                      ? [
+                            ...forceTierProductive,
+                            ...rankedChallengers.filter(
+                                ({ index }) => !isForceTierProductiveCandidate(candidates[index]),
+                            ),
+                        ]
+                      : rankedChallengers;
         const challengers = ordered.slice(0, this.shortlist - 1).map(({ index }) => candidates[index]);
         // Vine Throw changes future path costs and applies a two-lap snare, neither of which an immediate leaf can
         // value reliably. Preserve the normal top-K challenger and add at most one best legal Vine candidate for

@@ -961,7 +961,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const engine = startActionEngine(live.c, live.shooter, live.context);
         expect(composite!.actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
 
-        for (const ability of ["Through Shot", "Large Caliber"]) {
+        for (const ability of ["Sniper", "Through Shot", "Large Caliber"]) {
             const special = fixture();
             const specialComposite = enumerateCandidates(special.shooter, special.context, endTurn(special.shooter), {
                 maxMoveShotComposites: 1,
