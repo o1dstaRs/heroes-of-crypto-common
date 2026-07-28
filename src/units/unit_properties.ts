@@ -152,6 +152,12 @@ export class UnitProperties {
     // which own the whole derivation and must keep running it.
     public armor_mod_authoritative?: boolean;
     public attack_mod_authoritative?: boolean;
+    // The movement twin, and the one with teeth: the ranked client computes its OWN reachable cells from
+    // getSteps() (= steps + steps_mod), which adjustBaseStats derives from Quagmire / Hamstrung / Vine Throw
+    // (debuffs) and Battle Roar / Swift Boots / Crown of Command / Movement Augment (buffs). With the
+    // combat-applied ones absent, a slowed unit was offered its FULL range (the server then rejected the
+    // move) and a Battle-Roared one was denied steps it legitimately had.
+    public steps_authoritative?: boolean;
     // The morale twin of luck_authoritative. A ranked snapshot's morale is the server's FINAL value: base
     // + synergy + artifact deltas (Cursed Ward / Crown of Command) + every gain and loss accumulated during
     // the fight. adjustBaseStats must therefore not rebuild it from initialUnitProperties, because the

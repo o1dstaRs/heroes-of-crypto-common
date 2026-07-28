@@ -1426,7 +1426,36 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * !canMove() branch of the attack-cell search) — it simply has nowhere to step.
      */
     public canMove(): boolean {
-        return !this.hasEffectActive("Paralysis") && !this.hasDebuffActive("Whirlpool") && !this.isWebMovementLocked();
+        return (
+            !this.hasStatusApplied("Paralysis") && !this.hasStatusApplied("Whirlpool") && !this.isWebMovementLocked()
+        );
+    }
+    /**
+     * True when the named debuff or effect is on this unit — from the OBJECT arrays (sandbox owns the whole
+     * derivation and fills them) OR from the authoritative DISPLAY list (ranked).
+     *
+     * A ranked client deliberately leaves `this.debuffs` / `this.effects` EMPTY: it seeds only the display
+     * strings, because rebuilding the objects would make adjustBaseStats double-apply stats that already
+     * arrive authoritative. The server folds applied_debuffs AND applied_effects into the snapshot's single
+     * debuff list, so the display array is the one place both are visible on that side.
+     *
+     * Any RULE that must hold identically on both sides — "can this unit move", "may it shoot", "is this a
+     * legal target" — has to ask this rather than hasEffectActive/hasDebuffActive, or it silently evaluates
+     * to false in ranked and the client offers actions the server then rejects.
+     */
+    public hasStatusApplied(name: string): boolean {
+        return (
+            this.hasEffectActive(name) ||
+            this.hasDebuffActive(name) ||
+            (this.unitProperties.applied_debuffs ?? []).includes(name)
+        );
+    }
+    /**
+     * The BUFF twin of hasStatusApplied. Same contract, reading the buff display list — which is the only
+     * place a ranked client sees a buff the server applied, since it leaves `this.buffs` empty on purpose.
+     */
+    public hasStatusBuffApplied(name: string): boolean {
+        return this.hasBuffActive(name) || (this.unitProperties.applied_buffs ?? []).includes(name);
     }
     public increaseAmountAlive(increaseBy: number): void {
         if ((!this.isDead() && this.isSummoned()) || (this.isDead() && !this.isSummoned())) {
@@ -2727,6 +2756,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const authoritativeAttackMod = this.unitProperties.attack_mod_authoritative
             ? this.unitProperties.attack_mod
             : undefined;
+        const authoritativeSteps = this.unitProperties.steps_authoritative
+            ? { steps: this.unitProperties.steps, mod: this.unitProperties.steps_mod }
+            : undefined;
 
         // target
         if (!this.hasEffectActive("Aggr")) {
@@ -3212,6 +3244,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.steps_mod + angelicHostBuff.getPower(),
                 2,
             );
+        }
+
+        // RANKED: the chain above reads Quagmire / Hamstrung / Vine Throw / Battle Roar / the boots from
+        // OBJECT arrays a ranked client does not carry, so it would hand back full base movement. Restore the
+        // server's pair — the client draws its own reachable cells from getSteps(), so this is what stops it
+        // offering moves the server rejects (and denying ones it would allow).
+        if (authoritativeSteps !== undefined) {
+            this.unitProperties.steps = authoritativeSteps.steps;
+            this.unitProperties.steps_mod = authoritativeSteps.mod;
         }
 
         // ATTACK

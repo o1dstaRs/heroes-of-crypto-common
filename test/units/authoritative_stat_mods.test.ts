@@ -65,6 +65,47 @@ describe("authoritative stat mods", () => {
         expect(props.attack_mod).toBe(0);
     });
 
+    // Movement is the one with teeth: the client draws its own reachable cells from getSteps(), so a slow
+    // that never arrives means it offers moves the server rejects, and a haste that never arrives means it
+    // hides moves the server would allow.
+    it("keeps an authoritative steps pair instead of re-deriving it from combat slows it cannot see", () => {
+        const unit = createTestUnit({ name: "Peasant", amountAlive: 5, maxHp: 100 });
+        const props = unit.getUnitProperties();
+        const baseSteps = unit.getSteps();
+        props.steps = 3;
+        props.steps_mod = 1;
+        props.steps_authoritative = true;
+
+        adjust(unit);
+
+        expect(props.steps).toBe(3);
+        expect(props.steps_mod).toBe(1);
+        expect(unit.getSteps()).toBe(4);
+        expect(unit.getSteps()).not.toBe(baseSteps);
+    });
+
+    it("still re-derives steps locally when they are not authoritative", () => {
+        const unit = createTestUnit({ name: "Peasant", amountAlive: 5, maxHp: 100 });
+        const baseSteps = unit.getSteps();
+        unit.getUnitProperties().steps = 99;
+
+        adjust(unit);
+
+        expect(unit.getSteps()).toBe(baseSteps);
+    });
+
+    // Paralysis and Whirlpool stop movement. Both are applied in COMBAT, so ranked carries them only in the
+    // display list — canMove() read the object arrays and answered "yes" for a unit the server had frozen.
+    it("honours Paralysis and Whirlpool from the authoritative display list", () => {
+        for (const status of ["Paralysis", "Whirlpool"]) {
+            const unit = createTestUnit({ name: "Peasant", amountAlive: 5, maxHp: 100 });
+            expect(unit.canMove()).toBe(true);
+            unit.getUnitProperties().applied_debuffs.push(status);
+            expect(unit.hasStatusApplied(status)).toBe(true);
+            expect(unit.canMove()).toBe(false);
+        }
+    });
+
     // End to end on the real ability: sandbox derives the same number the server would ship.
     it("agrees with the value a locally-applied Shatter Armor derives", () => {
         const log = new SceneLogMock();
