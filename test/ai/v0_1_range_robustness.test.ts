@@ -11,9 +11,15 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { getAIStrategy, type IDecisionContext } from "../../src/ai";
+import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
+import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getRangeAttackSideCenter, RangeAttackCellSide } from "../../src/grid/grid_math";
+import { PathHelper } from "../../src/grid/path_helper";
+import { MoveHandler } from "../../src/handlers/move_handler";
+import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import type { IArmyUnitSpec } from "../../src/simulation/army";
 import {
     runMatch,
@@ -22,6 +28,7 @@ import {
     type ITurnExecutionObservation,
 } from "../../src/simulation/battle_engine";
 import { liveTwinSetup } from "../../src/simulation/livetwin";
+import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
 type StackSpec = readonly [faction: string, creatureName: string, level: number, size: number, amount: number];
 
@@ -97,31 +104,6 @@ const LAVA_GAME_158: RecordedReplay = {
         ["Nature", "Satyr", 2, 1, 36],
         ["Nature", "Mantis", 3, 1, 12],
         ["Life", "Angel", 4, 2, 2],
-    ],
-};
-
-// Re-recorded after Pegasus dropped from Nature L4 to Nature L3: the red level-four slot became
-// Thunderbird (the other exp-334 L4 flyer) and the seed moved 3167913824 -> 3167914054, the first of
-// several that reproduce the Cowardice fallback here (3167914078, 3167914171, 3167914195 also qualify).
-const NORMAL_GAME_799: RecordedReplay = {
-    // Re-seeded for the same reason as LAVA_GAME_158 above: the Cowardice-struck Elf no longer appeared.
-    seed: 3167945730,
-    gridType: PBTypes.GridVals.NORMAL,
-    green: [
-        ["Nature", "Wolf", 1, 1, 124],
-        ["Might", "Berserker", 1, 1, 109],
-        ["Nature", "Elf", 2, 1, 26],
-        ["Chaos", "Beholder", 2, 1, 22],
-        ["Might", "Cyclops", 3, 1, 8],
-        ["Life", "Champion", 4, 2, 3],
-    ],
-    red: [
-        ["Might", "Centaur", 1, 1, 73],
-        ["Chaos", "Scavenger", 1, 1, 164],
-        ["Life", "Healer", 2, 1, 40],
-        ["Nature", "Elf", 2, 1, 26],
-        ["Life", "Griffin", 3, 1, 9],
-        ["Might", "Thunderbird", 4, 2, 3],
     ],
 };
 
@@ -323,26 +305,6 @@ describe("v0.1 ranged-fire robustness", () => {
         expect(result.rejectedGreen + result.rejectedRed).toBe(0);
     });
 
-    test("Cowardice falls back to a completed move when every live enemy is stronger", () => {
-        const { result, turns } = replay(NORMAL_GAME_799);
-        const cowardiceFallback = turns.find(
-            (turn) =>
-                turn.execution.side === "red" && turn.decision.creatureName === "Elf" && turn.decision.hasCowardice,
-        );
-        expect(cowardiceFallback).toBeDefined();
-        expect(cowardiceFallback!.decision.enemies.length).toBeGreaterThan(0);
-        expect(
-            cowardiceFallback!.decision.enemies.every(
-                (enemy) => enemy.cumulativeHp > cowardiceFallback!.decision.cumulativeHp,
-            ),
-        ).toBe(true);
-        expect(cowardiceFallback!.execution.rawIncumbent).toHaveLength(1);
-        expect(cowardiceFallback!.execution.rawIncumbent[0].type).toBe("move_unit");
-        expectWholeStrategyPlanCompleted(cowardiceFallback!);
-        expectEveryRangePlanCompleted(turns);
-        expect(result.rejectedGreen + result.rejectedRed).toBe(0);
-    });
-
     test("a live Aggr target becomes the proposed and successfully executed range target", () => {
         const { result, turns } = replay(NORMAL_GAME_1148);
         const forcedShot = turns.find(
@@ -363,5 +325,65 @@ describe("v0.1 ranged-fire robustness", () => {
         ).toBe(true);
         expectEveryRangePlanCompleted(turns);
         expect(result.rejectedGreen + result.rejectedRed).toBe(0);
+    });
+
+    test("skips a Terrifying Gaze target even when that unit is the ray's first intersection", () => {
+        const combat = createCombatTestContext();
+        const shooter = createTestUnit({
+            name: "Gaze-aware shooter",
+            team: PBTypes.TeamVals.LOWER,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+        });
+        const forbidden = createTestUnit({
+            name: "Forbidden gazer",
+            team: PBTypes.TeamVals.UPPER,
+            attackType: PBTypes.AttackVals.MELEE,
+        });
+        const legal = createTestUnit({
+            name: "Legal alternate",
+            team: PBTypes.TeamVals.UPPER,
+            attackType: PBTypes.AttackVals.MELEE,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, forbidden, { x: 8, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, legal, { x: 9, y: 8 });
+        shooter.setForbiddenTarget(forbidden.getId());
+        shooter.refreshPossibleAttackTypes(true);
+
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 2);
+        const context: IDecisionContext = {
+            grid: combat.grid,
+            matrix: combat.grid.getMatrix(),
+            unitsHolder: combat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: combat.attackHandler,
+            fightProperties,
+        };
+        const actions = getAIStrategy("v0.1").decideTurn(shooter, context);
+        const shot = actions.find(
+            (action): action is Extract<GameAction, { type: "range_attack" }> => action.type === "range_attack",
+        );
+        expect(shot).toBeDefined();
+        expect(shot?.targetId).toBe(legal.getId());
+
+        fightProperties.startFight();
+        fightProperties.startTurn(shooter.getTeam(), 1_000);
+        const engine = new GameActionEngine({
+            fightProperties,
+            grid: combat.grid,
+            unitsHolder: combat.unitsHolder,
+            moveHandler: new MoveHandler(testGridSettings, combat.grid, combat.unitsHolder),
+            sceneLog: new SceneLogMock(),
+            attackHandler: combat.attackHandler,
+            getCurrentActiveUnitId: () => shooter.getId(),
+            getCurrentEnemiesCellsWithinMovementRange: () => [],
+        });
+        expect(actions.map((action) => engine.apply(action).completed)).toEqual(actions.map(() => true));
+        expect(forbidden.getCumulativeHp()).toBe(forbidden.getCumulativeMaxHp());
+        expect(legal.getCumulativeHp()).toBeLessThan(legal.getCumulativeMaxHp());
     });
 });

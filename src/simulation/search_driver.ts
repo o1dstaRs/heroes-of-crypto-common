@@ -210,10 +210,10 @@ import {
  * `v0.8s` seat remains the control). Unset defaults to SEARCH_VERSIONS; it is ignored while the max is zero.
  * SEARCH_CIRCUIT_BREAKER_MS=<positive ms> provides a lower-bound research emulation of the ranked server's
  * outer per-match circuit: the first over-budget result still applies, then historical versions retain each later
- * incumbent. Under the operation-bounded wait policy, one later aggressive v0.8/v0.8s wait (ordinary or
- * stronger-ranged) gets one complete scored retry per match; later waits retain. v0.8 still engine-validates a
- * bounded fallback for no-ops, Luck Shields, mountain attacks, and dominant-finish turns. The live wrapper adds
- * call-site overhead outside this timer.
+ * incumbent. Under the operation-bounded wait policy, every later aggressive v0.8/v0.8s wait (ordinary or
+ * stronger-ranged) gets a complete finite scored arbitration; the shortlist, rollout count, and horizon bound
+ * each decision independently. v0.8 still engine-validates a bounded fallback for no-ops, Luck Shields, mountain
+ * attacks, and dominant-finish turns. The live wrapper adds call-site overhead outside this timer.
  * v0.8 additionally treats a legal direct attack as lexicographically stronger than every non-combat action from
  * lap 9 onward while its living, non-summoned army has at least twice the enemy's HP. This narrow dominant-finish
  * tier bypasses probability saturation but still uses normal rollouts to choose among legal attacks.
@@ -512,8 +512,8 @@ interface ISearchCounters {
     scoredCandidatesTotal: number;
     /** Searches abandoned before every shortlisted candidate received a comparable full score. */
     deadlineFallbacks: number;
-    /** At most one fresh scored wait comparison after the per-match timing circuit has opened. */
-    circuitWaitRetries: number;
+    /** Finite operation-bounded wait arbitrations entered after the per-match timing circuit has opened. */
+    circuitWaitArbitrations: number;
     /** v0.8 turns that entered the fixed late two-to-one-HP finish window. */
     dominantFinishTurns: number;
     /** Normal searched turns where the finish tier replaced a non-combat incumbent with direct combat. */
@@ -681,7 +681,7 @@ const emptyCounters = (): ISearchCounters => ({
     candidatesTotal: 0,
     scoredCandidatesTotal: 0,
     deadlineFallbacks: 0,
-    circuitWaitRetries: 0,
+    circuitWaitArbitrations: 0,
     dominantFinishTurns: 0,
     dominantFinishCombatOverrides: 0,
     dominantFinishCombatFallbacks: 0,
@@ -863,7 +863,7 @@ export interface ISearchPassiveProductiveProbe {
     readonly backlineProtectorIntent: boolean;
     readonly backlineWardIntent: boolean;
     readonly circuitOpenAtDecision: boolean;
-    readonly circuitWaitRetry: boolean;
+    readonly circuitWaitArbitration: boolean;
     /** Live behavior time only; diagnostic counterfactual work is excluded. */
     readonly decisionMs: number;
     readonly resolution: SearchPassiveProbeResolution;
@@ -879,7 +879,7 @@ interface ISearchPassiveAuditContext {
     readonly backlineProtectorIntent: boolean;
     readonly backlineWardIntent: boolean;
     readonly circuitOpenAtDecision: boolean;
-    readonly circuitWaitRetry: boolean;
+    readonly circuitWaitArbitration: boolean;
     /** Freeze live decision timing before diagnostic-only work begins. */
     readonly beforeCounterfactual: () => void;
     readonly decisionElapsedMs: () => number;
@@ -1518,14 +1518,14 @@ export class SearchDriver {
             isPureRangedJitNoMeleeFocusStationaryIncumbent(unit, incumbent);
         const pureRangedDirectInterventionBoard = pureRangedNoMeleePressureBoard || pureRangedDeadlineFinisherBoard;
         // Historical and observe-only searches preserve the exact fail-closed incumbent after a circuit opens.
-        // A13 may complete one operation-bounded wait retry; hard v0.8 passives and dominant-finish turns still
+        // A13's operation-bounded waits remain safe to score after a wall-clock circuit opens: their shortlist,
+        // rollout count, and horizon form a finite work bound. Hard v0.8 passives and dominant-finish turns still
         // probe an engine-valid fallback.
         const arbitrateCircuitWait =
             this.circuitOpen &&
             !useProductiveFallback &&
             !pureRangedDirectInterventionBoard &&
-            operationBoundedWaitComparison &&
-            this.counters.circuitWaitRetries === 0;
+            operationBoundedWaitComparison;
         const auditCircuitPassiveReturn =
             this.circuitOpen &&
             !useProductiveFallback &&
@@ -1548,13 +1548,13 @@ export class SearchDriver {
         const savedActive = this.deps.getActiveUnitId();
         const seedBase = this.simSeed(unit);
         let pendingPassiveProductiveProbe: ISearchPassiveProductiveProbe | undefined;
-        // A later circuit-open wait returns before enumeration in production. Observer mode may enumerate and
-        // score a detached counterfactual, but none of that diagnostic work belongs to live decision timing.
+        // A non-operation-bounded circuit-open passive returns before enumeration in production. Observer mode
+        // may enumerate and score a detached counterfactual, but none of that diagnostic work belongs to live
+        // decision timing.
         let behaviorElapsedMs: number | undefined = auditCircuitPassiveReturn ? performance.now() - t0 : undefined;
-        // Consume the match-lifetime retry before enumeration begins. An enumeration failure must not permit a
-        // second attempt, and the retry's deadline below is measured from this same pre-enumeration timestamp.
+        // Count the arbitration before enumeration begins so faults cannot under-report attempted bounded work.
         if (arbitrateCircuitWait) {
-            this.counters.circuitWaitRetries += 1;
+            this.counters.circuitWaitArbitrations += 1;
         }
         // Swap the tournament's seeded RNG to a PRIVATE stream around the WHOLE search (enumeration
         // included) and restore the exact source reference in `finally` — identical hygiene to
@@ -1610,7 +1610,7 @@ export class SearchDriver {
                           backlineProtectorIntent: backlineProtectorIntent !== undefined,
                           backlineWardIntent: backlineWardIntent !== undefined,
                           circuitOpenAtDecision: this.circuitOpen,
-                          circuitWaitRetry: arbitrateCircuitWait,
+                          circuitWaitArbitration: arbitrateCircuitWait,
                           beforeCounterfactual: (): void => {
                               behaviorElapsedMs ??= performance.now() - t0;
                           },
@@ -1752,9 +1752,8 @@ export class SearchDriver {
                 }
             }
             if (arbitrateCircuitWait) {
-                // Give the first circuit-open A13 wait one complete, finite operation-bounded comparison. Later
-                // waits return immediately. The retry is consumed before enumeration so a fault cannot grant a
-                // second attempt.
+                // Every circuit-open A13 wait receives the same complete, finite operation-bounded comparison.
+                // The wall-clock circuit still fails closed for every unbounded/profile-deadline decision.
                 this.counters.decisions += 1;
                 return this.search(
                     unit,
@@ -2414,7 +2413,7 @@ export class SearchDriver {
             decisionDeadlineMs: this.decisionDeadlineMs,
             deadlineFallbacks: c.deadlineFallbacks,
             waitDeadlinePolicy: this.waitDeadlinePolicy,
-            circuitWaitRetries: c.circuitWaitRetries,
+            circuitWaitArbitrations: c.circuitWaitArbitrations,
             passiveCatalogExpansions: c.passiveCatalogExpansions,
             passiveCatalogExpansionRecoveries: c.passiveCatalogExpansionRecoveries,
             singleForceTierFastPaths: c.singleForceTierFastPaths,
@@ -2689,7 +2688,7 @@ export class SearchDriver {
             backlineProtectorIntent: audit.backlineProtectorIntent,
             backlineWardIntent: audit.backlineWardIntent,
             circuitOpenAtDecision: audit.circuitOpenAtDecision,
-            circuitWaitRetry: audit.circuitWaitRetry,
+            circuitWaitArbitration: audit.circuitWaitArbitration,
             decisionMs: Math.max(0, audit.decisionElapsedMs()),
             resolution,
         });

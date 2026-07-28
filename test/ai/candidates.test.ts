@@ -522,7 +522,13 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             expect(rearAim).toBeDefined();
             expect(rearAim!.targetId).toBe(front.getId());
             expect(rearAim!.shotFeatures?.primaryTargetDamage).toBeGreaterThan(0);
-            expect(rearAim!.shotFeatures?.aimTargetDamage).toBeGreaterThan(0);
+            if (special.through) {
+                expect(rearAim!.shotFeatures?.aimTargetDamage).toBeGreaterThan(0);
+            } else {
+                // Large Caliber explodes at the first intercepted group. The rear stack owns the selected
+                // edge, but it is outside the front stack's 3x3 splash and therefore takes no phantom damage.
+                expect(rearAim!.shotFeatures?.aimTargetDamage).toBe(0);
+            }
 
             const action = rearAim!.actions.find(
                 (entry): entry is Extract<GameAction, { type: "range_attack" }> => entry.type === "range_attack",
@@ -581,10 +587,100 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 ),
             ).toBe(true);
 
+            const frontHpBefore = front.getCumulativeHp();
+            const rearHpBefore = rear.getCumulativeHp();
             const engine = startActionEngine(c, shooter, context);
             expect(rearAim!.actions.every((entry) => engine.apply(entry).completed)).toBe(true);
+            expect(front.getCumulativeHp()).toBeLessThan(frontHpBefore);
+            if (special.through) {
+                expect(rear.getCumulativeHp()).toBeLessThan(rearHpBefore);
+            } else {
+                expect(rear.getCumulativeHp()).toBe(rearHpBefore);
+            }
         });
     }
+
+    it("Through Shot metadata matches stack power, Giant's Maul, and physical resistance in the engine", () => {
+        const run = (
+            options: {
+                giantsMaulPower?: number;
+                secondShot?: "Double Shot" | "Crafted Double Shot";
+                dualStrikeCharmPower?: number;
+            } = {},
+        ): { estimated: number; applied: number } => {
+            const c = createCombatTestContext();
+            const shooter = createTestUnit({
+                team: LOWER,
+                name: "Low-power Through Shot",
+                attackType: RANGE,
+                attack: 10,
+                damageMin: 10,
+                damageMax: 10,
+                rangeShots: 5,
+                shotDistance: 30,
+                amountAlive: 5,
+                stackPower: 1,
+                abilities: ["Through Shot", ...(options.secondShot ? [options.secondShot] : [])],
+            });
+            const target = createTestUnit({
+                team: UPPER,
+                name: "Status-resistant target",
+                attackType: MELEE,
+                armor: 10,
+                amountAlive: 100,
+                maxHp: 1_000,
+            });
+            const statusResistance = new Spell({
+                spellProperties: getSpellConfig("System", "Amulet of Resolve", NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            });
+            statusResistance.setPower(25);
+            target.applyBuff(statusResistance);
+            if (options.giantsMaulPower !== undefined) {
+                const giantsMaul = new Spell({
+                    spellProperties: getSpellConfig("System", "Giants Maul", NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                giantsMaul.setPower(options.giantsMaulPower);
+                shooter.applyBuff(giantsMaul);
+            }
+            if (options.dualStrikeCharmPower !== undefined) {
+                const dualStrikeCharm = new Spell({
+                    spellProperties: getSpellConfig("System", "Dual Strike Charm", NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                dualStrikeCharm.setPower(options.dualStrikeCharmPower);
+                shooter.applyBuff(dualStrikeCharm);
+            }
+            placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+            placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 7 });
+            shooter.refreshPossibleAttackTypes(true);
+            const context = ctxFor(c, true);
+            const candidate = ofKind(enumerateCandidates(shooter, context, endTurn(shooter)).candidates, "shot").find(
+                ({ targetId }) => targetId === target.getId(),
+            );
+            expect(candidate).toBeDefined();
+            const estimated = candidate!.shotFeatures!.primaryTargetDamage;
+            const hpBefore = target.getCumulativeHp();
+            const engine = startActionEngine(c, shooter, context);
+            expect(candidate!.actions.every((action) => engine.apply(action).completed)).toBe(true);
+            return { estimated, applied: hpBefore - target.getCumulativeHp() };
+        };
+
+        // Base deterministic damage is 50. Stack-power 1 scales Through Shot to 20%, then the target's
+        // 25% physical-AOE resistance floors 10 -> 7. Maul 50% is applied before resistance: 10 -> 15 -> 11.
+        expect(run()).toEqual({ estimated: 7, applied: 7 });
+        expect(run({ giantsMaulPower: 50 })).toEqual({ estimated: 11, applied: 11 });
+        // Crafted Double Shot is also stack-scaled: the second line volley is 20% of the first, so it adds
+        // only 1 after resistance (not another full 7). Dual Strike Charm raises that second impact to 2.
+        expect(run({ secondShot: "Crafted Double Shot" })).toEqual({ estimated: 8, applied: 8 });
+        expect(
+            run({
+                secondShot: "Crafted Double Shot",
+                dualStrikeCharmPower: 50,
+            }),
+        ).toEqual({ estimated: 9, applied: 9 });
+    });
 
     it("shots: Cowardice rejects the stronger resolved primary, leaves a legal lower-HP target, and does not enrich the invalid incumbent", () => {
         const c = createCombatTestContext();
@@ -865,6 +961,73 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const engine = startActionEngine(live.c, live.shooter, live.context);
         expect(composite!.actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
 
+        for (const ability of ["Through Shot", "Large Caliber"]) {
+            const special = fixture();
+            const specialComposite = enumerateCandidates(special.shooter, special.context, endTurn(special.shooter), {
+                maxMoveShotComposites: 1,
+                discoverMoveShotTargetsAfterMove: true,
+            }).candidates.find(hasMoveAndShot);
+            expect(specialComposite).toBeDefined();
+            special.shooter.grantStolenAbility(ability);
+            const enrichedSpecial = enumerateCandidates(special.shooter, special.context, specialComposite!.actions, {
+                maxMoveShotComposites: 0,
+                enrichIncumbentMetadata: true,
+            }).candidates[0];
+            expect(enrichedSpecial).toMatchObject({
+                kind: "incumbent",
+                targetId: specialComposite!.targetId,
+                features: {
+                    spendsRangeShot: 1,
+                },
+            });
+            expect(enrichedSpecial.features.expectedDamage).toBeGreaterThan(0);
+            expect(enrichedSpecial.shotFeatures?.primaryTargetDamage).toBeGreaterThan(0);
+            expect(selectV08STargetPressureCandidate(special.shooter, special.c.unitsHolder, [enrichedSpecial])).toBe(
+                enrichedSpecial,
+            );
+            const specialEngine = startActionEngine(special.c, special.shooter, special.context);
+            expect(specialComposite!.actions.map((action) => specialEngine.apply(action).completed)).toEqual([
+                true,
+                true,
+            ]);
+        }
+
+        const splash = fixture();
+        const splashComposite = enumerateCandidates(splash.shooter, splash.context, endTurn(splash.shooter), {
+            maxMoveShotComposites: 1,
+            discoverMoveShotTargetsAfterMove: true,
+        }).candidates.find(hasMoveAndShot);
+        expect(splashComposite).toBeDefined();
+        splash.shooter.grantStolenAbility("Large Caliber");
+        for (const [index, cell] of [
+            { x: 9, y: 13 },
+            { x: 10, y: 13 },
+            { x: 10, y: 12 },
+        ].entries()) {
+            const ally = createTestUnit({
+                team: LOWER,
+                name: `Splash ally ${index}`,
+                attackType: MELEE,
+                amountAlive: 20,
+                maxHp: 20,
+            });
+            placeUnit(splash.c.grid, splash.c.unitsHolder, ally, cell);
+        }
+        const splashContext = ctxFor(splash.c, true);
+        const enrichedSplash = enumerateCandidates(splash.shooter, splashContext, splashComposite!.actions, {
+            maxMoveShotComposites: 0,
+            enrichIncumbentMetadata: true,
+        }).candidates[0];
+        expect(enrichedSplash.shotFeatures?.friendlyFireDamage).toBeGreaterThan(
+            enrichedSplash.shotFeatures?.enemyDamage ?? 0,
+        );
+        expect(enrichedSplash.features.expectedDamage).toBeLessThan(0);
+        expect(
+            selectV08STargetPressureCandidate(splash.shooter, splash.c.unitsHolder, [enrichedSplash]),
+        ).toBeUndefined();
+        const splashEngine = startActionEngine(splash.c, splash.shooter, splashContext);
+        expect(splashComposite!.actions.map((action) => splashEngine.apply(action).completed)).toEqual([true, true]);
+
         const constrained = fixture();
         const other = createTestUnit({
             team: UPPER,
@@ -1056,6 +1219,102 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             false,
         ]);
     });
+
+    for (const special of [
+        { ability: "Through Shot", aoe: false },
+        { ability: "Large Caliber", aoe: true },
+    ] as const) {
+        it(`move-shots: ${special.ability} discovery preserves a rear aim through an intercepted primary`, () => {
+            const c = createCombatTestContext();
+            const shooter = createTestUnit({
+                team: LOWER,
+                name: `${special.ability} mover`,
+                attackType: RANGE,
+                attack: 10,
+                damageMin: 10,
+                damageMax: 10,
+                rangeShots: 5,
+                shotDistance: 30,
+                amountAlive: 5,
+                speed: 3,
+                stackPower: 5,
+                abilities: [special.ability],
+            });
+            const ally = createTestUnit({
+                team: LOWER,
+                name: "Stationary-line blocker",
+                attackType: MELEE,
+                amountAlive: 100,
+                maxHp: 1_000,
+            });
+            const front = createTestUnit({
+                team: UPPER,
+                name: "Resolved front primary",
+                attackType: MELEE,
+                amountAlive: 100,
+                maxHp: 1_000,
+            });
+            const rear = createTestUnit({
+                team: UPPER,
+                name: "Rear aim anchor",
+                attackType: MELEE,
+                amountAlive: 100,
+                maxHp: 1_000,
+            });
+            placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+            placeUnit(c.grid, c.unitsHolder, ally, { x: 2, y: 3 });
+            placeUnit(c.grid, c.unitsHolder, front, { x: 7, y: 7 });
+            placeUnit(c.grid, c.unitsHolder, rear, { x: 10, y: 7 });
+            shooter.refreshPossibleAttackTypes(true);
+            const originalPosition = { ...shooter.getPosition() };
+            const rearThreshold = (front.getPosition().x + rear.getPosition().x) / 2;
+
+            // Force a closed stationary line and deterministic post-move interception. This isolates the
+            // candidate/action identity contract from raster details: an action aimed at `rear` damages both
+            // stacks, while clamping rear's aimCell to `front` (the old targetId bug) damages only front.
+            c.attackHandler.evaluateRangeAttack = (_allUnits, _fromUnit, fromPosition, toPosition) => {
+                const moved = fromPosition.x !== originalPosition.x || fromPosition.y !== originalPosition.y;
+                if (!moved) {
+                    return {
+                        rangeAttackDivisors: [1],
+                        affectedUnits: [[ally]],
+                        affectedCells: [[ally.getBaseCell()]],
+                    };
+                }
+                const aimsBehindFront = toPosition.x > rearThreshold;
+                const affectedUnits = aimsBehindFront ? (special.aoe ? [[front, rear]] : [[front], [rear]]) : [[front]];
+                return {
+                    rangeAttackDivisors: affectedUnits.map(() => 1),
+                    affectedUnits,
+                    affectedCells: affectedUnits.map((group) => group.map((unit) => unit.getBaseCell())),
+                };
+            };
+            const context = ctxFor(c, true);
+            const candidates = enumerateCandidates(shooter, context, endTurn(shooter), {
+                maxMoveShotComposites: 2,
+                discoverMoveShotTargetsAfterMove: true,
+            }).candidates;
+            const composite = candidates.find((candidate) => {
+                const move = candidate.actions.find((action) => action.type === "move_unit");
+                const shot = candidate.actions.find((action) => action.type === "range_attack");
+                return (
+                    move?.type === "move_unit" &&
+                    shot?.type === "range_attack" &&
+                    candidate.targetId === front.getId() &&
+                    shot.targetId === rear.getId() &&
+                    shot.aimCell?.x === rear.getBaseCell().x &&
+                    shot.aimCell.y === rear.getBaseCell().y
+                );
+            });
+            expect(composite).toBeDefined();
+            const frontHpBefore = front.getCumulativeHp();
+            const rearHpBefore = rear.getCumulativeHp();
+            const engine = startActionEngine(c, shooter, context);
+            expect(composite!.actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
+            expect(front.getCumulativeHp()).toBeLessThan(frontHpBefore);
+            expect(rear.getCumulativeHp()).toBeLessThan(rearHpBefore);
+        });
+    }
 
     it("move-shots: enriches only an exact incumbent at cap zero without adding or reordering challengers", () => {
         const c = createCombatTestContext();
@@ -1677,7 +1936,11 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             expect(shot).toBeDefined();
             return shot!.features.expectedDamage;
         };
-        const giveBuff = (unit: Unit, name: "Amulet of Resolve" | "Broken Aegis", power: number): void => {
+        const giveBuff = (
+            unit: Unit,
+            name: "Amulet of Resolve" | "Broken Aegis" | "Giants Maul",
+            power: number,
+        ): void => {
             const buff = new Spell({
                 spellProperties: getSpellConfig("System", name, NUMBER_OF_LAPS_TOTAL),
                 amount: 1,
@@ -1692,12 +1955,14 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const brokenAegisReduction = score((_attacker, target) => giveBuff(target, "Broken Aegis", 20));
         const statusResistance = score((_attacker, target) => giveBuff(target, "Amulet of Resolve", 25));
         const mechanismVulnerability = score((_attacker, target) => target.grantAbility("Mechanism"));
+        const giantsMaul = score((attacker) => giveBuff(attacker, "Giants Maul", 50));
 
         expect(boarSaliva).toBeLessThan(baseline);
         expect(brokenAegisMiss).toBeLessThan(baseline);
         expect(brokenAegisReduction).toBeLessThan(baseline);
         expect(statusResistance).toBeLessThan(baseline);
         expect(mechanismVulnerability).toBeGreaterThan(baseline);
+        expect(giantsMaul).toBeGreaterThan(baseline);
     });
 
     it("Angel: Resurrection candidates target living allies with dead bodies and price the passive charge", () => {

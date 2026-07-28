@@ -11,6 +11,7 @@
 
 import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
+import { withDualStrikeCharm } from "../abilities/ability_helper";
 import type { GameAction } from "../engine/actions";
 import { projectPostMoveActorAvailability } from "../engine/post_move_actor_availability";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -1005,11 +1006,11 @@ class CandidateGenerator {
         shots: number,
         forcedTargetId: string | undefined,
     ): void {
+        const isThroughShot = this.unit.hasAbilityActive("Through Shot");
+        const isLargeCaliber = this.unit.hasAbilityActive("Large Caliber");
         if (
             !this.options.enrichIncumbentMetadata ||
             this.unit.hasAbilityActive("Sniper") ||
-            this.unit.hasAbilityActive("Through Shot") ||
-            this.unit.hasAbilityActive("Large Caliber") ||
             this.unit.hasAbilityActive("Area Throw") ||
             !this.unit.canMove()
         ) {
@@ -1093,22 +1094,21 @@ class CandidateGenerator {
         const postMoveCumulativeHp =
             (postMoveActor.stack.amountAlive - 1) * postMoveActor.stack.maxHp + Math.max(0, postMoveActor.stack.hp);
 
-        const target = this.context.unitsHolder.getAllUnits().get(shot.targetId);
+        const aimTarget = this.context.unitsHolder.getAllUnits().get(shot.targetId);
         if (
-            !target ||
-            target.isDead() ||
-            target.getTeam() !== this.enemyTeam ||
-            isHidden(target) ||
-            (forcedTargetId !== undefined && target.getId() !== forcedTargetId) ||
-            (this.unit.hasStatusApplied("Cowardice") && postMoveCumulativeHp < target.getCumulativeHp()) ||
-            !target.getCells().some((cell) => cell.x === shot.aimCell!.x && cell.y === shot.aimCell!.y) ||
+            !aimTarget ||
+            aimTarget.isDead() ||
+            aimTarget.getTeam() !== this.enemyTeam ||
+            isHidden(aimTarget) ||
+            this.unit.cannotAttackUnitId(aimTarget.getId()) ||
+            !aimTarget.getCells().some((cell) => cell.x === shot.aimCell!.x && cell.y === shot.aimCell!.y) ||
             !RANGE_ATTACK_CELL_SIDES.includes(shot.aimSide as RangeAttackCellSide) ||
             !isRangeAttackSideObservable(
                 this.context.matrix,
                 shot.aimCell,
                 shot.aimSide as RangeAttackCellSide,
                 this.unit.getTeam(),
-                false,
+                isThroughShot,
             )
         ) {
             return;
@@ -1144,45 +1144,42 @@ class CandidateGenerator {
             this.unit,
             origin,
             to,
+            isThroughShot,
             false,
-            false,
-            false,
+            isLargeCaliber,
         );
         const primaryHit = evaluation.affectedUnits[0]?.[0];
         if (
             evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length ||
-            primaryHit?.getId() !== target.getId()
+            !primaryHit ||
+            primaryHit.isDead() ||
+            primaryHit.getTeam() !== this.enemyTeam ||
+            isHidden(primaryHit) ||
+            this.unit.cannotAttackUnitId(primaryHit.getId()) ||
+            (!isThroughShot && !isLargeCaliber && primaryHit.getId() !== aimTarget.getId()) ||
+            (forcedTargetId !== undefined && primaryHit.getId() !== forcedTargetId) ||
+            (!isThroughShot &&
+                this.unit.hasStatusApplied("Cowardice") &&
+                postMoveCumulativeHp < primaryHit.getCumulativeHp())
         ) {
             return;
         }
         const damage = this.shotDamage(
             evaluation,
-            target.getId(),
+            primaryHit.getId(),
             shots,
-            false,
-            target.getId(),
+            isLargeCaliber,
+            aimTarget.getId(),
             postMoveActor.stack.amountAlive,
         );
         this.enrichIncumbentCandidate({
             kind: "shot",
             actions: incumbent.actions,
-            targetId: target.getId(),
+            targetId: primaryHit.getId(),
             targetCell: { x: route.cell.x, y: route.cell.y },
-            shotFeatures: this.shotFeatures(target, damage),
+            shotFeatures: this.shotFeatures(primaryHit, damage),
             features: this.features({ spendsRangeShot: 1, expectedDamage: damage.value, expectedKill: damage.kill }),
         });
-    }
-    /** n-choose-k for the one/two-shot expected-damage calculation. */
-    private combinations(n: number, k: number): number {
-        if (k < 0 || k > n) {
-            return 0;
-        }
-        const smaller = Math.min(k, n - k);
-        let result = 1;
-        for (let i = 1; i <= smaller; i += 1) {
-            result = (result * (n - smaller + i)) / i;
-        }
-        return result;
     }
     /**
      * Expected effective damage of a hit set (enemies add, splash friendly fire subtracts).
@@ -1216,17 +1213,47 @@ class CandidateGenerator {
         const counted = new Set<string>();
         const fightProperties = this.context.fightProperties;
         const attackerAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(this.unit.getTeam()) ?? 0;
-        const aoeAbility = isAOE
-            ? (this.unit.getAbility("Area Throw") ?? this.unit.getAbility("Large Caliber"))
-            : undefined;
-        let sharedAoeMultiplier = aoeAbility
-            ? this.unit.calculateAbilityMultiplier(aoeAbility, attackerAbilityPower)
+        // Through Shot owns the ranged attack outright when active; Large Caliber / Area Throw use the
+        // separate splash tail. Both are physical AOE for damage purposes, but only the latter applies
+        // Broken Aegis' incoming-damage reduction. Keep this order identical to the authoritative handlers:
+        // ability (and Paralysis), Giant's Maul, target-specific Aegis where applicable, then status resist.
+        const throughShotAbility = this.unit.getAbility("Through Shot");
+        const aoeAbility =
+            !throughShotAbility && isAOE
+                ? (this.unit.getAbility("Area Throw") ?? this.unit.getAbility("Large Caliber"))
+                : undefined;
+        const specialAbility = throughShotAbility ?? aoeAbility;
+        const isPhysicalAoe = !!throughShotAbility || !!aoeAbility;
+        let sharedAbilityMultiplier = specialAbility
+            ? this.unit.calculateAbilityMultiplier(specialAbility, attackerAbilityPower)
             : 1;
         const paralysis = this.unit.getEffect("Paralysis");
         if (paralysis) {
-            sharedAoeMultiplier *= (100 - paralysis.getPower()) / 100;
+            sharedAbilityMultiplier *= (100 - paralysis.getPower()) / 100;
         }
-        for (let i = 0; i < evaluation.affectedUnits.length; i += 1) {
+        const giantsMaul = isPhysicalAoe ? this.unit.getBuff("Giants Maul") : undefined;
+        const doubleShotAbility =
+            shots > 1
+                ? (this.unit.getAbility("Double Shot") ?? this.unit.getAbility("Crafted Double Shot"))
+                : undefined;
+        // Large Caliber / Area Throw's authoritative AOE tail repeats the same full splash when Double Shot
+        // exists. Ordinary and Through shots scale their second volley by the Double/Crafted ability and
+        // Dual Strike Charm. Through then folds that into its own stack-powered line multiplier.
+        const secondVolleyMultiplier = doubleShotAbility
+            ? aoeAbility
+                ? 1
+                : withDualStrikeCharm(
+                      this.unit.calculateAbilityMultiplier(doubleShotAbility, attackerAbilityPower),
+                      this.unit,
+                  )
+            : 0;
+        // Only Through Shot traverses and damages every ray group. Ordinary attacks and Large Caliber resolve
+        // the first impact group; Large Caliber's group already contains its complete 3x3 splash. Counting later
+        // screened groups manufactures damage the engine never applies.
+        const groupCount = throughShotAbility
+            ? evaluation.affectedUnits.length
+            : Math.min(1, evaluation.affectedUnits.length);
+        for (let i = 0; i < groupCount; i += 1) {
             const divisor = evaluation.rangeAttackDivisors[i] ?? 1;
             for (const target of evaluation.affectedUnits[i]) {
                 if (counted.has(target.getId())) {
@@ -1251,30 +1278,43 @@ class CandidateGenerator {
                     1,
                     attackerAmountAlive,
                 );
-                const applyEngineAoeModifiers = (rawDamage: number): number => {
-                    if (!isAOE) {
-                        return rawDamage;
+                const applyEngineVolleyModifiers = (rawDamage: number, volleyMultiplier = 1): number => {
+                    let adjusted = Math.floor(rawDamage * sharedAbilityMultiplier * volleyMultiplier);
+                    if (isPhysicalAoe) {
+                        if (giantsMaul) {
+                            adjusted = Math.floor(adjusted * (1 + giantsMaul.getPower() / 100));
+                        }
+                        if (aoeAbility) {
+                            const brokenAegis = target.getBuff("Broken Aegis");
+                            if (brokenAegis) {
+                                adjusted = Math.floor(adjusted * (1 - brokenAegis.getPower() / 100));
+                            }
+                        }
+                        adjusted = Math.floor(adjusted * target.getPhysicalAoeDamageMultiplier());
                     }
-                    let adjusted = Math.floor(rawDamage * sharedAoeMultiplier);
-                    const brokenAegis = target.getBuff("Broken Aegis");
-                    if (brokenAegis) {
-                        adjusted = Math.floor(adjusted * (1 - brokenAegis.getPower() / 100));
-                    }
-                    return Math.floor(adjusted * target.getPhysicalAoeDamageMultiplier());
+                    return adjusted;
                 };
-                const min = applyEngineAoeModifiers(minRaw);
-                const max = applyEngineAoeModifiers(maxRaw);
+                const firstMin = applyEngineVolleyModifiers(minRaw);
+                const firstMax = applyEngineVolleyModifiers(maxRaw);
+                const secondMin = secondVolleyMultiplier
+                    ? applyEngineVolleyModifiers(minRaw, secondVolleyMultiplier)
+                    : 0;
+                const secondMax = secondVolleyMultiplier
+                    ? applyEngineVolleyModifiers(maxRaw, secondVolleyMultiplier)
+                    : 0;
                 const hp = target.getCumulativeHp();
-                const conditionalDamage = (min + max) / 2;
+                const firstConditionalDamage = (firstMin + firstMax) / 2;
+                const secondConditionalDamage = (secondMin + secondMax) / 2;
                 const defenderAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(target.getTeam()) ?? 0;
                 const hitChance =
                     1 - Math.min(100, Math.max(0, this.unit.calculateMissChance(target, defenderAbilityPower))) / 100;
-                let effective = 0;
-                for (let hits = 1; hits <= shots; hits += 1) {
-                    const probability =
-                        this.combinations(shots, hits) * hitChance ** hits * (1 - hitChance) ** (shots - hits);
-                    effective += probability * Math.min(hits * conditionalDamage, hp);
-                }
+                const missChance = 1 - hitChance;
+                const effective =
+                    secondVolleyMultiplier > 0
+                        ? hitChance * missChance * Math.min(firstConditionalDamage, hp) +
+                          missChance * hitChance * Math.min(secondConditionalDamage, hp) +
+                          hitChance * hitChance * Math.min(firstConditionalDamage + secondConditionalDamage, hp)
+                        : hitChance * Math.min(firstConditionalDamage, hp);
                 if (target.getTeam() === this.enemyTeam) {
                     value += effective;
                     enemyDamage += effective;
@@ -1335,9 +1375,11 @@ class CandidateGenerator {
         const allUnits = unitsHolder.getAllUnits();
         const fromTeam = this.unit.getTeam();
         const from = this.unit.getPosition();
-        const isAOE = this.unit.hasAbilityActive("Large Caliber") || this.unit.hasAbilityActive("Area Throw");
+        const isLargeCaliber = this.unit.hasAbilityActive("Large Caliber");
+        const isAreaThrow = this.unit.hasAbilityActive("Area Throw");
+        const isAOE = isLargeCaliber || isAreaThrow;
         const isThroughShot = this.unit.hasAbilityActive("Through Shot");
-        const shots = this.unit.hasAbilityActive("Double Shot") ? 2 : 1;
+        const shots = this.unit.getAbility("Double Shot") || this.unit.getAbility("Crafted Double Shot") ? 2 : 1;
         const prefix = this.rangePrefix();
         const forcedTarget = allUnits.get(this.unit.getTarget());
         const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
@@ -1393,6 +1435,7 @@ class CandidateGenerator {
                         primaryHit.isDead() ||
                         primaryHit.getTeam() !== this.enemyTeam ||
                         isHidden(primaryHit) ||
+                        this.unit.cannotAttackUnitId(primaryHit.getId()) ||
                         (forcedTargetId !== undefined && primaryHit.getId() !== forcedTargetId) ||
                         (!isThroughShot &&
                             this.unit.hasStatusApplied("Cowardice") &&
@@ -1490,8 +1533,8 @@ class CandidateGenerator {
         this.enrichIncumbentMoveShot(attackHandler, shots, forcedTargetId);
         if (
             moveShotCap === 0 ||
-            isAOE ||
-            isThroughShot ||
+            isAreaThrow ||
+            ((isLargeCaliber || isThroughShot) && !discoverMoveShotTargetsAfterMove) ||
             (moveShotDiscoveryRequested && !discoverMoveShotTargetsAfterMove) ||
             (this.unit.hasAbilityActive("Sniper") && !discoverMoveShotTargetsAfterMove) ||
             !this.unit.canMove()
@@ -1561,16 +1604,16 @@ class CandidateGenerator {
                     if (isHidden(enemy) || this.unit.cannotAttackUnitId(enemy.getId())) continue;
                     for (const cell of enemy.getCells()) {
                         for (const side of RANGE_ATTACK_CELL_SIDES) {
-                            if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, false)) continue;
+                            if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot)) continue;
                             const to = getRangeAttackSideCenter(gs, cell, side, origin);
                             const evaluation = attackHandler.evaluateRangeAttack(
                                 allUnits,
                                 this.unit,
                                 origin,
                                 to,
+                                isThroughShot,
                                 false,
-                                false,
-                                false,
+                                isAOE,
                             );
                             const primaryHit = evaluation.affectedUnits[0]?.[0];
                             if (
@@ -1578,10 +1621,12 @@ class CandidateGenerator {
                                 evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length ||
                                 primaryHit.isDead() ||
                                 primaryHit.getTeam() !== this.enemyTeam ||
-                                primaryHit.getId() !== enemy.getId() ||
                                 isHidden(primaryHit) ||
+                                this.unit.cannotAttackUnitId(primaryHit.getId()) ||
+                                (!isThroughShot && !isAOE && primaryHit.getId() !== enemy.getId()) ||
                                 (forcedTargetId !== undefined && primaryHit.getId() !== forcedTargetId) ||
-                                (this.unit.hasDebuffActive("Cowardice") &&
+                                (!isThroughShot &&
+                                    this.unit.hasStatusApplied("Cowardice") &&
                                     postMoveCumulativeHp < primaryHit.getCumulativeHp())
                             ) {
                                 continue;
@@ -1596,7 +1641,7 @@ class CandidateGenerator {
                                 evaluation,
                                 primaryHit.getId(),
                                 shots,
-                                false,
+                                isAOE,
                                 enemy.getId(),
                                 postMoveActor.stack.amountAlive,
                             );
@@ -1698,7 +1743,10 @@ class CandidateGenerator {
                 {
                     type: "range_attack",
                     attackerId: this.unit.getId(),
-                    targetId: moveShot.shot.targetId,
+                    // The action engine authoritatively reconstructs the ray from an edge of `targetId`.
+                    // Special shots may aim at a rear stack while exposing the intercepted front stack as
+                    // candidate metadata, so keep transport intent anchored to the unit that owns aimCell.
+                    targetId: moveShot.shot.aimTargetId,
                     aimCell: moveShot.shot.aimCell,
                     aimSide: moveShot.shot.aimSide,
                 },
@@ -1745,7 +1793,7 @@ class CandidateGenerator {
         const gs = grid.getSettings();
         const allUnits = unitsHolder.getAllUnits();
         const prefix = this.rangePrefix();
-        const shots = this.unit.hasAbilityActive("Double Shot") ? 2 : 1;
+        const shots = this.unit.getAbility("Double Shot") || this.unit.getAbility("Crafted Double Shot") ? 2 : 1;
         const forcedTarget = allUnits.get(this.unit.getTarget());
         const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
 

@@ -53,7 +53,7 @@ import { liveTwinSetup } from "./livetwin";
 import type { ISearchPassiveProductiveProbe, SearchPassiveActionKind } from "./search_driver";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
 
-export const V08_PASSIVE_TURN_PANEL_SCHEMA = "hoc.v0_8_passive_turn_panel.v3" as const;
+export const V08_PASSIVE_TURN_PANEL_SCHEMA = "hoc.v0_8_passive_turn_panel.v4" as const;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_GAMES = 4096;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_SEED = 2_607_270_813;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_CONCURRENCY = 12;
@@ -253,14 +253,14 @@ export interface IV08PassiveDecisionFailureSample {
     backlineProtectorIntent: boolean;
     backlineWardIntent: boolean;
     circuitOpenAtDecision: boolean;
-    circuitWaitRetry: boolean;
+    circuitWaitArbitration: boolean;
     decisionMs: number;
 }
 
 export interface IV08PassiveDecisionTimingSample {
     decisionMs: number;
     circuitOpenWait: boolean;
-    circuitWaitRetry: boolean;
+    circuitWaitArbitration: boolean;
 }
 
 export interface IV08PassiveDecisionTimingSummary {
@@ -334,7 +334,7 @@ export interface IV08PassiveTurnPanelSummary {
     arachnaQueenFaults: number;
     passiveDecisionTiming: IV08PassiveDecisionTimingSummary;
     circuitOpenWaitTiming: IV08PassiveDecisionTimingSummary;
-    circuitOpenWaitRetryTiming: IV08PassiveDecisionTimingSummary;
+    circuitOpenWaitArbitrationTiming: IV08PassiveDecisionTimingSummary;
     circuitOpenWaitDeferredTiming: IV08PassiveDecisionTimingSummary;
     gates: {
         pass: boolean;
@@ -359,7 +359,7 @@ export interface IV08PassiveTurnPanelSummary {
         shortlistedProductiveScoreDelta?: number | null;
         resolution?: ISearchPassiveProductiveProbe["resolution"];
         circuitOpenAtDecision?: boolean;
-        circuitWaitRetry?: boolean;
+        circuitWaitArbitration?: boolean;
         decisionMs?: number;
     }>;
 }
@@ -775,10 +775,10 @@ export class V08PassiveTurnAuditor {
             this.decisionTimings.push({
                 decisionMs: probe.decisionMs,
                 circuitOpenWait,
-                circuitWaitRetry: probe.circuitWaitRetry,
+                circuitWaitArbitration: probe.circuitWaitArbitration,
             });
             if (circuitOpenWait) {
-                if (probe.circuitWaitRetry) {
+                if (probe.circuitWaitArbitration) {
                     this.add(creature, "circuitOpenWaitArbitrations");
                     if (!probe.retainedPassive) this.add(creature, "circuitOpenWaitOverrides");
                 } else {
@@ -870,7 +870,7 @@ export class V08PassiveTurnAuditor {
                     backlineProtectorIntent: probe.backlineProtectorIntent,
                     backlineWardIntent: probe.backlineWardIntent,
                     circuitOpenAtDecision: probe.circuitOpenAtDecision,
-                    circuitWaitRetry: probe.circuitWaitRetry,
+                    circuitWaitArbitration: probe.circuitWaitArbitration,
                     decisionMs: probe.decisionMs,
                 });
             }
@@ -1172,7 +1172,7 @@ export function summarizeV08PassiveTurnPanel(
     const failureSamples: IV08PassiveTurnPanelSummary["failureSamples"] = [];
     const passiveDecisionMs: number[] = [];
     const circuitOpenWaitDecisionMs: number[] = [];
-    const circuitOpenWaitRetryDecisionMs: number[] = [];
+    const circuitOpenWaitArbitrationDecisionMs: number[] = [];
     const circuitOpenWaitDeferredDecisionMs: number[] = [];
     let candidateEngineRejections = 0;
 
@@ -1213,9 +1213,10 @@ export function summarizeV08PassiveTurnPanel(
             passiveDecisionMs.push(timing.decisionMs);
             if (timing.circuitOpenWait) {
                 circuitOpenWaitDecisionMs.push(timing.decisionMs);
-                (timing.circuitWaitRetry ? circuitOpenWaitRetryDecisionMs : circuitOpenWaitDeferredDecisionMs).push(
-                    timing.decisionMs,
-                );
+                (timing.circuitWaitArbitration
+                    ? circuitOpenWaitArbitrationDecisionMs
+                    : circuitOpenWaitDeferredDecisionMs
+                ).push(timing.decisionMs);
             }
         }
         for (const sample of record.passiveFailureSamples) {
@@ -1238,7 +1239,7 @@ export function summarizeV08PassiveTurnPanel(
                 shortlistedProductiveScoreDelta: sample.shortlistedProductiveScoreDelta,
                 resolution: sample.resolution,
                 circuitOpenAtDecision: sample.circuitOpenAtDecision,
-                circuitWaitRetry: sample.circuitWaitRetry,
+                circuitWaitArbitration: sample.circuitWaitArbitration,
                 decisionMs: sample.decisionMs,
             });
         }
@@ -1419,7 +1420,7 @@ export function summarizeV08PassiveTurnPanel(
         arachnaQueenFaults,
         passiveDecisionTiming: summarizeDecisionTimings(passiveDecisionMs),
         circuitOpenWaitTiming: summarizeDecisionTimings(circuitOpenWaitDecisionMs),
-        circuitOpenWaitRetryTiming: summarizeDecisionTimings(circuitOpenWaitRetryDecisionMs),
+        circuitOpenWaitArbitrationTiming: summarizeDecisionTimings(circuitOpenWaitArbitrationDecisionMs),
         circuitOpenWaitDeferredTiming: summarizeDecisionTimings(circuitOpenWaitDeferredDecisionMs),
         gates: { pass: failed.length === 0, failed, checks },
         failureSamples,

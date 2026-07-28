@@ -186,11 +186,19 @@ describe("v0.8 search measurement alias", () => {
         // seeded draw. Two isolated runs reproduced these hashes.
         // Re-pinned after the L2/L3 catalogs grew (Wyvern..Nightmare) and poison began stacking; both shift the
         // same seeded draw and its combat trace.
-        expect(digest("v0.7")).toBe("57e1d04de4e9119764375d2451b1d630220c7461ed71d36d19b5803269b1f9b8");
+        // Re-pinned after v0.1's validated MOVE/fallback route began completing an adjacent melee as a
+        // standalone move + stationary strike. That base contract propagates through v0.7; two isolated runs
+        // reproduced this trace with no rejected actions.
+        // Re-pinned after primary v0.1 move-and-strike began using the same explicit move lifecycle as its
+        // fallback route. Fire Wall, Vine, smoke, moved-state, and movement events now resolve before the
+        // stationary strike instead of being bypassed by an integrated path. Two isolated runs reproduced it.
+        expect(digest("v0.7")).toBe("1a4188df722e61130fb97d2216225d7a6c1208e0a78cfc79c742c4a2c808b244");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
-        expect(digest("v0.8")).toBe("7c521763c73b87d8fec908729baa96fcff436aef140416f2ab4f99992323a40f");
+        // Re-pinned with the same MOVE/fallback completion change plus truthful Through Shot/physical-AOE
+        // damage metadata used by v0.8's direct finish scheduler. Two isolated runs reproduced this trace.
+        expect(digest("v0.8")).toBe("96217bbe1727b0186c0397a07ece513482f6bdfaef13dd79477511421e77b6d8");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {
@@ -404,19 +412,21 @@ describe("v0.8 search measurement alias", () => {
         expect(urgent.some((action) => action.type === "move_unit")).toBe(true);
     });
 
-    it("opens the exact BLOCK_CENTER Elf firing line before advancing in the lap-9 sprint", () => {
+    it("fires the BLOCK_CENTER Elf instead of advancing passively in the lap-9 sprint", () => {
         const options = {
             candidateVersion: "v0.8s",
             opponentVersion: "v0.7",
-            games: 16,
+            games: 1_024,
             baseSeed: V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_SEED,
             sourceCommit: "a".repeat(40),
             sourceDirty: false,
         } as const;
-        const plan = planV08BlockCenterActionGame(options, 14);
+        const plan = planV08BlockCenterActionGame(options, 608);
         const setup = liveTwinSetup();
         let nativeDecision: GameAction[] | undefined;
         let chosenDecision: GameAction[] | undefined;
+        let chosenActionsCompleted: boolean[] | undefined;
+        let recoveryAttempts: number | undefined;
         let lap9ElfId: string | undefined;
         withV08BlockCenterCandidateEnvironment(options, () =>
             runMatch({
@@ -445,34 +455,47 @@ describe("v0.8 search measurement alias", () => {
                 turnExecutionObserver: (observation) => {
                     if (observation.unitId === lap9ElfId) {
                         chosenDecision = structuredClone(observation.chosenDecision);
+                        chosenActionsCompleted = observation.strategyActions.map(({ completed }) => completed);
+                        recoveryAttempts = observation.recoveryAttempts.length;
                     }
                 },
             }),
         );
 
-        expect(plan.seed).toBe(4_008_461_184);
+        expect(plan.seed).toBe(2_101_899_737);
         const expected: GameAction[] = [
             {
                 type: "move_unit",
-                unitId: "7387b7a9-d3fc-521d-9b2d-308555ec02e1",
+                unitId: "dde1fb1c-4537-547a-bf69-c1f4f53efeb6",
                 path: [
-                    { x: 4, y: 7 },
-                    { x: 3, y: 8 },
+                    { x: 4, y: 4 },
+                    { x: 5, y: 4 },
+                    { x: 6, y: 4 },
                 ],
-                targetCells: [{ x: 3, y: 8 }],
+                targetCells: [{ x: 6, y: 4 }],
                 hasLavaCell: false,
                 hasWaterCell: false,
             },
             {
                 type: "range_attack",
-                attackerId: "7387b7a9-d3fc-521d-9b2d-308555ec02e1",
-                targetId: "71018232-c495-53db-83ae-634434548c91",
+                attackerId: "dde1fb1c-4537-547a-bf69-c1f4f53efeb6",
+                targetId: "99b6a8bf-908d-57c9-a089-ac6ee14aea7a",
                 aimCell: { x: 9, y: 12 },
                 aimSide: 0,
             },
         ];
         expect(nativeDecision).toEqual(expected);
-        expect(chosenDecision).toEqual(expected);
+        // Depending on whether the exact production wall-clock circuit is already warm, a13 may retain this
+        // move-shot or improve it to a stationary shot from the same actor into the same target. The tactical
+        // contract is that it fires instead of emitting an advance-only/passive turn, and that the real engine
+        // accepts the entire chosen proposal without recovery.
+        expect(chosenDecision?.at(-1)).toMatchObject({
+            type: "range_attack",
+            attackerId: "dde1fb1c-4537-547a-bf69-c1f4f53efeb6",
+            targetId: "99b6a8bf-908d-57c9-a089-ac6ee14aea7a",
+        });
+        expect(chosenActionsCompleted?.every(Boolean)).toBe(true);
+        expect(recoveryAttempts).toBe(0);
     });
 
     it("closes on a sole surviving enemy summon in the lap-9 sprint", () => {

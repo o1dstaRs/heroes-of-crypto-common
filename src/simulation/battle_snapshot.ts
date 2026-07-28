@@ -101,6 +101,7 @@ const UNIT_FIELDS = [
     "waterShieldSpent",
     "onHourglass",
     "movedThisTurn",
+    "movedRouteCellsThisTurn",
     "currentAttackModIncrease",
     "adjustedBaseStatsLaps",
     "luckPerTurn",

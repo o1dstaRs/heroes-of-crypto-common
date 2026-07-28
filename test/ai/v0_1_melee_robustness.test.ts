@@ -13,12 +13,17 @@ import { describe, expect, it } from "bun:test";
 
 import { getAIStrategy, type IDecisionContext } from "../../src/ai";
 import { AIActionType, findTarget, recordAITargetMemory } from "../../src/ai/ai";
+import type { IReadonlyWeightedRoute } from "../../src/ai/decision_path_catalog";
+import { StrategyV0_1 } from "../../src/ai/versions/v0_1";
 import { getSpellConfig } from "../../src/configuration/config_provider";
+import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCells } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
+import type { IWeightedRoute } from "../../src/grid/path_definitions";
+import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
@@ -36,6 +41,7 @@ const UPPER = PBTypes.TeamVals.UPPER;
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const MAGIC = PBTypes.AttackVals.MAGIC;
+const RANGE = PBTypes.AttackVals.RANGE;
 
 function contextFor(combat: CombatTestContext): IDecisionContext {
     return {
@@ -62,6 +68,46 @@ function setTeamCensus(combat: CombatTestContext): void {
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
     fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+}
+
+class ExposedStrategyV0_1 extends StrategyV0_1 {
+    public completeValidatedMove(unit: Unit, context: IDecisionContext, route: IReadonlyWeightedRoute): GameAction[] {
+        return this.completeMoveWithAdjacentMelee(unit, context, route);
+    }
+}
+
+function routeTo(cell: XY, route: XY[]): IWeightedRoute {
+    return {
+        cell,
+        route,
+        weight: route.length - 1,
+        firstAggrMet: false,
+        hasLavaCell: false,
+        hasWaterCell: false,
+    };
+}
+
+function startActionEngine(
+    combat: CombatTestContext,
+    unit: Unit,
+    context: IDecisionContext,
+    getCurrentActiveKnownPaths?: () => Map<number, IWeightedRoute[]> | undefined,
+): GameActionEngine {
+    const fightProperties = context.fightProperties!;
+    setTeamCensus(combat);
+    fightProperties.startFight();
+    fightProperties.startTurn(unit.getTeam(), 1_000);
+    return new GameActionEngine({
+        fightProperties,
+        grid: combat.grid,
+        unitsHolder: combat.unitsHolder,
+        moveHandler: new MoveHandler(testGridSettings, combat.grid, combat.unitsHolder),
+        sceneLog: new SceneLogMock(),
+        attackHandler: combat.attackHandler,
+        getCurrentActiveUnitId: () => unit.getId(),
+        getCurrentActiveKnownPaths,
+        getCurrentEnemiesCellsWithinMovementRange: () => [],
+    });
 }
 
 function placeLarge(combat: CombatTestContext, unit: Unit, base: XY): void {
@@ -377,10 +423,285 @@ describe("v0.1 melee robustness", () => {
         placeUnit(combat.grid, combat.unitsHolder, responded, { x: 7, y: 6 });
         FightStateManager.getInstance().getFightProperties().addRepliedAttack(responded.getId());
 
-        const strike = meleeAction(getAIStrategy("v0.1").decideTurn(attacker, contextFor(combat)));
+        const actions = getAIStrategy("v0.1").decideTurn(attacker, contextFor(combat));
+        expect(actions.map((action) => action.type)).toEqual(["move_unit", "melee_attack"]);
+        const move = actions[0];
+        const strike = meleeAction(actions);
         expect(strike?.targetId).toBe(responded.getId());
-        expect(strike?.path?.length).toBeGreaterThan(0);
+        expect(strike?.path).toBeUndefined();
+        expect(move.type).toBe("move_unit");
+        if (move.type === "move_unit") {
+            expect(move.path.length).toBeGreaterThan(0);
+            expect(move.targetCells).toContainEqual(strike!.attackFrom);
+        }
         expect(combat.grid.areCellsAdjacent([strike!.attackFrom], responded.getCells())).toBe(true);
+    });
+
+    it("runs a primary move-and-strike through the authoritative Fire Wall and Vine lifecycle", () => {
+        const combat = createCombatTestContext();
+        const attacker = createTestUnit({
+            name: "Primary hazard runner",
+            team: LOWER,
+            attackType: MELEE,
+            amountAlive: 4,
+            maxHp: 100,
+            speed: 4,
+        });
+        const target = createTestUnit({ name: "Primary target", team: UPPER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 5 });
+        for (const [index, cell] of [
+            { x: 6, y: 4 },
+            { x: 7, y: 4 },
+            { x: 8, y: 4 },
+            { x: 8, y: 5 },
+            { x: 8, y: 6 },
+            { x: 7, y: 6 },
+            { x: 6, y: 6 },
+        ].entries()) {
+            const blocker = createTestUnit({ name: `Attack-cell blocker ${index}`, team: LOWER, attackType: MELEE });
+            placeUnit(combat.grid, combat.unitsHolder, blocker, cell);
+        }
+        const context = contextFor(combat);
+        const destination = { x: 6, y: 5 };
+        context.fightProperties!.getFireWalls().add(destination);
+        context.fightProperties!.getVines().add(destination, 2, UPPER);
+
+        const actions = getAIStrategy("v0.1").decideTurn(attacker, context);
+        expect(actions.map((action) => action.type)).toEqual(["move_unit", "melee_attack"]);
+        expect(actions[0]).toMatchObject({ type: "move_unit", targetCells: [destination] });
+        expect(meleeAction(actions)).toMatchObject({
+            targetId: target.getId(),
+            attackFrom: destination,
+        });
+        expect(meleeAction(actions)?.path).toBeUndefined();
+
+        const engine = startActionEngine(combat, attacker, context);
+        const moveResult = engine.apply(actions[0]);
+        expect(moveResult.completed).toBe(true);
+        expect(moveResult.events.some((event) => event.type === "unit_moved")).toBe(true);
+        expect(moveResult.events.some((event) => event.type === "fire_wall_burned")).toBe(true);
+        expect(attacker.hasDebuffActive("Vine Throw")).toBe(true);
+        expect(engine.apply(actions[1]).completed).toBe(true);
+    });
+
+    it("preserves authoritative Rapid Charge distance across an explicit move and stationary strike", () => {
+        for (const exposeRankedPostMovePaths of [false, true]) {
+            const combat = createCombatTestContext();
+            const charger = createTestUnit({
+                name: "Wolf Rider",
+                team: LOWER,
+                attackType: MELEE,
+                amountAlive: 10,
+                damageMin: 1,
+                damageMax: 1,
+                abilities: ["Rapid Charge"],
+                stackPower: 5,
+            });
+            const target = createTestUnit({
+                name: "Charge target",
+                team: UPPER,
+                attackType: MELEE,
+                amountAlive: 100,
+                maxHp: 10,
+            });
+            placeUnit(combat.grid, combat.unitsHolder, charger, { x: 4, y: 5 });
+            placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 5 });
+            const context = contextFor(combat);
+            const actions = getAIStrategy("v0.1").decideTurn(charger, context);
+            const chargeRoute = routeTo({ x: 6, y: 5 }, [
+                { x: 4, y: 5 },
+                { x: 5, y: 5 },
+                { x: 6, y: 5 },
+            ]);
+            expect(actions.map((action) => action.type)).toEqual(["move_unit", "melee_attack"]);
+            expect(actions[0]).toMatchObject({
+                type: "move_unit",
+                path: chargeRoute.route,
+            });
+            expect(meleeAction(actions)?.path).toBeUndefined();
+
+            const getRankedPaths = exposeRankedPostMovePaths
+                ? (): Map<number, IWeightedRoute[]> => {
+                      const beforeMove = charger.getBaseCell().x === 4;
+                      const route = beforeMove ? chargeRoute : routeTo({ x: 6, y: 5 }, [{ x: 6, y: 5 }]);
+                      return new Map([[(6 << 4) | 5, [route]]]);
+                  }
+                : undefined;
+            const engine = startActionEngine(combat, charger, context, getRankedPaths);
+            expect(engine.apply(actions[0]).completed).toBe(true);
+            expect(charger.getMovedRouteCellsThisTurn()).toBe(3);
+            const targetHpBefore = target.getCumulativeHp();
+            expect(engine.apply(actions[1]).completed).toBe(true);
+            expect(targetHpBefore - target.getCumulativeHp()).toBe(13);
+            expect(charger.getMovedRouteCellsThisTurn()).toBe(0);
+        }
+    });
+
+    it("keeps Trent's discounted own-vine move-and-strike longer than its plain cell-count budget", () => {
+        const combat = createCombatTestContext();
+        const trent = createTestUnit({
+            name: "Trent",
+            team: LOWER,
+            attackType: MELEE,
+            abilities: ["In Its Own World"],
+        });
+        const target = createTestUnit({ name: "Vine-road target", team: UPPER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, trent, { x: 2, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 9, y: 5 });
+        const context = contextFor(combat);
+        for (let x = 3; x <= 8; x += 1) {
+            context.fightProperties!.getVines().add({ x, y: 5 }, 2, LOWER);
+        }
+
+        const actions = getAIStrategy("v0.1").decideTurn(trent, context);
+        expect(actions.map((action) => action.type)).toEqual(["move_unit", "melee_attack"]);
+        const move = actions[0];
+        expect(move.type).toBe("move_unit");
+        if (move.type !== "move_unit") {
+            throw new Error("expected Trent to move along its own vine road");
+        }
+        const startsAtOrigin = move.path[0]?.x === trent.getBaseCell().x && move.path[0]?.y === trent.getBaseCell().y;
+        const travelledCells = move.path.length - (startsAtOrigin ? 1 : 0);
+        expect(travelledCells).toBeGreaterThan(Math.ceil(trent.getSteps()));
+        expect(move.targetCells).toContainEqual({ x: 8, y: 5 });
+        expect(meleeAction(actions)).toMatchObject({
+            targetId: target.getId(),
+            attackFrom: { x: 8, y: 5 },
+        });
+        expect(meleeAction(actions)?.path).toBeUndefined();
+
+        const engine = startActionEngine(combat, trent, context);
+        expect(engine.apply(move).completed).toBe(true);
+        expect(engine.apply(actions[1]).completed).toBe(true);
+    });
+
+    it("runs a completed fallback move through Fire Wall and Vine effects before its stationary melee suffix", () => {
+        const combat = createCombatTestContext();
+        const attacker = createTestUnit({
+            name: "Hazard runner",
+            team: LOWER,
+            attackType: MELEE,
+            amountAlive: 4,
+            maxHp: 100,
+            speed: 4,
+        });
+        const target = createTestUnit({
+            name: "Adjacent after move",
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 10,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 4, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 5 });
+        const context = contextFor(combat);
+        const destination = { x: 6, y: 5 };
+        const route = routeTo(destination, [{ x: 4, y: 5 }, { x: 5, y: 5 }, destination]);
+        context.fightProperties!.getFireWalls().add(destination);
+        context.fightProperties!.getVines().add(destination, 2, UPPER);
+
+        const actions = new ExposedStrategyV0_1().completeValidatedMove(attacker, context, route);
+        expect(actions.map((action) => action.type)).toEqual(["move_unit", "melee_attack"]);
+        const strike = meleeAction(actions);
+        expect(strike).toMatchObject({
+            targetId: target.getId(),
+            attackFrom: destination,
+        });
+        expect(strike?.path).toBeUndefined();
+
+        const engine = startActionEngine(combat, attacker, context);
+        const moveResult = engine.apply(actions[0]);
+        expect(moveResult.completed).toBe(true);
+        expect(moveResult.events.some((event) => event.type === "unit_moved")).toBe(true);
+        expect(moveResult.events.some((event) => event.type === "fire_wall_burned")).toBe(true);
+        expect(attacker.hasDebuffActive("Vine Throw")).toBe(true);
+        expect(attacker.getCumulativeHp()).toBeLessThan(400);
+
+        const strikeResult = engine.apply(actions[1]);
+        expect(strikeResult.completed).toBe(true);
+        expect(strikeResult.events.some((event) => event.type === "unit_attacked")).toBe(true);
+    });
+
+    it("drops a fallback melee suffix when Fire Wall would make Cowardice reject it after moving", () => {
+        const combat = createCombatTestContext();
+        const attacker = createTestUnit({
+            name: "Projected coward",
+            team: LOWER,
+            attackType: MELEE,
+            amountAlive: 2,
+            maxHp: 100,
+            speed: 4,
+        });
+        const target = createTestUnit({
+            name: "Stronger after burn",
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 15,
+            maxHp: 10,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 4, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 5 });
+        applyCowardice(attacker);
+        const context = contextFor(combat);
+        const destination = { x: 6, y: 5 };
+        const route = routeTo(destination, [{ x: 4, y: 5 }, { x: 5, y: 5 }, destination]);
+        context.fightProperties!.getFireWalls().add(destination, 2, 50);
+
+        const actions = new ExposedStrategyV0_1().completeValidatedMove(attacker, context, route);
+        expect(actions).toEqual([
+            {
+                type: "move_unit",
+                unitId: attacker.getId(),
+                path: route.route,
+                targetCells: [destination],
+                hasLavaCell: false,
+                hasWaterCell: false,
+            },
+        ]);
+
+        const moveResult = startActionEngine(combat, attacker, context).apply(actions[0]);
+        expect(moveResult.completed).toBe(true);
+        expect(attacker.getCumulativeHp()).toBe(100);
+        expect(attacker.getCumulativeHp()).toBeLessThan(target.getCumulativeHp());
+    });
+
+    it("completes a fallback move when Cowardice bars every ranged target", () => {
+        const combat = createCombatTestContext();
+        const shooter = createTestUnit({
+            name: "Cowardly archer",
+            team: LOWER,
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            amountAlive: 1,
+            maxHp: 10,
+            speed: 3,
+        });
+        const stronger = createTestUnit({
+            name: "Stronger distant target",
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 20,
+            maxHp: 10,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 3, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, stronger, { x: 12, y: 5 });
+        shooter.refreshPossibleAttackTypes(true);
+        applyCowardice(shooter);
+        const context = contextFor(combat);
+
+        const actions = getAIStrategy("v0.1").decideTurn(shooter, context);
+        expect(actions).toHaveLength(1);
+        expect(actions[0]).toMatchObject({
+            type: "move_unit",
+            unitId: shooter.getId(),
+        });
+        expect(actions.some((action) => action.type === "range_attack" || action.type === "melee_attack")).toBe(false);
+
+        const engine = startActionEngine(combat, shooter, context);
+        expect(actions.map((action) => engine.apply(action).completed)).toEqual([true]);
+        expect(shooter.getBaseCell().x).toBeGreaterThan(3);
     });
 
     it("selects the concrete MELEE_MAGIC stance instead of emitting a rejected generic MELEE prefix", () => {

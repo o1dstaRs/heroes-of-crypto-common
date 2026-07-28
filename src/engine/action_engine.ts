@@ -436,6 +436,7 @@ export class GameActionEngine {
         // Mark that the unit moved this turn so a later end_turn reads as a real "manual" finish (it
         // acted) rather than a do-nothing skip.
         unit.setMovedThisTurn(true);
+        unit.setMovedRouteCellsThisTurn(pathIsFootprintOnly ? 1 : (knownMoveRoute?.route.length ?? action.path.length));
 
         const events: GameEvent[] = [
             {
@@ -604,29 +605,36 @@ export class GameActionEngine {
             false,
             attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
         );
+        // `target` is the declared aim anchor used to reconstruct the trajectory. Special shots may legally
+        // aim at a rear stack while the authoritative first intersection is a different front stack. Response
+        // ownership must follow that actual primary, exactly as damage does; using the aim anchor can suppress
+        // a legal retaliation or attribute its kill to a unit that was never hit.
+        const primaryRangeTarget = evalResult.affectedUnits[0]?.[0];
         let responseDivisor = 1;
         let responseUnits: Unit[] | undefined = undefined;
         if (
+            primaryRangeTarget &&
             // isRangeCapable, not attack_type === RANGE: a melee unit holding a stolen Endless Quiver
             // counter-shoots like any other shooter.
-            target.isRangeCapable() &&
-            target.getRangeShots() > 0 &&
-            !target.hasDebuffActive("Range Null Field Aura") &&
-            !target.hasStatusApplied("Rangebane") &&
+            primaryRangeTarget.isRangeCapable() &&
+            primaryRangeTarget.getRangeShots() > 0 &&
+            !primaryRangeTarget.hasDebuffActive("Range Null Field Aura") &&
+            !primaryRangeTarget.hasStatusApplied("Rangebane") &&
             !this.context.attackHandler.canBeAttackedByMelee(
-                target.getPosition(),
-                target.isSmallSize(),
-                this.context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
+                primaryRangeTarget.getPosition(),
+                primaryRangeTarget.isSmallSize(),
+                this.context.grid.getEnemyAggrMatrixByUnitId(primaryRangeTarget.getId()),
             )
         ) {
             const responseEval = this.context.attackHandler.evaluateRangeAttack(
                 this.context.unitsHolder.getAllUnits(),
-                target,
-                target.getPosition(),
+                primaryRangeTarget,
+                primaryRangeTarget.getPosition(),
                 attacker.getPosition(),
-                target.hasAbilityActive("Through Shot"),
+                primaryRangeTarget.hasAbilityActive("Through Shot"),
                 false,
-                target.hasAbilityActive("Large Caliber") || target.hasAbilityActive("Area Throw"),
+                primaryRangeTarget.hasAbilityActive("Large Caliber") ||
+                    primaryRangeTarget.hasAbilityActive("Area Throw"),
             );
             responseDivisor = responseEval.rangeAttackDivisors[0] ?? 1;
             responseUnits = responseEval.affectedUnits[0];
@@ -650,11 +658,10 @@ export class GameActionEngine {
         }
 
         const unitIdsDied = [...new Set(result.unitIdsDied)];
-        const primaryRangeTarget = evalResult.affectedUnits[0]?.[0];
         const responseTarget = responseUnits?.[0];
         const killAttributions = this.createDirectKillAttributions(unitIdsDied, [
             ...(primaryRangeTarget ? [{ victim: primaryRangeTarget, killer: attacker }] : []),
-            ...(responseTarget ? [{ victim: responseTarget, killer: target }] : []),
+            ...(responseTarget && primaryRangeTarget ? [{ victim: responseTarget, killer: primaryRangeTarget }] : []),
         ]);
         const events: GameEvent[] = [
             {

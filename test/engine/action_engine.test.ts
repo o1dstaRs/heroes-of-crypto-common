@@ -45,6 +45,10 @@ const setupActionFight = (
         lowerMovementType?: MovementType;
         supportMovementType?: MovementType;
         upperMovementType?: MovementType;
+        upperAttackType?: AttackType;
+        upperDamageMin?: number;
+        upperDamageMax?: number;
+        upperRangeShots?: number;
         lowerCell?: { x: number; y: number };
         supportCell?: { x: number; y: number };
         upperCell?: { x: number; y: number };
@@ -86,13 +90,17 @@ const setupActionFight = (
     const upper = createTestUnit({
         name: "Upper",
         team: PBTypes.TeamVals.UPPER,
+        attackType: opts.upperAttackType,
         speed: 3,
         morale: 4,
         abilities: opts.upperAbilities,
         amountAlive: opts.upperAmountAlive,
         armor: opts.upperArmor,
+        damageMin: opts.upperDamageMin,
+        damageMax: opts.upperDamageMax,
         magicResist: opts.upperMagicResist,
         maxHp: opts.upperMaxHp,
+        rangeShots: opts.upperRangeShots,
         spells: opts.upperSpells,
         movementType: opts.upperMovementType,
     });
@@ -1005,6 +1013,78 @@ describe("GameActionEngine", () => {
         expect(entry?.position).toEqual(upperPosition);
         // Sanity: the splashed amount reflects the HP actually lost.
         expect(setup.upper.getCumulativeHp()).toBe(hpBefore - (entry?.amount ?? 0));
+    });
+
+    it("lets the actual front intersection retaliate when Large Caliber intentionally aims at a rear stack", () => {
+        const setup = setupActionFight({
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerAttack: 20,
+            lowerAbilities: ["Large Caliber"],
+            lowerDamageMin: 10,
+            lowerDamageMax: 10,
+            lowerRangeShots: 3,
+            lowerCell: { x: 2, y: 7 },
+            supportCell: { x: 2, y: 6 },
+            upperAttackType: PBTypes.AttackVals.RANGE,
+            upperAbilities: ["Infest"],
+            upperAmountAlive: 100,
+            upperDamageMin: 1_000,
+            upperDamageMax: 1_000,
+            upperMaxHp: 100,
+            upperRangeShots: 3,
+            upperCell: { x: 7, y: 7 },
+            createSummonedUnit: ({ team, unitName }) =>
+                createTestUnit({
+                    name: unitName,
+                    team,
+                    abilities: ["Infest"],
+                    summoned: true,
+                }),
+        });
+        const rearAim = createTestUnit({
+            name: "Rear aim anchor",
+            team: PBTypes.TeamVals.UPPER,
+            attackType: PBTypes.AttackVals.MELEE,
+            amountAlive: 100,
+            maxHp: 100,
+        });
+        placeUnit(setup.grid, setup.unitsHolder, rearAim, { x: 10, y: 7 });
+        setup.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 2);
+        setup.lower.refreshPossibleAttackTypes(true);
+        setup.upper.refreshPossibleAttackTypes(true);
+        const attackerHpBefore = setup.lower.getCumulativeHp();
+        const frontHpBefore = setup.upper.getCumulativeHp();
+        const rearHpBefore = rearAim.getCumulativeHp();
+
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.lower.getId(),
+            targetId: rearAim.getId(),
+            aimCell: { x: 10, y: 7 },
+            aimSide: RangeAttackCellSide.LEFT,
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.upper.getCumulativeHp()).toBeLessThan(frontHpBefore);
+        expect(rearAim.getCumulativeHp()).toBe(rearHpBefore);
+        expect(setup.upper.getResponded()).toBe(true);
+        expect(setup.lower.getCumulativeHp()).toBeLessThan(attackerHpBefore);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "unit_summoned",
+                team: setup.upper.getTeam(),
+                sourceAbility: "Infest",
+            }),
+        );
+        // The event retains the bounded transport intent; damage and response ownership follow the ray.
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "unit_attacked",
+                attackType: "range",
+                attackerId: setup.lower.getId(),
+                targetId: rearAim.getId(),
+            }),
+        );
     });
 
     it("rejects range attacks against hidden targets without consuming the turn", () => {

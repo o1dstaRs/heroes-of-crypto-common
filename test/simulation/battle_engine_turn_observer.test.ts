@@ -380,13 +380,17 @@ describe("battle engine turn execution observer", () => {
         ]);
         const selectedThenAttacked = turns.find((turn) => turn.unitId === injectedUnitId);
         expect(selectedThenAttacked).toBeDefined();
-        expect(selectedThenAttacked!.strategyActions).toHaveLength(2);
+        expect(selectedThenAttacked!.strategyActions).toHaveLength(3);
         expect(selectedThenAttacked!.strategyActions[0]).toMatchObject({
             action: { type: "select_attack_type", attackType: PBTypes.AttackVals.MELEE_MAGIC },
             completed: false,
             rejectionReason: "attack_type_not_available",
         });
         expect(selectedThenAttacked!.strategyActions[1]).toMatchObject({
+            action: { type: "move_unit" },
+            completed: true,
+        });
+        expect(selectedThenAttacked!.strategyActions[2]).toMatchObject({
             action: { type: "melee_attack" },
             completed: true,
         });

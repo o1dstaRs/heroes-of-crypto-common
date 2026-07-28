@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { projectPostMoveActorAvailability } from "../../engine/post_move_actor_availability";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
@@ -22,10 +23,12 @@ import {
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../../grid/grid_math";
+import { VINE_STRIDE_COST_MULTIPLIER } from "../../spells/vines";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
 import { AIActionType, canUnitLandAt, findTarget, type IAIAction } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { decisionFireWalls } from "../decision_fight_state";
 import { isMindlessAiUnit } from "../unit_ai_overrides";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "../melee_attack_type";
@@ -180,6 +183,12 @@ export class StrategyV0_1 implements IAIStrategy {
             if (movesToAttack && !route?.route.length) {
                 return this.fallbackTurn(unit, context);
             }
+            if (movesToAttack) {
+                if (!route || !this.isLegalMoveRoute(unit, context, attackFrom, route)) {
+                    return this.fallbackTurn(unit, context);
+                }
+                return this.completeMoveWithAdjacentMelee(unit, context, route, targetId);
+            }
 
             const actions = meleeAttackTypeSelectionPrefix(unit);
             const selected = unit.getAttackTypeSelection();
@@ -247,16 +256,7 @@ export class StrategyV0_1 implements IAIStrategy {
             if (!route || !this.isLegalMoveRoute(unit, context, targetCell, route)) {
                 return this.fallbackTurn(unit, context);
             }
-            return [
-                {
-                    type: "move_unit",
-                    unitId: unit.getId(),
-                    path: route.route.map((c) => ({ x: c.x, y: c.y })),
-                    targetCells: this.footprintForCell(unit, targetCell, context),
-                    hasLavaCell: route.hasLavaCell,
-                    hasWaterCell: route.hasWaterCell,
-                },
-            ];
+            return this.completeMoveWithAdjacentMelee(unit, context, route);
         }
 
         // MAGIC_ATTACK (and anything else): v0.1 doesn't cast — just advance toward the enemy / hold.
@@ -274,7 +274,10 @@ export class StrategyV0_1 implements IAIStrategy {
     ): Extract<GameAction, { type: "range_attack" }> | undefined {
         const enemies = context.unitsHolder
             .getAllEnemyUnits(unit.getTeam())
-            .filter((target) => !target.isDead() && !target.hasBuffActive("Hidden"));
+            .filter(
+                (target) =>
+                    !target.isDead() && !target.hasBuffActive("Hidden") && !unit.cannotAttackUnitId(target.getId()),
+            );
         const preferred = enemies.find((target) => target.getId() === preferredTargetId);
         const orderedTargets = preferred
             ? [preferred, ...enemies.filter((target) => target.getId() !== preferredTargetId)]
@@ -320,7 +323,13 @@ export class StrategyV0_1 implements IAIStrategy {
         action: Extract<GameAction, { type: "range_attack" }>,
     ): boolean {
         const target = context.unitsHolder.getAllUnits().get(action.targetId);
-        if (!target || target.isDead() || target.getTeam() === unit.getTeam() || target.hasBuffActive("Hidden")) {
+        if (
+            !target ||
+            target.isDead() ||
+            target.getTeam() === unit.getTeam() ||
+            target.hasBuffActive("Hidden") ||
+            unit.cannotAttackUnitId(target.getId())
+        ) {
             return false;
         }
 
@@ -405,7 +414,7 @@ export class StrategyV0_1 implements IAIStrategy {
             return false;
         }
         const firstHit = firstGroup[0];
-        if (firstHit.isDead() || firstHit.getTeam() === unit.getTeam()) {
+        if (firstHit.isDead() || firstHit.getTeam() === unit.getTeam() || unit.cannotAttackUnitId(firstHit.getId())) {
             return false;
         }
         if (evaluation.affectedUnits.length === 1 && firstHit.hasBuffActive("Hidden")) {
@@ -420,13 +429,22 @@ export class StrategyV0_1 implements IAIStrategy {
     }
     /** Mirror the target-side checks in AttackHandler.handleMeleeAttack. */
     protected isLegalMeleeTarget(unit: Unit, target: Unit, context: IDecisionContext): boolean {
+        return this.isLegalMeleeTargetAtHp(unit, target, context, unit.getCumulativeHp());
+    }
+    /** Mirror melee target gates after movement effects have changed the attacker's projected stack HP. */
+    protected isLegalMeleeTargetAtHp(
+        unit: Unit,
+        target: Unit,
+        context: IDecisionContext,
+        attackerCumulativeHp: number,
+    ): boolean {
         if (target.isDead() || target.getTeam() === unit.getTeam() || target.hasBuffActive("Hidden")) {
             return false;
         }
         if (unit.cannotAttackUnitId(target.getId())) {
             return false;
         }
-        if (unit.hasStatusApplied("Cowardice") && unit.getCumulativeHp() < target.getCumulativeHp()) {
+        if (unit.hasStatusApplied("Cowardice") && attackerCumulativeHp < target.getCumulativeHp()) {
             return false;
         }
         const forcedTargetId = unit.getTarget();
@@ -443,13 +461,14 @@ export class StrategyV0_1 implements IAIStrategy {
         context: IDecisionContext,
         currentTargetId: string,
         attackFromCells: XY[],
+        attackerCumulativeHp = unit.getCumulativeHp(),
     ): string | undefined {
         const fightProperties = context.fightProperties ?? FightStateManager.getInstance().getFightProperties();
         const candidates = context.unitsHolder
             .getAllEnemyUnits(unit.getTeam())
             .filter(
                 (target) =>
-                    this.isLegalMeleeTarget(unit, target, context) &&
+                    this.isLegalMeleeTargetAtHp(unit, target, context, attackerCumulativeHp) &&
                     context.grid.areCellsAdjacent(attackFromCells, target.getCells()),
             );
         const current = candidates.find((target) => target.getId() === currentTargetId);
@@ -496,7 +515,18 @@ export class StrategyV0_1 implements IAIStrategy {
         const base = unit.getBaseCell();
         const travelled =
             route.route[0]?.x === base.x && route.route[0]?.y === base.y ? route.route.slice(1) : route.route;
-        if (!travelled.length || travelled.length > Math.max(1, Math.ceil(unit.getSteps()))) {
+        const vines =
+            context.fightProperties?.getVines() ?? FightStateManager.getInstance().getFightProperties().getVines();
+        const cheapestCellCost =
+            unit.hasAbilityActive("In Its Own World") && vines.size() > 0 ? VINE_STRIDE_COST_MULTIPLIER : 1;
+        const maxTravelledCells = Math.max(1, Math.ceil(unit.getSteps() / cheapestCellCost));
+        if (
+            !travelled.length ||
+            travelled.length > maxTravelledCells ||
+            !Number.isFinite(route.weight) ||
+            route.weight < 0 ||
+            route.weight > unit.getSteps() + 1e-9
+        ) {
             return false;
         }
         let previous = base;
@@ -520,6 +550,75 @@ export class StrategyV0_1 implements IAIStrategy {
             x: position.x - gs.getHalfStep(),
             y: position.y - gs.getHalfStep(),
         });
+    }
+    /**
+     * Finish an already validated movement route with a legal adjacent strike whenever possible.
+     *
+     * `findTarget` can describe this route as MOVE, or the mindless BLOCK_CENTER policy can reach it through
+     * the obstacle fallback. Both paths must implement the same "run and attack" contract. Project movement
+     * effects before testing Cowardice and actor availability so the suffix cannot manufacture a rejected hit.
+     */
+    protected completeMoveWithAdjacentMelee(
+        unit: Unit,
+        context: IDecisionContext,
+        route: IReadonlyWeightedRoute,
+        preferredTargetId?: string,
+    ): GameAction[] {
+        const targetCells = this.footprintForCell(unit, route.cell, context);
+        const move: Extract<GameAction, { type: "move_unit" }> = {
+            type: "move_unit",
+            unitId: unit.getId(),
+            path: route.route.map((cell) => ({ x: cell.x, y: cell.y })),
+            targetCells,
+            hasLavaCell: route.hasLavaCell,
+            hasWaterCell: route.hasWaterCell,
+        };
+        if (unit.hasAbilityActive("No Melee")) {
+            return [move];
+        }
+
+        const projection = projectPostMoveActorAvailability(unit, decisionFireWalls(context), move, route);
+        if (!projection.availableAfterMove || projection.resurrected) {
+            return [move];
+        }
+        const postMoveCumulativeHp =
+            projection.stack.amountAlive <= 0
+                ? 0
+                : (projection.stack.amountAlive - 1) * projection.stack.maxHp + Math.max(0, projection.stack.hp);
+        const adjacent = context.unitsHolder
+            .getAllEnemyUnits(unit.getTeam())
+            .filter(
+                (enemy) =>
+                    this.isLegalMeleeTargetAtHp(unit, enemy, context, postMoveCumulativeHp) &&
+                    context.grid.areCellsAdjacent(targetCells, enemy.getCells()),
+            );
+        const preferred = adjacent.find((enemy) => enemy.getId() === preferredTargetId);
+        const targetId = preferred ?? adjacent[0];
+        const resolvedTargetId = targetId
+            ? this.preferRespondedMeleeTarget(unit, context, targetId.getId(), targetCells, postMoveCumulativeHp)
+            : undefined;
+        if (!resolvedTargetId) {
+            return [move];
+        }
+
+        const actions = meleeAttackTypeSelectionPrefix(unit);
+        const selected = unit.getAttackTypeSelection();
+        const alreadyMelee = selected === PBTypes.AttackVals.MELEE || selected === PBTypes.AttackVals.MELEE_MAGIC;
+        if (!alreadyMelee && !actions.length) {
+            return [move];
+        }
+        // Keep movement as its own authoritative action. Besides updating occupancy, the move handler owns
+        // Fire Wall damage, Water Shield consumption, terrain buffs, vines, smoke and unit_moved events.
+        // A path-bearing melee_attack uses the older integrated movement path and does not apply that complete
+        // lifecycle, so folding this pair would let the simple AI bypass board hazards.
+        actions.push(move);
+        actions.push({
+            type: "melee_attack",
+            attackerId: unit.getId(),
+            targetId: resolvedTargetId,
+            attackFrom: { x: route.cell.x, y: route.cell.y },
+        });
+        return actions;
     }
     /**
      * A mindless stack can be temporarily boxed in by its own army even though it is healthy and mobile.
@@ -603,16 +702,7 @@ export class StrategyV0_1 implements IAIStrategy {
         if (!bestRoute?.route.length) {
             return this.idleTurn(unit, context);
         }
-        return [
-            {
-                type: "move_unit",
-                unitId: unit.getId(),
-                path: bestRoute.route.map((c) => ({ x: c.x, y: c.y })),
-                targetCells: this.footprintForCell(unit, bestRoute.cell, context),
-                hasLavaCell: bestRoute.hasLavaCell,
-                hasWaterCell: bestRoute.hasWaterCell,
-            },
-        ];
+        return this.completeMoveWithAdjacentMelee(unit, context, bestRoute);
     }
 }
 

@@ -33,6 +33,7 @@ import {
     isV08BlockCenterNonDamagingSpellTurnExempt,
     isV08BlockCenterNonProgressMove,
     planV08BlockCenterActionGame,
+    runV08BlockCenterActionPanelGame,
     summarizeV08BlockCenterActionPanel,
     V08BlockCenterActionAuditor,
     v08BlockCenterActionSignature,
@@ -50,6 +51,15 @@ const OPTIONS: IV08BlockCenterActionPanelOptions = {
     opponentVersion: "v0.7",
     games: 4,
     baseSeed: 0x1234_5678,
+    sourceCommit: "a".repeat(40),
+    sourceDirty: false,
+};
+
+const DEEP_PANEL_OPTIONS: IV08BlockCenterActionPanelOptions = {
+    candidateVersion: "v0.8",
+    opponentVersion: "v0.7",
+    games: 50_000,
+    baseSeed: 2_607_280_041,
     sourceCommit: "a".repeat(40),
     sourceDirty: false,
 };
@@ -134,6 +144,48 @@ const recordFor = (game: number): IV08BlockCenterActionRecord => {
 };
 
 describe("v0.8 BLOCK_CENTER action oracle panel", () => {
+    test("keeps deep game 1069 free of the pinned Berserker direct-action drought", () => {
+        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 1_069);
+
+        expect(record).toMatchObject({
+            game: 1_069,
+            pair: 534,
+            seed: 2_736_768_735,
+            candidateSide: "red",
+            candidateRoster: ["Berserker", "Berserker", "Valkyrie", "Trent", "Cyclops", "Tsar Cannon"],
+            opponentRoster: ["Peasant", "Blacksmith", "Valkyrie", "Elf", "Crusader", "Frenzied Boar"],
+            candidateEngineRejections: 0,
+        });
+        expect(record.metrics).toMatchObject({
+            urgentCatalogMisses: 0,
+            urgentMountainAdjacentMisses: 0,
+            urgentRepeatedNonProgressWithDirectOption: 0,
+            urgentCombatDroughts: 0,
+            lateDirectActionMisses: 0,
+        });
+    });
+
+    test("keeps deep game 1589 free of the Tsar Cannon mountain action stall", () => {
+        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 1_589);
+
+        expect(record).toMatchObject({
+            game: 1_589,
+            pair: 794,
+            seed: 1_400_331_939,
+            candidateSide: "red",
+            candidateRoster: ["Fairy", "Troglodyte", "Harpy", "Pikeman", "Efreet", "Tsar Cannon"],
+            opponentRoster: ["Leprechaun", "Centaur", "Pikeman", "Trent", "Cyclops", "Gargantuan"],
+            candidateEngineRejections: 0,
+        });
+        expect(record.metrics).toMatchObject({
+            urgentCatalogMisses: 0,
+            urgentMountainAdjacentMisses: 0,
+            urgentRepeatedNonProgressWithDirectOption: 0,
+            urgentCombatDroughts: 0,
+            lateDirectActionMisses: 0,
+        });
+    });
+
     test("uses deterministic random rosters and exact adjacent seat swaps on BLOCK_CENTER", () => {
         const fingerprint = fingerprintV08BlockCenterActionPlan(OPTIONS);
         expect(fingerprint).toHaveLength(64);

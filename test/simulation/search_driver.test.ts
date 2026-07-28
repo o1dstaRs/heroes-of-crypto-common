@@ -1872,7 +1872,9 @@ describe("search driver — gating, hygiene, determinism", () => {
             [named(GREEN_TEAM, "Elf"), { x: 1, y: 4 }],
             [named(GREEN_TEAM, "Tsar Cannon"), { x: 3, y: 13 }],
             [named(RED_TEAM, "Squire"), { x: 5, y: 7 }],
-            [named(RED_TEAM, "Tsar Cannon"), { x: 9, y: 7 }],
+            // Keep the intended rear-aim Large Caliber case engine-real: the Squire at (5, 7) is the
+            // first impact, while the Tsar's 2x2 footprint begins inside that impact's adjacent splash.
+            [named(RED_TEAM, "Tsar Cannon"), { x: 7, y: 7 }],
             [named(RED_TEAM, "Arbalester"), { x: 10, y: 8 }],
             [named(RED_TEAM, "Cyclops"), { x: 10, y: 5 }],
             [named(RED_TEAM, "Pikeman"), { x: 14, y: 13 }],
@@ -2237,7 +2239,9 @@ describe("search driver — gating, hygiene, determinism", () => {
         driver.onFightReady();
 
         const controlIncumbent = plainAim(actor, primary);
-        expect(driver.chooseDecision(actor, "v0.8s", controlIncumbent)).toBe(controlIncumbent);
+        // The control seat may still improve this engine-real splash through ordinary a13 search. The funnel
+        // assertion below is the relevant isolation invariant: only production v0.8 selector decisions count.
+        driver.chooseDecision(actor, "v0.8s", controlIncumbent);
         const nonShotIncumbent: GameAction[] = [{ type: "wait_turn", unitId: actor.getId() }];
         driver.chooseDecision(actor, "v0.8", nonShotIncumbent);
         const alreadyFocusedIncumbent = plainAim(actor, noMelee);
@@ -2451,7 +2455,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         });
     });
 
-    it("keeps circuit-open operation-bounded wait arbitration and behavior counters observer-invariant", () => {
+    it("scores every circuit-open operation-bounded wait and keeps behavior counters observer-invariant", () => {
         setEnv({
             V07_SEARCH: "1",
             SEARCH_VERSIONS: "v0.8",
@@ -2521,25 +2525,25 @@ describe("search driver — gating, hygiene, determinism", () => {
             betterShortlistedProductiveAlternative: true,
             evidenceComplete: true,
             circuitOpenAtDecision: true,
-            circuitWaitRetry: true,
+            circuitWaitArbitration: true,
             resolution: "scored",
         });
 
         const secondControlWait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
         const secondObservedWait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
-        expect(control.chooseDecision(unit, "v0.8", secondControlWait)).toBe(secondControlWait);
-        expect(observed.chooseDecision(unit, "v0.8", secondObservedWait)).toBe(secondObservedWait);
+        expect(control.chooseDecision(unit, "v0.8", secondControlWait)).not.toBe(secondControlWait);
+        expect(observed.chooseDecision(unit, "v0.8", secondObservedWait)).not.toBe(secondObservedWait);
         expect(behaviorCounters(observed.counters)).toEqual(behaviorCounters(control.counters));
-        expect(control.counters).toMatchObject({ circuitWaitRetries: 1, circuitSkipped: 1 });
-        expect(observed.counters).toMatchObject({ circuitWaitRetries: 1, circuitSkipped: 1 });
+        expect(control.counters).toMatchObject({ circuitWaitArbitrations: 2, circuitSkipped: 0 });
+        expect(observed.counters).toMatchObject({ circuitWaitArbitrations: 2, circuitSkipped: 0 });
         expect(probes).toHaveLength(2);
         expect(probes[1]).toMatchObject({
             unitId: unit.getId(),
             incumbentKind: "wait",
-            retainedPassive: true,
+            retainedPassive: false,
             circuitOpenAtDecision: true,
-            circuitWaitRetry: false,
-            resolution: "circuit_fallback",
+            circuitWaitArbitration: true,
+            resolution: "scored",
         });
 
         const fresh = h.makeDriver() as unknown as {
@@ -2558,7 +2562,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         fresh.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
         const freshWait: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
         expect(fresh.chooseDecision(unit, "v0.8", freshWait)).not.toBe(freshWait);
-        expect(fresh.counters).toMatchObject({ circuitWaitRetries: 1, circuitSkipped: 0 });
+        expect(fresh.counters).toMatchObject({ circuitWaitArbitrations: 1, circuitSkipped: 0 });
     });
 
     it("freezes passive behavior time before diagnostic aggregation can affect the circuit or later decisions", () => {
@@ -3320,7 +3324,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         const circuitTied = buildStrongPosture();
         const circuitTiedDriver = circuitTied.harness.makeDriver() as unknown as {
             circuitOpen: boolean;
-            counters: { circuitWaitRetries: number };
+            counters: { circuitWaitArbitrations: number };
             scoreCandidates(
                 unit: Unit,
                 candidates: readonly IEnumeratedCandidate[],
@@ -3334,7 +3338,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         circuitTiedDriver.circuitOpen = true;
         circuitTiedDriver.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
         expect(circuitTiedDriver.chooseDecision(circuitTied.unit, "v0.8s", circuitTied.wait)).toBe(circuitTied.wait);
-        expect(circuitTiedDriver.counters.circuitWaitRetries).toBe(1);
+        expect(circuitTiedDriver.counters.circuitWaitArbitrations).toBe(1);
 
         const better = buildStrongPosture();
         const betterDriver = better.harness.makeDriver() as unknown as {

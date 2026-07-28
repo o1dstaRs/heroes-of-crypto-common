@@ -95,7 +95,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Drawing the pair distinctly consumes the same two RNG values per team but maps the second one through a
 // pool of 11 instead of 12, so every seeded draft downstream of it shifts. Two isolated runs produced this
 // byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "d766afb9d51ef60f5c2aefc4e2d8fbeaec08a1ae5e127a9720283b7838684711";
+// Re-pinned after v0.1 primary move-and-strike began executing an explicit move before its stationary melee.
+// This resolves Fire Wall, Vine, smoke, moved-state and movement events instead of bypassing that lifecycle;
+// two isolated full-trace evaluations reproduced the hash below.
+const EXPECTED_REPLAY_SHA256 = "39e27e2420033d4ccbc02edf7eb18de12a9fe6841004ec618b255317156e109a";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

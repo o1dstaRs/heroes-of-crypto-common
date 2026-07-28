@@ -293,6 +293,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // engine tell a real "manual" end-of-turn (it moved, then finished) from a do-nothing turn (e.g. an
     // AI unit that ended without moving/attacking/casting), which should read + score as a skip.
     protected movedThisTurn = false;
+    // Authoritative ordered route length for the latest explicit move in this turn, including its origin
+    // cell. A following stationary melee uses it for Rapid Charge after move and strike are split into two
+    // engine actions; clients cannot inflate it because GameActionEngine records the resolved known route.
+    protected movedRouteCellsThisTurn = 0;
     protected currentAttackModIncrease = 0;
     protected adjustedBaseStatsLaps: number[] = [];
     protected luckPerTurn: number = 0;
@@ -2333,9 +2337,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     public setMovedThisTurn(moved: boolean) {
         this.movedThisTurn = moved;
+        if (!moved) {
+            this.movedRouteCellsThisTurn = 0;
+        }
     }
     public hasMovedThisTurn(): boolean {
         return this.movedThisTurn;
+    }
+    public setMovedRouteCellsThisTurn(cells: number): void {
+        this.movedRouteCellsThisTurn = Number.isFinite(cells) ? Math.max(0, Math.floor(cells)) : 0;
+    }
+    public getMovedRouteCellsThisTurn(): number {
+        return this.movedRouteCellsThisTurn;
     }
     public refreshPossibleAttackTypes(canLandRangeAttack: boolean): boolean {
         const currentSelectedAttackType = this.selectedAttackType;

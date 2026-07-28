@@ -1668,11 +1668,25 @@ export class AttackHandler {
 
         let abilityMultiplier = 1;
         let rapidChargeCellsNumber = 1;
-        if (currentActiveKnownPaths) {
+        let hasRapidChargePath = false;
+        const movedRouteCells =
+            stationaryAttack && attackerUnit.hasMovedThisTurn() ? attackerUnit.getMovedRouteCellsThisTurn() : 0;
+        if (movedRouteCells > 0) {
+            // An explicit move followed by a stationary strike must use the route that the authoritative move
+            // actually resolved. Ranked recomputes currentActiveKnownPaths after the move, where the attacker's
+            // current cell is represented by a one-cell route; preferring that map would silently erase Rapid
+            // Charge distance. The recorded value was populated only after move validation and is reset with
+            // movedThisTurn, so clients cannot use this precedence to spoof a longer charge.
+            hasRapidChargePath = true;
+            rapidChargeCellsNumber = movedRouteCells;
+        } else if (currentActiveKnownPaths) {
+            hasRapidChargePath = true;
             const paths = currentActiveKnownPaths.get((attackFromCell.x << 4) | attackFromCell.y);
             if (paths?.length) {
                 rapidChargeCellsNumber = paths[0].route.length;
             }
+        }
+        if (hasRapidChargePath) {
             abilityMultiplier = AllAbilities.processRapidChargeAbility(attackerUnit, rapidChargeCellsNumber);
         }
 

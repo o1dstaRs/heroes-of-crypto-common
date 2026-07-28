@@ -37,12 +37,14 @@ describe("v0.8 a13 Vine Throw search coverage", () => {
 
         expect(scored).toHaveLength(1);
         expect(scored[0][0].kind).toBe("incumbent");
-        expect(scored[0].some((candidate) => candidate.kind === "melee")).toBe(true);
+        expect(scored[0][0].actions.some((action) => action.type === "melee_attack")).toBe(true);
+        expect(scored[0].some((candidate) => candidate.kind === "move")).toBe(true);
         expect(scored[0].some((candidate) => candidate.kind === "spell" && candidate.spellName === "Vine Throw")).toBe(
             true,
         );
         // shortlist=2 normally means incumbent + one challenger. The reserved Vine is additive so the best
-        // immediate combat challenger is not silently displaced.
+        // ordinary challenger is not silently displaced. The exact move-melee duplicate is now enriched into
+        // the incumbent rather than repeated as a separate melee candidate.
         expect(scored[0]).toHaveLength(3);
     });
 });

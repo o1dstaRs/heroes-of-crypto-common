@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { IEnumeratedCandidate } from "../../src/ai/candidates";
 import type { DecisionPathCatalog, IDecisionPathCatalogStats } from "../../src/ai/decision_path_catalog";
+import { buildV08A13SearchEnvironment } from "../../src/ai/versions/v0_8_a13_profile";
 import type { GameAction } from "../../src/engine/actions";
 import type { GameEvent } from "../../src/engine/events";
 import {
@@ -163,7 +164,7 @@ const productiveProbe = (
     backlineProtectorIntent: false,
     backlineWardIntent: false,
     circuitOpenAtDecision: false,
-    circuitWaitRetry: false,
+    circuitWaitArbitration: false,
     decisionMs: 1,
     resolution: "scored",
     ...overrides,
@@ -941,13 +942,13 @@ describe("v0.8 random-roster passive-turn panel", () => {
                 backlineProtectorIntent: false,
                 backlineWardIntent: false,
                 circuitOpenAtDecision: true,
-                circuitWaitRetry: false,
+                circuitWaitArbitration: false,
                 decisionMs: 12.5,
             },
         ];
         failing[0].passiveDecisionTimings = [
-            { decisionMs: 2, circuitOpenWait: false, circuitWaitRetry: false },
-            { decisionMs: 12.5, circuitOpenWait: true, circuitWaitRetry: false },
+            { decisionMs: 2, circuitOpenWait: false, circuitWaitArbitration: false },
+            { decisionMs: 12.5, circuitOpenWait: true, circuitWaitArbitration: false },
         ];
         failing[0].byCreature.Abomination = emptyV08PassiveTurnMetrics();
         failing[0].byCreature.Abomination.rawEndTurnTurns = 1;
@@ -987,7 +988,7 @@ describe("v0.8 random-roster passive-turn panel", () => {
             p95Ms: 12.5,
             maxMs: 12.5,
         });
-        expect(summary.circuitOpenWaitRetryTiming).toEqual({
+        expect(summary.circuitOpenWaitArbitrationTiming).toEqual({
             count: 0,
             meanMs: 0,
             p95Ms: 0,
@@ -1042,12 +1043,13 @@ describe("v0.8 random-roster passive-turn panel", () => {
 
     test("classifies the known protector screen holds without manufacturing movement work", () => {
         // Block-center game 3443 has no attacks, casts, catch-up, local threat, or newly covered ward available
-        // to Harpy/Abomination on its post-hourglass holds. Alternatives either leave the screen or move
-        // laterally inside the same state, so those final shields are protected rather than avoidable.
+        // to Harpy/Abomination on its post-hourglass holds. One raw shield is conservatively marked avoidable
+        // before scored arbitration repairs it; all final shields are protected because the alternatives leave
+        // the screen or move laterally inside the same state.
         const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 3_443);
         expect(record.endReason).toBe("elimination");
-        expect(record.metrics.rawAvoidableDefendTurns).toBe(0);
-        expect(record.metrics.repairedRawAvoidableDefendTurns).toBe(0);
+        expect(record.metrics.rawAvoidableDefendTurns).toBe(1);
+        expect(record.metrics.repairedRawAvoidableDefendTurns).toBe(1);
         expect(record.metrics.avoidableDefendTurns).toBe(0);
         expect(record.metrics.finalDefendTurns).toBe(record.metrics.protectedDefendTurns);
         expect(record.metrics.protectedDefendTurns).toBeGreaterThan(0);
@@ -1059,23 +1061,51 @@ describe("v0.8 random-roster passive-turn panel", () => {
         expect(record.byCreature.Abomination.finalDefendTurns).toBe(record.byCreature.Abomination.protectedDefendTurns);
     });
 
-    test("censors a waited unit skipped by a live effect instead of reporting a missed reactivation", () => {
-        // Lava game 2 waits Mermaid several times after the damage-spell policy lets Battle Mage preserve the
-        // back line: some waits reactivate normally, others are consumed by a live effect before
-        // Strategy/SearchDriver is called. The battle-event hook is the only observer of an effect-consumed
-        // turn, and the POINT of this case is that such a turn is CENSORED rather than reported as a missed
-        // reactivation — that is the pair of zero assertions at the end, not the counts above them.
-        //
-        // Counts re-pinned after the Battle Mage rebalance (14/11 -> 26/10) changed how this fight unfolds:
-        // 2/1/1 -> 5/2/2. They are kept exact so a further shift is noticed, but the invariant is asserted
-        // separately below so it cannot silently degrade into "nothing was skipped, so nothing was missed".
+    test("scores every circuit-open wait in the exact games that exposed the global retry cutoff", () => {
+        const forcedCircuitEnvironment = {
+            ...buildV08A13SearchEnvironment("v0.8"),
+            // Keep the same production search shape while deterministically opening its timing circuit before
+            // these lap-two waits. The deadline remains strictly below the circuit breaker as required.
+            SEARCH_CIRCUIT_BREAKER_MS: "0.0001",
+            SEARCH_DECISION_DEADLINE_MS: "0.00001",
+        };
+        const options: IV08PassiveTurnPanelOptions = {
+            ...PRODUCTION_REGRESSION_OPTIONS,
+            inheritCandidateEnvironment: true,
+        };
+        const records = withScopedAIEnvironment(forcedCircuitEnvironment, () =>
+            [756, 758].map((game) => runV08PassiveTurnPanelGame(options, game)),
+        );
+
+        expect(records.map(({ seed }) => seed)).toEqual([961_641_207, 3_616_076_968]);
+        expect(records.map(({ candidateRoster }) => candidateRoster)).toEqual([
+            ["Peasant", "Peasant", "Manticore", "Pikeman", "Monk", "Hydra"],
+            ["Dryad", "Squire", "Medusa", "Manticore", "Pegasus", "Angel"],
+        ]);
+        for (const record of records) {
+            expect(record.crash).toBeUndefined();
+            expect(record.metrics.circuitOpenWaitArbitrations).toBeGreaterThan(1);
+            expect(record.metrics.circuitOpenWaitDeferred).toBe(0);
+            expect(record.metrics.avoidableWaitTurns).toBe(0);
+            expect(record.metrics.avoidableRetainedPassiveTurns).toBe(0);
+            expect(record.passiveFailureSamples).toEqual([]);
+            expect(
+                record.passiveDecisionTimings
+                    .filter(({ circuitOpenWait }) => circuitOpenWait)
+                    .every(({ circuitWaitArbitration }) => circuitWaitArbitration),
+            ).toBe(true);
+        }
+    });
+
+    test("operation-bounded scoring removes the effect-consumed waits from the lava regression", () => {
+        // Every circuit-open wait now receives finite scored arbitration. In this seeded lava fight Mermaid
+        // therefore waits only when it really reactivates; the former effect-consumed waits disappear.
+        // The synthetic lifecycle test above separately pins classification if a live effect does consume one.
         const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 2);
         expect(record.endReason).toBe("elimination");
-        expect(record.byCreature.Mermaid.waitTurns).toBe(5);
-        expect(record.byCreature.Mermaid.sameLapWaitReactivations).toBe(2);
-        expect(record.byCreature.Mermaid.waitsSkippedByEffectBeforeReactivation).toBe(2);
-        // The invariant: an effect-consumed wait actually happened here, and none of them were misreported.
-        expect(record.byCreature.Mermaid.waitsSkippedByEffectBeforeReactivation).toBeGreaterThan(0);
+        expect(record.byCreature.Mermaid.waitTurns).toBe(3);
+        expect(record.byCreature.Mermaid.sameLapWaitReactivations).toBe(3);
+        expect(record.byCreature.Mermaid.waitsSkippedByEffectBeforeReactivation).toBe(0);
         expect(record.byCreature.Mermaid.missedSameLapWaitReactivations).toBe(0);
         expect(record.metrics.missedSameLapWaitReactivations).toBe(0);
     });
