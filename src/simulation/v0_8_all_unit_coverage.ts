@@ -1213,7 +1213,9 @@ async function main(): Promise<void> {
 }
 
 if ((import.meta as unknown as { main?: boolean }).main) {
-    void main().catch((error) => {
+    // Keep module evaluation alive until worker termination settles. With a detached promise Bun can exit after
+    // the last worker closes, before this CLI resumes to persist its summary.
+    await main().catch((error) => {
         console.error(error);
         process.exitCode = 1;
     });
