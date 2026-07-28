@@ -58,13 +58,16 @@ describe("pick_sim", () => {
             return 0;
         });
 
+        // The two bundles a team is offered carry DIFFERENT Tier-1 artifacts. Note what the old fixture
+        // pinned here: with a constant RNG both bundles held artifact 1, which is precisely the bug --
+        // the artifact stopped being part of the choice.
         expect(state.lower.bundles).toEqual([
             [1, 4, 1],
-            [2, 5, 1],
+            [2, 5, 2],
         ]);
         expect(state.upper.bundles).toEqual([
             [3, 6, 1],
-            [11, 14, 1],
+            [11, 14, 2],
         ]);
         expect(state.lower.tier2Offers).toEqual([1, 2, 3]);
         expect(state.upper.tier2Offers).toEqual([1, 2, 3]);
@@ -81,9 +84,9 @@ describe("pick_sim", () => {
             14,
             13, // four globally distinct L2 offers (16-creature pool: Battle Mage in, Zena out to L3)
             12,
+            11, // lower's distinct T1 pair
             12,
-            12,
-            12, // independent T1 rolls
+            11, // upper's distinct T1 pair
             12,
             11,
             10, // lower T2 offer
@@ -136,7 +139,7 @@ describe("pick_sim", () => {
         // INITIAL_PICK phase (seq 1): starting bundle only.
         expect(getPickTeamView(state, LOWER).bundles).toEqual([
             [1, 4, 1],
-            [2, 5, 1],
+            [2, 5, 2],
         ]);
         const rejectedPerk = apply(state, { type: "select_perk", team: LOWER, perk: Perk.SEE_NONE });
         expect(rejectedPerk).toMatchObject({ status: "rejected", reason: "wrong_phase" });
@@ -254,5 +257,47 @@ describe("pick_sim", () => {
             type: "perk_selected",
             revealedOpponentSlots: [0, 1, 2, 3, 4, 5],
         });
+    });
+});
+
+describe("the starting bundles", () => {
+    // A player was offered the SAME Tier-1 artifact in both bundles. Each bundle used to draw its artifact
+    // independently out of twelve, so about one team in twelve lost the artifact half of the choice
+    // entirely -- whichever bundle they took, they got that artifact. One seed proves nothing here, so
+    // sweep enough of them that an 8%-per-team collision cannot hide.
+    const lcg = (seed: number): PickRandomInt => {
+        let state = seed >>> 0;
+        return (maxExclusive: number) => {
+            state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+            return state % maxExclusive;
+        };
+    };
+
+    it("never offers a team the same artifact in both bundles", () => {
+        for (let seed = 1; seed <= 400; seed += 1) {
+            const state = createPickSimState(lcg(seed));
+            for (const team of [state.lower, state.upper]) {
+                const [first, second] = team.bundles;
+                expect(first[2]).not.toBe(second[2]);
+            }
+        }
+    });
+
+    it("still offers two genuinely different bundles either side of the artifact", () => {
+        for (let seed = 1; seed <= 200; seed += 1) {
+            const state = createPickSimState(lcg(seed));
+            const creatures = [...state.lower.bundles, ...state.upper.bundles].flatMap(([l1, l2]) => [l1, l2]);
+            // All four bundles' creatures are distinct across BOTH teams, so no two bundles anywhere are alike.
+            expect(new Set(creatures).size).toBe(creatures.length);
+        }
+    });
+
+    it("keeps the Tier-2 offers distinct too", () => {
+        for (let seed = 1; seed <= 200; seed += 1) {
+            const state = createPickSimState(lcg(seed));
+            for (const team of [state.lower, state.upper]) {
+                expect(new Set(team.tier2Offers).size).toBe(team.tier2Offers.length);
+            }
+        }
     });
 });

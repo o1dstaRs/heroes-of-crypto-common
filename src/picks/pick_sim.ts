@@ -217,6 +217,24 @@ const pickDistinct = (pool: readonly number[], count: number, rng: PickRandomInt
     return picked;
 };
 
+/**
+ * The two Tier-1 artifacts a team is offered, one per starting bundle — DISTINCT.
+ *
+ * Each bundle used to draw its artifact independently, so roughly one team in twelve was shown the same
+ * artifact in both bundles and the artifact half of the choice silently vanished: whichever bundle you
+ * took, you got that artifact, and the decision collapsed to the creatures alone. Being asked to choose
+ * between a thing and itself is not a choice.
+ *
+ * Drawn as one distinct pair rather than two independent draws, which keeps the RNG consumption at the
+ * same two values per team and in the same order the bundles are built in.
+ */
+const tier1ArtifactPair = (rng: PickRandomInt): [number, number] =>
+    pickDistinct(
+        Array.from({ length: LIVE_TIER1_ARTIFACT_COUNT }, (_, index) => index + 1),
+        2,
+        rng,
+    ) as [number, number];
+
 const artifactOffers = (rng: PickRandomInt): [number, number, number] =>
     pickDistinct(
         Array.from({ length: LIVE_TIER2_ARTIFACT_COUNT }, (_, index) => index + 1),
@@ -241,13 +259,15 @@ export function createPickSimState(rng: PickRandomInt): IPickSimState {
         throw new Error("The live pick requires at least four level-1 and four level-2 creatures");
     }
 
-    const makeBundle = (index: number): PickBundle => [
+    const makeBundle = (index: number, tier1Artifact: number): PickBundle => [
         level1[index],
         level2[index],
-        draw(rng, LIVE_TIER1_ARTIFACT_COUNT) + 1,
+        tier1Artifact,
     ];
-    const lowerBundles: [PickBundle, PickBundle] = [makeBundle(0), makeBundle(1)];
-    const upperBundles: [PickBundle, PickBundle] = [makeBundle(2), makeBundle(3)];
+    const lowerTier1 = tier1ArtifactPair(rng);
+    const upperTier1 = tier1ArtifactPair(rng);
+    const lowerBundles: [PickBundle, PickBundle] = [makeBundle(0, lowerTier1[0]), makeBundle(1, lowerTier1[1])];
+    const upperBundles: [PickBundle, PickBundle] = [makeBundle(2, upperTier1[0]), makeBundle(3, upperTier1[1])];
 
     // The server generates both teams' T2 offers before auto-bans.
     const lowerTier2Offers = artifactOffers(rng);

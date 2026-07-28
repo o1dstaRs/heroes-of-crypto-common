@@ -91,7 +91,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned after the Battle Mage traded armour for health (14/11 -> 26/10). It survives exchanges it used
 // to lose, so every seeded trace containing one diverges from that point on — the digest moving is the
 // change landing, not a regression. Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "9246b8cf7352f2100d166ff5570b730ffd971db1d812244c134d3d33845b5f58";
+// Re-pinned after a team's two starting bundles stopped being able to offer the SAME Tier-1 artifact.
+// Drawing the pair distinctly consumes the same two RNG values per team but maps the second one through a
+// pool of 11 instead of 12, so every seeded draft downstream of it shifts. Two isolated runs produced this
+// byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "d766afb9d51ef60f5c2aefc4e2d8fbeaec08a1ae5e127a9720283b7838684711";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
