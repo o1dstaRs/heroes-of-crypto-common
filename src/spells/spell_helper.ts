@@ -1,4 +1,3 @@
-import { MAX_UNIT_STACK_POWER } from "../constants";
 /*
  * -----------------------------------------------------------------------------
  * This file is part of the common code of the Heroes of Crypto.
@@ -191,12 +190,31 @@ export function isSpellLineOfSightClear(
     if (!pathCells.length) {
         return false;
     }
+    // NEITHER endpoint's own body is an obstacle. A 2x2 creature stands on four cells but is addressed by
+    // one base cell, so the straight line to that base cell routinely crosses the creature's other three —
+    // and, aimed from the far side, the caster's own. Read literally, "everything between must be clear"
+    // made a large target unhittable from one half of the board and a large caster unable to shoot into
+    // it, which is not line of sight failing: the shot starts inside the caster and ends inside the
+    // target, so only a THIRD body (or the mountain) can intercept it.
+    //
+    // The two ids come off the endpoint cells rather than from parameters so every calling surface — the
+    // engine's cast, the AI's enumeration, the client's aim preview — gets this without having to
+    // remember to pass them. An empty endpoint (a cell-targeted spell) yields undefined and changes
+    // nothing.
+    const casterUnitId = grid.getOccupantUnitId(from);
+    const targetUnitId = grid.getOccupantUnitId(to);
     for (const cell of pathCells.slice(0, -1)) {
         if (!isWithinGrid(cell)) {
             return false;
         }
         const occupant = grid.getOccupantUnitId(cell);
-        if (occupant && occupant !== "L" && occupant !== "W") {
+        if (
+            occupant &&
+            occupant !== "L" &&
+            occupant !== "W" &&
+            occupant !== casterUnitId &&
+            occupant !== targetUnitId
+        ) {
             return false;
         }
     }
@@ -514,14 +532,9 @@ export const getMagicMirrorPower = (targetUnit: Unit): number => {
     if (massMagicMirrorBuff) {
         mirrorPower = Math.max(mirrorPower, massMagicMirrorBuff.getPower());
     }
-    // STACK-POWERED, like the game's other scaling percentages: the configured power is what a FULL stack
-    // reflects, and a depleted one reflects proportionally less — 15/30/45/60/75 across the five tiers at
-    // power 75. Luck then lifts (or drops) it, exactly as it does for ability chances elsewhere. Both are
-    // applied only when a mirror is actually up, so an unbuffed unit still reflects nothing.
-    if (mirrorPower > 0) {
-        const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, targetUnit.getStackPower()));
-        mirrorPower = (mirrorPower / MAX_UNIT_STACK_POWER) * stackPower;
-    }
+    // FLAT and stable: the Ogre Mage's Magic Mirror / Mass Magic Mirror reflect exactly their configured
+    // percentage (30 / 25) — NOT stack-scaled and NOT moved by luck (unlike the Magic Dragon's ability). The
+    // buff's own power is the whole answer; an unbuffed unit still reflects nothing (mirrorPower stays 0).
     if (mirrorPower > 100) {
         mirrorPower = 100;
     }

@@ -10,6 +10,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "bun:test";
+import { fireforgedSwordDamage, fireforgedSwordPower } from "../../src/spells/spell_damage";
 
 import { EmpowerAugment, DefaultPlacementLevel1 } from "../../src/augments/augment_properties";
 import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
@@ -140,7 +141,6 @@ describe("Empower augment in a live fight", () => {
         const { context, fightProperties } = setupTeam(EmpowerAugment.LEVEL_3);
         const swordsman = createTestUnit({ name: "Swordsman", team: PBTypes.TeamVals.LOWER, speed: 5 });
         placeUnit(context.grid, context.unitsHolder, swordsman, { x: 3, y: 3 });
-        const baseAttack = swordsman.getUnitProperties().base_attack;
 
         context.unitsHolder.applyAugments(fightProperties);
         swordsman.applyBuff(
@@ -151,7 +151,19 @@ describe("Empower augment in a live fight", () => {
         );
         swordsman.adjustBaseStats(false, 0, PBTypes.GridVals.NORMAL, 0, [], 0, 0, false);
 
-        // The blade's configured 10% becomes 12.4% of the holder's base attack at Empower level 3.
-        expect(swordsman.getUnitProperties().attack_mod).toBeCloseTo((baseAttack * 12.4) / 100, 6);
+        // The blade burns as a MAGIC rider on the swing, not as attack_mod: the sword must leave the
+        // holder's physical attack alone, and Empower must raise the fire instead. The configured 10%
+        // becomes 12.4% at Empower level 3.
+        expect(swordsman.getUnitProperties().attack_mod).toBe(0);
+        expect(fireforgedSwordPower(10, swordsman.getEmpowerPercentage())).toBeCloseTo(12.4, 6);
+        expect(
+            fireforgedSwordDamage({
+                damageDealt: 100,
+                swordPercentage: fireforgedSwordPower(10, swordsman.getEmpowerPercentage()),
+                targetMagicResist: 0,
+                targetIsFireElement: false,
+                targetIsWaterElement: false,
+            }),
+        ).toBe(12);
     });
 });

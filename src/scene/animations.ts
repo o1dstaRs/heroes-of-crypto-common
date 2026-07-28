@@ -22,6 +22,8 @@ export interface IAnimationData {
 /** Source of a secondary (non-primary-hit) damage instance applied during an attack exchange. */
 export type SecondaryDamageSource =
     | "fire_shield"
+    // Fireforged Sword: the enchanted blade's fire, reported apart from the steel that carried it.
+    | "fireforged_sword"
     | "chain_lightning"
     | "petrifying_gaze"
     | "magic_mirror"

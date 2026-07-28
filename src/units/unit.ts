@@ -47,7 +47,6 @@ import type { IWeightedRoute } from "../grid/path_definitions";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { Spell } from "../spells/spell";
-import { fireforgedSwordPower } from "../spells/spell_damage";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, type XY } from "../utils/math";
@@ -3297,22 +3296,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const riotBuff = this.getBuff("Riot");
         const massRiotBuff = this.getBuff("Mass Riot");
-        const fireforgedSwordBuff = this.getBuff("Fireforged Sword");
         if (riotBuff) {
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * riotBuff.getPower()) / 100;
         } else if (massRiotBuff) {
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * massRiotBuff.getPower()) / 100;
         } else {
             this.unitProperties.attack_mod = this.initialUnitProperties.attack_mod;
-        }
-
-        if (fireforgedSwordBuff) {
-            // The burning edge is magic damage riding on a physical swing, so the team's Empower Augment
-            // raises the bonus (and only the bonus — the underlying attack is Might's business).
-            this.unitProperties.attack_mod +=
-                (this.unitProperties.base_attack *
-                    fireforgedSwordPower(fireforgedSwordBuff.getPower(), this.getEmpowerPercentage())) /
-                100;
         }
 
         const weaknessDebuff = this.getDebuff("Weakness");

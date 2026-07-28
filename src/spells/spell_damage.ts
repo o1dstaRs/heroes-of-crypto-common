@@ -152,3 +152,39 @@ export function isOffensiveSpellMultiplier(multiplierType: SpellMultiplierType):
         multiplierType === SpellMultiplierType.UNIT_AMOUNT_DAMAGE
     );
 }
+
+/** A Fireforged Sword blade burns 50% hotter against water. */
+export const FIREFORGED_SWORD_WATER_MULTIPLIER = 1.5;
+
+/**
+ * The FIRE damage a Fireforged Sword rider deals on top of the swing that carried it.
+ *
+ * The blade is enchanted, not sharpened: the bonus is magic damage riding on a physical hit, so unlike
+ * the swing itself it ignores armour and is instead cut down by the target's magic resistance — and a
+ * fully magic-immune target takes none of it at all. Fire Elements (Efreet, Black Dragon) are the fire
+ * itself and shrug it off completely, the same immunity Fire Breath and Fire Shield already honour;
+ * water creatures take half again as much.
+ *
+ * Pure and Unit-free so the spellbook card, the engine and the tests all price the blade identically.
+ * `swordPercentage` is the buff's power AFTER the team's Empower Augment (see fireforgedSwordPower).
+ */
+export function fireforgedSwordDamage(params: {
+    damageDealt: number;
+    swordPercentage: number;
+    targetMagicResist: number;
+    targetIsFireElement: boolean;
+    targetIsWaterElement: boolean;
+}): number {
+    const { damageDealt, swordPercentage, targetMagicResist, targetIsFireElement, targetIsWaterElement } = params;
+    if (targetIsFireElement || targetMagicResist >= 100) {
+        return 0;
+    }
+    if (!(damageDealt > 0) || !(swordPercentage > 0)) {
+        return 0;
+    }
+
+    const burn = (damageDealt * swordPercentage) / 100;
+    const scaled = targetIsWaterElement ? burn * FIREFORGED_SWORD_WATER_MULTIPLIER : burn;
+
+    return applyMagicResistToSpellDamage(Math.floor(scaled), targetMagicResist);
+}

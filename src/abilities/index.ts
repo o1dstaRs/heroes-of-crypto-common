@@ -15,6 +15,7 @@ export * from "./dulling_defense_ability";
 export * from "./freeze_ability";
 export * from "./fire_breath_ability";
 export * from "./fire_shield_ability";
+export * from "./fireforged_sword_ability";
 export * from "./flesh_shield_aura_ability";
 export * from "./hamstring_ability";
 export * from "./poison_ability";

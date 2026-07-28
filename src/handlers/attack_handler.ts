@@ -1174,6 +1174,23 @@ export class AttackHandler {
                 // Small Specie / Boar Saliva) must not stun/petrify/etc. — mirrors the melee path,
                 // which gates this same block on !isAttackMissed (bug: an Orc could miss a Scavenger
                 // and still Stun it).
+                const rangedFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
+                    attackerUnit,
+                    targetUnit,
+                    damageFromAttack,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                for (const uId of rangedFireforgedSwordResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(uId)) {
+                        unitIdsDied.push(uId);
+                    }
+                }
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    rangedFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
+                );
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
@@ -2128,6 +2145,19 @@ export class AttackHandler {
                 });
             }
 
+            const fireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
+                attackerUnit,
+                targetUnit,
+                damageFromAttack,
+                this.sceneLog,
+                this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
+            );
+            updateUnitsDied(fireforgedSwordResult.unitIdsDied);
+            this.updateMoraleDecreaseForTheUnitTeam(
+                moraleDecreaseForTheUnitTeam,
+                fireforgedSwordResult.moraleDecreaseForTheUnitTeam,
+            );
             AllAbilities.processMinerAbility(attackerUnit, targetUnit, this.sceneLog);
             AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -2288,6 +2318,19 @@ export class AttackHandler {
             );
 
             if (!secondPunchResult.missed) {
+                const secondFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
+                    attackerUnit,
+                    targetUnit,
+                    secondPunchResult.damage,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                updateUnitsDied(secondFireforgedSwordResult.unitIdsDied);
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    secondFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
+                );
                 AllAbilities.processMinerAbility(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
