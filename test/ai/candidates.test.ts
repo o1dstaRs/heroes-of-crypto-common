@@ -883,6 +883,117 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(composites[0].actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
     });
 
+    it("move-shots: terminal discovery escapes non-positive Large Caliber splash but keeps a positive stationary shot", () => {
+        const fixture = (stationaryFriendlyFire: boolean) => {
+            const c = createCombatTestContext();
+            const shooter = createTestUnit({
+                team: LOWER,
+                name: "Large Caliber finisher",
+                attackType: RANGE,
+                attack: 10,
+                damageMin: 10,
+                damageMax: 10,
+                rangeShots: 5,
+                shotDistance: 30,
+                amountAlive: 5,
+                speed: 3,
+                stackPower: 100,
+                abilities: ["Large Caliber"],
+            });
+            const target = createTestUnit({
+                team: UPPER,
+                name: "Large Caliber target",
+                attackType: MELEE,
+                armor: 20,
+                amountAlive: 100,
+                maxHp: 1_000,
+            });
+            const ally = createTestUnit({
+                team: LOWER,
+                name: "Stationary splash ally",
+                attackType: MELEE,
+                armor: 10,
+                amountAlive: 100,
+                maxHp: 1_000,
+            });
+            placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
+            placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 7 });
+            placeUnit(c.grid, c.unitsHolder, ally, { x: 2, y: 3 });
+            shooter.refreshPossibleAttackTypes(true);
+            const originalPosition = { ...shooter.getPosition() };
+
+            // Keep real action-engine application and candidate damage calculation, while fixing the ray groups
+            // so this regression is independent of raster tie-breaks: the stationary splash loses more allied
+            // HP than it removes from the enemy, and every moved origin opens a clean positive ray.
+            c.attackHandler.evaluateRangeAttack = (_allUnits, _fromUnit, fromPosition) => {
+                const moved = fromPosition.x !== originalPosition.x || fromPosition.y !== originalPosition.y;
+                const affected = stationaryFriendlyFire && !moved ? [target, ally] : [target];
+                return {
+                    rangeAttackDivisors: [1],
+                    affectedUnits: [affected],
+                    affectedCells: [affected.map((unit) => unit.getBaseCell())],
+                };
+            };
+            return { c, shooter, target, ally, context: ctxFor(c, true) };
+        };
+        const hasMoveAndShot = (candidate: IEnumeratedCandidate): boolean =>
+            candidate.actions.some((action) => action.type === "move_unit") &&
+            candidate.actions.some((action) => action.type === "range_attack");
+        const options = {
+            maxMoveShotComposites: 1,
+            discoverMoveShotTargetsAfterMove: true,
+        } as const;
+
+        const counterproductive = fixture(true);
+        const counterproductiveSet = enumerateCandidates(
+            counterproductive.shooter,
+            counterproductive.context,
+            endTurn(counterproductive.shooter),
+            options,
+        );
+        const stationary = ofKind(counterproductiveSet.candidates, "shot").find(
+            (candidate) => !candidate.actions.some((action) => action.type === "move_unit"),
+        );
+        const composite = counterproductiveSet.candidates.find(hasMoveAndShot);
+        expect(stationary?.features.expectedDamage).toBeLessThan(0);
+        expect(stationary?.shotFeatures?.friendlyFireDamage).toBeGreaterThan(
+            stationary?.shotFeatures?.enemyDamage ?? 0,
+        );
+        expect(composite).toBeDefined();
+        expect(composite?.features.expectedDamage).toBeGreaterThan(0);
+        expect(composite?.shotFeatures?.friendlyFireDamage).toBe(0);
+        const targetHpBefore = counterproductive.target.getCumulativeHp();
+        const allyHpBefore = counterproductive.ally.getCumulativeHp();
+        const counterproductiveEngine = startActionEngine(
+            counterproductive.c,
+            counterproductive.shooter,
+            counterproductive.context,
+        );
+        expect(composite!.actions.map((action) => counterproductiveEngine.apply(action).completed)).toEqual([
+            true,
+            true,
+        ]);
+        expect(counterproductive.target.getCumulativeHp()).toBeLessThan(targetHpBefore);
+        expect(counterproductive.ally.getCumulativeHp()).toBe(allyHpBefore);
+
+        const productive = fixture(false);
+        const productiveSet = enumerateCandidates(
+            productive.shooter,
+            productive.context,
+            endTurn(productive.shooter),
+            options,
+        );
+        const productiveStationary = ofKind(productiveSet.candidates, "shot").find(
+            (candidate) => !candidate.actions.some((action) => action.type === "move_unit"),
+        );
+        expect(productiveStationary?.features.expectedDamage).toBeGreaterThan(0);
+        expect(productiveSet.candidates.some(hasMoveAndShot)).toBe(false);
+        const productiveTargetHpBefore = productive.target.getCumulativeHp();
+        const productiveEngine = startActionEngine(productive.c, productive.shooter, productive.context);
+        expect(productiveStationary!.actions.map((action) => productiveEngine.apply(action).completed)).toEqual([true]);
+        expect(productive.target.getCumulativeHp()).toBeLessThan(productiveTargetHpBefore);
+    });
+
     it("move-shots: terminal discovery opens a new BLOCK_CENTER line only when explicitly enabled", () => {
         const fixture = (abilities: string[] = [], speed = 4) => {
             const c = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);

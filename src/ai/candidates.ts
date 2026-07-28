@@ -1554,9 +1554,11 @@ class CandidateGenerator {
         ) {
             return;
         }
-        // Discovery is an escape hatch for a genuinely closed stationary line. It must not silently opt the
-        // terminal finisher into the legacy "move for more damage" candidate class when a shot already exists.
-        if (discoverMoveShotTargetsAfterMove && kept.length > 0) {
+        // Discovery is an escape hatch for a closed or counterproductive stationary line. It must not silently
+        // opt the terminal finisher into the legacy "move for more damage" class while a positive-net shot
+        // already exists. A structurally valid Large Caliber ray whose allied splash outweighs enemy damage is
+        // not productive and must not hide a safe positive move-then-shot.
+        if (discoverMoveShotTargetsAfterMove && found.some(({ value }) => value > 0)) {
             return;
         }
         const movePath = this.movePath();

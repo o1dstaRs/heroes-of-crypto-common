@@ -1289,24 +1289,35 @@ describe("v0.8 aggressive campaign orchestration", () => {
                 games: block.options.games,
             }),
         ).not.toThrow();
-        expect(() =>
-            validateV08CampaignBlockCenterQualificationSummary(
-                { ...block.summary, schema: "hoc.v0_8_block_center_action_panel.v1" },
-                {
-                    sourceCommit: QUALIFICATION_SOURCE,
-                    baseSeed: block.options.baseSeed,
-                    games: block.options.games,
-                },
-            ),
-        ).toThrow("Invalid BLOCK_CENTER qualification");
+        for (const staleSchema of ["hoc.v0_8_block_center_action_panel.v1", "hoc.v0_8_block_center_action_panel.v2"]) {
+            expect(() =>
+                validateV08CampaignBlockCenterQualificationSummary(
+                    { ...block.summary, schema: staleSchema },
+                    {
+                        sourceCommit: QUALIFICATION_SOURCE,
+                        baseSeed: block.options.baseSeed,
+                        games: block.options.games,
+                    },
+                ),
+            ).toThrow("Invalid BLOCK_CENTER qualification");
+        }
         for (const missingGate of [
             "observed_turns_positive",
             "every_record_has_observations",
             "mountain_state_turn_integrity",
             "creature_turn_integrity",
+            "creature_metric_integrity",
+            "counter_domain_integrity",
+            "failure_sample_integrity",
+            "record_result_integrity",
+            "metric_semantic_integrity",
             "oracle_direct_exposure_positive",
             "mountain_adjacent_direct_exposure_positive",
             "late_direct_exposure_positive",
+            "eliminations_only",
+            "strategy_rejections_zero",
+            "strategy_engine_rejection_parity",
+            "recovery_turns_zero",
             "urgent_mountain_terminal_jitter_zero",
         ]) {
             const checks = { ...block.summary.gates.checks };

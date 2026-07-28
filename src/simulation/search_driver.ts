@@ -1801,13 +1801,47 @@ export class SearchDriver {
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             };
             const enumeratedCandidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates;
+            let candidates = enumeratedCandidates.filter(keepCandidate);
+            const urgentMoveShotFallback =
+                prioritizeV08SUrgency &&
+                !this.observeOnly &&
+                isPureMoveCandidate({ actions: incumbent }) &&
+                !candidates.some((candidate) => isPositiveV08UrgentDamageCandidate(unit, candidate))
+                    ? this.firstEngineValidV08UrgentDamageCandidate(
+                          unit,
+                          enumerateCandidates(unit, context, incumbent, {
+                              ...enumerationOptions,
+                              maxMoveShotComposites: 2,
+                              discoverMoveShotTargetsAfterMove: true,
+                          }).candidates.filter(
+                              (candidate) =>
+                                  keepCandidate(candidate) &&
+                                  candidate.kind === "shot" &&
+                                  candidate.actions.some((action) => action.type === "move_unit"),
+                          ),
+                          seedBase,
+                      )
+                    : undefined;
+            if (urgentMoveShotFallback) {
+                // A13 normally seals move-shot exploration off. The lap-9 finisher opens only this private,
+                // top-two discovery path when the bounded catalog contains no positive direct action and the
+                // incumbent is a plain move. The selected composite is engine-probed and bypasses rollouts;
+                // none of the extra candidates can leak into ordinary search or earlier-lap behavior.
+                this.counters.decisions += 1;
+                this.counters.msTotal += performance.now() - t0;
+                if (urgentMoveShotFallback.actions !== incumbent) {
+                    this.counters.overrides += 1;
+                    bump(this.counters.overridesByIncumbentKind, incumbentKind);
+                    bump(this.counters.overridesToKind, urgentMoveShotFallback.kind);
+                }
+                return urgentMoveShotFallback.actions;
+            }
             const stationaryFinishMountain =
                 prioritizeV08SUrgency &&
                 isPureMoveCandidate({ actions: incumbent }) &&
                 !isEnemyClosingPureMove(unit, this.deps.unitsHolder, { actions: incumbent })
                     ? enumeratedCandidates.find((candidate) => isStationaryMountainCandidate(unit, candidate))
                     : undefined;
-            let candidates = enumeratedCandidates.filter(keepCandidate);
             if (stationaryFinishMountain && !this.observeOnly) {
                 // The normal move cap is ranked by base-cell Manhattan distance. That is a useful broad search
                 // heuristic but cannot prove strict footprint progress for a LARGE unit around BLOCK_CENTER.
@@ -3360,16 +3394,9 @@ export class SearchDriver {
         }
         return undefined;
     }
-    /**
-     * Break a released late-finish mountain oscillation without turning mining into a general challenger.
-     * Positive enemy damage wins first, then an engine-valid move that strictly closes footprint distance. Only
-     * when neither executes do we validate and return the already-generated in-place strike ahead of lateral or
-     * retreating movement; walking sideways around the blocking rock is the cycle source.
-     */
-    private firstEngineValidLateStationaryMountainCandidate(
+    private firstEngineValidV08UrgentDamageCandidate(
         unit: Unit,
         candidates: readonly IEnumeratedCandidate[],
-        stationaryMountain: IEnumeratedCandidate,
         seedBase: number,
     ): IEnumeratedCandidate | undefined {
         const damageCandidates = candidates.filter((candidate) => isPositiveV08UrgentDamageCandidate(unit, candidate));
@@ -3382,7 +3409,21 @@ export class SearchDriver {
         const orderedDamage = preferredDamage
             ? [preferredDamage, ...damageCandidates.filter((candidate) => candidate !== preferredDamage)]
             : damageCandidates;
-        if (this.firstEngineValidCandidate(unit, orderedDamage, seedBase)) return undefined;
+        return this.firstEngineValidCandidate(unit, orderedDamage, seedBase);
+    }
+    /**
+     * Break a released late-finish mountain oscillation without turning mining into a general challenger.
+     * Positive enemy damage wins first, then an engine-valid move that strictly closes footprint distance. Only
+     * when neither executes do we validate and return the already-generated in-place strike ahead of lateral or
+     * retreating movement; walking sideways around the blocking rock is the cycle source.
+     */
+    private firstEngineValidLateStationaryMountainCandidate(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        stationaryMountain: IEnumeratedCandidate,
+        seedBase: number,
+    ): IEnumeratedCandidate | undefined {
+        if (this.firstEngineValidV08UrgentDamageCandidate(unit, candidates, seedBase)) return undefined;
 
         const closingMoves = candidates.filter((candidate) =>
             isEnemyClosingPureMove(unit, this.deps.unitsHolder, candidate),

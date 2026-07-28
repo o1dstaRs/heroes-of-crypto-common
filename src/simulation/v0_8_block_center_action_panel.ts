@@ -80,7 +80,7 @@ import {
 import { liveTwinSetup } from "./livetwin";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
 
-export const V08_BLOCK_CENTER_ACTION_PANEL_SCHEMA = "hoc.v0_8_block_center_action_panel.v2" as const;
+export const V08_BLOCK_CENTER_ACTION_PANEL_SCHEMA = "hoc.v0_8_block_center_action_panel.v3" as const;
 export const V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_GAMES = 50_000;
 export const V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_SEED = 2_607_280_041;
 export const V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_CONCURRENCY = 12;
@@ -126,6 +126,12 @@ const observerLocalDecisionContext = (context: IDecisionContext): IDecisionConte
 });
 
 export type V08BlockCenterMountainState = "both_intact" | "left_only" | "right_only" | "cleared";
+const V08_BLOCK_CENTER_MOUNTAIN_STATES = [
+    "both_intact",
+    "left_only",
+    "right_only",
+    "cleared",
+] as const satisfies readonly V08BlockCenterMountainState[];
 export type V08BlockCenterDirectKind = "melee" | "shot" | "area_throw" | "spell";
 export type V08BlockCenterIssue =
     | "oracle_probe_rejection"
@@ -300,6 +306,7 @@ interface IV08BlockCenterPendingDecision {
     lap: number;
     mountainState: V08BlockCenterMountainState;
     mountainAdjacent: boolean;
+    stationaryMountainAvailable: boolean;
     actorCells: XY[];
     enemyCells: XY[];
     stateSha256: string;
@@ -311,7 +318,7 @@ interface IV08BlockCenterPendingDecision {
     meaningfulRoleMoveSignatures: Set<string>;
     probeFailures: Array<{
         source: "oracle" | "catalog";
-        option: IV08BlockCenterDirectOption;
+        actions: GameAction[];
         failure: string;
     }>;
 }
@@ -353,6 +360,26 @@ const METRIC_KEYS = [
     "recoveryTurns",
     "observerPairingFaults",
 ] as const satisfies readonly (keyof IV08BlockCenterMetrics)[];
+
+const FAILURE_SAMPLE_METRIC = {
+    oracle_probe_rejection: "oracleProbeRejections",
+    catalog_probe_rejection: "catalogProbeRejections",
+    catalog_missed_engine_valid_combat: "catalogMissedEngineValidCombat",
+    noncombat_with_direct_option: "noncombatWithDirectOptionTurns",
+    mountain_adjacent_missed_attack: "mountainAdjacentMissedAttacks",
+    non_progress_move: "nonProgressMoves",
+    aba_oscillation: "abaOscillations",
+    urgent_mountain_terminal_jitter: "urgentMountainTerminalJitter",
+    eligible_combat_drought: "eligibleCombatDroughts",
+    lap9_direct_action_miss: "lateDirectActionMisses",
+} as const satisfies Record<V08BlockCenterIssue, keyof IV08BlockCenterMetrics>;
+
+const LATE_FAILURE_SAMPLE_METRIC = {
+    catalog_missed_engine_valid_combat: "urgentCatalogMisses",
+    noncombat_with_direct_option: "lateDirectActionMisses",
+    mountain_adjacent_missed_attack: "urgentMountainAdjacentMisses",
+    eligible_combat_drought: "urgentCombatDroughts",
+} as const satisfies Partial<Record<V08BlockCenterIssue, keyof IV08BlockCenterMetrics>>;
 
 export const emptyV08BlockCenterMetrics = (): IV08BlockCenterMetrics => ({
     observedTurns: 0,
@@ -415,6 +442,16 @@ export function v08BlockCenterFootprintDistance(left: readonly XY[], right: read
     return closest;
 }
 
+export function v08BlockCenterFootprintManhattanDistance(left: readonly XY[], right: readonly XY[]): number {
+    let closest = Infinity;
+    for (const a of left) {
+        for (const b of right) {
+            closest = Math.min(closest, Math.abs(a.x - b.x) + Math.abs(a.y - b.y));
+        }
+    }
+    return closest;
+}
+
 export function isV08BlockCenterNonProgressMove(
     before: readonly XY[],
     after: readonly XY[],
@@ -424,11 +461,47 @@ export function isV08BlockCenterNonProgressMove(
     return v08BlockCenterFootprintDistance(after, enemyCells) >= v08BlockCenterFootprintDistance(before, enemyCells);
 }
 
+/**
+ * The hard terminal signal keeps the conservative Chebyshev plateau detector, but a remote move that closes
+ * Manhattan distance is real route progress around the obstacle. An actor with an engine-valid stationary
+ * mountain strike remains eligible: moving laterally away from that productive action is the cycle this gate
+ * protects. Raw adjacency is insufficient because a live forced target can make the obstacle action illegal.
+ */
+export function isV08BlockCenterTerminalNonProgressMove(
+    before: readonly XY[],
+    after: readonly XY[],
+    enemyCells: readonly XY[],
+    stationaryMountainAvailable: boolean,
+): boolean {
+    return (
+        isV08BlockCenterNonProgressMove(before, after, enemyCells) &&
+        (stationaryMountainAvailable ||
+            v08BlockCenterFootprintManhattanDistance(after, enemyCells) >=
+                v08BlockCenterFootprintManhattanDistance(before, enemyCells))
+    );
+}
+
 export function isV08BlockCenterABAOscillation(history: readonly string[], nextFootprint: string): boolean {
     if (history.length < 2) return false;
     const a = history[history.length - 2];
     const b = history[history.length - 1];
     return a !== b && nextFootprint === a;
+}
+
+export function isV08BlockCenterUrgentMountainABAOscillation(
+    lap: number,
+    mountainState: V08BlockCenterMountainState,
+    meleeOnly: boolean,
+    meaningfulRoleMove: boolean,
+    abaOscillation: boolean,
+): boolean {
+    return (
+        lap >= V08_BLOCK_CENTER_ACTION_PANEL_LATE_LAP &&
+        mountainState !== "cleared" &&
+        meleeOnly &&
+        !meaningfulRoleMove &&
+        abaOscillation
+    );
 }
 
 /**
@@ -1124,6 +1197,19 @@ const isCatalogDirectCandidate = (unit: Unit, candidate: IEnumeratedCandidate): 
     return selectV08DamageSpellCandidate(unit, [candidate]) === candidate;
 };
 
+const isStationaryMountainCandidate = (unit: Unit, candidate: IEnumeratedCandidate): boolean => {
+    if (candidate.kind !== "mine" || candidate.actions.length !== 1) return false;
+    const action = candidate.actions[0];
+    const base = unit.getBaseCell();
+    return (
+        action?.type === "obstacle_attack" &&
+        action.attackerId === unit.getId() &&
+        action.attackFrom?.x === base.x &&
+        action.attackFrom.y === base.y &&
+        !action.path?.length
+    );
+};
+
 function sharedCatalogDirectCandidates(
     unit: Unit,
     context: IDecisionContext,
@@ -1134,12 +1220,32 @@ function sharedCatalogDirectCandidates(
         includeMountainAttacks: true,
         enrichIncumbentMetadata: true,
     });
+    const catalogDirect = (candidate: IEnumeratedCandidate): boolean =>
+        isCatalogDirectCandidate(unit, candidate) && preservesRole(intents, unit, context, candidate.actions);
+    let direct = set.candidates.filter(catalogDirect);
+    const urgentPureMove =
+        (context.fightProperties?.getCurrentLap() ?? 0) >= V08_BLOCK_CENTER_ACTION_PANEL_LATE_LAP &&
+        incumbent.length > 0 &&
+        incumbent.every((action) => action.type === "move_unit");
+    if (!direct.length && urgentPureMove) {
+        // Mirror SearchDriver's private terminal escape hatch. This expansion is intentionally absent from
+        // `set`: its top-two cap is a production policy bound, while `set.truncated` audits accidental caps in
+        // the ordinary shared catalog. The independent oracle still fails qualification if both escapes miss.
+        direct = enumerateCandidates(unit, context, [...incumbent], {
+            includeMountainAttacks: true,
+            enrichIncumbentMetadata: true,
+            maxMoveShotComposites: 2,
+            discoverMoveShotTargetsAfterMove: true,
+        }).candidates.filter(
+            (candidate) =>
+                candidate.kind === "shot" &&
+                candidate.actions.some((action) => action.type === "move_unit") &&
+                catalogDirect(candidate),
+        );
+    }
     return {
         set,
-        direct: set.candidates.filter(
-            (candidate) =>
-                isCatalogDirectCandidate(unit, candidate) && preservesRole(intents, unit, context, candidate.actions),
-        ),
+        direct,
     };
 }
 
@@ -1299,6 +1405,149 @@ const mergeMetrics = (target: IV08BlockCenterMetrics, source: IV08BlockCenterMet
     for (const key of METRIC_KEYS) target[key] += source[key];
 };
 
+const isNonnegativeSafeCounter = (value: unknown): value is number =>
+    typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+
+const hasValidMetricCounterDomain = (metrics: IV08BlockCenterMetrics): boolean =>
+    METRIC_KEYS.every((key) => isNonnegativeSafeCounter(metrics[key]));
+
+const TURN_BOUNDED_METRICS = [
+    "oracleDirectEligibleTurns",
+    "sharedCatalogDirectEligibleTurns",
+    "catalogMissedEngineValidCombat",
+    "urgentCatalogMisses",
+    "chosenDirectActionTurns",
+    "noncombatWithDirectOptionTurns",
+    "nonDamagingSpellExemptions",
+    "mountainAdjacentTurns",
+    "mountainAdjacentDirectEligibleTurns",
+    "mountainAdjacentMissedAttacks",
+    "urgentMountainAdjacentMisses",
+    "pureMoveTurns",
+    "nonProgressMoves",
+    "urgentRepeatedNonProgressWithDirectOption",
+    "urgentMountainTerminalJitter",
+    "abaOscillations",
+    "eligibleCombatMisses",
+    "eligibleCombatDroughts",
+    "urgentCombatDroughts",
+    "lateDirectEligibleTurns",
+    "lateDirectActionMisses",
+    "recoveryTurns",
+] as const satisfies readonly (keyof IV08BlockCenterMetrics)[];
+
+const LATE_METRICS = [
+    "urgentCatalogMisses",
+    "urgentMountainAdjacentMisses",
+    "urgentRepeatedNonProgressWithDirectOption",
+    "urgentMountainTerminalJitter",
+    "urgentCombatDroughts",
+    "lateDirectEligibleTurns",
+    "lateDirectActionMisses",
+] as const satisfies readonly (keyof IV08BlockCenterMetrics)[];
+
+const hasSemanticallyValidMetrics = (metrics: IV08BlockCenterMetrics, laps?: number): boolean =>
+    TURN_BOUNDED_METRICS.every((key) => metrics[key] <= metrics.observedTurns) &&
+    metrics.catalogMissedEngineValidCombat <= metrics.oracleDirectEligibleTurns &&
+    metrics.urgentCatalogMisses <= metrics.catalogMissedEngineValidCombat &&
+    metrics.noncombatWithDirectOptionTurns <= metrics.oracleDirectEligibleTurns &&
+    metrics.nonDamagingSpellExemptions <= metrics.oracleDirectEligibleTurns &&
+    metrics.mountainAdjacentDirectEligibleTurns <= metrics.mountainAdjacentTurns &&
+    metrics.mountainAdjacentDirectEligibleTurns <= metrics.oracleDirectEligibleTurns &&
+    metrics.mountainAdjacentMissedAttacks <= metrics.mountainAdjacentTurns &&
+    metrics.mountainAdjacentMissedAttacks <= metrics.mountainAdjacentDirectEligibleTurns &&
+    metrics.mountainAdjacentMissedAttacks <= metrics.noncombatWithDirectOptionTurns &&
+    metrics.urgentMountainAdjacentMisses <= metrics.mountainAdjacentMissedAttacks &&
+    metrics.nonProgressMoves <= metrics.pureMoveTurns &&
+    metrics.urgentRepeatedNonProgressWithDirectOption <= metrics.nonProgressMoves &&
+    metrics.urgentRepeatedNonProgressWithDirectOption <= metrics.noncombatWithDirectOptionTurns &&
+    metrics.urgentMountainTerminalJitter <= metrics.pureMoveTurns &&
+    metrics.abaOscillations <= metrics.pureMoveTurns &&
+    metrics.eligibleCombatMisses === metrics.noncombatWithDirectOptionTurns &&
+    metrics.eligibleCombatDroughts <= metrics.eligibleCombatMisses &&
+    metrics.urgentCombatDroughts <= metrics.eligibleCombatDroughts &&
+    metrics.lateDirectEligibleTurns <= metrics.oracleDirectEligibleTurns &&
+    metrics.lateDirectActionMisses <= metrics.noncombatWithDirectOptionTurns &&
+    metrics.lateDirectActionMisses <= metrics.lateDirectEligibleTurns &&
+    (laps === undefined ||
+        laps >= V08_BLOCK_CENTER_ACTION_PANEL_LATE_LAP ||
+        LATE_METRICS.every((key) => metrics[key] === 0));
+
+const hasValidMountainCounterDomain = (mountainStates: Record<V08BlockCenterMountainState, number>): boolean =>
+    Object.keys(mountainStates).length === V08_BLOCK_CENTER_MOUNTAIN_STATES.length &&
+    V08_BLOCK_CENTER_MOUNTAIN_STATES.every(
+        (state) => Object.hasOwn(mountainStates, state) && isNonnegativeSafeCounter(mountainStates[state]),
+    );
+
+const hasValidResultDomain = (record: IV08BlockCenterActionRecord, maxLaps: number): boolean => {
+    const validWinner = record.winner === "candidate" || record.winner === "opponent" || record.winner === "draw";
+    const validEndReason =
+        record.endReason === "elimination" ||
+        record.endReason === "turn_cap" ||
+        record.endReason === "stuck" ||
+        record.endReason === "crash";
+    const validLaps = Number.isSafeInteger(record.laps) && record.laps >= 0 && record.laps <= maxLaps;
+    const validCrash =
+        record.endReason === "crash"
+            ? typeof record.crash === "string" && record.crash.length > 0
+            : record.crash === undefined;
+    const validElimination = record.endReason !== "elimination" || record.laps >= 1;
+    return validWinner && validEndReason && validLaps && validCrash && validElimination;
+};
+
+const hasConsistentFailureSamples = (record: IV08BlockCenterActionRecord): boolean => {
+    const counts = new Map<V08BlockCenterIssue, number>();
+    const derivedMetrics = new Set<keyof IV08BlockCenterMetrics>();
+    const byCreatureCounts = new Map<string, Map<V08BlockCenterIssue, number>>();
+    const byCreatureDerivedMetrics = new Map<string, Set<keyof IV08BlockCenterMetrics>>();
+    for (const sample of record.failureSamples) {
+        if (
+            !Object.hasOwn(FAILURE_SAMPLE_METRIC, sample.issue) ||
+            sample.game !== record.game ||
+            sample.pair !== record.pair ||
+            sample.seed !== record.seed ||
+            sample.candidateSide !== record.candidateSide ||
+            !Number.isSafeInteger(sample.lap) ||
+            sample.lap < 0 ||
+            sample.lap > record.laps ||
+            ((sample.issue === "urgent_mountain_terminal_jitter" || sample.issue === "lap9_direct_action_miss") &&
+                sample.lap < V08_BLOCK_CENTER_ACTION_PANEL_LATE_LAP)
+        ) {
+            return false;
+        }
+        counts.set(sample.issue, (counts.get(sample.issue) ?? 0) + 1);
+        const creatureCounts = byCreatureCounts.get(sample.creatureName) ?? new Map<V08BlockCenterIssue, number>();
+        creatureCounts.set(sample.issue, (creatureCounts.get(sample.issue) ?? 0) + 1);
+        byCreatureCounts.set(sample.creatureName, creatureCounts);
+        if (
+            sample.lap >= V08_BLOCK_CENTER_ACTION_PANEL_LATE_LAP &&
+            Object.hasOwn(LATE_FAILURE_SAMPLE_METRIC, sample.issue)
+        ) {
+            const key = LATE_FAILURE_SAMPLE_METRIC[sample.issue as keyof typeof LATE_FAILURE_SAMPLE_METRIC];
+            derivedMetrics.add(key);
+            const creatureDerivedMetrics =
+                byCreatureDerivedMetrics.get(sample.creatureName) ?? new Set<keyof IV08BlockCenterMetrics>();
+            creatureDerivedMetrics.add(key);
+            byCreatureDerivedMetrics.set(sample.creatureName, creatureDerivedMetrics);
+        }
+    }
+    return (
+        [...counts].every(([issue, count]) => count <= record.metrics[FAILURE_SAMPLE_METRIC[issue]]) &&
+        [...derivedMetrics].every((key) => record.metrics[key] > 0) &&
+        [...byCreatureCounts].every(([creatureName, creatureCounts]) => {
+            const metrics = record.byCreature[creatureName];
+            return (
+                metrics !== undefined &&
+                [...creatureCounts].every(([issue, count]) => count <= metrics[FAILURE_SAMPLE_METRIC[issue]])
+            );
+        }) &&
+        [...byCreatureDerivedMetrics].every(([creatureName, keys]) => {
+            const metrics = record.byCreature[creatureName];
+            return metrics !== undefined && [...keys].every((key) => metrics[key] > 0);
+        })
+    );
+};
+
 const increment = (record: Record<string, number>, key: string, amount = 1): void => {
     record[key] = (record[key] ?? 0) + amount;
 };
@@ -1374,7 +1623,11 @@ export class V08BlockCenterActionAuditor {
                 if (!cached.pass) {
                     this.bump(unit.getName(), source === "oracle" ? "oracleProbeRejections" : "catalogProbeRejections");
                     if (probeFailures.length < 8) {
-                        probeFailures.push({ source, option: structuredClone(option), failure: cached.failure });
+                        probeFailures.push({
+                            source,
+                            actions: structuredClone(option.actions),
+                            failure: cached.failure,
+                        });
                     }
                 }
                 return cached.pass;
@@ -1389,7 +1642,7 @@ export class V08BlockCenterActionAuditor {
             if (!pass) {
                 this.bump(unit.getName(), source === "oracle" ? "oracleProbeRejections" : "catalogProbeRejections");
                 if (probeFailures.length < 8) {
-                    probeFailures.push({ source, option: structuredClone(option), failure });
+                    probeFailures.push({ source, actions: structuredClone(option.actions), failure });
                 }
             }
             return pass;
@@ -1408,6 +1661,27 @@ export class V08BlockCenterActionAuditor {
         }
         const catalogDirect = catalogOption !== undefined;
         const catalogMiss = independent !== undefined && catalog.direct.length === 0;
+        const stationaryMountain = catalog.set.candidates.find((candidate) =>
+            isStationaryMountainCandidate(unit, candidate),
+        );
+        let stationaryMountainAvailable = false;
+        if (stationaryMountain) {
+            const result = observation.probeActions(stationaryMountain.actions);
+            stationaryMountainAvailable =
+                result.failure === null && result.completedActionTypes.includes("obstacle_attack");
+            if (!stationaryMountainAvailable) {
+                this.bump(unit.getName(), "catalogProbeRejections");
+                if (probeFailures.length < 8) {
+                    probeFailures.push({
+                        source: "catalog",
+                        actions: structuredClone(stationaryMountain.actions),
+                        failure:
+                            result.failure ??
+                            `probe completed [${result.completedActionTypes.join(",")}] without obstacle_attack`,
+                    });
+                }
+            }
+        }
         const state = mountainState(context);
         const actorCells = cloneCells(unit.getCells());
         const enemyCells = context.unitsHolder
@@ -1439,6 +1713,7 @@ export class V08BlockCenterActionAuditor {
             lap: context.fightProperties?.getCurrentLap() ?? 0,
             mountainState: state,
             mountainAdjacent: adjacentToMountain,
+            stationaryMountainAvailable,
             actorCells,
             enemyCells,
             stateSha256: stateFingerprint(observation),
@@ -1493,7 +1768,7 @@ export class V08BlockCenterActionAuditor {
                 pending,
                 failure.source === "oracle" ? "oracle_probe_rejection" : "catalog_probe_rejection",
                 observation.chosenDecision,
-                `${failure.failure}; rejected option ${v08BlockCenterActionSignature(failure.option.actions)}`,
+                `${failure.failure}; rejected option ${v08BlockCenterActionSignature(failure.actions)}`,
             );
         }
         if (pending.catalogMiss) {
@@ -1578,6 +1853,15 @@ export class V08BlockCenterActionAuditor {
                 pending.meleeOnly &&
                 !meaningfulRoleMove &&
                 isV08BlockCenterNonProgressMove(pending.actorCells, after, pending.enemyCells);
+            const terminalNonProgress =
+                pending.meleeOnly &&
+                !meaningfulRoleMove &&
+                isV08BlockCenterTerminalNonProgressMove(
+                    pending.actorCells,
+                    after,
+                    pending.enemyCells,
+                    pending.stationaryMountainAvailable,
+                );
             if (nonProgress) {
                 this.bump(pending.creatureName, "nonProgressMoves");
                 if (urgentTurn && directAvailable && history.consecutiveNonDamageTurns >= 1) {
@@ -1590,7 +1874,10 @@ export class V08BlockCenterActionAuditor {
                     `enemy distance ${v08BlockCenterFootprintDistance(pending.actorCells, pending.enemyCells)} -> ${v08BlockCenterFootprintDistance(after, pending.enemyCells)}`,
                 );
             }
-            const abaOscillation = isV08BlockCenterABAOscillation(history.footprints, afterKey);
+            // Only uninterrupted, non-role pure movement can form a hard A-B-A stall. A productive attack,
+            // spell, move-and-attack, or protector/ward relocation is a real decision boundary and must not
+            // leave an older footprint behind for a later return move to match.
+            const abaOscillation = !meaningfulRoleMove && isV08BlockCenterABAOscillation(history.footprints, afterKey);
             if (abaOscillation) {
                 this.bump(pending.creatureName, "abaOscillations");
                 this.sample(
@@ -1600,35 +1887,50 @@ export class V08BlockCenterActionAuditor {
                     `${history.footprints.at(-2)} -> ${history.footprints.at(-1)} -> ${afterKey}`,
                 );
             }
-            if (
+            const urgentMountainTerminalJitter =
                 isV08BlockCenterUrgentMountainTerminalJitter(
                     pending.lap,
                     pending.mountainState,
                     pending.meleeOnly,
                     meaningfulRoleMove,
-                    nonProgress,
+                    terminalNonProgress,
                     history.consecutiveUnproductiveMountainMoves,
-                )
-            ) {
+                ) ||
+                isV08BlockCenterUrgentMountainABAOscillation(
+                    pending.lap,
+                    pending.mountainState,
+                    pending.meleeOnly,
+                    meaningfulRoleMove,
+                    abaOscillation,
+                );
+            if (urgentMountainTerminalJitter) {
                 this.bump(pending.creatureName, "urgentMountainTerminalJitter");
                 this.sample(
                     pending,
                     "urgent_mountain_terminal_jitter",
                     observation.chosenDecision,
-                    `${history.consecutiveUnproductiveMountainMoves + 1} consecutive non-progress mountain moves; enemy distance ${v08BlockCenterFootprintDistance(pending.actorCells, pending.enemyCells)} -> ${v08BlockCenterFootprintDistance(after, pending.enemyCells)}${abaOscillation ? "; A-B-A footprint return" : ""}`,
+                    `${abaOscillation ? "A-B-A footprint return" : `${history.consecutiveUnproductiveMountainMoves + 1} consecutive non-progress mountain moves`}; enemy distance ${v08BlockCenterFootprintDistance(pending.actorCells, pending.enemyCells)} -> ${v08BlockCenterFootprintDistance(after, pending.enemyCells)}`,
                 );
             }
-            if (pending.mountainState !== "cleared" && pending.meleeOnly && !meaningfulRoleMove && nonProgress) {
+            if (
+                pending.mountainState !== "cleared" &&
+                pending.meleeOnly &&
+                !meaningfulRoleMove &&
+                terminalNonProgress
+            ) {
                 history.consecutiveUnproductiveMountainMoves += 1;
             } else {
                 history.consecutiveUnproductiveMountainMoves = 0;
             }
-            if (history.footprints.at(-1) !== afterKey) {
+            if (meaningfulRoleMove) {
+                history.footprints = [afterKey];
+            } else if (history.footprints.at(-1) !== afterKey) {
                 history.footprints.push(afterKey);
                 if (history.footprints.length > 3) history.footprints.shift();
             }
         } else {
             history.consecutiveUnproductiveMountainMoves = 0;
+            history.footprints = [footprintKey(movedFootprint(observation, pending.actorCells))];
         }
         if (directAction || nonDamagingSpellIsExempt) {
             history.consecutiveNonDamageTurns = 0;
@@ -1843,6 +2145,12 @@ export function summarizeV08BlockCenterActionPanel(
     let recordsWithObservations = 0;
     let recordsWithConsistentMountainTurns = 0;
     let recordsWithConsistentCreatureTurns = 0;
+    let recordsWithConsistentCreatureMetrics = 0;
+    let recordsWithValidCounterDomain = 0;
+    let recordsWithConsistentFailureSamples = 0;
+    let recordsWithRejectionParity = 0;
+    let recordsWithValidResultDomain = 0;
+    let recordsWithSemanticallyValidMetrics = 0;
     // Worker completion order is scheduling-dependent. Game-order aggregation makes the capped reproduction
     // sample set and serialized summary stable across concurrency levels.
     for (const record of [...records].sort((left, right) => left.game - right.game)) {
@@ -1871,19 +2179,50 @@ export function summarizeV08BlockCenterActionPanel(
         increment(maps, String(record.mapType));
         increment(endReasons, record.endReason);
         candidateEngineRejections += record.candidateEngineRejections;
-        const recordMountainTurns = Object.values(record.mountainStates).reduce((sum, count) => sum + count, 0);
+        const recordMountainTurns = V08_BLOCK_CENTER_MOUNTAIN_STATES.reduce(
+            (sum, state) => sum + record.mountainStates[state],
+            0,
+        );
         const recordCreatureTurns = Object.values(record.byCreature).reduce(
             (sum, creatureMetrics) => sum + creatureMetrics.observedTurns,
             0,
         );
+        const recordCreatureMetrics = emptyV08BlockCenterMetrics();
+        for (const creatureMetrics of Object.values(record.byCreature)) {
+            mergeMetrics(recordCreatureMetrics, creatureMetrics);
+        }
+        if (
+            isNonnegativeSafeCounter(record.candidateEngineRejections) &&
+            hasValidMetricCounterDomain(record.metrics) &&
+            Object.values(record.byCreature).every(hasValidMetricCounterDomain) &&
+            hasValidMountainCounterDomain(record.mountainStates)
+        ) {
+            recordsWithValidCounterDomain += 1;
+        }
+        if (hasConsistentFailureSamples(record)) recordsWithConsistentFailureSamples += 1;
+        if (record.metrics.strategyRejectedActions === record.candidateEngineRejections) {
+            recordsWithRejectionParity += 1;
+        }
+        if (hasValidResultDomain(record, options.maxLaps ?? 60)) recordsWithValidResultDomain += 1;
+        if (
+            hasSemanticallyValidMetrics(record.metrics, record.laps) &&
+            Object.values(record.byCreature).every((creatureMetrics) =>
+                hasSemanticallyValidMetrics(creatureMetrics, record.laps),
+            )
+        ) {
+            recordsWithSemanticallyValidMetrics += 1;
+        }
         if (record.metrics.observedTurns > 0) recordsWithObservations += 1;
         if (recordMountainTurns === record.metrics.observedTurns) recordsWithConsistentMountainTurns += 1;
         if (recordCreatureTurns === record.metrics.observedTurns) recordsWithConsistentCreatureTurns += 1;
+        if (METRIC_KEYS.every((key) => recordCreatureMetrics[key] === record.metrics[key])) {
+            recordsWithConsistentCreatureMetrics += 1;
+        }
         mergeMetrics(metrics, record.metrics);
         for (const [creatureName, source] of Object.entries(record.byCreature)) {
             mergeMetrics((byCreature[creatureName] ??= emptyV08BlockCenterMetrics()), source);
         }
-        for (const state of Object.keys(mountainStates) as V08BlockCenterMountainState[]) {
+        for (const state of V08_BLOCK_CENTER_MOUNTAIN_STATES) {
             mountainStates[state] += record.mountainStates[state];
         }
         for (const sample of record.failureSamples) {
@@ -1907,6 +2246,21 @@ export function summarizeV08BlockCenterActionPanel(
         (sum, creatureMetrics) => sum + creatureMetrics.observedTurns,
         0,
     );
+    const aggregateCreatureMetrics = emptyV08BlockCenterMetrics();
+    for (const creatureMetrics of Object.values(byCreature)) {
+        mergeMetrics(aggregateCreatureMetrics, creatureMetrics);
+    }
+    const aggregateCreatureMetricMismatches = METRIC_KEYS.filter(
+        (key) => aggregateCreatureMetrics[key] !== metrics[key],
+    );
+    const aggregateCounterDomainValid =
+        isNonnegativeSafeCounter(candidateEngineRejections) &&
+        hasValidMetricCounterDomain(metrics) &&
+        Object.values(byCreature).every(hasValidMetricCounterDomain) &&
+        hasValidMountainCounterDomain(mountainStates);
+    const aggregateMetricSemanticsValid =
+        hasSemanticallyValidMetrics(metrics) &&
+        Object.values(byCreature).every((creatureMetrics) => hasSemanticallyValidMetrics(creatureMetrics));
     const checks: Record<string, IV08BlockCenterActionGate> = {
         source_commit_bound: gate(
             sourceBound,
@@ -1941,6 +2295,31 @@ export function summarizeV08BlockCenterActionPanel(
             `${recordsWithConsistentCreatureTurns}/${records.length} records; ${creatureObservedTurns}/${metrics.observedTurns} total`,
             "every record and aggregate by-creature observed turns = observed turns",
         ),
+        creature_metric_integrity: gate(
+            recordsWithConsistentCreatureMetrics === records.length && aggregateCreatureMetricMismatches.length === 0,
+            `${recordsWithConsistentCreatureMetrics}/${records.length} records; aggregate mismatches: ${aggregateCreatureMetricMismatches.join(",") || "none"}`,
+            "every record and aggregate by-creature metric sum = global metric",
+        ),
+        counter_domain_integrity: gate(
+            recordsWithValidCounterDomain === records.length && aggregateCounterDomainValid,
+            `${recordsWithValidCounterDomain}/${records.length} records; aggregate ${aggregateCounterDomainValid ? "valid" : "invalid"}`,
+            "every record and aggregate counter is a nonnegative safe integer",
+        ),
+        failure_sample_integrity: gate(
+            recordsWithConsistentFailureSamples === records.length,
+            recordsWithConsistentFailureSamples,
+            `= ${records.length} records with plan-bound samples backed by their counters`,
+        ),
+        record_result_integrity: gate(
+            recordsWithValidResultDomain === records.length,
+            recordsWithValidResultDomain,
+            `= ${records.length} records with valid winner, laps, end reason, and crash fields`,
+        ),
+        metric_semantic_integrity: gate(
+            recordsWithSemanticallyValidMetrics === records.length && aggregateMetricSemanticsValid,
+            `${recordsWithSemanticallyValidMetrics}/${records.length} records; aggregate ${aggregateMetricSemanticsValid ? "valid" : "invalid"}`,
+            "every record and aggregate metric obeys turn, subset, and late-lap invariants",
+        ),
         mountain_state_coverage: gate(
             Object.values(mountainStates).every((count) => count > 0),
             Object.entries(mountainStates)
@@ -1963,10 +2342,22 @@ export function summarizeV08BlockCenterActionPanel(
             metrics.lateDirectEligibleTurns,
             "> 0",
         ),
+        eliminations_only: gate(
+            Object.keys(endReasons).length === 1 && (endReasons.elimination ?? 0) === records.length,
+            JSON.stringify(endReasons),
+            `elimination = ${records.length} and no other end reason`,
+        ),
         crashes_zero: gate((endReasons.crash ?? 0) === 0, endReasons.crash ?? 0, "= 0"),
         stuck_zero: gate((endReasons.stuck ?? 0) === 0, endReasons.stuck ?? 0, "= 0"),
         turn_caps_zero: gate((endReasons.turn_cap ?? 0) === 0, endReasons.turn_cap ?? 0, "= 0"),
         engine_rejections_zero: gate(candidateEngineRejections === 0, candidateEngineRejections, "= 0"),
+        strategy_rejections_zero: gate(metrics.strategyRejectedActions === 0, metrics.strategyRejectedActions, "= 0"),
+        strategy_engine_rejection_parity: gate(
+            recordsWithRejectionParity === records.length &&
+                metrics.strategyRejectedActions === candidateEngineRejections,
+            `${recordsWithRejectionParity}/${records.length} records; ${metrics.strategyRejectedActions}/${candidateEngineRejections} aggregate`,
+            "strategy observer rejections = candidate engine rejections in every record and aggregate",
+        ),
         observer_pairing_faults_zero: gate(metrics.observerPairingFaults === 0, metrics.observerPairingFaults, "= 0"),
         shared_catalog_enumeration_not_truncated: gate(
             metrics.sharedCatalogEnumerationTruncations === 0,
@@ -1979,6 +2370,7 @@ export function summarizeV08BlockCenterActionPanel(
             metrics.catalogProbeRejections,
             "= 0",
         ),
+        recovery_turns_zero: gate(metrics.recoveryTurns === 0, metrics.recoveryTurns, "= 0"),
         urgent_catalog_misses_zero: gate(metrics.urgentCatalogMisses === 0, metrics.urgentCatalogMisses, "= 0"),
         urgent_direct_action_misses_zero: gate(
             metrics.lateDirectActionMisses === 0,
