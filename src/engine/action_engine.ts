@@ -931,6 +931,15 @@ export class GameActionEngine {
         if (target && action.targetCell && !this.sameCell(action.targetCell, target.getBaseCell())) {
             return this.reject("spell_not_available");
         }
+        const targetedSpellLineIsClear =
+            !target ||
+            SpellHelper.isTargetedSpellLineOfSightClear(
+                spell.getName(),
+                this.context.grid,
+                (cell) => isCellWithinGrid(this.context.grid.getSettings(), cell),
+                caster.getBaseCell(),
+                target.getBaseCell(),
+            );
         // Every unit-targeted spell must pass the same authoritative gate before dispatch. Most spells flow
         // through AttackHandler.handleMagicAttack, which rejects Hidden enemies and calls canCastSpell; the
         // custom handlers below bypass that path, so validating here prevents them from targeting an invisible
@@ -938,6 +947,7 @@ export class GameActionEngine {
         if (
             target &&
             ((target.getTeam() !== caster.getTeam() && target.hasBuffActive("Hidden")) ||
+                !targetedSpellLineIsClear ||
                 !SpellHelper.canCastSpell(
                     false,
                     this.context.grid.getSettings(),

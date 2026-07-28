@@ -31,7 +31,7 @@ import {
     canCastSpell,
     canCastSummon,
     canMassCastSpell,
-    isSpellLineOfSightClear,
+    isTargetedSpellLineOfSightClear,
     isSpellUsableByCaster,
 } from "../spells/spell_helper";
 import type { Spell } from "../spells/spell";
@@ -39,7 +39,6 @@ import {
     applyMagicResistToSpellDamage,
     calculateSpellDamage,
     isOffensiveSpellMultiplier,
-    isThrownOffensiveSpell,
 } from "../spells/spell_damage";
 import {
     FIRE_WALL_ORIENTATIONS,
@@ -2036,9 +2035,10 @@ class CandidateGenerator {
         return { value, kill };
     }
     /** A thrown spell needs the clear line the engine's cast re-checks — mirror it, never propose a refusal. */
-    private hasSpellLineOfSight(target: Unit): boolean {
+    private hasTargetedSpellLineOfSight(spell: Spell, target: Unit): boolean {
         const gs = this.context.grid.getSettings();
-        return isSpellLineOfSightClear(
+        return isTargetedSpellLineOfSightClear(
+            spell.getName(),
             this.context.grid,
             (cell) => isCellWithinGrid(gs, cell),
             this.unit.getBaseCell(),
@@ -2230,18 +2230,14 @@ class CandidateGenerator {
                             undefined,
                         )
                     ) {
-                        // Vine Throw is a targeted debuff, not a stack-powered damage spell, but the engine
-                        // still throws it along the same blocked line as Fire Strike and Ring of Fire.
-                        if (spell.getName() === "Vine Throw" && !this.hasSpellLineOfSight(enemy)) {
+                        // A thrown spell must clear the same exact line the engine checks. This includes Vine
+                        // Throw even though it is a status spell, not an offensive-damage multiplier.
+                        if (!this.hasTargetedSpellLineOfSight(spell, enemy)) {
                             continue;
                         }
                         // An offensive spell must be valued at the damage it lands — a debuff candidate carries
-                        // neither number. The THROWN ones (Fire Strike, Ring of Fire) also need the line of sight
-                        // the engine re-checks; called-down spells have no line to keep.
+                        // neither number. Called-down spells have no line to keep.
                         if (isOffensiveSpellMultiplier(spell.getMultiplierType())) {
-                            if (isThrownOffensiveSpell(spell.getName()) && !this.hasSpellLineOfSight(enemy)) {
-                                continue;
-                            }
                             if (spell.getName() === "Ring of Fire") {
                                 const damage = this.ringOfFireDamage(spell, enemy);
                                 if (!damage) {

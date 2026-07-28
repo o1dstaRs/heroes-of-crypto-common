@@ -29,6 +29,7 @@ import {
 import {
     isV08StrongerRangedPostureWait,
     selectV08DirectCombatCandidate,
+    selectV08VineThrowCandidate,
     v08TeamRangedOutput,
 } from "../ai/versions/v0_8";
 import {
@@ -147,7 +148,9 @@ import {
  * least-deadline-slack enemy. Ordinary/balanced stronger-ranged waits remain legal through lap 8; the inherited
  * >=2:1 dominant finish may press from lap 7. At lap 9 it universally forces a positive-damage attack and otherwise
  * the nearest advance. Coverage-preserving attack caps, shortlist, deadline, and circuit fallbacks all use the same
- * selector; historical decisions are unchanged.
+ * selector; historical decisions are unchanged. Production a13 also carries one legal Vine Throw through its
+ * immediate-leaf shortlist: terrain/snare value only appears after future movement, so a leaf-only pre-pass cannot
+ * safely prove the cast is dominated.
  * SEARCH_OBSERVE_ONLY=1 is a research-only shadow mode: search still scores candidates but always returns
  * the exact incumbent action-array reference. SEARCH_INCUMBENT_KINDS limits which incumbent action classes
  * enter shadow search (the filter runs before enumeration), and SEARCH_CHALLENGER_KINDS limits the generated
@@ -2891,6 +2894,19 @@ export class SearchDriver {
                       ]
                     : rankedChallengers;
         const challengers = ordered.slice(0, this.shortlist - 1).map(({ index }) => candidates[index]);
+        // Vine Throw changes future path costs and applies a two-lap snare, neither of which an immediate leaf can
+        // value reliably. Preserve the normal top-K challenger and add at most one best legal Vine candidate for
+        // production a13's full 12-turn comparison. This expands only Trent/borrowed-Vine turns and leaves every
+        // historical/research policy unchanged unless it explicitly enables V08_AGGRESSIVE.
+        const reservedVine = this.aggressiveV08
+            ? selectV08VineThrowCandidate(
+                  this.deps.unitsHolder,
+                  rankedChallengers.map(({ index }) => candidates[index]),
+              )
+            : undefined;
+        if (reservedVine && !challengers.includes(reservedVine)) {
+            challengers.push(reservedVine);
+        }
         return [candidates[0], ...challengers];
     }
     // ---- Q2 gate-0 ablation ---------------------------------------------------------------------

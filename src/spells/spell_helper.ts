@@ -19,6 +19,7 @@ import { getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
 import { AppliedSpell } from "./applied_spell";
 import type { ICalculatedBuffsDebuffsEffect, Spell } from "./spell";
+import { isThrownOffensiveSpell } from "./spell_damage";
 import { SpellPowerType, SpellTargetType } from "./spell_properties";
 import { vinePathCells } from "./vines";
 
@@ -200,6 +201,31 @@ export function isSpellLineOfSightClear(
         }
     }
     return true;
+}
+
+/**
+ * Whether a unit-targeted spell travels across the board instead of being called down on its recipient.
+ *
+ * Keep this classification beside the shared line walk: candidate generation, native/fallback AI, manual
+ * targeting and the authoritative engine must all agree that Vine Throw, Fire Strike and Ring of Fire can be
+ * intercepted by terrain or a creature. Non-thrown targeted spells deliberately return false.
+ */
+export function targetedSpellRequiresLineOfSight(spellName: string): boolean {
+    return spellName === "Vine Throw" || isThrownOffensiveSpell(spellName);
+}
+
+/**
+ * Shared target-specific reachability gate. Returning true for non-thrown spells lets callers apply this after
+ * the generic canCastSpell check without growing another spell-name branch at every decision surface.
+ */
+export function isTargetedSpellLineOfSightClear(
+    spellName: string,
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    from: XY,
+    to: XY,
+): boolean {
+    return !targetedSpellRequiresLineOfSight(spellName) || isSpellLineOfSightClear(grid, isWithinGrid, from, to);
 }
 
 export function canCastSummon(spell: Spell, gridMatrix: number[][], emptyGridCell?: XY): boolean {

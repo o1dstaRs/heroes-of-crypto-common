@@ -43,6 +43,14 @@ const V08_POSTURE_PROTECTED_ACTION_TYPES = new Set<GameAction["type"]>([
     "obstacle_attack",
     "cast_spell",
 ]);
+const V08_VINE_THROW_SPELL = "Vine Throw";
+const V08_VINE_THROW_PROTECTED_ACTION_TYPES = new Set<GameAction["type"]>([
+    "wait_turn",
+    "melee_attack",
+    "range_attack",
+    "area_throw_attack",
+    "cast_spell",
+]);
 
 /** v0.8 closes Harpy's deterministic Castling omission without changing frozen v0.7 behavior. */
 export const V08_CASTER_ROUTER_POLICY = Object.freeze({
@@ -195,6 +203,50 @@ export function selectV08DamageSpellCandidate(
     return best;
 }
 
+const v08VineTargetPressure = (target: Unit): number =>
+    nonnegativeFinite(target.getAmountAlive()) *
+    nonnegativeFinite(target.getAttackDamageMax()) *
+    nonnegativeFinite(target.getSteps());
+
+/**
+ * Pick one Vine Throw for full consideration. Mobility-weighted live stack output is the primary signal:
+ * snaring a fast, dangerous stack buys more than spending the only charge on a nearly-dead low-output target.
+ * Grounded targets win exact ties because they also have to cross the laid terrain; lower resistance and stable
+ * candidate order finish the deterministic ordering.
+ */
+export function selectV08VineThrowCandidate(
+    unitsHolder: UnitsHolder,
+    candidates: readonly IEnumeratedCandidate[],
+): IEnumeratedCandidate | undefined {
+    let best: IEnumeratedCandidate | undefined;
+    let bestTarget: Unit | undefined;
+    for (const candidate of candidates) {
+        if (candidate.kind !== "spell" || candidate.spellName !== V08_VINE_THROW_SPELL || !candidate.targetId) {
+            continue;
+        }
+        const target = unitsHolder.getAllUnits().get(candidate.targetId);
+        if (!target || target.isDead()) {
+            continue;
+        }
+        if (!best || !bestTarget) {
+            best = candidate;
+            bestTarget = target;
+            continue;
+        }
+        const pressureDelta = v08VineTargetPressure(target) - v08VineTargetPressure(bestTarget);
+        const groundedDelta = Number(!target.canFly()) - Number(!bestTarget.canFly());
+        const resistanceDelta = bestTarget.getMagicResist() - target.getMagicResist();
+        if (
+            pressureDelta > 0 ||
+            (pressureDelta === 0 && (groundedDelta > 0 || (groundedDelta === 0 && resistanceDelta > 0)))
+        ) {
+            best = candidate;
+            bestTarget = target;
+        }
+    }
+    return best;
+}
+
 /**
  * MELEE_MAGIC spellbooks historically bypass v0.2's pure-MAGIC caster branch, so Battle Mage and Magic Dragon
  * could walk toward a target while legal long-range damage sat unused. Pick the best legal spell, then compare it
@@ -246,6 +298,30 @@ function enumerateV08BoundaryCandidates(
         // late finish comparator can improve target selection even when v0.7 already chose to attack.
         enrichIncumbentMetadata: true,
     }).candidates;
+}
+
+/**
+ * Trent is a MELEE creature, so the historical MAGIC/MELEE_MAGIC routers never inspect its castable ability.
+ * On an ordinary advance/no-op turn, make the best engine-legal Vine Throw the native v0.8 proposal. Preserve
+ * immediate combat, another cast, and tactical hourglass; a13 can then compare the cast with its best challenger,
+ * while the browser's searchless v0.8 path still knows how to use the ability.
+ */
+export function prioritizeV08VineThrow(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
+    if (
+        !unit
+            .getSpells()
+            .some((spell) => spell.getName() === V08_VINE_THROW_SPELL && isSpellUsableByCaster(unit, spell)) ||
+        decision.some((action) => V08_VINE_THROW_PROTECTED_ACTION_TYPES.has(action.type)) ||
+        v08DominantFinishState(context.unitsHolder, unit.getTeam(), context.fightProperties?.getCurrentLap() ?? 0)
+            .active
+    ) {
+        return decision;
+    }
+    const vine = selectV08VineThrowCandidate(
+        context.unitsHolder,
+        enumerateV08BoundaryCandidates(unit, context, decision),
+    );
+    return vine?.actions ?? decision;
 }
 
 const attacksForbiddenTarget = (unit: Unit, decision: readonly GameAction[]): boolean =>
@@ -495,10 +571,11 @@ export class StrategyV0_8 extends StrategyV0_7 {
         const positioned = prioritizeV08RangedPositioning(unit, context, finished, this.version);
         const legalDecision = repairV08ForbiddenTargetDecision(unit, context, positioned);
         const spellDecision = prioritizeV08DamageSpell(unit, context, legalDecision);
+        const vineDecision = prioritizeV08VineThrow(unit, context, spellDecision);
         const protectedDecision = prioritizeV08BacklineProtector(
             unit,
             context,
-            spellDecision,
+            vineDecision,
             this.canHourglass(unit, context),
         );
         return repairV08BacklineWardDecision(unit, context, protectedDecision);

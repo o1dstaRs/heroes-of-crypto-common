@@ -24,7 +24,9 @@ import {
     getMagicMirrorPower,
     hasAlreadyAppliedSpell,
     isMirrored,
+    isTargetedSpellLineOfSightClear,
     spellToTextureName,
+    targetedSpellRequiresLineOfSight,
 } from "../../src/spells/spell_helper";
 import {
     SpellMultiplierType,
@@ -35,6 +37,32 @@ import {
 import { createTestUnit, testGridSettings } from "../helpers/combat";
 
 describe("spell_helper", () => {
+    it("classifies and blocks every thrown targeted spell while leaving called-down spells unrestricted", () => {
+        const blockedGrid = {
+            getOccupantUnitId: (cell: { x: number; y: number }): string | undefined =>
+                cell.x === 4 && cell.y === 2 ? "blocker" : undefined,
+        };
+        const withinGrid = (cell: { x: number; y: number }): boolean =>
+            cell.x >= 0 &&
+            cell.y >= 0 &&
+            cell.x < testGridSettings.getGridSize() &&
+            cell.y < testGridSettings.getGridSize();
+        const from = { x: 2, y: 2 };
+        const to = { x: 8, y: 2 };
+
+        expect(targetedSpellRequiresLineOfSight("Vine Throw")).toBe(true);
+        expect(targetedSpellRequiresLineOfSight("Fire Strike")).toBe(true);
+        expect(targetedSpellRequiresLineOfSight("Ring of Fire")).toBe(true);
+        expect(targetedSpellRequiresLineOfSight("Lightning Strike")).toBe(false);
+        expect(isTargetedSpellLineOfSightClear("Vine Throw", blockedGrid, withinGrid, from, to)).toBe(false);
+        expect(isTargetedSpellLineOfSightClear("Fire Strike", blockedGrid, withinGrid, from, to)).toBe(false);
+        expect(isTargetedSpellLineOfSightClear("Ring of Fire", blockedGrid, withinGrid, from, to)).toBe(false);
+        expect(isTargetedSpellLineOfSightClear("Lightning Strike", blockedGrid, withinGrid, from, to)).toBe(true);
+        expect(
+            isTargetedSpellLineOfSightClear("Vine Throw", { getOccupantUnitId: () => undefined }, withinGrid, from, to),
+        ).toBe(true);
+    });
+
     it("evaluates mass flying, ally, heal, and enemy spell targets", () => {
         const windFlow = spell("System", "Wind Flow");
         const massHeal = spell("Life", "Mass Heal");
