@@ -2537,6 +2537,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * ranked the runes looked completely dead: the log said "+2 armor" and the card never moved. applyBuff
      * writes the same total into the description as `desc;first;second`, and the server ships those
      * descriptions verbatim, so the display arrays are an equally authoritative source — fall back to them.
+     *
+     * A snapshot that carries the server's final armor_mod / attack_mod (armor_mod_authoritative) overwrites
+     * the whole chain afterwards, so this can never double-count; it is what keeps the runes correct when
+     * those fields are absent, and it stays the only source in sandbox.
      */
     private getBuffStacks(buffName: string): number {
         const applied = this.getBuff(buffName);
@@ -2713,6 +2717,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         synergyLuckIncrease: number,
         stepsMoraleMultiplier = 0,
     ) {
+        // A ranked snapshot hands over the server's FINAL armor_mod / attack_mod. Capture them HERE, before
+        // the derivation chains below overwrite them, and restore at the end of each chain. Captured from
+        // the live properties rather than initialUnitProperties because that is where the snapshot lands,
+        // and it stays correct across repeated calls (each run restores the same number it captured).
+        const authoritativeArmorMod = this.unitProperties.armor_mod_authoritative
+            ? this.unitProperties.armor_mod
+            : undefined;
+        const authoritativeAttackMod = this.unitProperties.attack_mod_authoritative
+            ? this.unitProperties.attack_mod
+            : undefined;
+
         // target
         if (!this.hasEffectActive("Aggr")) {
             this.resetTarget();
@@ -3014,6 +3029,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const enchantArmorStacks = this.getBuffStacks("Armor Rune");
         if (enchantArmorStacks) {
             this.unitProperties.armor_mod = roundUnitStat(this.unitProperties.armor_mod + enchantArmorStacks, 2);
+        }
+
+        // RANKED: everything above derives armor_mod from effect/buff OBJECT arrays the ranked client
+        // deliberately leaves empty, so it would land on the base value while the server has (say) Shatter
+        // Armor's -10 applied. The snapshot carries the server's final armor_mod and seeds it into
+        // initialUnitProperties, so restore it here rather than guarding each step of the chain.
+        if (authoritativeArmorMod !== undefined) {
+            this.unitProperties.armor_mod = authoritativeArmorMod;
         }
 
         // this.unitProperties.armor_mod = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
@@ -3352,6 +3375,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const enchantWeaponStacks = this.getBuffStacks("Weapon Rune");
         if (enchantWeaponStacks) {
             this.unitProperties.attack_mod = roundUnitStat(this.unitProperties.attack_mod + enchantWeaponStacks, 2);
+        }
+
+        // The attack twin of the armor_mod restore above — Riot / Mass Riot / Weakness / Warlord's Edge /
+        // Angelic Host / Weapon Rune all read buff objects a ranked client does not carry.
+        if (authoritativeAttackMod !== undefined) {
+            this.unitProperties.attack_mod = authoritativeAttackMod;
         }
         this.unitProperties.base_attack = roundUnitStat(this.unitProperties.base_attack * baseAttackMultiplier, 2);
         this.unitProperties.shot_distance = roundUnitStat(this.unitProperties.shot_distance, 2);

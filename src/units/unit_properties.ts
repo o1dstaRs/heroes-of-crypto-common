@@ -137,6 +137,21 @@ export class UnitProperties {
     // luck spread that diverges from the server. Left undefined for locally-simulated units (sandbox),
     // which compute luck themselves.
     public luck_authoritative?: boolean;
+    // The armor/attack twins of luck_authoritative, for the SAME reason turned inside out: adjustBaseStats
+    // derives armor_mod and attack_mod from the effect/buff OBJECT arrays (Shatter Armor, Spiritual Armor,
+    // Riot, Weakness, Veteran Helm, Titan Plate, Angelic Host, the Runes ...), and a ranked client
+    // deliberately leaves those arrays EMPTY — it seeds only the DISPLAY strings, because rebuilding the
+    // objects would double-apply stats that already arrive authoritative. The consequence was that NO
+    // debuff- or buff-driven stat change ever reached the ranked HUD: a unit under Shatter Armor showed its
+    // full base armor while the server had -10 applied, which reads as "the effect isn't working".
+    //
+    // The snapshot now carries the server's FINAL armor_mod / attack_mod, and these flags tell
+    // adjustBaseStats to keep that number verbatim instead of re-deriving it from arrays it cannot see.
+    // Both mods feed melee and ranged identically (getArmor/getRangeArmor/getAttack are base + mod), so one
+    // number per stat is exact for every consumer. Left undefined for locally-simulated units (sandbox),
+    // which own the whole derivation and must keep running it.
+    public armor_mod_authoritative?: boolean;
+    public attack_mod_authoritative?: boolean;
     // The morale twin of luck_authoritative. A ranked snapshot's morale is the server's FINAL value: base
     // + synergy + artifact deltas (Cursed Ward / Crown of Command) + every gain and loss accumulated during
     // the fight. adjustBaseStats must therefore not rebuild it from initialUnitProperties, because the
