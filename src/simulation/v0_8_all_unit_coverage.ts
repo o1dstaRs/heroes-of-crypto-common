@@ -1088,13 +1088,28 @@ export function runV08AllUnitCoverageConcurrent(
     }
     return new Promise((resolve, reject) => {
         const records: IV08AllUnitCoverageRecord[] = [];
-        const workers: Worker[] = [];
+        const liveWorkers = new Set<Worker>();
         const stoppingWorkers = new WeakSet<Worker>();
         let dispatched = 0;
         let completed = 0;
         let settled = false;
-        const cleanup = async (): Promise<void> => {
-            await Promise.allSettled(workers.map((worker) => worker.terminate()));
+        const cleanup = (): Promise<void> => {
+            // Bun can leave terminate() unresolved when another worker in the pool already self-exited. Every
+            // worker has a stop protocol, so close the remaining workers through it and wait for real exits.
+            const pending = new Set(liveWorkers);
+            if (pending.size === 0) return Promise.resolve();
+            return new Promise((accept) => {
+                for (const worker of pending) {
+                    worker.once("exit", () => {
+                        pending.delete(worker);
+                        if (pending.size === 0) accept();
+                    });
+                    if (!stoppingWorkers.has(worker)) {
+                        stoppingWorkers.add(worker);
+                        worker.postMessage({ type: "stop" });
+                    }
+                }
+            });
         };
         const fail = (error: unknown): void => {
             if (settled) return;
@@ -1125,7 +1140,7 @@ export function runV08AllUnitCoverageConcurrent(
         try {
             for (let index = 0; index < poolSize; index += 1) {
                 const worker = new Worker(workerUrl, { workerData: { options } });
-                workers.push(worker);
+                liveWorkers.add(worker);
                 worker.on(
                     "message",
                     (message: { type: "ready" } | { type: "result"; record: IV08AllUnitCoverageRecord }) => {
@@ -1150,6 +1165,7 @@ export function runV08AllUnitCoverageConcurrent(
                 );
                 worker.on("error", fail);
                 worker.on("exit", (code) => {
+                    liveWorkers.delete(worker);
                     if (!settled && (code !== 0 || !stoppingWorkers.has(worker))) {
                         fail(new Error(`All-unit coverage worker exited before completion with code ${code}`));
                     }
