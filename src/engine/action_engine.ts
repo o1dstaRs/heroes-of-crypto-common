@@ -1207,7 +1207,17 @@ export class GameActionEngine {
         const settings = this.context.grid.getSettings();
         // Everything before the target's own cell must be clear. The target obviously occupies the last cell,
         // and the caster's cell is already excluded by vinePathCells.
+        //
+        // Neither endpoint's own body counts as a blocker, for the reason spelled out in
+        // isSpellLineOfSightClear: a 2x2 creature is addressed by ONE base cell but stands on four, so the
+        // line to that base cell crosses its own remaining cells whenever the throw comes from the far side.
+        const casterUnitId = this.context.grid.getOccupantUnitId(from);
+        const targetUnitId = this.context.grid.getOccupantUnitId(to);
         for (const cell of pathCells.slice(0, -1)) {
+            const occupant = this.context.grid.getOccupantUnitId(cell);
+            if (occupant && (occupant === casterUnitId || occupant === targetUnitId)) {
+                continue;
+            }
             // Lava and water are ground the vine creeps over; a body or the mountain is not. Shared with the
             // client's aim preview so a highlighted throw is never one this then refuses.
             if (!isVineCrossableCell(this.context.grid, isCellWithinGrid(settings, cell), cell)) {
