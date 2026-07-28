@@ -76,8 +76,11 @@ const BLOCK_GAME_62: RecordedReplay = {
     ],
 };
 
+// Re-seeded after the accumulated balance changes (Battle Mage 14/11 -> 26/10 most recently): the old seed
+// stopped producing a Cowardice-struck Beholder that takes a range shot at all, so there was nothing left for
+// this case to assert on. This seed reproduces the same behaviour it was written to guard.
 const LAVA_GAME_158: RecordedReplay = {
-    seed: 4171994912,
+    seed: 4173008544,
     gridType: PBTypes.GridVals.LAVA_CENTER,
     green: [
         ["Nature", "Leprechaun", 1, 1, 148],
@@ -101,7 +104,8 @@ const LAVA_GAME_158: RecordedReplay = {
 // Thunderbird (the other exp-334 L4 flyer) and the seed moved 3167913824 -> 3167914054, the first of
 // several that reproduce the Cowardice fallback here (3167914078, 3167914171, 3167914195 also qualify).
 const NORMAL_GAME_799: RecordedReplay = {
-    seed: 3167914054,
+    // Re-seeded for the same reason as LAVA_GAME_158 above: the Cowardice-struck Elf no longer appeared.
+    seed: 3167945730,
     gridType: PBTypes.GridVals.NORMAL,
     green: [
         ["Nature", "Wolf", 1, 1, 124],

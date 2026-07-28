@@ -589,14 +589,22 @@ describe("v0.8 random-roster passive-turn panel", () => {
     });
 
     test("censors a waited unit skipped by a live effect instead of reporting a missed reactivation", () => {
-        // Lava game 2 waits Mermaid twice after the damage-spell policy lets Battle Mage preserve the back line:
-        // one wait reactivates normally and the other is consumed by a live effect before Strategy/SearchDriver
-        // is called. The battle-event hook is the only observer of the effect-consumed turn.
+        // Lava game 2 waits Mermaid several times after the damage-spell policy lets Battle Mage preserve the
+        // back line: some waits reactivate normally, others are consumed by a live effect before
+        // Strategy/SearchDriver is called. The battle-event hook is the only observer of an effect-consumed
+        // turn, and the POINT of this case is that such a turn is CENSORED rather than reported as a missed
+        // reactivation — that is the pair of zero assertions at the end, not the counts above them.
+        //
+        // Counts re-pinned after the Battle Mage rebalance (14/11 -> 26/10) changed how this fight unfolds:
+        // 2/1/1 -> 5/2/2. They are kept exact so a further shift is noticed, but the invariant is asserted
+        // separately below so it cannot silently degrade into "nothing was skipped, so nothing was missed".
         const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 2);
         expect(record.endReason).toBe("elimination");
-        expect(record.byCreature.Mermaid.waitTurns).toBe(2);
-        expect(record.byCreature.Mermaid.sameLapWaitReactivations).toBe(1);
-        expect(record.byCreature.Mermaid.waitsSkippedByEffectBeforeReactivation).toBe(1);
+        expect(record.byCreature.Mermaid.waitTurns).toBe(5);
+        expect(record.byCreature.Mermaid.sameLapWaitReactivations).toBe(2);
+        expect(record.byCreature.Mermaid.waitsSkippedByEffectBeforeReactivation).toBe(2);
+        // The invariant: an effect-consumed wait actually happened here, and none of them were misreported.
+        expect(record.byCreature.Mermaid.waitsSkippedByEffectBeforeReactivation).toBeGreaterThan(0);
         expect(record.byCreature.Mermaid.missedSameLapWaitReactivations).toBe(0);
         expect(record.metrics.missedSameLapWaitReactivations).toBe(0);
     });
