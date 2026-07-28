@@ -1059,7 +1059,7 @@ export class GameActionEngine {
         const cells: XY[] = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
         const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? [];
         const allies = affected.filter((u) => u.getTeam() === caster.getTeam());
-        processCraftAbility(caster, allies, this.context.sceneLog);
+        const crafted = processCraftAbility(caster, allies, this.context.sceneLog);
         caster.useSpell(spell.getName());
         const events: GameEvent[] = [
             {
@@ -1069,6 +1069,14 @@ export class GameActionEngine {
                 targetCell: c,
                 unitIdsDied: [],
                 animations: [],
+                // The rolls, so the client can SHOW them instead of re-rolling its own. "nothing" is the
+                // outcome that matters most here: it changes no state, so it is invisible to a snapshot diff
+                // and was simply unshowable in ranked before this.
+                outcomes: crafted.map((r) => ({
+                    unitId: r.unitId,
+                    outcome: r.outcome,
+                    ...(r.grantedAbility ? { grantedAbility: r.grantedAbility } : {}),
+                })),
             },
         ];
         events.push(...this.turnEngine.completeTurn(caster));
@@ -1886,11 +1894,17 @@ export class GameActionEngine {
     private enchantCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
         const isArmor = spell.getName() === "Armor Rune";
         const buffName = spell.getName();
+        // Reported on the event below: a FAILED rune changes nothing, so like Craft's "nothing" it can only
+        // reach a ranked client if the server states it outright.
+        let outcome = "failed";
+        let total: number | undefined;
         if (getRandomInt(0, 100) < 50) {
             const next = (target.getBuff(buffName)?.getFirstSpellProperty() ?? 0) + 1;
             target.deleteBuff(buffName); // idempotent when absent; re-applied below carrying the new total
             target.applyBuff(spell, next);
             this.context.sceneLog.updateLog(`${target.getName()} enchanted: +${next} ${isArmor ? "armor" : "attack"}`);
+            outcome = "enchanted";
+            total = next;
         } else {
             this.context.sceneLog.updateLog(`${target.getName()}'s ${isArmor ? "armor" : "weapon"} enchant failed`);
         }
@@ -1904,6 +1918,7 @@ export class GameActionEngine {
                 targetCell: target.getBaseCell(),
                 unitIdsDied: [],
                 animations: [],
+                outcomes: [{ unitId: target.getId(), outcome, ...(total !== undefined ? { amount: total } : {}) }],
             },
         ];
         events.push(...this.turnEngine.completeTurn(caster));

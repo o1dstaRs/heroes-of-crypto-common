@@ -154,6 +154,18 @@ export type GameEvent =
            * which is where the effect belongs.
            */
           resurrected?: { unitId: string; amount: number; hp: number; position: XY }[];
+          /**
+           * Per-target outcome of a cast whose result is a ROLL rather than a state change: the Blacksmith's
+           * Craft ("stun" / "nothing" / "double" / "frozen") and the Armor/Weapon Runes ("enchanted" /
+           * "failed"). Without this the two outcomes that change nothing — Craft's "No effect!" and a failed
+           * rune — were unshowable in ranked: a snapshot diff cannot see a non-change, and the replay must
+           * never re-roll a discrete result (it runs with unseeded RNG, so it would show each player a
+           * different answer). The server's roll travels here instead, which is the only honest source.
+           *
+           * `grantedAbility` names what a successful Craft handed over; `amount` carries a rune's new running
+           * total. Absent for every other spell.
+           */
+          outcomes?: { unitId: string; outcome: string; grantedAbility?: string; amount?: number }[];
       }
     // Smoke spell: clouds placed on free cells of a 2x2 block. lapsRemaining is the per-cell budget at place
     // time (mirrors SmokeClouds.add) — the client renders the cloud and can show the countdown.
