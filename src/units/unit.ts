@@ -2527,6 +2527,27 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return buffProperties;
     }
     /**
+     * The running total a stacking buff keeps in its FIRST spell property (Blacksmith's runes), read so it
+     * survives a unit that carries the buff only as snapshot display state.
+     *
+     * A ranked client rebuilds every unit from the authoritative snapshot, which conveys buffs as the
+     * `applied_buffs*` arrays alone — `this.buffs` stays empty there (RankedPlayScene's
+     * getUnitPropertiesFromAuthoritativeState), so getBuff() returns undefined and reading the AppliedSpell
+     * on its own scored every enchant as +0. The Blacksmith's whole contribution is that number, so in
+     * ranked the runes looked completely dead: the log said "+2 armor" and the card never moved. applyBuff
+     * writes the same total into the description as `desc;first;second`, and the server ships those
+     * descriptions verbatim, so the display arrays are an equally authoritative source — fall back to them.
+     */
+    private getBuffStacks(buffName: string): number {
+        const applied = this.getBuff(buffName);
+        if (applied) {
+            return applied.getFirstSpellProperty() ?? 0;
+        }
+        // Absent buff -> ["", ""] -> 0. A malformed entry must not poison the stat with NaN.
+        const stored = Number(this.getBuffProperties(buffName)[0]);
+        return Number.isFinite(stored) ? stored : 0;
+    }
+    /**
      * Moves ONE applied buff off `from` and onto this unit, carrying its power, the laps it has LEFT and
      * its rendered description across. Borrowed Grace (Monk) takes a blessing rather than copying it, so
      * the entry has to survive the move intact — rebuilding it from configuration would hand back a full
@@ -2990,12 +3011,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // Armor Rune (Blacksmith): a stacking flat +N armor buff. The accumulated bonus lives in the buff's
         // first spell property (set in enchantCast), so a unit enchanted N times carries +N here and on its card.
-        const enchantArmorBuff = this.getBuff("Armor Rune");
-        if (enchantArmorBuff) {
-            this.unitProperties.armor_mod = roundUnitStat(
-                this.unitProperties.armor_mod + (enchantArmorBuff.getFirstSpellProperty() ?? 0),
-                2,
-            );
+        const enchantArmorStacks = this.getBuffStacks("Armor Rune");
+        if (enchantArmorStacks) {
+            this.unitProperties.armor_mod = roundUnitStat(this.unitProperties.armor_mod + enchantArmorStacks, 2);
         }
 
         // this.unitProperties.armor_mod = Number((this.unitProperties.base_armor * baseArmorMultiplier).toFixed(2));
@@ -3331,12 +3349,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         // Weapon Rune (Blacksmith): a stacking flat +N attack buff; accumulated bonus in the buff's first
         // spell property (set in enchantCast). getAttack() = base_attack + attack_mod, so this lands as flat +N.
-        const enchantWeaponBuff = this.getBuff("Weapon Rune");
-        if (enchantWeaponBuff) {
-            this.unitProperties.attack_mod = roundUnitStat(
-                this.unitProperties.attack_mod + (enchantWeaponBuff.getFirstSpellProperty() ?? 0),
-                2,
-            );
+        const enchantWeaponStacks = this.getBuffStacks("Weapon Rune");
+        if (enchantWeaponStacks) {
+            this.unitProperties.attack_mod = roundUnitStat(this.unitProperties.attack_mod + enchantWeaponStacks, 2);
         }
         this.unitProperties.base_attack = roundUnitStat(this.unitProperties.base_attack * baseAttackMultiplier, 2);
         this.unitProperties.shot_distance = roundUnitStat(this.unitProperties.shot_distance, 2);
