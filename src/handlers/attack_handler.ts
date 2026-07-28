@@ -212,7 +212,11 @@ export class AttackHandler {
             !this.canBeAttackedByMelee(unit.getPosition(), unit.isSmallSize(), aggrMatrix) &&
             unit.getRangeShots() > 0 &&
             !unit.hasDebuffActive("Range Null Field Aura") &&
-            !unit.hasDebuffActive("Rangebane")
+            // hasStatusApplied for Rangebane: it is applied in COMBAT (Spit Ball), so a ranked client — which
+            // leaves the debuff OBJECT arrays empty by design — answered "no Rangebane" forever and kept
+            // offering a shot the server refuses. The aura above needs no bridge; auras are reconciled from
+            // the snapshot. This method is called straight from the client, so the rule has to hold here too.
+            !unit.hasStatusApplied("Rangebane")
         );
     }
     public canBeAttackedByMelee(unitPosition: HoCMath.XY, isSmallUnit: boolean, enemyAggrMatrix?: number[][]): boolean {
@@ -738,7 +742,7 @@ export class AttackHandler {
             (!targetUnit ||
                 (targetUnit.getTeam() === attackerUnit.getTeam() && !isAOE) ||
                 targetUnit.isDead() ||
-                (attackerUnit.hasDebuffActive("Cowardice") &&
+                (attackerUnit.hasStatusApplied("Cowardice") &&
                     attackerUnit.getCumulativeHp() < targetUnit.getCumulativeHp()))
         ) {
             return { completed: false, unitIdsDied, animationData };
@@ -794,7 +798,7 @@ export class AttackHandler {
             targetUnit.canRespond(PBTypes.AttackVals.RANGE) &&
             this.canLandRangeAttack(targetUnit, this.grid.getEnemyAggrMatrixByUnitId(targetUnit.getId())) &&
             !(
-                targetUnit.hasDebuffActive("Cowardice") &&
+                targetUnit.hasStatusApplied("Cowardice") &&
                 targetUnit.getCumulativeHp() < rangeResponseUnit.getCumulativeHp()
             ) &&
             (!targetUnit.getTarget() || targetUnit.getTarget() === attackerUnit.getId()) &&
@@ -1361,7 +1365,7 @@ export class AttackHandler {
                 !targetUnit ||
                 targetUnit.getTeam() === attackerUnit.getTeam() ||
                 targetUnit.isDead() ||
-                (attackerUnit.hasDebuffActive("Cowardice") &&
+                (attackerUnit.hasStatusApplied("Cowardice") &&
                     attackerUnit.getCumulativeHp() < targetUnit.getCumulativeHp())
             ) {
                 if (targetUnit.isDead() && !unitIdsDied.includes(targetUnit.getId())) {
@@ -1488,7 +1492,8 @@ export class AttackHandler {
                 attackerUnit.getAttackTypeSelection() !== PBTypes.AttackVals.MELEE_MAGIC) ||
             attackerUnit.hasAbilityActive("No Melee") ||
             attackerUnit.getTeam() === targetUnit.getTeam() ||
-            (attackerUnit.hasDebuffActive("Cowardice") && attackerUnit.getCumulativeHp() < targetUnit.getCumulativeHp())
+            (attackerUnit.hasStatusApplied("Cowardice") &&
+                attackerUnit.getCumulativeHp() < targetUnit.getCumulativeHp())
         ) {
             return { completed: false, unitIdsDied, animationData };
         }
@@ -1856,7 +1861,7 @@ export class AttackHandler {
                 !attackerUnit.canSkipResponse() &&
                 !targetUnit.hasAbilityActive("No Melee") &&
                 !(
-                    targetUnit.hasDebuffActive("Cowardice") &&
+                    targetUnit.hasStatusApplied("Cowardice") &&
                     targetUnit.getCumulativeHp() < attackerUnit.getCumulativeHp()
                 ) &&
                 (!targetUnit.getTarget() || targetUnit.getTarget() === attackerUnit.getId()) &&

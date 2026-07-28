@@ -1171,6 +1171,12 @@ class UnitRepr implements IUnitAIRepr {
         return this.debuffs.has(debuffName);
     }
 
+    // The ranked-safe twin the AI now asks (IUnitAIRepr.hasStatusApplied). This mock has no separate
+    // display list, so the one debuff set answers both.
+    public hasStatusApplied(name: string): boolean {
+        return this.debuffs.has(name);
+    }
+
     public getRangeShots(): number {
         return this.rangeShots;
     }

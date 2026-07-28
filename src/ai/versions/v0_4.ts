@@ -257,7 +257,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (groups.length === 1 && firstHit.hasBuffActive("Hidden")) {
             return false;
         }
-        if (unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < firstHit.getCumulativeHp()) {
+        if (unit.hasStatusApplied("Cowardice") && unit.getCumulativeHp() < firstHit.getCumulativeHp()) {
             return false;
         }
         const forced = unit.getTarget();
@@ -450,7 +450,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const adjacentInPlace = (e: Unit): boolean =>
             e.getCells().some((ec) => myCells.some((mc) => isAdjacentCell(ec, mc)));
         const cowardlyVs = (e: Unit): boolean =>
-            unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
+            unit.hasStatusApplied("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
         // A target we can legally strike RIGHT HERE this turn — the exact set of conditions the engine's
         // melee handler enforces: alive, not "Hidden" (engine refuses), not a Cowardice-blocked stronger
         // stack, and adjacent now (so no move is needed, valid even if the unit can't move).

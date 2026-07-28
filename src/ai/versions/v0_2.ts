@@ -685,7 +685,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
                             !primaryHit.hasAbilityActive("Hidden") &&
                             evaluation.affectedUnits.length === evaluation.rangeAttackDivisors.length &&
                             (forcedTargetId === undefined || primaryHit.getId() === forcedTargetId) &&
-                            (!unit.hasDebuffActive("Cowardice") ||
+                            (!unit.hasStatusApplied("Cowardice") ||
                                 unit.getCumulativeHp() >= primaryHit.getCumulativeHp());
                         if (armCandidateIsLegal) {
                             canonicalShots!.push({

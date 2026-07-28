@@ -102,7 +102,7 @@ export function processLightningSpinAbility(
                         .getAdditionalAbilityPowerPerTeam(enemy.getTeam()),
                 );
 
-            if (fromUnit.hasDebuffActive("Cowardice") && fromUnit.getCumulativeHp() < enemy.getCumulativeHp()) {
+            if (fromUnit.hasStatusApplied("Cowardice") && fromUnit.getCumulativeHp() < enemy.getCumulativeHp()) {
                 continue;
             }
 

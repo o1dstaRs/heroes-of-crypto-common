@@ -416,7 +416,7 @@ export class StrategyV0_1 implements IAIStrategy {
         if (forcedTarget && !forcedTarget.isDead() && firstHit.getId() !== forcedTarget.getId()) {
             return false;
         }
-        return through || !unit.hasDebuffActive("Cowardice") || unit.getCumulativeHp() >= firstHit.getCumulativeHp();
+        return through || !unit.hasStatusApplied("Cowardice") || unit.getCumulativeHp() >= firstHit.getCumulativeHp();
     }
     /** Mirror the target-side checks in AttackHandler.handleMeleeAttack. */
     protected isLegalMeleeTarget(unit: Unit, target: Unit, context: IDecisionContext): boolean {
@@ -426,7 +426,7 @@ export class StrategyV0_1 implements IAIStrategy {
         if (unit.cannotAttackUnitId(target.getId())) {
             return false;
         }
-        if (unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < target.getCumulativeHp()) {
+        if (unit.hasStatusApplied("Cowardice") && unit.getCumulativeHp() < target.getCumulativeHp()) {
             return false;
         }
         const forcedTargetId = unit.getTarget();

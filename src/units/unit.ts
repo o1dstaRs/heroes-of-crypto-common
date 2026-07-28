@@ -201,6 +201,11 @@ export interface IUnitAIRepr {
     getAttackType(): AttackType;
     hasAbilityActive(abilityName: string): boolean;
     hasDebuffActive(debuffName: string): boolean;
+    /**
+     * Debuff/effect check that also reads the authoritative display list, so the rule holds for a ranked
+     * client (which leaves the OBJECT arrays empty) as well as for the engine and the simulator.
+     */
+    hasStatusApplied(name: string): boolean;
     getRangeShots(): number;
     getRangeShotDistance(): number;
 }
@@ -2911,12 +2916,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     this.unitProperties.morale = MORALE_MAX_VALUE_TOTAL;
                 }
             }
-            if (this.hasBuffActive("Morale")) {
+            // hasStatus*Applied: morale itself arrives authoritative in ranked, but the MULTIPLIER is
+            // derived here from the buff objects — which ranked leaves empty — so a high-morale unit still
+            // multiplied its damage by 1 and every damage preview under-read it.
+            if (this.hasStatusBuffApplied("Morale")) {
                 this.unitProperties.attack_multiplier = 1.25;
                 if (!lockedMorale) {
                     this.unitProperties.morale = MORALE_MAX_VALUE_TOTAL;
                 }
-            } else if (this.hasDebuffActive("Dismorale")) {
+            } else if (this.hasStatusApplied("Dismorale")) {
                 this.unitProperties.attack_multiplier = 0.8;
                 if (!lockedMorale) {
                     this.unitProperties.morale = -MORALE_MAX_VALUE_TOTAL;

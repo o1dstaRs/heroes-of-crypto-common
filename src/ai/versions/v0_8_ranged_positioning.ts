@@ -440,7 +440,7 @@ function supportedPrepinEgress(
         unit.hasAbilityActive("Area Throw") ||
         unit.hasAbilityActive("Double Shot") ||
         unit.hasDebuffActive("Range Null Field Aura") ||
-        unit.hasDebuffActive("Rangebane") ||
+        unit.hasStatusApplied("Rangebane") ||
         attackHandler.canBeAttackedByMelee(
             unit.getPosition(),
             unit.isSmallSize(),
@@ -461,7 +461,7 @@ function supportedPrepinEgress(
         !fightProperties.hasAlreadyRepliedAttack(target.getId()) &&
         target.canRespond(RANGE) &&
         !target.hasDebuffActive("Range Null Field Aura") &&
-        !target.hasDebuffActive("Rangebane") &&
+        !target.hasStatusApplied("Rangebane") &&
         !attackHandler.canBeAttackedByMelee(
             target.getPosition(),
             target.isSmallSize(),
@@ -713,7 +713,7 @@ function supportedBandAdvance(
         unit.hasAbilityActive("Area Throw") ||
         unit.hasAbilityActive("Double Shot") ||
         unit.hasDebuffActive("Range Null Field Aura") ||
-        unit.hasDebuffActive("Rangebane") ||
+        unit.hasStatusApplied("Rangebane") ||
         attackHandler.canBeAttackedByMelee(
             unit.getPosition(),
             unit.isSmallSize(),
@@ -734,7 +734,7 @@ function supportedBandAdvance(
         !fightProperties.hasAlreadyRepliedAttack(target.getId()) &&
         target.canRespond(RANGE) &&
         !target.hasDebuffActive("Range Null Field Aura") &&
-        !target.hasDebuffActive("Rangebane") &&
+        !target.hasStatusApplied("Rangebane") &&
         !attackHandler.canBeAttackedByMelee(
             target.getPosition(),
             target.isSmallSize(),
@@ -933,7 +933,7 @@ function protectedAdvanceShotCatalog(
         unit.hasAbilityActive("Large Caliber") ||
         unit.hasAbilityActive("Area Throw") ||
         unit.hasDebuffActive("Range Null Field Aura") ||
-        unit.hasDebuffActive("Rangebane") ||
+        unit.hasStatusApplied("Rangebane") ||
         !attackHandler.canLandRangeAttack(unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId()))
     ) {
         return { decision };
@@ -952,7 +952,7 @@ function protectedAdvanceShotCatalog(
         !(context.fightProperties?.hasAlreadyRepliedAttack(target.getId()) ?? false) &&
         target.canRespond(RANGE) &&
         !target.hasDebuffActive("Range Null Field Aura") &&
-        !target.hasDebuffActive("Rangebane") &&
+        !target.hasStatusApplied("Rangebane") &&
         !attackHandler.canBeAttackedByMelee(
             target.getPosition(),
             target.isSmallSize(),
@@ -2030,7 +2030,7 @@ function pinnedRetreat(
     emitFunnel("mobile");
     if (unit.hasAbilityActive("Handyman")) return decision;
     emitFunnel("ordinary_shooter");
-    if (unit.hasDebuffActive("Range Null Field Aura") || unit.hasDebuffActive("Rangebane")) return decision;
+    if (unit.hasDebuffActive("Range Null Field Aura") || unit.hasStatusApplied("Rangebane")) return decision;
     emitFunnel("range_unsuppressed");
     if (
         !attackHandler.canBeAttackedByMelee(

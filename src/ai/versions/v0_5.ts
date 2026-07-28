@@ -316,7 +316,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const enemyTeam = otherTeam(unit.getTeam());
         const forced = unit.getTarget();
         const cowardlyVs = (e: Unit): boolean =>
-            unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
+            unit.hasStatusApplied("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
         const targets = context.unitsHolder.getAllAllies(enemyTeam).filter(
             (e) =>
                 !e.isDead() &&
@@ -550,7 +550,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // this guards the AIM below (spin's primary, each directional aim), not the hit-set. A Cowardice-blocked
         // aim was the sole residual sim-rejection cause (16/50k, Thunderbird/Hydra AOE).
         const cowardlyVs = (e: Unit): boolean =>
-            unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
+            unit.hasStatusApplied("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
         const footprintAt = (cell: XY): XY[] => this.footprintForCell(unit, cell, context);
         const adjEnemies = (cell: XY): Unit[] => {
             const fp = footprintAt(cell);
@@ -1101,7 +1101,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
                     (e) =>
                         !e.isDead() &&
                         !isHidden(e) &&
-                        !(unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp()) &&
+                        !(unit.hasStatusApplied("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp()) &&
                         e.getCells().some((ec) => myCells.some((mc) => isAdjacentCell(mc, ec))),
                 );
             if (alt) {
@@ -1188,7 +1188,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const v4target = strike.targetId;
         const v4from = strike.attackFrom ?? base;
         const cowardlyVs = (e: Unit): boolean =>
-            unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
+            unit.hasStatusApplied("Cowardice") && unit.getCumulativeHp() < e.getCumulativeHp();
         const enemies = unitsHolder
             .getAllAllies(enemyTeam)
             .filter((e) => !e.isDead() && !isHidden(e) && !cowardlyVs(e));

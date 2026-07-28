@@ -707,7 +707,7 @@ class CandidateGenerator {
             if (isHidden(e)) {
                 return false;
             }
-            if (this.unit.hasDebuffActive("Cowardice") && this.unit.getCumulativeHp() < e.getCumulativeHp()) {
+            if (this.unit.hasStatusApplied("Cowardice") && this.unit.getCumulativeHp() < e.getCumulativeHp()) {
                 return false;
             }
             if (forced && forced !== e.getId()) {
@@ -1090,7 +1090,7 @@ class CandidateGenerator {
             target.getTeam() !== this.enemyTeam ||
             isHidden(target) ||
             (forcedTargetId !== undefined && target.getId() !== forcedTargetId) ||
-            (this.unit.hasDebuffActive("Cowardice") && this.unit.getCumulativeHp() < target.getCumulativeHp()) ||
+            (this.unit.hasStatusApplied("Cowardice") && this.unit.getCumulativeHp() < target.getCumulativeHp()) ||
             !target.getCells().some((cell) => cell.x === shot.aimCell!.x && cell.y === shot.aimCell!.y) ||
             !RANGE_ATTACK_CELL_SIDES.includes(shot.aimSide as RangeAttackCellSide) ||
             !isRangeAttackSideObservable(
@@ -1119,7 +1119,7 @@ class CandidateGenerator {
             ) ||
             this.unit.getRangeShots() <= 0 ||
             this.unit.hasDebuffActive("Range Null Field Aura") ||
-            this.unit.hasDebuffActive("Rangebane")
+            this.unit.hasStatusApplied("Rangebane")
         ) {
             return;
         }
@@ -1373,7 +1373,7 @@ class CandidateGenerator {
                         isHidden(primaryHit) ||
                         (forcedTargetId !== undefined && primaryHit.getId() !== forcedTargetId) ||
                         (!isThroughShot &&
-                            this.unit.hasDebuffActive("Cowardice") &&
+                            this.unit.hasStatusApplied("Cowardice") &&
                             this.unit.getCumulativeHp() < primaryHit.getCumulativeHp())
                     ) {
                         continue;
@@ -1513,7 +1513,7 @@ class CandidateGenerator {
             for (const shot of kept) {
                 if (
                     (forcedTargetId && shot.targetId !== forcedTargetId) ||
-                    (this.unit.hasDebuffActive("Cowardice") &&
+                    (this.unit.hasStatusApplied("Cowardice") &&
                         this.unit.getCumulativeHp() < shot.target.getCumulativeHp())
                 ) {
                     continue;

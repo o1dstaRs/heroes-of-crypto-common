@@ -585,7 +585,7 @@ export class GameActionEngine {
         // ability/aura exists precisely to forbid this. The handler otherwise never re-checks the
         // attacker's range eligibility, so without this an AI (or a tampered client) can shoot through
         // the field and the shot animation plays. canLandRangeAttack enforces the same names.
-        if (attacker.hasDebuffActive("Range Null Field Aura") || attacker.hasDebuffActive("Rangebane")) {
+        if (attacker.hasDebuffActive("Range Null Field Aura") || attacker.hasStatusApplied("Rangebane")) {
             return this.reject("attack_not_available");
         }
 
@@ -612,7 +612,7 @@ export class GameActionEngine {
             target.isRangeCapable() &&
             target.getRangeShots() > 0 &&
             !target.hasDebuffActive("Range Null Field Aura") &&
-            !target.hasDebuffActive("Rangebane") &&
+            !target.hasStatusApplied("Rangebane") &&
             !this.context.attackHandler.canBeAttackedByMelee(
                 target.getPosition(),
                 target.isSmallSize(),

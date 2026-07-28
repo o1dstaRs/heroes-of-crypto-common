@@ -1344,7 +1344,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                         cause = "forced_target_mismatch";
                     } else if (unit.cannotAttackUnitId(tgt.getId())) {
                         cause = "terrifying_gaze";
-                    } else if (unit.hasDebuffActive("Cowardice") && unit.getCumulativeHp() < tgt.getCumulativeHp()) {
+                    } else if (unit.hasStatusApplied("Cowardice") && unit.getCumulativeHp() < tgt.getCumulativeHp()) {
                         cause = "cowardice";
                     } else if (!grid.areCellsAdjacent(afCells, tgt.getCells())) {
                         cause = "not_adjacent";
@@ -1374,7 +1374,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                         cause = "hidden";
                     } else if (unit.hasDebuffActive("Range Null Field Aura")) {
                         cause = "null_field";
-                    } else if (unit.hasDebuffActive("Rangebane")) {
+                    } else if (unit.hasStatusApplied("Rangebane")) {
                         cause = "rangebane";
                     } else if (unit.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE) {
                         cause = "not_range_selected";
@@ -1386,7 +1386,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                         const primary = resolveRangeAttackPrimary(unit, tgt, action, grid, attackHandler, unitsHolder);
                         cause =
                             !unit.hasAbilityActive("Through Shot") &&
-                            unit.hasDebuffActive("Cowardice") &&
+                            unit.hasStatusApplied("Cowardice") &&
                             primary &&
                             primary.getTeam() !== unit.getTeam() &&
                             unit.getCumulativeHp() < primary.getCumulativeHp()
