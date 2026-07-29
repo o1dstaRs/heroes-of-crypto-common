@@ -167,6 +167,13 @@ describe("B1 full-game league genome", () => {
         ).toBe(champion);
         expect(
             pickLeagueCreature(levelFourPickState([abomination, champion], [ward], []), PBTypes.TeamVals.LOWER, anchor),
+        ).toBe(champion);
+        expect(
+            pickLeagueCreature(
+                levelFourPickState([abomination, champion], [ward, creature("Battle Mage")], []),
+                PBTypes.TeamVals.LOWER,
+                anchor,
+            ),
         ).toBe(abomination);
         expect(
             pickLeagueCreature(levelFourPickState([queen, champion], [ward], [flyer]), PBTypes.TeamVals.LOWER, anchor),

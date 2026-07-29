@@ -22,7 +22,12 @@ import {
     scoreLeagueCreature,
     type ILeagueGenome,
 } from "../../simulation/league_genome";
-import { DRAFT_FEATURE_DIM, eligibleBacklineProtectorChoices } from "./creature_score";
+import {
+    DRAFT_FEATURE_DIM,
+    applyCreatureRoleFitMultiplier,
+    creatureRoleFitMultiplier,
+    eligibleBacklineProtectorChoices,
+} from "./creature_score";
 import leagueRound1CandidateGenome from "./draft_genomes/league_round1_br_57de5a2d_candidate.json";
 import leagueRound3ProjectedGenome from "./draft_genomes/league_round3_br_52752642_projected.json";
 import v07NonfightDraftGenome from "./draft_genomes/v07_nonfight_draft_48d23ac4461_projected.json";
@@ -186,7 +191,10 @@ export function pickDraftGenomeCreature(
     let best: number | undefined;
     let bestScore = -Infinity;
     for (const creatureId of eligible) {
-        const score = draftGenomeCreatureScore(genome, creatureId);
+        const score = applyCreatureRoleFitMultiplier(
+            draftGenomeCreatureScore(genome, creatureId),
+            creatureRoleFitMultiplier(creatureId, ownCreatureIds, knownOpponentCreatureIds),
+        );
         if (score > bestScore) {
             best = creatureId;
             bestScore = score;

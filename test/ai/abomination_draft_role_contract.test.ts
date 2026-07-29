@@ -32,16 +32,24 @@ describe("Abomination draft role contract", () => {
         expect(pickDraftGenomeCreature(shippedGenome, OFFER, pureMeleeRoster, [])).toBe(CHAMPION);
     });
 
-    test.each([
-        ["Battle Mage", CREATURES.BATTLE_MAGE],
-        ["Magic Dragon", CREATURES.MAGIC_DRAGON],
-    ] as const)("selects Abomination for a %s ward under both live and shipped scoring", (_name, ward) => {
+    test("excludes Abomination for one opportunistic ward", () => {
+        const ward = CREATURES.BATTLE_MAGE;
         expect(isBacklineProtectionBeneficiaryCreature(ward)).toBe(true);
-        expect(eligibleBacklineProtectorChoices(OFFER, [ward], [])).toEqual(OFFER);
+        expect(eligibleBacklineProtectorChoices(OFFER, [ward], [])).toEqual([CHAMPION]);
+        expect(livePolicy.pickCreature(4, OFFER, [ward], [])).toBe(CHAMPION);
+        expect(pickDraftGenomeCreature(shippedGenome, OFFER, [ward], [])).toBe(CHAMPION);
+    });
+
+    test.each([
+        ["two mages", [CREATURES.BATTLE_MAGE, CREATURES.MAGIC_DRAGON]],
+        ["ranged plus mage", [CREATURES.ARBALESTER, CREATURES.BATTLE_MAGE]],
+    ] as const)("selects Abomination for a %s army under both live and shipped scoring", (_name, wards) => {
+        expect(wards.every((ward) => isBacklineProtectionBeneficiaryCreature(ward))).toBe(true);
+        expect(eligibleBacklineProtectorChoices(OFFER, wards, [])).toEqual(OFFER);
         expect(draftGenomeCreatureScore(shippedGenome, ABOMINATION)).toBeGreaterThan(
             draftGenomeCreatureScore(shippedGenome, CHAMPION),
         );
-        expect(livePolicy.pickCreature(4, OFFER, [ward], [])).toBe(ABOMINATION);
-        expect(pickDraftGenomeCreature(shippedGenome, OFFER, [ward], [])).toBe(ABOMINATION);
+        expect(livePolicy.pickCreature(4, OFFER, wards, [])).toBe(ABOMINATION);
+        expect(pickDraftGenomeCreature(shippedGenome, OFFER, wards, [])).toBe(ABOMINATION);
     });
 });

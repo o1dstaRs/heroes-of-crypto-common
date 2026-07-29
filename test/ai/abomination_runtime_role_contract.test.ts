@@ -221,40 +221,74 @@ describe("Abomination runtime role contract", () => {
     test.each([
         ["Battle Mage", "Battle Mage"],
         ["Magic Dragon", "Magic Dragon"],
-    ] as const)("allows a local protective hit for %s but rejects a forward attack or move", (_label, wardName) => {
-        const local = board(wardName, { x: 7, y: 7 });
-        const localIntent = buildV08BacklineProtectorIntent(local.protector, local.context)!;
-        const localCandidate = localAttackCandidate(local.protector, local.enemy);
-        const rushCandidate = moveCandidate(local.protector, { x: 10, y: 10 });
-        const farAttack: GameAction[] = [
-            {
-                type: "melee_attack",
-                attackerId: local.protector.getId(),
-                targetId: local.enemy.getId(),
-                attackFrom: { x: 11, y: 11 },
-            },
-        ];
+    ] as const)(
+        "rejects a retaliating local hit for %s, allows it after response is spent, and rejects a rush",
+        (_label, wardName) => {
+            const local = board(wardName, { x: 7, y: 7 });
+            const localIntent = buildV08BacklineProtectorIntent(local.protector, local.context)!;
+            const localCandidate = localAttackCandidate(local.protector, local.enemy);
+            const rushCandidate = moveCandidate(local.protector, { x: 10, y: 10 });
+            const farAttack: GameAction[] = [
+                {
+                    type: "melee_attack",
+                    attackerId: local.protector.getId(),
+                    targetId: local.enemy.getId(),
+                    attackFrom: { x: 11, y: 11 },
+                },
+            ];
 
-        expect(
-            preservesV08BacklineProtectorIntent(localIntent, local.protector, local.context, localCandidate.actions),
-        ).toBe(true);
-        expect(prioritizeV08BacklineProtector(local.protector, local.context, localCandidate.actions, false)).toBe(
-            localCandidate.actions,
-        );
-        expect(isV08BacklineProtectorDecisionAllowed(local.protector, local.context, farAttack)).toBe(false);
-        expect(
-            preservesV08BacklineProtectorIntent(localIntent, local.protector, local.context, rushCandidate.actions),
-        ).toBe(false);
+            expect(
+                preservesV08BacklineProtectorIntent(
+                    localIntent,
+                    local.protector,
+                    local.context,
+                    localCandidate.actions,
+                ),
+            ).toBe(true);
+            expect(
+                prioritizeV08BacklineProtector(local.protector, local.context, localCandidate.actions, false),
+            ).toEqual([{ type: "defend_turn", unitId: local.protector.getId() }]);
+            expect(isV08BacklineProtectorDecisionAllowed(local.protector, local.context, localCandidate.actions)).toBe(
+                false,
+            );
+            const freshResponseSummary = buildV09HardGuardSummary(
+                [localCandidate, rushCandidate],
+                local.protector,
+                local.context,
+            );
+            expect(
+                v09CandidatePassesHardGuards(
+                    0,
+                    localCandidate,
+                    [localCandidate, rushCandidate],
+                    local.protector,
+                    local.context,
+                    freshResponseSummary,
+                ),
+            ).toBe(false);
 
-        const candidates = [localCandidate, rushCandidate];
-        const summary = buildV09HardGuardSummary(candidates, local.protector, local.context);
-        expect(
-            v09CandidatePassesHardGuards(0, localCandidate, candidates, local.protector, local.context, summary),
-        ).toBe(true);
-        expect(
-            v09CandidatePassesHardGuards(1, rushCandidate, candidates, local.protector, local.context, summary),
-        ).toBe(false);
-    });
+            local.enemy.setResponded(true);
+            expect(prioritizeV08BacklineProtector(local.protector, local.context, localCandidate.actions, false)).toBe(
+                localCandidate.actions,
+            );
+            expect(isV08BacklineProtectorDecisionAllowed(local.protector, local.context, localCandidate.actions)).toBe(
+                true,
+            );
+            expect(isV08BacklineProtectorDecisionAllowed(local.protector, local.context, farAttack)).toBe(false);
+            expect(
+                preservesV08BacklineProtectorIntent(localIntent, local.protector, local.context, rushCandidate.actions),
+            ).toBe(false);
+
+            const candidates = [localCandidate, rushCandidate];
+            const summary = buildV09HardGuardSummary(candidates, local.protector, local.context);
+            expect(
+                v09CandidatePassesHardGuards(0, localCandidate, candidates, local.protector, local.context, summary),
+            ).toBe(true);
+            expect(
+                v09CandidatePassesHardGuards(1, rushCandidate, candidates, local.protector, local.context, summary),
+            ).toBe(false);
+        },
+    );
 
     test("releases the role with no ward, depleted spells, or the universal late finish", () => {
         const assertReleased = (fixture: ReturnType<typeof board>, label: string): void => {

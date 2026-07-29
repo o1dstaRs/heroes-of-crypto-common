@@ -21,6 +21,7 @@ import * as SpellHelper from "../spells/spell_helper";
 import { SpellPowerType } from "../spells/spell_properties";
 import type { IWeightedRoute } from "../grid/path_definitions";
 import { Spell } from "../spells/spell";
+import { SmokeClouds } from "../spells/smoke_clouds";
 import * as HoCConstants from "../constants";
 import * as AbilityHelper from "../abilities/ability_helper";
 import type { ISceneLog } from "../scene/scene_log_interface";
@@ -35,6 +36,7 @@ import type { IVisibleDamage } from "../scene/animations";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 import { PBTypes } from "../generated/protobuf/v1/types";
+import { canUnitRespondToMelee } from "./melee_response";
 
 export interface IRangeAttackEvaluation {
     rangeAttackDivisors: number[];
@@ -145,6 +147,7 @@ export class AttackHandler {
         isThroughShot = false,
         isSelection = false,
         isAOEShot = false,
+        hypotheticalSmokeCells?: readonly HoCMath.XY[],
     ): IRangeAttackEvaluation {
         // Through Shot keeps travelling past the aimed target to the edge of the field, so it can
         // hit every unit standing on that line - not just the ones up to the hovered target.
@@ -167,6 +170,7 @@ export class AttackHandler {
             isThroughShot,
             isSelection,
             isAOEShot,
+            hypotheticalSmokeCells,
         );
     }
     /**
@@ -1868,19 +1872,7 @@ export class AttackHandler {
 
         const captureResponse = (): void => {
             hasLightningSpinResponseLanded = false;
-            if (
-                !targetUnit.isDead() &&
-                !fightProperties.hasAlreadyRepliedAttack(targetUnit.getId()) &&
-                targetUnit.canRespond(PBTypes.AttackVals.MELEE) &&
-                !attackerUnit.canSkipResponse() &&
-                !targetUnit.hasAbilityActive("No Melee") &&
-                !(
-                    targetUnit.hasStatusApplied("Cowardice") &&
-                    targetUnit.getCumulativeHp() < attackerUnit.getCumulativeHp()
-                ) &&
-                (!targetUnit.getTarget() || targetUnit.getTarget() === attackerUnit.getId()) &&
-                !targetUnit.cannotAttackUnitId(attackerUnit.getId())
-            ) {
+            if (!targetUnit.isDead() && canUnitRespondToMelee(attackerUnit, targetUnit, fightProperties)) {
                 const isResponseMissed =
                     HoCLib.getRandomInt(0, 100) <
                     targetUnit.calculateMissChance(
@@ -2728,6 +2720,7 @@ export class AttackHandler {
         isThroughShot = false,
         isSelection = false,
         isAOEShot = false,
+        hypotheticalSmokeCells?: readonly HoCMath.XY[],
     ): IRangeAttackEvaluation {
         const affectedUnitIds: string[] = [];
         const affectedUnits: Array<Unit[]> = [];
@@ -2740,13 +2733,18 @@ export class AttackHandler {
         // smoke stays halved for all of them, matching the user's "arrow becomes 1/2, then 1/4..." intent: the
         // existing range-falloff divisor already doubles per shot-distance, and smoke doubles it once more.
         const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
+        // AI planning can project a not-yet-cast cloud without touching FightProperties. Hypothetical cells
+        // supplement (rather than replace) live smoke, so the same evaluator is truthful in later laps too.
+        const hypotheticalSmokeKeys = hypotheticalSmokeCells?.length
+            ? new Set(hypotheticalSmokeCells.map((cell) => SmokeClouds.key(cell)))
+            : undefined;
         let pathCrossedSmoke = false;
 
         for (const cellToPosition of cellsToPositions) {
             const cell = cellToPosition[0];
             const position = cellToPosition[1];
 
-            if (!pathCrossedSmoke && smokeClouds.has(cell)) {
+            if (!pathCrossedSmoke && (smokeClouds.has(cell) || hypotheticalSmokeKeys?.has(SmokeClouds.key(cell)))) {
                 pathCrossedSmoke = true;
             }
 

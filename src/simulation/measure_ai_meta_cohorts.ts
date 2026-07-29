@@ -28,6 +28,7 @@ import {
     AI_META_GAMES_PER_MATCHUP,
     AI_META_MAPS,
     AI_META_POLICY,
+    AI_META_RANKED_DRAFT_POLICY_SPEC,
     AI_META_RECORDED_MAPS,
     AI_META_SCHEMA_VERSION,
     AI_META_SYNERGY_DEFINITIONS,
@@ -921,6 +922,11 @@ function writeSummary(
                 workerOverride: "V08_A13_SEARCH=1",
             },
             selectionPolicy: AI_META_POLICY,
+            rankedDraftPolicy: {
+                spec: AI_META_RANKED_DRAFT_POLICY_SPEC,
+                sequence: "live-ranked-pick-v1",
+                visibility: "own prior picks plus legitimately revealed opponent identities",
+            },
             explorationRate: AI_META_EXPLORATION_RATE,
             rankingDimensions: ["units", "artifactsT1", "artifactsT2", "augmentPlans", "augmentLevels", "synergies"],
             synergyTracking: {

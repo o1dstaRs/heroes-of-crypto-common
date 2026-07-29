@@ -55,7 +55,7 @@ describe("SetupPolicyV0", () => {
         expect(policy.pickCreature(1, pool, [], [])).toBe(best);
     });
 
-    test("protector eligibility requires a real ward, and Queen also requires known flyer pressure", () => {
+    test("Abomination requires a backline-heavy army, and Queen also requires known flyer pressure", () => {
         const abomination = PBTypes.CreatureVals.ABOMINATION;
         const queen = PBTypes.CreatureVals.ARACHNA_QUEEN;
         const champion = PBTypes.CreatureVals.CHAMPION;
@@ -65,10 +65,30 @@ describe("SetupPolicyV0", () => {
         const offer = [abomination, queen, champion];
 
         expect(eligibleBacklineProtectorChoices(offer, [], [])).toEqual([champion]);
-        expect(eligibleBacklineProtectorChoices(offer, [rangedWard], [])).toEqual([abomination, champion]);
-        expect(eligibleBacklineProtectorChoices(offer, [hybridCasterWard], [knownFlyer])).toEqual(offer);
+        expect(eligibleBacklineProtectorChoices(offer, [rangedWard], [])).toEqual([champion]);
+        expect(eligibleBacklineProtectorChoices(offer, [rangedWard, hybridCasterWard], [])).toEqual([
+            abomination,
+            champion,
+        ]);
+        expect(eligibleBacklineProtectorChoices(offer, [rangedWard, hybridCasterWard], [knownFlyer])).toEqual(offer);
         // A forced all-protector offer must still make draft progress.
         expect(eligibleBacklineProtectorChoices([abomination, queen], [], [])).toEqual([abomination, queen]);
+    });
+
+    test("uses public opponent and own-roster context for Ash Moth, Healer, and Angel roles", () => {
+        const ashMoth = PBTypes.CreatureVals.ASH_MOTH;
+        const blacksmith = PBTypes.CreatureVals.BLACKSMITH;
+        const enemyRanger = PBTypes.CreatureVals.ORC;
+        expect(policy.pickCreature(1, [ashMoth, blacksmith], [], [enemyRanger])).toBe(ashMoth);
+
+        const healer = PBTypes.CreatureVals.HEALER;
+        const pikeman = PBTypes.CreatureVals.PIKEMAN;
+        expect(policy.pickCreature(2, [healer, pikeman], [PBTypes.CreatureVals.FRENZIED_BOAR], [])).toBe(healer);
+
+        const angel = PBTypes.CreatureVals.ANGEL;
+        const champion = PBTypes.CreatureVals.CHAMPION;
+        const rangedArmy = [PBTypes.CreatureVals.ORC, PBTypes.CreatureVals.ARBALESTER];
+        expect(policy.pickCreature(4, [angel, champion], rangedArmy, [enemyRanger])).toBe(angel);
     });
 
     test("synergies: one measured-best synergy per faction fielded with 2+ units", () => {

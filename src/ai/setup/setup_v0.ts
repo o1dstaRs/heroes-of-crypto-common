@@ -11,7 +11,12 @@
 
 import { CreatureFactions } from "../../generated/protobuf/v1/creature_gen";
 import { Perk } from "../../perks/perk_properties";
-import { eligibleBacklineProtectorChoices, scoreCreature } from "./creature_score";
+import {
+    applyCreatureRoleFitMultiplier,
+    creatureRoleFitMultiplier,
+    eligibleBacklineProtectorChoices,
+    scoreCreature,
+} from "./creature_score";
 import {
     AUGMENT_PRIORITY,
     BEST_SYNERGY_BY_FACTION,
@@ -71,7 +76,16 @@ export class SetupPolicyV0 implements ISetupPolicy {
         knownOpponentCreatureIds: readonly number[],
     ): number {
         const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
-        return bestBy(eligible, (id) => scoreCreature(id)) ?? available[0] ?? 0;
+        return (
+            bestBy(eligible, (id) =>
+                applyCreatureRoleFitMultiplier(
+                    scoreCreature(id),
+                    creatureRoleFitMultiplier(id, ownCreatureIds, knownOpponentCreatureIds),
+                ),
+            ) ??
+            available[0] ??
+            0
+        );
     }
     public pickArtifactT2(offered: readonly number[]): number {
         return bestBy(offered, (id) => TIER2_ARTIFACT_WINRATE[id] ?? 0) ?? offered[0] ?? 0;

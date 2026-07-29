@@ -1209,22 +1209,28 @@ describe("v0.8 random-roster passive-turn panel", () => {
 
     test("classifies the known protector screen holds without manufacturing movement work", () => {
         // Block-center game 3443 has no attacks, casts, catch-up, local threat, or newly covered ward available
-        // to Harpy/Abomination on its post-hourglass holds. One raw shield is conservatively marked avoidable
-        // before scored arbitration repairs it; all final shields are protected because the alternatives leave
-        // the screen or move laterally inside the same state.
+        // to Harpy/Abomination on its post-hourglass holds. The shared Flesh-Shield retaliation-risk predicate
+        // now rejects the tempting raw Abomination hit before passive arbitration, so no avoidable shield needs
+        // repair. Screen holds remain protected; the response-before-damage correction adds one genuinely forced
+        // Abomination shield after the role releases, with no productive candidate left.
         const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 3_443);
         expect(record.endReason).toBe("elimination");
-        expect(record.metrics.rawAvoidableDefendTurns).toBe(1);
-        expect(record.metrics.repairedRawAvoidableDefendTurns).toBe(1);
+        expect(record.metrics.rawAvoidableDefendTurns).toBe(0);
+        expect(record.metrics.repairedRawAvoidableDefendTurns).toBe(0);
         expect(record.metrics.avoidableDefendTurns).toBe(0);
-        expect(record.metrics.finalDefendTurns).toBe(record.metrics.protectedDefendTurns);
+        expect(record.metrics.forcedDefendTurns).toBe(1);
+        expect(record.metrics.finalDefendTurns).toBe(
+            record.metrics.protectedDefendTurns + record.metrics.forcedDefendTurns,
+        );
         expect(record.metrics.protectedDefendTurns).toBeGreaterThan(0);
         expect(record.metrics.strategyRejectedActions).toBe(0);
         expect(record.metrics.recoveryAttempts).toBe(0);
         expect(record.byCreature.Harpy.protectedDefendTurns).toBeGreaterThan(0);
         expect(record.byCreature.Abomination.protectedDefendTurns).toBeGreaterThan(0);
         expect(record.byCreature.Harpy.finalDefendTurns).toBe(record.byCreature.Harpy.protectedDefendTurns);
-        expect(record.byCreature.Abomination.finalDefendTurns).toBe(record.byCreature.Abomination.protectedDefendTurns);
+        expect(record.byCreature.Abomination.finalDefendTurns).toBe(
+            record.byCreature.Abomination.protectedDefendTurns + record.byCreature.Abomination.forcedDefendTurns,
+        );
     });
 
     test("scores every circuit-open wait in the exact games that exposed the global retry cutoff", () => {

@@ -30,6 +30,7 @@ import { meleeAttackTypeSelectionPrefix } from "../ai/melee_attack_type";
 import {
     buildV08BacklineProtectorIntent,
     buildV08BacklineWardIntent,
+    isV08BacklineProtectorDecisionHardRisk,
     isV08BacklineProtectorPureMoveMeaningful,
     isV08BacklineWardPureMoveMeaningful,
     preservesV08BacklineProtectorIntent,
@@ -645,7 +646,9 @@ const preservesRole = (
     context: IDecisionContext,
     actions: readonly GameAction[],
 ): boolean =>
-    (!intents.protector || preservesV08BacklineProtectorIntent(intents.protector, unit, context, actions)) &&
+    (!intents.protector ||
+        (preservesV08BacklineProtectorIntent(intents.protector, unit, context, actions) &&
+            !isV08BacklineProtectorDecisionHardRisk(intents.protector, unit, context, actions))) &&
     (!intents.ward || preservesV08BacklineWardIntent(intents.ward, unit, context, actions));
 
 const physicalDamageCanLand = (

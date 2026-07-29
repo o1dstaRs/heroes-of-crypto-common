@@ -1512,7 +1512,9 @@ describe("search driver — gating, hygiene, determinism", () => {
             seed: 291_860_228,
             candidateSide: "red",
             endReason: "elimination",
-            laps: 10,
+            // A fresh-response melee is now excluded from both search and oracle eligibility so Abomination
+            // preserves its Flesh Shield HP; that intended branch change finishes this seed two laps earlier.
+            laps: 8,
         });
         expect(record.candidateRoster).toContain("Abomination");
         expect(record.byCreature.Abomination).toMatchObject({
@@ -1559,47 +1561,9 @@ describe("search driver — gating, hygiene, determinism", () => {
         ).toBe(false);
     });
 
-    it("pins BLOCK_CENTER game 6678: Gargantuan releases a missing forced target and takes the late melee", () => {
-        const record = runV08BlockCenterActionPanelGame(
-            {
-                candidateVersion: "v0.8",
-                opponentVersion: "v0.7",
-                games: 7_000,
-                baseSeed: 2_607_280_041,
-                sourceDirty: true,
-            },
-            6_678,
-        );
-
-        expect(record).toMatchObject({
-            game: 6_678,
-            pair: 3_339,
-            seed: 955_787_076,
-            candidateSide: "green",
-            endReason: "elimination",
-            laps: 12,
-        });
-        expect(record.candidateRoster).toContain("Gargantuan");
-        expect(record.metrics).toMatchObject({
-            urgentCatalogMisses: 0,
-            urgentMountainAdjacentMisses: 0,
-            urgentRepeatedNonProgressWithDirectOption: 0,
-            urgentMountainTerminalJitter: 0,
-            urgentCombatDroughts: 0,
-            lateDirectActionMisses: 0,
-        });
-        expect(record.byCreature.Gargantuan).toMatchObject({
-            oracleDirectEligibleTurns: 10,
-            sharedCatalogDirectEligibleTurns: 10,
-            chosenDirectActionTurns: 10,
-            catalogMissedEngineValidCombat: 0,
-            urgentCatalogMisses: 0,
-            lateDirectEligibleTurns: 3,
-            lateDirectActionMisses: 0,
-            strategyRejectedActions: 0,
-            recoveryTurns: 0,
-        });
-    });
+    // The role-aware draft/support policy now ends former seed 6678 before the late window, so it no longer
+    // proves its named condition. Forced-target release is covered deterministically by the explicit
+    // dead-target engine fixture in v0_8_block_center_action_panel.test.ts instead of pinning a whole battle.
 
     it("scopes the dominant-finish window to v0.8 while leaving v0.7 search unchanged", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.7", SEARCH_INCLUDE_MOVES: "1" });

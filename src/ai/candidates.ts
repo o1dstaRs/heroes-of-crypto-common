@@ -313,6 +313,104 @@ export function evaluateRangeCandidateDamage(
     return { value, kill, enemyDamage, friendlyFireDamage, primaryTargetDamage, aimTargetDamage };
 }
 
+export interface IBestLegalStationaryRangeAttack {
+    expectedDamage: number;
+    aimTargetId: string;
+    primaryTargetId: string;
+    aimCell: XY;
+    aimSide: RangeAttackCellSide;
+}
+
+/**
+ * The strongest productive stationary ranged action available to one shooter under an optional not-yet-cast
+ * Smoke footprint. This deliberately walks the same target-cell/visible-side space as addShots, then delegates
+ * trajectory, interception, mountains, Through Shot, falloff and Smoke divisors to AttackHandler. Re-running
+ * the complete space for each cloud models rational retargeting: a cloud gets credit only for damage the
+ * shooter cannot recover by choosing another visible edge or another stack.
+ */
+export function findBestLegalStationaryRangeAttack(
+    shooter: Unit,
+    context: IDecisionContext,
+    hypotheticalSmokeCells?: readonly XY[],
+): IBestLegalStationaryRangeAttack | undefined {
+    const attackHandler = context.attackHandler;
+    if (
+        !attackHandler ||
+        !attackHandler.canLandRangeAttack(shooter, context.grid.getEnemyAggrMatrixByUnitId(shooter.getId())) ||
+        !(shooter.getAttackTypeSelection() === RANGE || shooter.getPossibleAttackTypes().includes(RANGE))
+    ) {
+        return undefined;
+    }
+
+    const allUnits = context.unitsHolder.getAllUnits();
+    const shooterTeam = shooter.getTeam();
+    const enemyTeam = otherTeam(shooterTeam);
+    const targets = context.unitsHolder.getAllAllies(enemyTeam).filter((target) => !target.isDead());
+    const gridSettings = context.grid.getSettings();
+    const matrix = context.matrix;
+    const isThroughShot = shooter.hasAbilityActive("Through Shot");
+    const isAOE = shooter.hasAbilityActive("Large Caliber") || shooter.hasAbilityActive("Area Throw");
+    const shots = shooter.getAbility("Double Shot") || shooter.getAbility("Crafted Double Shot") ? 2 : 1;
+    const forcedTarget = allUnits.get(shooter.getTarget());
+    const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
+    let best: IBestLegalStationaryRangeAttack | undefined;
+
+    for (const aimTarget of targets) {
+        if (isHidden(aimTarget) || shooter.cannotAttackUnitId(aimTarget.getId())) continue;
+        for (const aimCell of aimTarget.getCells()) {
+            for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
+                if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot)) continue;
+                const to = getRangeAttackSideCenter(gridSettings, aimCell, aimSide, shooter.getPosition());
+                const evaluation = attackHandler.evaluateRangeAttack(
+                    allUnits,
+                    shooter,
+                    shooter.getPosition(),
+                    to,
+                    isThroughShot,
+                    false,
+                    isAOE,
+                    hypotheticalSmokeCells,
+                );
+                const primaryTarget = evaluation.affectedUnits[0]?.[0];
+                if (
+                    !primaryTarget ||
+                    evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length ||
+                    primaryTarget.isDead() ||
+                    primaryTarget.getTeam() !== enemyTeam ||
+                    isHidden(primaryTarget) ||
+                    shooter.cannotAttackUnitId(primaryTarget.getId()) ||
+                    (forcedTargetId !== undefined && primaryTarget.getId() !== forcedTargetId) ||
+                    (!isThroughShot &&
+                        shooter.hasStatusApplied("Cowardice") &&
+                        shooter.getCumulativeHp() < primaryTarget.getCumulativeHp()) ||
+                    (!isThroughShot && !isAOE && primaryTarget.getId() !== aimTarget.getId())
+                ) {
+                    continue;
+                }
+                const damage = evaluateRangeCandidateDamage(
+                    shooter,
+                    context,
+                    evaluation,
+                    primaryTarget.getId(),
+                    shots,
+                    isAOE,
+                    aimTarget.getId(),
+                ).value;
+                if (damage > 0 && (!best || damage > best.expectedDamage)) {
+                    best = {
+                        expectedDamage: damage,
+                        aimTargetId: aimTarget.getId(),
+                        primaryTargetId: primaryTarget.getId(),
+                        aimCell: { x: aimCell.x, y: aimCell.y },
+                        aimSide,
+                    };
+                }
+            }
+        }
+    }
+    return best;
+}
+
 export interface IEnumeratedCandidate {
     kind: CandidateKind;
     /** Ordered engine actions implementing the candidate (same convention as IAIStrategy.decideTurn). */
@@ -1995,10 +2093,13 @@ class CandidateGenerator {
     /**
      * Smoke spell candidate selection. Smoke is a defensive tool: it halves ranged damage that crosses a 2x2
      * cloud, so the AI wants it on the line of fire BETWEEN enemy ranged units and its own army. There is no
-     * cast-range gate, so we search the engine-legal cells for the highest-value anchor:
-     *   - Prefer a cell whose 2x2 footprint sits on the segment from each enemy ranger to the centroid of our
-     *     own units, weighting by how much enemy ranged firepower would have to shoot through it.
-     *   - Require all 4 footprint cells to pass the engine's exact smoke-placement oracle.
+     * cast-range gate, so we search a bounded set of engine-legal cells sampled between each enemy shooter and
+     * our army. Every sample is scored by the authoritative best legal shot before versus after the cloud:
+     *   - visible target edges, first interception, mountains, Through Shot and capped falloff all come from
+     *     AttackHandler, with the proposed cells passed as a pure hypothetical;
+     *   - the shooter may retarget after Smoke, so a bypassable cloud receives no imaginary protection value;
+     *   - enemy damage prevented adds value and friendly damage prevented subtracts it;
+     *   - all 4 footprint cells must pass the engine's exact smoke-placement oracle.
      * Determinism: ties broken by grid order (no RNG), so the lookahead is reproducible.
      */
     private addSmokeCastCandidates(spell: Spell): void {
@@ -2023,12 +2124,31 @@ class CandidateGenerator {
         ax = Math.round(ax / allies.length);
         ay = Math.round(ay / allies.length);
 
+        const alliedRangers = allies.filter((ally) => ally.isRangeCapable() && ally.getRangeShots() > 0);
+        const baselineDamage = new Map<string, number>();
+        for (const shooter of [...enemyRangers, ...alliedRangers]) {
+            baselineDamage.set(
+                shooter.getId(),
+                findBestLegalStationaryRangeAttack(shooter, this.context)?.expectedDamage ?? 0,
+            );
+        }
+        const preventedDamage = (shooters: readonly Unit[], cells: readonly XY[]): number => {
+            let total = 0;
+            for (const shooter of shooters) {
+                const before = baselineDamage.get(shooter.getId()) ?? 0;
+                if (before <= 0) continue;
+                const after = findBestLegalStationaryRangeAttack(shooter, this.context, cells)?.expectedDamage ?? 0;
+                total += Math.max(0, before - after);
+            }
+            return total;
+        };
+
         let best: { cell: XY; score: number } | undefined;
+        const seenAnchors = new Set<number>();
         // Sample candidate anchors along each enemy-ranger -> ally-centroid segment (midpoint is the highest-
         // value blocker; we also probe one cell either side for occupancy fit). Bounded by the grid.
         for (const e of enemyRangers) {
             const ec = e.getBaseCell();
-            const firepower = Math.max(1, e.getRangeShots()) * Math.max(1, e.getAttackDamageMax());
             for (const frac of [0.45, 0.5, 0.55, 0.66]) {
                 const anchor = {
                     x: Math.round(ec.x + (ax - ec.x) * frac),
@@ -2038,11 +2158,14 @@ class CandidateGenerator {
                 for (const ox of [0, -1]) {
                     for (const oy of [0, -1]) {
                         const c = { x: anchor.x + ox, y: anchor.y + oy };
+                        const anchorKey = (c.x << 8) | (c.y & 0xff);
+                        if (seenAnchors.has(anchorKey)) continue;
+                        seenAnchors.add(anchorKey);
                         const cells = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
                         if (!cells.every((cell) => isSmokeableCell(grid, isCellWithinGrid(gs, cell), cell))) {
                             continue;
                         }
-                        const score = firepower / frac; // closer to the ranger = more shots blinded
+                        const score = preventedDamage(enemyRangers, cells) - preventedDamage(alliedRangers, cells);
                         if (!best || score > best.score) {
                             best = { cell: c, score };
                         }
@@ -2050,8 +2173,8 @@ class CandidateGenerator {
                 }
             }
         }
-        if (best) {
-            this.pushSpell(spell, undefined, best.cell, { expectedDamage: best.score / 10 });
+        if (best && best.score > 0) {
+            this.pushSpell(spell, undefined, best.cell, { expectedDamage: best.score });
         }
     }
     /**

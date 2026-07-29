@@ -189,6 +189,75 @@ export const isBacklineProtectionBeneficiaryCreature = (creatureId: number): boo
 export const backlineProtectionBeneficiaryCount = (creatureIds: readonly number[]): number =>
     creatureIds.reduce((count, creatureId) => count + Number(isBacklineProtectionBeneficiaryCreature(creatureId)), 0);
 
+/** One opportunistic caster is not a "backline army"; two independent assets make the protector slot coherent. */
+export const MIN_ABOMINATION_BACKLINE_BENEFICIARIES = 2;
+
+const ALWAYS_DURABLE_HEAL_ANCHOR_NAMES = new Set(["Abomination", "Frenzied Boar", "Goblin Knight"]);
+
+const hasNamedCreature = (creatureIds: readonly number[], names: ReadonlySet<string>): boolean =>
+    creatureIds.some((creatureId) => {
+        const name = creatureIndex().get(creatureId)?.name;
+        return !!name && names.has(name);
+    });
+
+/**
+ * Fair, public-context role fit layered over either the hand heuristic or a shipped intrinsic genome. The
+ * multiplier deliberately does not inspect positions or hidden picks:
+ *  - Ash Moth becomes a real counter-pick only after enemy shooters are revealed.
+ *  - A Healer and its durable anchor reinforce each other in whichever one is selected later.
+ *  - Angel is preferred as a ranged-line screen when both armies actually field a firing line.
+ *
+ * Intrinsic weights remain immutable/trainable; this small role head prevents a composition-independent argmax
+ * from selecting a support unit in the exact matchup where its defining spell/aura has no target.
+ */
+export const creatureRoleFitMultiplier = (
+    creatureId: number,
+    ownCreatureIds: readonly number[],
+    knownOpponentCreatureIds: readonly number[],
+): number => {
+    const info = creatureIndex().get(creatureId);
+    if (!info) return 1;
+    const knownEnemyShooters = knownOpponentCreatureIds.reduce(
+        (count, opponentId) => count + Number(creatureIndex().get(opponentId)?.ranged),
+        0,
+    );
+    const ownBackline = backlineProtectionBeneficiaryCount(ownCreatureIds);
+    const ownHasHealer = ownCreatureIds.some((id) => creatureIndex().get(id)?.name === "Healer");
+    const ownAngelHasActiveScreen =
+        knownEnemyShooters > 0 &&
+        ownCreatureIds.some((id) => creatureIndex().get(id)?.name === "Angel") &&
+        backlineProtectionBeneficiaryCount(ownCreatureIds.filter((id) => creatureIndex().get(id)?.name !== "Angel")) >=
+            2;
+    const ownHasDurableAnchor =
+        hasNamedCreature(ownCreatureIds, ALWAYS_DURABLE_HEAL_ANCHOR_NAMES) || ownAngelHasActiveScreen;
+    const candidateAngelHasActiveScreen = info.name === "Angel" && ownBackline >= 2 && knownEnemyShooters > 0;
+
+    if (info.name === "Ash Moth" && knownEnemyShooters > 0) {
+        return knownEnemyShooters >= 2 ? 3 : 2.25;
+    }
+
+    let multiplier = 1;
+    if (info.name === "Healer" && ownHasDurableAnchor) multiplier *= 2;
+    if (ownHasHealer && (ALWAYS_DURABLE_HEAL_ANCHOR_NAMES.has(info.name) || candidateAngelHasActiveScreen)) {
+        multiplier *= 1.25;
+    }
+    // Angel can satisfy two independent composition jobs: a Healer sustain anchor and a firing-line screen.
+    // Preserve both signals instead of letting whichever branch happens to run first erase the other.
+    if (candidateAngelHasActiveScreen) multiplier *= 1.5;
+    return multiplier;
+};
+
+/**
+ * Apply a role-fit boost without assuming a learned score is positive. Multiplication promotes positive scores,
+ * but would make a negative score more negative and therefore punish the exact counter-pick we meant to help.
+ * Dividing a negative score by the same >=1 multiplier preserves score ordering semantics while moving it
+ * monotonically toward zero.
+ */
+export const applyCreatureRoleFitMultiplier = (score: number, multiplier: number): number => {
+    if (!Number.isFinite(score) || !Number.isFinite(multiplier) || multiplier <= 1) return score;
+    return score >= 0 ? score * multiplier : score / multiplier;
+};
+
 /**
  * Hard draft-safety layer shared by live ranked and league training. A protector without a shooter or
  * spell-bearing ward is a role mismatch, so remove it whenever the offer contains any ordinary legal
@@ -199,11 +268,13 @@ export const eligibleBacklineProtectorChoices = (
     ownCreatureIds: readonly number[],
     knownOpponentCreatureIds: readonly number[],
 ): readonly number[] => {
-    const hasWard = backlineProtectionBeneficiaryCount(ownCreatureIds) > 0;
+    const backlineCount = backlineProtectionBeneficiaryCount(ownCreatureIds);
+    const hasAbominationArmy = backlineCount >= MIN_ABOMINATION_BACKLINE_BENEFICIARIES;
+    const hasWard = backlineCount > 0;
     const knownFlyer = knownOpponentCreatureIds.some((creatureId) => creatureIndex().get(creatureId)?.canFly);
     const ordinary = available.filter((creatureId) => {
         const name = creatureIndex().get(creatureId)?.name;
-        if (name === "Abomination") return hasWard;
+        if (name === "Abomination") return hasAbominationArmy;
         if (name === "Arachna Queen") return hasWard && knownFlyer;
         return true;
     });

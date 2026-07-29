@@ -15,7 +15,14 @@ import {
     Tier1Artifact,
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
-import { creatureInfo, DEFAULT_DRAFT_W } from "../ai/setup/creature_score";
+import {
+    LEAGUE_ROUND1_DRAFT_SPEC,
+    draftGenomeCreatureScore,
+    parseDraftGenome,
+    pickDraftGenomeCreature,
+} from "../ai/setup/draft_ship";
+import { creatureInfo } from "../ai/setup/creature_score";
+import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { TIER1_ARTIFACT_WINRATE, TIER2_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import {
     augmentPlanId,
@@ -34,6 +41,19 @@ import { getArmorPower, getMightPower, getMovementPower, getSniperPower } from "
 import { CreatureFactions } from "../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { Perk } from "../perks/perk_properties";
+import {
+    createPickSimState,
+    getCurrentPickPhase,
+    getKnownOpponentCreatures,
+    getPickTeamView,
+    getVisibleCreatureChoices,
+    isPickSimComplete,
+    transitionServerPersistedPickSim,
+    type IPickSimState,
+    type PickAction,
+    type PickRandomInt,
+    type PickTeam,
+} from "../picks/pick_sim";
 import { ChaosSynergy, LifeSynergy, MightSynergy, NatureSynergy } from "../synergies/synergy_properties";
 import {
     creaturesByLevel,
@@ -44,7 +64,7 @@ import {
     resolveStackAmount,
     type IArmyUnitSpec,
 } from "./army";
-import { creatureIdForName, draftRoster } from "./draft";
+import { creatureIdForName } from "./draft";
 
 /**
  * Post-draft contextual-oracle meta measurement.
@@ -62,6 +82,7 @@ export const AI_META_POLICY = "contextual-oracle-v2-cast-buffs-80x20";
 export const AI_META_EXPLORATION_RATE = 0.2;
 export const AI_META_FIGHT_VERSION = "v0.8";
 export const AI_META_FIGHT_PROFILE = "v0.8+a13";
+export const AI_META_RANKED_DRAFT_POLICY_SPEC = LEAGUE_ROUND1_DRAFT_SPEC;
 export const AI_META_SYNERGY_POLICY_SPEC = V07_NONFIGHT_SETUP_SPEC;
 export const AI_META_SYNERGY_POLICY_SHA256 = V07_NONFIGHT_BEHAVIOR_SHA256;
 export const AI_META_SYNERGY_TRACKING = "exact-active-choice-level-v1";
@@ -193,7 +214,8 @@ export function aiMetaSynergyKey(faction: number, synergy: number, level: 1 | 2 
 }
 
 export const AI_META_COHORT_DESCRIPTIONS: Readonly<Record<AiMetaCohort, string>> = {
-    "ranked-draft": "Current melee-coevolution draft scorer choosing from six offers per level.",
+    "ranked-draft":
+        "Shipped ranked draft policy driven through the live sequential offers, role gates, collisions, and private reveals.",
     "uniform-mixed": "Level-balanced armies sampled uniformly from every enabled creature.",
     "ranged-heavy": "Each army fields two to four ranged stacks.",
     "ground-melee": "Each army fields no ranged stacks and at least four ground-melee stacks.",
@@ -412,20 +434,120 @@ function generateSyntheticRoster(
     throw new Error(`Unable to generate ${archetype} roster from seed ${seed}`);
 }
 
-function generateRankedRoster(seed: number, excluded: ReadonlySet<string>): IArmyUnitSpec[] {
-    for (let attempt = 0; attempt < 20_000; attempt += 1) {
-        const offerSeed = hashSimulationParts("ai-meta-ranked-roster", seed, attempt);
-        const roster = draftRoster(
-            DEFAULT_DRAFT_W,
-            offerSeed,
-            DEFAULT_ROSTER_COMPOSITION,
-            DEFAULT_AMOUNT_BY_LEVEL,
-            6,
-            "expBudget",
-        );
-        if (roster.every((unit) => !excluded.has(unit.creatureName))) return roster;
+const AI_META_RANKED_DRAFT_GENOME = parseDraftGenome(AI_META_RANKED_DRAFT_POLICY_SPEC, "ai-meta-ranked-draft");
+const LOWER = PBTypes.TeamVals.LOWER;
+const UPPER = PBTypes.TeamVals.UPPER;
+
+const rankedTeamState = (state: IPickSimState, team: PickTeam) => (team === LOWER ? state.lower : state.upper);
+
+const rankedPickRandomInt = (seed: number): PickRandomInt => {
+    const rng = makeRng(seed);
+    return (maxExclusive) => Math.floor(rng() * maxExclusive);
+};
+
+const applyRankedPick = (state: IPickSimState, action: PickAction, rng: PickRandomInt): IPickSimState => {
+    const result = transitionServerPersistedPickSim(state, action, rng);
+    if (result.status !== "accepted") {
+        throw new Error(`AI meta ranked draft ${action.type} was ${result.status}: ${result.reason}`);
     }
-    throw new Error(`Unable to generate non-overlapping ranked roster from seed ${seed}`);
+    return result.state;
+};
+
+const pickRankedBundle = (bundles: readonly (readonly [number, number, number])[]): number => {
+    let bestIndex = 0;
+    let bestScore = -Infinity;
+    bundles.forEach(([level1, level2, artifact], index) => {
+        const score =
+            draftGenomeCreatureScore(AI_META_RANKED_DRAFT_GENOME, level1) +
+            draftGenomeCreatureScore(AI_META_RANKED_DRAFT_GENOME, level2) +
+            (TIER1_ARTIFACT_WINRATE[artifact] ?? 50);
+        if (score > bestScore) {
+            bestIndex = index;
+            bestScore = score;
+        }
+    });
+    return bestIndex;
+};
+
+/**
+ * The AI-meta ranked cohort consumes the same shipped creature-pick seam as the ranked server. Keeping this
+ * wrapper exported gives focused tests a direct contract for role eligibility without duplicating the policy.
+ */
+export const pickAiMetaRankedCreature = (
+    available: readonly number[],
+    ownCreatureIds: readonly number[],
+    knownOpponentCreatureIds: readonly number[],
+): number | undefined =>
+    pickDraftGenomeCreature(AI_META_RANKED_DRAFT_GENOME, available, ownCreatureIds, knownOpponentCreatureIds);
+
+const materializeRankedRoster = (creatureIds: readonly number[]): IArmyUnitSpec[] =>
+    creatureIds.map((creatureId) => {
+        const info = creatureInfo(creatureId);
+        if (!info) throw new Error(`AI meta ranked draft selected unknown creature id ${creatureId}`);
+        const catalog = creaturesByLevel(info.level).find((entry) => entry.creatureName === info.name);
+        if (!catalog) throw new Error(`AI meta ranked draft selected disabled creature ${info.name}`);
+        return {
+            faction: catalog.faction,
+            creatureName: catalog.creatureName,
+            level: catalog.level,
+            size: catalog.size,
+            amount: resolveStackAmount(catalog.creatureName, catalog.level, DEFAULT_AMOUNT_BY_LEVEL, "expBudget"),
+        };
+    });
+
+/**
+ * Drive the exact live ranked phase order and private-information reducer. Every individual creature decision
+ * sees the acting team's prior picks plus only opponent identities legitimately revealed at that point.
+ * Collisions are persisted/revealed and retried just as on the server, preserving global roster exclusivity.
+ */
+function generateRankedRosters(seed: number): [IArmyUnitSpec[], IArmyUnitSpec[]] {
+    const rng = rankedPickRandomInt(seed);
+    let state = createPickSimState(rng);
+    const perk = SETUP_POLICY_V0.pickPerk();
+    state = applyRankedPick(state, { type: "select_perk", team: LOWER, perk }, rng);
+    state = applyRankedPick(state, { type: "select_perk", team: UPPER, perk }, rng);
+
+    // Both simultaneous bundle decisions consume the same pre-commit state, matching the live timeout policy.
+    const lowerBundle = pickRankedBundle(getPickTeamView(state, LOWER).bundles);
+    const upperBundle = pickRankedBundle(getPickTeamView(state, UPPER).bundles);
+    state = applyRankedPick(state, { type: "select_bundle", team: LOWER, bundleIndex: lowerBundle }, rng);
+    state = applyRankedPick(state, { type: "select_bundle", team: UPPER, bundleIndex: upperBundle }, rng);
+
+    let transitions = 0;
+    while (!isPickSimComplete(state)) {
+        if ((transitions += 1) > 40) {
+            throw new Error("AI meta ranked draft exceeded the collision retry guard");
+        }
+        const phase = getCurrentPickPhase(state);
+        if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
+            const lowerArtifact = SETUP_POLICY_V0.pickArtifactT2(getPickTeamView(state, LOWER).tier2Offers);
+            const upperArtifact = SETUP_POLICY_V0.pickArtifactT2(getPickTeamView(state, UPPER).tier2Offers);
+            state = applyRankedPick(state, { type: "select_tier2", team: LOWER, artifactId: lowerArtifact }, rng);
+            state = applyRankedPick(state, { type: "select_tier2", team: UPPER, artifactId: upperArtifact }, rng);
+            continue;
+        }
+        if (phase.phase !== PBTypes.PickPhaseVals.PICK || phase.actors.length !== 1) {
+            throw new Error(`Unexpected AI meta ranked pick phase ${phase.phase} at sequence ${state.phaseSequence}`);
+        }
+        const team = phase.actors[0];
+        const ownCreatureIds = rankedTeamState(state, team).creatures;
+        const knownOpponentCreatureIds = getKnownOpponentCreatures(state, team);
+        const creatureId = pickAiMetaRankedCreature(
+            getVisibleCreatureChoices(state, team),
+            ownCreatureIds,
+            knownOpponentCreatureIds,
+        );
+        if (creatureId === undefined) {
+            throw new Error(`AI meta ranked draft found no visible L${phase.creatureLevel} creature`);
+        }
+        const result = transitionServerPersistedPickSim(state, { type: "pick_creature", team, creatureId }, rng);
+        if (result.status === "rejected") {
+            throw new Error(`AI meta ranked creature pick was rejected as ${result.reason}`);
+        }
+        state = result.state;
+    }
+
+    return [materializeRankedRoster(state.lower.creatures), materializeRankedRoster(state.upper.creatures)];
 }
 
 const CROSS_ARCHETYPES = ["ranged", "melee", "flyer", "caster"] as const;
@@ -462,15 +584,18 @@ export function generateMetaMatchup(options: IAiMetaRunOptions, pair: number): I
     const combatSeed = hashSimulationParts("ai-meta-combat", options.baseSeed, options.cohort, pair);
     const map = cohortMap(options.cohort, pair);
     const [archetypeA, archetypeB] = cohortArchetypes(options.cohort, pair);
-    const rosterA =
-        archetypeA === "ranked"
-            ? generateRankedRoster(hashSimulationParts(setupSeed, "a"), new Set())
-            : generateSyntheticRoster(archetypeA, hashSimulationParts(setupSeed, "a"), new Set());
-    const excluded = new Set(rosterA.map((unit) => unit.creatureName));
-    const rosterB =
-        archetypeB === "ranked"
-            ? generateRankedRoster(hashSimulationParts(setupSeed, "b"), excluded)
-            : generateSyntheticRoster(archetypeB, hashSimulationParts(setupSeed, "b"), excluded);
+    let rosterA: IArmyUnitSpec[];
+    let rosterB: IArmyUnitSpec[];
+    if (archetypeA === "ranked" && archetypeB === "ranked") {
+        [rosterA, rosterB] = generateRankedRosters(hashSimulationParts(setupSeed, "live-ranked-pick"));
+    } else {
+        if (archetypeA === "ranked" || archetypeB === "ranked") {
+            throw new Error("AI meta ranked rosters must be generated as one live pick");
+        }
+        rosterA = generateSyntheticRoster(archetypeA, hashSimulationParts(setupSeed, "a"), new Set());
+        const excluded = new Set(rosterA.map((unit) => unit.creatureName));
+        rosterB = generateSyntheticRoster(archetypeB, hashSimulationParts(setupSeed, "b"), excluded);
+    }
     if (!rostersAreStrictlyDistinct(rosterA, rosterB)) {
         throw new Error(`Generated mirrored/overlapping rosters for ${options.cohort} pair ${pair}`);
     }

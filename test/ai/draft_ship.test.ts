@@ -27,7 +27,13 @@ import {
     projectDraftGenomeForShipping,
     V07_NONFIGHT_DRAFT_SPEC,
 } from "../../src/ai/setup/draft_ship";
-import { DRAFT_ANCHOR_W, DRAFT_FEATURE_DIM, scoreCreatureWeighted } from "../../src/ai/setup/creature_score";
+import {
+    DRAFT_ANCHOR_W,
+    DRAFT_FEATURE_DIM,
+    applyCreatureRoleFitMultiplier,
+    creatureRoleFitMultiplier,
+    scoreCreatureWeighted,
+} from "../../src/ai/setup/creature_score";
 import leagueRound1CandidateGenome from "../../src/ai/setup/draft_genomes/league_round1_br_57de5a2d_candidate.json";
 import leagueRound3ProjectedGenome from "../../src/ai/setup/draft_genomes/league_round3_br_52752642_projected.json";
 import v07NonfightDraftGenome from "../../src/ai/setup/draft_genomes/v07_nonfight_draft_48d23ac4461_projected.json";
@@ -67,12 +73,79 @@ describe("draft ship genome", () => {
         const abomination = PBTypes.CreatureVals.ABOMINATION;
         const champion = PBTypes.CreatureVals.CHAMPION;
         const ward = PBTypes.CreatureVals.ARBALESTER;
+        const secondWard = PBTypes.CreatureVals.BATTLE_MAGE;
 
         expect(draftGenomeCreatureScore(genome, abomination)).toBeGreaterThan(
             draftGenomeCreatureScore(genome, champion),
         );
         expect(pickDraftGenomeCreature(genome, [abomination, champion], [], [])).toBe(champion);
-        expect(pickDraftGenomeCreature(genome, [abomination, champion], [ward], [])).toBe(abomination);
+        expect(pickDraftGenomeCreature(genome, [abomination, champion], [ward], [])).toBe(champion);
+        expect(pickDraftGenomeCreature(genome, [abomination, champion], [ward, secondWard], [])).toBe(abomination);
+    });
+
+    it("makes role fit a monotone boost for both positive and negative learned scores", () => {
+        expect(applyCreatureRoleFitMultiplier(30, 3)).toBe(90);
+        expect(applyCreatureRoleFitMultiplier(-30, 3)).toBe(-10);
+        expect(applyCreatureRoleFitMultiplier(-30, 1)).toBe(-30);
+
+        const negativeGenome = parseDraftGenome(LEAGUE_ROUND3_DRAFT_SPEC);
+        const ashMoth = PBTypes.CreatureVals.ASH_MOTH;
+        const squire = PBTypes.CreatureVals.SQUIRE;
+        const offer = [ashMoth, squire];
+        expect(offer.every((creatureId) => draftGenomeCreatureScore(negativeGenome, creatureId) < 0)).toBe(true);
+        expect(pickDraftGenomeCreature(negativeGenome, offer, [], [])).toBe(squire);
+        expect(pickDraftGenomeCreature(negativeGenome, offer, [], [PBTypes.CreatureVals.ARBALESTER])).toBe(ashMoth);
+    });
+
+    it("composes Healer sustain with Angel's active ranged-line screen only in the intended matchup", () => {
+        const angel = PBTypes.CreatureVals.ANGEL;
+        const healer = PBTypes.CreatureVals.HEALER;
+        const firingLine = [PBTypes.CreatureVals.ARBALESTER, PBTypes.CreatureVals.BATTLE_MAGE];
+        const shooter = [PBTypes.CreatureVals.ORC];
+
+        expect(creatureRoleFitMultiplier(angel, [healer, ...firingLine], shooter)).toBe(1.25 * 1.5);
+        expect(creatureRoleFitMultiplier(angel, [healer, ...firingLine], [])).toBe(1);
+        expect(creatureRoleFitMultiplier(healer, [angel, ...firingLine], shooter)).toBe(2);
+        expect(creatureRoleFitMultiplier(healer, [angel, ...firingLine], [])).toBe(1);
+    });
+
+    it("supports the ranked phase order where Healer is owned before every durable anchor", () => {
+        const genome = parseDraftGenome(LEAGUE_ROUND1_DRAFT_SPEC);
+        const healerFirst = [PBTypes.CreatureVals.HEALER];
+        const firingLine = [PBTypes.CreatureVals.ARBALESTER, PBTypes.CreatureVals.BATTLE_MAGE];
+
+        expect(
+            pickDraftGenomeCreature(
+                genome,
+                [PBTypes.CreatureVals.GOBLIN_KNIGHT, PBTypes.CreatureVals.SCAVENGER],
+                healerFirst,
+                [],
+            ),
+        ).toBe(PBTypes.CreatureVals.GOBLIN_KNIGHT);
+        expect(
+            pickDraftGenomeCreature(
+                genome,
+                [PBTypes.CreatureVals.FRENZIED_BOAR, PBTypes.CreatureVals.CHAMPION],
+                healerFirst,
+                [],
+            ),
+        ).toBe(PBTypes.CreatureVals.FRENZIED_BOAR);
+        expect(
+            pickDraftGenomeCreature(
+                genome,
+                [PBTypes.CreatureVals.ABOMINATION, PBTypes.CreatureVals.CHAMPION],
+                [...healerFirst, ...firingLine],
+                [],
+            ),
+        ).toBe(PBTypes.CreatureVals.ABOMINATION);
+        expect(
+            pickDraftGenomeCreature(
+                genome,
+                [PBTypes.CreatureVals.ANGEL, PBTypes.CreatureVals.CHAMPION],
+                [...healerFirst, ...firingLine],
+                [PBTypes.CreatureVals.ORC],
+            ),
+        ).toBe(PBTypes.CreatureVals.ANGEL);
     });
 
     it("embeds the full intrinsic head while preserving every non-draft anchor weight", () => {

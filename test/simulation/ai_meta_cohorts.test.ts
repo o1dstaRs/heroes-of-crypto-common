@@ -12,11 +12,15 @@
 import { describe, expect, it } from "bun:test";
 import { Worker } from "node:worker_threads";
 
+import { LEAGUE_ROUND1_DRAFT_SPEC } from "../../src/ai/setup/draft_ship";
+import { isBacklineProtectionBeneficiaryCreature } from "../../src/ai/setup/creature_score";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
     AI_META_COHORTS,
     AI_META_FIGHT_PROFILE,
     AI_META_FIGHT_VERSION,
     AI_META_MAPS,
+    AI_META_RANKED_DRAFT_POLICY_SPEC,
     AI_META_RECORDED_MAPS,
     AI_META_SYNERGY_DEFINITIONS,
     AI_META_SYNERGY_POLICY_SPEC,
@@ -26,6 +30,7 @@ import {
     cohortArchetypes,
     cohortMap,
     generateMetaMatchup,
+    pickAiMetaRankedCreature,
     prepareMetaPair,
     rosterSignature,
     rostersAreStrictlyDistinct,
@@ -112,6 +117,23 @@ describe("AI meta cohort generation", () => {
             }
         }
         expect(sawChaos).toBe(true);
+    });
+
+    it("uses the shipped role-aware creature picker for ranked cohort decisions", () => {
+        const creatures = PBTypes.CreatureVals;
+        const offer = [creatures.ABOMINATION, creatures.CHAMPION] as const;
+        const pureMelee = [creatures.SQUIRE, creatures.PIKEMAN, creatures.CRUSADER];
+        const rangedHeavy = [creatures.ARBALESTER, creatures.ELF, creatures.MEDUSA];
+
+        expect(AI_META_RANKED_DRAFT_POLICY_SPEC).toBe(LEAGUE_ROUND1_DRAFT_SPEC);
+        expect(pureMelee.every((id) => !isBacklineProtectionBeneficiaryCreature(id))).toBe(true);
+        expect(rangedHeavy.every((id) => isBacklineProtectionBeneficiaryCreature(id))).toBe(true);
+        expect(pickAiMetaRankedCreature(offer, pureMelee, [])).toBe(creatures.CHAMPION);
+        expect(pickAiMetaRankedCreature(offer, rangedHeavy, [])).toBe(creatures.ABOMINATION);
+
+        const queenOffer = [creatures.ARACHNA_QUEEN, creatures.CHAMPION] as const;
+        expect(pickAiMetaRankedCreature(queenOffer, rangedHeavy, [])).toBe(creatures.CHAMPION);
+        expect(pickAiMetaRankedCreature(queenOffer, rangedHeavy, [creatures.MANTICORE])).toBe(creatures.ARACHNA_QUEEN);
     });
 
     it("identifies only units with Tome-amplifiable castable buffs", () => {
@@ -242,13 +264,22 @@ describe("AI meta cohort generation", () => {
         // has a size-incompatible swap partner. Re-pinned again 11 -> 233 after the poison aura began
         // stacking and riding responses, which reshuffled the seeded draft once more. 233 is the lowest
         // pair that again fields Black Dragon against Arachna Queen on the same map 4 (272/332/335/359/374
-        // also qualify within the first 400).
-        const record = await runMetaPairInWorker("ranked-draft", 233);
+        // also qualify within the first 400), then 233 -> 20 after the cohort began driving the exact live
+        // sequential draft instead of independently scoring one synthetic offer per level.
+        const record = await runMetaPairInWorker("ranked-draft", 20);
 
-        expect(record.pair).toBe(233);
+        expect(record.pair).toBe(20);
         expect(record.map).toBe(4);
-        expect(record.armyA.roster.some((unit) => unit.creatureName === "Black Dragon")).toBe(true);
-        expect(record.armyB.roster.some((unit) => unit.creatureName === "Arachna Queen")).toBe(true);
+        expect(
+            [record.armyA, record.armyB].some((army) =>
+                army.roster.some((unit) => unit.creatureName === "Black Dragon"),
+            ),
+        ).toBe(true);
+        expect(
+            [record.armyA, record.armyB].some((army) =>
+                army.roster.some((unit) => unit.creatureName === "Arachna Queen"),
+            ),
+        ).toBe(true);
         expect(record.games).toHaveLength(2);
         expect(record.games.every((game) => game.rejectedA === 0 && game.rejectedB === 0)).toBe(true);
     });

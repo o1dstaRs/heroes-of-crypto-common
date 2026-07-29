@@ -294,19 +294,21 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             seed: 2_303_609_179,
             candidateSide: "red",
             winner: "candidate",
-            laps: 9,
+            // Abomination now declines a fresh-response melee and preserves its Flesh Shield HP, changing the
+            // downstream pursuit trace while retaining this fixture's informational-only jitter contract.
+            laps: 7,
             endReason: "elimination",
             candidateEngineRejections: 0,
         });
         expect(record.byCreature.Wyvern).toMatchObject({
-            observedTurns: 10,
-            oracleDirectEligibleTurns: 4,
-            sharedCatalogDirectEligibleTurns: 4,
-            chosenDirectActionTurns: 3,
-            pureMoveTurns: 5,
-            nonProgressMoves: 2,
-            noncombatWithDirectOptionTurns: 1,
-            eligibleCombatMisses: 1,
+            observedTurns: 9,
+            oracleDirectEligibleTurns: 6,
+            sharedCatalogDirectEligibleTurns: 6,
+            chosenDirectActionTurns: 4,
+            pureMoveTurns: 3,
+            nonProgressMoves: 1,
+            noncombatWithDirectOptionTurns: 2,
+            eligibleCombatMisses: 2,
             abaOscillations: 0,
             urgentRepeatedNonProgressWithDirectOption: 0,
             urgentMountainTerminalJitter: 0,
@@ -318,13 +320,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         expect(
             record.failureSamples.some(
                 ({ creatureName, lap, issue }) =>
-                    creatureName === "Wyvern" && lap === 2 && issue === "non_progress_move",
-            ),
-        ).toBe(true);
-        expect(
-            record.failureSamples.some(
-                ({ creatureName, lap, issue }) =>
-                    creatureName === "Wyvern" && lap === 3 && issue === "noncombat_with_direct_option",
+                    creatureName === "Wyvern" && lap === 4 && issue === "noncombat_with_direct_option",
             ),
         ).toBe(true);
         expect(
@@ -349,22 +345,24 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             seed: 1_927_717_569,
             candidateSide: "red",
             winner: "candidate",
-            laps: 9,
+            // Angel's ranged-line role changes the battle length, but Cyclops still exposes one catalog-only
+            // action which the independent positive-damage oracle correctly refuses to count as a miss.
+            laps: 8,
             endReason: "elimination",
             candidateEngineRejections: 0,
         });
         expect(record.byCreature.Cyclops).toMatchObject({
-            observedTurns: 9,
+            observedTurns: 8,
             oracleDirectEligibleTurns: 7,
-            sharedCatalogDirectEligibleTurns: 9,
+            sharedCatalogDirectEligibleTurns: 8,
             chosenDirectActionTurns: 7,
             noncombatWithDirectOptionTurns: 0,
-            mountainAdjacentTurns: 1,
+            mountainAdjacentTurns: 0,
             mountainAdjacentDirectEligibleTurns: 0,
             mountainAdjacentMissedAttacks: 0,
             eligibleCombatMisses: 0,
             eligibleCombatDroughts: 0,
-            lateDirectEligibleTurns: 1,
+            lateDirectEligibleTurns: 0,
             lateDirectActionMisses: 0,
         });
         expect(

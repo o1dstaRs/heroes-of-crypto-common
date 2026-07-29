@@ -10,17 +10,21 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { PBTypes } from "../../generated/protobuf/v1/types";
+import { GRID_SIZE } from "../../grid/grid_constants";
+import { canUnitRespondToMelee } from "../../handlers/melee_response";
 import { isSpellUsableByCaster } from "../../spells/spell_helper";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { estimatePrimaryMeleeDamage } from "../melee_damage_estimate";
 import { creatureInfo } from "../setup/creature_score";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { otherTeam } from "./v0_1";
 import { enemyFieldsSplashAoe, layoutRevealPlacement, opponentCreatureIdsForPlacement } from "./v0_7_placement_reveal";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
 
-export type V08BacklineProtectorKind = "abomination" | "arachna_queen";
+export type V08BacklineProtectorKind = "abomination" | "angel" | "arachna_queen";
 
 export interface IV08BacklineProtectorIntent {
     readonly kind: V08BacklineProtectorKind;
@@ -36,6 +40,7 @@ export interface IV08BacklineWardIntent {
 
 export const v08BacklineProtectorKind = (unit: Unit): V08BacklineProtectorKind | undefined => {
     if (unit.getName() === "Abomination") return "abomination";
+    if (unit.getName() === "Angel") return "angel";
     if (unit.getName() === "Arachna Queen") return "arachna_queen";
     return undefined;
 };
@@ -81,10 +86,17 @@ const liveEnemyFlyers = (unit: Unit, context: IDecisionContext): Unit[] =>
         .filter((enemy) => !enemy.isDead() && enemy.canFly())
         .sort((left, right) => left.getId().localeCompare(right.getId()));
 
+const liveEnemyShooters = (unit: Unit, context: IDecisionContext): Unit[] =>
+    context.unitsHolder
+        .getAllEnemyUnits(unit.getTeam())
+        .filter((enemy) => !enemy.isDead() && enemy.isRangeCapable() && enemy.getRangeShots() > 0)
+        .sort((left, right) => left.getId().localeCompare(right.getId()));
+
 /**
  * One shared intent object drives native v0.8 and a13 challenger filtering. Abomination always protects the
- * highest-value live ward. Queen is an anti-fly interceptor only: summoned Infest rewards and no-flyer boards
- * remain offensive. Late dominant/urgent finish releases both roles.
+ * highest-value live ward. Angel screens a real firing line only when at least two allied ranged/caster assets
+ * face a live shooter. Queen is an anti-fly interceptor only: summoned Infest rewards and no-flyer boards remain
+ * offensive. Late dominant/urgent finish releases every role.
  */
 export function buildV08BacklineProtectorIntent(
     unit: Unit,
@@ -94,6 +106,7 @@ export function buildV08BacklineProtectorIntent(
     if (!kind || (kind === "arachna_queen" && unit.isSummoned())) return undefined;
     const wards = sortedWards(unit, context);
     if (!wards.length) return undefined;
+    if (kind === "angel" && (wards.length < 2 || !liveEnemyShooters(unit, context).length)) return undefined;
     if (
         v08DominantFinishState(context.unitsHolder, unit.getTeam(), context.fightProperties?.getCurrentLap() ?? 0)
             .active
@@ -129,7 +142,14 @@ const footprintDistance = (left: readonly XY[], right: readonly XY[]): number =>
 
 export const v08BacklineProtectorCoverageRange = (unit: Unit, context: IDecisionContext): number => {
     const kind = v08BacklineProtectorKind(unit);
-    const auraName = kind === "abomination" ? "Flesh Shield" : kind === "arachna_queen" ? "Web" : undefined;
+    const auraName =
+        kind === "abomination"
+            ? "Flesh Shield"
+            : kind === "angel"
+              ? "Arrows Wingshield"
+              : kind === "arachna_queen"
+                ? "Web"
+                : undefined;
     const baseRange = auraName ? (unit.getAuraEffect(auraName)?.getRange() ?? 1) : 0;
     const synergyRange = context.fightProperties?.getAdditionalAuraRangePerTeam(unit.getTeam()) ?? 0;
     return Math.max(0, Math.floor(baseRange + synergyRange));
@@ -138,7 +158,21 @@ export const v08BacklineProtectorCoverageRange = (unit: Unit, context: IDecision
 const coversWard = (protectorCells: readonly XY[], ward: Unit, protector: Unit, context: IDecisionContext): boolean =>
     footprintDistance(protectorCells, ward.getCells()) <= v08BacklineProtectorCoverageRange(protector, context);
 
-const decisionDestinationCells = (unit: Unit, decision: readonly GameAction[]): XY[] => {
+const decisionDestinationCells = (
+    unit: Unit,
+    context: Pick<IDecisionContext, "unitsHolder">,
+    decision: readonly GameAction[],
+): XY[] => {
+    const castling = [...decision]
+        .reverse()
+        .find(
+            (action): action is Extract<GameAction, { type: "cast_spell" }> =>
+                action.type === "cast_spell" && action.casterId === unit.getId() && action.spellName === "Castling",
+        );
+    const castlingTarget = castling?.targetId ? context.unitsHolder.getAllUnits().get(castling.targetId) : undefined;
+    if (castlingTarget && !castlingTarget.isDead()) {
+        return castlingTarget.getCells().map((cell) => ({ x: cell.x, y: cell.y }));
+    }
     const obstacle = [...decision]
         .reverse()
         .find(
@@ -220,6 +254,72 @@ const nearbyWardThreats = (intent: IV08BacklineProtectorIntent, unit: Unit, cont
     );
 };
 
+export interface IV08BacklineProtectorDecisionRiskOptions {
+    /**
+     * A caller that has already applied the candidate through the real engine may prove that this action
+     * removes its target even when the pure damage estimator cannot model the sequence.
+     */
+    readonly immediatelyRemovesTarget?: boolean;
+    /**
+     * Native v0.8 can always retain its wait/defend hold. Candidate selectors may set this false only after
+     * proving that no safer role-compatible action remains in their complete, engine-valid candidate set.
+     */
+    readonly saferProductiveDefenseAvailable?: boolean;
+}
+
+/** Mirrors AttackHandler's authoritative first melee-response gate, including ranked snapshot compatibility. */
+export function isImmediateMeleeResponseExposed(
+    attacker: Unit,
+    target: Unit,
+    context: Pick<IDecisionContext, "fightProperties">,
+): boolean {
+    return canUnitRespondToMelee(attacker, target, context.fightProperties);
+}
+
+/**
+ * Hard tactical risk shared by native v0.8 and learned/search candidate filters.
+ *
+ * Abomination's HP is the team's finite Flesh Shield budget, so an ordinary local melee hit is not productive
+ * when it invites an actual response or Fire Shield reflection. The response predicate mirrors the authoritative
+ * melee gate, including Cowardice, forced/forbidden targets, and both retaliation-state sources; this matters
+ * because over-approximating a response turns safe attacks into avoidable waits. Neither a guaranteed kill nor
+ * Fire Shield is an exception: the engine resolves both retaliation and reflection before applying primary
+ * damage to the target.
+ */
+export function isV08BacklineProtectorDecisionHardRisk(
+    intent: IV08BacklineProtectorIntent,
+    unit: Unit,
+    context: IDecisionContext,
+    decision: readonly GameAction[],
+    options: IV08BacklineProtectorDecisionRiskOptions = {},
+): boolean {
+    if (intent.kind !== "abomination") return false;
+    const melee = [...decision]
+        .reverse()
+        .find((action): action is Extract<GameAction, { type: "melee_attack" }> => action.type === "melee_attack");
+    if (!melee) return false;
+    const target = context.unitsHolder.getAllUnits().get(melee.targetId);
+    if (!target || target.isDead()) return false;
+
+    const estimate = estimatePrimaryMeleeDamage(unit, target, context, melee.attackFrom, decision);
+    const responseExposed = isImmediateMeleeResponseExposed(unit, target, context);
+    const fireShieldExposed =
+        target.hasAbilityActive("Fire Shield") &&
+        !unit.hasAbilityActive("Fire Element") &&
+        unit.getMagicResist() < 100 &&
+        (estimate?.landedOutcomes.some((outcome) => outcome.damage > 0) ?? true);
+    if (!fireShieldExposed && !responseExposed) return false;
+
+    const localWardThreat = nearbyWardThreats(intent, unit, context).some(
+        (threat) => threat.getId() === target.getId(),
+    );
+    const removesOnlyImmediateThreat =
+        localWardThreat &&
+        options.immediatelyRemovesTarget === true &&
+        options.saferProductiveDefenseAvailable === false;
+    return !removesOnlyImmediateThreat;
+}
+
 const queenInterceptsLocalDiver = (
     intent: IV08BacklineProtectorIntent,
     unit: Unit,
@@ -255,7 +355,16 @@ export function preservesV08BacklineProtectorIntent(
     context: IDecisionContext,
     decision: readonly GameAction[],
 ): boolean {
-    const destination = decisionDestinationCells(unit, decision);
+    const destination = decisionDestinationCells(unit, context, decision);
+    const angelAttacks =
+        intent.kind === "angel" &&
+        decision.some(
+            (action) =>
+                action.type === "melee_attack" || action.type === "range_attack" || action.type === "area_throw_attack",
+        );
+    // Angel may fly several cells, but an attack is an interception only when its final footprint still applies
+    // Arrows Wingshield to the primary firing-line ward. Pure catch-up moves retain the normal multi-turn route.
+    if (angelAttacks && !coversWard(destination, intent.ward, unit, context)) return false;
     // Forced displacement can put the selected ward outside the aura even while the protector happens to cover
     // lower-value stacks. In that recovery state, allow strict no-loss catch-up or an immediate higher-value
     // primary swap; a13 must not require one activation to restore range when a preserving route needs several.
@@ -294,7 +403,7 @@ export function isV08BacklineProtectorPureMoveMeaningful(
 ): boolean {
     if (!isPureMoveDecision(decision)) return false;
     const current = unit.getCells();
-    const destination = decisionDestinationCells(unit, decision);
+    const destination = decisionDestinationCells(unit, context, decision);
     if (sameFootprint(current, destination) || !preservesV08BacklineProtectorIntent(intent, unit, context, decision)) {
         return false;
     }
@@ -321,7 +430,11 @@ export function isV08BacklineProtectorDecisionAllowed(
     decision: readonly GameAction[],
 ): boolean {
     const intent = buildV08BacklineProtectorIntent(unit, context);
-    return !intent || preservesV08BacklineProtectorIntent(intent, unit, context, decision);
+    return (
+        !intent ||
+        (preservesV08BacklineProtectorIntent(intent, unit, context, decision) &&
+            !isV08BacklineProtectorDecisionHardRisk(intent, unit, context, decision))
+    );
 }
 
 interface IProtectorRoute {
@@ -412,8 +525,9 @@ export function isV08BacklineProtectorRuntimeDecisionAllowed(
     decision: readonly GameAction[],
     hasCatchUpRoute = v08BacklineProtectorHasCatchUpRoute(intent, unit, context),
 ): boolean {
+    if (isV08BacklineProtectorDecisionHardRisk(intent, unit, context, decision)) return false;
     if (preservesV08BacklineProtectorIntent(intent, unit, context, decision)) return true;
-    return !hasCatchUpRoute && sameFootprint(unit.getCells(), decisionDestinationCells(unit, decision));
+    return !hasCatchUpRoute && sameFootprint(unit.getCells(), decisionDestinationCells(unit, context, decision));
 }
 
 /**
@@ -428,10 +542,12 @@ export function prioritizeV08BacklineProtector(
 ): GameAction[] {
     const intent = buildV08BacklineProtectorIntent(unit, context);
     if (!intent) return decision;
+    const hardRisk = isV08BacklineProtectorDecisionHardRisk(intent, unit, context, decision);
     const currentlyCovered = coversWard(unit.getCells(), intent.ward, unit, context);
     if (!currentlyCovered) {
-        const destination = decisionDestinationCells(unit, decision);
+        const destination = decisionDestinationCells(unit, context, decision);
         if (
+            !hardRisk &&
             catchUpDestinationAllowed(intent, unit, context, destination) &&
             preservesCurrentlyCoveredWards(intent, unit, context, destination)
         ) {
@@ -439,11 +555,11 @@ export function prioritizeV08BacklineProtector(
         }
         const follow = followWard(intent, unit, context);
         if (follow) return follow;
-        if (catchUpDestinationAllowed(intent, unit, context, destination)) return decision;
+        if (!hardRisk && catchUpDestinationAllowed(intent, unit, context, destination)) return decision;
         // Preserve an otherwise useful in-place attack/cast when forced displacement and occupancy leave no
         // closer route. This avoids turning a movement lock into a needless defend without allowing a charge.
-        if (sameFootprint(destination, unit.getCells())) return decision;
-    } else if (preservesV08BacklineProtectorIntent(intent, unit, context, decision)) {
+        if (!hardRisk && sameFootprint(destination, unit.getCells())) return decision;
+    } else if (preservesV08BacklineProtectorIntent(intent, unit, context, decision) && !hardRisk) {
         // Native v0.8 is SearchDriver's incumbent. Suppress only a pure relocation that changes no protection
         // objective; otherwise candidate zero can retain lateral screen jitter without ever entering the hard
         // passive repair path. Attacks, casts, move-attacks, and the uncovered-primary catch-up above are kept.
@@ -496,7 +612,7 @@ export function preservesV08BacklineWardIntent(
     context: IDecisionContext,
     decision: readonly GameAction[],
 ): boolean {
-    const destination = decisionDestinationCells(unit, decision);
+    const destination = decisionDestinationCells(unit, context, decision);
     const range = v08BacklineProtectorCoverageRange(intent.protector, context);
     const currentDistance = footprintDistance(intent.protector.getCells(), unit.getCells());
     const destinationDistance = footprintDistance(intent.protector.getCells(), destination);
@@ -515,7 +631,7 @@ export function isV08BacklineWardPureMoveMeaningful(
 ): boolean {
     if (!isPureMoveDecision(decision)) return false;
     const current = unit.getCells();
-    const destination = decisionDestinationCells(unit, decision);
+    const destination = decisionDestinationCells(unit, context, decision);
     if (sameFootprint(current, destination) || !preservesV08BacklineWardIntent(intent, unit, context, decision)) {
         return false;
     }
@@ -547,34 +663,367 @@ const placementKnowsEnemyFlyer = (context: IPlacementContext): boolean => {
     return !!visibleOpponentIds?.some((creatureId) => creatureInfo(creatureId)?.canFly);
 };
 
+const placementKnowsEnemyShooter = (context: IPlacementContext): boolean => {
+    const visibleOpponentIds = opponentCreatureIdsForPlacement(context, "v0.8");
+    return !!visibleOpponentIds?.some((creatureId) => creatureInfo(creatureId)?.ranged);
+};
+
+interface IAbominationPlacementCandidate {
+    readonly base: XY;
+    readonly primaryBase: XY;
+    readonly coveredValue: number;
+    readonly coveredCount: number;
+    readonly frontness: number;
+    readonly edgeness: number;
+    readonly primaryFrontness: number;
+    readonly primaryEdgeness: number;
+}
+
+const placementCellKey = (cell: XY): number => (cell.x << 4) | cell.y;
+
+const betterAbominationPlacement = (
+    candidate: IAbominationPlacementCandidate,
+    incumbent: IAbominationPlacementCandidate | undefined,
+): boolean => {
+    if (!incumbent) return true;
+    if (candidate.coveredValue !== incumbent.coveredValue) return candidate.coveredValue > incumbent.coveredValue;
+    if (candidate.coveredCount !== incumbent.coveredCount) return candidate.coveredCount > incumbent.coveredCount;
+    // Flesh Shield HP belongs behind or beside its ward, not in the generic forward bodyguard slot.
+    if (candidate.frontness !== incumbent.frontness) return candidate.frontness < incumbent.frontness;
+    if (candidate.edgeness !== incumbent.edgeness) return candidate.edgeness > incumbent.edgeness;
+    if (candidate.primaryFrontness !== incumbent.primaryFrontness) {
+        return candidate.primaryFrontness < incumbent.primaryFrontness;
+    }
+    if (candidate.primaryEdgeness !== incumbent.primaryEdgeness) {
+        return candidate.primaryEdgeness > incumbent.primaryEdgeness;
+    }
+    return (
+        candidate.base.y < incumbent.base.y ||
+        (candidate.base.y === incumbent.base.y && candidate.base.x < incumbent.base.x)
+    );
+};
+
+/**
+ * `layoutRevealPlacement` deliberately uses a generic forward bodyguard slot. Re-seat only Abomination after
+ * that legal layout is built: retain exact primary coverage, maximize the total value of already placed live
+ * wards inside Flesh Shield, then choose the deepest/most-sideward tied cell. Other stacks keep the layout's
+ * packed or anti-splash spacing, and Queen remains byte-for-byte on the historical generic slot.
+ */
+const optimizeAbominationPlacement = (
+    units: readonly Unit[],
+    context: IPlacementContext,
+    wards: readonly Unit[],
+    placements: Map<string, XY>,
+): Map<string, XY> => {
+    const legal = context.placement.possibleCellHashes();
+    if (!legal.size || !wards.length) return placements;
+    const legalCells = [...legal].map((hash) => ({ x: hash >> 4, y: hash & 0xf }));
+    const xs = legalCells.map((cell) => cell.x);
+    const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const frontness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cell.y : GRID_SIZE - 1 - cell.y);
+    const edgeness = (cell: XY): number => Math.abs(cell.x - centreX);
+
+    for (const protector of units.filter((unit) => v08BacklineProtectorKind(unit) === "abomination")) {
+        const current = placements.get(protector.getId());
+        const primary = wards[0];
+        const currentPrimaryBase = placements.get(primary.getId());
+        if (!current || !currentPrimaryBase) continue;
+
+        const occupied = new Set<number>();
+        for (const placedUnit of units) {
+            if (placedUnit.getId() === protector.getId() || placedUnit.getId() === primary.getId()) continue;
+            const base = placements.get(placedUnit.getId());
+            if (!base) continue;
+            for (const cell of footprintForBase(placedUnit, base)) occupied.add(placementCellKey(cell));
+        }
+        const placedSecondaryWards = wards
+            .filter((ward) => ward.getId() !== primary.getId())
+            .map((ward) => {
+                const base = placements.get(ward.getId());
+                return base ? { ward, cells: footprintForBase(ward, base) } : undefined;
+            })
+            .filter((ward): ward is { ward: Unit; cells: XY[] } => ward !== undefined);
+        const range = Math.max(0, Math.floor(protector.getAuraEffect("Flesh Shield")?.getRange() ?? 1));
+        let best: IAbominationPlacementCandidate | undefined;
+        for (const base of legalCells) {
+            const cells = footprintForBase(protector, base);
+            if (cells.some((cell) => !legal.has(placementCellKey(cell)) || occupied.has(placementCellKey(cell)))) {
+                continue;
+            }
+            const protectorKeys = new Set(cells.map(placementCellKey));
+            for (const primaryBase of legalCells) {
+                const primaryCells = footprintForBase(primary, primaryBase);
+                if (
+                    primaryCells.some(
+                        (cell) =>
+                            !legal.has(placementCellKey(cell)) ||
+                            occupied.has(placementCellKey(cell)) ||
+                            protectorKeys.has(placementCellKey(cell)),
+                    ) ||
+                    footprintDistance(cells, primaryCells) > range
+                ) {
+                    continue;
+                }
+                const coveredSecondaries = placedSecondaryWards.filter(
+                    ({ cells: wardCells }) => footprintDistance(cells, wardCells) <= range,
+                );
+                const coveredWards = [primary, ...coveredSecondaries.map(({ ward }) => ward)];
+                const candidate: IAbominationPlacementCandidate = {
+                    base,
+                    primaryBase,
+                    coveredValue: totalWardValue(coveredWards),
+                    coveredCount: coveredWards.length,
+                    frontness: frontness(base),
+                    edgeness: edgeness(base),
+                    primaryFrontness: frontness(primaryBase),
+                    primaryEdgeness: edgeness(primaryBase),
+                };
+                if (betterAbominationPlacement(candidate, best)) best = candidate;
+            }
+        }
+        if (best) {
+            placements.set(protector.getId(), { ...best.base });
+            placements.set(primary.getId(), { ...best.primaryBase });
+        }
+    }
+    return placements;
+};
+
+interface IAngelPlacementCandidate {
+    readonly base: XY;
+    readonly primaryBase: XY;
+    readonly secondaryBase: XY;
+    readonly coveredValue: number;
+    readonly coveredCount: number;
+    readonly frontness: number;
+    readonly edgeness: number;
+    readonly wardFrontness: number;
+    readonly wardEdgeness: number;
+}
+
+interface IPlacementAuraEdge {
+    readonly protector: Unit;
+    readonly beneficiary: Unit;
+    readonly range: number;
+}
+
+const existingProtectorPlacementEdges = (
+    units: readonly Unit[],
+    wards: readonly Unit[],
+    placements: ReadonlyMap<string, XY>,
+): IPlacementAuraEdge[] => {
+    const edges: IPlacementAuraEdge[] = [];
+    for (const protector of units.filter((unit) => {
+        const kind = v08BacklineProtectorKind(unit);
+        return kind === "abomination" || kind === "angel";
+    })) {
+        const protectorBase = placements.get(protector.getId());
+        if (!protectorBase) continue;
+        const protectorCells = footprintForBase(protector, protectorBase);
+        const kind = v08BacklineProtectorKind(protector);
+        const range = Math.max(
+            0,
+            Math.floor(
+                protector.getAuraEffect(kind === "abomination" ? "Flesh Shield" : "Arrows Wingshield")?.getRange() ??
+                    (kind === "angel" ? 2 : 1),
+            ),
+        );
+        for (const beneficiary of wards) {
+            if (beneficiary.getId() === protector.getId()) continue;
+            const beneficiaryBase = placements.get(beneficiary.getId());
+            if (
+                beneficiaryBase &&
+                footprintDistance(protectorCells, footprintForBase(beneficiary, beneficiaryBase)) <= range
+            ) {
+                edges.push({ protector, beneficiary, range });
+            }
+        }
+    }
+    return edges;
+};
+
+const betterAngelPlacement = (
+    candidate: IAngelPlacementCandidate,
+    incumbent: IAngelPlacementCandidate | undefined,
+): boolean => {
+    if (!incumbent) return true;
+    if (candidate.coveredValue !== incumbent.coveredValue) return candidate.coveredValue > incumbent.coveredValue;
+    if (candidate.coveredCount !== incumbent.coveredCount) return candidate.coveredCount > incumbent.coveredCount;
+    if (candidate.frontness !== incumbent.frontness) return candidate.frontness < incumbent.frontness;
+    if (candidate.edgeness !== incumbent.edgeness) return candidate.edgeness > incumbent.edgeness;
+    if (candidate.wardFrontness !== incumbent.wardFrontness) {
+        return candidate.wardFrontness < incumbent.wardFrontness;
+    }
+    if (candidate.wardEdgeness !== incumbent.wardEdgeness) return candidate.wardEdgeness > incumbent.wardEdgeness;
+    return (
+        candidate.base.y < incumbent.base.y ||
+        (candidate.base.y === incumbent.base.y && candidate.base.x < incumbent.base.x)
+    );
+};
+
+/**
+ * Angel is a flyer and therefore is not part of layoutRevealPlacement's ground-bodyguard pool. Re-seat Angel and
+ * its two highest-value wards after the legal base layout is complete, keeping every other stack fixed. This
+ * turns the generic opposite-corners firing line into an actual range-2 Arrows Wingshield group.
+ */
+const optimizeAngelPlacement = (
+    units: readonly Unit[],
+    context: IPlacementContext,
+    wards: readonly Unit[],
+    placements: Map<string, XY>,
+): Map<string, XY> => {
+    const legal = context.placement.possibleCellHashes();
+    if (!legal.size) return placements;
+    const legalCells = [...legal].map((hash) => ({ x: hash >> 4, y: hash & 0xf }));
+    const xs = legalCells.map((cell) => cell.x);
+    const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const frontness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cell.y : GRID_SIZE - 1 - cell.y);
+    const edgeness = (cell: XY): number => Math.abs(cell.x - centreX);
+
+    for (const angel of units.filter((unit) => v08BacklineProtectorKind(unit) === "angel")) {
+        if (!placements.has(angel.getId())) continue;
+        // The optimizer runs once per split Angel. Snapshot every already established Abomination/Angel edge
+        // before each pass, so moving shared wards for the next Angel cannot silently tear down the first screen.
+        const requiredProtectorEdges = existingProtectorPlacementEdges(units, wards, placements);
+        const angelWards = wards
+            .filter((ward) => ward.getId() !== angel.getId())
+            .map((ward) => {
+                const base = placements.get(ward.getId());
+                return base ? { ward, cells: footprintForBase(ward, base) } : undefined;
+            })
+            .filter((ward): ward is { ward: Unit; cells: XY[] } => ward !== undefined);
+        if (angelWards.length < 2) continue;
+        const [primary, secondary] = angelWards;
+
+        const occupied = new Set<number>();
+        for (const placedUnit of units) {
+            if (
+                placedUnit.getId() === angel.getId() ||
+                placedUnit.getId() === primary.ward.getId() ||
+                placedUnit.getId() === secondary.ward.getId()
+            ) {
+                continue;
+            }
+            const base = placements.get(placedUnit.getId());
+            if (!base) continue;
+            for (const cell of footprintForBase(placedUnit, base)) occupied.add(placementCellKey(cell));
+        }
+        const range = Math.max(0, Math.floor(angel.getAuraEffect("Arrows Wingshield")?.getRange() ?? 2));
+        const footprintIsFree = (cells: readonly XY[], extraOccupied: ReadonlySet<number> = occupied): boolean =>
+            cells.every((cell) => legal.has(placementCellKey(cell)) && !extraOccupied.has(placementCellKey(cell)));
+        let best: IAngelPlacementCandidate | undefined;
+        for (const base of legalCells) {
+            const cells = footprintForBase(angel, base);
+            if (!footprintIsFree(cells)) continue;
+            const angelKeys = new Set([...occupied, ...cells.map(placementCellKey)]);
+            for (const primaryBase of legalCells) {
+                const primaryCells = footprintForBase(primary.ward, primaryBase);
+                if (!footprintIsFree(primaryCells, angelKeys) || footprintDistance(cells, primaryCells) > range) {
+                    continue;
+                }
+                const primaryKeys = new Set([...angelKeys, ...primaryCells.map(placementCellKey)]);
+                for (const secondaryBase of legalCells) {
+                    const secondaryCells = footprintForBase(secondary.ward, secondaryBase);
+                    if (
+                        !footprintIsFree(secondaryCells, primaryKeys) ||
+                        footprintDistance(cells, secondaryCells) > range
+                    ) {
+                        continue;
+                    }
+                    const movedBases = new Map<string, XY>([
+                        [angel.getId(), base],
+                        [primary.ward.getId(), primaryBase],
+                        [secondary.ward.getId(), secondaryBase],
+                    ]);
+                    const preservesProtectorEdges = requiredProtectorEdges.every(
+                        ({ protector, beneficiary, range: edgeRange }) => {
+                            const protectorBase =
+                                movedBases.get(protector.getId()) ?? placements.get(protector.getId());
+                            const beneficiaryBase =
+                                movedBases.get(beneficiary.getId()) ?? placements.get(beneficiary.getId());
+                            return (
+                                !!protectorBase &&
+                                !!beneficiaryBase &&
+                                footprintDistance(
+                                    footprintForBase(protector, protectorBase),
+                                    footprintForBase(beneficiary, beneficiaryBase),
+                                ) <= edgeRange
+                            );
+                        },
+                    );
+                    if (!preservesProtectorEdges) continue;
+                    const additionallyCovered = angelWards
+                        .slice(2)
+                        .filter(({ cells: wardCells }) => footprintDistance(cells, wardCells) <= range);
+                    const covered = [primary.ward, secondary.ward, ...additionallyCovered.map(({ ward }) => ward)];
+                    const candidate: IAngelPlacementCandidate = {
+                        base,
+                        primaryBase,
+                        secondaryBase,
+                        coveredValue: totalWardValue(covered),
+                        coveredCount: covered.length,
+                        frontness: frontness(base),
+                        edgeness: edgeness(base),
+                        wardFrontness: frontness(primaryBase) + frontness(secondaryBase),
+                        wardEdgeness: edgeness(primaryBase) + edgeness(secondaryBase),
+                    };
+                    if (betterAngelPlacement(candidate, best)) best = candidate;
+                }
+            }
+        }
+        if (best) {
+            placements.set(angel.getId(), { ...best.base });
+            placements.set(primary.ward.getId(), { ...best.primaryBase });
+            placements.set(secondary.ward.getId(), { ...best.secondaryBase });
+        }
+    }
+    return placements;
+};
+
 /**
  * v0.8-only opening geometry. v0.7 stays byte-stable. The measured anti-splash layout keeps precedence;
- * otherwise active protectors are assigned to the highest-value ranged/caster wards. Queen is selected as a
- * guard only when the public enemy roster contains a flyer.
+ * otherwise active protectors are assigned to the highest-value ranged/caster wards. Angel is active only for
+ * two real wards against a public shooter; Queen is selected only when the public enemy roster contains a flyer.
  */
 export function v08BacklineProtectorPlacement(units: Unit[], context: IPlacementContext): Map<string, XY> | undefined {
     const wards = placementWards(units);
-    if (!wards.length || enemyFieldsSplashAoe(context)) return undefined;
+    if (!wards.length) return undefined;
+    const splashAoe = enemyFieldsSplashAoe(context);
     const activeProtectors = units
         .filter((unit) => {
             const kind = v08BacklineProtectorKind(unit);
-            return kind === "abomination" || (kind === "arachna_queen" && placementKnowsEnemyFlyer(context));
+            if (kind === "abomination") return true;
+            if (kind === "angel") {
+                return (
+                    wards.filter((ward) => ward.getId() !== unit.getId()).length >= 2 &&
+                    placementKnowsEnemyShooter(context)
+                );
+            }
+            return kind === "arachna_queen" && placementKnowsEnemyFlyer(context);
         })
         .sort((left, right) => {
             const leftKind = v08BacklineProtectorKind(left);
             const rightKind = v08BacklineProtectorKind(right);
             return (
                 Number(rightKind === "abomination") - Number(leftKind === "abomination") ||
+                Number(rightKind === "angel") - Number(leftKind === "angel") ||
                 left.getId().localeCompare(right.getId())
             );
         });
     if (!activeProtectors.length) return undefined;
+    const hasActiveAbomination = activeProtectors.some(
+        (protector) => v08BacklineProtectorKind(protector) === "abomination",
+    );
+    const hasActiveAngel = activeProtectors.some((protector) => v08BacklineProtectorKind(protector) === "angel");
+    // Queen's historical anti-splash precedence is unchanged. Abomination instead retains one exact Flesh
+    // Shield anchor and Angel its range-2 line while gap-1 disperses the remaining stacks.
+    if (splashAoe && !hasActiveAbomination && !hasActiveAngel) return undefined;
     const activeIds = new Set(activeProtectors.map((unit) => unit.getId()));
     const inactiveQueenIds = units
         .filter((unit) => v08BacklineProtectorKind(unit) === "arachna_queen" && !activeIds.has(unit.getId()))
         .map((unit) => unit.getId());
-    return layoutRevealPlacement(units, context, {
-        gap: 0,
+    const placements = layoutRevealPlacement(units, context, {
+        gap: splashAoe ? 1 : 0,
         screenShooters: true,
         cornerShift: false,
         screenBacklineProtectors: true,
@@ -582,4 +1031,10 @@ export function v08BacklineProtectorPlacement(units: Unit[], context: IPlacement
         excludedGuardUnitIds: inactiveQueenIds,
         preferredBacklineUnitIds: wards.map((unit) => unit.getId()),
     });
+    return optimizeAngelPlacement(
+        units,
+        context,
+        wards,
+        optimizeAbominationPlacement(units, context, wards, placements),
+    );
 }

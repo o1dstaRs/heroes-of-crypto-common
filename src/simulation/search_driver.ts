@@ -37,6 +37,7 @@ import {
 import {
     buildV08BacklineProtectorIntent,
     buildV08BacklineWardIntent,
+    isV08BacklineProtectorDecisionHardRisk,
     isV08BacklineProtectorPureMoveMeaningful,
     isV08BacklineWardPureMoveMeaningful,
     preservesV08BacklineProtectorIntent,
@@ -1738,7 +1739,13 @@ export class SearchDriver {
                     : undefined;
             const preservesBacklineIntent = (candidate: Pick<IEnumeratedCandidate, "actions">): boolean =>
                 (!backlineProtectorIntent ||
-                    preservesV08BacklineProtectorIntent(backlineProtectorIntent, unit, context, candidate.actions)) &&
+                    (preservesV08BacklineProtectorIntent(backlineProtectorIntent, unit, context, candidate.actions) &&
+                        !isV08BacklineProtectorDecisionHardRisk(
+                            backlineProtectorIntent,
+                            unit,
+                            context,
+                            candidate.actions,
+                        ))) &&
                 (!backlineWardIntent ||
                     preservesV08BacklineWardIntent(backlineWardIntent, unit, context, candidate.actions));
             const keepsBacklineIntent = (candidate: Pick<IEnumeratedCandidate, "actions">): boolean =>

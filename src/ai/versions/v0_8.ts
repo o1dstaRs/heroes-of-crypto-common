@@ -29,8 +29,10 @@ import {
     prioritizeV08BacklineProtector,
     v08BacklineProtectorPlacement,
 } from "./v0_8_backline_protector";
+import { prioritizeV08BlacksmithCraft, v08BlacksmithCraftPlacement } from "./v0_8_blacksmith";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
 import { prioritizeV08RangedPositioning } from "./v0_8_ranged_positioning";
+import { prioritizeV08AshMothSmoke, prioritizeV08HealerSustain } from "./v0_8_support_roles";
 import { prioritizeV08A13FinishDecision } from "./v0_8s_finish";
 
 const MELEE = PBTypes.AttackVals.MELEE;
@@ -63,6 +65,10 @@ export const V08_CASTER_ROUTER_POLICY = Object.freeze({
  * disables the v0.8 Castling addition while retaining the inherited v0.7 policy.
  */
 export const V08_CASTLING_ROUTER_VERSIONS_ENV = "V08_CASTLING_ROUTER_VERSIONS";
+/** Exact-version A/B scope for Blacksmith's multi-target Craft routing and no-AOE opening cluster. */
+export const V08_BLACKSMITH_ROLE_VERSIONS_ENV = "V08_BLACKSMITH_ROLE_VERSIONS";
+/** Exact-version A/B scope for the Ash Moth/Healer role routers; absent enables every v0.8-family seat. */
+export const V08_SUPPORT_ROLE_VERSIONS_ENV = "V08_SUPPORT_ROLE_VERSIONS";
 
 const nonnegativeFinite = (value: number): number => (Number.isFinite(value) ? Math.max(0, value) : 0);
 
@@ -521,7 +527,10 @@ export class StrategyV0_8 extends StrategyV0_7 {
         // Run the inherited path first so v0.7 primes its immutable initial-army profile even when the
         // role-aware layout below overrides the returned cells.
         const inherited = super.placeArmy(units, productionContext);
-        return v08BacklineProtectorPlacement(units, productionContext) ?? inherited;
+        const protectedLayout = v08BacklineProtectorPlacement(units, productionContext) ?? inherited;
+        return strategyVersionMatchesExperimentScope(this.version, process.env[V08_BLACKSMITH_ROLE_VERSIONS_ENV])
+            ? v08BlacksmithCraftPlacement(units, productionContext, protectedLayout)
+            : protectedLayout;
     }
     protected override frontMove(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
         const strongerRangedPosture = v08HasStrongerRangedPosture(
@@ -572,10 +581,26 @@ export class StrategyV0_8 extends StrategyV0_7 {
         const legalDecision = repairV08ForbiddenTargetDecision(unit, context, positioned);
         const spellDecision = prioritizeV08DamageSpell(unit, context, legalDecision);
         const vineDecision = prioritizeV08VineThrow(unit, context, spellDecision);
+        const supportRolesEnabled = strategyVersionMatchesExperimentScope(
+            this.version,
+            process.env[V08_SUPPORT_ROLE_VERSIONS_ENV],
+        );
+        const smokeDecision = supportRolesEnabled
+            ? prioritizeV08AshMothSmoke(unit, context, vineDecision)
+            : vineDecision;
+        const supportDecision = supportRolesEnabled
+            ? prioritizeV08HealerSustain(unit, context, smokeDecision)
+            : smokeDecision;
+        const craftDecision = strategyVersionMatchesExperimentScope(
+            this.version,
+            process.env[V08_BLACKSMITH_ROLE_VERSIONS_ENV],
+        )
+            ? prioritizeV08BlacksmithCraft(unit, context, supportDecision)
+            : supportDecision;
         const protectedDecision = prioritizeV08BacklineProtector(
             unit,
             context,
-            vineDecision,
+            craftDecision,
             this.canHourglass(unit, context),
         );
         return repairV08BacklineWardDecision(unit, context, protectedDecision);
