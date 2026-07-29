@@ -1739,7 +1739,10 @@ export class V08BlockCenterActionAuditor {
             enemyCells,
             enemyStateKey: enemyStateKey(enemies),
             stateSha256: stateFingerprint(observation),
-            oracleOption: independent ?? catalogOption,
+            // A catalog action completing in the engine proves that the action is legal, but not that its
+            // physical attack deals positive enemy damage. Keep catalog-only coverage in catalogDirect; all
+            // missed-action counters must share the independently damage-proven oracle denominator.
+            oracleOption: independent,
             catalogDirect,
             catalogMiss,
             damagingSpellNames,

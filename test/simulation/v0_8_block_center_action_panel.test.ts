@@ -122,6 +122,14 @@ const DEEP_BLOCK_CENTER_REGRESSIONS = [
         candidateRoster: ["Mermaid", "Troglodyte", "Valkyrie", "Wyvern", "Goblin Knight", "Abomination"],
         opponentRoster: ["Mermaid", "Berserker", "Wyvern", "Beholder", "Pegasus", "Angel"],
     },
+    {
+        game: 9_521,
+        pair: 4_760,
+        seed: 1_927_717_569,
+        candidateSide: "red",
+        candidateRoster: ["Leprechaun", "Peasant", "Harpy", "Elf", "Cyclops", "Angel"],
+        opponentRoster: ["Orc", "Centaur", "Hyena", "Healer", "Goblin Knight", "Black Dragon"],
+    },
 ] as const;
 
 const activatedActionEngine = (
@@ -307,6 +315,48 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
                     creatureName === "Troglodyte" && issue === "urgent_mountain_terminal_jitter",
             ),
         ).toBe(false);
+    });
+
+    test("does not promote game 9521's catalog-only Cyclops actions into damage-proven misses", () => {
+        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 9_521);
+
+        expect(record).toMatchObject({
+            game: 9_521,
+            pair: 4_760,
+            seed: 1_927_717_569,
+            candidateSide: "red",
+            winner: "candidate",
+            laps: 9,
+            endReason: "elimination",
+            candidateEngineRejections: 0,
+        });
+        expect(record.byCreature.Cyclops).toMatchObject({
+            observedTurns: 9,
+            oracleDirectEligibleTurns: 7,
+            sharedCatalogDirectEligibleTurns: 9,
+            chosenDirectActionTurns: 7,
+            noncombatWithDirectOptionTurns: 0,
+            mountainAdjacentTurns: 1,
+            mountainAdjacentDirectEligibleTurns: 0,
+            mountainAdjacentMissedAttacks: 0,
+            eligibleCombatMisses: 0,
+            eligibleCombatDroughts: 0,
+            lateDirectEligibleTurns: 1,
+            lateDirectActionMisses: 0,
+        });
+        expect(
+            record.failureSamples.some(
+                ({ creatureName, issue }) =>
+                    creatureName === "Cyclops" &&
+                    (issue === "noncombat_with_direct_option" ||
+                        issue === "mountain_adjacent_missed_attack" ||
+                        issue === "eligible_combat_drought"),
+            ),
+        ).toBe(false);
+        expect(
+            summarizeV08BlockCenterActionPanel(DEEP_PANEL_OPTIONS, [record]).gates.checks.metric_semantic_integrity
+                .pass,
+        ).toBe(true);
     });
 
     test("uses deterministic random rosters and exact adjacent seat swaps on BLOCK_CENTER", () => {
