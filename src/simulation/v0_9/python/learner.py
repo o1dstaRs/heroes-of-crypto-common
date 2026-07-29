@@ -20,14 +20,33 @@ import tempfile
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Any, Iterator, Sequence
 
-import numpy as np
 import torch
 from torch import Tensor, nn
 from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 
 from corpus import descriptor_fingerprint, validate_corpus
+from learner_input import (
+    NORMALIZATION_CACHE_SCHEMA,
+    NormalizationCache,
+    eligible_in_order,
+    normalization_cache_path,
+    read_normalization_cache,
+    split_eligible_paths,
+    write_normalization_cache,
+)
+from packed_input import (
+    FEATURE_WIDTH,
+    FULL_FEATURE_SHA256,
+    PACKED_CACHE_SCHEMA,
+    Decision,
+    PackedCache,
+    PackedDecisionStore,
+    collate_numpy,
+    iter_json_decisions,
+    load_or_build_packed_cache,
+)
 from shard_order import (
     TRAINING_SHARD_ORDER_SCHEMA,
     ordered_worker_paths,
@@ -35,14 +54,9 @@ from shard_order import (
     training_epoch_seed,
 )
 
-IL_SCHEMA = "hoc.ai.v0_9_il.v4"
-IL_TYPE = "v09_il_decision"
-IL_VERSION = 4
 MODEL_SCHEMA = "hoc.ai.v0_9_model.v1"
 MODEL_HASH_ALGORITHM = "sha256-canonical-inference-json-v1"
 FEATURE_SCHEMA = "hoc.ai.v0_9_features.il_v4.v1"
-FEATURE_WIDTH = 166
-FULL_FEATURE_SHA256 = "01d5d1fdb32edb31add64201da4d37443f0e8a54379f2f50763da83c1ca3d18e"
 
 
 def canonical_json(value: Any) -> str:
@@ -87,102 +101,21 @@ def feature_contract(path: Path) -> dict[str, Any]:
     return value
 
 
-@dataclass(frozen=True)
-class Decision:
-    features: list[list[float]]
-    means: list[float]
-    mean_valid: list[bool]
-    teacher_index: int
-    incumbent_index: int
-    weights: list[float]
-
-
-def decision_from_row(row: dict[str, Any], expected_split: str | None) -> Decision | None:
-    if row.get("t") != IL_TYPE:
-        return None
-    if row.get("v") != IL_VERSION or row.get("schema") != IL_SCHEMA:
-        raise ValueError("mixed or unsupported IL schema")
-    fingerprints = row.get("featureFingerprints", {})
-    if fingerprints.get("full") != FULL_FEATURE_SHA256:
-        raise ValueError("IL row has a different full feature fingerprint")
-    if expected_split is not None and row.get("split") != expected_split:
-        return None
-    value_features = row.get("valueFeatures")
-    candidates = row.get("candidates")
-    teacher_index = row.get("teacherIndex")
-    if (
-        not isinstance(value_features, list)
-        or len(value_features) != 60
-        or not isinstance(candidates, list)
-        or not candidates
-        or len(candidates) > 96
-        or not isinstance(teacher_index, int)
-        or teacher_index < 0
-        or teacher_index >= len(candidates)
-        or row.get("incumbentIndex") != 0
-    ):
-        raise ValueError("malformed IL-v4 decision")
-    features: list[list[float]] = []
-    means: list[float] = []
-    mean_valid: list[bool] = []
-    weights: list[float] = []
-    for candidate in candidates:
-        cf = candidate.get("candidateFeatures")
-        af = candidate.get("actionFeatures")
-        rich = candidate.get("richFeatures")
-        vector = [*value_features, *(cf or []), *(af or []), *(rich or [])]
-        if (
-            len(vector) != FEATURE_WIDTH
-            or any(not isinstance(value, (int, float)) or not math.isfinite(value) for value in vector)
-        ):
-            raise ValueError("invalid IL-v4 candidate feature vector")
-        mean = candidate.get("teacherMean")
-        visits = candidate.get("teacherVisits")
-        stderr = candidate.get("teacherStdErr")
-        if (
-            (mean is not None and (not isinstance(mean, (int, float)) or not math.isfinite(mean)))
-            or not isinstance(visits, int)
-            or visits < 1
-            or (
-                stderr is not None
-                and (not isinstance(stderr, (int, float)) or not math.isfinite(stderr) or stderr < 0)
-            )
-        ):
-            raise ValueError("invalid IL-v4 teacher observation")
-        features.append([float(value) for value in vector])
-        means.append(float(mean) if mean is not None else 0.0)
-        mean_valid.append(mean is not None)
-        # Exact visits are always known. Standard error only tightens confidence when the teacher retained it.
-        confidence = math.sqrt(float(visits))
-        if stderr is not None:
-            confidence /= max(0.02, 1.0 + float(stderr))
-        weights.append(confidence)
-    if not mean_valid[teacher_index]:
-        raise ValueError("teacherIndex points at an engine-rejected candidate")
-    return Decision(features, means, mean_valid, teacher_index, 0, weights)
-
-
-def iter_decisions(paths: Sequence[Path], split: str | None) -> Iterator[Decision]:
-    for path in paths:
-        with path.open("r", encoding="utf-8") as stream:
-            for line_number, line in enumerate(stream, start=1):
-                if not line.strip():
-                    continue
-                try:
-                    value = json.loads(line)
-                    decision = decision_from_row(value, split)
-                except Exception as error:
-                    raise ValueError(f"{path}:{line_number}: {error}") from error
-                if decision is not None:
-                    yield decision
-
-
 class DecisionDataset(IterableDataset[Decision]):
-    def __init__(self, paths: Sequence[Path], split: str, seed: int):
+    def __init__(
+        self,
+        paths: Sequence[Path],
+        split: str,
+        seed: int,
+        eligible_paths: frozenset[Path],
+        packed_cache: PackedCache,
+    ):
         super().__init__()
         self.paths = tuple(paths)
         self.split = split
         self.seed = seed
+        self.eligible_paths = eligible_paths
+        self.packed_cache = packed_cache
 
     def __iter__(self) -> Iterator[Decision]:
         worker = get_worker_info()
@@ -194,7 +127,14 @@ class DecisionDataset(IterableDataset[Decision]):
             worker.id if worker else 0,
             worker.num_workers if worker else 1,
         )
-        yield from iter_decisions(paths, self.split)
+        # Filter only after reproducing the old full-corpus permutation and worker stride. This avoids touching
+        # the opposite split while preserving every selected shard's exact epoch order and worker assignment.
+        path_indices = {path: index for index, path in enumerate(self.paths)}
+        store = PackedDecisionStore(self.packed_cache)
+        # Do not explicitly close here: an incomplete final DataLoader batch can exhaust this generator before
+        # collate consumes its already-yielded mmap slices. Their NumPy owners release the mapping after collation.
+        for path in eligible_in_order(paths, self.eligible_paths):
+            yield from store.iter_shard(path_indices[path])
 
 
 @dataclass
@@ -208,31 +148,16 @@ class Batch:
 
 
 def collate(decisions: Sequence[Decision]) -> Batch:
-    maximum = max(len(decision.features) for decision in decisions)
-    batch = len(decisions)
     # Build each dense buffer once in NumPy. Constructing six tiny torch tensors per decision made the
     # JSONL/collation side dominate a very small MLP and left the 5090 waiting between bursts.
-    features = np.zeros((batch, maximum, FEATURE_WIDTH), dtype=np.float32)
-    means = np.zeros((batch, maximum), dtype=np.float32)
-    mean_valid = np.zeros((batch, maximum), dtype=np.bool_)
-    mask = np.zeros((batch, maximum), dtype=np.bool_)
-    teacher = np.zeros((batch,), dtype=np.int64)
-    confidence = np.ones((batch, maximum), dtype=np.float32)
-    for index, decision in enumerate(decisions):
-        count = len(decision.features)
-        features[index, :count] = decision.features
-        means[index, :count] = decision.means
-        mean_valid[index, :count] = decision.mean_valid
-        mask[index, :count] = True
-        teacher[index] = decision.teacher_index
-        confidence[index, :count] = decision.weights
+    batch = collate_numpy(decisions)
     return Batch(
-        torch.from_numpy(features),
-        torch.from_numpy(means),
-        torch.from_numpy(mean_valid),
-        torch.from_numpy(mask),
-        torch.from_numpy(teacher),
-        torch.from_numpy(confidence),
+        torch.from_numpy(batch.features),
+        torch.from_numpy(batch.means),
+        torch.from_numpy(batch.mean_valid),
+        torch.from_numpy(batch.mask),
+        torch.from_numpy(batch.teacher),
+        torch.from_numpy(batch.confidence),
     )
 
 
@@ -264,24 +189,116 @@ class NormalizedRanker(nn.Module):
         return self.ranker(normalized)
 
 
-def estimate_normalization(paths: Sequence[Path]) -> tuple[Tensor, Tensor, int]:
-    count = 0
-    mean = torch.zeros(FEATURE_WIDTH, dtype=torch.float64)
-    m2 = torch.zeros(FEATURE_WIDTH, dtype=torch.float64)
-    for decision in iter_decisions(paths, "train"):
+class NormalizationAccumulator:
+    """Exact source-order Welford accumulator used by both JSON fallback and cache construction."""
+
+    def __init__(self) -> None:
+        self.count = 0
+        self.mean = torch.zeros(FEATURE_WIDTH, dtype=torch.float64)
+        self.m2 = torch.zeros(FEATURE_WIDTH, dtype=torch.float64)
+
+    def observe(self, decision: Decision) -> None:
         for values in decision.features:
             vector = torch.tensor(values, dtype=torch.float64)
-            count += 1
-            delta = vector - mean
-            mean += delta / count
-            m2 += delta * (vector - mean)
-    if count < 2:
-        raise ValueError("training corpus has fewer than two candidate observations")
-    variance = m2 / (count - 1)
-    scale = torch.rsqrt(torch.clamp(variance, min=1e-12))
-    # Constant/binary-never-observed features stay numerically inert.
-    scale = torch.where(variance < 1e-12, torch.ones_like(scale), scale)
-    return mean.float(), scale.float(), count
+            self.count += 1
+            delta = vector - self.mean
+            self.mean += delta / self.count
+            self.m2 += delta * (vector - self.mean)
+
+    def finish(self) -> tuple[Tensor, Tensor, int]:
+        if self.count < 2:
+            raise ValueError("training corpus has fewer than two candidate observations")
+        variance = self.m2 / (self.count - 1)
+        scale = torch.rsqrt(torch.clamp(variance, min=1e-12))
+        # Constant/binary-never-observed features stay numerically inert.
+        scale = torch.where(variance < 1e-12, torch.ones_like(scale), scale)
+        return self.mean.float(), scale.float(), self.count
+
+
+def estimate_normalization(
+    paths: Sequence[Path],
+    eligible_paths: frozenset[Path],
+    expected_file_sha256: dict[Path, str],
+) -> tuple[Tensor, Tensor, int]:
+    accumulator = NormalizationAccumulator()
+    for decision in iter_json_decisions(
+        eligible_in_order(paths, eligible_paths),
+        "train",
+        expected_file_sha256,
+    ):
+        accumulator.observe(decision)
+    return accumulator.finish()
+
+
+def prepare_input_caches(
+    paths: Sequence[Path],
+    descriptors: Sequence[Any],
+    eligible_paths: dict[str, frozenset[Path]],
+    campaign: dict[str, Any],
+    corpus_sha256: str,
+    campaign_directory: Path,
+) -> tuple[Tensor, Tensor, int, NormalizationCache, PackedCache]:
+    cache_arguments = {
+        "run_fingerprint": campaign["runFingerprint"],
+        "source_commit": campaign["identity"]["sourceCommit"],
+        "corpus_sha256": corpus_sha256,
+        "feature_schema_sha256": FULL_FEATURE_SHA256,
+        "feature_width": FEATURE_WIDTH,
+    }
+    cache_path = normalization_cache_path(
+        campaign_directory,
+        run_fingerprint=cache_arguments["run_fingerprint"],
+        source_commit=cache_arguments["source_commit"],
+        corpus_sha256=cache_arguments["corpus_sha256"],
+        feature_schema_sha256=cache_arguments["feature_schema_sha256"],
+    )
+    normalization_cache: NormalizationCache | None = None
+    if cache_path.exists():
+        normalization_cache = read_normalization_cache(cache_path, **cache_arguments)
+
+    expected_file_sha256 = {
+        Path(descriptor.path).resolve(): descriptor.fileSha256 for descriptor in descriptors
+    }
+    accumulator = NormalizationAccumulator() if normalization_cache is None else None
+    packed_cache, packed_built = load_or_build_packed_cache(
+        paths,
+        descriptors,
+        campaign_directory,
+        run_fingerprint=cache_arguments["run_fingerprint"],
+        source_commit=cache_arguments["source_commit"],
+        corpus_sha256=cache_arguments["corpus_sha256"],
+        feature_schema_sha256=cache_arguments["feature_schema_sha256"],
+        observer=(
+            lambda decision, split: accumulator.observe(decision)
+            if accumulator is not None and split == "train"
+            else None
+        )
+    )
+    if normalization_cache is None:
+        offset, scale, observations = (
+            accumulator.finish()
+            if packed_built and accumulator is not None
+            else estimate_normalization(
+                paths,
+                eligible_paths["train"],
+                expected_file_sha256,
+            )
+        )
+        normalization_cache = write_normalization_cache(
+            cache_path,
+            run_fingerprint=cache_arguments["run_fingerprint"],
+            source_commit=cache_arguments["source_commit"],
+            corpus_sha256=cache_arguments["corpus_sha256"],
+            feature_schema_sha256=cache_arguments["feature_schema_sha256"],
+            offsets=[float(value) for value in offset],
+            scales=[float(value) for value in scale],
+            observations=observations,
+        )
+    else:
+        offset = torch.tensor(normalization_cache.offsets, dtype=torch.float32)
+        scale = torch.tensor(normalization_cache.scales, dtype=torch.float32)
+        observations = normalization_cache.observations
+    return offset, scale, observations, normalization_cache, packed_cache
 
 
 def ranking_loss(scores: Tensor, batch: Batch) -> Tensor:
@@ -680,6 +697,8 @@ def main() -> None:
         manifest_path,
         allow_partial=args.allow_partial_corpus,
     )
+    eligible_paths = split_eligible_paths(paths, descriptors)
+    corpus_sha256 = descriptor_fingerprint(descriptors)
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -689,7 +708,14 @@ def main() -> None:
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA learner requested but PyTorch cannot see a CUDA device")
 
-    offset, scale, observations = estimate_normalization(paths)
+    offset, scale, observations, normalization_cache, packed_cache = prepare_input_caches(
+        paths,
+        descriptors,
+        eligible_paths,
+        campaign,
+        corpus_sha256,
+        manifest_path.parent,
+    )
     model = NormalizedRanker(CandidateRanker(hidden), offset, scale, args.input_clip).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     checkpoint = args.checkpoint or args.out.with_suffix(".checkpoint.pt")
@@ -698,7 +724,12 @@ def main() -> None:
         "runFingerprint": campaign["runFingerprint"],
         "manifestSha256": campaign["manifestSha256"],
         "featureContractSha256": hashlib.sha256(contract_path.read_bytes()).hexdigest(),
-        "corpusSha256": descriptor_fingerprint(descriptors),
+        "corpusSha256": corpus_sha256,
+        "normalizationCacheSchema": NORMALIZATION_CACHE_SCHEMA,
+        "normalizationCacheSha256": normalization_cache.cache_sha256,
+        "packedCacheSchema": PACKED_CACHE_SCHEMA,
+        "packedCacheSha256": packed_cache.cache_sha256,
+        "packedCachePathOrderSha256": packed_cache.path_order_sha256,
         "shards": [asdict(descriptor) for descriptor in descriptors],
         "hidden": hidden,
         "seed": args.seed,
@@ -741,7 +772,13 @@ def main() -> None:
             torch.cuda.set_rng_state_all(saved["cudaRandomState"])
 
     validation = DataLoader(
-        DecisionDataset(paths, "validation", args.seed + 1),
+        DecisionDataset(
+            paths,
+            "validation",
+            args.seed + 1,
+            eligible_paths["validation"],
+            packed_cache,
+        ),
         batch_size=args.batch_size,
         num_workers=args.workers,
         collate_fn=collate,
@@ -760,7 +797,13 @@ def main() -> None:
         # checkpointed batch cursor. A dedicated generator keeps worker initialization from perturbing the model
         # RNG when that loader is reconstructed during resume.
         training = DataLoader(
-            DecisionDataset(paths, "train", epoch_seed),
+            DecisionDataset(
+                paths,
+                "train",
+                epoch_seed,
+                eligible_paths["train"],
+                packed_cache,
+            ),
             batch_size=args.batch_size,
             num_workers=args.workers,
             collate_fn=collate,
@@ -852,6 +895,19 @@ def main() -> None:
         )
     final_metrics = {
         "normalizationObservations": observations,
+        "normalizationCache": {
+            "schema": NORMALIZATION_CACHE_SCHEMA,
+            "sha256": normalization_cache.cache_sha256,
+        },
+        "packedCache": {
+            "schema": PACKED_CACHE_SCHEMA,
+            "sha256": packed_cache.cache_sha256,
+            "pathOrderSha256": packed_cache.path_order_sha256,
+            "shards": packed_cache.shards,
+            "decisions": packed_cache.decisions,
+            "candidates": packed_cache.candidates,
+            "dataBytes": packed_cache.data_bytes,
+        },
         "corpusSha256": config["corpusSha256"],
         "hardware": {
             "device": config["device"],

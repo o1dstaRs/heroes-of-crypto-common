@@ -79,12 +79,11 @@ def fingerprint(value: Any) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
-def file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+def read_utf8_and_sha256(path: Path) -> tuple[str, str]:
+    """Read a shard once while preserving the SHA-256 of its exact on-disk bytes."""
+
+    source = path.read_bytes()
+    return source.decode("utf-8"), hashlib.sha256(source).hexdigest()
 
 
 def expand_paths(patterns: Sequence[str]) -> list[Path]:
@@ -272,7 +271,8 @@ def validate_shard(
         path.relative_to(Path(campaign["outputDirectory"]).resolve())
     except ValueError as error:
         raise ValueError(f"{path}: shard is outside the immutable campaign output") from error
-    source_lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    source, file_sha256 = read_utf8_and_sha256(path)
+    source_lines = [line.strip() for line in source.splitlines() if line.strip()]
     if not source_lines:
         raise ValueError(f"{path}: empty shard")
     rows: list[dict[str, Any]] = []
@@ -368,7 +368,7 @@ def validate_shard(
         raise ValueError(f"{path}: shard path/cohort/map does not match its deterministic seed-index schedule")
     return ShardDescriptor(
         path=str(path),
-        fileSha256=file_sha256(path),
+        fileSha256=file_sha256,
         purpose=purpose,
         seedIndex=seed_index,
         phase=footer["phase"],
