@@ -2582,9 +2582,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public getBuffProperties(buffName: string): [string, string] {
         const buffProperties: [string, string] = ["", ""];
         for (let i = 0; i < this.unitProperties.applied_buffs_descriptions.length; i++) {
+            // This is called from every stack-power refresh. Most lookups do not match most entries, so avoid
+            // allocating and splitting a description until its parallel buff-name entry is the one requested.
+            if (buffName !== this.unitProperties.applied_buffs[i]) {
+                continue;
+            }
             const description = this.unitProperties.applied_buffs_descriptions[i];
             const splitDescription = description.split(";");
-            if (splitDescription.length === 3 && buffName === this.unitProperties.applied_buffs[i]) {
+            if (splitDescription.length === 3) {
                 buffProperties[0] = splitDescription[1];
                 buffProperties[1] = splitDescription[2];
                 break;
