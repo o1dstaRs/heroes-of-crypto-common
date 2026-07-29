@@ -57,6 +57,7 @@ from shard_order import (
 MODEL_SCHEMA = "hoc.ai.v0_9_model.v1"
 MODEL_HASH_ALGORITHM = "sha256-canonical-inference-json-v1"
 FEATURE_SCHEMA = "hoc.ai.v0_9_features.il_v4.v1"
+EPOCH_PROGRESS_SCHEMA = "hoc.ai.v0_9_learner_epoch_progress.v1"
 
 
 def canonical_json(value: Any) -> str:
@@ -145,6 +146,17 @@ class Batch:
     mask: Tensor
     teacher: Tensor
     confidence: Tensor
+
+
+@dataclass(frozen=True)
+class EpochProgress:
+    epoch: int
+    next_batch: int
+    qat_layer_shifts: tuple[int, ...]
+    running_loss: float
+    batches: int
+    examples: int
+    active_elapsed_seconds: float
 
 
 def collate(decisions: Sequence[Decision]) -> Batch:
@@ -618,6 +630,76 @@ def build_research_artifact(
     }
 
 
+def _epoch_progress_payload(progress: EpochProgress) -> dict[str, Any]:
+    return {
+        "schema": EPOCH_PROGRESS_SCHEMA,
+        "epoch": progress.epoch,
+        "nextBatch": progress.next_batch,
+        "qatLayerShifts": list(progress.qat_layer_shifts),
+        "runningLoss": progress.running_loss,
+        "batches": progress.batches,
+        "examples": progress.examples,
+        "activeElapsedSeconds": progress.active_elapsed_seconds,
+    }
+
+
+def restore_epoch_progress(
+    value: Any,
+    *,
+    next_epoch: int,
+    next_batch: int,
+    expected_qat_layer_count: int,
+) -> EpochProgress | None:
+    if next_batch == 0:
+        if value is not None:
+            raise ValueError("epoch-boundary checkpoint must not retain in-progress epoch state")
+        return None
+    if (
+        not isinstance(value, dict)
+        or set(value)
+        != {
+            "schema",
+            "epoch",
+            "nextBatch",
+            "qatLayerShifts",
+            "runningLoss",
+            "batches",
+            "examples",
+            "activeElapsedSeconds",
+        }
+        or value.get("schema") != EPOCH_PROGRESS_SCHEMA
+        or type(value.get("epoch")) is not int
+        or value["epoch"] != next_epoch
+        or type(value.get("nextBatch")) is not int
+        or value["nextBatch"] != next_batch
+        or not isinstance(value.get("qatLayerShifts"), list)
+        or len(value["qatLayerShifts"]) != expected_qat_layer_count
+        or any(type(shift) is not int or shift < 0 or shift > 24 for shift in value["qatLayerShifts"])
+        or isinstance(value.get("runningLoss"), bool)
+        or not isinstance(value.get("runningLoss"), (int, float))
+        or not math.isfinite(value["runningLoss"])
+        or value["runningLoss"] < 0
+        or type(value.get("batches")) is not int
+        or value["batches"] != next_batch
+        or type(value.get("examples")) is not int
+        or value["examples"] < value["batches"]
+        or isinstance(value.get("activeElapsedSeconds"), bool)
+        or not isinstance(value.get("activeElapsedSeconds"), (int, float))
+        or not math.isfinite(value["activeElapsedSeconds"])
+        or value["activeElapsedSeconds"] < 0
+    ):
+        raise ValueError("checkpoint in-progress epoch state is malformed or inconsistent")
+    return EpochProgress(
+        epoch=value["epoch"],
+        next_batch=value["nextBatch"],
+        qat_layer_shifts=tuple(value["qatLayerShifts"]),
+        running_loss=float(value["runningLoss"]),
+        batches=value["batches"],
+        examples=value["examples"],
+        active_elapsed_seconds=float(value["activeElapsedSeconds"]),
+    )
+
+
 def save_checkpoint(
     path: Path,
     next_epoch: int,
@@ -626,7 +708,16 @@ def save_checkpoint(
     optimizer: torch.optim.Optimizer,
     config: dict[str, Any],
     history: list[dict[str, Any]],
+    epoch_progress: EpochProgress | None = None,
 ) -> None:
+    progress_payload = _epoch_progress_payload(epoch_progress) if epoch_progress is not None else None
+    expected_qat_layer_count = len(epoch_progress.qat_layer_shifts) if epoch_progress is not None else 0
+    restore_epoch_progress(
+        progress_payload,
+        next_epoch=next_epoch,
+        next_batch=next_batch,
+        expected_qat_layer_count=expected_qat_layer_count,
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     torch.save(
@@ -637,6 +728,7 @@ def save_checkpoint(
             "optimizer": optimizer.state_dict(),
             "config": config,
             "history": history,
+            "epochProgress": progress_payload,
             "pythonRandomState": random.getstate(),
             "torchRandomState": torch.random.get_rng_state(),
             "cudaRandomState": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
@@ -756,6 +848,7 @@ def main() -> None:
     }
     first_epoch = 0
     resume_batch = 0
+    resume_epoch_progress: EpochProgress | None = None
     history: list[dict[str, Any]] = []
     if args.resume:
         saved = torch.load(checkpoint, map_location=device, weights_only=False)
@@ -765,6 +858,24 @@ def main() -> None:
         optimizer.load_state_dict(saved["optimizer"])
         first_epoch = int(saved["nextEpoch"])
         resume_batch = int(saved["nextBatch"])
+        if (
+            first_epoch < 0
+            or first_epoch > args.epochs
+            or resume_batch < 0
+            or (resume_batch > 0 and first_epoch >= args.epochs)
+        ):
+            raise ValueError("checkpoint epoch/batch cursor is outside this training run")
+        resume_qat = first_epoch < args.epochs and first_epoch >= args.epochs - args.qat_epochs
+        resume_epoch_progress = restore_epoch_progress(
+            saved.get("epochProgress"),
+            next_epoch=first_epoch,
+            next_batch=resume_batch,
+            expected_qat_layer_count=(
+                sum(isinstance(layer, nn.Linear) for layer in model.ranker.network)
+                if resume_qat
+                else 0
+            ),
+        )
         history = list(saved.get("history", []))
         random.setstate(saved["pythonRandomState"])
         torch.random.set_rng_state(saved["torchRandomState"])
@@ -813,24 +924,42 @@ def main() -> None:
             generator=loader_generator,
         )
         model.train()
-        running_loss = 0.0
-        batches = 0
-        examples = 0
-        epoch_started = time.monotonic()
+        resumed_progress = (
+            resume_epoch_progress
+            if epoch == first_epoch and resume_batch > 0
+            else None
+        )
+        running_loss = resumed_progress.running_loss if resumed_progress is not None else 0.0
+        batches = resumed_progress.batches if resumed_progress is not None else 0
+        examples = resumed_progress.examples if resumed_progress is not None else 0
+        active_elapsed_seconds = (
+            resumed_progress.active_elapsed_seconds if resumed_progress is not None else 0.0
+        )
+        active_segment_started = time.monotonic()
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats(device)
         qat = epoch >= args.epochs - args.qat_epochs
         qat_layer_shifts = (
-            [
-                quantized_layer_parameters(layer, args.input_scale)[1]
-                for layer in model.ranker.network
-                if isinstance(layer, nn.Linear)
-            ]
-            if qat
-            else []
+            list(resumed_progress.qat_layer_shifts)
+            if resumed_progress is not None
+            else (
+                [
+                    quantized_layer_parameters(layer, args.input_scale)[1]
+                    for layer in model.ranker.network
+                    if isinstance(layer, nn.Linear)
+                ]
+                if qat
+                else []
+            )
         )
+        last_batch_cursor = 0
         for batch_index, batch in enumerate(training):
+            last_batch_cursor = batch_index + 1
             if epoch == first_epoch and batch_index < resume_batch:
+                if batch_index + 1 == resume_batch:
+                    # Replaying the deterministic loader cursor is not active learner work and must not inflate
+                    # resumed throughput time. Start the new active segment after the final skipped batch.
+                    active_segment_started = time.monotonic()
                 continue
             batch = move_batch(batch, device)
             optimizer.zero_grad(set_to_none=True)
@@ -855,9 +984,30 @@ def main() -> None:
             batches += 1
             examples += batch.features.shape[0]
             if time.monotonic() - last_checkpoint >= args.checkpoint_seconds:
-                save_checkpoint(checkpoint, epoch, batch_index + 1, model, optimizer, config, history)
-                last_checkpoint = time.monotonic()
-        training_elapsed = time.monotonic() - epoch_started
+                active_elapsed_seconds += time.monotonic() - active_segment_started
+                save_checkpoint(
+                    checkpoint,
+                    epoch,
+                    batch_index + 1,
+                    model,
+                    optimizer,
+                    config,
+                    history,
+                    EpochProgress(
+                        epoch=epoch,
+                        next_batch=batch_index + 1,
+                        qat_layer_shifts=tuple(qat_layer_shifts),
+                        running_loss=running_loss,
+                        batches=batches,
+                        examples=examples,
+                        active_elapsed_seconds=active_elapsed_seconds,
+                    ),
+                )
+                active_segment_started = time.monotonic()
+                last_checkpoint = active_segment_started
+        if epoch == first_epoch and resume_batch > last_batch_cursor:
+            raise ValueError("checkpoint batch cursor exceeds the deterministic epoch length")
+        training_elapsed = active_elapsed_seconds + (time.monotonic() - active_segment_started)
         metrics = evaluate(model, validation, device, args.validation_batches)
         metrics.update(
             {
@@ -879,6 +1029,7 @@ def main() -> None:
         print(json.dumps(metrics, sort_keys=True), flush=True)
         save_checkpoint(checkpoint, epoch + 1, 0, model, optimizer, config, history)
         resume_batch = 0
+        resume_epoch_progress = None
 
     final_validation = evaluate(model, validation, device, args.validation_batches)
     fixed_validation = evaluate_fixed(model, validation, device, args.input_scale, args.validation_batches)

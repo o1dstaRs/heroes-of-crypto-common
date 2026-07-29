@@ -11,10 +11,13 @@ import torch
 from learner import (
     Batch,
     CandidateRanker,
+    EpochProgress,
     FEATURE_WIDTH,
     NormalizedRanker,
     export_layers,
+    quantized_layer_parameters,
     ranking_loss,
+    restore_epoch_progress,
     save_checkpoint,
 )
 from shard_order import (
@@ -73,13 +76,38 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="hoc-v09-smoke-") as directory:
         checkpoint = Path(directory) / "learner.pt"
         config = {"smoke": True}
-        save_checkpoint(checkpoint, 3, 7, model, optimizer, config, [{"epoch": 2}])
+        shifts = tuple(
+            quantized_layer_parameters(layer, 256)[1]
+            for layer in model.ranker.network
+            if isinstance(layer, torch.nn.Linear)
+        )
+        progress = EpochProgress(
+            epoch=3,
+            next_batch=7,
+            qat_layer_shifts=shifts,
+            running_loss=8.75,
+            batches=7,
+            examples=14,
+            active_elapsed_seconds=2.5,
+        )
+        save_checkpoint(checkpoint, 3, 7, model, optimizer, config, [{"epoch": 2}], progress)
         saved = torch.load(checkpoint, map_location="cpu", weights_only=False)
-        if saved["nextEpoch"] != 3 or saved["nextBatch"] != 7 or saved["history"] != [{"epoch": 2}]:
+        restored = restore_epoch_progress(
+            saved["epochProgress"],
+            next_epoch=3,
+            next_batch=7,
+            expected_qat_layer_count=len(shifts),
+        )
+        if (
+            saved["nextEpoch"] != 3
+            or saved["nextBatch"] != 7
+            or saved["history"] != [{"epoch": 2}]
+            or restored != progress
+        ):
             raise RuntimeError("checkpoint lost its mid-epoch resume cursor")
     print(
         '{"ok":true,"finiteLoss":true,"quantizedExport":true,'
-        '"midEpochResume":true,"epochShardReshuffle":true}'
+        '"midEpochResume":true,"epochProgress":true,"epochShardReshuffle":true}'
     )
 
 

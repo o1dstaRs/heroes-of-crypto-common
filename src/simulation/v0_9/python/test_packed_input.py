@@ -27,10 +27,13 @@ from packed_input import (
     FULL_FEATURE_SHA256,
     IL_SCHEMA,
     IL_VERSION,
+    PACKED_CACHE_BUILD_HEADROOM_BYTES,
+    PACKED_CACHE_FREE_RESERVE_BYTES,
     PACKED_CACHE_SCHEMA,
     PackedDecisionStore,
     _HashedWriter,
     build_packed_cache,
+    cleanup_stale_packed_cache_temporaries,
     collate_numpy,
     expected_packed_data_bytes,
     file_sha256,
@@ -38,6 +41,7 @@ from packed_input import (
     iter_json_decisions,
     load_or_build_packed_cache,
     packed_cache_path,
+    packed_cache_required_free_bytes,
     validate_packed_cache,
 )
 from shard_order import ordered_worker_paths
@@ -543,6 +547,168 @@ class PackedInputTest(unittest.TestCase):
             )
             self.assertFalse(cache_path.exists())
             self.assertTrue(packed.directory.is_dir())
+
+    def test_disk_preflight_accounts_for_maximum_corpus_and_only_cleans_stale_temps(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="hoc-v09-packed-preflight-") as directory:
+            root = Path(directory)
+            paths, descriptors, _eligible = self.fixtures(root)
+            cache_directory = packed_cache_path(
+                root,
+                run_fingerprint=RUN,
+                source_commit=SOURCE,
+                corpus_sha256=CORPUS,
+                feature_schema_sha256=FULL_FEATURE_SHA256,
+            )
+            cache_directory.parent.mkdir()
+            stale = cache_directory.parent / f".packed-{'1' * 64}.stale01"
+            stale.mkdir()
+            (stale / "partial.bin").write_bytes(b"partial")
+            obsolete = cache_directory.parent / f"packed-{'2' * 64}"
+            obsolete.mkdir()
+            (obsolete / "old.bin").write_bytes(b"old-cache")
+            maximum_data_bytes = expected_packed_data_bytes(
+                sum(descriptor.decisions for descriptor in descriptors) * 96,
+                sum(descriptor.decisions for descriptor in descriptors),
+                len(paths),
+            )
+            required = packed_cache_required_free_bytes(maximum_data_bytes)
+            self.assertEqual(
+                required,
+                maximum_data_bytes
+                + PACKED_CACHE_FREE_RESERVE_BYTES
+                + PACKED_CACHE_BUILD_HEADROOM_BYTES,
+            )
+
+            with patch("packed_input.shutil.disk_usage", return_value=SimpleNamespace(free=required - 1)):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    f"maximumDataBytes={maximum_data_bytes}",
+                ):
+                    build_packed_cache(
+                        paths,
+                        descriptors,
+                        cache_directory,
+                        run_fingerprint=RUN,
+                        source_commit=SOURCE,
+                        corpus_sha256=CORPUS,
+                        feature_schema_sha256=FULL_FEATURE_SHA256,
+                    )
+            self.assertFalse(stale.exists())
+            self.assertTrue(obsolete.is_dir())
+            self.assertFalse(cache_directory.exists())
+            self.assertEqual(list(cache_directory.parent.glob(f".{cache_directory.name}.*")), [])
+
+    def test_stale_temp_cleanup_is_scoped_and_never_follows_links(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="hoc-v09-packed-stale-cleanup-") as directory:
+            root = Path(directory)
+            parent = root / "learner-cache"
+            parent.mkdir()
+            outside = root / "outside"
+            outside.mkdir()
+            sentinel = outside / "sentinel.bin"
+            sentinel.write_bytes(b"must-survive")
+            stale = parent / f".packed-{'3' * 64}.stale02"
+            stale.mkdir()
+            (stale / "outside-link").symlink_to(outside, target_is_directory=True)
+            blocked = parent / f".packed-{'4' * 64}.stale03"
+            blocked.symlink_to(outside, target_is_directory=True)
+            completed = parent / f"packed-{'5' * 64}"
+            completed.mkdir()
+            unknown = parent / ".packed-not-owned.stale04"
+            unknown.mkdir()
+
+            with self.assertRaisesRegex(ValueError, "cleanup refuses symlink"):
+                cleanup_stale_packed_cache_temporaries(parent)
+            self.assertTrue(stale.is_dir())
+            self.assertTrue(completed.is_dir())
+            self.assertTrue(unknown.is_dir())
+            self.assertEqual(sentinel.read_bytes(), b"must-survive")
+
+            blocked.unlink()
+            self.assertEqual(
+                cleanup_stale_packed_cache_temporaries(parent),
+                (stale.name,),
+            )
+            self.assertFalse(stale.exists())
+            self.assertTrue(completed.is_dir())
+            self.assertTrue(unknown.is_dir())
+            self.assertEqual(sentinel.read_bytes(), b"must-survive")
+
+    def test_completed_cache_gc_requires_valid_active_and_is_scoped(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="hoc-v09-packed-completed-cleanup-") as directory:
+            root = Path(directory)
+            paths, descriptors, _eligible = self.fixtures(root)
+            cache, built = load_or_build_packed_cache(
+                paths,
+                descriptors,
+                root,
+                run_fingerprint=RUN,
+                source_commit=SOURCE,
+                corpus_sha256=CORPUS,
+                feature_schema_sha256=FULL_FEATURE_SHA256,
+            )
+            self.assertTrue(built)
+            obsolete = cache.directory.parent / f"packed-{'6' * 64}"
+            obsolete.mkdir()
+            (obsolete / "old.bin").write_bytes(b"old-cache")
+            unknown = cache.directory.parent / "packed-not-owned"
+            unknown.mkdir()
+            outside = root / "outside"
+            outside.mkdir()
+            sentinel = outside / "sentinel.bin"
+            sentinel.write_bytes(b"must-survive")
+            blocked = cache.directory.parent / f"packed-{'7' * 64}"
+            blocked.symlink_to(outside, target_is_directory=True)
+            means_path = cache.directory / str(cache.files["means"]["name"])
+            original_means = means_path.read_bytes()
+            corrupted_means = bytearray(original_means)
+            corrupted_means[0] ^= 0x01
+            means_path.write_bytes(corrupted_means)
+
+            with self.assertRaisesRegex(ValueError, "means data seal mismatch"):
+                load_or_build_packed_cache(
+                    paths,
+                    descriptors,
+                    root,
+                    run_fingerprint=RUN,
+                    source_commit=SOURCE,
+                    corpus_sha256=CORPUS,
+                    feature_schema_sha256=FULL_FEATURE_SHA256,
+                )
+            self.assertTrue(obsolete.is_dir())
+            self.assertTrue(blocked.is_symlink())
+            means_path.write_bytes(original_means)
+
+            with self.assertRaisesRegex(ValueError, "cleanup refuses symlink"):
+                load_or_build_packed_cache(
+                    paths,
+                    descriptors,
+                    root,
+                    run_fingerprint=RUN,
+                    source_commit=SOURCE,
+                    corpus_sha256=CORPUS,
+                    feature_schema_sha256=FULL_FEATURE_SHA256,
+                )
+            self.assertTrue(obsolete.is_dir())
+            self.assertTrue(blocked.is_symlink())
+            self.assertEqual(sentinel.read_bytes(), b"must-survive")
+
+            blocked.unlink()
+            reused, rebuilt = load_or_build_packed_cache(
+                paths,
+                descriptors,
+                root,
+                run_fingerprint=RUN,
+                source_commit=SOURCE,
+                corpus_sha256=CORPUS,
+                feature_schema_sha256=FULL_FEATURE_SHA256,
+            )
+            self.assertFalse(rebuilt)
+            self.assertEqual(reused.cache_sha256, cache.cache_sha256)
+            self.assertFalse(obsolete.exists())
+            self.assertTrue(cache.directory.is_dir())
+            self.assertTrue(unknown.is_dir())
+            self.assertEqual(sentinel.read_bytes(), b"must-survive")
 
     def test_failed_build_removes_its_partial_directory(self) -> None:
         with tempfile.TemporaryDirectory(prefix="hoc-v09-packed-cleanup-") as directory:

@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import struct
 import tempfile
@@ -28,6 +29,9 @@ PACKED_CACHE_FREE_RESERVE_BYTES = 16 * 1024**3
 PACKED_CACHE_BUILD_HEADROOM_BYTES = 1024**3
 PACKED_CACHE_DISK_CHECK_INTERVAL_BYTES = 256 * 1024**2
 PACKED_CACHE_VALIDATION_CHUNK = 65_536
+
+_PACKED_CACHE_DIRECTORY = re.compile(r"^packed-[0-9a-f]{64}$")
+_PACKED_CACHE_TEMPORARY_DIRECTORY = re.compile(r"^\.packed-[0-9a-f]{64}\.[A-Za-z0-9_-]{6,64}$")
 
 _FILE_LAYOUT = {
     "features": ("features.f32", "<f4"),
@@ -276,6 +280,87 @@ def expected_packed_data_bytes(candidates: int, decisions: int, shards: int) -> 
     return candidate_bytes + decisions * 8 + (decisions + 1) * 8 + (shards + 1) * 8
 
 
+def packed_cache_required_free_bytes(maximum_data_bytes: int, bytes_written: int = 0) -> int:
+    if (
+        type(maximum_data_bytes) is not int
+        or maximum_data_bytes < 0
+        or type(bytes_written) is not int
+        or bytes_written < 0
+        or bytes_written > maximum_data_bytes
+    ):
+        raise ValueError("packed cache disk accounting is malformed")
+    return (
+        PACKED_CACHE_FREE_RESERVE_BYTES
+        + PACKED_CACHE_BUILD_HEADROOM_BYTES
+        + maximum_data_bytes
+        - bytes_written
+    )
+
+
+def _cleanup_owned_cache_directories(
+    parent: Path,
+    *,
+    pattern: re.Pattern[str],
+    excluded: frozenset[Path] = frozenset(),
+) -> tuple[str, ...]:
+    """Remove a fully validated set of owned direct children without following links.
+
+    The campaign orchestrator's exclusive lock is the concurrency boundary. This intentionally does not
+    attempt to defend against a hostile same-user process racing directory entries after validation.
+    """
+
+    parent = validate_cache_parent(parent, create=False)
+    if not parent.is_dir():
+        raise ValueError("learner cache parent must exist before lifecycle cleanup")
+    excluded = frozenset(Path(os.path.abspath(os.fspath(path))) for path in excluded)
+    candidates: list[Path] = []
+    for child in parent.iterdir():
+        if child in excluded or pattern.fullmatch(child.name) is None:
+            continue
+        if child.parent != parent:
+            raise ValueError("packed cache cleanup candidate escaped learner-cache")
+        if child.is_symlink():
+            raise ValueError(f"packed cache cleanup refuses symlink {child.name}")
+        if not child.is_dir():
+            raise ValueError(f"packed cache cleanup candidate is not a directory: {child.name}")
+        candidates.append(child)
+    if candidates and not shutil.rmtree.avoids_symlink_attacks:
+        raise ValueError("packed cache cleanup requires symlink-safe directory removal")
+    # Validate the complete set before deleting anything, then recheck each direct child immediately before
+    # removal. shutil's fd-based implementation unlinks nested links instead of traversing their targets.
+    for child in sorted(candidates, key=lambda path: path.name):
+        validate_cache_parent(parent, create=False)
+        if child.parent != parent or child.is_symlink() or not child.is_dir():
+            raise ValueError(f"packed cache cleanup candidate changed during validation: {child.name}")
+        shutil.rmtree(child)
+    return tuple(child.name for child in sorted(candidates, key=lambda path: path.name))
+
+
+def cleanup_stale_packed_cache_temporaries(parent: Path) -> tuple[str, ...]:
+    """Remove only interrupted atomic-build directories under the exclusively owned campaign cache."""
+
+    return _cleanup_owned_cache_directories(parent, pattern=_PACKED_CACHE_TEMPORARY_DIRECTORY)
+
+
+def cleanup_obsolete_packed_cache_directories(parent: Path, active_directory: Path) -> tuple[str, ...]:
+    """Remove completed monolithic caches only after the caller validated/published the active cache."""
+
+    parent = validate_cache_parent(parent, create=False)
+    active = Path(os.path.abspath(os.fspath(active_directory)))
+    if (
+        active.parent != parent
+        or _PACKED_CACHE_DIRECTORY.fullmatch(active.name) is None
+        or active.is_symlink()
+        or not active.is_dir()
+    ):
+        raise ValueError("active packed cache must be a real finalized directory inside learner-cache")
+    return _cleanup_owned_cache_directories(
+        parent,
+        pattern=_PACKED_CACHE_DIRECTORY,
+        excluded=frozenset((active,)),
+    )
+
+
 def _atomic_manifest(path: Path, value: Mapping[str, Any]) -> None:
     file_descriptor, temporary = tempfile.mkstemp(prefix=".manifest.", suffix=".tmp", dir=path.parent)
     try:
@@ -314,14 +399,17 @@ def build_packed_cache(
         raise ValueError("packed cache directory must not be a symlink")
     if directory.exists() and not directory.is_dir():
         raise ValueError("packed cache directory must be a real directory")
+    cleanup_stale_packed_cache_temporaries(parent)
     expected_decisions = sum(descriptor.decisions for descriptor in descriptors)
     maximum_data_bytes = expected_packed_data_bytes(expected_decisions * 96, expected_decisions, len(paths))
     free_bytes = shutil.disk_usage(parent).free
-    if free_bytes < PACKED_CACHE_FREE_RESERVE_BYTES + PACKED_CACHE_BUILD_HEADROOM_BYTES:
+    required_free_bytes = packed_cache_required_free_bytes(maximum_data_bytes)
+    if free_bytes < required_free_bytes:
         raise ValueError(
             "packed cache has insufficient free disk for an atomic build with its safety reserve: "
-            f"free={free_bytes} "
-            f"required={PACKED_CACHE_FREE_RESERVE_BYTES + PACKED_CACHE_BUILD_HEADROOM_BYTES}"
+            f"free={free_bytes} required={required_free_bytes} "
+            f"maximumDataBytes={maximum_data_bytes} reserve={PACKED_CACHE_FREE_RESERVE_BYTES} "
+            f"headroom={PACKED_CACHE_BUILD_HEADROOM_BYTES}"
         )
     temporary = Path(tempfile.mkdtemp(prefix=f".{directory.name}.", dir=parent))
     writers: dict[str, _HashedWriter] = {}
@@ -359,10 +447,14 @@ def build_packed_cache(
             bytes_written = sum(writer.bytes_written for writer in writers.values())
             if bytes_written >= next_disk_check:
                 free_bytes = shutil.disk_usage(parent).free
-                if free_bytes < PACKED_CACHE_FREE_RESERVE_BYTES:
+                required_free_bytes = packed_cache_required_free_bytes(
+                    maximum_data_bytes,
+                    bytes_written,
+                )
+                if free_bytes < required_free_bytes:
                     raise OSError(
                         28,
-                        "packed cache build reached its 16-GiB free-disk safety reserve",
+                        "packed cache build can no longer finish while preserving its disk reserve",
                         str(temporary),
                     )
                 next_disk_check = bytes_written + PACKED_CACHE_DISK_CHECK_INTERVAL_BYTES
@@ -449,7 +541,7 @@ def build_packed_cache(
             if directory.is_symlink() or not directory.is_dir():
                 raise
             shutil.rmtree(temporary)
-            return validate_packed_cache(
+            cache = validate_packed_cache(
                 paths,
                 descriptors,
                 directory,
@@ -458,7 +550,9 @@ def build_packed_cache(
                 corpus_sha256=corpus_sha256,
                 feature_schema_sha256=feature_schema_sha256,
             )
-        return PackedCache(
+            cleanup_obsolete_packed_cache_directories(parent, directory)
+            return cache
+        cache = PackedCache(
             directory=directory,
             cache_sha256=manifest["cacheSha256"],
             path_order_sha256=manifest["pathOrderSha256"],
@@ -468,6 +562,8 @@ def build_packed_cache(
             data_bytes=data_bytes,
             files=files,
         )
+        cleanup_obsolete_packed_cache_directories(parent, directory)
+        return cache
     except BaseException:
         for writer in writers.values():
             if not writer.stream.closed:
@@ -674,7 +770,10 @@ def load_or_build_packed_cache(
         "feature_schema_sha256": feature_schema_sha256,
     }
     if directory.exists():
-        return validate_packed_cache(paths, descriptors, directory, **arguments), False
+        cache = validate_packed_cache(paths, descriptors, directory, **arguments)
+        cleanup_stale_packed_cache_temporaries(directory.parent)
+        cleanup_obsolete_packed_cache_directories(directory.parent, directory)
+        return cache, False
     return (
         build_packed_cache(
             paths,
