@@ -413,6 +413,41 @@ describe("v0.1 melee robustness", () => {
         );
     });
 
+    it("honors the authoritative ranked responded flag when local fight state is not hydrated", () => {
+        const combat = createCombatTestContext();
+        const attacker = createTestUnit({
+            name: "Berserker",
+            team: LOWER,
+            attackType: MELEE,
+            abilities: ["AI Driven"],
+        });
+        const fresh = createTestUnit({
+            name: "Fresh",
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 5,
+            damageMax: 4,
+        });
+        const responded = createTestUnit({
+            name: "Responded in ranked snapshot",
+            team: UPPER,
+            attackType: MELEE,
+            amountAlive: 5,
+            damageMax: 4,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, fresh, { x: 5, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, responded, { x: 6, y: 5 });
+        recordAITargetMemory(combat.unitsHolder, attacker.getId(), fresh.getId());
+        responded.setResponded(true);
+
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        expect(fightProperties.hasAlreadyRepliedAttack(responded.getId())).toBe(false);
+        expect(meleeAction(getAIStrategy("v0.1").decideTurn(attacker, contextFor(combat)))?.targetId).toBe(
+            responded.getId(),
+        );
+    });
+
     it("can retarget a move-and-strike without changing its validated route", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({ name: "Berserker", team: LOWER, attackType: MELEE });

@@ -472,7 +472,13 @@ export class StrategyV0_1 implements IAIStrategy {
                     context.grid.areCellsAdjacent(attackFromCells, target.getCells()),
             );
         const current = candidates.find((target) => target.getId() === currentTargetId);
-        if (current && fightProperties.hasAlreadyRepliedAttack(currentTargetId)) {
+        // Sandbox/server update FightProperties and Unit.responded together. Ranked snapshots restore the
+        // authoritative per-unit `responded` flag (for the tag) but intentionally do not reconstruct every
+        // FightProperties collection in the browser. Read either source so a client-controlled AI-Driven
+        // Berserker/Boar gets the same response-spent preference as headless/server v0.1.
+        const hasResponded = (target: Unit): boolean =>
+            target.getResponded() || fightProperties.hasAlreadyRepliedAttack(target.getId());
+        if (current && hasResponded(current)) {
             return currentTargetId;
         }
 
@@ -488,10 +494,7 @@ export class StrategyV0_1 implements IAIStrategy {
                 return cellA.y - cellB.y || cellA.x - cellB.x || a.getName().localeCompare(b.getName());
             });
         const responded = sortByThreat(
-            candidates.filter(
-                (target) =>
-                    target.getId() !== currentTargetId && fightProperties.hasAlreadyRepliedAttack(target.getId()),
-            ),
+            candidates.filter((target) => target.getId() !== currentTargetId && hasResponded(target)),
         );
         return responded[0]?.getId() ?? current?.getId() ?? sortByThreat(candidates)[0]?.getId();
     }
