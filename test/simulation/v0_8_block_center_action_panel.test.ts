@@ -130,6 +130,14 @@ const DEEP_BLOCK_CENTER_REGRESSIONS = [
         candidateRoster: ["Leprechaun", "Peasant", "Harpy", "Elf", "Cyclops", "Angel"],
         opponentRoster: ["Orc", "Centaur", "Hyena", "Healer", "Goblin Knight", "Black Dragon"],
     },
+    {
+        game: 15_969,
+        pair: 7_984,
+        seed: 4_253_757_401,
+        candidateSide: "red",
+        candidateRoster: ["Leprechaun", "Leprechaun", "Nomad", "Beholder", "Ogre Mage", "Magic Dragon"],
+        opponentRoster: ["Arbalester", "Dryad", "Healer", "Battle Mage", "Mantis", "Behemoth"],
+    },
 ] as const;
 
 const activatedActionEngine = (
@@ -357,6 +365,45 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             summarizeV08BlockCenterActionPanel(DEEP_PANEL_OPTIONS, [record]).gates.checks.metric_semantic_integrity
                 .pass,
         ).toBe(true);
+    });
+
+    test("keeps game 15969's blocked Nomad lane-clearing return informational while allies finish", () => {
+        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 15_969);
+
+        expect(record).toMatchObject({
+            game: 15_969,
+            pair: 7_984,
+            seed: 4_253_757_401,
+            candidateSide: "red",
+            winner: "candidate",
+            laps: 11,
+            endReason: "elimination",
+            candidateEngineRejections: 0,
+        });
+        expect(record.byCreature.Nomad).toMatchObject({
+            observedTurns: 13,
+            oracleDirectEligibleTurns: 6,
+            sharedCatalogDirectEligibleTurns: 6,
+            chosenDirectActionTurns: 5,
+            pureMoveTurns: 6,
+            nonProgressMoves: 2,
+            abaOscillations: 1,
+            urgentMountainTerminalJitter: 0,
+            lateDirectEligibleTurns: 0,
+            lateDirectActionMisses: 0,
+            strategyRejectedActions: 0,
+            recoveryTurns: 0,
+        });
+        expect(
+            record.failureSamples.some(
+                ({ creatureName, lap, issue }) => creatureName === "Nomad" && lap === 11 && issue === "aba_oscillation",
+            ),
+        ).toBe(true);
+        expect(
+            record.failureSamples.some(
+                ({ creatureName, issue }) => creatureName === "Nomad" && issue === "urgent_mountain_terminal_jitter",
+            ),
+        ).toBe(false);
     });
 
     test("uses deterministic random rosters and exact adjacent seat swaps on BLOCK_CENTER", () => {

@@ -316,6 +316,7 @@ interface IV08BlockCenterPendingDecision {
     catalogMiss: boolean;
     damagingSpellNames: Set<string>;
     meleeOnly: boolean;
+    terminalEscapeAvailable: boolean;
     meaningfulRoleMoveSignatures: Set<string>;
     probeFailures: Array<{
         source: "oracle" | "catalog";
@@ -716,6 +717,34 @@ const actorAfterRoute = (
     // GameActionEngine removes a killed mover before its suffix. A self-resurrected mover is deliberately
     // excluded too: candidate enumeration treats that cleanup edge as a standalone move, not a composite.
     return projection.availableAfterMove && !projection.resurrected ? projection : undefined;
+};
+
+/**
+ * A lateral move is not an avoidable stall when congestion, terrain, and role constraints leave no closer
+ * landing. Prove one exact alternative from uncapped reachability and the authoritative engine before a later
+ * A-B-A or repeated non-progress move can become a hard policy fault.
+ */
+const hasEngineValidStrictProgressMove = (
+    unit: Unit,
+    context: IDecisionContext,
+    intents: IV08BlockCenterRoleIntents,
+    enemyCells: readonly XY[],
+    accept: (actions: readonly GameAction[]) => boolean,
+): boolean => {
+    const beforeDistance = v08BlockCenterFootprintDistance(unit.getCells(), enemyCells);
+    if (!Number.isFinite(beforeDistance)) return false;
+    for (const route of routesForUnit(unit, context)) {
+        const action = routeMoveAction(unit, route);
+        if (
+            !actorAfterRoute(unit, context, route) ||
+            v08BlockCenterFootprintDistance(action.targetCells ?? [], enemyCells) >= beforeDistance ||
+            !preservesRole(intents, unit, context, [action])
+        ) {
+            continue;
+        }
+        if (accept([action])) return true;
+    }
+    return false;
 };
 
 function findIndependentMeleeOption(
@@ -1709,6 +1738,18 @@ export class V08BlockCenterActionAuditor {
         const actorCells = cloneCells(unit.getCells());
         const enemies = context.unitsHolder.getAllEnemyUnits(unit.getTeam()).filter((enemy) => !enemy.isDead());
         const enemyCells = enemies.flatMap((enemy) => cloneCells(enemy.getCells()));
+        const lap = context.fightProperties?.getCurrentLap() ?? 0;
+        const meleeOnly = !unit.isRangeCapable() && !unit.getCanCastSpells();
+        const terminalEscapeAvailable =
+            independent !== undefined ||
+            stationaryMountainAvailable ||
+            (lap >= V08_BLOCK_CENTER_ACTION_PANEL_LATE_LAP &&
+                state !== "cleared" &&
+                meleeOnly &&
+                hasEngineValidStrictProgressMove(unit, context, intents, enemyCells, (actions) => {
+                    const result = observation.probeActions!(actions);
+                    return result.failure === null && result.completedActionTypes.includes("move_unit");
+                }));
         const adjacentToMountain = actorCells.some((actorCell) =>
             context.grid.getCenterCells(true).some((centerCell) => isAdjacent(actorCell, centerCell)),
         );
@@ -1731,7 +1772,7 @@ export class V08BlockCenterActionAuditor {
         this.pending = {
             unitId: unit.getId(),
             creatureName: unit.getName(),
-            lap: context.fightProperties?.getCurrentLap() ?? 0,
+            lap,
             mountainState: state,
             mountainAdjacent: adjacentToMountain,
             stationaryMountainAvailable,
@@ -1746,7 +1787,8 @@ export class V08BlockCenterActionAuditor {
             catalogDirect,
             catalogMiss,
             damagingSpellNames,
-            meleeOnly: !unit.isRangeCapable() && !unit.getCanCastSpells(),
+            meleeOnly,
+            terminalEscapeAvailable,
             meaningfulRoleMoveSignatures,
             probeFailures,
         };
@@ -1913,8 +1955,12 @@ export class V08BlockCenterActionAuditor {
                     `${history.footprints.at(-2)} -> ${history.footprints.at(-1)} -> ${afterKey}`,
                 );
             }
+            // Keep raw oscillation/non-progress telemetry informational when the actor had no damage, stationary
+            // mine, or engine-valid closer move. Forcing a wait, shield, or remote move-to-mine in that state
+            // would punish temporary melee congestion rather than identify an avoidable production stall.
             const urgentMountainTerminalJitter =
-                isV08BlockCenterUrgentMountainTerminalJitter(
+                pending.terminalEscapeAvailable &&
+                (isV08BlockCenterUrgentMountainTerminalJitter(
                     pending.lap,
                     pending.mountainState,
                     pending.meleeOnly,
@@ -1922,15 +1968,15 @@ export class V08BlockCenterActionAuditor {
                     terminalNonProgress,
                     history.consecutiveUnproductiveMountainMoves,
                 ) ||
-                isV08BlockCenterUrgentMountainABAOscillation(
-                    pending.lap,
-                    pending.mountainState,
-                    pending.meleeOnly,
-                    meaningfulRoleMove,
-                    abaOscillation,
-                    history.enemyStateKey !== pending.enemyStateKey,
-                    !nonProgress,
-                );
+                    isV08BlockCenterUrgentMountainABAOscillation(
+                        pending.lap,
+                        pending.mountainState,
+                        pending.meleeOnly,
+                        meaningfulRoleMove,
+                        abaOscillation,
+                        history.enemyStateKey !== pending.enemyStateKey,
+                        !nonProgress,
+                    ));
             if (urgentMountainTerminalJitter) {
                 this.bump(pending.creatureName, "urgentMountainTerminalJitter");
                 this.sample(
