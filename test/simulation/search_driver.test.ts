@@ -1456,7 +1456,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(harness.fightProperties.getObstacleHitsLeft()).toBeLessThan(hitsBefore);
     });
 
-    it("does not promote move-to-mountain mining or alter the qualified lap-7/8 dominant window", () => {
+    it("does not promote move-to-mountain mining and preserves unrelated dominant-window fallthrough", () => {
         const assertFallsThrough = (actorBase: XY, lap: number, expectMoveMountain: boolean): void => {
             const { harness, actor, incumbent } = terminalMountainFixture(actorBase, { x: 2, y: 12 }, lap);
             const mountain = enumerateCandidates(
@@ -1490,7 +1490,7 @@ describe("search driver — gating, hygiene, determinism", () => {
 
         // From here the generated mountain candidate needs a route, so it cannot enter the stationary fast path.
         assertFallsThrough({ x: 3, y: 12 }, V08S_URGENT_FINISH_START_LAP, true);
-        // Even an adjacent 2:1 leader retains the already-qualified dominant-window behavior before lap nine.
+        // This adjacent control does not satisfy the solo-melee retreat guard's complete runtime state.
         assertFallsThrough({ x: 5, y: 10 }, V08S_URGENT_FINISH_START_LAP - 1, false);
     });
 
@@ -1521,6 +1521,42 @@ describe("search driver — gating, hygiene, determinism", () => {
             strategyRejectedActions: 0,
             recoveryTurns: 0,
         });
+    });
+
+    it("pins BLOCK_CENTER game 4139: a blocked Squire clears the final rock instead of retreating and returning", () => {
+        const record = runV08BlockCenterActionPanelGame(
+            {
+                candidateVersion: "v0.8",
+                opponentVersion: "v0.7",
+                games: 5_000,
+                baseSeed: 2_607_280_041,
+                sourceDirty: true,
+            },
+            4_139,
+        );
+
+        expect(record).toMatchObject({
+            game: 4_139,
+            pair: 2_069,
+            seed: 1_371_697_966,
+            candidateSide: "red",
+            endReason: "elimination",
+        });
+        expect(record.candidateRoster).toContain("Squire");
+        expect(record.byCreature.Squire).toMatchObject({
+            abaOscillations: 0,
+            urgentMountainTerminalJitter: 0,
+            strategyRejectedActions: 0,
+            recoveryTurns: 0,
+        });
+        expect(
+            record.failureSamples.some(
+                (sample) =>
+                    sample.creatureName === "Squire" &&
+                    sample.lap === V08S_URGENT_FINISH_START_LAP - 1 &&
+                    sample.issue === "non_progress_move",
+            ),
+        ).toBe(false);
     });
 
     it("scopes the dominant-finish window to v0.8 while leaving v0.7 search unchanged", () => {

@@ -102,6 +102,14 @@ const DEEP_BLOCK_CENTER_REGRESSIONS = [
     { game: 2_345, pair: 1_172, seed: 4_049_669_629, candidateSide: "red" },
     { game: 2_717, pair: 1_358, seed: 3_853_482_135, candidateSide: "red" },
     { game: 3_202, pair: 1_601, seed: 341_310_362, candidateSide: "green" },
+    {
+        game: 4_139,
+        pair: 2_069,
+        seed: 1_371_697_966,
+        candidateSide: "red",
+        candidateRoster: ["Squire", "Fairy", "Hyena", "Harpy", "Mantis", "Abomination"],
+        opponentRoster: ["Leprechaun", "Mermaid", "Troll", "Battle Mage", "Unicorn", "Champion"],
+    },
 ] as const;
 
 const activatedActionEngine = (

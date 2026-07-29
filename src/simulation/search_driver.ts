@@ -1532,6 +1532,14 @@ export class SearchDriver {
             isV08Search && v08DominantFinishState(this.deps.unitsHolder, unit.getTeam(), currentLap).dominant;
         const prioritizeV08SUrgency =
             isV08TargetPressurePolicy && Number.isFinite(currentLap) && currentLap >= V08S_URGENT_FINISH_START_LAP;
+        const guardDominantPreUrgentSoloMountainRetreat =
+            isV08TargetPressurePolicy &&
+            prioritizeDominantFinish &&
+            Number.isFinite(currentLap) &&
+            currentLap === V08S_URGENT_FINISH_START_LAP - 1 &&
+            !unit.isRangeCapable() &&
+            !unit.getCanCastSpells() &&
+            this.deps.unitsHolder.getAllEnemyUnits(unit.getTeam()).filter((enemy) => !enemy.isDead()).length === 1;
         const v08sHasStrongerRangedOutput =
             isV08TargetPressurePolicy &&
             v08TeamRangedOutput(unit.getTeam(), this.deps.unitsHolder) >
@@ -1837,7 +1845,7 @@ export class SearchDriver {
                 return urgentMoveShotFallback.actions;
             }
             const stationaryFinishMountain =
-                prioritizeV08SUrgency &&
+                (prioritizeV08SUrgency || guardDominantPreUrgentSoloMountainRetreat) &&
                 isPureMoveCandidate({ actions: incumbent }) &&
                 !isEnemyClosingPureMove(unit, this.deps.unitsHolder, { actions: incumbent })
                     ? enumeratedCandidates.find((candidate) => isStationaryMountainCandidate(unit, candidate))
@@ -1845,8 +1853,10 @@ export class SearchDriver {
             if (stationaryFinishMountain && !this.observeOnly) {
                 // The normal move cap is ranked by base-cell Manhattan distance. That is a useful broad search
                 // heuristic but cannot prove strict footprint progress for a LARGE unit around BLOCK_CENTER.
-                // This rare lap-9+, already-adjacent path privately removes only the move cap; no extra candidate
-                // leaks into rollout search, and the engine probe below still selects at most one action.
+                // The same bounded intervention starts one lap earlier only for a dominant melee-only stack
+                // facing the final enemy: letting a blocked stack retreat on lap 8 makes the universal lap-9
+                // closer return to the exact prior cell. This private pass removes only the move cap; no extra
+                // candidate leaks into rollout search, and the engine probe below still selects at most one action.
                 const terminalFallbackCandidates = enumerateCandidates(unit, context, incumbent, {
                     ...enumerationOptions,
                     maxMoveDestinations: 0,
