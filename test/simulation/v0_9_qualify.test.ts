@@ -13,6 +13,7 @@ import { buildMirrorRoster } from "../../src/simulation/measure_mirror_cohorts";
 import { withScopedAIEnvironment } from "../../src/simulation/v0_8_a13_search";
 import {
     buildV09CampaignManifest,
+    buildV09DevelopmentActorPhysicalCorePolicy,
     buildV09SeedLedger,
     V09_RTX5090_GPU_UUID,
     v09CampaignRunFingerprint,
@@ -74,7 +75,12 @@ function fixture() {
     const directory = mkdtempSync(join(tmpdir(), "hoc-v09-qualify-"));
     const runFingerprint = v09CampaignRunFingerprint(identity);
     const ledger = buildV09SeedLedger(runFingerprint, [], counts);
-    const manifest = buildV09CampaignManifest(identity, directory, ledger);
+    const manifest = buildV09CampaignManifest(
+        identity,
+        directory,
+        ledger,
+        buildV09DevelopmentActorPhysicalCorePolicy(),
+    );
     const unsealed: IV09ModelArtifact = {
         ...V09_MODEL_ARTIFACT,
         status: "trained",
@@ -227,6 +233,7 @@ function evidencePairRecord(
         reachedArmageddonA: reachedArmageddon,
     });
     const { recordSha256: _fixtureSha256, ...fixtureUnsigned } = fixtureRecord;
+    void _fixtureSha256;
     const unsigned = {
         ...fixtureUnsigned,
         runFingerprint: manifest.runFingerprint,
@@ -297,6 +304,7 @@ function selfRehashQualificationSummary(candidate: IV09QualificationSummary): IV
         failuresSha256,
     };
     const { receiptInputsSha256: _oldReceiptSha256, ...receiptUnsigned } = receiptCandidate;
+    void _oldReceiptSha256;
     const withoutSummaryHash = {
         ...candidate,
         failuresSha256,
@@ -306,6 +314,7 @@ function selfRehashQualificationSummary(candidate: IV09QualificationSummary): IV
         },
     };
     const { summarySha256: _oldSummarySha256, ...summaryUnsigned } = withoutSummaryHash;
+    void _oldSummarySha256;
     return { ...summaryUnsigned, summarySha256: fingerprintV09(summaryUnsigned) };
 }
 

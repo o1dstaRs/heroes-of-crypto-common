@@ -18,8 +18,10 @@ artifact or promotes v0.9 automatically.
 - Every initialization must name at least one reserved v0.8 output path with `--protect-v08-root`; repeat the
   option for every v0.8 root that must be protected. A v0.9 output may not equal, contain, or be contained
   by any protected root.
-- CPU teacher actors run at nice level 10 on one physical CPU lane each, with four physical lanes reserved
-  for the OS and learner.
+- Before campaign initialization, the otherwise-idle training host benchmarks exactly `20/22/23/24`
+  physical actor lanes on a fixed, counterbalanced panel. The eligible sealed receipt freezes the selected
+  worker count, topology, affinity-visible CPU IDs, source receipt, GPU UUID, and thermal evidence into the
+  campaign. Teacher actors and training-host qualification then use those exact CPU IDs at nice level 10.
 - Smoke IL is written only under `il-smoke/`. Full training reads only `il/`, so smoke shards cannot enter
   or satisfy a full-campaign corpus. Never copy, move, or symlink shards between those trees.
 - Every orchestrator command holds the campaign's exclusive lease for its lifetime. Never run `smoke`,
@@ -42,6 +44,8 @@ cd /path/to/heroes-of-crypto-common
 
 CAMPAIGN=/srv/hoc-ai/v0.9/campaign-001
 SOURCE_RECEIPT=/srv/hoc-ai/v0.9/source-001.json
+ACTOR_LANE_RUN=/srv/hoc-ai/v0.9/actor-lane-001
+ACTOR_LANE_RECEIPT="$ACTOR_LANE_RUN/actor-lane-benchmark.json"
 V08_OUTPUT=/srv/hoc-ai/v0.8
 
 test "$(bun --version)" = "1.3.14"
@@ -52,17 +56,29 @@ bun src/simulation/v0_9/source_identity.ts \
   --repository "$(pwd)" \
   --out "$SOURCE_RECEIPT"
 
+# Run only on an otherwise-idle training host. This production audit serially
+# measures 20/22/23/24 lanes and writes only to the fresh path above.
+bun src/simulation/v0_9/actor_lane_benchmark.ts \
+  --out "$ACTOR_LANE_RUN" \
+  --repository "$(pwd)" \
+  --source-receipt "$SOURCE_RECEIPT" \
+  --gpu-uuid GPU-5126d018-ec86-be8b-1bf5-b5ac323d3350 \
+  --protect-v08-root "$V08_OUTPUT"
+
 bun src/simulation/v0_9/supervisor.ts init \
   --out "$CAMPAIGN" \
   --repository "$(pwd)" \
   --source-receipt "$SOURCE_RECEIPT" \
+  --actor-lane-receipt "$ACTOR_LANE_RECEIPT" \
   --gpu-uuid GPU-5126d018-ec86-be8b-1bf5-b5ac323d3350 \
   --protect-v08-root "$V08_OUTPUT"
 ```
 
 Initialization fails if the checkout is dirty, the source receipt is stale, the GPU UUID differs, or
-the output overlaps a protected v0.8 root. `--protect-v08-root` is mandatory even when the intended
-campaign path appears unrelated to v0.8.
+the output overlaps a protected v0.8 root. It also rejects a fixture/ineligible benchmark, changed source
+or topology, or selected CPU IDs outside the current affinity. The accepted benchmark is copied into the
+campaign as immutable evidence. `--protect-v08-root` is mandatory even when the intended campaign path
+appears unrelated to v0.8.
 
 ## Fail-closed smoke
 
@@ -94,7 +110,6 @@ the smoke IL.
 nohup bun src/simulation/v0_9/orchestrator.ts launch \
   --campaign "$CAMPAIGN" \
   --repository "$(pwd)" \
-  --workers 20 \
   >"$CAMPAIGN/orchestrator.log" 2>&1 &
 ```
 
@@ -116,9 +131,12 @@ An interrupted run is resumed without replacing accepted shards or changing mode
 nohup bun src/simulation/v0_9/orchestrator.ts resume \
   --campaign "$CAMPAIGN" \
   --repository "$(pwd)" \
-  --workers 20 \
   >>"$CAMPAIGN/orchestrator.log" 2>&1 &
 ```
+
+`launch`, `resume`, and full actor-stage commands reject any worker count other than the receipt's immutable
+selection. Smoke always uses the policy's four-lane prefix. Omitting `--workers` from a training-host command
+selects the immutable target automatically; supplying it is useful as an operator-visible cross-check.
 
 GPU samples are persisted every two seconds. Because the deployable ranker is intentionally tiny and
 JSONL-fed, the hardware gate expects short GPU bursts rather than pretending an RTX 5090 must hold 50%

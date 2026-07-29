@@ -9,11 +9,12 @@
  * -----------------------------------------------------------------------------
  */
 
-import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
+    buildV09AuditedActorPhysicalCorePolicy,
     buildV09CampaignManifest,
     buildV09Checkpoint,
     buildV09SeedLedger,
@@ -21,12 +22,18 @@ import {
     readV09Checkpoint,
     v09CampaignRunFingerprint,
     writeV09Checkpoint,
+    V09_ACTOR_LANE_EVIDENCE_FILE,
     V09_DEFAULT_SEED_COUNTS,
     V09_RTX5090_GPU_UUID,
     type IV09CampaignManifest,
     type IV09SeedLedger,
     type V09CampaignStage,
 } from "./campaign";
+import {
+    validateV09ActorLaneBenchmarkReceipt,
+    type IV09ActorLaneBenchmarkReceipt,
+} from "./actor_lane_benchmark_receipt";
+import { discoverV09ActorCpuTopology, type IV09ActorCpuTopology } from "./actor_cpu_topology";
 import { fingerprintV09 } from "./protocol";
 import { verifyV09SourceIdentity, writeV09SourceIdentity, type IV09SourceIdentityReceipt } from "./source_identity";
 
@@ -127,10 +134,30 @@ const stageExpectedUnits = (stage: V09CampaignStage): number => {
     }
 };
 
+/**
+ * Resolve every existing path component through the filesystem while retaining a not-yet-created suffix.
+ *
+ * `path.resolve()` is only lexical. On its own, an intermediate symlink could make a seemingly isolated
+ * campaign path land inside a protected v0.8 directory.
+ */
+export function canonicalV09PathThroughExistingAncestor(path: string): string {
+    let existing = resolve(path);
+    const missing: string[] = [];
+    while (lstatSync(existing, { throwIfNoEntry: false }) === undefined) {
+        const parent = dirname(existing);
+        if (parent === existing) throw new Error(`v0.9 path has no existing ancestor: ${path}`);
+        missing.unshift(basename(existing));
+        existing = parent;
+    }
+    // Unlike existsSync, lstat sees a dangling link. realpath then rejects it instead of treating the link as a
+    // safe missing suffix whose target could appear after validation.
+    return missing.reduce((parent, segment) => resolve(parent, segment), realpathSync(existing));
+}
+
 export function assertV09OutputIsolation(outputDirectory: string, v08Roots: readonly string[]): string {
-    const output = resolve(outputDirectory);
+    const output = canonicalV09PathThroughExistingAncestor(outputDirectory);
     for (const rawRoot of v08Roots) {
-        const root = resolve(rawRoot);
+        const root = canonicalV09PathThroughExistingAncestor(rawRoot);
         const fromRoot = relative(root, output);
         const fromOutput = relative(output, root);
         if (
@@ -234,17 +261,17 @@ export function assessV09LearnerHardwareEvidence(
 }
 
 function normalizedProtectedV08Roots(rawRoots: readonly string[]): string[] {
-    const roots = [...new Set(rawRoots.map((root) => resolve(root)))].sort();
-    if (!roots.length) {
+    const requestedRoots = [...new Set(rawRoots.map((root) => resolve(root)))].sort();
+    if (!requestedRoots.length) {
         throw new Error("v0.9 initialization requires at least one --protect-v08-root");
     }
-    for (const root of roots) {
+    for (const root of requestedRoots) {
         if (!existsSync(root)) throw new Error(`protected v0.8 root does not exist: ${root}`);
         const stat = lstatSync(root);
         if (stat.isSymbolicLink()) throw new Error(`protected v0.8 root must not be a symlink: ${root}`);
         if (!stat.isDirectory()) throw new Error(`protected v0.8 root is not a directory: ${root}`);
     }
-    return roots;
+    return [...new Set(requestedRoots.map((root) => realpathSync(root)))].sort();
 }
 
 function validateV09V08ProtectionReceipt(
@@ -312,6 +339,81 @@ export function writeV09V08ProtectionReceipt(
         throw error;
     }
     return receipt;
+}
+
+export function bindV09ActorLaneBenchmarkToCampaign(
+    value: unknown,
+    sourceReceipt: IV09SourceIdentityReceipt,
+    gpuUuid: string,
+    topology: IV09ActorCpuTopology = discoverV09ActorCpuTopology(),
+): {
+    receipt: IV09ActorLaneBenchmarkReceipt;
+    actorPhysicalCores: ReturnType<typeof buildV09AuditedActorPhysicalCorePolicy>;
+} {
+    const receipt = validateV09ActorLaneBenchmarkReceipt(value);
+    if (!receipt.eligibleForCampaign || receipt.mode !== "production") {
+        throw new Error("campaign initialization requires an eligible production actor-lane benchmark");
+    }
+    if (
+        receipt.source.receiptSha256 !== sourceReceipt.receiptSha256 ||
+        receipt.source.sourceCommit !== sourceReceipt.sourceCommit ||
+        receipt.source.sourceStatusSha256 !== sourceReceipt.sourceStatusSha256 ||
+        receipt.source.rulesFingerprint !== sourceReceipt.rulesFingerprint
+    ) {
+        throw new Error("actor-lane benchmark source identity does not match campaign source");
+    }
+    if (receipt.host.gpuUuid !== gpuUuid) {
+        throw new Error("actor-lane benchmark GPU identity does not match campaign GPU");
+    }
+    if (
+        receipt.host.topologySha256 !== topology.topologySha256 ||
+        receipt.host.allowedLogicalCpuIds.join(",") !== topology.allowedLogicalCpuIds.join(",") ||
+        receipt.host.physicalCpuIds.join(",") !== topology.physicalCpuIds.join(",") ||
+        receipt.selection.selectedPhysicalCpuIds.some((cpu) => !topology.physicalCpuIds.includes(cpu))
+    ) {
+        throw new Error("actor-lane benchmark CPU topology does not match the current affinity");
+    }
+    return {
+        receipt,
+        actorPhysicalCores: buildV09AuditedActorPhysicalCorePolicy({
+            benchmarkReceiptSha256: receipt.receiptSha256,
+            benchmarkSourceReceiptSha256: receipt.source.receiptSha256,
+            topologySha256: receipt.host.topologySha256,
+            benchmarkPhysicalCoreCount: receipt.host.physicalCpuIds.length,
+            selectedWorkers: receipt.selection.selectedWorkers,
+            selectedPhysicalCpuIds: receipt.selection.selectedPhysicalCpuIds,
+        }),
+    };
+}
+
+export function writeV09ActorLaneBenchmarkEvidence(
+    campaignDirectory: string,
+    receipt: IV09ActorLaneBenchmarkReceipt,
+): string {
+    const validated = validateV09ActorLaneBenchmarkReceipt(receipt);
+    if (!validated.eligibleForCampaign) {
+        throw new Error("refusing to copy ineligible actor-lane benchmark evidence");
+    }
+    const path = resolve(campaignDirectory, V09_ACTOR_LANE_EVIDENCE_FILE);
+    const acceptExactExisting = (): string => {
+        const existing = validateV09ActorLaneBenchmarkReceipt(JSON.parse(readFileSync(path, "utf8")) as unknown);
+        if (fingerprintV09(existing) !== fingerprintV09(validated)) {
+            throw new Error("refusing incompatible actor-lane benchmark evidence resume");
+        }
+        return path;
+    };
+    if (existsSync(path)) return acceptExactExisting();
+    try {
+        writeFileSync(path, `${JSON.stringify(validated, null, 2)}\n`, {
+            encoding: "utf8",
+            flag: "wx",
+            mode: 0o600,
+        });
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST") return acceptExactExisting();
+        throw error;
+    }
+    return path;
 }
 
 export function verifyV09V08ProtectionReceipt(
@@ -513,6 +615,7 @@ function main(): void {
             resume: { type: "boolean", default: false },
             "gpu-uuid": { type: "string" },
             "source-receipt": { type: "string" },
+            "actor-lane-receipt": { type: "string" },
             repository: { type: "string", default: process.cwd() },
             "reserved-seeds": { type: "string" },
             "protect-v08-root": { type: "string", multiple: true },
@@ -524,8 +627,10 @@ function main(): void {
         throw new Error("usage: bun supervisor.ts <init|status|checkpoint|learner-command> --out <campaign>");
     }
     if (command === "init") {
-        if (!values["gpu-uuid"] || !values["source-receipt"]) {
-            throw new Error("init requires --gpu-uuid and a verified --source-receipt from source_identity.ts");
+        if (!values["gpu-uuid"] || !values["source-receipt"] || !values["actor-lane-receipt"]) {
+            throw new Error(
+                "init requires --gpu-uuid, a verified --source-receipt, and an eligible --actor-lane-receipt",
+            );
         }
         const protectedRoots = normalizedProtectedV08Roots(values["protect-v08-root"] ?? []);
         const sourceReceipt = verifyV09SourceIdentity(
@@ -533,6 +638,11 @@ function main(): void {
             values.repository,
         );
         const output = assertV09OutputIsolation(values.out, protectedRoots);
+        const actorLane = bindV09ActorLaneBenchmarkToCampaign(
+            JSON.parse(readFileSync(values["actor-lane-receipt"], "utf8")) as unknown,
+            sourceReceipt,
+            values["gpu-uuid"],
+        );
         const identity = {
             sourceCommit: sourceReceipt.sourceCommit,
             sourceStatusSha256: sourceReceipt.sourceStatusSha256,
@@ -548,8 +658,9 @@ function main(): void {
             : [];
         if (!Array.isArray(reserved)) throw new Error("--reserved-seeds must be a JSON array of uint32 seeds");
         const ledger = buildV09SeedLedger(v09CampaignRunFingerprint(identity), reserved);
-        const manifest = buildV09CampaignManifest(identity, output, ledger);
+        const manifest = buildV09CampaignManifest(identity, output, ledger, actorLane.actorPhysicalCores);
         initializeV09Campaign(output, manifest, ledger);
+        writeV09ActorLaneBenchmarkEvidence(output, actorLane.receipt);
         const sourceIdentityPath = resolve(output, "source-identity.json");
         if (existsSync(sourceIdentityPath)) {
             const existing = JSON.parse(readFileSync(sourceIdentityPath, "utf8")) as IV09SourceIdentityReceipt;

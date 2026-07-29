@@ -33,13 +33,16 @@ import {
     validateV09CampaignManifest,
     validateV09SeedLedger,
     writeV09Checkpoint,
+    V09_ACTOR_LANE_EVIDENCE_FILE,
     V09_CAMPAIGN_STAGES,
     V09_RTX5090_GPU_UUID,
     type IV09CampaignManifest,
+    type IV09ActorPhysicalCorePolicy,
     type IV09SeedLedger,
     type V09CampaignStage,
     type V09SeedPurpose,
 } from "./campaign";
+import { discoverV09ActorCpuTopology, type IV09ActorCpuTopology } from "./actor_cpu_topology";
 import {
     createV09ProductionHandoffBundle,
     validateV09ProductionHandoffBundle,
@@ -54,10 +57,10 @@ import {
     type IV09QualificationSummary,
     type V09QualificationNodeRole,
 } from "./qualify";
-import { validateV09GameShard } from "./recorder";
 import { verifyV09SourceIdentity, type IV09SourceIdentityReceipt } from "./source_identity";
 import {
     assessV09LearnerHardwareEvidence,
+    bindV09ActorLaneBenchmarkToCampaign,
     buildV09LearnerLaunch,
     verifyV09V08ProtectionReceipt,
     V09_ARCHITECTURE_CANDIDATES,
@@ -65,6 +68,12 @@ import {
     V09_PYTHON_ENVIRONMENT,
 } from "./supervisor";
 import { V09_TEACHER_COHORTS, V09_TEACHER_MAPS } from "./teacher_actor";
+import { V09_TEACHER_WORK_ASSIGNMENT } from "./teacher_schedule";
+import {
+    validateV09ActorGameShards,
+    validateV09ActorShardNames,
+    v09ActorShardValidationError,
+} from "./actor_output_validation";
 
 export const V09_ORCHESTRATOR_RECEIPT_SCHEMA = "hoc.ai.v0_9_orchestrator_receipt.v1" as const;
 
@@ -289,6 +298,12 @@ async function withOrchestratorLock<T>(
     }
 }
 
+export function requireV09AuditedActorPhysicalCorePolicy(policy: IV09ActorPhysicalCorePolicy): void {
+    if (policy.selection.kind !== "audited_benchmark") {
+        throw new Error("v0.9 orchestrator requires an audited actor-lane benchmark policy");
+    }
+}
+
 function loadContext(campaignDirectory: string, repositoryRoot: string): IOrchestratorContext {
     const campaign = resolve(campaignDirectory);
     const repository = resolve(repositoryRoot);
@@ -313,6 +328,13 @@ function loadContext(campaignDirectory: string, repositoryRoot: string): IOrches
     ) {
         throw new Error("v0.9 orchestrator campaign/GPU/seed/source identity mismatch");
     }
+    const actorPolicy = manifest.resourcePolicy.v09ActorPhysicalCores;
+    requireV09AuditedActorPhysicalCorePolicy(actorPolicy);
+    const evidence = JSON.parse(readFileSync(resolve(campaign, V09_ACTOR_LANE_EVIDENCE_FILE), "utf8")) as unknown;
+    const bound = bindV09ActorLaneBenchmarkToCampaign(evidence, verifiedSource, manifest.identity.gpuUuid);
+    if (fingerprintV09(bound.actorPhysicalCores) !== fingerprintV09(actorPolicy)) {
+        throw new Error("v0.9 actor-lane benchmark evidence does not match immutable campaign policy");
+    }
     return {
         campaignDirectory: campaign,
         receiptDirectory: campaign,
@@ -329,6 +351,7 @@ function loadBundleContext(
     outputDirectory: string,
 ): IOrchestratorContext {
     const handoff = validateV09ProductionHandoffBundle(bundleDirectory);
+    requireV09AuditedActorPhysicalCorePolicy(handoff.manifest.resourcePolicy.v09ActorPhysicalCores);
     const repository = resolve(repositoryRoot);
     const verifiedSource = verifyV09SourceIdentity(handoff.sourceIdentity, repository);
     if (
@@ -657,6 +680,40 @@ function physicalCpuIds(): number[] {
     return cpus;
 }
 
+export function resolveV09CampaignActorCpuIds(
+    policy: IV09ActorPhysicalCorePolicy,
+    workers: number,
+    auditedTopology?: IV09ActorCpuTopology,
+    developmentPhysicalCpuIds?: readonly number[],
+): number[] {
+    if (!Number.isSafeInteger(workers) || workers < 1) throw new Error("actor workers must be positive");
+    if (workers > policy.target) {
+        throw new Error(`actor launch requests ${workers} lanes beyond immutable target ${policy.target}`);
+    }
+    if (policy.selection.kind === "audited_benchmark") {
+        const topology = auditedTopology ?? discoverV09ActorCpuTopology();
+        if (
+            topology.topologySha256 !== policy.selection.topologySha256 ||
+            policy.selection.selectedPhysicalCpuIds.some((cpu) => !topology.physicalCpuIds.includes(cpu))
+        ) {
+            throw new Error("current CPU topology/affinity no longer matches the actor-lane benchmark");
+        }
+        return policy.selection.selectedPhysicalCpuIds.slice(0, workers);
+    }
+    const physical = developmentPhysicalCpuIds ? [...developmentPhysicalCpuIds] : physicalCpuIds();
+    if (physical.length < workers + policy.reserveForOsAndLearner) {
+        throw new Error(
+            `actor launch needs ${workers} physical lanes plus ${policy.reserveForOsAndLearner} reserved; ` +
+                `found ${physical.length}`,
+        );
+    }
+    return physical.slice(0, workers);
+}
+
+function campaignActorPhysicalCpuIds(context: IOrchestratorContext, workers: number): number[] {
+    return resolveV09CampaignActorCpuIds(context.manifest.resourcePolicy.v09ActorPhysicalCores, workers);
+}
+
 async function bootstrapVenv(context: IOrchestratorContext): Promise<void> {
     const python = resolve(context.campaignDirectory, "venv/bin/python");
     const results: ICommandResult[] = [];
@@ -739,19 +796,24 @@ function studentBinding(path: string | null): string {
     return artifact.modelSha256!;
 }
 
-function validateActorOutput(
+async function validateActorOutput(
     context: IOrchestratorContext,
     purpose: V09SeedPurpose,
     binding: string,
     expected: number,
     smokeRun: boolean,
-): void {
+): Promise<void> {
     const directory = resolve(context.campaignDirectory, smokeRun ? "il-smoke" : "il", purpose, binding);
     const files = existsSync(directory) ? readdirSync(directory).filter((name) => name.endsWith(".jsonl")) : [];
-    if (files.length !== expected) {
-        throw new Error(`${purpose}/${binding} has ${files.length} complete shards; expected ${expected}`);
-    }
     const stream = context.ledger.streams.find((candidate) => candidate.purpose === purpose)!;
+    const orderedFiles = validateV09ActorShardNames({
+        files,
+        seeds: stream.seeds,
+        expected,
+        purpose,
+        binding,
+    });
+    const shardResults = await validateV09ActorGameShards(orderedFiles.map((file) => resolve(directory, file)));
     const phase = purpose.startsWith("wide_teacher")
         ? "wide_teacher"
         : purpose.startsWith("dagger_1")
@@ -760,9 +822,9 @@ function validateActorOutput(
     const split = purpose.endsWith("_validation") ? "validation" : "train";
     for (let index = 0; index < expected; index += 1) {
         const seed = stream.seeds[index]!;
-        const file = `${String(index).padStart(6, "0")}-${seed}.jsonl`;
-        if (!files.includes(file)) throw new Error(`${purpose}/${binding} is missing exact seed lane ${index}`);
-        const footer = validateV09GameShard(resolve(directory, file));
+        const shardResult = shardResults[index]!;
+        if (!shardResult.ok) throw v09ActorShardValidationError(shardResult);
+        const footer = shardResult.footer;
         const pattern =
             phase === "wide_teacher"
                 ? "anchor-mirror"
@@ -800,13 +862,7 @@ async function runActorPurpose(
     workers: number,
     smoke: boolean,
 ): Promise<void> {
-    const physical = physicalCpuIds();
-    const reserve = context.manifest.resourcePolicy.v09ActorPhysicalCores.reserveForOsAndLearner;
-    if (physical.length < workers + reserve) {
-        throw new Error(
-            `actor launch needs ${workers} physical lanes plus ${reserve} reserved; found ${physical.length}`,
-        );
-    }
+    const physical = campaignActorPhysicalCpuIds(context, workers);
     const script = resolve(context.repositoryRoot, "src/simulation/v0_9/teacher_actor.ts");
     const launches: IV09ActorCommandLaunch[] = Array.from({ length: workers }, (_, workerIndex) => {
         const actorArgs = [
@@ -845,7 +901,7 @@ async function runActorPurpose(
     const results = await runV09ActorCommandsFailFast(launches);
     const binding = studentBinding(studentArtifact);
     const stream = context.ledger.streams.find((candidate) => candidate.purpose === purpose)!;
-    validateActorOutput(context, purpose, binding, smoke ? Math.min(workers, stream.count) : stream.count, smoke);
+    await validateActorOutput(context, purpose, binding, smoke ? Math.min(workers, stream.count) : stream.count, smoke);
     const games = results.reduce((sum, result) => {
         const measurements = result.stdout
             .trim()
@@ -864,8 +920,16 @@ async function runActorPurpose(
     writeReceipt(context, `actors-${purpose}-${binding.slice(0, 12)}${smoke ? "-smoke" : ""}`, {
         purpose,
         binding,
-        physicalCpuIds: physical.slice(0, workers),
+        physicalCpuIds: physical,
         workers,
+        actorLaneSelection: context.manifest.resourcePolicy.v09ActorPhysicalCores.selection,
+        actorLaneSelectionSha256: fingerprintV09(context.manifest.resourcePolicy.v09ActorPhysicalCores.selection),
+        workAssignment: V09_TEACHER_WORK_ASSIGNMENT,
+        workAssignmentSha256: fingerprintV09({
+            workAssignment: V09_TEACHER_WORK_ASSIGNMENT,
+            workers,
+            physicalCpuIds: physical,
+        }),
         games,
         gamesPerSecond: games / Math.max(...results.map((result) => result.elapsedSeconds), 1e-9),
         results,
@@ -1273,18 +1337,20 @@ async function runQualification(
         ...(limitPairs === null ? [] : ["--limit-pairs", String(limitPairs)]),
         ...(smokeRun ? ["--smoke"] : []),
     ];
-    const physical = physicalCpuIds();
-    const reserve =
+    const selectedCpuIds =
         nodeRole === "production_cpu"
-            ? 1
-            : context.manifest.resourcePolicy.v09ActorPhysicalCores.reserveForOsAndLearner;
-    if (physical.length < concurrency + reserve) {
-        throw new Error(
-            `${nodeRole} qualification needs ${concurrency} physical lanes plus ${reserve} reserved; ` +
-                `found ${physical.length}`,
-        );
-    }
-    const selectedCpuIds = physical.slice(0, concurrency);
+            ? (() => {
+                  const physical = physicalCpuIds();
+                  const reserve = 1;
+                  if (physical.length < concurrency + reserve) {
+                      throw new Error(
+                          `${nodeRole} qualification needs ${concurrency} physical lanes plus ${reserve} reserved; ` +
+                              `found ${physical.length}`,
+                      );
+                  }
+                  return physical.slice(0, concurrency);
+              })()
+            : campaignActorPhysicalCpuIds(context, concurrency);
     const executable = process.platform !== "linux" ? process.execPath : "nice";
     const commandArgs =
         process.platform !== "linux"
@@ -1619,16 +1685,41 @@ function cli(): ICli {
     };
 }
 
-async function main(): Promise<void> {
-    const { command, context, values } = cli();
-    if (command === "qualification" && values.workers === undefined) {
+export function resolveV09OrchestratorWorkers(
+    command: string,
+    requestedWorkers: string | undefined,
+    smoke: boolean,
+    actorPolicy: IV09ActorPhysicalCorePolicy,
+): number {
+    if (command === "qualification" && requestedWorkers === undefined) {
         throw new Error("production qualification requires an explicit --workers 1");
     }
-    const workers = Number(values.workers ?? context.manifest.resourcePolicy.v09ActorPhysicalCores.target);
-    const maximumWorkers = command === "qualification" ? 1 : 20;
-    if (!Number.isSafeInteger(workers) || workers < 1 || workers > maximumWorkers) {
-        throw new Error(`workers must be 1..${maximumWorkers}`);
+    const smokeActorCommand = command === "smoke" || (command === "actors" && smoke);
+    const expectedWorkers =
+        command === "qualification" ? 1 : smokeActorCommand ? actorPolicy.smoke : actorPolicy.target;
+    const workers = Number(requestedWorkers ?? expectedWorkers);
+    if (!Number.isSafeInteger(workers) || workers < 1 || workers > actorPolicy.target) {
+        throw new Error(`workers must be 1..${actorPolicy.target}`);
     }
+    if (
+        (command === "launch" || command === "resume" || (command === "actors" && !smoke)) &&
+        workers !== actorPolicy.target
+    ) {
+        throw new Error(`training actor workers must equal immutable benchmark target ${actorPolicy.target}`);
+    }
+    if (smokeActorCommand && workers !== actorPolicy.smoke) {
+        throw new Error(`smoke actor workers must equal immutable smoke target ${actorPolicy.smoke}`);
+    }
+    if (command === "qualification" && workers !== 1) {
+        throw new Error("production qualification requires exactly one worker");
+    }
+    return workers;
+}
+
+async function main(): Promise<void> {
+    const { command, context, values } = cli();
+    const actorPolicy = context.manifest.resourcePolicy.v09ActorPhysicalCores;
+    const workers = resolveV09OrchestratorWorkers(command, values.workers, values.smoke === true, actorPolicy);
     if (command === "bootstrap") return withOrchestratorLock(context, command, () => bootstrapVenv(context));
     if (command === "preflight") return withOrchestratorLock(context, command, () => preflight(context));
     if (command === "smoke") {

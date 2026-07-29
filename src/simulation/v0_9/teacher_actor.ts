@@ -40,6 +40,7 @@ import {
     type V09Map,
 } from "./protocol";
 import { V09GameRecorder, validateV09GameShard } from "./recorder";
+import { v09TeacherWorkerIndices } from "./teacher_schedule";
 import { createV09TeacherObserver } from "./teacher_observer";
 
 export const V09_TEACHER_COHORTS = V09_PROTOCOL_TEACHER_COHORTS;
@@ -395,7 +396,7 @@ export function runV09TeacherActor(args: IV09TeacherActorArgs): {
         let resumed = 0;
         let decisions = 0;
         let attempted = 0;
-        for (let index = args.workerIndex; index < stream.seeds.length; index += args.workers) {
+        for (const index of v09TeacherWorkerIndices(stream.seeds.length, args.workerIndex, args.workers)) {
             if (args.limit !== null && attempted >= args.limit) break;
             attempted += 1;
             const seed = stream.seeds[index]!;

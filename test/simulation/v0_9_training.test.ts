@@ -23,6 +23,7 @@ import { V09_FEATURE_SCHEMA_SHA256, V09_INPUT_FEATURE_NAMES } from "../../src/ai
 import {
     buildV09CampaignManifest,
     buildV09Checkpoint,
+    buildV09DevelopmentActorPhysicalCorePolicy,
     buildV09SeedLedger,
     initializeV09Campaign,
     readV09Checkpoint,
@@ -263,7 +264,12 @@ describe("v0.9 training protocol", () => {
         expect(new Set(seeds).size).toBe(seeds.length);
         expect(seeds.some((seed) => seed <= 3)).toBe(false);
 
-        const manifest = buildV09CampaignManifest(identity, directory, ledger);
+        const manifest = buildV09CampaignManifest(
+            identity,
+            directory,
+            ledger,
+            buildV09DevelopmentActorPhysicalCorePolicy(),
+        );
         const learnerLaunch = buildV09LearnerLaunch(manifest, directory, [join(directory, "il/*.jsonl")]);
         expect(learnerLaunch.environment).toEqual({
             CUDA_VISIBLE_DEVICES: V09_RTX5090_GPU_UUID,
@@ -329,7 +335,12 @@ describe("v0.9 training protocol", () => {
             qualification: 1,
         };
         const ledger = buildV09SeedLedger(v09CampaignRunFingerprint(identity), [], counts);
-        const manifest = buildV09CampaignManifest(identity, directory, ledger);
+        const manifest = buildV09CampaignManifest(
+            identity,
+            directory,
+            ledger,
+            buildV09DevelopmentActorPhysicalCorePolicy(),
+        );
         initializeV09Campaign(directory, manifest, ledger);
         const paths: string[] = [];
         for (const [purpose, split] of [
@@ -428,7 +439,12 @@ describe("v0.9 training protocol", () => {
             qualification: 2,
         };
         const ledger = buildV09SeedLedger(v09CampaignRunFingerprint(identity), [], counts);
-        const manifest = buildV09CampaignManifest(identity, directory, ledger);
+        const manifest = buildV09CampaignManifest(
+            identity,
+            directory,
+            ledger,
+            buildV09DevelopmentActorPhysicalCorePolicy(),
+        );
         initializeV09Campaign(directory, manifest, ledger);
         const priorHorizon = process.env.SEARCH_HORIZON;
         process.env.SEARCH_HORIZON = "777";
@@ -482,7 +498,12 @@ describe("v0.9 training protocol", () => {
             qualification: 2,
         };
         const ledger = buildV09SeedLedger(v09CampaignRunFingerprint(identity), [], counts);
-        const manifest = buildV09CampaignManifest(identity, directory, ledger);
+        const manifest = buildV09CampaignManifest(
+            identity,
+            directory,
+            ledger,
+            buildV09DevelopmentActorPhysicalCorePolicy(),
+        );
         initializeV09Campaign(directory, manifest, ledger);
         const artifact = sealV09ResearchArtifact({
             ...V09_MODEL_ARTIFACT,
@@ -725,7 +746,12 @@ describe("v0.9 training protocol", () => {
             qualification: 2,
         };
         const ledger = buildV09SeedLedger(v09CampaignRunFingerprint(identity), [], counts);
-        const manifest = buildV09CampaignManifest(identity, campaignDirectory, ledger);
+        const manifest = buildV09CampaignManifest(
+            identity,
+            campaignDirectory,
+            ledger,
+            buildV09DevelopmentActorPhysicalCorePolicy(),
+        );
         initializeV09Campaign(campaignDirectory, manifest, ledger);
         const artifact = sealV09ResearchArtifact({
             ...V09_MODEL_ARTIFACT,
@@ -852,7 +878,12 @@ describe("v0.9 training protocol", () => {
             gpuUuid: V09_RTX5090_GPU_UUID,
         };
         const ledger = buildV09SeedLedger(v09CampaignRunFingerprint(identity), []);
-        const manifest = buildV09CampaignManifest(identity, campaignDirectory, ledger);
+        const manifest = buildV09CampaignManifest(
+            identity,
+            campaignDirectory,
+            ledger,
+            buildV09DevelopmentActorPhysicalCorePolicy(),
+        );
         initializeV09Campaign(campaignDirectory, manifest, ledger);
         expect(() => writeV09V08ProtectionReceipt(campaignDirectory, manifest, [])).toThrow(
             "at least one --protect-v08-root",

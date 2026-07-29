@@ -29,6 +29,7 @@ export const V09_SEED_LEDGER_SCHEMA = "hoc.ai.v0_9_seed_ledger.v1" as const;
 export const V09_CHECKPOINT_SCHEMA = "hoc.ai.v0_9_campaign_checkpoint.v1" as const;
 export const V09_CAMPAIGN_HOURS = 168;
 export const V09_RTX5090_GPU_UUID = "GPU-5126d018-ec86-be8b-1bf5-b5ac323d3350" as const;
+export const V09_ACTOR_LANE_EVIDENCE_FILE = "actor-lane-benchmark.json" as const;
 
 export const V09_CAMPAIGN_STAGES = [
     "preflight",
@@ -85,6 +86,72 @@ export interface IV09CampaignIdentity {
     gpuUuid: string;
 }
 
+export interface IV09DevelopmentActorLaneSelection {
+    kind: "development_fixture";
+    benchmarkReceiptSha256: null;
+    benchmarkSourceReceiptSha256: null;
+    topologySha256: null;
+    benchmarkPhysicalCoreCount: 24;
+    selectedPhysicalCpuIds: number[];
+}
+
+export interface IV09AuditedActorLaneSelection {
+    kind: "audited_benchmark";
+    benchmarkReceiptSha256: string;
+    benchmarkSourceReceiptSha256: string;
+    topologySha256: string;
+    benchmarkPhysicalCoreCount: number;
+    selectedPhysicalCpuIds: number[];
+}
+
+export type IV09ActorLaneSelection = IV09DevelopmentActorLaneSelection | IV09AuditedActorLaneSelection;
+
+export interface IV09ActorPhysicalCorePolicy {
+    smoke: 4;
+    target: number;
+    reserveForOsAndLearner: number;
+    selection: IV09ActorLaneSelection;
+}
+
+export function buildV09DevelopmentActorPhysicalCorePolicy(): IV09ActorPhysicalCorePolicy {
+    return {
+        smoke: 4,
+        target: 20,
+        reserveForOsAndLearner: 4,
+        selection: {
+            kind: "development_fixture",
+            benchmarkReceiptSha256: null,
+            benchmarkSourceReceiptSha256: null,
+            topologySha256: null,
+            benchmarkPhysicalCoreCount: 24,
+            selectedPhysicalCpuIds: [],
+        },
+    };
+}
+
+export function buildV09AuditedActorPhysicalCorePolicy(binding: {
+    benchmarkReceiptSha256: string;
+    benchmarkSourceReceiptSha256: string;
+    topologySha256: string;
+    benchmarkPhysicalCoreCount: number;
+    selectedWorkers: number;
+    selectedPhysicalCpuIds: readonly number[];
+}): IV09ActorPhysicalCorePolicy {
+    return {
+        smoke: 4,
+        target: binding.selectedWorkers,
+        reserveForOsAndLearner: binding.benchmarkPhysicalCoreCount - binding.selectedWorkers,
+        selection: {
+            kind: "audited_benchmark",
+            benchmarkReceiptSha256: binding.benchmarkReceiptSha256,
+            benchmarkSourceReceiptSha256: binding.benchmarkSourceReceiptSha256,
+            topologySha256: binding.topologySha256,
+            benchmarkPhysicalCoreCount: binding.benchmarkPhysicalCoreCount,
+            selectedPhysicalCpuIds: [...binding.selectedPhysicalCpuIds],
+        },
+    };
+}
+
 export interface IV09CampaignManifest {
     schema: typeof V09_CAMPAIGN_SCHEMA;
     runFingerprint: string;
@@ -104,11 +171,7 @@ export interface IV09CampaignManifest {
     resourcePolicy: {
         gpuRole: "learner_only";
         gpuUuid: string;
-        v09ActorPhysicalCores: {
-            smoke: 4;
-            target: 20;
-            reserveForOsAndLearner: 4;
-        };
+        v09ActorPhysicalCores: IV09ActorPhysicalCorePolicy;
         v09Nice: 10;
         v08Priority: "unchanged_separate_hosts";
     };
@@ -135,6 +198,7 @@ export interface IV09CampaignCheckpoint {
 const SHA256 = /^[0-9a-f]{64}$/;
 const GIT_COMMIT = /^[0-9a-f]{7,64}$/;
 const GPU_UUID = /^GPU-[0-9a-f-]+$/i;
+const V09_AUDITED_ACTOR_TARGETS = [20, 22, 23, 24] as const;
 
 function requireSha(value: string, context: string): string {
     const normalized = value.toLowerCase();
@@ -146,6 +210,56 @@ function requireGitCommit(value: string, context: string): string {
     const normalized = value.toLowerCase();
     if (!GIT_COMMIT.test(normalized)) throw new Error(`${context} must be a lowercase Git commit`);
     return normalized;
+}
+
+function validateV09ActorPhysicalCorePolicy(value: IV09ActorPhysicalCorePolicy): void {
+    if (
+        !value ||
+        typeof value !== "object" ||
+        value.smoke !== 4 ||
+        !Number.isSafeInteger(value.target) ||
+        value.target < value.smoke ||
+        !Number.isSafeInteger(value.reserveForOsAndLearner) ||
+        value.reserveForOsAndLearner < 0 ||
+        !value.selection ||
+        typeof value.selection !== "object"
+    ) {
+        throw new Error("v0.9 actor physical-core policy is malformed");
+    }
+    const selection = value.selection;
+    if (selection.kind === "development_fixture") {
+        if (
+            value.target !== 20 ||
+            value.reserveForOsAndLearner !== 4 ||
+            selection.benchmarkReceiptSha256 !== null ||
+            selection.benchmarkSourceReceiptSha256 !== null ||
+            selection.topologySha256 !== null ||
+            selection.benchmarkPhysicalCoreCount !== 24 ||
+            !Array.isArray(selection.selectedPhysicalCpuIds) ||
+            selection.selectedPhysicalCpuIds.length !== 0
+        ) {
+            throw new Error("v0.9 development actor policy must use the explicit safe 20+4 fixture");
+        }
+        return;
+    }
+    if (selection.kind !== "audited_benchmark") {
+        throw new Error("v0.9 actor physical-core selection kind is invalid");
+    }
+    requireSha(selection.benchmarkReceiptSha256, "actor benchmark receipt");
+    requireSha(selection.benchmarkSourceReceiptSha256, "actor benchmark source receipt");
+    requireSha(selection.topologySha256, "actor benchmark topology");
+    if (
+        !(V09_AUDITED_ACTOR_TARGETS as readonly number[]).includes(value.target) ||
+        !Number.isSafeInteger(selection.benchmarkPhysicalCoreCount) ||
+        selection.benchmarkPhysicalCoreCount < 24 ||
+        value.reserveForOsAndLearner !== selection.benchmarkPhysicalCoreCount - value.target ||
+        !Array.isArray(selection.selectedPhysicalCpuIds) ||
+        selection.selectedPhysicalCpuIds.length !== value.target ||
+        selection.selectedPhysicalCpuIds.some((cpu) => !Number.isSafeInteger(cpu) || cpu < 0) ||
+        new Set(selection.selectedPhysicalCpuIds).size !== selection.selectedPhysicalCpuIds.length
+    ) {
+        throw new Error("v0.9 audited actor physical-core policy is inconsistent");
+    }
 }
 
 function atomicJson(path: string, value: unknown): void {
@@ -275,8 +389,10 @@ export function buildV09CampaignManifest(
     identity: IV09CampaignIdentity,
     outputDirectory: string,
     seedLedger: IV09SeedLedger,
+    actorPhysicalCores: IV09ActorPhysicalCorePolicy,
 ): IV09CampaignManifest {
     validateV09SeedLedger(seedLedger);
+    validateV09ActorPhysicalCorePolicy(actorPhysicalCores);
     if (!GPU_UUID.test(identity.gpuUuid) || identity.gpuUuid !== V09_RTX5090_GPU_UUID) {
         throw new Error(`v0.9 campaign GPU must be the approved RTX 5090 UUID ${V09_RTX5090_GPU_UUID}`);
     }
@@ -310,9 +426,11 @@ export function buildV09CampaignManifest(
             gpuRole: "learner_only" as const,
             gpuUuid: identity.gpuUuid,
             v09ActorPhysicalCores: {
-                smoke: 4 as const,
-                target: 20 as const,
-                reserveForOsAndLearner: 4 as const,
+                ...actorPhysicalCores,
+                selection: {
+                    ...actorPhysicalCores.selection,
+                    selectedPhysicalCpuIds: [...actorPhysicalCores.selection.selectedPhysicalCpuIds],
+                },
             },
             v09Nice: 10 as const,
             v08Priority: "unchanged_separate_hosts" as const,
@@ -372,11 +490,9 @@ export function validateV09CampaignManifest(
     if (fingerprintV09(value.schedule) !== fingerprintV09(schedule)) {
         throw new Error("v0.9 campaign schedule mismatch");
     }
+    validateV09ActorPhysicalCorePolicy(value.resourcePolicy.v09ActorPhysicalCores);
     if (
         value.resourcePolicy.gpuRole !== "learner_only" ||
-        value.resourcePolicy.v09ActorPhysicalCores.smoke !== 4 ||
-        value.resourcePolicy.v09ActorPhysicalCores.target !== 20 ||
-        value.resourcePolicy.v09ActorPhysicalCores.reserveForOsAndLearner !== 4 ||
         value.resourcePolicy.v09Nice !== 10 ||
         value.resourcePolicy.v08Priority !== "unchanged_separate_hosts"
     ) {
