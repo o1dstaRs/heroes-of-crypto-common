@@ -170,6 +170,32 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         }
     });
 
+    it("melee: only a live forced target constrains candidates; missing and dead targets release them", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "Aggr-constrained brawler", attackType: MELEE });
+        const forced = createTestUnit({ team: UPPER, name: "Live forced target", attackType: MELEE });
+        const other = createTestUnit({ team: UPPER, name: "Other adjacent target", attackType: MELEE });
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
+        placeUnit(c.grid, c.unitsHolder, forced, { x: 5, y: 6 });
+        placeUnit(c.grid, c.unitsHolder, other, { x: 6, y: 5 });
+        const meleeTargetIds = (): Set<string | undefined> =>
+            new Set(
+                ofKind(enumerateCandidates(unit, ctxFor(c), endTurn(unit)).candidates, "melee").map(
+                    ({ targetId }) => targetId,
+                ),
+            );
+
+        unit.setTarget(forced.getId());
+        expect(meleeTargetIds()).toEqual(new Set([forced.getId()]));
+
+        unit.setTarget("missing-forced-target");
+        expect(meleeTargetIds()).toEqual(new Set([forced.getId(), other.getId()]));
+
+        unit.setTarget(forced.getId());
+        forced.applyDamage(forced.getCumulativeHp(), 0, new SceneLogMock());
+        expect(meleeTargetIds()).toEqual(new Set([other.getId()]));
+    });
+
     it("melee metadata applies a native shooter's penalty while Handyman retains full damage", () => {
         const meleeMetadata = (abilities: string[] = []): IEnumeratedCandidate => {
             const c = createCombatTestContext();

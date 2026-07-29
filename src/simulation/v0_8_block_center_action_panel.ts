@@ -639,13 +639,19 @@ const physicalDamageCanLand = (
 ): boolean => {
     const attackerAbilityPower = context.fightProperties?.getAdditionalAbilityPowerPerTeam(attacker.getTeam()) ?? 0;
     const targetAbilityPower = context.fightProperties?.getAdditionalAbilityPowerPerTeam(target.getTeam()) ?? 0;
-    const maximum = attacker.calculateAttackDamageMax(
+    let maximum = attacker.calculateAttackDamageMax(
         attacker.getAttack(),
         target,
         ranged,
         attackerAbilityPower,
         divisor,
     );
+    // Unit.calculateAttackDamage applies a native shooter's 0.5 melee penalty after the raw roll and floors
+    // the result. Its raw helper clamps to at least one, so testing that helper alone manufactures a
+    // "damaging" melee option when the only possible roll is 1 and the authoritative hit is always 0.
+    if (!ranged && attacker.getAttackType() === RANGE && !attacker.hasAbilityActive("Handyman")) {
+        maximum = Math.floor(maximum * 0.5);
+    }
     const miss = attacker.calculateMissChance(target, targetAbilityPower);
     return maximum > 0 && miss < 100;
 };

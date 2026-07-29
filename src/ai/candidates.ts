@@ -853,7 +853,8 @@ class CandidateGenerator {
         // Mirrors AttackHandler.handleMeleeAttack's guards: never a Hidden target, never a Cowardice-blocked
         // one, when the unit carries a FORCED target (aggro) only that enemy is accepted, and when Terrifying
         // Gaze has frightened it, the one gazer it may not touch is dropped.
-        const forced = this.unit.getTarget();
+        const forcedTarget = this.context.unitsHolder.getAllUnits().get(this.unit.getTarget());
+        const forced = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
         return this.enemies.filter((e) => {
             if (isHidden(e)) {
                 return false;

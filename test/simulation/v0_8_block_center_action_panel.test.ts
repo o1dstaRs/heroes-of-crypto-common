@@ -110,6 +110,10 @@ const DEEP_BLOCK_CENTER_REGRESSIONS = [
         candidateRoster: ["Squire", "Fairy", "Hyena", "Harpy", "Mantis", "Abomination"],
         opponentRoster: ["Leprechaun", "Mermaid", "Troll", "Battle Mage", "Unicorn", "Champion"],
     },
+    { game: 4_545, pair: 2_272, seed: 3_351_245_449, candidateSide: "red" },
+    { game: 5_695, pair: 2_847, seed: 643_450_648, candidateSide: "red" },
+    { game: 6_678, pair: 3_339, seed: 955_787_076, candidateSide: "green" },
+    { game: 6_724, pair: 3_362, seed: 1_878_267_435, candidateSide: "green" },
 ] as const;
 
 const activatedActionEngine = (
@@ -403,6 +407,54 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         } finally {
             abilityPower.mockRestore();
         }
+    });
+
+    test("matches native-shooter melee flooring and the Handyman boundary", () => {
+        const setup = (abilities: string[] = []) => {
+            const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+            const shooter = createTestUnit({
+                team: PBTypes.TeamVals.LOWER,
+                name: abilities.length ? "Handyman shooter" : "Spent shooter",
+                attackType: PBTypes.AttackVals.RANGE,
+                attack: 1,
+                damageMin: 1,
+                damageMax: 1,
+                amountAlive: 1,
+                rangeShots: 0,
+                abilities,
+            });
+            const target = createTestUnit({
+                team: PBTypes.TeamVals.UPPER,
+                name: "Armored neighbour",
+                attackType: PBTypes.AttackVals.MELEE,
+                armor: 100,
+            });
+            placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 4, y: 7 });
+            placeUnit(combat.grid, combat.unitsHolder, target, { x: 4, y: 8 });
+            shooter.refreshPossibleAttackTypes(false);
+            return { shooter, target, ...activatedActionEngine(combat, shooter) };
+        };
+
+        const penalized = setup();
+        expect(
+            penalized.shooter.calculateAttackDamageMax(penalized.shooter.getAttack(), penalized.target, false, 0),
+        ).toBe(1);
+        expect(penalized.shooter.calculateAttackDamage(penalized.target, PBTypes.AttackVals.MELEE, 0)).toBe(0);
+        expect(findIndependentV08BlockCenterDirectOption(penalized.shooter, penalized.context)).toBeUndefined();
+        const penalizedTargetHp = penalized.target.getCumulativeHp();
+        expect(
+            penalized.engine.apply({
+                type: "melee_attack",
+                attackerId: penalized.shooter.getId(),
+                targetId: penalized.target.getId(),
+                attackFrom: penalized.shooter.getBaseCell(),
+            }).completed,
+        ).toBe(true);
+        expect(penalized.target.getCumulativeHp()).toBe(penalizedTargetHp);
+
+        const handyman = setup(["Handyman"]);
+        expect(handyman.shooter.calculateAttackDamage(handyman.target, PBTypes.AttackVals.MELEE, 0)).toBe(1);
+        expect(findIndependentV08BlockCenterDirectOption(handyman.shooter, handyman.context)).toBeDefined();
     });
 
     test("authoritative probes reject impossible direct attacks and restore the live match exactly", () => {
