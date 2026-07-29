@@ -44,6 +44,10 @@ import {
     type IV09ParityVector,
 } from "../../src/simulation/v0_9/parity";
 import {
+    v09InitialArchitectureCheckpointProgress,
+    v09LearnerRejectionFingerprintPayload,
+} from "../../src/simulation/v0_9/orchestrator";
+import {
     parseV09Corpus,
     parseV09DecisionRow,
     V09_FEATURE_FINGERPRINTS,
@@ -142,6 +146,46 @@ const rawDecision = () => ({
 });
 
 describe("v0.9 training protocol", () => {
+    it("counts accepted and quality-rejected architectures as a completed initial sweep", () => {
+        expect(v09InitialArchitectureCheckpointProgress(1, 2)).toEqual({
+            completedUnits: 3,
+            expectedUnits: 3,
+        });
+        expect(() => v09InitialArchitectureCheckpointProgress(3, 1)).toThrow(
+            "initial architecture progress exceeds the preregistered sweep",
+        );
+    });
+
+    it("verifies a Python-sealed learner rejection without hashing unstable float spellings", () => {
+        const python = Bun.spawnSync({
+            cmd: [
+                "python3",
+                "-c",
+                [
+                    "from learner_receipt import LEARNER_REJECTION_SCHEMA, canonical_json, seal_learner_rejection",
+                    "unsigned = {",
+                    "  'schema': LEARNER_REJECTION_SCHEMA, 'reason': 'fixed_accuracy_drop',",
+                    "  'message': 'fixture', 'runFingerprint': 'a' * 64, 'sourceCommit': 'b' * 40,",
+                    "  'corpusSha256': 'c' * 64, 'hidden': [64, 32],",
+                    "  'minimumQatFixedAgreement': 0.99, 'maximumFixedAccuracyDrop': 0.01,",
+                    "  'selectedQatEpoch': 25, 'selectedQatStage': 'entry',",
+                    "  'fixedValidation': {'decisions': 524288.0, 'top1Accuracy': 0.33},",
+                    "  'qatReferenceValidation': {'top1Accuracy': 0.35},",
+                    "  'fidelityAccuracyDrop': 0.019999999999999962, 'metricsSha256': 'd' * 64,",
+                    "}",
+                    "print(canonical_json(seal_learner_rejection(unsigned)))",
+                ].join("\n"),
+            ],
+            cwd: join(import.meta.dir, "../../src/simulation/v0_9/python"),
+            env: { ...process.env, ...V09_PYTHON_ENVIRONMENT },
+        });
+        expect(python.exitCode).toBe(0);
+        const rejection = JSON.parse(python.stdout.toString()) as Parameters<
+            typeof v09LearnerRejectionFingerprintPayload
+        >[0] & { rejectionSha256: string };
+        expect(rejection.rejectionSha256).toBe(fingerprintV09(v09LearnerRejectionFingerprintPayload(rejection)));
+    });
+
     it("reshuffles shards per epoch while reproducing the same worker partitions on resume", () => {
         const python = Bun.spawnSync({
             cmd: [
@@ -277,21 +321,21 @@ describe("v0.9 training protocol", () => {
             PYTHONUNBUFFERED: "1",
             V09_RUN_FINGERPRINT: manifest.runFingerprint,
         });
-        const fixedGateIndex = learnerLaunch.argv.indexOf("--minimum-fixed-agreement");
+        const fixedGateIndex = learnerLaunch.argv.indexOf("--minimum-qat-fixed-agreement");
         expect(learnerLaunch.argv.slice(fixedGateIndex, fixedGateIndex + 4)).toEqual([
-            "--minimum-fixed-agreement",
+            "--minimum-qat-fixed-agreement",
             "0.99",
             "--maximum-fixed-accuracy-drop",
             "0.01",
         ]);
         const smokeLaunch = buildV09LearnerLaunch(manifest, directory, [join(directory, "il-smoke/*.jsonl")], {
             allowPartialCorpus: true,
-            minimumFixedAgreement: 0,
+            minimumQatFixedAgreement: 0,
             maximumFixedAccuracyDrop: 1,
         });
-        const smokeFixedGateIndex = smokeLaunch.argv.indexOf("--minimum-fixed-agreement");
+        const smokeFixedGateIndex = smokeLaunch.argv.indexOf("--minimum-qat-fixed-agreement");
         expect(smokeLaunch.argv.slice(smokeFixedGateIndex, smokeFixedGateIndex + 4)).toEqual([
-            "--minimum-fixed-agreement",
+            "--minimum-qat-fixed-agreement",
             "0",
             "--maximum-fixed-accuracy-drop",
             "1",
@@ -299,7 +343,7 @@ describe("v0.9 training protocol", () => {
         expect(smokeLaunch.argv).toContain("--allow-partial-corpus");
         expect(() =>
             buildV09LearnerLaunch(manifest, directory, [join(directory, "il/*.jsonl")], {
-                minimumFixedAgreement: Number.NaN,
+                minimumQatFixedAgreement: Number.NaN,
             }),
         ).toThrow("finite ratios");
         initializeV09Campaign(directory, manifest, ledger);

@@ -758,6 +758,15 @@ async function bootstrapVenv(context: IOrchestratorContext): Promise<void> {
             { cwd: context.repositoryRoot, environment },
         ),
     );
+    results.push(
+        await runCommand(python, ["-m", "unittest", "-v", "test_learner_quantization", "test_learner_resume"], {
+            cwd: resolve(context.repositoryRoot, "src/simulation/v0_9/python"),
+            environment: {
+                ...environment,
+                CUDA_VISIBLE_DEVICES: V09_RTX5090_GPU_UUID,
+            },
+        }),
+    );
     writeReceipt(context, "bootstrap-venv", results);
 }
 
@@ -966,6 +975,35 @@ async function runActorPhase(
     }
 }
 
+type LearnerRunOutcome = { status: "accepted"; artifactPath: string } | { status: "rejected"; rejectionPath: string };
+
+export function v09LearnerRejectionFingerprintPayload(rejection: {
+    schema?: string;
+    reason?: string;
+    runFingerprint?: string;
+    sourceCommit?: string;
+    corpusSha256?: string;
+    hidden?: number[];
+    metricsSha256?: string;
+}): Record<string, unknown> {
+    return {
+        schema: rejection.schema,
+        reason: rejection.reason,
+        runFingerprint: rejection.runFingerprint,
+        sourceCommit: rejection.sourceCommit,
+        corpusSha256: rejection.corpusSha256,
+        hidden: rejection.hidden,
+        metricsSha256: rejection.metricsSha256,
+    };
+}
+
+function requireAcceptedLearner(outcome: LearnerRunOutcome, stage: string): string {
+    if (outcome.status === "rejected") {
+        throw new Error(`${stage} learner failed its fixed-point quality gate: ${outcome.rejectionPath}`);
+    }
+    return outcome.artifactPath;
+}
+
 async function runLearner(
     context: IOrchestratorContext,
     data: readonly string[],
@@ -973,7 +1011,7 @@ async function runLearner(
     hidden: readonly number[],
     smoke: boolean,
     resume: boolean,
-): Promise<string> {
+): Promise<LearnerRunOutcome> {
     const launch = buildV09LearnerLaunch(context.manifest, context.repositoryRoot, data, {
         hidden,
         modelTag: tag,
@@ -984,8 +1022,8 @@ async function runLearner(
         resume: false,
         allowPartialCorpus: smoke,
         // A one-epoch smoke fit proves the CUDA/QAT -> CPU fixed-point -> parity pipeline, not model quality.
-        // Full training retains the learner's strict 0.99 agreement / 0.01 accuracy-drop gates below.
-        minimumFixedAgreement: smoke ? 0 : undefined,
+        // Full training retains strict projected-QAT/runtime parity and pre-QAT/fixed quality gates below.
+        minimumQatFixedAgreement: smoke ? 0 : undefined,
         maximumFixedAccuracyDrop: smoke ? 1 : undefined,
     });
     if (!existsSync(launch.executable)) throw new Error("pinned learner interpreter is missing");
@@ -994,6 +1032,7 @@ async function runLearner(
     const artifactPath = launch.argv[outputIndex]!;
     const checkpointPath = launch.argv[checkpointIndex]!;
     const metricsPath = artifactPath.replace(/\.json$/, ".metrics.json");
+    const rejectionPath = artifactPath.replace(/\.json$/, ".rejection.json");
     const gpuLogPath = resolve(context.campaignDirectory, "hardware", `learner-${tag}-h${hidden.join("x")}.gpu.jsonl`);
     const currentCorpusSha256 = async (): Promise<string> => {
         const corpusValidation = await runCommand(
@@ -1051,7 +1090,19 @@ async function runLearner(
             cudaCapability: number[];
         };
         finalValidation: { top1Accuracy: number };
-        fixedValidation: { top1Accuracy: number; floatFixedTop1Agreement: number };
+        fixedValidation: {
+            top1Accuracy: number;
+            qatFixedTop1Agreement: number;
+            floatFixedTop1Agreement: number;
+        };
+        quantization: {
+            semantics: string;
+            layerShifts: number[];
+            selectedQatEpoch: number | null;
+            selectedQatStage: "entry" | "epoch" | null;
+            qatReferenceValidation: { top1Accuracy: number };
+            fidelityAccuracyDrop: number;
+        };
         corpusSha256: string;
     } => {
         if (!existsSync(metricsPath)) throw new Error(`learner metrics are missing at ${metricsPath}`);
@@ -1065,7 +1116,19 @@ async function runLearner(
                 cudaCapability?: number[] | null;
             };
             finalValidation?: { top1Accuracy?: number };
-            fixedValidation?: { top1Accuracy?: number; floatFixedTop1Agreement?: number };
+            fixedValidation?: {
+                top1Accuracy?: number;
+                qatFixedTop1Agreement?: number;
+                floatFixedTop1Agreement?: number;
+            };
+            quantization?: {
+                semantics?: string;
+                layerShifts?: number[];
+                selectedQatEpoch?: number | null;
+                selectedQatStage?: "entry" | "epoch" | null;
+                qatReferenceValidation?: { top1Accuracy?: number };
+                fidelityAccuracyDrop?: number;
+            };
             corpusSha256?: string;
         };
         if (
@@ -1081,6 +1144,21 @@ async function runLearner(
             !metrics.hardware.cudaCapability.every((value) => Number.isSafeInteger(value) && value >= 0) ||
             !Number.isFinite(metrics.finalValidation?.top1Accuracy) ||
             !Number.isFinite(metrics.fixedValidation?.top1Accuracy) ||
+            !Number.isFinite(metrics.fixedValidation?.qatFixedTop1Agreement) ||
+            metrics.quantization?.semantics !== "fp32-frozen-shift-half-away-v1" ||
+            !Array.isArray(metrics.quantization.layerShifts) ||
+            !metrics.quantization.layerShifts.every(
+                (shift) => Number.isSafeInteger(shift) && shift >= 0 && shift <= 24,
+            ) ||
+            (metrics.quantization.selectedQatEpoch !== null &&
+                (typeof metrics.quantization.selectedQatEpoch !== "number" ||
+                    !Number.isSafeInteger(metrics.quantization.selectedQatEpoch) ||
+                    metrics.quantization.selectedQatEpoch < 0)) ||
+            (metrics.quantization.selectedQatStage !== null &&
+                metrics.quantization.selectedQatStage !== "entry" &&
+                metrics.quantization.selectedQatStage !== "epoch") ||
+            !Number.isFinite(metrics.quantization.qatReferenceValidation?.top1Accuracy) ||
+            !Number.isFinite(metrics.quantization.fidelityAccuracyDrop) ||
             !Number.isFinite(metrics.fixedValidation?.floatFixedTop1Agreement)
         ) {
             throw new Error(`learner metrics are malformed or bind a stale corpus at ${metricsPath}`);
@@ -1109,6 +1187,27 @@ async function runLearner(
         metrics: ReturnType<typeof readMetrics>,
         result: ICommandResult | null,
     ): void => {
+        const ratios = [
+            metrics.finalValidation.top1Accuracy,
+            metrics.fixedValidation.top1Accuracy,
+            metrics.fixedValidation.qatFixedTop1Agreement,
+            metrics.fixedValidation.floatFixedTop1Agreement,
+            metrics.quantization.qatReferenceValidation.top1Accuracy,
+        ];
+        const expectedDrop =
+            metrics.quantization.qatReferenceValidation.top1Accuracy - metrics.fixedValidation.top1Accuracy;
+        if (
+            ratios.some((value) => value < 0 || value > 1) ||
+            metrics.quantization.layerShifts.length !== artifact.layers.length ||
+            metrics.quantization.layerShifts.some((shift, index) => shift !== artifact.layers[index]?.scaleShift) ||
+            !Number.isSafeInteger(metrics.quantization.selectedQatEpoch) ||
+            (metrics.quantization.selectedQatStage !== "entry" && metrics.quantization.selectedQatStage !== "epoch") ||
+            Math.abs(expectedDrop - metrics.quantization.fidelityAccuracyDrop) > 1e-12 ||
+            metrics.fixedValidation.qatFixedTop1Agreement < (smoke ? 0 : 0.99) ||
+            metrics.quantization.fidelityAccuracyDrop > (smoke ? 1 : 0.01)
+        ) {
+            throw new Error("learner fixed-point metrics do not bind the sealed artifact and production gates");
+        }
         const throughput = metrics.history
             .map((entry) => entry.examplesPerSecond)
             .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
@@ -1134,11 +1233,91 @@ async function runLearner(
             result,
         });
     };
+    const finalizeRejectionReceipt = (metrics: ReturnType<typeof readMetrics>, result: ICommandResult | null): void => {
+        const rejection = JSON.parse(readFileSync(rejectionPath, "utf8")) as {
+            schema?: string;
+            reason?: string;
+            message?: string;
+            runFingerprint?: string;
+            sourceCommit?: string;
+            corpusSha256?: string;
+            hidden?: number[];
+            minimumQatFixedAgreement?: number;
+            maximumFixedAccuracyDrop?: number;
+            selectedQatEpoch?: number | null;
+            selectedQatStage?: string | null;
+            fixedValidation?: { qatFixedTop1Agreement?: number; top1Accuracy?: number };
+            qatReferenceValidation?: { top1Accuracy?: number };
+            fidelityAccuracyDrop?: number;
+            metricsSha256?: string;
+            rejectionSha256?: string;
+        };
+        if (
+            rejection.schema !== "hoc.ai.v0_9_learner_rejection.v2" ||
+            rejection.reason !== "fixed_accuracy_drop" ||
+            typeof rejection.message !== "string" ||
+            rejection.runFingerprint !== context.manifest.runFingerprint ||
+            rejection.sourceCommit !== context.manifest.identity.sourceCommit ||
+            rejection.corpusSha256 !== metrics.corpusSha256 ||
+            rejection.hidden?.join(",") !== hidden.join(",") ||
+            rejection.minimumQatFixedAgreement !== (smoke ? 0 : 0.99) ||
+            rejection.maximumFixedAccuracyDrop !== (smoke ? 1 : 0.01) ||
+            rejection.selectedQatEpoch !== metrics.quantization.selectedQatEpoch ||
+            rejection.selectedQatStage !== metrics.quantization.selectedQatStage ||
+            !Number.isFinite(rejection.fixedValidation?.qatFixedTop1Agreement) ||
+            rejection.fixedValidation?.qatFixedTop1Agreement !== metrics.fixedValidation.qatFixedTop1Agreement ||
+            rejection.fixedValidation!.qatFixedTop1Agreement! < (smoke ? 0 : 0.99) ||
+            !Number.isFinite(rejection.fixedValidation?.top1Accuracy) ||
+            rejection.fixedValidation?.top1Accuracy !== metrics.fixedValidation.top1Accuracy ||
+            !Number.isFinite(rejection.qatReferenceValidation?.top1Accuracy) ||
+            rejection.qatReferenceValidation?.top1Accuracy !==
+                metrics.quantization.qatReferenceValidation.top1Accuracy ||
+            !Number.isFinite(rejection.fidelityAccuracyDrop) ||
+            rejection.fidelityAccuracyDrop !== metrics.quantization.fidelityAccuracyDrop ||
+            rejection.fidelityAccuracyDrop! <= (smoke ? 1 : 0.01) ||
+            Math.abs(
+                rejection.qatReferenceValidation!.top1Accuracy! -
+                    rejection.fixedValidation!.top1Accuracy! -
+                    rejection.fidelityAccuracyDrop!,
+            ) > 1e-12 ||
+            rejection.metricsSha256 !== sha256File(metricsPath) ||
+            rejection.rejectionSha256 !== fingerprintV09(v09LearnerRejectionFingerprintPayload(rejection))
+        ) {
+            throw new Error(`learner rejection is malformed or stale at ${rejectionPath}`);
+        }
+        const throughput = metrics.history
+            .map((entry) => entry.examplesPerSecond)
+            .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
+        if (!throughput.length) throw new Error("rejected learner emitted no positive throughput evidence");
+        const gpu = assessV09LearnerHardwareEvidence(persistedGpuSamples(), throughput);
+        if (!smoke && !gpu.satisfied) {
+            throw new Error(`rejected learner hardware evidence failed: ${gpu.failures.join("; ")}`);
+        }
+        writeReceipt(context, `learner-rejection-${tag}-h${hidden.join("x")}`, {
+            rejectionPath,
+            rejectionSha256: sha256File(rejectionPath),
+            metricsPath,
+            metricsSha256: sha256File(metricsPath),
+            corpusSha256: metrics.corpusSha256,
+            learnerHardware: metrics.hardware,
+            gpuEvidence: gpu,
+            resumedExistingRejection: result === null,
+            result,
+        });
+    };
+    if (existsSync(artifactPath) && existsSync(rejectionPath)) {
+        throw new Error("learner cannot publish both an accepted artifact and a rejection");
+    }
     if (existsSync(artifactPath)) {
         const artifact = validateArtifact();
         const metrics = readMetrics(await currentCorpusSha256());
         finalizeLearnerReceipt(artifact, metrics, null);
-        return artifactPath;
+        return { status: "accepted", artifactPath };
+    }
+    if (existsSync(rejectionPath)) {
+        const metrics = readMetrics(await currentCorpusSha256());
+        finalizeRejectionReceipt(metrics, null);
+        return { status: "rejected", rejectionPath };
     }
     if (existsSync(checkpointPath)) {
         if (!resume) throw new Error(`learner checkpoint exists at ${checkpointPath}; use the resume command`);
@@ -1150,10 +1329,18 @@ async function runLearner(
         monitorGpuUuid: V09_RTX5090_GPU_UUID,
         gpuLogPath,
     });
+    if (existsSync(artifactPath) && existsSync(rejectionPath)) {
+        throw new Error("learner published both an accepted artifact and a rejection");
+    }
+    if (existsSync(rejectionPath)) {
+        const metrics = readMetrics();
+        finalizeRejectionReceipt(metrics, result);
+        return { status: "rejected", rejectionPath };
+    }
     const artifact = validateArtifact();
     const metrics = readMetrics();
     finalizeLearnerReceipt(artifact, metrics, result);
-    return artifactPath;
+    return { status: "accepted", artifactPath };
 }
 
 async function runParity(context: IOrchestratorContext, artifactPath: string, id: string): Promise<void> {
@@ -1197,7 +1384,9 @@ interface ILearnerCandidate {
     corpusSha256: string;
     floatTop1: number;
     fixedTop1: number;
+    qatFixedAgreement: number;
     floatFixedAgreement: number;
+    fidelityAccuracyDrop: number;
     parameters: number;
 }
 
@@ -1211,16 +1400,43 @@ function readLearnerCandidate(artifactPath: string, hidden: readonly number[]): 
     const metrics = JSON.parse(readFileSync(metricsPath, "utf8")) as {
         corpusSha256?: string;
         finalValidation?: { top1Accuracy?: number };
-        fixedValidation?: { top1Accuracy?: number; floatFixedTop1Agreement?: number };
+        fixedValidation?: {
+            top1Accuracy?: number;
+            qatFixedTop1Agreement?: number;
+            floatFixedTop1Agreement?: number;
+        };
+        quantization?: {
+            semantics?: string;
+            layerShifts?: number[];
+            selectedQatEpoch?: number | null;
+            selectedQatStage?: "entry" | "epoch" | null;
+            qatReferenceValidation?: { top1Accuracy?: number };
+            fidelityAccuracyDrop?: number;
+        };
     };
     const floatTop1 = metrics.finalValidation?.top1Accuracy;
     const fixedTop1 = metrics.fixedValidation?.top1Accuracy;
+    const qatFixedAgreement = metrics.fixedValidation?.qatFixedTop1Agreement;
     const floatFixedAgreement = metrics.fixedValidation?.floatFixedTop1Agreement;
+    const fidelityAccuracyDrop = metrics.quantization?.fidelityAccuracyDrop;
     if (
         !metrics.corpusSha256 ||
         !Number.isFinite(floatTop1) ||
         !Number.isFinite(fixedTop1) ||
-        !Number.isFinite(floatFixedAgreement)
+        !Number.isFinite(qatFixedAgreement) ||
+        !Number.isFinite(fidelityAccuracyDrop) ||
+        !Number.isFinite(floatFixedAgreement) ||
+        metrics.quantization?.semantics !== "fp32-frozen-shift-half-away-v1" ||
+        !Array.isArray(metrics.quantization.layerShifts) ||
+        metrics.quantization.layerShifts.length !== artifact.layers.length ||
+        metrics.quantization.layerShifts.some((shift, index) => shift !== artifact.layers[index]?.scaleShift) ||
+        !Number.isSafeInteger(metrics.quantization.selectedQatEpoch) ||
+        (metrics.quantization.selectedQatStage !== "entry" && metrics.quantization.selectedQatStage !== "epoch") ||
+        !Number.isFinite(metrics.quantization.qatReferenceValidation?.top1Accuracy) ||
+        Math.abs(metrics.quantization.qatReferenceValidation!.top1Accuracy! - fixedTop1! - fidelityAccuracyDrop!) >
+            1e-12 ||
+        qatFixedAgreement! < 0.99 ||
+        fidelityAccuracyDrop! > 0.01
     ) {
         throw new Error(`candidate metrics ${metricsPath} are incomplete`);
     }
@@ -1231,7 +1447,9 @@ function readLearnerCandidate(artifactPath: string, hidden: readonly number[]): 
         corpusSha256: metrics.corpusSha256,
         floatTop1: floatTop1!,
         fixedTop1: fixedTop1!,
+        qatFixedAgreement: qatFixedAgreement!,
         floatFixedAgreement: floatFixedAgreement!,
+        fidelityAccuracyDrop: fidelityAccuracyDrop!,
         parameters: artifact.layers.reduce((sum, layer) => sum + layer.weights.length + layer.biases.length, 0),
     };
 }
@@ -1239,16 +1457,20 @@ function readLearnerCandidate(artifactPath: string, hidden: readonly number[]): 
 function selectInitialCandidate(
     context: IOrchestratorContext,
     candidates: readonly ILearnerCandidate[],
+    rejectionPaths: readonly string[],
 ): ILearnerCandidate {
-    if (candidates.length !== V09_ARCHITECTURE_CANDIDATES.length) {
+    if (candidates.length + rejectionPaths.length !== V09_ARCHITECTURE_CANDIDATES.length) {
         throw new Error("initial architecture selection requires every preregistered candidate");
     }
+    if (!candidates.length) throw new Error("every preregistered initial architecture failed its quality gate");
     if (new Set(candidates.map((candidate) => candidate.corpusSha256)).size !== 1) {
         throw new Error("initial candidates were not trained on the exact same corpus");
     }
     const ranked = [...candidates].sort(
         (left, right) =>
             right.fixedTop1 - left.fixedTop1 ||
+            right.qatFixedAgreement - left.qatFixedAgreement ||
+            left.fidelityAccuracyDrop - right.fidelityAccuracyDrop ||
             right.floatFixedAgreement - left.floatFixedAgreement ||
             right.floatTop1 - left.floatTop1 ||
             left.parameters - right.parameters ||
@@ -1258,6 +1480,8 @@ function selectInitialCandidate(
     writeReceipt(context, "initial-architecture-selection", {
         criterion: [
             "fixedValidation.top1Accuracy:desc",
+            "fixedValidation.qatFixedTop1Agreement:desc",
+            "quantization.fidelityAccuracyDrop:asc",
             "fixedValidation.floatFixedTop1Agreement:desc",
             "finalValidation.top1Accuracy:desc",
             "parameterCount:asc",
@@ -1270,8 +1494,14 @@ function selectInitialCandidate(
             hidden: candidate.hidden,
             floatTop1: candidate.floatTop1,
             fixedTop1: candidate.fixedTop1,
+            qatFixedAgreement: candidate.qatFixedAgreement,
             floatFixedAgreement: candidate.floatFixedAgreement,
+            fidelityAccuracyDrop: candidate.fidelityAccuracyDrop,
             parameters: candidate.parameters,
+        })),
+        rejected: rejectionPaths.map((path) => ({
+            rejectionPath: path,
+            rejectionSha256: sha256File(path),
         })),
         selected: {
             artifactPath: selected.artifactPath,
@@ -1280,6 +1510,25 @@ function selectInitialCandidate(
         },
     });
     return selected;
+}
+
+export function v09InitialArchitectureCheckpointProgress(
+    acceptedCandidates: number,
+    rejectedCandidates: number,
+): { completedUnits: number; expectedUnits: number } {
+    if (
+        !Number.isSafeInteger(acceptedCandidates) ||
+        acceptedCandidates < 0 ||
+        !Number.isSafeInteger(rejectedCandidates) ||
+        rejectedCandidates < 0
+    ) {
+        throw new Error("initial architecture progress requires non-negative integer candidate counts");
+    }
+    const completedUnits = acceptedCandidates + rejectedCandidates;
+    if (completedUnits > V09_ARCHITECTURE_CANDIDATES.length) {
+        throw new Error("initial architecture progress exceeds the preregistered sweep");
+    }
+    return { completedUnits, expectedUnits: V09_ARCHITECTURE_CANDIDATES.length };
 }
 
 const wideCorpus = (context: IOrchestratorContext): string[] => [
@@ -1507,32 +1756,59 @@ async function fullPipeline(context: IOrchestratorContext, workers: number, resu
 
     const wide = wideCorpus(context);
     const initialCandidates: ILearnerCandidate[] = [];
+    const initialRejections: string[] = [];
     for (const hidden of V09_ARCHITECTURE_CANDIDATES) {
-        const artifactPath = await runLearner(context, wide, "initial", hidden, false, resume);
+        const outcome = await runLearner(context, wide, "initial", hidden, false, resume);
+        if (outcome.status === "rejected") {
+            initialRejections.push(outcome.rejectionPath);
+            continue;
+        }
+        const artifactPath = outcome.artifactPath;
         await runParity(context, artifactPath, `initial-h${hidden.join("x")}`);
         initialCandidates.push(readLearnerCandidate(artifactPath, hidden));
     }
-    const initial = selectInitialCandidate(context, initialCandidates);
+    const initial = selectInitialCandidate(context, initialCandidates, initialRejections);
+    const initialProgress = v09InitialArchitectureCheckpointProgress(
+        initialCandidates.length,
+        initialRejections.length,
+    );
     advanceCheckpoint(
         context,
         "initial_fit",
-        initialCandidates.length,
-        V09_ARCHITECTURE_CANDIDATES.length,
-        Object.fromEntries(
-            initialCandidates.map((candidate) => [`h${candidate.hidden.join("x")}`, candidate.artifact.modelSha256!]),
-        ),
+        initialProgress.completedUnits,
+        initialProgress.expectedUnits,
+        Object.fromEntries([
+            ...initialCandidates.map(
+                (candidate) => [`h${candidate.hidden.join("x")}`, candidate.artifact.modelSha256!] as const,
+            ),
+            ...initialRejections.map(
+                (path) =>
+                    [
+                        `rejected-${path.match(/-h([0-9x]+)\.rejection\.json$/)?.[1] ?? sha256File(path).slice(0, 8)}`,
+                        sha256File(path),
+                    ] as const,
+            ),
+        ]),
     );
 
     await runActorPhase(context, "dagger_1", initial.artifactPath, workers, false);
     const dagger1Data = daggerCorpus(context, wide, "dagger_1", initial.artifact.modelSha256!);
-    const dagger1Path = await runLearner(context, dagger1Data, "dagger1", initial.hidden, false, resume);
+    const dagger1Outcome = await runLearner(context, dagger1Data, "dagger1", initial.hidden, false, resume);
+    if (dagger1Outcome.status === "rejected") {
+        throw new Error("selected architecture failed the DAgger-1 fixed-point quality gate");
+    }
+    const dagger1Path = dagger1Outcome.artifactPath;
     await runParity(context, dagger1Path, "dagger1");
     const dagger1 = readLearnerCandidate(dagger1Path, initial.hidden);
     advanceCheckpoint(context, "dagger_1", 1, 1, { student: dagger1.artifact.modelSha256! });
 
     await runActorPhase(context, "dagger_2", dagger1Path, workers, false);
     const dagger2Data = daggerCorpus(context, dagger1Data, "dagger_2", dagger1.artifact.modelSha256!);
-    const finalPath = await runLearner(context, dagger2Data, "dagger2-final", initial.hidden, false, resume);
+    const finalOutcome = await runLearner(context, dagger2Data, "dagger2-final", initial.hidden, false, resume);
+    if (finalOutcome.status === "rejected") {
+        throw new Error("selected architecture failed the final DAgger fixed-point quality gate");
+    }
+    const finalPath = finalOutcome.artifactPath;
     await runParity(context, finalPath, "dagger2-final");
     const final = readLearnerCandidate(finalPath, initial.hidden);
     advanceCheckpoint(context, "quantize", 1, 1, { researchModel: final.artifact.modelSha256! });
@@ -1587,7 +1863,10 @@ async function smoke(context: IOrchestratorContext, resume: boolean): Promise<vo
         resolve(context.campaignDirectory, "il-smoke/wide_teacher_train/v0.8-a13/*.jsonl"),
         resolve(context.campaignDirectory, "il-smoke/wide_teacher_validation/v0.8-a13/*.jsonl"),
     ];
-    const initial = await runLearner(context, wide, "smoke-wide", [64, 32], true, resume);
+    const initial = requireAcceptedLearner(
+        await runLearner(context, wide, "smoke-wide", [64, 32], true, resume),
+        "smoke-wide",
+    );
     await runParity(context, initial, "smoke-wide");
     await runActorPhase(context, "dagger_1", initial, workers, true);
     const initialArtifact = JSON.parse(readFileSync(initial, "utf8")) as IV09ModelArtifact;
@@ -1596,7 +1875,10 @@ async function smoke(context: IOrchestratorContext, resume: boolean): Promise<vo
         resolve(context.campaignDirectory, `il-smoke/dagger_1_train/${initialArtifact.modelSha256}/*.jsonl`),
         resolve(context.campaignDirectory, `il-smoke/dagger_1_validation/${initialArtifact.modelSha256}/*.jsonl`),
     ];
-    const dagger1 = await runLearner(context, dagger1Data, "smoke-dagger1", [64, 32], true, resume);
+    const dagger1 = requireAcceptedLearner(
+        await runLearner(context, dagger1Data, "smoke-dagger1", [64, 32], true, resume),
+        "smoke-dagger1",
+    );
     await runParity(context, dagger1, "smoke-dagger1");
     await runActorPhase(context, "dagger_2", dagger1, workers, true);
     const dagger1Artifact = JSON.parse(readFileSync(dagger1, "utf8")) as IV09ModelArtifact;
@@ -1605,7 +1887,10 @@ async function smoke(context: IOrchestratorContext, resume: boolean): Promise<vo
         resolve(context.campaignDirectory, `il-smoke/dagger_2_train/${dagger1Artifact.modelSha256}/*.jsonl`),
         resolve(context.campaignDirectory, `il-smoke/dagger_2_validation/${dagger1Artifact.modelSha256}/*.jsonl`),
     ];
-    const dagger2 = await runLearner(context, dagger2Data, "smoke-dagger2", [64, 32], true, resume);
+    const dagger2 = requireAcceptedLearner(
+        await runLearner(context, dagger2Data, "smoke-dagger2", [64, 32], true, resume),
+        "smoke-dagger2",
+    );
     await runParity(context, dagger2, "smoke-dagger2");
     await runQualification(context, dagger2, workers, "development_smoke", 1, 1, 0, true);
     writeReceipt(context, "smoke-complete", { artifacts: { initial, dagger1, dagger2 } });
@@ -1748,10 +2033,10 @@ async function main(): Promise<void> {
     if (command === "learner") {
         if (!values.data?.length || !values.tag) throw new Error("learner requires --data ... and --tag");
         const hidden = (values.hidden ?? V09_ARCHITECTURE_CANDIDATES[0].join(",")).split(",").map(Number);
-        const artifact = await withOrchestratorLock(context, command, () =>
+        const outcome = await withOrchestratorLock(context, command, () =>
             runLearner(context, values.data!, values.tag!, hidden, values.smoke === true, values.resume === true),
         );
-        process.stdout.write(`${JSON.stringify({ artifact })}\n`);
+        process.stdout.write(`${JSON.stringify(outcome)}\n`);
         return;
     }
     if (command === "parity") {

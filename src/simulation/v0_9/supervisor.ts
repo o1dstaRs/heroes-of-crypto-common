@@ -440,7 +440,7 @@ export function buildV09LearnerLaunch(
         resume?: boolean;
         modelTag?: string;
         allowPartialCorpus?: boolean;
-        minimumFixedAgreement?: number;
+        minimumQatFixedAgreement?: number;
         maximumFixedAccuracyDrop?: number;
     } = {},
 ): IV09LearnerLaunch {
@@ -452,12 +452,12 @@ export function buildV09LearnerLaunch(
     const architectureId = hidden.join("x");
     const modelTag = options.modelTag ?? "initial";
     if (!/^[a-z0-9][a-z0-9._-]*$/.test(modelTag)) throw new Error("v0.9 learner modelTag is invalid");
-    const minimumFixedAgreement = options.minimumFixedAgreement ?? 0.99;
+    const minimumQatFixedAgreement = options.minimumQatFixedAgreement ?? 0.99;
     const maximumFixedAccuracyDrop = options.maximumFixedAccuracyDrop ?? 0.01;
     if (
-        !Number.isFinite(minimumFixedAgreement) ||
-        minimumFixedAgreement < 0 ||
-        minimumFixedAgreement > 1 ||
+        !Number.isFinite(minimumQatFixedAgreement) ||
+        minimumQatFixedAgreement < 0 ||
+        minimumQatFixedAgreement > 1 ||
         !Number.isFinite(maximumFixedAccuracyDrop) ||
         maximumFixedAccuracyDrop < 0 ||
         maximumFixedAccuracyDrop > 1
@@ -487,8 +487,8 @@ export function buildV09LearnerLaunch(
         String(options.workers ?? 8),
         "--hidden",
         hidden.join(","),
-        "--minimum-fixed-agreement",
-        String(minimumFixedAgreement),
+        "--minimum-qat-fixed-agreement",
+        String(minimumQatFixedAgreement),
         "--maximum-fixed-accuracy-drop",
         String(maximumFixedAccuracyDrop),
     ];

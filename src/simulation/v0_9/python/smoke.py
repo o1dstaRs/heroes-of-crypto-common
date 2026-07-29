@@ -90,7 +90,17 @@ def main() -> None:
             examples=14,
             active_elapsed_seconds=2.5,
         )
-        save_checkpoint(checkpoint, 3, 7, model, optimizer, config, [{"epoch": 2}], progress)
+        save_checkpoint(
+            checkpoint,
+            3,
+            7,
+            model,
+            optimizer,
+            config,
+            [{"epoch": 2}],
+            progress,
+            qat_layer_shifts=shifts,
+        )
         saved = torch.load(checkpoint, map_location="cpu", weights_only=False)
         restored = restore_epoch_progress(
             saved["epochProgress"],

@@ -124,7 +124,17 @@ class LearnerResumeTest(unittest.TestCase):
         batch = training_batch()
         with tempfile.TemporaryDirectory(prefix="hoc-v09-resume-exact-") as directory:
             checkpoint = Path(directory) / "learner.pt"
-            save_checkpoint(checkpoint, 4, 1, model, optimizer, {"test": True}, [], prefix)
+            save_checkpoint(
+                checkpoint,
+                4,
+                1,
+                model,
+                optimizer,
+                {"test": True},
+                [],
+                prefix,
+                qat_layer_shifts=frozen_shifts,
+            )
             saved = torch.load(checkpoint, map_location="cpu", weights_only=False)
 
             uninterrupted_suffix_loss = train_one_qat_batch(model, optimizer, batch, frozen_shifts)

@@ -36,6 +36,7 @@ from learner_input import (
     split_eligible_paths,
     write_normalization_cache,
 )
+from learner_receipt import LEARNER_REJECTION_SCHEMA, seal_learner_rejection
 from packed_input import (
     FEATURE_WIDTH,
     FULL_FEATURE_SHA256,
@@ -58,6 +59,9 @@ MODEL_SCHEMA = "hoc.ai.v0_9_model.v1"
 MODEL_HASH_ALGORITHM = "sha256-canonical-inference-json-v1"
 FEATURE_SCHEMA = "hoc.ai.v0_9_features.il_v4.v1"
 EPOCH_PROGRESS_SCHEMA = "hoc.ai.v0_9_learner_epoch_progress.v1"
+CHECKPOINT_SCHEMA = "hoc.ai.v0_9_learner_checkpoint.v2"
+QAT_CANDIDATE_SCHEMA = "hoc.ai.v0_9_qat_candidate.v1"
+QUANTIZATION_SEMANTICS = "fp32-frozen-shift-half-away-v1"
 
 
 def canonical_json(value: Any) -> str:
@@ -399,12 +403,6 @@ def move_batch(batch: Batch, device: torch.device) -> Batch:
     )
 
 
-def quantized_weight(weight: Tensor) -> tuple[Tensor, int]:
-    maximum = float(weight.detach().abs().max())
-    shift = 0 if maximum == 0 else max(0, min(24, math.floor(math.log2(127.0 / maximum))))
-    return torch.clamp(torch.round(weight.detach() * (2**shift)), -127, 127).to(torch.int8), shift
-
-
 def round_half_away_tensor(value: Tensor) -> Tensor:
     return torch.sign(value) * torch.floor(torch.abs(value) + 0.5)
 
@@ -417,11 +415,31 @@ def round_half_away(value: float) -> int:
     return math.floor(value + 0.5) if value >= 0 else math.ceil(value - 0.5)
 
 
-def quantized_layer_parameters(layer: nn.Linear, input_scale: int) -> tuple[Tensor, int, list[int]]:
-    weights, shift = quantized_weight(layer.weight)
+def quantized_weight(weight: Tensor, shift: int | None = None) -> tuple[Tensor, int]:
+    detached = weight.detach().to(device="cpu", dtype=torch.float64)
+    if not bool(torch.isfinite(detached).all()):
+        raise ValueError("quantized weight contains a non-finite value")
+    if shift is None:
+        maximum = float(detached.abs().max())
+        shift = 0 if maximum == 0 else max(0, min(24, math.floor(math.log2(127.0 / maximum))))
+    if type(shift) is not int or shift < 0 or shift > 24:
+        raise ValueError("quantized weight shift must be an integer in [0, 24]")
+    quantized = round_half_away_tensor(detached * (2**shift)).clamp(-127, 127).to(torch.int8)
+    return quantized, shift
+
+
+def quantized_layer_parameters(
+    layer: nn.Linear,
+    input_scale: int,
+    frozen_shift: int | None = None,
+) -> tuple[Tensor, int, list[int]]:
+    weights, shift = quantized_weight(layer.weight, frozen_shift)
     while True:
         bias_multiplier = input_scale * (2**shift)
-        biases = [round_half_away(float(value) * bias_multiplier) for value in layer.bias.detach().cpu()]
+        bias_values = layer.bias.detach().to(device="cpu", dtype=torch.float64)
+        if not bool(torch.isfinite(bias_values).all()):
+            raise ValueError("quantized bias contains a non-finite value")
+        biases = [round_half_away(float(value) * bias_multiplier) for value in bias_values]
         rows = weights.to(torch.int64).abs().sum(dim=1).cpu().tolist()
         safe = all(
             -(2**31) <= bias <= 2**31 - 1
@@ -430,10 +448,12 @@ def quantized_layer_parameters(layer: nn.Linear, input_scale: int) -> tuple[Tens
         )
         if safe:
             return weights, shift, biases
+        if frozen_shift is not None:
+            raise OverflowError("frozen quantized layer shift can overflow the signed int32 accumulator")
         if shift == 0:
             raise OverflowError("quantized layer can overflow the signed int32 accumulator")
         shift -= 1
-        weights = torch.clamp(torch.round(layer.weight.detach() * (2**shift)), -127, 127).to(torch.int8)
+        weights, _ = quantized_weight(layer.weight, shift)
 
 
 def qat_forward(
@@ -442,38 +462,88 @@ def qat_forward(
     input_scale: int,
     layer_shifts: Sequence[int],
 ) -> Tensor:
-    normalized = ((raw - model.offset) * model.scale).clamp(-model.clip, model.clip)
-    input_integer = round_half_away_tensor(normalized * input_scale).clamp(-32767, 32767)
-    value = ste_replace(normalized, input_integer / input_scale)
-    linear_layers = [layer for layer in model.ranker.network if isinstance(layer, nn.Linear)]
-    if len(layer_shifts) != len(linear_layers):
-        raise ValueError("QAT layer-shift schedule does not match the dense network")
-    for index, (layer, shift) in enumerate(zip(linear_layers, layer_shifts)):
-        # Keep fake quantization on-device. Exact int32 overflow analysis and Python-list export happen once per
-        # epoch/final artifact, never in the hot batch loop.
-        weight_integer = round_half_away_tensor(layer.weight * (2**shift)).clamp(-127, 127)
-        restored_weight = weight_integer / (2**shift)
-        bias_integer = round_half_away_tensor(layer.bias * (input_scale * (2**shift)))
-        restored_bias = bias_integer / (input_scale * (2**shift))
-        value = nn.functional.linear(
-            value,
-            ste_replace(layer.weight, restored_weight),
-            ste_replace(layer.bias, restored_bias),
+    # Fake-quantized matrix products model the exact integer runtime. BF16 changes enough accumulated values to
+    # train a materially different function, so QAT must remain FP32 even when its caller enables AMP.
+    autocast = (
+        torch.autocast(device_type=raw.device.type, enabled=False)
+        if raw.device.type in {"cpu", "cuda"}
+        else contextlib.nullcontext()
+    )
+    with autocast:
+        normalized = ((raw.float() - model.offset.float()) * model.scale.float()).clamp(
+            -model.clip,
+            model.clip,
         )
-        value_integer = round_half_away_tensor(value * input_scale)
-        if index < len(linear_layers) - 1:
-            value_integer = value_integer.clamp(0, 32767)
-        else:
-            value_integer = value_integer.clamp(-(2**31), 2**31 - 1)
-        value = ste_replace(value, value_integer / input_scale)
-    return value.squeeze(-1)
+        input_integer = round_half_away_tensor(normalized * input_scale).clamp(-32767, 32767)
+        value = ste_replace(normalized, input_integer / input_scale)
+        linear_layers = [layer for layer in model.ranker.network if isinstance(layer, nn.Linear)]
+        if len(layer_shifts) != len(linear_layers):
+            raise ValueError("QAT layer-shift schedule does not match the dense network")
+        for index, (layer, shift) in enumerate(zip(linear_layers, layer_shifts)):
+            # Keep fake quantization on-device. Exact int32 overflow analysis and Python-list export happen once
+            # per validation/artifact, never in the hot batch loop.
+            weight = layer.weight.float()
+            bias = layer.bias.float()
+            weight_integer = round_half_away_tensor(weight * (2**shift)).clamp(-127, 127)
+            restored_weight = weight_integer / (2**shift)
+            bias_integer = round_half_away_tensor(bias * (input_scale * (2**shift)))
+            restored_bias = bias_integer / (input_scale * (2**shift))
+            value = nn.functional.linear(
+                value,
+                ste_replace(weight, restored_weight),
+                ste_replace(bias, restored_bias),
+            )
+            value_integer = round_half_away_tensor(value * input_scale)
+            if index < len(linear_layers) - 1:
+                value_integer = value_integer.clamp(0, 32767)
+            else:
+                value_integer = value_integer.clamp(-(2**31), 2**31 - 1)
+            value = ste_replace(value, value_integer / input_scale)
+        return value.squeeze(-1)
 
 
-def export_layers(model: NormalizedRanker, input_scale: int) -> list[dict[str, Any]]:
+def training_forward_loss(
+    model: NormalizedRanker,
+    batch: Batch,
+    input_scale: int,
+    layer_shifts: Sequence[int],
+    qat: bool,
+    amp: str,
+) -> tuple[Tensor, Tensor]:
+    device_type = batch.features.device.type
+    autocast = (
+        torch.autocast(device_type=device_type, enabled=False)
+        if qat and device_type in {"cpu", "cuda"}
+        else (
+            torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+            if device_type == "cuda" and amp == "bf16"
+            else contextlib.nullcontext()
+        )
+    )
+    with autocast:
+        scores = (
+            qat_forward(model, batch.features, input_scale, layer_shifts)
+            if qat
+            else model(batch.features)
+        )
+        return scores, ranking_loss(scores, batch)
+
+
+def export_layers(
+    model: NormalizedRanker,
+    input_scale: int,
+    layer_shifts: Sequence[int] | None = None,
+) -> list[dict[str, Any]]:
     layers: list[dict[str, Any]] = []
     linear_layers = [layer for layer in model.ranker.network if isinstance(layer, nn.Linear)]
+    if layer_shifts is not None and len(layer_shifts) != len(linear_layers):
+        raise ValueError("export layer-shift schedule does not match the dense network")
     for index, layer in enumerate(linear_layers):
-        weights, shift, biases = quantized_layer_parameters(layer, input_scale)
+        weights, shift, biases = quantized_layer_parameters(
+            layer,
+            input_scale,
+            None if layer_shifts is None else layer_shifts[index],
+        )
         layers.append(
             {
                 "inputSize": layer.in_features,
@@ -490,15 +560,27 @@ def export_layers(model: NormalizedRanker, input_scale: int) -> list[dict[str, A
 class FixedPointRanker:
     """Vectorized reference for the exact integer operations used by scoreV09FixedPoint."""
 
-    def __init__(self, model: NormalizedRanker, input_scale: int, device: torch.device):
+    def __init__(
+        self,
+        model: NormalizedRanker,
+        input_scale: int,
+        device: torch.device,
+        layer_shifts: Sequence[int] | None = None,
+    ):
         self.offset = model.offset.detach().to(device=device, dtype=torch.float64)
         self.scale = model.scale.detach().to(device=device, dtype=torch.float64)
         self.clip = model.clip
         self.input_scale = input_scale
         self.layers: list[tuple[Tensor, int, Tensor, bool]] = []
         linear_layers = [layer for layer in model.ranker.network if isinstance(layer, nn.Linear)]
+        if layer_shifts is not None and len(layer_shifts) != len(linear_layers):
+            raise ValueError("fixed-point layer-shift schedule does not match the dense network")
         for index, layer in enumerate(linear_layers):
-            weights, shift, biases = quantized_layer_parameters(layer, input_scale)
+            weights, shift, biases = quantized_layer_parameters(
+                layer,
+                input_scale,
+                None if layer_shifts is None else layer_shifts[index],
+            )
             self.layers.append(
                 (
                     weights.to(device=device, dtype=torch.int64),
@@ -534,31 +616,56 @@ def evaluate_fixed(
     device: torch.device,
     input_scale: int,
     maximum_batches: int,
+    layer_shifts: Sequence[int],
 ) -> dict[str, float]:
     model.eval()
     # The deployable ranker is an integer CPU runtime. CUDA does not implement signed-int64 matrix
     # multiplication, and evaluating there would not exercise the production execution domain anyway.
     fixed_device = torch.device("cpu")
-    fixed = FixedPointRanker(model, input_scale, fixed_device)
+    fixed = FixedPointRanker(model, input_scale, fixed_device, layer_shifts)
     decisions = 0
     teacher_correct = 0
     float_fixed_agreement = 0
+    qat_fixed_agreement = 0
+    score_values = 0
+    exact_score_values = 0
+    maximum_score_delta = 0
     with torch.no_grad():
         for batch_index, batch in enumerate(loader):
             if batch_index >= maximum_batches:
                 break
             model_batch = move_batch(batch, device)
             float_scores = model(model_batch.features).masked_fill(~model_batch.mask, -torch.inf)
+            unmasked_qat_scores = qat_forward(
+                model,
+                model_batch.features,
+                input_scale,
+                layer_shifts,
+            )
+            qat_scores = unmasked_qat_scores.masked_fill(~model_batch.mask, -torch.inf)
             fixed_scores = fixed(batch.features).masked_fill(~batch.mask, -(2**63))
             float_choice = float_scores.argmax(dim=1).to(fixed_device)
+            qat_choice = qat_scores.argmax(dim=1).to(fixed_device)
             fixed_choice = fixed_scores.argmax(dim=1)
             decisions += len(fixed_choice)
             teacher_correct += int((fixed_choice == batch.teacher).sum())
             float_fixed_agreement += int((fixed_choice == float_choice).sum())
+            qat_fixed_agreement += int((fixed_choice == qat_choice).sum())
+            qat_integer_scores = round_half_away_tensor(
+                unmasked_qat_scores.to(fixed_device) * input_scale
+            ).to(torch.int64)
+            valid_delta = (qat_integer_scores[batch.mask] - fixed_scores[batch.mask]).abs()
+            score_values += valid_delta.numel()
+            exact_score_values += int((valid_delta == 0).sum())
+            if valid_delta.numel():
+                maximum_score_delta = max(maximum_score_delta, int(valid_delta.max()))
     return {
         "decisions": float(decisions),
         "top1Accuracy": teacher_correct / max(1, decisions),
         "floatFixedTop1Agreement": float_fixed_agreement / max(1, decisions),
+        "qatFixedTop1Agreement": qat_fixed_agreement / max(1, decisions),
+        "qatFixedScoreAgreement": exact_score_values / max(1, score_values),
+        "qatFixedMaximumScoreDelta": float(maximum_score_delta),
     }
 
 
@@ -571,8 +678,9 @@ def build_research_artifact(
     input_clip: float,
     min_override_margin: float,
     metrics: dict[str, Any],
+    layer_shifts: Sequence[int],
 ) -> dict[str, Any]:
-    layers = export_layers(model, input_scale)
+    layers = export_layers(model, input_scale, layer_shifts)
     normalization = {
         "offsets": [float(value) for value in model.offset.cpu()],
         "scales": [float(value) for value in model.scale.cpu()],
@@ -700,6 +808,297 @@ def restore_epoch_progress(
     )
 
 
+def restore_layer_shifts(value: Any, expected_count: int) -> tuple[int, ...] | None:
+    if value is None:
+        return None
+    if (
+        not isinstance(value, (list, tuple))
+        or len(value) != expected_count
+        or any(type(shift) is not int or shift < 0 or shift > 24 for shift in value)
+    ):
+        raise ValueError("checkpoint frozen QAT layer shifts are malformed")
+    return tuple(value)
+
+
+def _validated_metric(metrics: Any, key: str, label: str) -> float:
+    if not isinstance(metrics, dict):
+        raise ValueError(f"{label} metrics are missing")
+    value = metrics.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError(f"{label} metric {key} is invalid")
+    return float(value)
+
+
+def _validated_ratio(metrics: Any, key: str, label: str) -> float:
+    value = _validated_metric(metrics, key, label)
+    if value < 0 or value > 1:
+        raise ValueError(f"{label} metric {key} is outside [0, 1]")
+    return value
+
+
+def fixed_point_gate_status(
+    fixed_validation: dict[str, Any],
+    reference_validation: dict[str, Any],
+    minimum_qat_fixed_agreement: float,
+    maximum_fixed_accuracy_drop: float,
+) -> tuple[bool, float]:
+    agreement = _validated_ratio(fixed_validation, "qatFixedTop1Agreement", "fixed validation")
+    fixed_accuracy = _validated_ratio(fixed_validation, "top1Accuracy", "fixed validation")
+    reference_accuracy = _validated_ratio(reference_validation, "top1Accuracy", "QAT reference")
+    fidelity_accuracy_drop = reference_accuracy - fixed_accuracy
+    return (
+        agreement >= minimum_qat_fixed_agreement
+        and fidelity_accuracy_drop <= maximum_fixed_accuracy_drop,
+        fidelity_accuracy_drop,
+    )
+
+
+def enforce_fixed_point_gates(
+    fixed_validation: dict[str, Any],
+    reference_validation: dict[str, Any],
+    minimum_qat_fixed_agreement: float,
+    maximum_fixed_accuracy_drop: float,
+) -> float:
+    agreement = _validated_ratio(fixed_validation, "qatFixedTop1Agreement", "fixed validation")
+    passes, fidelity_accuracy_drop = fixed_point_gate_status(
+        fixed_validation,
+        reference_validation,
+        minimum_qat_fixed_agreement,
+        maximum_fixed_accuracy_drop,
+    )
+    if agreement < minimum_qat_fixed_agreement:
+        raise RuntimeError(
+            "QAT/fixed-point top-1 agreement "
+            f"{agreement:.6f} is below {minimum_qat_fixed_agreement:.6f}"
+        )
+    if not passes:
+        raise RuntimeError(
+            "fixed-point validation accuracy drop from the pre-QAT reference "
+            f"{fidelity_accuracy_drop:.6f} exceeds {maximum_fixed_accuracy_drop:.6f}"
+        )
+    return fidelity_accuracy_drop
+
+
+def qat_candidate_passes(
+    candidate: dict[str, Any],
+    minimum_qat_fixed_agreement: float,
+    maximum_fixed_accuracy_drop: float,
+) -> bool:
+    passes, drop = fixed_point_gate_status(
+        candidate.get("fixedValidation"),
+        candidate.get("referenceValidation"),
+        minimum_qat_fixed_agreement,
+        maximum_fixed_accuracy_drop,
+    )
+    recorded_drop = _validated_metric(candidate, "fidelityAccuracyDrop", "QAT candidate")
+    if recorded_drop != drop:
+        raise ValueError("QAT candidate fidelity drop does not match its frozen reference")
+    return passes
+
+
+def qat_candidate_key(
+    candidate: dict[str, Any],
+    minimum_qat_fixed_agreement: float,
+    maximum_fixed_accuracy_drop: float,
+) -> tuple[float, ...]:
+    fixed_validation = candidate.get("fixedValidation")
+    float_validation = candidate.get("floatValidation")
+    agreement = _validated_metric(fixed_validation, "qatFixedTop1Agreement", "fixed validation")
+    fixed_accuracy = _validated_ratio(fixed_validation, "top1Accuracy", "fixed validation")
+    float_agreement = _validated_ratio(fixed_validation, "floatFixedTop1Agreement", "fixed validation")
+    _, drop = fixed_point_gate_status(
+        fixed_validation,
+        candidate.get("referenceValidation"),
+        minimum_qat_fixed_agreement,
+        maximum_fixed_accuracy_drop,
+    )
+    recorded_drop = _validated_metric(candidate, "fidelityAccuracyDrop", "QAT candidate")
+    if recorded_drop != drop:
+        raise ValueError("QAT candidate fidelity drop does not match its frozen reference")
+    loss = _validated_metric(float_validation, "loss", "float validation")
+    epoch = candidate.get("epoch")
+    if type(epoch) is not int or epoch < 0:
+        raise ValueError("QAT candidate epoch is invalid")
+    stage = candidate.get("stage")
+    if stage not in {"entry", "epoch"}:
+        raise ValueError("QAT candidate stage is invalid")
+    violation = max(0.0, minimum_qat_fixed_agreement - agreement) + max(
+        0.0,
+        drop - maximum_fixed_accuracy_drop,
+    )
+    return (
+        float(qat_candidate_passes(candidate, minimum_qat_fixed_agreement, maximum_fixed_accuracy_drop)),
+        -violation,
+        fixed_accuracy,
+        agreement,
+        float_agreement,
+        -loss,
+        -float(epoch),
+        float(stage == "entry"),
+    )
+
+
+def snapshot_qat_candidate(
+    epoch: int,
+    model: NormalizedRanker,
+    layer_shifts: Sequence[int],
+    float_validation: dict[str, Any],
+    fixed_validation: dict[str, Any],
+    reference_validation: dict[str, Any],
+    stage: str = "epoch",
+) -> dict[str, Any]:
+    if stage not in {"entry", "epoch"}:
+        raise ValueError("QAT candidate stage is invalid")
+    reference_accuracy = _validated_ratio(reference_validation, "top1Accuracy", "QAT reference")
+    fixed_accuracy = _validated_ratio(fixed_validation, "top1Accuracy", "fixed validation")
+    return {
+        "schema": QAT_CANDIDATE_SCHEMA,
+        "epoch": epoch,
+        "stage": stage,
+        "model": {
+            key: value.detach().to(device="cpu").clone()
+            for key, value in model.state_dict().items()
+        },
+        "layerShifts": list(layer_shifts),
+        "floatValidation": dict(float_validation),
+        "fixedValidation": dict(fixed_validation),
+        "referenceValidation": dict(reference_validation),
+        "fidelityAccuracyDrop": reference_accuracy - fixed_accuracy,
+    }
+
+
+def restore_qat_candidate(
+    value: Any,
+    model: NormalizedRanker,
+    expected_layer_shifts: Sequence[int] | None,
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if (
+        not isinstance(value, dict)
+        or value.get("schema") != QAT_CANDIDATE_SCHEMA
+        or type(value.get("epoch")) is not int
+        or value["epoch"] < 0
+        or value.get("stage") not in {"entry", "epoch"}
+        or not isinstance(value.get("model"), dict)
+        or set(value["model"]) != set(model.state_dict())
+    ):
+        raise ValueError("checkpoint best QAT candidate is malformed")
+    shifts = restore_layer_shifts(
+        value.get("layerShifts"),
+        sum(isinstance(layer, nn.Linear) for layer in model.ranker.network),
+    )
+    if shifts is None or (expected_layer_shifts is not None and shifts != tuple(expected_layer_shifts)):
+        raise ValueError("checkpoint best QAT candidate shifts do not match the frozen schedule")
+    for key, expected in model.state_dict().items():
+        saved = value["model"][key]
+        if not isinstance(saved, Tensor) or saved.shape != expected.shape or saved.dtype != expected.dtype:
+            raise ValueError("checkpoint best QAT candidate model state is incompatible")
+        if not bool(torch.isfinite(saved).all()):
+            raise ValueError("checkpoint best QAT candidate model state is non-finite")
+    _validated_metric(value.get("floatValidation"), "loss", "float validation")
+    _validated_ratio(value.get("fixedValidation"), "top1Accuracy", "fixed validation")
+    _validated_ratio(value.get("fixedValidation"), "qatFixedTop1Agreement", "fixed validation")
+    _validated_ratio(value.get("fixedValidation"), "floatFixedTop1Agreement", "fixed validation")
+    reference_accuracy = _validated_ratio(value.get("referenceValidation"), "top1Accuracy", "QAT reference")
+    fixed_accuracy = _validated_ratio(value.get("fixedValidation"), "top1Accuracy", "fixed validation")
+    recorded_drop = _validated_metric(value, "fidelityAccuracyDrop", "QAT candidate")
+    if recorded_drop != reference_accuracy - fixed_accuracy:
+        raise ValueError("checkpoint QAT candidate fidelity drop does not match its metrics")
+    return value
+
+
+def select_best_qat_candidate(
+    current: dict[str, Any] | None,
+    candidate: dict[str, Any],
+    minimum_qat_fixed_agreement: float,
+    maximum_fixed_accuracy_drop: float,
+) -> dict[str, Any]:
+    if current is None:
+        return candidate
+    return (
+        candidate
+        if qat_candidate_key(
+            candidate,
+            minimum_qat_fixed_agreement,
+            maximum_fixed_accuracy_drop,
+        )
+        > qat_candidate_key(
+            current,
+            minimum_qat_fixed_agreement,
+            maximum_fixed_accuracy_drop,
+        )
+        else current
+    )
+
+
+def load_qat_candidate(
+    model: NormalizedRanker,
+    value: Any,
+    expected_layer_shifts: Sequence[int] | None,
+) -> tuple[tuple[int, ...], dict[str, Any], int, str]:
+    candidate = restore_qat_candidate(value, model, expected_layer_shifts)
+    if candidate is None:
+        raise ValueError("best QAT candidate is missing")
+    model.load_state_dict(candidate["model"])
+    shifts = restore_layer_shifts(
+        candidate["layerShifts"],
+        sum(isinstance(layer, nn.Linear) for layer in model.ranker.network),
+    )
+    if shifts is None:
+        raise ValueError("best QAT candidate is missing its frozen layer shifts")
+    return shifts, dict(candidate["referenceValidation"]), int(candidate["epoch"]), str(candidate["stage"])
+
+
+def restore_qat_checkpoint_state(
+    saved: dict[str, Any],
+    model: NormalizedRanker,
+    *,
+    require_frozen_state: bool,
+    require_best_candidate: bool,
+) -> tuple[tuple[int, ...] | None, dict[str, Any] | None, dict[str, Any] | None]:
+    shifts = restore_layer_shifts(
+        saved.get("qatLayerShifts"),
+        sum(isinstance(layer, nn.Linear) for layer in model.ranker.network),
+    )
+    reference = saved.get("qatReferenceValidation")
+    if reference is not None:
+        _validated_ratio(reference, "top1Accuracy", "QAT reference")
+    if require_frozen_state and (shifts is None or reference is None):
+        raise ValueError("QAT checkpoint is missing its frozen quantization state")
+    candidate = restore_qat_candidate(saved.get("bestQatCandidate"), model, shifts)
+    if require_best_candidate and candidate is None:
+        raise ValueError("QAT checkpoint is missing its best validated candidate")
+    if candidate is not None:
+        if reference != candidate["referenceValidation"]:
+            raise ValueError("QAT checkpoint candidate reference differs from its frozen reference")
+        next_epoch = saved.get("nextEpoch")
+        if type(next_epoch) is not int or (
+            candidate["stage"] == "epoch" and candidate["epoch"] >= next_epoch
+        ) or (
+            candidate["stage"] == "entry" and candidate["epoch"] > next_epoch
+        ):
+            raise ValueError("QAT checkpoint candidate epoch is inconsistent with its cursor")
+        if candidate["stage"] == "epoch":
+            if not any(
+                isinstance(entry, dict)
+                and entry.get("qat") is True
+                and entry.get("epoch") == candidate["epoch"]
+                for entry in saved.get("history", [])
+            ):
+                raise ValueError("QAT checkpoint candidate epoch is absent from its validation history")
+        else:
+            config = saved.get("config")
+            if (
+                not isinstance(config, dict)
+                or type(config.get("epochs")) is not int
+                or type(config.get("qatEpochs")) is not int
+                or candidate["epoch"] != config["epochs"] - config["qatEpochs"]
+            ):
+                raise ValueError("QAT-entry candidate does not match the configured transition epoch")
+    return shifts, reference, candidate
+
+
 def save_checkpoint(
     path: Path,
     next_epoch: int,
@@ -709,6 +1108,9 @@ def save_checkpoint(
     config: dict[str, Any],
     history: list[dict[str, Any]],
     epoch_progress: EpochProgress | None = None,
+    qat_layer_shifts: Sequence[int] | None = None,
+    qat_reference_validation: dict[str, Any] | None = None,
+    best_qat_candidate: dict[str, Any] | None = None,
 ) -> None:
     progress_payload = _epoch_progress_payload(epoch_progress) if epoch_progress is not None else None
     expected_qat_layer_count = len(epoch_progress.qat_layer_shifts) if epoch_progress is not None else 0
@@ -718,10 +1120,21 @@ def save_checkpoint(
         next_batch=next_batch,
         expected_qat_layer_count=expected_qat_layer_count,
     )
+    frozen_shifts = restore_layer_shifts(
+        qat_layer_shifts,
+        sum(isinstance(layer, nn.Linear) for layer in model.ranker.network),
+    )
+    if epoch_progress is not None and epoch_progress.qat_layer_shifts:
+        if frozen_shifts is None or tuple(epoch_progress.qat_layer_shifts) != frozen_shifts:
+            raise ValueError("in-progress QAT shifts do not match the checkpoint frozen schedule")
+    if qat_reference_validation is not None:
+        _validated_ratio(qat_reference_validation, "top1Accuracy", "QAT reference")
+    restore_qat_candidate(best_qat_candidate, model, frozen_shifts)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     torch.save(
         {
+            "schema": CHECKPOINT_SCHEMA,
             "nextEpoch": next_epoch,
             "nextBatch": next_batch,
             "model": model.state_dict(),
@@ -729,6 +1142,9 @@ def save_checkpoint(
             "config": config,
             "history": history,
             "epochProgress": progress_payload,
+            "qatLayerShifts": list(frozen_shifts) if frozen_shifts is not None else None,
+            "qatReferenceValidation": qat_reference_validation,
+            "bestQatCandidate": best_qat_candidate,
             "pythonRandomState": random.getstate(),
             "torchRandomState": torch.random.get_rng_state(),
             "cudaRandomState": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
@@ -761,7 +1177,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--validation-batches", type=int, default=512)
     parser.add_argument("--checkpoint-seconds", type=int, default=600)
     parser.add_argument("--amp", choices=("bf16", "off"), default="bf16")
-    parser.add_argument("--minimum-fixed-agreement", type=float, default=0.99)
+    parser.add_argument(
+        "--minimum-qat-fixed-agreement",
+        "--minimum-fixed-agreement",
+        dest="minimum_qat_fixed_agreement",
+        type=float,
+        default=0.99,
+        help="minimum FP32 projected-QAT versus exact fixed-runtime top-1 agreement",
+    )
     parser.add_argument("--maximum-fixed-accuracy-drop", type=float, default=0.01)
     parser.add_argument(
         "--allow-partial-corpus",
@@ -777,6 +1200,15 @@ def main() -> None:
         raise ValueError("epochs must be positive and qat-epochs must be in [0, epochs]")
     if args.input_scale < 1 or args.input_scale > 32767:
         raise ValueError("input-scale must fit the runtime int16 contract")
+    if (
+        not math.isfinite(args.minimum_qat_fixed_agreement)
+        or args.minimum_qat_fixed_agreement < 0
+        or args.minimum_qat_fixed_agreement > 1
+        or not math.isfinite(args.maximum_fixed_accuracy_drop)
+        or args.maximum_fixed_accuracy_drop < 0
+        or args.maximum_fixed_accuracy_drop > 1
+    ):
+        raise ValueError("fixed-point gates must be finite ratios in [0, 1]")
     hidden = [int(value) for value in args.hidden.split(",") if value]
     if not hidden or any(value < 1 for value in hidden):
         raise ValueError("hidden must contain positive comma-separated widths")
@@ -799,6 +1231,11 @@ def main() -> None:
     device = torch.device(args.device)
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA learner requested but PyTorch cannot see a CUDA device")
+    if device.type == "cuda":
+        # QAT models exact integer arithmetic closely enough that TF32's shortened mantissa is not acceptable.
+        torch.set_float32_matmul_precision("highest")
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
 
     offset, scale, observations, normalization_cache, packed_cache = prepare_input_caches(
         paths,
@@ -835,8 +1272,10 @@ def main() -> None:
         "inputScale": args.input_scale,
         "minimumOverrideMargin": args.min_override_margin,
         "validationBatches": args.validation_batches,
-        "minimumFixedAgreement": args.minimum_fixed_agreement,
+        "minimumQatFixedAgreement": args.minimum_qat_fixed_agreement,
         "maximumFixedAccuracyDrop": args.maximum_fixed_accuracy_drop,
+        "quantizationSemantics": QUANTIZATION_SEMANTICS,
+        "checkpointSchema": CHECKPOINT_SCHEMA,
         "allowPartialCorpus": args.allow_partial_corpus,
         "trainingShardOrderSchema": TRAINING_SHARD_ORDER_SCHEMA,
         "amp": args.amp,
@@ -850,8 +1289,13 @@ def main() -> None:
     resume_batch = 0
     resume_epoch_progress: EpochProgress | None = None
     history: list[dict[str, Any]] = []
+    qat_layer_shifts: tuple[int, ...] | None = None
+    qat_reference_validation: dict[str, Any] | None = None
+    best_qat_candidate: dict[str, Any] | None = None
     if args.resume:
         saved = torch.load(checkpoint, map_location=device, weights_only=False)
+        if saved.get("schema") != CHECKPOINT_SCHEMA:
+            raise ValueError("checkpoint predates the exact FP32/frozen-shift QAT semantics")
         if saved.get("config") != config:
             raise ValueError("checkpoint configuration does not match this training run")
         model.load_state_dict(saved["model"])
@@ -876,6 +1320,24 @@ def main() -> None:
                 else 0
             ),
         )
+        has_qat_history = any(
+            isinstance(entry, dict) and bool(entry.get("qat"))
+            for entry in saved.get("history", [])
+        )
+        completed_qat = first_epoch == args.epochs and args.qat_epochs > 0
+        resumed_qat_work = resume_batch > 0 or has_qat_history
+        qat_layer_shifts, qat_reference_validation, best_qat_candidate = restore_qat_checkpoint_state(
+            saved,
+            model,
+            require_frozen_state=(resume_qat and resumed_qat_work) or completed_qat,
+            require_best_candidate=(resume_qat and resumed_qat_work) or completed_qat,
+        )
+        if (
+            resume_epoch_progress is not None
+            and resume_epoch_progress.qat_layer_shifts
+            and tuple(resume_epoch_progress.qat_layer_shifts) != qat_layer_shifts
+        ):
+            raise ValueError("QAT checkpoint epoch shifts differ from its frozen schedule")
         history = list(saved.get("history", []))
         random.setstate(saved["pythonRandomState"])
         torch.random.set_rng_state(saved["torchRandomState"])
@@ -923,6 +1385,39 @@ def main() -> None:
             prefetch_factor=4 if args.workers > 0 else None,
             generator=loader_generator,
         )
+        qat = epoch >= args.epochs - args.qat_epochs
+        if qat and qat_layer_shifts is None:
+            qat_reference_validation = evaluate(model, validation, device, args.validation_batches)
+            qat_layer_shifts = tuple(
+                quantized_layer_parameters(layer, args.input_scale)[1]
+                for layer in model.ranker.network
+                if isinstance(layer, nn.Linear)
+            )
+            qat_entry_fixed_validation = evaluate_fixed(
+                model,
+                validation,
+                device,
+                args.input_scale,
+                args.validation_batches,
+                qat_layer_shifts,
+            )
+            qat_entry_candidate = snapshot_qat_candidate(
+                epoch,
+                model,
+                qat_layer_shifts,
+                qat_reference_validation,
+                qat_entry_fixed_validation,
+                qat_reference_validation,
+                stage="entry",
+            )
+            best_qat_candidate = select_best_qat_candidate(
+                best_qat_candidate,
+                qat_entry_candidate,
+                args.minimum_qat_fixed_agreement,
+                args.maximum_fixed_accuracy_drop,
+            )
+        if qat and qat_reference_validation is None:
+            raise RuntimeError("QAT started without a frozen reference validation")
         model.train()
         resumed_progress = (
             resume_epoch_progress
@@ -938,20 +1433,9 @@ def main() -> None:
         active_segment_started = time.monotonic()
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats(device)
-        qat = epoch >= args.epochs - args.qat_epochs
-        qat_layer_shifts = (
-            list(resumed_progress.qat_layer_shifts)
-            if resumed_progress is not None
-            else (
-                [
-                    quantized_layer_parameters(layer, args.input_scale)[1]
-                    for layer in model.ranker.network
-                    if isinstance(layer, nn.Linear)
-                ]
-                if qat
-                else []
-            )
-        )
+        epoch_qat_layer_shifts = qat_layer_shifts if qat_layer_shifts is not None and qat else ()
+        if resumed_progress is not None and resumed_progress.qat_layer_shifts != epoch_qat_layer_shifts:
+            raise ValueError("resumed epoch QAT shifts differ from the frozen run schedule")
         last_batch_cursor = 0
         for batch_index, batch in enumerate(training):
             last_batch_cursor = batch_index + 1
@@ -963,18 +1447,14 @@ def main() -> None:
                 continue
             batch = move_batch(batch, device)
             optimizer.zero_grad(set_to_none=True)
-            autocast = (
-                torch.autocast(device_type="cuda", dtype=torch.bfloat16)
-                if device.type == "cuda" and args.amp == "bf16"
-                else contextlib.nullcontext()
+            scores, loss = training_forward_loss(
+                model,
+                batch,
+                args.input_scale,
+                epoch_qat_layer_shifts,
+                qat,
+                args.amp,
             )
-            with autocast:
-                scores = (
-                    qat_forward(model, batch.features, args.input_scale, qat_layer_shifts)
-                    if qat
-                    else model(batch.features)
-                )
-                loss = ranking_loss(scores, batch)
             if not torch.isfinite(loss):
                 raise RuntimeError(f"non-finite training loss at epoch {epoch}, batch {batch_index}")
             loss.backward()
@@ -996,12 +1476,15 @@ def main() -> None:
                     EpochProgress(
                         epoch=epoch,
                         next_batch=batch_index + 1,
-                        qat_layer_shifts=tuple(qat_layer_shifts),
+                        qat_layer_shifts=epoch_qat_layer_shifts,
                         running_loss=running_loss,
                         batches=batches,
                         examples=examples,
                         active_elapsed_seconds=active_elapsed_seconds,
                     ),
+                    qat_layer_shifts=qat_layer_shifts,
+                    qat_reference_validation=qat_reference_validation,
+                    best_qat_candidate=best_qat_candidate,
                 )
                 active_segment_started = time.monotonic()
                 last_checkpoint = active_segment_started
@@ -1020,30 +1503,132 @@ def main() -> None:
                 "examplesPerSecond": examples / max(1e-9, training_elapsed),
                 "gpuPeakMemoryGiB":
                     torch.cuda.max_memory_allocated(device) / (1024**3) if device.type == "cuda" else 0,
-                "amp": args.amp if device.type == "cuda" else "off",
+                "amp": "off" if qat else (args.amp if device.type == "cuda" else "off"),
+                "requestedAmp": args.amp if device.type == "cuda" else "off",
                 "trainingShardEpochSeed": epoch_seed,
                 "trainingShardOrderSha256": training_epoch_order_sha256(paths, args.seed, epoch),
             }
         )
+        if qat:
+            if qat_layer_shifts is None or qat_reference_validation is None:
+                raise RuntimeError("QAT validation is missing its frozen run state")
+            try:
+                fixed_epoch_validation = evaluate_fixed(
+                    model,
+                    validation,
+                    device,
+                    args.input_scale,
+                    args.validation_batches,
+                    qat_layer_shifts,
+                )
+            except OverflowError as error:
+                # A late candidate may leave the grid frozen at QAT entry. Preserve an earlier validated best
+                # instead of letting this one architecture lose its already-safe checkpoint.
+                metrics.update(
+                    {
+                        "fixedValidationError": str(error),
+                        "qatReferenceTop1Accuracy": qat_reference_validation["top1Accuracy"],
+                        "passesFixedPointGates": False,
+                        "selectedAsBestQat": False,
+                        "qatLayerShifts": list(qat_layer_shifts),
+                    }
+                )
+            else:
+                candidate = snapshot_qat_candidate(
+                    epoch,
+                    model,
+                    qat_layer_shifts,
+                    metrics,
+                    fixed_epoch_validation,
+                    qat_reference_validation,
+                )
+                selected = select_best_qat_candidate(
+                    best_qat_candidate,
+                    candidate,
+                    args.minimum_qat_fixed_agreement,
+                    args.maximum_fixed_accuracy_drop,
+                )
+                selected_as_best_qat = selected is candidate
+                best_qat_candidate = selected
+                metrics.update(
+                    {
+                        "fixedValidation": fixed_epoch_validation,
+                        "qatReferenceTop1Accuracy": qat_reference_validation["top1Accuracy"],
+                        "fidelityAccuracyDrop": candidate["fidelityAccuracyDrop"],
+                        "passesFixedPointGates": qat_candidate_passes(
+                            candidate,
+                            args.minimum_qat_fixed_agreement,
+                            args.maximum_fixed_accuracy_drop,
+                        ),
+                        "selectedAsBestQat": selected_as_best_qat,
+                        "qatLayerShifts": list(qat_layer_shifts),
+                    }
+                )
         history.append(metrics)
         print(json.dumps(metrics, sort_keys=True), flush=True)
-        save_checkpoint(checkpoint, epoch + 1, 0, model, optimizer, config, history)
+        save_checkpoint(
+            checkpoint,
+            epoch + 1,
+            0,
+            model,
+            optimizer,
+            config,
+            history,
+            qat_layer_shifts=qat_layer_shifts,
+            qat_reference_validation=qat_reference_validation,
+            best_qat_candidate=best_qat_candidate,
+        )
         resume_batch = 0
         resume_epoch_progress = None
 
+    selected_qat_epoch: int | None = None
+    selected_qat_stage: str | None = None
+    if args.qat_epochs > 0 and best_qat_candidate is None:
+        raise RuntimeError("no QAT epoch produced a fixed-point-safe validation candidate")
+    if best_qat_candidate is not None:
+        (
+            qat_layer_shifts,
+            qat_reference_validation,
+            selected_qat_epoch,
+            selected_qat_stage,
+        ) = load_qat_candidate(model, best_qat_candidate, qat_layer_shifts)
+    if qat_layer_shifts is None:
+        qat_layer_shifts = tuple(
+            quantized_layer_parameters(layer, args.input_scale)[1]
+            for layer in model.ranker.network
+            if isinstance(layer, nn.Linear)
+        )
     final_validation = evaluate(model, validation, device, args.validation_batches)
-    fixed_validation = evaluate_fixed(model, validation, device, args.input_scale, args.validation_batches)
-    if fixed_validation["floatFixedTop1Agreement"] < args.minimum_fixed_agreement:
-        raise RuntimeError(
-            "fixed-point top-1 agreement "
-            f"{fixed_validation['floatFixedTop1Agreement']:.6f} is below {args.minimum_fixed_agreement:.6f}"
+    if qat_reference_validation is None:
+        qat_reference_validation = dict(final_validation)
+    fixed_validation = evaluate_fixed(
+        model,
+        validation,
+        device,
+        args.input_scale,
+        args.validation_batches,
+        qat_layer_shifts,
+    )
+    rejection_reason: str | None = None
+    try:
+        fidelity_accuracy_drop = enforce_fixed_point_gates(
+            fixed_validation,
+            qat_reference_validation,
+            args.minimum_qat_fixed_agreement,
+            args.maximum_fixed_accuracy_drop,
         )
-    if final_validation["top1Accuracy"] - fixed_validation["top1Accuracy"] > args.maximum_fixed_accuracy_drop:
-        raise RuntimeError(
-            "fixed-point validation accuracy drop "
-            f"{final_validation['top1Accuracy'] - fixed_validation['top1Accuracy']:.6f} exceeds "
-            f"{args.maximum_fixed_accuracy_drop:.6f}"
+    except RuntimeError as error:
+        # Projected-QAT/runtime disagreement is systemic and must abort the campaign. A model-quality miss is
+        # architecture-specific during the preregistered initial sweep and is published as a sealed rejection.
+        if fixed_validation["qatFixedTop1Agreement"] < args.minimum_qat_fixed_agreement:
+            raise
+        _, fidelity_accuracy_drop = fixed_point_gate_status(
+            fixed_validation,
+            qat_reference_validation,
+            args.minimum_qat_fixed_agreement,
+            args.maximum_fixed_accuracy_drop,
         )
+        rejection_reason = str(error)
     final_metrics = {
         "normalizationObservations": observations,
         "normalizationCache": {
@@ -1068,9 +1653,42 @@ def main() -> None:
             "cudaCapability": config["cudaCapability"],
         },
         "history": history,
+        "quantization": {
+            "semantics": QUANTIZATION_SEMANTICS,
+            "layerShifts": list(qat_layer_shifts),
+            "selectedQatEpoch": selected_qat_epoch,
+            "selectedQatStage": selected_qat_stage,
+            "qatReferenceValidation": qat_reference_validation,
+            "fidelityAccuracyDrop": fidelity_accuracy_drop,
+        },
         "finalValidation": final_validation,
         "fixedValidation": fixed_validation,
     }
+    metrics_path = args.out.with_suffix(".metrics.json").resolve()
+    atomic_json(metrics_path, final_metrics)
+    if rejection_reason is not None:
+        rejection_unsigned = {
+            "schema": LEARNER_REJECTION_SCHEMA,
+            "reason": "fixed_accuracy_drop",
+            "message": rejection_reason,
+            "runFingerprint": campaign["runFingerprint"],
+            "sourceCommit": campaign["identity"]["sourceCommit"],
+            "corpusSha256": config["corpusSha256"],
+            "hidden": hidden,
+            "minimumQatFixedAgreement": args.minimum_qat_fixed_agreement,
+            "maximumFixedAccuracyDrop": args.maximum_fixed_accuracy_drop,
+            "selectedQatEpoch": selected_qat_epoch,
+            "selectedQatStage": selected_qat_stage,
+            "fixedValidation": fixed_validation,
+            "qatReferenceValidation": qat_reference_validation,
+            "fidelityAccuracyDrop": fidelity_accuracy_drop,
+            "metricsSha256": hashlib.sha256(metrics_path.read_bytes()).hexdigest(),
+        }
+        rejection = seal_learner_rejection(rejection_unsigned)
+        rejection_path = args.out.with_suffix(".rejection.json").resolve()
+        atomic_json(rejection_path, rejection)
+        print(json.dumps({"rejected": str(rejection_path), "reason": rejection["reason"]}, sort_keys=True))
+        return
     artifact = build_research_artifact(
         model,
         contract,
@@ -1080,8 +1698,11 @@ def main() -> None:
         args.input_clip,
         args.min_override_margin,
         final_metrics,
+        qat_layer_shifts,
     )
     staging_artifact = args.out.with_suffix(".unsealed.json").resolve()
+    # Publish metrics before the model. The orchestrator treats a sealed artifact as the completion marker, so
+    # this ordering makes every crash point resumable: metrics-only reruns sealing, artifact implies both exist.
     atomic_json(staging_artifact, artifact)
     sealer = Path(__file__).resolve().parents[1] / "seal_artifact.ts"
     subprocess.run(
@@ -1089,7 +1710,6 @@ def main() -> None:
         check=True,
     )
     sealed = json.loads(args.out.resolve().read_text(encoding="utf-8"))
-    atomic_json(args.out.with_suffix(".metrics.json").resolve(), final_metrics)
     staging_artifact.unlink()
     print(json.dumps({"artifact": str(args.out.resolve()), "modelSha256": sealed["modelSha256"]}, sort_keys=True))
 
