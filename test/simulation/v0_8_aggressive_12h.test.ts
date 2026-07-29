@@ -1215,7 +1215,7 @@ describe("v0.8 aggressive campaign orchestration", () => {
         ).not.toThrow();
         expect(() =>
             validateV08CampaignPassiveQualificationSummary(
-                { ...passive.summary, schema: "hoc.v0_8_passive_turn_panel.v4" },
+                { ...passive.summary, schema: "hoc.v0_8_passive_turn_panel.v5" },
                 {
                     sourceCommit: QUALIFICATION_SOURCE,
                     baseSeed: passive.options.baseSeed,

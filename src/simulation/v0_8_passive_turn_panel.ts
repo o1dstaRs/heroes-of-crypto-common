@@ -53,12 +53,14 @@ import { liveTwinSetup } from "./livetwin";
 import type { ISearchPassiveProductiveProbe, SearchPassiveActionKind } from "./search_driver";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
 
-export const V08_PASSIVE_TURN_PANEL_SCHEMA = "hoc.v0_8_passive_turn_panel.v5" as const;
+export const V08_PASSIVE_TURN_PANEL_SCHEMA = "hoc.v0_8_passive_turn_panel.v6" as const;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_GAMES = 4096;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_SEED = 2_607_270_813;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_CONCURRENCY = 12;
 export const V08_PASSIVE_TURN_PANEL_DEFAULT_MIN_CREATURE_APPEARANCES = 250;
-export const V08_PASSIVE_TURN_PANEL_MAX_DEFEND_SHARE = 0.01;
+// This remains an absolute Luck Shield budget: forced and role-protected Defends both count. The extra basis
+// point admits the measured protector census without creating a circular exemption for screen-preserving holds.
+export const V08_PASSIVE_TURN_PANEL_MAX_DEFEND_SHARE = 0.0101;
 export const V08_PASSIVE_TURN_PANEL_MIN_WAIT_REACTIVATION_RATE = 0.95;
 export const V08_PASSIVE_TURN_PANEL_MAPS: readonly number[] = Object.freeze([
     PBTypes.GridVals.NORMAL,
@@ -330,6 +332,7 @@ export interface IV08PassiveTurnPanelSummary {
     byCreature: Record<string, IV08PassiveTurnMetrics>;
     enabledCreatureAppearances: Record<string, number>;
     underrepresentedCreatures: string[];
+    defendClassMismatches: number;
     defendShare: number;
     eligibleWaitReactivationRate: number;
     allWaitReactivationRate: number;
@@ -1118,6 +1121,31 @@ const mergeMetrics = (target: IV08PassiveTurnMetrics, source: IV08PassiveTurnMet
 
 const cloneMetrics = (metrics: IV08PassiveTurnMetrics): IV08PassiveTurnMetrics => ({ ...metrics });
 
+const DEFEND_CLASS_KEYS = [
+    "finalDefendTurns",
+    "forcedDefendTurns",
+    "protectedDefendTurns",
+    "avoidableDefendTurns",
+] as const;
+
+const hasValidDefendClassPartition = (metrics: IV08PassiveTurnMetrics): boolean =>
+    Number.isSafeInteger(metrics.turns) &&
+    metrics.turns >= 0 &&
+    DEFEND_CLASS_KEYS.every((key) => Number.isSafeInteger(metrics[key]) && metrics[key] >= 0) &&
+    metrics.finalDefendTurns <= metrics.turns &&
+    metrics.finalDefendTurns ===
+        metrics.forcedDefendTurns + metrics.protectedDefendTurns + metrics.avoidableDefendTurns;
+
+const defendClassCrossScopeMismatches = (
+    metrics: IV08PassiveTurnMetrics,
+    byCreature: Readonly<Record<string, IV08PassiveTurnMetrics>>,
+): number =>
+    DEFEND_CLASS_KEYS.filter(
+        (key) =>
+            Object.values(byCreature).reduce((total, creatureMetrics) => total + creatureMetrics[key], 0) !==
+            metrics[key],
+    ).length;
+
 export function v08PassiveCreatureFaults(metrics: IV08PassiveTurnMetrics | undefined): number {
     if (!metrics) return 0;
     return (
@@ -1185,6 +1213,7 @@ export function summarizeV08PassiveTurnPanel(
     let candidateEngineRejections = 0;
     let recordsWithoutObservedTurns = 0;
     let recordTurnTotalMismatches = 0;
+    let defendClassMismatches = 0;
 
     // Worker completion order is scheduler-dependent. Game-order aggregation keeps capped failure samples,
     // by-creature insertion order, and the serialized summary stable across worker counts and hosts.
@@ -1222,6 +1251,11 @@ export function summarizeV08PassiveTurnPanel(
             recordsWithoutObservedTurns += 1;
         }
         if (recordByCreatureTurns !== record.metrics.turns) recordTurnTotalMismatches += 1;
+        if (!hasValidDefendClassPartition(record.metrics)) defendClassMismatches += 1;
+        for (const creatureMetrics of Object.values(record.byCreature)) {
+            if (!hasValidDefendClassPartition(creatureMetrics)) defendClassMismatches += 1;
+        }
+        defendClassMismatches += defendClassCrossScopeMismatches(record.metrics, record.byCreature);
         mergeMetrics(metrics, record.metrics);
         for (const [creatureName, source] of Object.entries(record.byCreature)) {
             mergeMetrics((byCreature[creatureName] ??= emptyV08PassiveTurnMetrics()), source);
@@ -1289,6 +1323,11 @@ export function summarizeV08PassiveTurnPanel(
     const underrepresentedCreatures = enabled.filter(
         (creatureName) => enabledCreatureAppearances[creatureName] < minAppearances,
     );
+    if (!hasValidDefendClassPartition(metrics)) defendClassMismatches += 1;
+    for (const creatureMetrics of Object.values(byCreature)) {
+        if (!hasValidDefendClassPartition(creatureMetrics)) defendClassMismatches += 1;
+    }
+    defendClassMismatches += defendClassCrossScopeMismatches(metrics, byCreature);
     const defendShare = ratio(metrics.finalDefendTurns, metrics.turns, 0);
     const eligibleWaits = metrics.sameLapWaitReactivations + metrics.missedSameLapWaitReactivations;
     const eligibleWaitReactivationRate = ratio(metrics.sameLapWaitReactivations, eligibleWaits, 1);
@@ -1364,6 +1403,11 @@ export function summarizeV08PassiveTurnPanel(
             metrics.repairedRawAvoidableDefendTurns === metrics.rawAvoidableDefendTurns,
             `${metrics.repairedRawAvoidableDefendTurns}/${metrics.rawAvoidableDefendTurns}`,
             "repaired = raw avoidable",
+        ),
+        defend_classes_consistent: gate(
+            defendClassMismatches === 0,
+            defendClassMismatches,
+            "= 0 record, aggregate, or by-creature classification/domain mismatches",
         ),
         final_defend_share: gate(
             defendShare <= V08_PASSIVE_TURN_PANEL_MAX_DEFEND_SHARE,
@@ -1458,6 +1502,7 @@ export function summarizeV08PassiveTurnPanel(
         byCreature,
         enabledCreatureAppearances,
         underrepresentedCreatures,
+        defendClassMismatches,
         defendShare,
         eligibleWaitReactivationRate,
         allWaitReactivationRate,

@@ -1053,6 +1053,85 @@ describe("v0.8 random-roster passive-turn panel", () => {
         expect(appearanceGate.underrepresentedCreatures.length).toBeGreaterThan(0);
     });
 
+    test("keeps forced and protected Luck Shields inside the absolute 1.01% budget", () => {
+        const records = Array.from({ length: OPTIONS.games }, (_, game) => fixtureRecord(game));
+        const turnCounts = [1_665, 1_667, 1_667, 1_667, 1_667, 1_667];
+        records.forEach((record, index) => {
+            record.metrics.turns = turnCounts[index]!;
+            const observed = Object.values(record.byCreature).find((metrics) => metrics.turns === 1)!;
+            observed.turns = turnCounts[index]!;
+        });
+        const defendedCreature = Object.values(records[0]!.byCreature).find(
+            (metrics) => metrics.turns === turnCounts[0],
+        )!;
+        Object.assign(records[0]!.metrics, {
+            rawDefendTurns: 101,
+            chosenDefendTurns: 101,
+            finalDefendTurns: 101,
+            forcedDefendTurns: 1,
+            protectedDefendTurns: 100,
+        });
+        Object.assign(defendedCreature, {
+            rawDefendTurns: 101,
+            chosenDefendTurns: 101,
+            finalDefendTurns: 101,
+            forcedDefendTurns: 1,
+            protectedDefendTurns: 100,
+        });
+
+        const atBoundary = summarizeV08PassiveTurnPanel(OPTIONS, records);
+        expect(atBoundary.defendShare).toBe(0.0101);
+        expect(atBoundary.defendClassMismatches).toBe(0);
+        expect(atBoundary.gates.checks.defend_classes_consistent.pass).toBe(true);
+        expect(atBoundary.gates.checks.final_defend_share.pass).toBe(true);
+        expect(atBoundary.gates.pass).toBe(true);
+
+        const overBudget = records.map((record) => ({
+            ...record,
+            metrics: { ...record.metrics },
+            byCreature: Object.fromEntries(
+                Object.entries(record.byCreature).map(([name, metrics]) => [name, { ...metrics }]),
+            ),
+        }));
+        const overBudgetCreature = Object.values(overBudget[0]!.byCreature).find(
+            (metrics) => metrics.turns === turnCounts[0],
+        )!;
+        overBudget[0]!.metrics.rawDefendTurns += 1;
+        overBudget[0]!.metrics.chosenDefendTurns += 1;
+        overBudget[0]!.metrics.finalDefendTurns += 1;
+        overBudget[0]!.metrics.forcedDefendTurns += 1;
+        overBudgetCreature.rawDefendTurns += 1;
+        overBudgetCreature.chosenDefendTurns += 1;
+        overBudgetCreature.finalDefendTurns += 1;
+        overBudgetCreature.forcedDefendTurns += 1;
+        const overBudgetSummary = summarizeV08PassiveTurnPanel(OPTIONS, overBudget);
+        expect(overBudgetSummary.defendShare).toBe(0.0102);
+        expect(overBudgetSummary.gates.checks.defend_classes_consistent.pass).toBe(true);
+        expect(overBudgetSummary.gates.failed).toContain("final_defend_share");
+
+        const malformed = records.map((record) => ({
+            ...record,
+            metrics: { ...record.metrics },
+            byCreature: Object.fromEntries(
+                Object.entries(record.byCreature).map(([name, metrics]) => [name, { ...metrics }]),
+            ),
+        }));
+        const malformedCreature = Object.values(malformed[0]!.byCreature).find(
+            (metrics) => metrics.turns === turnCounts[0],
+        )!;
+        malformedCreature.protectedDefendTurns = 99;
+        malformedCreature.forcedDefendTurns = 2;
+        const malformedSummary = summarizeV08PassiveTurnPanel(OPTIONS, malformed);
+        expect(malformedSummary.defendClassMismatches).toBeGreaterThan(0);
+        expect(malformedSummary.gates.failed).toContain("defend_classes_consistent");
+
+        malformed[0]!.metrics.protectedDefendTurns = -1;
+        malformed[0]!.metrics.forcedDefendTurns = 102;
+        const invalidDomainSummary = summarizeV08PassiveTurnPanel(OPTIONS, malformed);
+        expect(invalidDomainSummary.defendClassMismatches).toBeGreaterThan(0);
+        expect(invalidDomainSummary.gates.failed).toContain("defend_classes_consistent");
+    });
+
     test("fails closed when records contain no observations or disagree with their by-creature turn totals", () => {
         const records = Array.from({ length: OPTIONS.games }, (_, game) => fixtureRecord(game));
         const silent = records.map((record) => ({

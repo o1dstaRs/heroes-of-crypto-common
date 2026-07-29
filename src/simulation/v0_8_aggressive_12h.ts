@@ -2639,6 +2639,7 @@ export const V08_CAMPAIGN_PASSIVE_QUALIFICATION_REQUIRED_GATES = Object.freeze([
     "introduced_defends_zero",
     "avoidable_defends_zero",
     "raw_avoidable_defends_repaired",
+    "defend_classes_consistent",
     "final_defend_share",
     "missed_wait_reactivations_zero",
     "repeated_same_lap_waits_zero",
