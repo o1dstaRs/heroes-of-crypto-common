@@ -309,6 +309,7 @@ interface IV08BlockCenterPendingDecision {
     stationaryMountainAvailable: boolean;
     actorCells: XY[];
     enemyCells: XY[];
+    enemyStateKey: string;
     stateSha256: string;
     oracleOption?: IV08BlockCenterDirectOption;
     catalogDirect: boolean;
@@ -325,6 +326,7 @@ interface IV08BlockCenterPendingDecision {
 
 interface IV08BlockCenterMovementHistory {
     footprints: string[];
+    enemyStateKey: string;
     eligibleCombatMisses: number;
     consecutiveNonDamageTurns: number;
     consecutiveUnproductiveMountainMoves: number;
@@ -426,6 +428,11 @@ const footprintKey = (cells: readonly XY[]): string =>
         .sort((left, right) => left.x - right.x || left.y - right.y)
         .map(cellKey)
         .join(";");
+const enemyStateKey = (enemies: readonly Unit[]): string =>
+    enemies
+        .map((enemy) => `${enemy.getId()}:${footprintKey(enemy.getCells())}`)
+        .sort()
+        .join("|");
 const isAdjacent = (left: XY, right: XY): boolean =>
     Math.max(Math.abs(left.x - right.x), Math.abs(left.y - right.y)) <= 1;
 const sideForUnit = (unit: Unit): Side => (unit.getTeam() === GREEN_TEAM ? "green" : "red");
@@ -488,19 +495,29 @@ export function isV08BlockCenterABAOscillation(history: readonly string[], nextF
     return a !== b && nextFootprint === a;
 }
 
+/**
+ * Keep every physical A-B-A return as an informational oscillation, but reserve the hard failure for a stable
+ * tactical state or a return that still fails to close. An enemy that crosses the board between activations can
+ * make the actor's old footprint the newly correct pursuit route; rejecting that response would punish motion,
+ * not a stall. Identity is part of the caller's enemy-state key so a replacement stack at the same cells also
+ * counts as a changed tactical state.
+ */
 export function isV08BlockCenterUrgentMountainABAOscillation(
     lap: number,
     mountainState: V08BlockCenterMountainState,
     meleeOnly: boolean,
     meaningfulRoleMove: boolean,
     abaOscillation: boolean,
+    enemyStateChanged = false,
+    closesCurrentEnemyDistance = false,
 ): boolean {
     return (
         lap >= V08_BLOCK_CENTER_ACTION_PANEL_LATE_LAP &&
         mountainState !== "cleared" &&
         meleeOnly &&
         !meaningfulRoleMove &&
-        abaOscillation
+        abaOscillation &&
+        (!enemyStateChanged || !closesCurrentEnemyDistance)
     );
 }
 
@@ -1690,10 +1707,8 @@ export class V08BlockCenterActionAuditor {
         }
         const state = mountainState(context);
         const actorCells = cloneCells(unit.getCells());
-        const enemyCells = context.unitsHolder
-            .getAllEnemyUnits(unit.getTeam())
-            .filter((enemy) => !enemy.isDead())
-            .flatMap((enemy) => cloneCells(enemy.getCells()));
+        const enemies = context.unitsHolder.getAllEnemyUnits(unit.getTeam()).filter((enemy) => !enemy.isDead());
+        const enemyCells = enemies.flatMap((enemy) => cloneCells(enemy.getCells()));
         const adjacentToMountain = actorCells.some((actorCell) =>
             context.grid.getCenterCells(true).some((centerCell) => isAdjacent(actorCell, centerCell)),
         );
@@ -1722,6 +1737,7 @@ export class V08BlockCenterActionAuditor {
             stationaryMountainAvailable,
             actorCells,
             enemyCells,
+            enemyStateKey: enemyStateKey(enemies),
             stateSha256: stateFingerprint(observation),
             oracleOption: independent ?? catalogOption,
             catalogDirect,
@@ -1787,6 +1803,7 @@ export class V08BlockCenterActionAuditor {
         }
         const history = this.history.get(pending.unitId) ?? {
             footprints: [footprintKey(pending.actorCells)],
+            enemyStateKey: pending.enemyStateKey,
             eligibleCombatMisses: 0,
             consecutiveNonDamageTurns: 0,
             consecutiveUnproductiveMountainMoves: 0,
@@ -1908,6 +1925,8 @@ export class V08BlockCenterActionAuditor {
                     pending.meleeOnly,
                     meaningfulRoleMove,
                     abaOscillation,
+                    history.enemyStateKey !== pending.enemyStateKey,
+                    !nonProgress,
                 );
             if (urgentMountainTerminalJitter) {
                 this.bump(pending.creatureName, "urgentMountainTerminalJitter");
@@ -1943,6 +1962,7 @@ export class V08BlockCenterActionAuditor {
         } else {
             history.consecutiveNonDamageTurns += 1;
         }
+        history.enemyStateKey = pending.enemyStateKey;
         this.history.set(pending.unitId, history);
     }
     public finish(): void {

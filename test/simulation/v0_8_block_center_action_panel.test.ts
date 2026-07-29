@@ -114,6 +114,14 @@ const DEEP_BLOCK_CENTER_REGRESSIONS = [
     { game: 5_695, pair: 2_847, seed: 643_450_648, candidateSide: "red" },
     { game: 6_678, pair: 3_339, seed: 955_787_076, candidateSide: "green" },
     { game: 6_724, pair: 3_362, seed: 1_878_267_435, candidateSide: "green" },
+    {
+        game: 7_845,
+        pair: 3_922,
+        seed: 2_303_609_179,
+        candidateSide: "red",
+        candidateRoster: ["Mermaid", "Troglodyte", "Valkyrie", "Wyvern", "Goblin Knight", "Abomination"],
+        opponentRoster: ["Mermaid", "Berserker", "Wyvern", "Beholder", "Pegasus", "Angel"],
+    },
 ] as const;
 
 const activatedActionEngine = (
@@ -260,6 +268,46 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             expect(record.crash).toBeUndefined();
         });
     }
+
+    test("keeps game 7845's moving-target pursuit informational instead of hard mountain jitter", () => {
+        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 7_845);
+
+        expect(record).toMatchObject({
+            game: 7_845,
+            pair: 3_922,
+            seed: 2_303_609_179,
+            candidateSide: "red",
+            winner: "candidate",
+            laps: 11,
+            endReason: "elimination",
+            candidateEngineRejections: 0,
+        });
+        expect(record.byCreature.Troglodyte).toMatchObject({
+            observedTurns: 12,
+            oracleDirectEligibleTurns: 4,
+            sharedCatalogDirectEligibleTurns: 4,
+            chosenDirectActionTurns: 4,
+            pureMoveTurns: 7,
+            abaOscillations: 1,
+            urgentMountainTerminalJitter: 0,
+            lateDirectEligibleTurns: 1,
+            lateDirectActionMisses: 0,
+            strategyRejectedActions: 0,
+            recoveryTurns: 0,
+        });
+        expect(
+            record.failureSamples.some(
+                ({ creatureName, lap, issue }) =>
+                    creatureName === "Troglodyte" && lap === 9 && issue === "aba_oscillation",
+            ),
+        ).toBe(true);
+        expect(
+            record.failureSamples.some(
+                ({ creatureName, issue }) =>
+                    creatureName === "Troglodyte" && issue === "urgent_mountain_terminal_jitter",
+            ),
+        ).toBe(false);
+    });
 
     test("uses deterministic random rosters and exact adjacent seat swaps on BLOCK_CENTER", () => {
         const fingerprint = fingerprintV08BlockCenterActionPlan(OPTIONS);
@@ -1095,7 +1143,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         expect(auditor.failureSamples.some(({ issue }) => issue === "urgent_mountain_terminal_jitter")).toBe(true);
     });
 
-    test("gates a terminal melee A-B-A return even when its closing leg resets distance progress", () => {
+    test("gates a terminal melee A-B-A return against a stable enemy even when its closing leg makes progress", () => {
         const plan = planV08BlockCenterActionGame(OPTIONS, 0);
         const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
         const actor = createTestUnit({
@@ -1118,6 +1166,10 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         const relocate = (cell: XY): void => {
             combat.grid.cleanupAll(actor.getId(), actor.getAttackRange(), actor.isSmallSize());
             placeUnit(combat.grid, combat.unitsHolder, actor, cell);
+        };
+        const relocateTarget = (cell: XY): void => {
+            combat.grid.cleanupAll(target.getId(), target.getAttackRange(), target.isSmallSize());
+            placeUnit(combat.grid, combat.unitsHolder, target, cell);
         };
         const observeMove = (from: XY, to: XY): void => {
             const move: GameAction = {
@@ -1177,10 +1229,45 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             ),
         ).toBe(true);
 
+        // The same physical return is diagnostic, not a hard stall, when the enemy crosses the board and makes
+        // the old footprint newly closer. Game 7845 follows this exact pursuit pattern.
+        auditor = new V08BlockCenterActionAuditor(plan);
+        relocate(a);
+        relocateTarget({ x: 13, y: 7 });
+        observeMove(a, b);
+        relocate(b);
+        relocateTarget({ x: 1, y: 5 });
+        observeMove(b, a);
+        auditor.finish();
+
+        expect(auditor.metrics).toMatchObject({
+            observedTurns: 2,
+            abaOscillations: 1,
+            urgentMountainTerminalJitter: 0,
+        });
+        expect(auditor.failureSamples.some(({ issue }) => issue === "urgent_mountain_terminal_jitter")).toBe(false);
+
+        // A changed target board does not excuse a return that still fails to close current enemy distance.
+        auditor = new V08BlockCenterActionAuditor(plan);
+        relocate(a);
+        relocateTarget({ x: 13, y: 7 });
+        observeMove(a, b);
+        relocate(b);
+        relocateTarget({ x: 13, y: 8 });
+        observeMove(b, a);
+        auditor.finish();
+
+        expect(auditor.metrics).toMatchObject({
+            observedTurns: 2,
+            abaOscillations: 1,
+            urgentMountainTerminalJitter: 1,
+        });
+
         // A completed productive turn is a history boundary. Returning after mining is not a consecutive
         // movement loop and must not inherit the earlier A footprint.
         auditor = new V08BlockCenterActionAuditor(plan);
         relocate(a);
+        relocateTarget({ x: 13, y: 7 });
         observeMove(a, b);
         relocate(b);
         const mine: GameAction = {
@@ -1220,6 +1307,29 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             abaOscillations: 0,
             urgentMountainTerminalJitter: 0,
         });
+
+        // Enemy identity participates in the tactical-state key, so replacing a stack in the same footprint
+        // cannot masquerade as an unchanged board.
+        auditor = new V08BlockCenterActionAuditor(plan);
+        relocate(a);
+        relocateTarget({ x: 1, y: 5 });
+        observeMove(a, b);
+        relocate(b);
+        combat.grid.cleanupAll(target.getId(), target.getAttackRange(), target.isSmallSize());
+        combat.unitsHolder.deleteUnitById(target.getId());
+        const replacement = createTestUnit({
+            team: PBTypes.TeamVals.UPPER,
+            name: "Replacement target",
+        });
+        placeUnit(combat.grid, combat.unitsHolder, replacement, { x: 1, y: 5 });
+        observeMove(b, a);
+        auditor.finish();
+
+        expect(auditor.metrics).toMatchObject({
+            observedTurns: 2,
+            abaOscillations: 1,
+            urgentMountainTerminalJitter: 0,
+        });
     });
 
     test("classifies enemy-distance progress and A-B-A movement independently of AI scores", () => {
@@ -1250,6 +1360,12 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         expect(isV08BlockCenterUrgentMountainABAOscillation(9, "both_intact", false, false, true)).toBe(false);
         expect(isV08BlockCenterUrgentMountainABAOscillation(9, "both_intact", true, true, true)).toBe(false);
         expect(isV08BlockCenterUrgentMountainABAOscillation(9, "both_intact", true, false, false)).toBe(false);
+        expect(isV08BlockCenterUrgentMountainABAOscillation(9, "both_intact", true, false, true, true, true)).toBe(
+            false,
+        );
+        expect(isV08BlockCenterUrgentMountainABAOscillation(9, "both_intact", true, false, true, true, false)).toBe(
+            true,
+        );
         expect(isV08BlockCenterNonDamagingSpellTurnExempt(8)).toBe(true);
         expect(isV08BlockCenterNonDamagingSpellTurnExempt(9)).toBe(false);
     });
