@@ -9,7 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
-import type { IAIStrategy } from "../ai";
+import { getAIStrategy, type IAIStrategy } from "../ai";
+import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import type { GameAction } from "../engine/actions";
 import type { GameActionEngine } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
@@ -428,7 +429,9 @@ export class LookaheadDriver {
     }
     // ---- simulated turn plumbing (mirrors battle_engine's loop, minus recording) --------------
     private simPlayTurn(unit: Unit): void {
-        const strat = this.deps.strategyForTeam(unit.getTeam());
+        const teamStrategy = this.deps.strategyForTeam(unit.getTeam());
+        // A future rollout turn has the same per-unit controller contract as a live root turn.
+        const strat = isMindlessAiUnit(unit) ? getAIStrategy(MINDLESS_AI_VERSION) : teamStrategy;
         const id = unit.getId();
         let decided: GameAction[];
         try {

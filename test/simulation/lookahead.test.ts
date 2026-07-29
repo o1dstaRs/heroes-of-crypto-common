@@ -400,6 +400,42 @@ describe("lookahead driver — replay determinism / no RNG leak", () => {
             setDeterministicRandomSource(undefined);
         }
     });
+
+    it("pins active AI-Driven rollout turns to v0.1 instead of the team strategy", () => {
+        try {
+            const h = buildBattle(1314, "v0.5");
+            const unit = h.activeUnit();
+            expect(unit).toBeDefined();
+            unit!.grantAbility("AI Driven");
+
+            const teamStrategy = getAIStrategy("v0.5");
+            const v01 = getAIStrategy("v0.1");
+            const originalTeamDecideTurn = teamStrategy.decideTurn;
+            const originalV01DecideTurn = v01.decideTurn;
+            let teamCalls = 0;
+            const origins: Array<IDecisionContext["decisionOrigin"]> = [];
+            teamStrategy.decideTurn = (rolloutUnit, context) => {
+                teamCalls += 1;
+                return originalTeamDecideTurn.call(teamStrategy, rolloutUnit, context);
+            };
+            v01.decideTurn = (rolloutUnit, context) => {
+                origins.push(context.decisionOrigin);
+                return originalV01DecideTurn.call(v01, rolloutUnit, context);
+            };
+
+            try {
+                (h.driver as unknown as { simPlayTurn(unitToPlay: Unit): void }).simPlayTurn(unit!);
+            } finally {
+                teamStrategy.decideTurn = originalTeamDecideTurn;
+                v01.decideTurn = originalV01DecideTurn;
+            }
+
+            expect(origins).toEqual(["rollout"]);
+            expect(teamCalls).toBe(0);
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+    });
 });
 
 function normalize(value: unknown): unknown {

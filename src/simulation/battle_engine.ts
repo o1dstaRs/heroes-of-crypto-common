@@ -235,7 +235,7 @@ export interface IStrategyActionExecution {
     readonly events: readonly GameEvent[];
 }
 
-export type TurnRecoverySource = "none" | "advance" | "defend";
+export type TurnRecoverySource = "none" | "v0.1_retry" | "advance" | "defend";
 
 /** Simulator fallback used only when every substantive strategy action was declined. */
 export interface ITurnRecoveryObservation {
@@ -1171,11 +1171,17 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // its team's brain — see ai/unit_ai_overrides. Resolving it HERE rather than inside decideTurn
         // also takes search and lookahead off the unit, since both gate on strategy.version just below.
         const teamStrategy = unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy;
-        const strategy = isMindlessAiUnit(unit) ? getAIStrategy(MINDLESS_AI_VERSION) : teamStrategy;
+        const mindlessUnit = isMindlessAiUnit(unit);
+        const strategy = mindlessUnit ? getAIStrategy(MINDLESS_AI_VERSION) : teamStrategy;
         const matrix = grid.getMatrix();
-        const searchApplies = search.appliesTo(strategy.version);
+        // The per-unit pin is an authoritative control invariant, not merely a version default. An
+        // experimental `SEARCH_VERSIONS=v0.1` must not put a mindless live turn back through a generic
+        // selector, and the separate trajectory driver must obey the same boundary.
+        const searchApplies = !mindlessUnit && search.appliesTo(strategy.version);
         const trajectorySearchApplies =
-            v08A13TrajectoryTeams.has(unit.getTeam()) && v08A13TrajectorySearch?.appliesTo(strategy.version) === true;
+            !mindlessUnit &&
+            v08A13TrajectoryTeams.has(unit.getTeam()) &&
+            v08A13TrajectorySearch?.appliesTo(strategy.version) === true;
         const decisionPathCatalog =
             searchApplies || trajectorySearchApplies
                 ? createDecisionPathCatalog(grid, pathHelper, unit, matrix, config.decisionObserver !== undefined)
@@ -1203,7 +1209,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                   }
                 : {}),
         };
-        const lookaheadApplies = lookahead.enabled && strategy.version === "v0.5";
+        const lookaheadApplies = !mindlessUnit && lookahead.enabled && strategy.version === "v0.5";
         const targetMemoryBeforeDecision =
             searchApplies || trajectorySearchApplies || lookaheadApplies
                 ? captureAITargetMemory(unitsHolder)
@@ -1314,6 +1320,23 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         let auditWaited = false;
         let auditAttacked = false;
         let auditMoved = false;
+        const markCompletedProductiveAction = (action: GameAction): void => {
+            if (action.type === "select_attack_type") {
+                return;
+            }
+            didSomething = true;
+            if (action.type === "wait_turn") {
+                auditWaited = true;
+            } else if (action.type === "move_unit") {
+                auditMoved = true;
+            } else if (
+                action.type === "melee_attack" ||
+                action.type === "range_attack" ||
+                action.type === "cast_spell"
+            ) {
+                auditAttacked = true;
+            }
+        };
         const auditProposedAttack = decided.some((a) => a.type === "melee_attack" || a.type === "range_attack");
         const auditProposedMove = decided.some((a) => a.type === "move_unit");
         for (let actionIndex = 0; actionIndex < decided.length; actionIndex += 1) {
@@ -1331,18 +1354,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 turnEventsForObservation!.push(...observedEvents);
             }
             if (result.completed && action.type !== "select_attack_type") {
-                didSomething = true; // a real action landed (a move or an attack)
-                if (action.type === "wait_turn") {
-                    auditWaited = true;
-                } else if (action.type === "move_unit") {
-                    auditMoved = true;
-                } else if (
-                    action.type === "melee_attack" ||
-                    action.type === "range_attack" ||
-                    action.type === "cast_spell"
-                ) {
-                    auditAttacked = true;
-                }
+                markCompletedProductiveAction(action); // a real action landed (a move or an attack)
             }
             if (!result.completed) {
                 // The strategy proposed a command the engine declined — including a bookkeeping selector.
@@ -1432,7 +1444,9 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 rejectedDetails.push({
                     type: action.type,
                     reason: result.rejectionReason,
-                    version: (unit.getTeam() === GREEN_TEAM ? greenStrategy : redStrategy).version,
+                    // Report the strategy that actually emitted the command. A mindless unit on a v0.8
+                    // team is v0.1 here; attributing its rejection to the team hid the per-unit route.
+                    version: strategy.version,
                     creature: unit.getName(),
                     ammo: unit.getRangeShots(),
                     possible: unit.getPossibleAttackTypes().join("|"),
@@ -1448,9 +1462,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
 
         // A move_unit leaves the unit ACTIVE (it may attack after moving), so a turn can be incomplete
         // even though the unit acted. Only RECOVER when nothing landed — i.e. the engine declined every
-        // proposal (a doomed attack) — so the turn isn't wasted: advance toward the enemy, else defend.
-        // Then close out the turn. Only completed actions are recorded, so a declined proposal never
-        // shows up as a "rejected" turn.
+        // proposal (a doomed attack). Mindless control is stricter: re-run exact v0.1 once against the
+        // post-selector state, then let the neutral end-turn below close it. A hard-coded advance/defend
+        // here would be a second tactical controller and could replace a now-legal charge with a shield.
+        // Ordinary strategies retain the generic advance-toward-enemy, else defend safety net.
         if (SKIP_AUDIT.enabled && didSomething) {
             // The turn landed something: hourglass park, an attack, or a plain move.
             auditTurn(
@@ -1465,6 +1480,22 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 }
                 const fromCell = { ...unit.getBaseCell() };
                 const r = engine.apply(action);
+                if (!r.completed && source === "v0.1_retry") {
+                    if (unit.getTeam() === GREEN_TEAM) {
+                        rejectedGreen += 1;
+                    } else {
+                        rejectedRed += 1;
+                    }
+                    rejectedDetails.push({
+                        type: action.type,
+                        reason: r.rejectionReason,
+                        version: strategy.version,
+                        creature: unit.getName(),
+                        ammo: unit.getRangeShots(),
+                        possible: unit.getPossibleAttackTypes().join("|"),
+                        cause: "v0.1_retry",
+                    });
+                }
                 if (turnExecutionObserver) {
                     const observedEvents = structuredClone(r.events);
                     const recoveryAttempt: ITurnRecoveryObservation = {
@@ -1482,20 +1513,41 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 applyEvents(r.events);
                 return r.completed;
             };
-            const advance = advanceTowardEnemyAction(unit, grid, unitsHolder, pathHelper);
-            const advanced = !!advance && recover(advance, "advance");
-            if (!advanced) {
-                recover({ type: "defend_turn", unitId: actingUnitId }, "defend");
-            }
-            if (SKIP_AUDIT.enabled) {
-                // decideTurn landed NOTHING — this is exactly what the client renders as "skips turn" (it has
-                // no advance/defend net). Label by what was proposed, whether the sim could still advance
-                // (client would skip, sim moves) or only defend (truly stuck), unit size, and re-up state.
-                const proposed = auditProposedAttack ? "atkrej" : auditProposedMove ? "movrej" : "idle";
-                const recovery = advanced ? "advance" : "defend";
-                const size = unit.isSmallSize() ? "small" : "large";
-                const reup = fightProperties.hasAlreadyHourglass(unit.getId()) ? "_reup" : "";
-                auditTurn(`skip_${proposed}_${recovery}_${size}${reup}`, unit.getName());
+            if (mindlessUnit) {
+                // No search/trajectory/lookahead is consulted for this retry. It is the same pinned policy
+                // reading the authoritative state after any selector attempt from its first proposal.
+                let retried: GameAction[] = [];
+                try {
+                    retried = strategy.decideTurn(unit, decisionContext);
+                } catch {
+                    // The initial decision already ran successfully. A retry-only policy fault must not
+                    // crash the match or hand control to another selector; the neutral end-turn below is
+                    // the sole fail-closed outcome.
+                }
+                for (const action of retried) {
+                    if (finished || currentActiveUnitId !== actingUnitId) {
+                        break;
+                    }
+                    if (recover(action, "v0.1_retry")) {
+                        markCompletedProductiveAction(action);
+                    }
+                }
+            } else {
+                const advance = advanceTowardEnemyAction(unit, grid, unitsHolder, pathHelper);
+                const advanced = !!advance && recover(advance, "advance");
+                if (!advanced) {
+                    recover({ type: "defend_turn", unitId: actingUnitId }, "defend");
+                }
+                if (SKIP_AUDIT.enabled) {
+                    // decideTurn landed NOTHING — this is exactly what the client renders as "skips turn" (it has
+                    // no advance/defend net). Label by what was proposed, whether the sim could still advance
+                    // (client would skip, sim moves) or only defend (truly stuck), unit size, and re-up state.
+                    const proposed = auditProposedAttack ? "atkrej" : auditProposedMove ? "movrej" : "idle";
+                    const recovery = advanced ? "advance" : "defend";
+                    const size = unit.isSmallSize() ? "small" : "large";
+                    const reup = fightProperties.hasAlreadyHourglass(unit.getId()) ? "_reup" : "";
+                    auditTurn(`skip_${proposed}_${recovery}_${size}${reup}`, unit.getName());
+                }
             }
         }
         if (!finished && currentActiveUnitId === actingUnitId) {

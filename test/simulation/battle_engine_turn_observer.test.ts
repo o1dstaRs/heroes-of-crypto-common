@@ -11,8 +11,9 @@ import {
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../../src/grid/grid_math";
-import { buildRoster, makeRng } from "../../src/simulation/army";
+import { buildRoster, makeRng, type IArmyUnitSpec } from "../../src/simulation/army";
 import { runMatch, type IMatchResult, type ITurnExecutionObservation } from "../../src/simulation/battle_engine";
+import { LookaheadDriver } from "../../src/simulation/lookahead";
 import { SearchDriver } from "../../src/simulation/search_driver";
 import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
@@ -64,6 +65,184 @@ const runObservedMatchWithV01Transform = (
 };
 
 describe("battle engine turn execution observer", () => {
+    test("keeps active AI-Driven roots out of research search and trajectory selectors", () => {
+        const previousSearch = process.env.V07_SEARCH;
+        const previousVersions = process.env.SEARCH_VERSIONS;
+        const previousLookahead = process.env.V05_LOOKAHEAD;
+        const originalAppliesTo = SearchDriver.prototype.appliesTo;
+        const originalChooseDecision = SearchDriver.prototype.chooseDecision;
+        const originalLookaheadChooseDecision = LookaheadDriver.prototype.chooseDecision;
+        const observedVersions: string[] = [];
+        let v01SearchGateCalls = 0;
+        let v01SearchSelections = 0;
+        let v01LookaheadSelections = 0;
+        process.env.V07_SEARCH = "1";
+        process.env.SEARCH_VERSIONS = "v0.1";
+        process.env.V05_LOOKAHEAD = "on";
+        SearchDriver.prototype.appliesTo = function (version): boolean {
+            if (version === "v0.1") {
+                v01SearchGateCalls += 1;
+            }
+            return originalAppliesTo.call(this, version);
+        };
+        SearchDriver.prototype.chooseDecision = function (unit, version, incumbent, context): GameAction[] {
+            if (version === "v0.1") {
+                v01SearchSelections += 1;
+            }
+            return originalChooseDecision.call(this, unit, version, incumbent, context);
+        };
+        LookaheadDriver.prototype.chooseDecision = function (unit, incumbent): GameAction[] {
+            if (unit.hasAbilityActive("AI Driven")) {
+                v01LookaheadSelections += 1;
+            }
+            return originalLookaheadChooseDecision.call(this, unit, incumbent);
+        };
+        const roster: readonly IArmyUnitSpec[] = [
+            { faction: "Might", creatureName: "Berserker", level: 1, size: 1, amount: 20 },
+        ];
+        try {
+            runMatch({
+                greenVersion: "v0.8",
+                redVersion: "v0.8",
+                roster,
+                seed: 91_001,
+                maxLaps: 2,
+                searchScoredDecisionObserver: () => {},
+                searchV08A13TrajectoryTeams: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+                decisionObserver: ({ strategyVersion }) => observedVersions.push(strategyVersion),
+            });
+        } finally {
+            SearchDriver.prototype.appliesTo = originalAppliesTo;
+            SearchDriver.prototype.chooseDecision = originalChooseDecision;
+            LookaheadDriver.prototype.chooseDecision = originalLookaheadChooseDecision;
+            if (previousSearch === undefined) delete process.env.V07_SEARCH;
+            else process.env.V07_SEARCH = previousSearch;
+            if (previousVersions === undefined) delete process.env.SEARCH_VERSIONS;
+            else process.env.SEARCH_VERSIONS = previousVersions;
+            if (previousLookahead === undefined) delete process.env.V05_LOOKAHEAD;
+            else process.env.V05_LOOKAHEAD = previousLookahead;
+        }
+
+        expect(observedVersions.length).toBeGreaterThan(0);
+        expect(observedVersions.every((version) => version === "v0.1")).toBe(true);
+        // Both the generic research driver and the optional a13 trajectory driver are short-circuited
+        // before their version gates, so neither can become a second controller for the live root.
+        expect(v01SearchGateCalls).toBe(0);
+        expect(v01SearchSelections).toBe(0);
+        expect(v01LookaheadSelections).toBe(0);
+    });
+
+    test("re-decides a rejected mindless attack with exact v0.1 instead of generic advance or defend", () => {
+        const originalDecideTurn = STRATEGY_V0_1.decideTurn;
+        const turns: ITurnExecutionObservation[] = [];
+        let injectedUnitId: string | undefined;
+        STRATEGY_V0_1.decideTurn = (unit, context) => {
+            const incumbent = originalDecideTurn.call(STRATEGY_V0_1, unit, context);
+            if (
+                !injectedUnitId &&
+                unit.hasAbilityActive("AI Driven") &&
+                incumbent.some((action) => action.type === "melee_attack")
+            ) {
+                injectedUnitId = unit.getId();
+                return [{ type: "range_attack", attackerId: unit.getId(), targetId: unit.getId() }];
+            }
+            return incumbent;
+        };
+        const roster: readonly IArmyUnitSpec[] = [
+            { faction: "Might", creatureName: "Berserker", level: 1, size: 1, amount: 20 },
+        ];
+        let result: IMatchResult;
+        try {
+            result = runMatch({
+                greenVersion: "v0.8",
+                redVersion: "v0.8",
+                roster,
+                seed: 91_002,
+                maxLaps: 8,
+                turnExecutionObserver: (observation) => turns.push(observation),
+            });
+        } finally {
+            STRATEGY_V0_1.decideTurn = originalDecideTurn;
+        }
+
+        expect(injectedUnitId).toBeDefined();
+        const retriedTurn = turns.find(
+            (turn) =>
+                turn.unitId === injectedUnitId &&
+                turn.strategyActions.some((execution) => execution.action.type === "range_attack"),
+        );
+        expect(retriedTurn).toBeDefined();
+        expect(retriedTurn!.strategyVersion).toBe("v0.1");
+        expect(retriedTurn!.recoveryAttempts.length).toBeGreaterThan(0);
+        expect(retriedTurn!.recoveryAttempts.every((attempt) => attempt.source === "v0.1_retry")).toBe(true);
+        expect(
+            retriedTurn!.recoveryAttempts.some(
+                (attempt) => attempt.completed && attempt.action?.type === "melee_attack",
+            ),
+        ).toBe(true);
+        expect(retriedTurn!.events.map((event) => event.type)).toContain("unit_attacked");
+        expect(retriedTurn!.events.map((event) => event.type)).not.toContain("unit_defended");
+        expect(result.rejectedDetails).toContainEqual(
+            expect.objectContaining({
+                creature: "Berserker",
+                type: "range_attack",
+                version: "v0.1",
+            }),
+        );
+    });
+
+    test("ends neutrally when the mindless v0.1 retry itself throws", () => {
+        const originalDecideTurn = STRATEGY_V0_1.decideTurn;
+        const turns: ITurnExecutionObservation[] = [];
+        let injectedUnitId: string | undefined;
+        let throwOnRetry = false;
+        STRATEGY_V0_1.decideTurn = (unit, context) => {
+            if (throwOnRetry && unit.getId() === injectedUnitId) {
+                throwOnRetry = false;
+                throw new Error("injected retry-only failure");
+            }
+            const incumbent = originalDecideTurn.call(STRATEGY_V0_1, unit, context);
+            if (
+                !injectedUnitId &&
+                unit.hasAbilityActive("AI Driven") &&
+                incumbent.some((action) => action.type === "melee_attack")
+            ) {
+                injectedUnitId = unit.getId();
+                throwOnRetry = true;
+                return [{ type: "range_attack", attackerId: unit.getId(), targetId: unit.getId() }];
+            }
+            return incumbent;
+        };
+        const roster: readonly IArmyUnitSpec[] = [
+            { faction: "Might", creatureName: "Berserker", level: 1, size: 1, amount: 20 },
+        ];
+        try {
+            runMatch({
+                greenVersion: "v0.8",
+                redVersion: "v0.8",
+                roster,
+                seed: 91_003,
+                maxLaps: 8,
+                turnExecutionObserver: (observation) => turns.push(observation),
+            });
+        } finally {
+            STRATEGY_V0_1.decideTurn = originalDecideTurn;
+        }
+
+        expect(injectedUnitId).toBeDefined();
+        const failedRetryTurn = turns.find(
+            (turn) =>
+                turn.unitId === injectedUnitId &&
+                turn.strategyActions.some((execution) => execution.action.type === "range_attack"),
+        );
+        expect(failedRetryTurn).toBeDefined();
+        expect(failedRetryTurn!.recoveryAttempts).toEqual([]);
+        expect(failedRetryTurn!.recovery).toEqual({ source: "none", completed: false, events: [] });
+        expect(failedRetryTurn!.events.map((event) => event.type)).toContain("unit_skipped");
+        expect(failedRetryTurn!.events.map((event) => event.type)).not.toContain("unit_defended");
+        expect(failedRetryTurn!.events.map((event) => event.type)).not.toContain("unit_moved");
+    });
+
     test("emits policy telemetry only when search retains the strategy incumbent", () => {
         const retained: IAIPolicyEvent[] = [];
         const retainedProposals: IAIPolicyEvent[] = [];

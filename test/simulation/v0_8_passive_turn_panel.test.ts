@@ -1263,16 +1263,18 @@ describe("v0.8 random-roster passive-turn panel", () => {
         }
     });
 
-    test("operation-bounded scoring removes the effect-consumed waits from the lava regression", () => {
-        // Every circuit-open wait now receives finite scored arbitration. In this seeded lava fight Mermaid
-        // therefore waits only when it really reactivates; the former effect-consumed waits disappear.
-        // The synthetic lifecycle test above separately pins classification if a live effect does consume one.
+    test("censors strict-rollout effect-consumed waits without reporting a missed reactivation", () => {
+        // Exact v0.1 modelling for the candidate Frenzied Boar changes this seeded lava fight's downstream
+        // target trajectory. Mermaid now has two waits consumed by effects before it can reactivate; those
+        // are censored lifecycle outcomes, not missed opportunities or avoidable policy waits. The forced-
+        // circuit games immediately above retain the operation-bounded arbitration regression coverage.
         const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 2);
         expect(record.endReason).toBe("elimination");
-        expect(record.byCreature.Mermaid.waitTurns).toBe(3);
+        expect(record.byCreature.Mermaid.waitTurns).toBe(5);
         expect(record.byCreature.Mermaid.sameLapWaitReactivations).toBe(3);
-        expect(record.byCreature.Mermaid.waitsSkippedByEffectBeforeReactivation).toBe(0);
+        expect(record.byCreature.Mermaid.waitsSkippedByEffectBeforeReactivation).toBe(2);
         expect(record.byCreature.Mermaid.missedSameLapWaitReactivations).toBe(0);
+        expect(record.byCreature.Mermaid.avoidableWaitTurns).toBe(0);
         expect(record.metrics.missedSameLapWaitReactivations).toBe(0);
     });
 });

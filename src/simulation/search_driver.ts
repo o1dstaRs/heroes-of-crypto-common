@@ -20,6 +20,7 @@ import {
     type IDecisionContext,
     type IEnumeratedCandidate,
 } from "../ai";
+import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import {
     canWaitOnHourglassMirror,
     extractWaitFeatures,
@@ -4066,10 +4067,13 @@ export class SearchDriver {
     // ---- simulated turn plumbing (mirrors lookahead.ts / battle_engine's loop, minus recording) ----
     private simPlayTurn(unit: Unit): void {
         // SEARCH_OPP_MODEL: the searched side keeps its true self-model; only the enemy is re-modelled.
-        const strat =
+        const teamStrategy =
             this.oppModel && unit.getTeam() === this.rolloutEnemyTeam
                 ? this.oppModel
                 : this.deps.strategyForTeam(unit.getTeam());
+        // Rollouts must model the same controller that will own this future live turn. In particular,
+        // an opponent model or team v0.8+a13 policy must never steer an active AI-Driven stack.
+        const strat = isMindlessAiUnit(unit) ? getAIStrategy(MINDLESS_AI_VERSION) : teamStrategy;
         const id = unit.getId();
         let decided: GameAction[];
         try {

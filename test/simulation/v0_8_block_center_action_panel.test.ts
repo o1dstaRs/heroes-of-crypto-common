@@ -285,7 +285,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         });
     }
 
-    test("keeps game 7845's moving-target pursuit informational instead of hard mountain jitter", () => {
+    test("keeps game 7845's strict-v0.1 rollout pursuit informational instead of hard mountain jitter", () => {
         const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 7_845);
 
         expect(record).toMatchObject({
@@ -294,19 +294,23 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             seed: 2_303_609_179,
             candidateSide: "red",
             winner: "candidate",
-            laps: 11,
+            laps: 9,
             endReason: "elimination",
             candidateEngineRejections: 0,
         });
-        expect(record.byCreature.Troglodyte).toMatchObject({
-            observedTurns: 12,
+        expect(record.byCreature.Wyvern).toMatchObject({
+            observedTurns: 10,
             oracleDirectEligibleTurns: 4,
             sharedCatalogDirectEligibleTurns: 4,
-            chosenDirectActionTurns: 4,
-            pureMoveTurns: 7,
-            abaOscillations: 1,
+            chosenDirectActionTurns: 3,
+            pureMoveTurns: 5,
+            nonProgressMoves: 2,
+            noncombatWithDirectOptionTurns: 1,
+            eligibleCombatMisses: 1,
+            abaOscillations: 0,
+            urgentRepeatedNonProgressWithDirectOption: 0,
             urgentMountainTerminalJitter: 0,
-            lateDirectEligibleTurns: 1,
+            lateDirectEligibleTurns: 0,
             lateDirectActionMisses: 0,
             strategyRejectedActions: 0,
             recoveryTurns: 0,
@@ -314,13 +318,24 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         expect(
             record.failureSamples.some(
                 ({ creatureName, lap, issue }) =>
-                    creatureName === "Troglodyte" && lap === 9 && issue === "aba_oscillation",
+                    creatureName === "Wyvern" && lap === 2 && issue === "non_progress_move",
             ),
         ).toBe(true);
         expect(
             record.failureSamples.some(
-                ({ creatureName, issue }) =>
-                    creatureName === "Troglodyte" && issue === "urgent_mountain_terminal_jitter",
+                ({ creatureName, lap, issue }) =>
+                    creatureName === "Wyvern" && lap === 3 && issue === "noncombat_with_direct_option",
+            ),
+        ).toBe(true);
+        expect(
+            record.failureSamples.some(
+                ({ creatureName, lap, issue }) =>
+                    creatureName === "Wyvern" && lap === 4 && issue === "non_progress_move",
+            ),
+        ).toBe(true);
+        expect(
+            record.failureSamples.some(
+                ({ creatureName, issue }) => creatureName === "Wyvern" && issue === "urgent_mountain_terminal_jitter",
             ),
         ).toBe(false);
     });

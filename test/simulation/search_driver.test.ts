@@ -4746,6 +4746,58 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(origins.every((origin) => origin === "rollout")).toBe(true);
     });
 
+    it("pins active AI-Driven rollout turns to v0.1 ahead of team and opponent models", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_OPP_MODEL: "v0.4",
+        });
+        let teamCalls = 0;
+        let opponentModelCalls = 0;
+        const origins: Array<IDecisionContext["decisionOrigin"]> = [];
+        const teamStrategy = {
+            version: "team-rollout-recorder",
+            decideTurn: (): GameAction[] => {
+                teamCalls += 1;
+                return [];
+            },
+        } as unknown as IAIStrategy;
+        const h = buildBattle(1314, "v0.8", teamStrategy);
+        const unit = h.activeUnit();
+        expect(unit).toBeDefined();
+        unit!.grantAbility("AI Driven");
+
+        const v01 = getAIStrategy("v0.1");
+        const opponentModel = getAIStrategy("v0.4");
+        const originalV01DecideTurn = v01.decideTurn;
+        const originalOpponentDecideTurn = opponentModel.decideTurn;
+        v01.decideTurn = (rolloutUnit, context) => {
+            origins.push(context.decisionOrigin);
+            return originalV01DecideTurn.call(v01, rolloutUnit, context);
+        };
+        opponentModel.decideTurn = (rolloutUnit, context) => {
+            opponentModelCalls += 1;
+            return originalOpponentDecideTurn.call(opponentModel, rolloutUnit, context);
+        };
+        try {
+            const driver = h.makeDriver() as unknown as {
+                rolloutEnemyTeam: TeamType | null;
+                simPlayTurn(unitToPlay: Unit): void;
+            };
+            // Exercise the strongest alternate route: the unit is on the side currently rebound to
+            // SEARCH_OPP_MODEL. AI Driven must still win before that model is consulted.
+            driver.rolloutEnemyTeam = unit!.getTeam();
+            driver.simPlayTurn(unit!);
+        } finally {
+            v01.decideTurn = originalV01DecideTurn;
+            opponentModel.decideTurn = originalOpponentDecideTurn;
+        }
+
+        expect(origins).toEqual(["rollout"]);
+        expect(teamCalls).toBe(0);
+        expect(opponentModelCalls).toBe(0);
+    });
+
     it("force-transitions a live stalled lap instead of scoring a premature leaf", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
         const h = buildBattle(707, "v0.6");

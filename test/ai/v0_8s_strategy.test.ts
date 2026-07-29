@@ -465,22 +465,10 @@ describe("v0.8 search measurement alias", () => {
         expect(plan.seed).toBe(2_101_899_737);
         const expected: GameAction[] = [
             {
-                type: "move_unit",
-                unitId: "dde1fb1c-4537-547a-bf69-c1f4f53efeb6",
-                path: [
-                    { x: 4, y: 4 },
-                    { x: 5, y: 4 },
-                    { x: 6, y: 4 },
-                ],
-                targetCells: [{ x: 6, y: 4 }],
-                hasLavaCell: false,
-                hasWaterCell: false,
-            },
-            {
                 type: "range_attack",
                 attackerId: "dde1fb1c-4537-547a-bf69-c1f4f53efeb6",
                 targetId: "99b6a8bf-908d-57c9-a089-ac6ee14aea7a",
-                aimCell: { x: 9, y: 12 },
+                aimCell: { x: 5, y: 13 },
                 aimSide: 0,
             },
         ];
