@@ -84,8 +84,32 @@ export const LEAGUE_GENOME_KEYS: readonly string[] = [
     "perk.seeNone",
 ];
 
+/** Win-rate of a coin-flip: what an artifact with no measured row is worth to the anchor. */
+const NEUTRAL_ARTIFACT_WEIGHT = 50;
+
 const artifactAnchor = (table: Readonly<Record<number, number>>): number[] =>
-    Array.from({ length: 12 }, (_, index) => table[index + 1] ?? 50);
+    Array.from({ length: 12 }, (_, index) => table[index + 1] ?? NEUTRAL_ARTIFACT_WEIGHT);
+
+/**
+ * Weight of one artifact head, by artifact id.
+ *
+ * The heads are a FIXED 12 wide and sit at fixed offsets, because the genome dimension is a trained-model
+ * contract (LEAGUE_GENOME_DIM, the v0.9 feature schema hash, every pinned genome vector). The live pool has
+ * since grown past 12 (LIVE_TIER{1,2}_ARTIFACT_COUNT), so an id beyond the head would silently read the
+ * NEXT head's first weight and score an artifact by an unrelated number. Ids outside the head fall back to
+ * the neutral 50 the anchor uses for an unmeasured artifact instead, which leaves them pickable but never
+ * preferred on a bogus weight. Widening the heads is a genome-migration change, not a drive-by one.
+ */
+const artifactHeadWeight = (
+    weights: readonly number[],
+    head: { readonly offset: number; readonly length: number },
+    artifactId: number,
+): number => {
+    if (!Number.isInteger(artifactId) || artifactId < 1 || artifactId > head.length) {
+        return NEUTRAL_ARTIFACT_WEIGHT;
+    }
+    return weights[head.offset + artifactId - 1];
+};
 
 const augmentAnchor = (): number[] => {
     const base: Record<LeagueAugmentKind, number> = { Armor: 19, Might: 15, Sniper: 7, Movement: -5 };
@@ -274,7 +298,7 @@ export function pickLeagueBundle(state: IPickSimState, team: PickTeam, genome: I
         const score =
             scoreLeagueCreature(level1, bundleOwn, opponent, genome.weights) +
             scoreLeagueCreature(level2, bundleOwn, opponent, genome.weights) +
-            genome.weights[LEAGUE_GENOME_LAYOUT.tier1.offset + artifact - 1];
+            artifactHeadWeight(genome.weights, LEAGUE_GENOME_LAYOUT.tier1, artifact);
         if (score > bestScore) {
             bestScore = score;
             bestIndex = index as 0 | 1;
@@ -309,8 +333,8 @@ export function pickLeagueTier2(state: IPickSimState, team: PickTeam, genome: IL
     let best = offers[0] ?? 0;
     for (const artifact of offers.slice(1)) {
         if (
-            genome.weights[LEAGUE_GENOME_LAYOUT.tier2.offset + artifact - 1] >
-            genome.weights[LEAGUE_GENOME_LAYOUT.tier2.offset + best - 1]
+            artifactHeadWeight(genome.weights, LEAGUE_GENOME_LAYOUT.tier2, artifact) >
+            artifactHeadWeight(genome.weights, LEAGUE_GENOME_LAYOUT.tier2, best)
         ) {
             best = artifact;
         }

@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 
+import { TIER1_ARTIFACT_LIST } from "../../src/artifacts/artifact_properties";
 import {
     AI_META_MAPS,
     AI_META_RECORDED_MAPS,
@@ -167,7 +168,7 @@ test("reaggregates legacy raw files into all, live, and numeric map dimensions w
                 ),
             ),
         );
-        expect(enriched.rankings.artifactsT1).toHaveLength(12 * dimensions.size);
+        expect(enriched.rankings.artifactsT1).toHaveLength(TIER1_ARTIFACT_LIST.length * dimensions.size);
         expect(enriched.rankings.artifactsT1.every((row) => row.map !== undefined)).toBe(true);
         expect(enriched.rankings.synergies).toHaveLength(24 * dimensions.size);
         expect(new Set(enriched.rankings.synergies.map((row) => `${row.cohort}/${row.map}`))).toEqual(dimensions);

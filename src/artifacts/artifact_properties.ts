@@ -40,6 +40,7 @@ export enum Tier1Artifact {
     HUNTERS_LONGBOW = 10, // ranged units: +1 flat atk per archer in the army (scales with archer count), no downside
     HELM_OF_FOCUS = 11, // +25% mind resist
     BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 20% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
+    MAGES_RING = 13, // +10% magic damage (army-wide); Tier-1 half of the arcane pair
 }
 
 export enum Tier2Artifact {
@@ -56,6 +57,7 @@ export enum Tier2Artifact {
     TOME_OF_AMPLIFICATION = 10, // +50% power to non-healing castable buffs allied units apply to allies
     RIME_CHARM = 11, // 30% chance to apply a 3-turn slow on any attack
     LAVA_STRIDERS = 12, // all units may move over lava
+    ARCHMAGES_RING = 13, // +20% magic damage (army-wide); Tier-2 half of the arcane pair
 }
 
 export type ArtifactType =
@@ -77,6 +79,7 @@ export const ToTier1Artifact: { [key: string]: Tier1Artifact } = {
     "10": Tier1Artifact.HUNTERS_LONGBOW,
     "11": Tier1Artifact.HELM_OF_FOCUS,
     "12": Tier1Artifact.BROKEN_AEGIS,
+    "13": Tier1Artifact.MAGES_RING,
 };
 
 export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
@@ -94,6 +97,7 @@ export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
     "10": Tier2Artifact.TOME_OF_AMPLIFICATION,
     "11": Tier2Artifact.RIME_CHARM,
     "12": Tier2Artifact.LAVA_STRIDERS,
+    "13": Tier2Artifact.ARCHMAGES_RING,
 };
 
 // Effect magnitudes. Centralised here so balance tuning happens in one place.
@@ -135,6 +139,12 @@ export const ARTIFACT_POWER = {
     // ability's power in configuration/abilities.json — the displayed figure only, since the applied
     // amount also scales with stack power and luck (Unit.calculateAbilityCount).
     WOUNDING_CHARM_DEEP_WOUNDS_PERCENT: 6,
+    // The arcane pair: the only artifacts that raise MAGIC damage. Both feed
+    // Unit.getMagicDamageBonusPercentage(), so they stack ADDITIVELY with the Empower Augment, the Empower
+    // scroll and the Satyr's Sylvan Focus aura rather than multiplying with them - two sources still read
+    // as a plain "+N%". Tier 2 is deliberately double Tier 1, matching the Warlord's Edge / Keen Blade gap.
+    MAGES_RING_MAGIC_PERCENT: 10,
+    ARCHMAGES_RING_MAGIC_PERCENT: 20,
 } as const;
 
 export interface ArtifactProperties {
@@ -269,6 +279,13 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "Broken Aegis",
         "Broken Aegis: the wielder's attacks have a 20% chance to Break the enemy they hit (muting its abilities), at the cost of a 4% chance to miss.",
     ),
+    [Tier1Artifact.MAGES_RING]: t1(
+        Tier1Artifact.MAGES_RING,
+        "mages_ring",
+        "Mage's Ring",
+        "Mages Ring",
+        "Increases all magic damage the army deals by {}%.",
+    ),
 };
 
 export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
@@ -357,6 +374,13 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "Lava Striders",
         "All army units may move over and stand in lava; while on central lava they gain Made of Fire (+10% to all stats and abilities).",
     ),
+    [Tier2Artifact.ARCHMAGES_RING]: t2(
+        Tier2Artifact.ARCHMAGES_RING,
+        "archmages_ring",
+        "Archmage's Ring",
+        "Archmages Ring",
+        "Increases all magic damage the army deals by {}%.",
+    ),
 };
 
 export const getTier1ArtifactProperties = (id: Tier1Artifact): ArtifactProperties => TIER1_ARTIFACTS[id];
@@ -390,6 +414,8 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     berserkers_bond: [AP.BERSERKERS_BOND_ATTACK, AP.BERSERKERS_BOND_DEFENSE_PENALTY],
     tome_of_amplification: [AP.TOME_BUFF_POWER_PERCENT],
     rime_charm: [AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS],
+    mages_ring: [AP.MAGES_RING_MAGIC_PERCENT],
+    archmages_ring: [AP.ARCHMAGES_RING_MAGIC_PERCENT],
 };
 
 // Human-readable effect text with the real numbers substituted in (the raw `description` keeps `{}`/`[]`

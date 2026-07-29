@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
+import { LIVE_TIER1_ARTIFACT_COUNT } from "../../src/picks/pick_sim";
 import { CreatureLevelList } from "../../src/units/unit_properties";
 import type { IMatchConfig } from "../../src/simulation/battle_engine";
 import {
@@ -105,7 +106,7 @@ describe("measure_picksim_oracle pick phase", () => {
                             expect(outcome.state.creaturesBanned).not.toContain(id);
                         }
                         expect(team.tier2Offers).toContain(team.tier2Artifact!);
-                        expect(team.tier1Artifact! >= 1 && team.tier1Artifact! <= 12).toBe(true);
+                        expect(team.tier1Artifact! >= 1 && team.tier1Artifact! <= LIVE_TIER1_ARTIFACT_COUNT).toBe(true);
                     }
                     // Shared exclusive pool: no creature fielded by both teams.
                     const lowerSet = new Set(outcome.state.lower.creatures);

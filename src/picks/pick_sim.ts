@@ -30,8 +30,8 @@ export type PickRandomInt = (maxExclusive: number) => number;
  * agree and refuses to build a pick if they drift, so these move together or not at all.
  */
 export const LIVE_AUTO_BANS_BY_LEVEL = [6, 6, 3, 5] as const;
-export const LIVE_TIER1_ARTIFACT_COUNT = 12;
-export const LIVE_TIER2_ARTIFACT_COUNT = 12;
+export const LIVE_TIER1_ARTIFACT_COUNT = 13;
+export const LIVE_TIER2_ARTIFACT_COUNT = 13;
 export const LIVE_TIER2_OFFER_SIZE = 3;
 export const SERVER_PERSISTED_CREATURE_ORDER = "server-level-sort-after-each-accepted-pick" as const;
 
@@ -616,7 +616,11 @@ const applyTier2 = (
     if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.ARTIFACT_2)) {
         return rejected(state, isPickSimComplete(state) ? "pick_complete" : "wrong_phase");
     }
-    if (!Number.isInteger(action.artifactId) || action.artifactId < 1 || action.artifactId > 12) {
+    if (
+        !Number.isInteger(action.artifactId) ||
+        action.artifactId < 1 ||
+        action.artifactId > LIVE_TIER2_ARTIFACT_COUNT
+    ) {
         return rejected(state, "invalid_artifact");
     }
     const own = teamState(state, action.team);

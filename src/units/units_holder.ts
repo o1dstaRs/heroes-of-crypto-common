@@ -555,6 +555,12 @@ export class UnitsHolder {
                         BROKEN_AEGIS_MISS_CHANCE,
                     );
                     break;
+                case Tier1Artifact.MAGES_RING:
+                    // Pure marker + power: nothing here touches a stat. Magic damage is assembled in
+                    // Unit.getMagicDamageBonusPercentage(), which reads this buff's power, so the engine's
+                    // casts, the AI's estimates and the sidebar card all pick the ring up from one place.
+                    applyArtifactBuff("Mages Ring", AP.MAGES_RING_MAGIC_PERCENT);
+                    break;
                 default:
                     break;
             }
@@ -616,6 +622,10 @@ export class UnitsHolder {
                     // only promises the boost "while on central lava", and that boost is the Made of Fire
                     // BUFF, applied by applyLavaWaterModifier when a move route actually touches lava.
                     applyArtifactBuff("Lava Striders", 0);
+                    break;
+                case Tier2Artifact.ARCHMAGES_RING:
+                    // See Mage's Ring above — read by Unit.getMagicDamageBonusPercentage(), not by a stat hook.
+                    applyArtifactBuff("Archmages Ring", AP.ARCHMAGES_RING_MAGIC_PERCENT);
                     break;
                 default:
                     break;

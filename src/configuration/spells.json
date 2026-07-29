@@ -850,6 +850,48 @@
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
+        },
+        "Mages Ring": {
+            "name": "Mages Ring",
+            "level": 0,
+            "desc": [
+                "Artifact. Increases all magic damage dealt by the entire army by {}%.",
+                "Spells, Fire Wall, Fireforged Sword, Chain Lightning, Fire Breath and Fire Shield.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Archmages Ring": {
+            "name": "Archmages Ring",
+            "level": 0,
+            "desc": [
+                "Artifact. Increases all magic damage dealt by the entire army by {}%.",
+                "Spells, Fire Wall, Fireforged Sword, Chain Lightning, Fire Breath and Fire Shield.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
         }
     },
     "Life": {
