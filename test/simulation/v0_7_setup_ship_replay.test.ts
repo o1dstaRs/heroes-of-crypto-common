@@ -104,7 +104,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // pinned to in isolation -- the ring count and the distinct-Tier-1-pair fix each move the draft on their
 // own, so only the combination produces the trace below. Two isolated runs produced this byte-identical
 // digest.
-const EXPECTED_REPLAY_SHA256 = "b50daf9f695d451efdef2c251b4cdaae7f5d9bddd49730b0171c29b7da27a61b";
+// Re-pinned after the Battle Mage's health came down 26 -> 21. It dies to exchanges it used to survive,
+// so every seeded trace containing one diverges from that point on. Two isolated runs produced this
+// byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "6da6a25b8ee4be247a0f2bab556919dd51e2ac9908df8c764b5e0d6c43ac60e5";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

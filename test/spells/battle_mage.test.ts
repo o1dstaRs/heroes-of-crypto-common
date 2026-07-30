@@ -228,6 +228,8 @@ describe("Battle Mage spell configuration", () => {
     // weakest level 2 casters (Healer, Satyr) on both, but a rebalance took health 14 -> 26 and armor 11 -> 10:
     // the stack now survives a hit while still folding to sustained damage, so it plays as a body with a book
     // rather than as glass. Armor stays the cheapest of the three, which is where the price is now paid.
+    // Health later came back down 26 -> 21: still clearly the healthiest of the three, but no longer so far
+    // ahead that the armor discount stopped being felt.
     it("is the softest-armoured level 2 caster, and buys health with it", () => {
         const creatures = creaturesJson as unknown as Record<string, Record<string, { hp: number; armor: number }>>;
         const healer = creatures.Life.Healer;
@@ -235,7 +237,7 @@ describe("Battle Mage spell configuration", () => {
 
         expect(battleMage.armor).toBeLessThan(Math.min(healer.armor, satyr.armor));
         // Pinned outright rather than relative, so drifting back under the old floor has to be deliberate.
-        expect(battleMage.hp).toBe(26);
+        expect(battleMage.hp).toBe(21);
         expect(battleMage.hp).toBeGreaterThan(Math.max(healer.hp, satyr.hp));
     });
 });
