@@ -389,10 +389,14 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             seed: 4_253_757_401,
             candidateSide: "red",
             winner: "candidate",
-            laps: 10,
+            laps: 8,
             endReason: "elimination",
             candidateEngineRejections: 0,
         });
+        // Re-pinned again as the Battle Mage's melee dropped to 2-5 (was 3-6), shortening the fight further
+        // (10 laps -> 8) and moving the Nomad's counts. The reasoning below still holds unchanged: what this
+        // case guards is the CLASSIFICATION, not the counts.
+        //
         // The Battle Mage's health coming down 26 -> 21 shortened this fight (11 laps -> 10) and the Nomad
         // no longer oscillates at all: abaOscillations 1 -> 0, and NO game in
         // DEEP_BLOCK_CENTER_REGRESSIONS produces an aba_oscillation sample any more. So the specific lap-11
@@ -403,10 +407,10 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         // urgent miss -- so that is asserted directly below, plus a guard that holds whenever an oscillation
         // does reappear. Vacuous today, correct tomorrow, and honest either way.
         expect(record.byCreature.Nomad).toMatchObject({
-            observedTurns: 7,
-            oracleDirectEligibleTurns: 4,
-            sharedCatalogDirectEligibleTurns: 4,
-            chosenDirectActionTurns: 3,
+            observedTurns: 10,
+            oracleDirectEligibleTurns: 7,
+            sharedCatalogDirectEligibleTurns: 7,
+            chosenDirectActionTurns: 6,
             pureMoveTurns: 2,
             nonProgressMoves: 0,
             abaOscillations: 0,

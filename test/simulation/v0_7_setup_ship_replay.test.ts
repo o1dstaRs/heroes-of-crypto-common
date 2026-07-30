@@ -107,7 +107,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned after the Battle Mage's health came down 26 -> 21. It dies to exchanges it used to survive,
 // so every seeded trace containing one diverges from that point on. Two isolated runs produced this
 // byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "6da6a25b8ee4be247a0f2bab556919dd51e2ac9908df8c764b5e0d6c43ac60e5";
+// Re-pinned after the Battle Mage's melee dropped to 2-5 (was 3-6). It trades blows differently, so every
+// seeded trace containing one diverges from that point on. Two isolated runs produced this byte-identical
+// digest.
+const EXPECTED_REPLAY_SHA256 = "221c0b889e902ee7f64871ddb3c6c72359f98e5a54c43a4653b590bf7197d078";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
