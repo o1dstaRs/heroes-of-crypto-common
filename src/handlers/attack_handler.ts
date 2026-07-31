@@ -519,28 +519,6 @@ export class AttackHandler {
 
         return { completed: false, unitIdsDied, animationData };
     }
-    /**
-     * Chip the center mountains for a chakram whose disc crossed them. Each distinct mountain CELL the disc
-     * touched is one hit on that cell's mountain (left half vs right, split at mid-column) — the same
-     * per-strike loss a melee mountain attack deals via encounterObstacleHit. A mountain reduced to 0 is
-     * cleared to walkable, exactly like an obstacle_attack destroying it.
-     */
-    private applyChakramMountainHits(mountainCells: HoCMath.XY[]): void {
-        if (!mountainCells.length) {
-            return;
-        }
-        const fightProperties = FightStateManager.getInstance().getFightProperties();
-        const midColumn = this.grid.getSettings().getGridSize() >> 1;
-        for (const cell of mountainCells) {
-            fightProperties.encounterObstacleHit(cell.x >= midColumn);
-        }
-        if (fightProperties.getObstacleHitsLeftLeft() <= 0) {
-            this.grid.clearMountainSide(false);
-        }
-        if (fightProperties.getObstacleHitsLeftRight() <= 0) {
-            this.grid.clearMountainSide(true);
-        }
-    }
     public handleRangeAttack(
         unitsHolder: UnitsHolder,
         hoverRangeAttackDivisors: number[],
@@ -838,17 +816,17 @@ export class AttackHandler {
             rangeResponseUnit = undefined;
         }
 
-        // ABILITY Chakram (Zena): the throw's 1-cell disc traces a FULL circle at every enemy/mountain it
-        // touches, damaging everyone it passes through and chipping every mountain cell it crosses, chaining
-        // until a circle finds nothing new. resolveChakramTrajectory PRECOMPUTES the whole flight so the client
-        // only replays it. Victims JOIN affectedUnits, so they resolve through the very same AOE tail as Large
-        // Caliber / Area Throw (Giant's Maul, status resistance, Flesh Shield ordering, per-unit numbers).
+        // ABILITY Chakram (Zena): the disc bounces to every enemy standing APART from the last one hit —
+        // 1 empty cell of separation keeps full bounce damage, 2 halves it — nearest first, each enemy at
+        // most once, then it returns to Zena. resolveChakramTrajectory PRECOMPUTES the whole flight,
+        // deterministically, so the client replays it AND the hover preview shows the exact victims.
+        // Victims JOIN affectedUnits, so they resolve through the very same AOE tail as Large Caliber /
+        // Area Throw (Giant's Maul, status resistance, Flesh Shield ordering, per-unit numbers).
         const chakramTrajectory = AllAbilities.resolveChakramTrajectory(
             attackerUnit,
             targetUnit,
             unitsHolder,
             this.grid,
-            () => HoCLib.getRandomInt(0, 100) / 100,
         );
         if (chakramTrajectory.hitUnits.length && affectedUnits) {
             for (const hitUnit of chakramTrajectory.hitUnits) {
@@ -857,12 +835,14 @@ export class AttackHandler {
                 }
             }
             this.sceneLog.updateLog(
-                `${attackerUnit.getName()} chakram ricochets to ${chakramTrajectory.hitUnits
-                    .map((u) => u.getName())
+                `${attackerUnit.getName()} chakram bounces to ${chakramTrajectory.hitUnits
+                    .map(
+                        (u) =>
+                            `${u.getName()}${chakramTrajectory.damageFactorByUnitId[u.getId()] === 1 ? "" : " (half)"}`,
+                    )
                     .join(", ")}`,
             );
         }
-        this.applyChakramMountainHits(chakramTrajectory.mountainCells);
         if (chakramTrajectory.steps.length) {
             // Hand the client the exact circles + per-leg hits so it flies the disc and lands each hit as the
             // disc reaches it (see IVisibleDamage.chakramArcs).
@@ -886,6 +866,7 @@ export class AttackHandler {
             this.damageStatisticHolder,
             true,
             (damageForAnimation.secondary ??= []),
+            chakramTrajectory.damageFactorByUnitId,
         );
         let attackDamageApplied = true;
         if (aoeRangeAttackResult.landed) {
@@ -965,14 +946,13 @@ export class AttackHandler {
 
         if (rangeResponseUnit && rangeResponseUnits) {
             // ABILITY Chakram (Zena) on the RESPONSE: a counter-throw behaves EXACTLY like the initiating one —
-            // the disc does not care who threw it. Same full-circle trajectory, ally exclusion, Angel stop and
-            // mountain chipping, with the RESPONDER as the attacker and its shooter as the primary victim.
+            // the disc does not care who threw it. Same separation chain, ally exclusion and Angel stop,
+            // with the RESPONDER as the attacker and its shooter as the primary victim.
             const responseChakramTrajectory = AllAbilities.resolveChakramTrajectory(
                 targetUnit,
                 rangeResponseUnit,
                 unitsHolder,
                 this.grid,
-                () => HoCLib.getRandomInt(0, 100) / 100,
             );
             if (responseChakramTrajectory.hitUnits.length) {
                 for (const hitUnit of responseChakramTrajectory.hitUnits) {
@@ -981,12 +961,16 @@ export class AttackHandler {
                     }
                 }
                 this.sceneLog.updateLog(
-                    `${targetUnit.getName()} chakram ricochets to ${responseChakramTrajectory.hitUnits
-                        .map((u) => u.getName())
+                    `${targetUnit.getName()} chakram bounces to ${responseChakramTrajectory.hitUnits
+                        .map(
+                            (u) =>
+                                `${u.getName()}${
+                                    responseChakramTrajectory.damageFactorByUnitId[u.getId()] === 1 ? "" : " (half)"
+                                }`,
+                        )
                         .join(", ")}`,
                 );
             }
-            this.applyChakramMountainHits(responseChakramTrajectory.mountainCells);
             if (responseChakramTrajectory.steps.length) {
                 damageForAnimation.chakramArcs = [
                     ...(damageForAnimation.chakramArcs ?? []),
@@ -1010,6 +994,7 @@ export class AttackHandler {
                 this.damageStatisticHolder,
                 false,
                 (damageForAnimation.secondary ??= []),
+                responseChakramTrajectory.damageFactorByUnitId,
             );
             if (aoeRangeResponseResult.landed) {
                 damageFromResponse = AllAbilities.processLuckyStrikeAbility(

@@ -55,6 +55,9 @@ export function processRangeAOEAbility(
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     isAttack = true,
     secondaryDamage?: ISecondaryDamage[],
+    // Per-victim scaling applied to the raw hit before artifacts/resistances — Zena's Chakram halves
+    // the bounce onto a target two cells removed (see chakram_ability.damageFactorByUnitId).
+    perUnitDamageFactors?: Record<string, number>,
 ): IAOERangeAttackResult {
     const unitIdsDied: string[] = [];
     const perUnitDamage: IAOERangeAttackResult["perUnitDamage"] = [];
@@ -146,6 +149,13 @@ export function processRangeAOEAbility(
                     ),
                     sceneLog,
                 );
+
+                // Chakram: a bounce onto a target two cells removed lands at half strength (factor 0.5);
+                // scaled before artifacts/resistances so those keep their usual relative effect.
+                const perUnitFactor = perUnitDamageFactors?.[unit.getId()];
+                if (perUnitFactor !== undefined && perUnitFactor !== 1) {
+                    damageFromAttack = Math.floor(damageFromAttack * perUnitFactor);
+                }
 
                 // ARTIFACT Giant's Maul: +% non-magical AOE damage at impact (every struck unit), before the
                 // status-resistance reduction below.

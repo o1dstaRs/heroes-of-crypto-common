@@ -682,8 +682,9 @@
         "name": "Chakram",
         "type": "ATTACK",
         "desc": [
-            "Ranged attacks ricochet in a half circle to the next enemy, up to {} times.",
-            "Each bounce deals ~100% of the damage (90-110% by luck) and never hits allies."
+            "Ranged attacks bounce to every enemy standing apart from the last one hit: 1 empty cell",
+            "between them keeps full damage, 2 cells halves it. Nearest first, each enemy is hit",
+            "once at most, then the chakram returns. Never hits allies."
         ],
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",
