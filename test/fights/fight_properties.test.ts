@@ -267,6 +267,30 @@ describe("FightProperties", () => {
             expect(fightProperties.getNumberOfUnitsAvailableForPlacement(PBTypes.TeamVals.LOWER)).toBe(8);
         });
 
+        it("scales Chaos Break on Attack across all synergy levels", () => {
+            const team = PBTypes.TeamVals.LOWER;
+            const levels = [
+                { unitCount: 2, level: SynergyLevel.LEVEL_1, chance: 6 },
+                { unitCount: 4, level: SynergyLevel.LEVEL_2, chance: 11 },
+                { unitCount: 6, level: SynergyLevel.LEVEL_3, chance: 17 },
+            ] as const;
+
+            for (const { unitCount, level, chance } of levels) {
+                const fightProperties = new FightProperties();
+                fightProperties.setSynergyUnitsPerFactions(team, 0, unitCount, 0, 0);
+
+                expect(
+                    fightProperties.updateSynergyPerTeam(
+                        team,
+                        PBTypes.FactionVals.CHAOS,
+                        ChaosSynergy.BREAK_ON_ATTACK,
+                        level,
+                    ),
+                ).toBe(true);
+                expect(fightProperties.getBreakChancePerTeam(team)).toBe(chance);
+            }
+        });
+
         it("exposes possible synergies and selected synergy bonuses", () => {
             const fightProperties = new FightProperties();
             const team = PBTypes.TeamVals.LOWER;
@@ -330,7 +354,7 @@ describe("FightProperties", () => {
                     SynergyLevel.LEVEL_3,
                 ),
             ).toBe(true);
-            expect(fightProperties.getBreakChancePerTeam(team)).toBe(19);
+            expect(fightProperties.getBreakChancePerTeam(team)).toBe(17);
             expect(fightProperties.getAdditionalMovementStepsPerTeam(team)).toBe(0);
 
             expect(
