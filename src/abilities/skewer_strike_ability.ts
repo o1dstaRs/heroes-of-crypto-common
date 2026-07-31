@@ -155,6 +155,10 @@ export function processSkewerStrikeAbility(
                 (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
         }
 
+        // Water Shield: captured BEFORE the damage lands (applyDamage consumes the shield). An
+        // absorbed skewer hit applies no on-hit riders — same rule as the main melee path and
+        // Lightning Spin's per-enemy gate.
+        const waterShieldAbsorbed = damageFromAttack > 0 && nextStandingTarget.willWaterShieldAbsorb(fromUnit);
         const amountBefore = nextStandingTarget.getAmountAlive();
         const damageDealt = nextStandingTarget.applyDamage(
             damageFromAttack,
@@ -165,8 +169,6 @@ export function processSkewerStrikeAbility(
             // like everywhere else (the shield check reads the attacker's element).
             fromUnit,
         );
-        // Poison Cloud Aura: an aura'd attacker poisons every unit skewered in the line.
-        processPoisonAuraAbility(fromUnit, nextStandingTarget, damageDealt, sceneLog);
         const amountAfter = nextStandingTarget.getAmountAlive();
 
         damageStatisticHolder.add({
@@ -196,28 +198,32 @@ export function processSkewerStrikeAbility(
 
         // check all the possible modificators here
         // just in case if we have more inherited/stolen abilities
-        processMinerAbility(fromUnit, nextStandingTarget, sceneLog);
-        processStunAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
-        processFreezeAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
-        processRimeCharmAbility(fromUnit, nextStandingTarget, sceneLog);
-        processDullingDefenseAblity(nextStandingTarget, fromUnit, sceneLog);
-        processPetrifyingGazeAbility(
-            fromUnit,
-            nextStandingTarget,
-            petrifyingGazeDamage,
-            sceneLog,
-            damageStatisticHolder,
-            secondaryDamage,
-        );
-        processBoarSalivaAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
-        processAggrAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
-        processDeepWoundsAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
-        processPegasusLightAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
-        processParalysisAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
-        if (isAttack) {
-            processShatterArmorAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
-        } else {
-            processBlindnessAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+        if (!nextStandingTarget.isDead() && !waterShieldAbsorbed) {
+            // Poison Cloud Aura: an aura'd attacker poisons every unit skewered in the line.
+            processPoisonAuraAbility(fromUnit, nextStandingTarget, damageDealt, sceneLog);
+            processMinerAbility(fromUnit, nextStandingTarget, sceneLog);
+            processStunAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+            processFreezeAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+            processRimeCharmAbility(fromUnit, nextStandingTarget, sceneLog);
+            processDullingDefenseAblity(nextStandingTarget, fromUnit, sceneLog);
+            processPetrifyingGazeAbility(
+                fromUnit,
+                nextStandingTarget,
+                petrifyingGazeDamage,
+                sceneLog,
+                damageStatisticHolder,
+                secondaryDamage,
+            );
+            processBoarSalivaAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+            processAggrAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+            processDeepWoundsAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+            processPegasusLightAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+            processParalysisAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+            if (isAttack) {
+                processShatterArmorAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+            } else {
+                processBlindnessAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
+            }
         }
         // Gaze is processed after the skewer's base damage. Track a last-creature petrification as a
         // skewer death so the result, morale, and client cleanup cannot omit it.

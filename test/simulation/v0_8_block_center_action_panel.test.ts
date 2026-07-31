@@ -390,34 +390,35 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         ).toBe(true);
     });
 
-    // Re-derived under the 6-row Placement LEVEL_3 geometry + the Sniper 8/17/27 augment change, per
-    // the RE-PIN NEEDED plan: game 15969 no longer exhibits the guarded scenario at all (its trace now
-    // ends in a DRAW, so "while allies finish" is gone). Game 16071 reproduces the same guarded
-    // CLASSIFICATION on the new geometry: the candidate's Scavenger takes exactly one blocked
-    // lane-clearing return that stays an informational noncombat_with_direct_option sample — never an
-    // urgent miss — while its allies finish the fight (candidate elimination win, zero rejections).
-    test("keeps game 16071's blocked Scavenger lane-clearing return informational while allies finish", () => {
-        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 16_071);
+    // Re-derived after Arachna Queen hp rose 180 -> 190 and Battle Mage hp fell 19 -> 17: game 16071
+    // now loses and produces three informational turns, so it no longer isolates this classification.
+    // Game 16251 restores the strict scenario: Thunderbird waits exactly once despite an engine-valid
+    // melee option, the event remains informational rather than urgent, and its allies finish the fight
+    // with a candidate elimination win and zero rejections.
+    test("keeps game 16251's Thunderbird wait informational while allies finish", () => {
+        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 16_251);
 
         expect(record).toMatchObject({
-            game: 16_071,
-            pair: 8_035,
-            seed: 2_191_027_740,
+            game: 16_251,
+            pair: 8_125,
+            seed: 572_077_654,
             candidateSide: "red",
             winner: "candidate",
-            laps: 12,
+            laps: 5,
             endReason: "elimination",
             candidateEngineRejections: 0,
         });
-        expect(record.byCreature.Scavenger).toMatchObject({
-            observedTurns: 15,
-            oracleDirectEligibleTurns: 10,
-            sharedCatalogDirectEligibleTurns: 10,
-            chosenDirectActionTurns: 9,
+        expect(record.byCreature.Thunderbird).toMatchObject({
+            observedTurns: 3,
+            oracleDirectEligibleTurns: 3,
+            sharedCatalogDirectEligibleTurns: 3,
+            chosenDirectActionTurns: 2,
             noncombatWithDirectOptionTurns: 1,
-            pureMoveTurns: 3,
+            eligibleCombatMisses: 1,
+            pureMoveTurns: 0,
             nonProgressMoves: 0,
             abaOscillations: 0,
+            urgentRepeatedNonProgressWithDirectOption: 0,
             urgentMountainAdjacentMisses: 0,
             urgentMountainTerminalJitter: 0,
             lateDirectEligibleTurns: 0,
@@ -427,7 +428,12 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         });
         const informational = record.failureSamples.filter(({ issue }) => issue === "noncombat_with_direct_option");
         expect(informational).toHaveLength(1);
-        expect(informational[0].creatureName).toBe("Scavenger");
+        expect(informational[0]).toMatchObject({
+            creatureName: "Thunderbird",
+            lap: 3,
+            chosenDecision: [{ type: "wait_turn" }],
+            oracleOption: { kind: "melee" },
+        });
         // The invariant: an ABA oscillation, wherever it turns up, is informational and never an urgent miss.
         for (const sample of record.failureSamples.filter((f) => f.issue === "aba_oscillation")) {
             expect(sample.creatureName).toBeTruthy();
@@ -437,7 +443,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         expect(
             record.failureSamples.some(
                 ({ creatureName, issue }) =>
-                    creatureName === "Scavenger" && issue === "urgent_mountain_terminal_jitter",
+                    creatureName === "Thunderbird" && issue === "urgent_mountain_terminal_jitter",
             ),
         ).toBe(false);
     });

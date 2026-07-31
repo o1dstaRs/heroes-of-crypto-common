@@ -174,7 +174,7 @@
         },
         "Battle Mage": {
             "name": "Battle Mage",
-            "hp": 19,
+            "hp": 17,
             "steps": 3.3,
             "speed": 4.2,
             "armor": 10,
