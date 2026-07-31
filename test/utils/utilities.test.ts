@@ -275,6 +275,39 @@ describe("utility functions", () => {
         });
     });
 
+    it("makes simulation UUIDs reproducible and unique without weakening the live crypto path", () => {
+        const seeded = (): (() => number) => {
+            let state = 0x4d2 >>> 0;
+            return () => {
+                state = (state + 0x6d2b79f5) >>> 0;
+                let value = state;
+                value = Math.imul(value ^ (value >>> 15), value | 1);
+                value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+                return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+            };
+        };
+        try {
+            setDeterministicRandomSource(seeded());
+            const first = Array.from({ length: 3 }, () => createSecureUuid());
+            setDeterministicRandomSource(undefined);
+            setDeterministicRandomSource(seeded());
+            const second = Array.from({ length: 3 }, () => createSecureUuid());
+
+            expect(second).toEqual(first);
+            expect(new Set(first).size).toBe(first.length);
+            first.forEach((id) =>
+                expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+            );
+
+            // Constant deterministic sources are common in tests that pin a combat outcome; their IDs must
+            // still not collide inside one simulated fight.
+            setDeterministicRandomSource(() => 0);
+            expect(createSecureUuid()).not.toBe(createSecureUuid());
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+    });
+
     it("seeded getRandomInt has full low-bit entropy (small ranges are not stuck)", () => {
         // Regression: the seeded mulberry32 source yields 32-bit floats; nextRaw53 must spread those into a
         // full 53-bit value with random LOW bits. A prior `floor(r * 2^53)` left the low 21 bits always 0, so

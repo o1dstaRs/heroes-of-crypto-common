@@ -51,9 +51,15 @@ export function getSecureRandomValues<T extends ArrayBufferView>(array: T): T {
  */
 export type RandomSource = () => number;
 let deterministicSource: RandomSource | undefined;
+let deterministicUuidSequence = 0;
 
 /** Install (or clear, with `undefined`) a seeded randomness source. Simulation/tests only — see above. */
 export function setDeterministicRandomSource(source: RandomSource | undefined): void {
+    // A new simulation starts from the secure/live path and installs its own seeded source. Reset the
+    // deterministic UUID stream at that boundary so identical seeded matches receive identical unit IDs.
+    // Do not reset while simulation code temporarily swaps in a private lookahead stream: a summon created
+    // there must not collide with a live unit when the original source is restored.
+    if (source === undefined || deterministicSource === undefined) deterministicUuidSequence = 0;
     deterministicSource = source;
 }
 
@@ -209,6 +215,27 @@ export const uuidFromBytes = (buffer: Uint8Array): string => {
 };
 
 export function createSecureUuid(): string {
+    if (deterministicSource) {
+        // Simulations seed combat randomness, and SearchDriver includes unit IDs in its private rollout
+        // seed. Leaving IDs on crypto randomness made the same seeded fight take different search paths on
+        // different workers. Keep live UUIDs crypto-secure, but produce unique, reproducible v4 UUIDs while
+        // the explicit simulation-only deterministic source is installed.
+        const sequence = deterministicUuidSequence++;
+        const bytes = new Uint8Array(16);
+        // UUID allocation must not consume the combat RNG stream. Otherwise merely making identity stable
+        // would change every seeded damage/morale roll and invalidate the very measurements it fixes.
+        // Six counter bytes are enough for 2^48 distinct IDs in one simulation; the fixed prefix keeps the
+        // values out of the live crypto-generated namespace.
+        bytes.set([0x73, 0x69, 0x6d, 0x00]); // "sim" namespace
+        let value = sequence;
+        for (let index = bytes.length - 1; index >= 9; index -= 1) {
+            bytes[index] = value & 0xff;
+            value = Math.floor(value / 256);
+        }
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        return uuidFromBytes(bytes);
+    }
     const c = getWebCrypto();
     if (!c) {
         throw new Error("Crypto-secure UUID generation is unavailable in this runtime");
