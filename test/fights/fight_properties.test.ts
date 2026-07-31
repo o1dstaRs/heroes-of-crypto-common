@@ -261,7 +261,7 @@ describe("FightProperties", () => {
                 }),
             ).toBe(true);
 
-            expect(fightProperties.getAugmentPlacement(PBTypes.TeamVals.LOWER)).toEqual([5]);
+            expect(fightProperties.getAugmentPlacement(PBTypes.TeamVals.LOWER)).toEqual([6]);
             expect(fightProperties.getAugmentArmor(PBTypes.TeamVals.LOWER)).toBe(ArmorAugment.LEVEL_3);
             expect(fightProperties.getAugmentMovement(PBTypes.TeamVals.LOWER)).toBe(MovementAugment.LEVEL_2);
             expect(fightProperties.getNumberOfUnitsAvailableForPlacement(PBTypes.TeamVals.LOWER)).toBe(8);

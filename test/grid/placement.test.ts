@@ -56,9 +56,31 @@ describe("placements", () => {
         expect(upperRight.possibleCellPositions()[0]).toEqual({ x: 1, y: 14 });
     });
 
+    it("height 6 (Placement LEVEL_3) opens the board's edge line", () => {
+        const lower = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 6);
+        const upper = new RectanglePlacement(testGridSettings, PlacementPositionType.UPPER_RIGHT, 6);
+
+        // 16 columns x 6 rows, INCLUDING the edge row that heights 3-5 stop short of.
+        expect(lower.possibleCellPositions()).toHaveLength(96);
+        expect(lower.possibleCellPositions().some((c) => c.y === 0)).toBe(true);
+        expect(lower.isAllowed(positionFor({ x: 4, y: 0 }))).toBe(true);
+        expect(lower.isAllowed(positionFor({ x: 4, y: 6 }))).toBe(false);
+
+        expect(upper.possibleCellPositions()).toHaveLength(96);
+        expect(upper.possibleCellPositions()[0]).toEqual({ x: 0, y: 15 });
+        expect(upper.isAllowed(positionFor({ x: 11, y: 15 }))).toBe(true);
+        expect(upper.isAllowed(positionFor({ x: 11, y: 9 }))).toBe(false);
+
+        // Large (2x2) anchors stay inside the zone: lowest anchor row keeps the footprint on rows 0-5.
+        const largeAnchors = lower.possibleCellPositions(false);
+        expect(largeAnchors.some((c) => c.y === 1)).toBe(true);
+        expect(largeAnchors.every((c) => c.y >= 1 && c.y <= 5)).toBe(true);
+    });
+
     it("rejects unsupported placement sizes and position types", () => {
         expect(() => new SquarePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 2)).toThrow();
         expect(() => new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 2)).toThrow();
+        expect(() => new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 7)).toThrow();
         expect(() => new SquarePlacement(testGridSettings, PlacementPositionType.NO_TYPE, 3)).toThrow();
         expect(() => new RectanglePlacement(testGridSettings, PlacementPositionType.NO_TYPE, 3)).toThrow();
     });

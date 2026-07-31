@@ -57,7 +57,9 @@ export const getPlacementSizes = (
             if (placementType === PlacementType.SQUARE) {
                 return [5, 5];
             } else if (placementType === PlacementType.RECTANGLE) {
-                return [5];
+                // Height 6: the top placement tier also opens the board's edge line (row 0 / 15),
+                // which every lower height stops one row short of.
+                return [6];
             } else {
                 return [0];
             }
@@ -201,11 +203,11 @@ export const getSniperPower = (augment: SniperAugment): [number, number] => {
         case SniperAugment.NO_AUGMENT:
             return [0, 0];
         case SniperAugment.LEVEL_1:
-            return [7, 20];
+            return [8, 20];
         case SniperAugment.LEVEL_2:
-            return [15, 40];
+            return [17, 40];
         case SniperAugment.LEVEL_3:
-            return [24, 70];
+            return [27, 70];
         default:
             throw new Error("Invalid sniper augment");
     }

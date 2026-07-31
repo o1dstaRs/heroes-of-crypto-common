@@ -63,7 +63,7 @@ describe("augment_properties", () => {
         ).toEqual([5, 5]);
         expect(
             getPlacementSizes(PlacementType.RECTANGLE, PlacementAugment.LEVEL_3, DefaultPlacementLevel1.THREE_BY_THREE),
-        ).toEqual([5]);
+        ).toEqual([6]);
         expect(
             getPlacementSizes(PlacementType.NO_TYPE, PlacementAugment.LEVEL_2, DefaultPlacementLevel1.THREE_BY_THREE),
         ).toEqual([0]);
@@ -92,9 +92,9 @@ describe("augment_properties", () => {
             getSniperPower(SniperAugment.LEVEL_3),
         ]).toEqual([
             [0, 0],
-            [7, 20],
-            [15, 40],
-            [24, 70],
+            [8, 20],
+            [17, 40],
+            [27, 70],
         ]);
         expect([
             getMovementPower(MovementAugment.NO_AUGMENT),

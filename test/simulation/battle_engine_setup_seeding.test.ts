@@ -61,7 +61,7 @@ describe("battle_engine setup seeding", () => {
         expect(acceptedPlacementWidth(Perk.SEE_NONE)).toBe(3);
         expect(acceptedPlacementWidth(Perk.SEE_NONE, [{ kind: "Placement", value: 0 }])).toBe(3);
         expect(acceptedPlacementWidth(Perk.SEE_NONE, [{ kind: "Placement", value: 1 }])).toBe(4);
-        expect(acceptedPlacementWidth(Perk.SEE_NONE, [{ kind: "Placement", value: 2 }])).toBe(5);
+        expect(acceptedPlacementWidth(Perk.SEE_NONE, [{ kind: "Placement", value: 2 }])).toBe(6);
         expect(
             acceptedPlacementWidth(Perk.SEE_ALL, [
                 { kind: "Armor", value: 3 },
