@@ -444,6 +444,34 @@ export class UnitsHolder {
                 unit.applyBuff(buff, primary, secondary);
             };
 
+            // Crown carries three independent stats through the existing buff representation: movement is
+            // the AppliedSpell power, while morale and armor occupy its two stored properties. That keeps
+            // every value available in ranked snapshots without extending the wire protocol.
+            const applyThreeStatArtifactBuff = (
+                buffName: string,
+                power: number,
+                firstStoredProperty: number,
+                secondStoredProperty: number,
+            ): void => {
+                const buff = new Spell({
+                    spellProperties: getSpellConfig("System", buffName, NUMBER_OF_LAPS_TOTAL),
+                    amount: 1,
+                });
+                const descriptionValues = [power, firstStoredProperty, secondStoredProperty];
+                let descriptionValueIndex = 0;
+                buff.setDesc(
+                    buff
+                        .getDesc()
+                        .map((description) =>
+                            description.replace(/\{\}|\[\]|<>/g, () =>
+                                String(descriptionValues[descriptionValueIndex++] ?? ""),
+                            ),
+                        ),
+                );
+                buff.setPower(power);
+                unit.applyBuff(buff, firstStoredProperty, secondStoredProperty);
+            };
+
             // Cursed / dual artifacts have an upside AND a downside. Apply the functional buff (positive half)
             // exactly like a normal artifact — the stat hooks read the `;primary;secondary` suffix that
             // applyBuff appends, so the visible text can be positive-only — then ALSO apply a power-0 marker
@@ -577,7 +605,7 @@ export class UnitsHolder {
                     applyArtifactBuff("Clover of Fortune", AP.CLOVER_LUCK);
                     break;
                 case Tier2Artifact.CROWN_OF_COMMAND:
-                    applyArtifactBuff("Crown of Command", AP.CROWN_STEPS, AP.CROWN_MORALE);
+                    applyThreeStatArtifactBuff("Crown of Command", AP.CROWN_STEPS, AP.CROWN_MORALE, AP.CROWN_ARMOR);
                     break;
                 case Tier2Artifact.PENDANT_OF_VITALITY:
                     applyDualArtifact(

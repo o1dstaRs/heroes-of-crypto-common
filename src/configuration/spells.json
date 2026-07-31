@@ -501,7 +501,7 @@
         "Crown of Command": {
             "name": "Crown of Command",
             "level": 0,
-            "desc": ["Artifact. Grants +{} movement and +[] morale.", "Lasts till the end of the fight."],
+            "desc": ["Artifact. Grants +{} movement, +[] morale, and +<> armor.", "Lasts till the end of the fight."],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",

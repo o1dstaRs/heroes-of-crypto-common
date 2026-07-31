@@ -2924,14 +2924,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             } else {
                 this.unitProperties.morale = this.initialUnitProperties.morale;
             }
-            // ARTIFACTS: Cursed Ward (-morale) and Crown of Command (+morale). Second buff property carries morale.
+            // ARTIFACTS: Cursed Ward (-morale) and Crown of Command (+morale). Crown's first stored
+            // property carries morale; its AppliedSpell power carries movement and its second property armor.
             const cursedWardMoraleBuff = this.getBuff("Cursed Ward");
             if (cursedWardMoraleBuff) {
                 this.unitProperties.morale -= parseInt(this.getBuffProperties("Cursed Ward")[1] || "0", 10);
             }
             const crownOfCommandMoraleBuff = this.getBuff("Crown of Command");
             if (crownOfCommandMoraleBuff) {
-                this.unitProperties.morale += parseInt(this.getBuffProperties("Crown of Command")[1] || "0", 10);
+                this.unitProperties.morale += parseInt(this.getBuffProperties("Crown of Command")[0] || "0", 10);
             }
         }
         if (this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism")) {
@@ -3018,6 +3019,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const wingedBootsArmorBuff = this.getBuff("Winged Boots");
         if (wingedBootsArmorBuff) {
             this.unitProperties.base_armor += parseInt(this.getBuffProperties("Winged Boots")[1] || "0", 10);
+        }
+        // Crown of Command carries armor in its second stored property (movement remains the buff power and
+        // morale the first property), so all three values survive authoritative ranked snapshots.
+        const crownOfCommandArmorBuff = this.getBuff("Crown of Command");
+        if (crownOfCommandArmorBuff) {
+            this.unitProperties.base_armor += parseInt(this.getBuffProperties("Crown of Command")[1] || "0", 10);
         }
         const berserkersBondArmorBuff = this.getBuff("Berserkers Bond");
         if (berserkersBondArmorBuff) {

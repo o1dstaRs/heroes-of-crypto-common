@@ -49,7 +49,7 @@ export enum Tier2Artifact {
     TITAN_PLATE = 2, // +15% defense (all)
     HOLY_CROSS = 3, // +50% heal & resurrection; cast Troll ability without consuming it
     CLOVER_OF_FORTUNE = 4, // +10 luck
-    CROWN_OF_COMMAND = 5, // +1 movement (all) & +2 morale
+    CROWN_OF_COMMAND = 5, // +1 movement, +8 morale, and +1 armor (all)
     GIANTS_MAUL = 6, // +50% non-magical (physical) AOE damage, resisted by status resistance
     PENDANT_OF_VITALITY = 7, // +25% HP (all) / -20% attack
     FARSIGHT_QUIVER = 8, // all allied archers shoot at full arrow (no range falloff)
@@ -115,7 +115,8 @@ export const ARTIFACT_POWER = {
     CURSED_WARD_MORALE_PENALTY: 6,
     CLOVER_LUCK: 10,
     CROWN_STEPS: 1,
-    CROWN_MORALE: 5,
+    CROWN_MORALE: 8,
+    CROWN_ARMOR: 1,
     // Swift Boots is now a PERCENT of base steps (not a flat +1), applied to melee units.
     SWIFT_BOOTS_STEPS: 25,
     WINGED_BOOTS_STEPS: 1,
@@ -323,7 +324,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "crown_of_command",
         "Crown of Command",
         "Crown of Command",
-        "Grants +{} movement and +[] morale to the whole army.",
+        "Grants +{} movement, +[] morale, and +<> armor to the whole army.",
     ),
     [Tier2Artifact.GIANTS_MAUL]: t2(
         Tier2Artifact.GIANTS_MAUL,
@@ -387,8 +388,9 @@ export const getTier1ArtifactProperties = (id: Tier1Artifact): ArtifactPropertie
 export const getTier2ArtifactProperties = (id: Tier2Artifact): ArtifactProperties => TIER2_ARTIFACTS[id];
 
 // Concrete power values (in order) that fill each description's placeholders: `{}` = first value,
-// `[]` = second value. Keyed by slug so it spans both tiers. Sourced from ARTIFACT_POWER — keep in sync
-// if a power constant changes. Artifacts with no numeric effect (lava_striders) are omitted.
+// `[]` = second value, `<>` = third value. Keyed by slug so it spans both tiers. Sourced from
+// ARTIFACT_POWER — keep in sync if a power constant changes. Artifacts with no numeric effect
+// (lava_striders) are omitted.
 const AP = ARTIFACT_POWER;
 const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] } = {
     veteran_helm: [AP.VETERAN_HELM_PERCENT],
@@ -408,7 +410,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     farsight_quiver: [AP.FARSIGHT_QUIVER_RANGE_PERCENT],
     holy_cross: [AP.HOLY_CROSS_HEAL_RES_PERCENT],
     clover_of_fortune: [AP.CLOVER_LUCK],
-    crown_of_command: [AP.CROWN_STEPS, AP.CROWN_MORALE],
+    crown_of_command: [AP.CROWN_STEPS, AP.CROWN_MORALE, AP.CROWN_ARMOR],
     giants_maul: [AP.GIANTS_MAUL_AOE_PERCENT],
     pendant_of_vitality: [AP.PENDANT_HP_PERCENT, AP.PENDANT_ATTACK_PENALTY_PERCENT],
     berserkers_bond: [AP.BERSERKERS_BOND_ATTACK, AP.BERSERKERS_BOND_DEFENSE_PENALTY],
@@ -426,7 +428,7 @@ export const formatArtifactDescription = (props: ArtifactProperties): string => 
         return props.description;
     }
     let i = 0;
-    return props.description.replace(/\{\}|\[\]/g, () => {
+    return props.description.replace(/\{\}|\[\]|<>/g, () => {
         const v = values[i];
         i += 1;
         return v === undefined ? "" : String(v);
