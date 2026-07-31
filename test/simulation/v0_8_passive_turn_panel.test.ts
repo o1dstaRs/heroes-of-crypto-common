@@ -1270,17 +1270,24 @@ describe("v0.8 random-roster passive-turn panel", () => {
     });
 
     test("censors strict-rollout effect-consumed waits without reporting a missed reactivation", () => {
-        // Exact v0.1 modelling for the candidate Frenzied Boar changes this seeded lava fight's downstream
-        // target trajectory. Mermaid now has two waits consumed by effects before it can reactivate; those
-        // are censored lifecycle outcomes, not missed opportunities or avoidable policy waits. The forced-
-        // circuit games immediately above retain the operation-bounded arbitration regression coverage.
+        // A wait consumed by a live effect before the unit can reactivate is a CENSORED lifecycle outcome,
+        // not a missed opportunity or an avoidable policy wait -- that distinction is what this test exists
+        // to hold, and the counts below only matter as evidence the path was actually walked.
+        //
+        // It followed the creature rather than being re-pinned: the Battle Mage's health coming down
+        // 26 -> 21 changed this seeded lava fight's trajectory, and the unit whose wait gets eaten is now
+        // Troglodyte instead of Mermaid. Asserting skipped > 0 keeps the test honest if that moves again --
+        // a re-pin to Mermaid's new numbers (skipped: 0) would have quietly deleted the coverage.
         const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 2);
         expect(record.endReason).toBe("elimination");
-        expect(record.byCreature.Mermaid.waitTurns).toBe(5);
-        expect(record.byCreature.Mermaid.sameLapWaitReactivations).toBe(3);
-        expect(record.byCreature.Mermaid.waitsSkippedByEffectBeforeReactivation).toBe(2);
-        expect(record.byCreature.Mermaid.missedSameLapWaitReactivations).toBe(0);
-        expect(record.byCreature.Mermaid.avoidableWaitTurns).toBe(0);
+        const censored = record.byCreature.Troglodyte;
+        expect(censored.waitsSkippedByEffectBeforeReactivation).toBeGreaterThan(0);
+        expect(censored.waitsSkippedByEffectBeforeReactivation).toBe(1);
+        expect(censored.waitTurns).toBe(2);
+        expect(censored.sameLapWaitReactivations).toBe(1);
+        // The censoring must not be reported as a miss, here or in the run-wide metric.
+        expect(censored.missedSameLapWaitReactivations).toBe(0);
+        expect(censored.avoidableWaitTurns).toBe(0);
         expect(record.metrics.missedSameLapWaitReactivations).toBe(0);
     });
 });
