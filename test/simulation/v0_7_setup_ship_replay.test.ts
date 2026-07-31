@@ -120,7 +120,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned after Arachna Queen hp rose 180 -> 190: the added survivability changes seeded setup
 // valuation and downstream combat traces. Re-pinned again after Battle Mage hp fell 19 -> 17, which
 // changes the same seeded valuation and exchanges. Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "c91190ba276722efd40d1d3b73d824f7abacc6a4c74e01c1be22512ab8d9e829";
+// Re-pinned for the Abomination buff (hp 500 -> 550, armor 44 -> 46): the tank's added durability
+// re-values seeded setups and every downstream exchange it appears in.
+const EXPECTED_REPLAY_SHA256 = "0cb01557c8216f933601e5772ad60ee4b87bd33e3b881779f60ef3c086ca261c";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

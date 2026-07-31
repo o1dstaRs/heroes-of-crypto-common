@@ -299,7 +299,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         expect(abomination.isDead()).toBe(true);
     });
 
-    it("returns the exact rounding overflow at the Abomination's default 44 armor", () => {
+    it("returns the exact rounding overflow at 44 armor (the pre-buff Abomination default)", () => {
         const { grid, unitsHolder, damageStatisticHolder, abomination, ally, attacker } = setupAuraTrio({
             abominationMaxHp: 40,
             allyArmor: 20,
