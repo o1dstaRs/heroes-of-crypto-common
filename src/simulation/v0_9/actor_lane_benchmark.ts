@@ -38,6 +38,7 @@ import {
     type IV09ActorLaneBenchmarkReceipt,
     type IV09ActorLaneBenchmarkRun,
     type V09ActorLaneBenchmarkMode,
+    type V09ActorLaneThermalTelemetry,
 } from "./actor_lane_benchmark_receipt";
 import { runV09ActorCommandsFailFast, type IV09ActorCommandLaunch, type ICommandResult } from "./orchestrator";
 import { validateV09GameShard } from "./recorder";
@@ -70,6 +71,7 @@ export interface IV09ActorLaneBenchmarkOptions {
     protectedV08Roots: readonly string[];
     panelGames: number;
     repetitions: number;
+    allowMissingThermalTelemetry: boolean;
 }
 
 export type IV09ActorLaneBenchmarkReceiptBase = Omit<IV09ActorLaneBenchmarkInput, "runs" | "completedAt">;
@@ -171,6 +173,7 @@ export async function executeV09ActorLaneBenchmarkPlan(
         }
         if (
             receiptBase.mode === "production" &&
+            receiptBase.thermalTelemetry === "observed" &&
             (run.peakTemperatureC > V09_ACTOR_LANE_SELECTION_POLICY.maximumTemperatureC ||
                 run.throttleCountAfter !== run.throttleCountBefore)
         ) {
@@ -355,7 +358,7 @@ export function inspectV09ActorLaneBenchmarkHost(gpuUuid: string): IHostInspecti
     };
 }
 
-function assertProductionHost(inspection: IHostInspection): void {
+function assertProductionHost(inspection: IHostInspection, thermalTelemetry: V09ActorLaneThermalTelemetry): void {
     const { host, idle } = inspection;
     if (
         host.platform !== V09_ACTOR_LANE_SELECTION_POLICY.requiredPlatform ||
@@ -371,8 +374,14 @@ function assertProductionHost(inspection: IHostInspection): void {
     if (host.physicalCpuIds.length < Math.max(...V09_AUDITED_ACTOR_LANE_COUNTS)) {
         throw new Error("actor benchmark requires 24 affinity-allowed physical CPU lanes");
     }
-    if (!host.temperatureSensorCount || !host.throttleCounterCount) {
+    if (thermalTelemetry === "observed" && (!host.temperatureSensorCount || !host.throttleCounterCount)) {
         throw new Error("actor benchmark requires CPU temperature and thermal-throttle telemetry");
+    }
+    if (
+        thermalTelemetry === "unavailable_user_override" &&
+        (host.temperatureSensorCount !== 0 || host.throttleCounterCount !== 0)
+    ) {
+        throw new Error("thermal telemetry override is only valid when both telemetry sources are unavailable");
     }
     if (idle.conflictingProcesses.length) {
         throw new Error(`actor benchmark found conflicting jobs:\n${idle.conflictingProcesses.join("\n")}`);
@@ -527,6 +536,7 @@ async function runCandidate(
     physicalCpuIds: readonly number[],
     temperaturePaths: readonly string[],
     throttlePaths: readonly string[],
+    thermalTelemetry: V09ActorLaneThermalTelemetry,
 ): Promise<IV09ActorLaneBenchmarkRun> {
     verifyV09SourceIdentity(sourceReceipt, repositoryRoot);
     const conflicts = conflictingProcesses();
@@ -589,30 +599,33 @@ async function runCandidate(
         environment: { ...process.env, CUDA_VISIBLE_DEVICES: "" },
     }));
 
-    const throttleCountBefore = readThrottleCount(throttlePaths);
-    let peakTemperatureC = readPeakTemperature(temperaturePaths);
+    const observedTelemetry = thermalTelemetry === "observed";
+    const throttleCountBefore = observedTelemetry ? readThrottleCount(throttlePaths) : 0;
+    let peakTemperatureC = observedTelemetry ? readPeakTemperature(temperaturePaths) : 0;
     let telemetryFailure: unknown;
-    const sampler = setInterval(() => {
-        try {
-            peakTemperatureC = Math.max(peakTemperatureC, readPeakTemperature(temperaturePaths));
-        } catch (error) {
-            telemetryFailure = error;
-        }
-    }, 2_000);
+    const sampler = observedTelemetry
+        ? setInterval(() => {
+              try {
+                  peakTemperatureC = Math.max(peakTemperatureC, readPeakTemperature(temperaturePaths));
+              } catch (error) {
+                  telemetryFailure = error;
+              }
+          }, 2_000)
+        : null;
     const started = performance.now();
     let results: ICommandResult[];
     try {
         results = await runV09ActorCommandsFailFast(launches);
     } finally {
-        clearInterval(sampler);
+        if (sampler !== null) clearInterval(sampler);
     }
     const elapsedSeconds = (performance.now() - started) / 1_000;
-    peakTemperatureC = Math.max(peakTemperatureC, readPeakTemperature(temperaturePaths));
+    if (observedTelemetry) peakTemperatureC = Math.max(peakTemperatureC, readPeakTemperature(temperaturePaths));
     if (telemetryFailure) throw telemetryFailure;
-    const throttleCountAfter = readThrottleCount(throttlePaths);
+    const throttleCountAfter = observedTelemetry ? readThrottleCount(throttlePaths) : 0;
     if (
-        peakTemperatureC > V09_ACTOR_LANE_SELECTION_POLICY.maximumTemperatureC ||
-        throttleCountAfter !== throttleCountBefore
+        (observedTelemetry && peakTemperatureC > V09_ACTOR_LANE_SELECTION_POLICY.maximumTemperatureC) ||
+        (observedTelemetry && throttleCountAfter !== throttleCountBefore)
     ) {
         throw new Error(
             `actor benchmark candidate ${entry.workers} failed thermal safety ` +
@@ -661,7 +674,10 @@ export async function runV09ActorLaneBenchmark(
         repositoryRoot,
     );
     const inspection = inspectV09ActorLaneBenchmarkHost(options.gpuUuid);
-    assertProductionHost(inspection);
+    const thermalTelemetry: V09ActorLaneThermalTelemetry = options.allowMissingThermalTelemetry
+        ? "unavailable_user_override"
+        : "observed";
+    assertProductionHost(inspection, thermalTelemetry);
 
     // Creation happens only after every clean-source, host-idle, topology, GPU, and path-isolation gate passes.
     mkdirSync(outputDirectory);
@@ -671,6 +687,7 @@ export async function runV09ActorLaneBenchmark(
     const stream = ledger.streams.find((candidate) => candidate.purpose === "wide_teacher_train")!;
     const receiptBase: IV09ActorLaneBenchmarkReceiptBase = {
         mode: "production",
+        thermalTelemetry,
         source: {
             receiptSha256: sourceReceipt.receiptSha256,
             sourceCommit: sourceReceipt.sourceCommit,
@@ -702,6 +719,7 @@ export async function runV09ActorLaneBenchmark(
             inspection.host.physicalCpuIds,
             inspection.temperaturePaths,
             inspection.throttlePaths,
+            thermalTelemetry,
         ),
     );
     verifyV09SourceIdentity(sourceReceipt, repositoryRoot);
@@ -721,6 +739,7 @@ function cliOptions(): IV09ActorLaneBenchmarkOptions {
             "protect-v08-root": { type: "string", multiple: true },
             "panel-games": { type: "string" },
             repetitions: { type: "string" },
+            "allow-missing-thermal-telemetry": { type: "boolean", default: false },
         },
         strict: true,
     });
@@ -736,6 +755,7 @@ function cliOptions(): IV09ActorLaneBenchmarkOptions {
         sourceReceiptPath: values["source-receipt"],
         gpuUuid: values["gpu-uuid"],
         protectedV08Roots: values["protect-v08-root"] ?? [],
+        allowMissingThermalTelemetry: values["allow-missing-thermal-telemetry"] === true,
         panelGames: parsePositiveInteger(
             values["panel-games"],
             V09_ACTOR_LANE_SELECTION_POLICY.minimumProductionPanelGames,

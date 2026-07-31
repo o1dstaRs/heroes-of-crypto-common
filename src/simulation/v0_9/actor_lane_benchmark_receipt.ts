@@ -12,10 +12,11 @@
 import { V09_RTX5090_GPU_UUID } from "./campaign";
 import { fingerprintV09 } from "./protocol";
 
-export const V09_ACTOR_LANE_BENCHMARK_SCHEMA = "hoc.ai.v0_9_actor_lane_benchmark.v1" as const;
+export const V09_ACTOR_LANE_BENCHMARK_SCHEMA = "hoc.ai.v0_9_actor_lane_benchmark.v2" as const;
 export const V09_AUDITED_ACTOR_LANE_COUNTS = [20, 22, 23, 24] as const;
 export type V09AuditedActorLaneCount = (typeof V09_AUDITED_ACTOR_LANE_COUNTS)[number];
 export type V09ActorLaneBenchmarkMode = "production" | "test_fixture";
+export type V09ActorLaneThermalTelemetry = "observed" | "unavailable_user_override";
 
 export const V09_ACTOR_LANE_SELECTION_POLICY = Object.freeze({
     requiredPlatform: "linux",
@@ -106,6 +107,7 @@ export interface IV09ActorLaneSelection {
 
 export interface IV09ActorLaneBenchmarkInput {
     mode: V09ActorLaneBenchmarkMode;
+    thermalTelemetry: V09ActorLaneThermalTelemetry;
     source: IV09ActorLaneBenchmarkSource;
     host: IV09ActorLaneBenchmarkHost;
     idle: IV09ActorLaneBenchmarkIdleEvidence;
@@ -263,6 +265,9 @@ function assertBenchmarkInput(input: IV09ActorLaneBenchmarkInput): void {
     if (input.mode !== "production" && input.mode !== "test_fixture") {
         throw new Error("benchmark mode must be production or test_fixture");
     }
+    if (input.thermalTelemetry !== "observed" && input.thermalTelemetry !== "unavailable_user_override") {
+        throw new Error("benchmark thermal telemetry mode is unsupported");
+    }
     assertSource(input.source);
     assertHost(input.host);
     assertIdle(input.idle);
@@ -340,8 +345,12 @@ function deriveSelection(input: IV09ActorLaneBenchmarkInput): {
         if (input.host.physicalCpuIds.length < Math.max(...V09_AUDITED_ACTOR_LANE_COUNTS)) {
             throw new Error("production benchmark host does not expose 24 affinity-allowed physical cores");
         }
-        if (input.host.temperatureSensorCount < 1 || input.host.throttleCounterCount < 1) {
-            throw new Error("production benchmark requires temperature and throttle telemetry");
+        if (input.thermalTelemetry === "observed") {
+            if (input.host.temperatureSensorCount < 1 || input.host.throttleCounterCount < 1) {
+                throw new Error("production benchmark requires temperature and throttle telemetry");
+            }
+        } else if (input.host.temperatureSensorCount !== 0 || input.host.throttleCounterCount !== 0) {
+            throw new Error("thermal telemetry override is only valid when both telemetry sources are unavailable");
         }
         if (
             input.panel.games < V09_ACTOR_LANE_SELECTION_POLICY.minimumProductionPanelGames ||
@@ -358,11 +367,15 @@ function deriveSelection(input: IV09ActorLaneBenchmarkInput): {
             throw new Error("production benchmark did not begin on an idle host");
         }
         for (const run of input.runs) {
-            if (
-                run.peakTemperatureC > V09_ACTOR_LANE_SELECTION_POLICY.maximumTemperatureC ||
-                run.throttleCountAfter !== run.throttleCountBefore
-            ) {
-                throw new Error(`worker candidate ${run.workers} failed thermal safety`);
+            if (input.thermalTelemetry === "observed") {
+                if (
+                    run.peakTemperatureC > V09_ACTOR_LANE_SELECTION_POLICY.maximumTemperatureC ||
+                    run.throttleCountAfter !== run.throttleCountBefore
+                ) {
+                    throw new Error(`worker candidate ${run.workers} failed thermal safety`);
+                }
+            } else if (run.peakTemperatureC !== 0 || run.throttleCountBefore !== 0 || run.throttleCountAfter !== 0) {
+                throw new Error(`worker candidate ${run.workers} recorded telemetry despite the override`);
             }
         }
         if (
@@ -393,7 +406,10 @@ function deriveSelection(input: IV09ActorLaneBenchmarkInput): {
             candidates,
             rationale:
                 `selected ${selected.workers} lanes; a larger candidate must improve mean throughput by at least ` +
-                `${V09_ACTOR_LANE_SELECTION_POLICY.minimumThroughputGainRatio * 100}%`,
+                `${V09_ACTOR_LANE_SELECTION_POLICY.minimumThroughputGainRatio * 100}%` +
+                (input.thermalTelemetry === "unavailable_user_override"
+                    ? "; CPU thermal telemetry was unavailable and explicitly user-overridden"
+                    : ""),
         },
     };
 }
@@ -418,6 +434,7 @@ export function validateV09ActorLaneBenchmarkReceipt(value: unknown): IV09ActorL
     }
     const input: IV09ActorLaneBenchmarkInput = {
         mode: receipt.mode,
+        thermalTelemetry: receipt.thermalTelemetry,
         source: receipt.source,
         host: receipt.host,
         idle: receipt.idle,
