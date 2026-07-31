@@ -285,30 +285,34 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         });
     }
 
-    test("keeps game 7845's strict-v0.1 rollout pursuit informational instead of hard mountain jitter", () => {
-        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 7_845);
+    test("keeps game 104's strict-v0.1 rollout pursuit informational instead of hard mountain jitter", () => {
+        // Originally pinned on game 7845's Wyvern pursuit. The Water-Shield rules fix (an absorbed hit
+        // lands no on-hit riders) shifted that seeded trajectory until the pursuit disappeared from it
+        // entirely (7845's Wyvern now shows mountain-adjacent misses and no non-progress move at all), so
+        // the fixture moved — via a panel scan — to game 104, whose Wyvern shows the same shape: an
+        // informational noncombat_with_direct_option + non_progress_move pursuit trace on one lap with
+        // every urgent/hard-jitter counter at zero.
+        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 104);
 
         expect(record).toMatchObject({
-            game: 7_845,
-            pair: 3_922,
-            seed: 2_303_609_179,
-            candidateSide: "red",
+            game: 104,
+            pair: 52,
+            seed: 3_198_986_141,
+            candidateSide: "green",
             winner: "candidate",
-            // Abomination now declines a fresh-response melee and preserves its Flesh Shield HP, changing the
-            // downstream pursuit trace while retaining this fixture's informational-only jitter contract.
-            laps: 7,
+            laps: 4,
             endReason: "elimination",
             candidateEngineRejections: 0,
         });
         expect(record.byCreature.Wyvern).toMatchObject({
-            observedTurns: 9,
-            oracleDirectEligibleTurns: 6,
-            sharedCatalogDirectEligibleTurns: 6,
-            chosenDirectActionTurns: 4,
-            pureMoveTurns: 3,
+            observedTurns: 5,
+            oracleDirectEligibleTurns: 4,
+            sharedCatalogDirectEligibleTurns: 4,
+            chosenDirectActionTurns: 3,
+            pureMoveTurns: 1,
             nonProgressMoves: 1,
-            noncombatWithDirectOptionTurns: 2,
-            eligibleCombatMisses: 2,
+            noncombatWithDirectOptionTurns: 1,
+            eligibleCombatMisses: 1,
             abaOscillations: 0,
             urgentRepeatedNonProgressWithDirectOption: 0,
             urgentMountainTerminalJitter: 0,
@@ -320,13 +324,13 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         expect(
             record.failureSamples.some(
                 ({ creatureName, lap, issue }) =>
-                    creatureName === "Wyvern" && lap === 4 && issue === "noncombat_with_direct_option",
+                    creatureName === "Wyvern" && lap === 2 && issue === "noncombat_with_direct_option",
             ),
         ).toBe(true);
         expect(
             record.failureSamples.some(
                 ({ creatureName, lap, issue }) =>
-                    creatureName === "Wyvern" && lap === 4 && issue === "non_progress_move",
+                    creatureName === "Wyvern" && lap === 2 && issue === "non_progress_move",
             ),
         ).toBe(true);
         expect(
