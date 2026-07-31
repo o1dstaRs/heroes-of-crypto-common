@@ -117,7 +117,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // augment EV feeds seeded setup valuation, so every trace re-values from the first augment pick.
 // Two isolated runs produced this byte-identical digest. (Re-pinned for Battle Mage hp 21 -> 19:
 // creature stats feed seeded setup valuation, so every trace re-values from the first roster read.)
-const EXPECTED_REPLAY_SHA256 = "fedb9079c1aa13490aaabeeab851b10ac78beba705d16a544bb45c2c82287473";
+// Re-pinned after Arachna Queen hp rose 180 -> 190: the added survivability changes seeded setup
+// valuation and downstream combat traces. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "a88b813c70fce8a61e60e9bb36eeaf547865629156e3fc8c5e334af71f3a750f";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
