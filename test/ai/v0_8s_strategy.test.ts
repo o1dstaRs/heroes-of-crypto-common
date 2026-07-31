@@ -192,7 +192,10 @@ describe("v0.8 search measurement alias", () => {
         // Re-pinned after primary v0.1 move-and-strike began using the same explicit move lifecycle as its
         // fallback route. Fire Wall, Vine, smoke, moved-state, and movement events now resolve before the
         // stationary strike instead of being bypassed by an integrated path. Two isolated runs reproduced it.
-        expect(digest("v0.7")).toBe("1a4188df722e61130fb97d2216225d7a6c1208e0a78cfc79c742c4a2c808b244");
+        // Re-pinned after Tsar Cannon's shot range grew 8 -> 8.5 and Dryad's damage rose 2-4 -> 3-5; both
+        // sides field these units across the seeded draws, so every trace containing one diverges from that
+        // point on. Two isolated runs reproduced this digest byte-identically.
+        expect(digest("v0.7")).toBe("7da4702b3b60163c99d97cbbbb6e46e3520fe5e8ff6624bb2a73a40a490e98a4");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -201,7 +204,9 @@ describe("v0.8 search measurement alias", () => {
         // Re-pinned after v0.8's Healer sustain router began preserving real front-stack HP instead of casting
         // armor over an available heal. The v0.7 control hash above remains byte-identical, both runs finish
         // with zero rejected actions, and two clean-source runs reproduced the v0.8 trace below.
-        expect(digest("v0.8")).toBe("3bba32f97f14b762405f63e0669e6347b614423a4c710d62d2ae378701f4d27c");
+        // Re-pinned with the same Tsar Cannon range / Dryad damage balance change; two isolated runs
+        // reproduced this digest byte-identically alongside the v0.7 control above.
+        expect(digest("v0.8")).toBe("daf0b2cd3a9cee4402bb71f849cc18cdc1b037d12032dcdf5525d413defff42b");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

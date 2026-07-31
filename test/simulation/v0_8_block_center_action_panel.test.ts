@@ -389,10 +389,15 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             seed: 4_253_757_401,
             candidateSide: "red",
             winner: "candidate",
-            laps: 8,
+            laps: 7,
             endReason: "elimination",
             candidateEngineRejections: 0,
         });
+        // Re-pinned after Dryad's damage rose 2-4 -> 3-5 (and Tsar Cannon's shot range 8 -> 8.5): the
+        // opponent roster fields a Dryad, so the seeded trace shortens again (8 laps -> 7) and the Nomad's
+        // counts shift. The guarded CLASSIFICATION is unchanged — the blocked lane-clearing return still
+        // reproduces as an informational noncombat_with_direct_option sample, never an urgent miss.
+        //
         // Re-pinned again as the Battle Mage's melee dropped to 2-5 (was 3-6), shortening the fight further
         // (10 laps -> 8) and moving the Nomad's counts. The reasoning below still holds unchanged: what this
         // case guards is the CLASSIFICATION, not the counts.
@@ -407,11 +412,11 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         // urgent miss -- so that is asserted directly below, plus a guard that holds whenever an oscillation
         // does reappear. Vacuous today, correct tomorrow, and honest either way.
         expect(record.byCreature.Nomad).toMatchObject({
-            observedTurns: 10,
-            oracleDirectEligibleTurns: 7,
-            sharedCatalogDirectEligibleTurns: 7,
-            chosenDirectActionTurns: 6,
-            pureMoveTurns: 2,
+            observedTurns: 8,
+            oracleDirectEligibleTurns: 6,
+            sharedCatalogDirectEligibleTurns: 6,
+            chosenDirectActionTurns: 5,
+            pureMoveTurns: 1,
             nonProgressMoves: 0,
             abaOscillations: 0,
             urgentMountainTerminalJitter: 0,
