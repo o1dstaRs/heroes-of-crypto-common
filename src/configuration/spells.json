@@ -231,6 +231,27 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Magic Defense Augment": {
+            "name": "Magic Defense Augment",
+            "level": 0,
+            "desc": [
+                "Level []. Augment increases the magic resist of the entire team by {}%.",
+                "Applied on top of the unit's own magic resist, before ability rolls.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Sniper Augment": {
             "name": "Sniper Augment",
             "level": 0,

@@ -3152,6 +3152,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 2,
             );
         }
+        // The Magic Defense augment is the dedicated magic half: same shape as the Armor augment's magic
+        // bonus, applied off the same base so the two stack additively rather than compounding.
+        const magicDefenseAugmentBuff = this.getBuff("Magic Defense Augment");
+        if (magicDefenseAugmentBuff) {
+            this.unitProperties.magic_resist += roundUnitStat(
+                (this.initialUnitProperties.magic_resist / 100) * magicDefenseAugmentBuff.getPower(),
+                2,
+            );
+        }
         const enchantedSkinAbility = this.getAbility("Enchanted Skin");
         if (enchantedSkinAbility) {
             this.unitProperties.magic_resist_mod = enchantedSkinAbility.getPower();
