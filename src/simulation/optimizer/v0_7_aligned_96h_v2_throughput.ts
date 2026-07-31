@@ -742,12 +742,32 @@ function diagnosticPlanFromSeeds(seeds: readonly number[]): IV07AlignedV2Injecte
     return plan;
 }
 
+// The diagnostic plan is a pure function of the content-addressed manifest bytes, but deriving it
+// expands the 268k-seed affine reservation and fingerprints every intermediate (~1.4s). Builders,
+// validators, replays and attestations each re-derive it, which multiplied into tens of seconds of
+// identical recomputation per test run and per replay session. Cache the derived plan by the
+// manifest's raw SHA-256 — the same digest the derivation already verifies against the frozen
+// pin — and hand every caller a structuredClone so no caller can alias or mutate the cached copy.
+// The cached object is exactly diagnosticPlanFromSeeds' output (itself fingerprint-pinned), so
+// this cannot change any derived digest.
+const cachedLegacyDiagnosticPlans = new Map<string, IV07AlignedV2InjectedSeedPlan>();
+
+function cachedLegacyDiagnosticPlan(sourceManifestBytes: Buffer): IV07AlignedV2InjectedSeedPlan {
+    const key = sha256(sourceManifestBytes);
+    let plan = cachedLegacyDiagnosticPlans.get(key);
+    if (!plan) {
+        plan = diagnosticPlanFromSeeds(selectedSourceSeeds(sourceManifestBytes));
+        cachedLegacyDiagnosticPlans.set(key, plan);
+    }
+    return plan;
+}
+
 export function buildV07AlignedV2ThroughputDiagnosticPlan(sourceManifestBytes: Buffer): IV07AlignedV2InjectedSeedPlan {
-    return diagnosticPlanFromSeeds(selectedSourceSeeds(sourceManifestBytes));
+    return structuredClone(cachedLegacyDiagnosticPlan(sourceManifestBytes));
 }
 
 export function buildV08AlignedV1ThroughputDiagnosticPlan(sourceManifestBytes: Buffer): IV08AlignedV1InjectedSeedPlan {
-    const legacy = diagnosticPlanFromSeeds(selectedSourceSeeds(sourceManifestBytes));
+    const legacy = cachedLegacyDiagnosticPlan(sourceManifestBytes);
     const plan: IV08AlignedV1InjectedSeedPlan = {
         schemaVersion: 1,
         artifactKind: "v0_8_aligned_96h_v1_seed_plan",
