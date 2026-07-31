@@ -795,6 +795,9 @@ export class AttackHandler {
         let damageFromResponse = 0;
         let petrifyingGazeResponseDamage = 0;
         let isResponseMissed = false;
+        // Water Shield on the RESPONDER's victim (the original attacker): captured before the counter-shot's
+        // damage lands so its on-hit riders are skipped like a missed counter when the hit is absorbed.
+        let rangeResponseAbsorbed = false;
         if (
             rangeResponseUnit &&
             !attackerUnit.canSkipResponse() &&
@@ -1069,6 +1072,7 @@ export class AttackHandler {
                         HoCLib.killTag(rangeResponseUnit.calculatePossibleLosses(damageFromResponse)),
                 );
 
+                rangeResponseAbsorbed = damageFromResponse > 0 && rangeResponseUnit.willWaterShieldAbsorb(targetUnit);
                 // response damage
                 this.damageStatisticHolder.add({
                     unitName: targetUnit.getName(),
@@ -1084,13 +1088,20 @@ export class AttackHandler {
                     team: targetUnit.getTeam(),
                     lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                 });
-                const pegasusLightEffect = rangeResponseUnit.getEffect("Pegasus Light");
-                if (pegasusLightEffect) {
-                    targetUnitPlusMorale += pegasusLightEffect.getPower();
+                if (!rangeResponseAbsorbed) {
+                    const pegasusLightEffect = rangeResponseUnit.getEffect("Pegasus Light");
+                    if (pegasusLightEffect) {
+                        targetUnitPlusMorale += pegasusLightEffect.getPower();
+                    }
+                    // A counter-shot is a hit like any other: the responder's poison aura applies with the
+                    // roles swapped, exactly as it does on its own turn. Same fix as the melee response path.
+                    AllAbilities.processPoisonAuraAbility(
+                        targetUnit,
+                        rangeResponseUnit,
+                        damageFromResponse,
+                        this.sceneLog,
+                    );
                 }
-                // A counter-shot is a hit like any other: the responder's poison aura applies with the roles
-                // swapped, exactly as it does on its own turn. Same fix as the melee response path below.
-                AllAbilities.processPoisonAuraAbility(targetUnit, rangeResponseUnit, damageFromResponse, this.sceneLog);
             }
 
             AllAbilities.processOneInTheFieldAbility(targetUnit);
@@ -1128,6 +1139,9 @@ export class AttackHandler {
         };
 
         let switchTargetUnit = false;
+        // Water Shield: captured BEFORE the damage lands (applyDamage consumes the shield). An absorbed
+        // shot applies nothing — the on-hit rider block below is skipped exactly like a missed shot.
+        let rangeAttackAbsorbed = false;
         if (!aoeRangeAttackResult?.landed || !isAOE) {
             if (!attackDamageApplied) {
                 const fleshShieldAbsorb = AllAbilities.processFleshShieldAura(
@@ -1156,6 +1170,7 @@ export class AttackHandler {
                 damageForAnimation.amount = damageFromAttack;
                 damageForAnimation.hits = []; // Initialize hits as an array of objects
                 const initialAmountAlive = targetUnit.getAmountAlive();
+                rangeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
                 // attack damage
                 const damageDealt = targetUnit.applyDamage(
                     damageFromAttack,
@@ -1179,17 +1194,19 @@ export class AttackHandler {
                     team: attackerUnit.getTeam(),
                     lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                 });
-                const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");
-                if (pegasusLightEffect) {
-                    attackerUnitPlusMorale += pegasusLightEffect.getPower();
+                if (!rangeAttackAbsorbed) {
+                    const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");
+                    if (pegasusLightEffect) {
+                        attackerUnitPlusMorale += pegasusLightEffect.getPower();
+                    }
                 }
             }
 
-            if (!targetUnit.isDead() && !isAttackMissed) {
+            if (!targetUnit.isDead() && !isAttackMissed && !rangeAttackAbsorbed) {
                 // On-hit effects only land when the shot itself did: a dodged/missed shot (Dodge /
                 // Small Specie / Boar Saliva) must not stun/petrify/etc. — mirrors the melee path,
                 // which gates this same block on !isAttackMissed (bug: an Orc could miss a Scavenger
-                // and still Stun it).
+                // and still Stun it). A Water-Shield-absorbed shot is treated the same as a miss.
                 const rangedFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
                     attackerUnit,
                     targetUnit,
@@ -1285,9 +1302,10 @@ export class AttackHandler {
                         resolveAssimilation();
                         return { completed: true, unitIdsDied, animationData, abilityStolen };
                     }
-                } else if (!isResponseMissed) {
+                } else if (!isResponseMissed && !rangeResponseAbsorbed) {
                     // Same rule for the return shot: a dodged/missed counter lands no on-hit effects
-                    // (mirrors the melee response path's isResponseMissed gate).
+                    // (mirrors the melee response path's isResponseMissed gate). A counter absorbed by
+                    // the victim's Water Shield lands none either.
                     AllAbilities.processStunAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processFreezeAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processRimeCharmAbility(targetUnit, rangeResponseUnit, this.sceneLog);
@@ -1439,7 +1457,7 @@ export class AttackHandler {
         }
 
         if (!secondShotResult.aoeRangeAttackLanded) {
-            if (!targetUnit.isDead() && secondShotResult.applied) {
+            if (!targetUnit.isDead() && secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
@@ -2031,6 +2049,10 @@ export class AttackHandler {
                             HoCLib.killTag(attackerUnit.calculatePossibleLosses(damageFromResponse)),
                     );
 
+                    // Water Shield on the counterattacked ATTACKER: an absorbed response lands none of the
+                    // responder's on-hit riders — same rule as a missed response.
+                    const meleeResponseAbsorbed =
+                        damageFromResponse > 0 && attackerUnit.willWaterShieldAbsorb(targetUnit);
                     this.damageStatisticHolder.add({
                         unitName: targetUnit.getName(),
                         damage: attackerUnit.applyDamage(
@@ -2045,6 +2067,7 @@ export class AttackHandler {
                         team: targetUnit.getTeam(),
                         lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                     });
+                    if (!meleeResponseAbsorbed) {
                     const pegasusLightEffect = attackerUnit.getEffect("Pegasus Light");
                     if (pegasusLightEffect) {
                         targetUnitPlusMorale += pegasusLightEffect.getPower();
@@ -2112,6 +2135,7 @@ export class AttackHandler {
                             (damageForAnimation.secondary ??= []),
                         ),
                     );
+                    }
                 }
                 AllAbilities.processOneInTheFieldAbility(targetUnit);
             }
@@ -2124,6 +2148,9 @@ export class AttackHandler {
         captureResponse();
 
         if (!hasLightningSpinAttackLanded && !isAttackMissed && !targetUnit.isDead()) {
+            // Water Shield: captured BEFORE the blow lands (applyDamage consumes the shield). An absorbed
+            // strike applies nothing — the whole on-hit rider block below is skipped like a missed blow.
+            const meleeAttackAbsorbed = damageFromAttack > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
             // this code has to be here to make sure that respond damage has been applied as well
             damageForAnimation.render = true;
             damageForAnimation.amount = damageFromAttack;
@@ -2168,73 +2195,79 @@ export class AttackHandler {
                 });
             }
 
-            const fireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
-                attackerUnit,
-                targetUnit,
-                damageFromAttack,
-                this.sceneLog,
-                this.damageStatisticHolder,
-                (damageForAnimation.secondary ??= []),
-            );
-            updateUnitsDied(fireforgedSwordResult.unitIdsDied);
-            this.updateMoraleDecreaseForTheUnitTeam(
-                moraleDecreaseForTheUnitTeam,
-                fireforgedSwordResult.moraleDecreaseForTheUnitTeam,
-            );
-            AllAbilities.processMinerAbility(attackerUnit, targetUnit, this.sceneLog);
-            AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-            AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-            AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
-            AllAbilities.processPetrifyingGazeAbility(
-                attackerUnit,
-                targetUnit,
-                petrifyingGazeAttackDamage,
-                this.sceneLog,
-                this.damageStatisticHolder,
-                (damageForAnimation.secondary ??= []),
-            );
-            AllAbilities.processBoarSalivaAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-            AllAbilities.processAggrAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-            AllAbilities.processTerrifyingGazeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-            {
-                const deepWoundsPower = AllAbilities.processDeepWoundsAbility(
-                    attackerUnit,
-                    targetUnit,
-                    attackerUnit,
-                    this.sceneLog,
-                );
-                if (deepWoundsPower > 0) {
-                    (damageForAnimation.deepWounds ??= []).push({ unitId: targetUnit.getId(), power: deepWoundsPower });
-                }
-            }
-            AllAbilities.processPegasusLightAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-            AllAbilities.processParalysisAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-            AllAbilities.processShatterArmorAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-            AllAbilities.processHamstringAbility(
-                attackerUnit,
-                targetUnit,
-                attackerUnit,
-                unitsHolder,
-                this.grid,
-                this.sceneLog,
-            );
-            AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
-            AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
-            updateUnitsDied(
-                AllAbilities.processChainLightningAbility(
+            // An absorbed strike lands no on-hit riders — same rule as a missed blow (the outer gate).
+            if (!meleeAttackAbsorbed) {
+                const fireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
                     attackerUnit,
                     targetUnit,
                     damageFromAttack,
-                    this.grid,
-                    unitsHolder,
                     this.sceneLog,
                     this.damageStatisticHolder,
                     (damageForAnimation.secondary ??= []),
-                ),
-            );
-            const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");
-            if (pegasusLightEffect) {
-                attackerUnitPlusMorale += pegasusLightEffect.getPower();
+                );
+                updateUnitsDied(fireforgedSwordResult.unitIdsDied);
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    fireforgedSwordResult.moraleDecreaseForTheUnitTeam,
+                );
+                AllAbilities.processMinerAbility(attackerUnit, targetUnit, this.sceneLog);
+                AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processPetrifyingGazeAbility(
+                    attackerUnit,
+                    targetUnit,
+                    petrifyingGazeAttackDamage,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                AllAbilities.processBoarSalivaAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processAggrAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processTerrifyingGazeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                {
+                    const deepWoundsPower = AllAbilities.processDeepWoundsAbility(
+                        attackerUnit,
+                        targetUnit,
+                        attackerUnit,
+                        this.sceneLog,
+                    );
+                    if (deepWoundsPower > 0) {
+                        (damageForAnimation.deepWounds ??= []).push({
+                            unitId: targetUnit.getId(),
+                            power: deepWoundsPower,
+                        });
+                    }
+                }
+                AllAbilities.processPegasusLightAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processParalysisAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processShatterArmorAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processHamstringAbility(
+                    attackerUnit,
+                    targetUnit,
+                    attackerUnit,
+                    unitsHolder,
+                    this.grid,
+                    this.sceneLog,
+                );
+                AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
+                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
+                updateUnitsDied(
+                    AllAbilities.processChainLightningAbility(
+                        attackerUnit,
+                        targetUnit,
+                        damageFromAttack,
+                        this.grid,
+                        unitsHolder,
+                        this.sceneLog,
+                        this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
+                    ),
+                );
+                const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");
+                if (pegasusLightEffect) {
+                    attackerUnitPlusMorale += pegasusLightEffect.getPower();
+                }
             }
             // ~ already responded here
         }
@@ -2263,6 +2296,10 @@ export class AttackHandler {
             });
         } else if (secondPunchResult.applied) {
             captureResponse();
+            // Water Shield vs the second punch: possible when the FIRST punch missed (shield intact).
+            // Captured before the second punch's damage lands; an absorbed punch applies no riders.
+            const secondPunchAbsorbed =
+                secondPunchResult.damage > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
             if (secondPunchResult.damage > 0) {
                 const secondPunchFleshShieldAbsorb = AllAbilities.processFleshShieldAura(
                     attackerUnit,
@@ -2340,7 +2377,7 @@ export class AttackHandler {
                 secondFireShieldResult.moraleDecreaseForTheUnitTeam,
             );
 
-            if (!secondPunchResult.missed) {
+            if (!secondPunchResult.missed && !secondPunchAbsorbed) {
                 const secondFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
                     attackerUnit,
                     targetUnit,

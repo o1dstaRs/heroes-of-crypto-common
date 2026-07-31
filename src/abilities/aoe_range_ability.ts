@@ -85,6 +85,10 @@ export function processRangeAOEAbility(
             ...affectedUnits.filter((unit) => unit.hasAbilityActive("Flesh Shield Aura")),
             ...affectedUnits.filter((unit) => !unit.hasAbilityActive("Flesh Shield Aura")),
         ];
+        // Units whose sub-hit actually LANDED. A dodged sub-hit and a Water-Shield-absorbed sub-hit
+        // both apply nothing, so the on-hit rider pass below (Stun/Freeze/Rime Charm/Spit Ball) only
+        // runs for members of this set — mirroring the single-target rule in the attack handler.
+        const landedHitUnitIds = new Set<string>();
         for (const unit of impactOrder) {
             if (unit.isDead()) {
                 if (!unitIdsDied.includes(unit.getId())) {
@@ -191,10 +195,16 @@ export function processRangeAOEAbility(
                 // unit stood when hit (it may die and be removed before the visuals play).
                 const unitPositionAtImpact = { ...unit.getPosition() };
                 const amountAliveBeforeDamage = unit.getAmountAlive();
+                const waterShieldAbsorbed = damageFromAttack > 0 && unit.willWaterShieldAbsorb(attackerUnit);
+                if (!waterShieldAbsorbed) {
+                    landedHitUnitIds.add(unit.getId());
+                }
                 const damageDealt = unit.applyDamage(
                     damageFromAttack,
                     FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
                     sceneLog,
+                    false,
+                    attackerUnit,
                 );
                 // Poison Cloud Aura: an aura'd attacker poisons every unit its AOE hits, not just the primary.
                 processPoisonAuraAbility(attackerUnit, unit, damageDealt, sceneLog);
@@ -212,9 +222,11 @@ export function processRangeAOEAbility(
                     team: attackerUnit.getTeam(),
                     lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                 });
-                const pegasusLightEffect = unit.getEffect("Pegasus Light");
-                if (pegasusLightEffect) {
-                    increaseMoraleTotal += pegasusLightEffect.getPower();
+                if (!waterShieldAbsorbed) {
+                    const pegasusLightEffect = unit.getEffect("Pegasus Light");
+                    if (pegasusLightEffect) {
+                        increaseMoraleTotal += pegasusLightEffect.getPower();
+                    }
                 }
                 sceneLog.updateLog(
                     `${attackerUnit.getName()} ${isAttack ? "🏹" : "resp"} ${unit.getName()} (${damageFromAttack})` +
@@ -222,7 +234,7 @@ export function processRangeAOEAbility(
                 );
                 maxDamage = Math.max(maxDamage, damageFromAttack);
 
-                if (!unit.isDead()) {
+                if (!unit.isDead() && !waterShieldAbsorbed) {
                     processPetrifyingGazeAbility(
                         attackerUnit,
                         unit,
@@ -249,6 +261,9 @@ export function processRangeAOEAbility(
                     }
                     wasDead.push(unit);
                 }
+                continue;
+            }
+            if (!landedHitUnitIds.has(unit.getId())) {
                 continue;
             }
             processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);

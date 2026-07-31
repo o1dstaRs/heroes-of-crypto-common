@@ -67,6 +67,10 @@ export function processThroughShotAbility(
     let targetUnit: Unit | undefined = undefined;
 
     const unitsDamaged: Unit[] = [];
+
+    // Pierced units whose hit was fully absorbed by Water Shield — excluded from the rider pass below.
+
+    const absorbedUnitIds = new Set<string>();
     let moraleIncreaseTotal = 0;
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
 
@@ -174,10 +178,18 @@ export function processThroughShotAbility(
             );
             const amountAliveBeforeDamage = targetUnit.getAmountAlive();
             const positionAtImpact = { ...targetUnit.getPosition() };
+            // Water Shield: captured before this pierced unit's damage lands — an absorbed sub-hit
+            // applies none of the shot's on-hit riders (same rule as a missed single-target shot).
+            const waterShieldAbsorbed = damageFromAttack > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
+            if (waterShieldAbsorbed) {
+                absorbedUnitIds.add(targetUnit.getId());
+            }
             const damageDealt = targetUnit.applyDamage(
                 damageFromAttack,
                 FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
                 sceneLog,
+                false,
+                attackerUnit,
             );
             // Poison Cloud Aura: an aura'd attacker poisons every unit the shot passes through.
             processPoisonAuraAbility(attackerUnit, targetUnit, damageDealt, sceneLog);
@@ -193,18 +205,20 @@ export function processThroughShotAbility(
                 amount: damageDealt,
                 unitsDied: Math.max(0, amountAliveBeforeDamage - targetUnit.getAmountAlive()),
             });
-            const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");
-            if (pegasusLightEffect) {
-                attackerUnit.increaseMorale(
-                    pegasusLightEffect.getPower(),
-                    FightStateManager.getInstance()
-                        .getFightProperties()
-                        .getAdditionalMoralePerTeam(attackerUnit.getTeam()),
-                );
+            if (!waterShieldAbsorbed) {
+                const pegasusLightEffect = targetUnit.getEffect("Pegasus Light");
+                if (pegasusLightEffect) {
+                    attackerUnit.increaseMorale(
+                        pegasusLightEffect.getPower(),
+                        FightStateManager.getInstance()
+                            .getFightProperties()
+                            .getAdditionalMoralePerTeam(attackerUnit.getTeam()),
+                    );
+                }
             }
             unitsDamaged.push(targetUnit);
 
-            if (!targetUnit.isDead()) {
+            if (!targetUnit.isDead() && !waterShieldAbsorbed) {
                 processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
@@ -228,7 +242,7 @@ export function processThroughShotAbility(
                 moraleDecreaseForTheUnitTeam[unitNameKey] =
                     (moraleDecreaseForTheUnitTeam[unitNameKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
             }
-        } else {
+        } else if (!absorbedUnitIds.has(unit.getId())) {
             processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
             processFreezeAbility(attackerUnit, unit, attackerUnit, sceneLog);
             processRimeCharmAbility(attackerUnit, unit, sceneLog);

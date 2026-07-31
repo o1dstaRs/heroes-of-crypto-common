@@ -33,6 +33,8 @@ export interface IDoubleShotResult {
     damage: number;
     /** Second-shot impact before Flesh Shield; Petrifying Gaze resolves from this damage on the hit target. */
     petrifyingGazeDamage: number;
+    /** True when the target's Water Shield absorbed this shot — the caller must skip its on-hit riders. */
+    waterShieldAbsorbed: boolean;
     unitIdsDied: string[];
     animationData: IAnimationData[];
     moraleIncrease: number;
@@ -59,6 +61,7 @@ export function processDoubleShotAbility(
 
     let damageFromAttack = 0;
     let petrifyingGazeDamage = 0;
+    let waterShieldAbsorbed = false;
     let moraleIncrease = 0;
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
 
@@ -75,6 +78,7 @@ export function processDoubleShotAbility(
             aoeRangeAttackLanded: false,
             damage: damageFromAttack,
             petrifyingGazeDamage,
+            waterShieldAbsorbed: false,
             unitIdsDied,
             animationData,
             moraleIncrease,
@@ -95,6 +99,7 @@ export function processDoubleShotAbility(
             aoeRangeAttackLanded: false,
             damage: damageFromAttack,
             petrifyingGazeDamage,
+            waterShieldAbsorbed: false,
             unitIdsDied,
             animationData,
             moraleIncrease,
@@ -188,6 +193,10 @@ export function processDoubleShotAbility(
         damageForAnimation.amount = damageFromAttack;
         damageForAnimation.unitPosition = toUnit.getPosition();
         damageForAnimation.unitIsSmall = toUnit.isSmallSize();
+        // Water Shield: reachable when the FIRST shot missed (shield intact). Captured before the
+        // damage lands; the caller skips this shot's on-hit riders when it absorbed. The attacker is
+        // passed through so a Fire Element shooter bypasses the shield here like everywhere else.
+        waterShieldAbsorbed = damageFromAttack > 0 && toUnit.willWaterShieldAbsorb(fromUnit);
         // Snapshot losses BEFORE applyDamage — calculatePossibleLosses reads current hp/amount_alive.
         const unitsKilled = toUnit.calculatePossibleLosses(damageFromAttack);
         damageStatisticHolder.add({
@@ -196,13 +205,17 @@ export function processDoubleShotAbility(
                 damageFromAttack,
                 FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
                 sceneLog,
+                false,
+                fromUnit,
             ),
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });
-        const pegasusLightEffect = toUnit.getEffect("Pegasus Light");
-        if (pegasusLightEffect) {
-            moraleIncrease += pegasusLightEffect.getPower();
+        if (!waterShieldAbsorbed) {
+            const pegasusLightEffect = toUnit.getEffect("Pegasus Light");
+            if (pegasusLightEffect) {
+                moraleIncrease += pegasusLightEffect.getPower();
+            }
         }
         sceneLog.updateLog(
             `${fromUnit.getName()} 🏹 ${toUnit.getName()} (${damageFromAttack})` + HoCLib.killTag(unitsKilled),
@@ -214,6 +227,7 @@ export function processDoubleShotAbility(
         aoeRangeAttackLanded: aoeRangeAttackResult.landed,
         damage: damageFromAttack,
         petrifyingGazeDamage,
+        waterShieldAbsorbed,
         unitIdsDied: aoeRangeAttackResult.unitIdsDied,
         animationData,
         moraleIncrease,

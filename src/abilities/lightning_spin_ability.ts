@@ -185,10 +185,15 @@ export function processLightningSpinAbility(
 
             const positionAtImpact = { ...enemy.getPosition() };
             const amountAliveBefore = enemy.getAmountAlive();
+            // Water Shield: captured before the spin's damage lands on this enemy — an absorbed sub-hit
+            // applies none of the on-hit riders below (same rule as a missed single-target blow).
+            const waterShieldAbsorbed = damageFromAttack > 0 && enemy.willWaterShieldAbsorb(fromUnit);
             const damageDealt = enemy.applyDamage(
                 damageFromAttack,
                 FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
                 sceneLog,
+                false,
+                fromUnit,
             );
             // Poison Cloud Aura: an aura'd attacker poisons every enemy caught in the spin.
             processPoisonAuraAbility(fromUnit, enemy, damageDealt, sceneLog);
@@ -207,9 +212,11 @@ export function processLightningSpinAbility(
             });
             const unitsKilled = Math.max(0, amountAliveBefore - enemy.getAmountAlive());
             enemyIdDamageFromAttack.set(enemy.getId(), damageFromAttack);
-            const pegasusLightEffect = enemy.getEffect("Pegasus Light");
-            if (pegasusLightEffect) {
-                increaseMoraleTotal += pegasusLightEffect.getPower();
+            if (!waterShieldAbsorbed) {
+                const pegasusLightEffect = enemy.getEffect("Pegasus Light");
+                if (pegasusLightEffect) {
+                    increaseMoraleTotal += pegasusLightEffect.getPower();
+                }
             }
 
             sceneLog.updateLog(
@@ -219,7 +226,7 @@ export function processLightningSpinAbility(
 
             if (enemy.isDead()) {
                 unitsDead.push(enemy);
-            } else {
+            } else if (!waterShieldAbsorbed) {
                 // check all the possible modificators here
                 // just in case if we have more inherited/stolen abilities
                 processMinerAbility(fromUnit, enemy, sceneLog);

@@ -1556,7 +1556,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // nothing at all; `waterShieldSpent` stops the seeding refresh from re-granting the buff afterwards.
         // FIRE IGNORES IT: a Fire Element attacker (and the fire abilities they cast — Fire Breath, Fire
         // Shield) passes straight through, dealing full damage without absorbing OR consuming the shield.
-        if (this.hasBuffActive("Water Shield") && !attacker?.hasAbilityActive("Fire Element")) {
+        if (this.willWaterShieldAbsorb(attacker)) {
             this.waterShieldSpent = true;
             this.deleteBuff("Water Shield");
             sceneLog.updateLog(`${this.getName()}'s Water Shield absorbs the hit and breaks`);
@@ -1809,6 +1809,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return;
         }
         this.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Water Shield"), amount: 1 }));
+    }
+    /**
+     * Whether `attacker`'s next damage instance on this unit would be fully absorbed by an intact Water
+     * Shield. The single source of truth for the absorb condition — applyDamage consumes the shield
+     * through this same check, and attack paths call it BEFORE dealing damage to know that the strike's
+     * on-hit riders (debuffs, gazes, auras) must not land: an absorbed hit applies nothing, like a miss.
+     */
+    public willWaterShieldAbsorb(attacker?: Unit): boolean {
+        return this.hasBuffActive("Water Shield") && !attacker?.hasAbilityActive("Fire Element");
     }
     public calculatePossibleLosses(minusHp: number): number {
         let amountDied = 0;

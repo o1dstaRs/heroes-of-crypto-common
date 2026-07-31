@@ -160,6 +160,10 @@ export function processSkewerStrikeAbility(
             damageFromAttack,
             FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(fromUnit.getTeam()),
             sceneLog,
+            false,
+            // The attacker is threaded through so a Fire Element skewerer bypasses Water Shield here
+            // like everywhere else (the shield check reads the attacker's element).
+            fromUnit,
         );
         // Poison Cloud Aura: an aura'd attacker poisons every unit skewered in the line.
         processPoisonAuraAbility(fromUnit, nextStandingTarget, damageDealt, sceneLog);
