@@ -62,8 +62,11 @@ const toRoster = (rows: readonly StackSpec[]): IArmyUnitSpec[] =>
 // search evaluates and the old seed (1323129968) stopped producing any edge-aimed shot at all — not a
 // different aim cell, none. This seed reproduces the same behaviour the test was written to guard: red's
 // Arbalester picking the alternate DOWN edge rather than the natural one.
+// Re-seeded again after the Sniper augment's attack component rose to 8/17/27 (parity with Might): the
+// stronger shot EV re-biased edge selection and seed 1323620946 stopped producing any DOWN-edge
+// alternate at all. This seed reproduces the guarded behaviour (DOWN-edge aim at cell (5,6)).
 const BLOCK_GAME_62: RecordedReplay = {
-    seed: 1323620946,
+    seed: 1100000245,
     gridType: PBTypes.GridVals.BLOCK_CENTER,
     green: [
         ["Nature", "Wolf", 1, 1, 124],
@@ -107,8 +110,11 @@ const LAVA_GAME_158: RecordedReplay = {
     ],
 };
 
+// Re-seeded with the Sniper 8/17/27 change: the prior seed's Aggr chain no longer yields a red
+// Arbalester shot at its live forced Pikeman target. This seed reproduces the guarded chain — the
+// forced target IS the executed range target.
 const NORMAL_GAME_1148: RecordedReplay = {
-    seed: 3837704031,
+    seed: 2500000198,
     gridType: PBTypes.GridVals.NORMAL,
     green: [
         ["Might", "Wolf Rider", 1, 1, 81],
@@ -259,7 +265,7 @@ describe("v0.1 ranged-fire robustness", () => {
                 action?.attackerId === redArbalester!.unitId &&
                 action.targetId === greenArbalester!.unitId &&
                 action.aimCell?.x === 5 &&
-                action.aimCell.y === 5 &&
+                action.aimCell.y === 6 &&
                 action.aimSide === RangeAttackCellSide.DOWN
             );
         });
@@ -269,7 +275,7 @@ describe("v0.1 ranged-fire robustness", () => {
                 type: "range_attack",
                 attackerId: redArbalester!.unitId,
                 targetId: greenArbalester!.unitId,
-                aimCell: { x: 5, y: 5 },
+                aimCell: { x: 5, y: 6 },
                 aimSide: RangeAttackCellSide.DOWN,
             },
         ]);

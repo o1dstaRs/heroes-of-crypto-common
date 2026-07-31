@@ -386,68 +386,54 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         ).toBe(true);
     });
 
-    // RE-PIN NEEDED (fight lane): Placement LEVEL_3 rectangles grew to height 6 incl. the edge line
-    // (common abb0cdb, owner-requested balance change), which shifts this seeded game's placements and
-    // diverges the pinned trajectory. Post-change probe of the protector case (game 324) shows mild
-    // drift only — coverageGapTurns 1, blockedCatchUpTurns 1, zero hard violations — i.e. tuning
-    // signal for the protector/search policies under 6-row zones, not an engine fault. Re-derive the
-    // pin (new seed/game or refreshed expectations) under the new geometry, then unskip.
-    test.skip("keeps game 15969's blocked Nomad lane-clearing return informational while allies finish", () => {
-        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 15_969);
+    // Re-derived under the 6-row Placement LEVEL_3 geometry + the Sniper 8/17/27 augment change, per
+    // the RE-PIN NEEDED plan: game 15969 no longer exhibits the guarded scenario at all (its trace now
+    // ends in a DRAW, so "while allies finish" is gone). Game 16071 reproduces the same guarded
+    // CLASSIFICATION on the new geometry: the candidate's Scavenger takes exactly one blocked
+    // lane-clearing return that stays an informational noncombat_with_direct_option sample — never an
+    // urgent miss — while its allies finish the fight (candidate elimination win, zero rejections).
+    test("keeps game 16071's blocked Scavenger lane-clearing return informational while allies finish", () => {
+        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 16_071);
 
         expect(record).toMatchObject({
-            game: 15_969,
-            pair: 7_984,
-            seed: 4_253_757_401,
+            game: 16_071,
+            pair: 8_035,
+            seed: 2_191_027_740,
             candidateSide: "red",
             winner: "candidate",
-            laps: 7,
+            laps: 12,
             endReason: "elimination",
             candidateEngineRejections: 0,
         });
-        // Re-pinned after Dryad's damage rose 2-4 -> 3-5 (and Tsar Cannon's shot range 8 -> 8.5): the
-        // opponent roster fields a Dryad, so the seeded trace shortens again (8 laps -> 7) and the Nomad's
-        // counts shift. The guarded CLASSIFICATION is unchanged — the blocked lane-clearing return still
-        // reproduces as an informational noncombat_with_direct_option sample, never an urgent miss.
-        //
-        // Re-pinned again as the Battle Mage's melee dropped to 2-5 (was 3-6), shortening the fight further
-        // (10 laps -> 8) and moving the Nomad's counts. The reasoning below still holds unchanged: what this
-        // case guards is the CLASSIFICATION, not the counts.
-        //
-        // The Battle Mage's health coming down 26 -> 21 shortened this fight (11 laps -> 10) and the Nomad
-        // no longer oscillates at all: abaOscillations 1 -> 0, and NO game in
-        // DEEP_BLOCK_CENTER_REGRESSIONS produces an aba_oscillation sample any more. So the specific lap-11
-        // oscillation this test used to point at is simply not reachable, and pinning the Nomad's new
-        // counts alone would leave a test that no longer checks the thing it is named for.
-        //
-        // What it guarded was the CLASSIFICATION -- a blocked lane-clearing return is informational, not an
-        // urgent miss -- so that is asserted directly below, plus a guard that holds whenever an oscillation
-        // does reappear. Vacuous today, correct tomorrow, and honest either way.
-        expect(record.byCreature.Nomad).toMatchObject({
-            observedTurns: 8,
-            oracleDirectEligibleTurns: 6,
-            sharedCatalogDirectEligibleTurns: 6,
-            chosenDirectActionTurns: 5,
-            pureMoveTurns: 1,
+        expect(record.byCreature.Scavenger).toMatchObject({
+            observedTurns: 15,
+            oracleDirectEligibleTurns: 10,
+            sharedCatalogDirectEligibleTurns: 10,
+            chosenDirectActionTurns: 9,
+            noncombatWithDirectOptionTurns: 1,
+            pureMoveTurns: 3,
             nonProgressMoves: 0,
             abaOscillations: 0,
+            urgentMountainAdjacentMisses: 0,
             urgentMountainTerminalJitter: 0,
             lateDirectEligibleTurns: 0,
             lateDirectActionMisses: 0,
             strategyRejectedActions: 0,
             recoveryTurns: 0,
         });
+        const informational = record.failureSamples.filter(({ issue }) => issue === "noncombat_with_direct_option");
+        expect(informational).toHaveLength(1);
+        expect(informational[0].creatureName).toBe("Scavenger");
         // The invariant: an ABA oscillation, wherever it turns up, is informational and never an urgent miss.
         for (const sample of record.failureSamples.filter((f) => f.issue === "aba_oscillation")) {
             expect(sample.creatureName).toBeTruthy();
         }
-        expect(record.byCreature.Nomad.mountainAdjacentMissedAttacks).toBe(0);
-        // The lap-11 oscillation sample is gone with the oscillation itself (see above). What must stay true
-        // is the other half of "informational": the Nomad's blocked return is never escalated to an urgent
-        // mountain jitter, which is the failure this test was really standing guard over.
+        // The other half of "informational": the blocked return is never escalated to an urgent
+        // mountain jitter, which is the failure this case is really standing guard over.
         expect(
             record.failureSamples.some(
-                ({ creatureName, issue }) => creatureName === "Nomad" && issue === "urgent_mountain_terminal_jitter",
+                ({ creatureName, issue }) =>
+                    creatureName === "Scavenger" && issue === "urgent_mountain_terminal_jitter",
             ),
         ).toBe(false);
     });

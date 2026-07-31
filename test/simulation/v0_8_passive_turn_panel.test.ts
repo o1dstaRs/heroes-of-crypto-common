@@ -1218,7 +1218,9 @@ describe("v0.8 random-roster passive-turn panel", () => {
         expect(record.metrics.rawAvoidableDefendTurns).toBe(0);
         expect(record.metrics.repairedRawAvoidableDefendTurns).toBe(0);
         expect(record.metrics.avoidableDefendTurns).toBe(0);
-        expect(record.metrics.forcedDefendTurns).toBe(1);
+        // Sniper 8/17/27 re-valued this trace: one additional GENUINELY forced shield appears. The
+        // guarded classification is untouched — every avoidable-defend counter above stays zero.
+        expect(record.metrics.forcedDefendTurns).toBe(2);
         expect(record.metrics.finalDefendTurns).toBe(
             record.metrics.protectedDefendTurns + record.metrics.forcedDefendTurns,
         );
@@ -1282,8 +1284,10 @@ describe("v0.8 random-roster passive-turn panel", () => {
         const censored = record.byCreature.Troglodyte;
         expect(censored.waitsSkippedByEffectBeforeReactivation).toBeGreaterThan(0);
         expect(censored.waitsSkippedByEffectBeforeReactivation).toBe(1);
-        expect(censored.waitTurns).toBe(2);
-        expect(censored.sameLapWaitReactivations).toBe(1);
+        // Sniper 8/17/27 re-valued this trace: the Troglodyte's normal same-lap wait+reactivation pair
+        // dropped out, leaving exactly the effect-consumed wait — which is the censoring under test.
+        expect(censored.waitTurns).toBe(1);
+        expect(censored.sameLapWaitReactivations).toBe(0);
         // The censoring must not be reported as a miss, here or in the run-wide metric.
         expect(censored.missedSameLapWaitReactivations).toBe(0);
         expect(censored.avoidableWaitTurns).toBe(0);

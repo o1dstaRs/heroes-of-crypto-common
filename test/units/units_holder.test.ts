@@ -350,7 +350,9 @@ describe("UnitsHolder", () => {
         expect(melee.getBaseAttack()).toBeCloseTo(11.5);
         expect(melee.getSteps()).toBe(4);
         expect(ranged.getBaseArmor()).toBeCloseTo(10.6);
-        expect(ranged.getBaseAttack()).toBeCloseTo(11.4);
+        // Sniper L1 attack rose 7% -> 8%, reaching parity with Might L1 — the ranged and melee
+        // augmented attacks now match exactly.
+        expect(ranged.getBaseAttack()).toBeCloseTo(11.5);
         expect(ranged.getUnitProperties().shot_distance).toBeCloseTo(19.2);
         expect(ranged.getSteps()).toBe(4);
     });
