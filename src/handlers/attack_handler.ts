@@ -2068,73 +2068,78 @@ export class AttackHandler {
                         lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
                     });
                     if (!meleeResponseAbsorbed) {
-                    const pegasusLightEffect = attackerUnit.getEffect("Pegasus Light");
-                    if (pegasusLightEffect) {
-                        targetUnitPlusMorale += pegasusLightEffect.getPower();
-                    }
-
-                    AllAbilities.processMinerAbility(targetUnit, attackerUnit, this.sceneLog);
-                    const fireShieldFromAttackerResult = AllAbilities.processFireShieldAbility(
-                        attackerUnit,
-                        targetUnit,
-                        this.sceneLog,
-                        damageFromResponse,
-                        unitsHolder,
-                        this.damageStatisticHolder,
-                        (damageForAnimation.secondary ??= []),
-                    );
-                    updateUnitsDied(fireShieldFromAttackerResult.unitIdsDied);
-                    this.updateMoraleDecreaseForTheUnitTeam(
-                        moraleDecreaseForTheUnitTeam,
-                        fireShieldFromAttackerResult.moraleDecreaseForTheUnitTeam,
-                    );
-                    AllAbilities.processStunAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                    AllAbilities.processFreezeAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                    AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
-                    AllAbilities.processPetrifyingGazeAbility(
-                        targetUnit,
-                        attackerUnit,
-                        petrifyingGazeResponseDamage,
-                        this.sceneLog,
-                        this.damageStatisticHolder,
-                        (damageForAnimation.secondary ??= []),
-                    );
-                    AllAbilities.processBoarSalivaAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                    AllAbilities.processAggrAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                    {
-                        const deepWoundsPower = AllAbilities.processDeepWoundsAbility(
-                            targetUnit,
-                            attackerUnit,
-                            attackerUnit,
-                            this.sceneLog,
-                        );
-                        if (deepWoundsPower > 0) {
-                            (damageForAnimation.deepWounds ??= []).push({
-                                unitId: attackerUnit.getId(),
-                                power: deepWoundsPower,
-                            });
+                        const pegasusLightEffect = attackerUnit.getEffect("Pegasus Light");
+                        if (pegasusLightEffect) {
+                            targetUnitPlusMorale += pegasusLightEffect.getPower();
                         }
-                    }
-                    // A response is a hit like any other, so every on-hit rider the responder owns fires with
-                    // the roles swapped — including its poison aura. Left out originally, which made an
-                    // aura'd unit poison only on its own turn and not when it struck back.
-                    AllAbilities.processPoisonAuraAbility(targetUnit, attackerUnit, damageFromResponse, this.sceneLog);
-                    AllAbilities.processPegasusLightAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                    AllAbilities.processParalysisAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                    AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog);
-                    AllAbilities.processBlindnessAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                    updateUnitsDied(
-                        AllAbilities.processChainLightningAbility(
+
+                        AllAbilities.processMinerAbility(targetUnit, attackerUnit, this.sceneLog);
+                        const fireShieldFromAttackerResult = AllAbilities.processFireShieldAbility(
+                            attackerUnit,
+                            targetUnit,
+                            this.sceneLog,
+                            damageFromResponse,
+                            unitsHolder,
+                            this.damageStatisticHolder,
+                            (damageForAnimation.secondary ??= []),
+                        );
+                        updateUnitsDied(fireShieldFromAttackerResult.unitIdsDied);
+                        this.updateMoraleDecreaseForTheUnitTeam(
+                            moraleDecreaseForTheUnitTeam,
+                            fireShieldFromAttackerResult.moraleDecreaseForTheUnitTeam,
+                        );
+                        AllAbilities.processStunAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                        AllAbilities.processFreezeAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                        AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
+                        AllAbilities.processPetrifyingGazeAbility(
                             targetUnit,
                             attackerUnit,
-                            damageFromResponse,
-                            this.grid,
-                            unitsHolder,
+                            petrifyingGazeResponseDamage,
                             this.sceneLog,
                             this.damageStatisticHolder,
                             (damageForAnimation.secondary ??= []),
-                        ),
-                    );
+                        );
+                        AllAbilities.processBoarSalivaAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                        AllAbilities.processAggrAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                        {
+                            const deepWoundsPower = AllAbilities.processDeepWoundsAbility(
+                                targetUnit,
+                                attackerUnit,
+                                attackerUnit,
+                                this.sceneLog,
+                            );
+                            if (deepWoundsPower > 0) {
+                                (damageForAnimation.deepWounds ??= []).push({
+                                    unitId: attackerUnit.getId(),
+                                    power: deepWoundsPower,
+                                });
+                            }
+                        }
+                        // A response is a hit like any other, so every on-hit rider the responder owns fires with
+                        // the roles swapped — including its poison aura. Left out originally, which made an
+                        // aura'd unit poison only on its own turn and not when it struck back.
+                        AllAbilities.processPoisonAuraAbility(
+                            targetUnit,
+                            attackerUnit,
+                            damageFromResponse,
+                            this.sceneLog,
+                        );
+                        AllAbilities.processPegasusLightAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                        AllAbilities.processParalysisAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                        AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog);
+                        AllAbilities.processBlindnessAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                        updateUnitsDied(
+                            AllAbilities.processChainLightningAbility(
+                                targetUnit,
+                                attackerUnit,
+                                damageFromResponse,
+                                this.grid,
+                                unitsHolder,
+                                this.sceneLog,
+                                this.damageStatisticHolder,
+                                (damageForAnimation.secondary ??= []),
+                            ),
+                        );
                     }
                 }
                 AllAbilities.processOneInTheFieldAbility(targetUnit);
@@ -2298,8 +2303,7 @@ export class AttackHandler {
             captureResponse();
             // Water Shield vs the second punch: possible when the FIRST punch missed (shield intact).
             // Captured before the second punch's damage lands; an absorbed punch applies no riders.
-            const secondPunchAbsorbed =
-                secondPunchResult.damage > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
+            const secondPunchAbsorbed = secondPunchResult.damage > 0 && targetUnit.willWaterShieldAbsorb(attackerUnit);
             if (secondPunchResult.damage > 0) {
                 const secondPunchFleshShieldAbsorb = AllAbilities.processFleshShieldAura(
                     attackerUnit,
