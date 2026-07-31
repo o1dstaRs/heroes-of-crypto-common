@@ -1274,11 +1274,10 @@ describe("v0.8 random-roster passive-turn panel", () => {
         // not a missed opportunity or an avoidable policy wait -- that distinction is what this test exists
         // to hold, and the counts below only matter as evidence the path was actually walked.
         //
-        // It followed the creature rather than being re-pinned: the Battle Mage's health coming down
-        // 26 -> 21 changed this seeded lava fight's trajectory, and the unit whose wait gets eaten is now
-        // Troglodyte instead of Mermaid. Asserting skipped > 0 keeps the test honest if that moves again --
-        // a re-pin to Mermaid's new numbers (skipped: 0) would have quietly deleted the coverage.
-        const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 2);
+        // Frenzied Boar's 240/42 -> 220/40 durability change moved the old game off this lifecycle. This
+        // deterministic lava fight preserves the Troglodyte path: two waits, one normal same-lap reactivation,
+        // and one wait consumed by a live effect. Asserting skipped > 0 keeps the test honest if it moves again.
+        const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 464);
         expect(record.endReason).toBe("elimination");
         const censored = record.byCreature.Troglodyte;
         expect(censored.waitsSkippedByEffectBeforeReactivation).toBeGreaterThan(0);

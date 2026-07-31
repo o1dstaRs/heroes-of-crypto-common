@@ -429,7 +429,7 @@ describe("v0.8 search measurement alias", () => {
             sourceCommit: "a".repeat(40),
             sourceDirty: false,
         } as const;
-        const plan = planV08BlockCenterActionGame(options, 608);
+        const plan = planV08BlockCenterActionGame(options, 782);
         const setup = liveTwinSetup();
         const nativeDecisions: GameAction[][] = [];
         const chosenDecisions: GameAction[][] = [];
@@ -469,8 +469,8 @@ describe("v0.8 search measurement alias", () => {
                 })),
         );
 
-        expect(plan.seed).toBe(2_101_899_737);
-        // Angel now screens this Elf/Berserker line and turns the former nine-lap chase into a seven-lap win.
+        expect(plan.seed).toBe(1_109_576_960);
+        // Angel screens this Elf/Arbalester/Valkyrie line and turns the former lap-nine chase into a six-lap win.
         // Keep the original failure contract underneath that stronger outcome: every Elf activation is useful,
         // it fires whenever the native ray exists, and a13 never needs rejection recovery.
         expect(result?.winner).toBe("green");

@@ -92,6 +92,13 @@ describe("config_provider", () => {
         expect(creature.abilities_descriptions[fleshShieldIndex]?.toLowerCase()).not.toContain("luck");
     });
 
+    it("loads Frenzied Boar's reduced durability", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Frenzied Boar", "frenzied_boar_512", 1);
+
+        expect(creature.max_hp).toBe(220);
+        expect(creature.base_armor).toBe(40);
+    });
+
     it("loads every ability config", () => {
         for (const abilityName of catalogKeys(abilitiesJson)) {
             const ability = getAbilityConfig(abilityName);

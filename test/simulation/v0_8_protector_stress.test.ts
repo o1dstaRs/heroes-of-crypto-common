@@ -146,8 +146,9 @@ describe("v0.8 protector stress summary", () => {
 
 describe("v0.8 protector production regressions", () => {
     // Game indices were re-curated after Squire gained Arcane Ward Aura, then again after Abomination's
-    // 500-HP / 44-armor rebalance. The tests keep their exact meaning: only the deterministic cases that
-    // currently exhibit each condition changed, while every safety metric remains asserted.
+    // 500-HP / 44-armor rebalance and Frenzied Boar's 220-HP / 40-armor rebalance. The tests keep their exact
+    // meaning: only the deterministic cases that currently exhibit each condition changed, while every safety
+    // metric remains asserted.
     test("keeps a live Centaur and Battle Mage from melee-rushing out of Flesh Shield", () => {
         for (const game of [11, 72]) {
             const record = runV08ProtectorStressGame({ baseSeed: 80_813_441, maxLaps: 60 }, game);
@@ -161,7 +162,7 @@ describe("v0.8 protector production regressions", () => {
     });
 
     test("keeps exact Flesh Shield coverage through the former center-map narrowing case", () => {
-        const record = runV08ProtectorStressGame({ baseSeed: 80_813_441, maxLaps: 60 }, 36);
+        const record = runV08ProtectorStressGame({ baseSeed: 80_813_441, maxLaps: 60 }, 324);
         expect(record.rejectedActions).toBe(0);
         expect(record.metrics.abominationCoverageGapTurns).toBe(0);
         expect(record.metrics.blockedCatchUpTurns).toBe(0);

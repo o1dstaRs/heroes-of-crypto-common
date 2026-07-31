@@ -1360,10 +1360,10 @@
         },
         "Frenzied Boar": {
             "name": "Frenzied Boar",
-            "hp": 240,
+            "hp": 220,
             "steps": 7,
             "speed": 6.5,
-            "armor": 42,
+            "armor": 40,
             "attack_type": "MELEE",
             "attack": 41,
             "attack_damage_min": 70,
