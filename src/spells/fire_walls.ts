@@ -133,11 +133,16 @@ export class FireWall {
  */
 export class FireWalls {
     private readonly walls = new Map<number, FireWall>();
+    /** Changes whenever renderable fire state changes, so clients can reuse a snapshot between animation frames. */
+    private revision = 0;
     public static key(cell: XY): number {
         return (cell.x << 8) | (cell.y & 0xff);
     }
     public size(): number {
         return this.walls.size;
+    }
+    public getRevision(): number {
+        return this.revision;
     }
     public has(cell: XY): boolean {
         return this.walls.has(FireWalls.key(cell));
@@ -150,6 +155,7 @@ export class FireWalls {
         burnPercentage: number = FIRE_WALL_BURN_PERCENTAGE,
     ): void {
         this.walls.set(FireWalls.key(cell), new FireWall({ x: cell.x, y: cell.y }, laps, burnPercentage));
+        this.revision += 1;
     }
     public addAll(
         cells: XY[],
@@ -165,10 +171,14 @@ export class FireWalls {
         return this.walls.get(FireWalls.key(cell))?.burnPercentage ?? 0;
     }
     public remove(cell: XY): boolean {
-        return this.walls.delete(FireWalls.key(cell));
+        const removed = this.walls.delete(FireWalls.key(cell));
+        if (removed) this.revision += 1;
+        return removed;
     }
     public clear(): void {
+        if (!this.walls.size) return;
         this.walls.clear();
+        this.revision += 1;
     }
     // Snapshot of every burning cell (for client rendering + AI evaluation). Returns plain XY copies so
     // callers can't mutate the stored cells.
@@ -183,13 +193,16 @@ export class FireWalls {
     // tick (so the engine can emit a `fire_wall_expired` event for the client to remove the visuals).
     public minusAllLaps(): XY[] {
         const expired: XY[] = [];
+        let changed = false;
         for (const [key, wall] of this.walls) {
+            changed = true;
             wall.minusLap();
             if (wall.getLapsRemaining() <= 0) {
                 expired.push({ x: wall.cell.x, y: wall.cell.y });
                 this.walls.delete(key);
             }
         }
+        if (changed) this.revision += 1;
         return expired;
     }
     // Serialization for fight snapshots / journal replay. Compact shape: [{x,y,l}, ...].

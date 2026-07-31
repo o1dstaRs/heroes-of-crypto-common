@@ -49,11 +49,16 @@ export class SmokeCloud {
 // the move handler dispels a cell the moment a creature occupies it.
 export class SmokeClouds {
     private readonly clouds = new Map<number, SmokeCloud>();
+    /** Changes whenever renderable cloud state changes, so clients can reuse a snapshot between animation frames. */
+    private revision = 0;
     public static key(cell: XY): number {
         return (cell.x << 8) | (cell.y & 0xff);
     }
     public size(): number {
         return this.clouds.size;
+    }
+    public getRevision(): number {
+        return this.revision;
     }
     public has(cell: XY): boolean {
         return this.clouds.has(SmokeClouds.key(cell));
@@ -62,12 +67,17 @@ export class SmokeClouds {
     // lifetime (a re-cast over a still-smoking cell top-ups the laps rather than stacking).
     public add(cell: XY, laps: number = SMOKE_CLOUD_DEFAULT_LAPS): void {
         this.clouds.set(SmokeClouds.key(cell), new SmokeCloud({ x: cell.x, y: cell.y }, laps));
+        this.revision += 1;
     }
     public dispel(cell: XY): boolean {
-        return this.clouds.delete(SmokeClouds.key(cell));
+        const removed = this.clouds.delete(SmokeClouds.key(cell));
+        if (removed) this.revision += 1;
+        return removed;
     }
     public clear(): void {
+        if (!this.clouds.size) return;
         this.clouds.clear();
+        this.revision += 1;
     }
     // Snapshot of every active smoked cell (for client rendering + AI evaluation). Returns plain XY copies so
     // callers can't mutate the stored cells.
@@ -82,13 +92,16 @@ export class SmokeClouds {
     // tick (so the engine can emit a `smoke_expired` event for the client to remove the visuals).
     public minusAllLaps(): XY[] {
         const expired: XY[] = [];
+        let changed = false;
         for (const [key, cloud] of this.clouds) {
+            changed = true;
             cloud.minusLap();
             if (cloud.getLapsRemaining() <= 0) {
                 expired.push({ x: cloud.cell.x, y: cloud.cell.y });
                 this.clouds.delete(key);
             }
         }
+        if (changed) this.revision += 1;
         return expired;
     }
     // Serialization for fight snapshots / journal replay. Compact shape: [{x,y,l}, ...].

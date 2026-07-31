@@ -67,11 +67,16 @@ export class Vine {
  */
 export class Vines {
     private readonly vines = new Map<number, Vine>();
+    /** Changes whenever renderable vine state changes, so clients can reuse a snapshot between animation frames. */
+    private revision = 0;
     public static key(cell: XY): number {
         return (cell.x << 8) | (cell.y & 0xff);
     }
     public size(): number {
         return this.vines.size;
+    }
+    public getRevision(): number {
+        return this.revision;
     }
     public has(cell: XY): boolean {
         return this.vines.has(Vines.key(cell));
@@ -80,6 +85,7 @@ export class Vines {
     // its lifetime rather than stacking the penalty — two vines on one cell would read as one on screen.
     public add(cell: XY, laps: number = VINE_DEFAULT_LAPS, team = 0): void {
         this.vines.set(Vines.key(cell), new Vine({ x: cell.x, y: cell.y }, laps, team));
+        this.revision += 1;
     }
     public addAll(cells: XY[], laps: number = VINE_DEFAULT_LAPS, team = 0): void {
         for (const cell of cells) {
@@ -99,10 +105,14 @@ export class Vines {
         return owner !== undefined && owner !== team;
     }
     public remove(cell: XY): boolean {
-        return this.vines.delete(Vines.key(cell));
+        const removed = this.vines.delete(Vines.key(cell));
+        if (removed) this.revision += 1;
+        return removed;
     }
     public clear(): void {
+        if (!this.vines.size) return;
         this.vines.clear();
+        this.revision += 1;
     }
     // Snapshot of every vined cell (for client rendering + AI evaluation). Returns plain XY copies so
     // callers can't mutate the stored cells.
@@ -117,13 +127,16 @@ export class Vines {
     // (so the engine can emit a `vine_expired` event for the client to remove the visuals).
     public minusAllLaps(): XY[] {
         const expired: XY[] = [];
+        let changed = false;
         for (const [key, vine] of this.vines) {
+            changed = true;
             vine.minusLap();
             if (vine.getLapsRemaining() <= 0) {
                 expired.push({ x: vine.cell.x, y: vine.cell.y });
                 this.vines.delete(key);
             }
         }
+        if (changed) this.revision += 1;
         return expired;
     }
     // Serialization for fight snapshots / journal replay. Compact shape: [{x,y,l}, ...].
