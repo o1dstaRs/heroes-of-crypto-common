@@ -32,9 +32,9 @@ export const V08_A13_GENOME_SHA256 = "25331ab6910440daa8a21ac81bfd4a452df2e2281c
 export const V08_A13_SOURCE_BINDING_SHA256 =
     "e68485b177e98f4fb98228a6595e29b08c50726ef4882ee44ea53652a4613459" as const;
 export const V08_A13_SOURCE_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "21994cdfe20f4c0c4fe7f88f47610bd0c1c030b43f9700b35920300b6d38432b" as const;
+    "fd9fa86ba7c80196d4509a9dbb955b4dd0aa20341c24dbd6518032fd77a0d04e" as const;
 export const V08_A13_PRODUCTION_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "afe3da2cf4622a0327cb827a194be2594351de0160f7baf9751295eace13be08" as const;
+    "d86c65e7fa028654f19bd64f844e2b964621f0a1196612cc45f3d9e1a1aea445" as const;
 
 export const V08_A13_VALUE_LEAF = Object.freeze({
     b: 0.06534069459644987,
@@ -215,6 +215,7 @@ export function buildV08A13SearchEnvironment(
         // delete research-only switches, so an inherited shell cannot mutate the sealed a13 policy later.
         V08_BLACKSMITH_ROLE_VERSIONS: version,
         V08_CASTLING_ROUTER_VERSIONS: undefined,
+        V08_NIGHTMARE_ROLE_VERSIONS: version,
         V08_RANGED_POSITION_MODE: undefined,
         V08_RANGED_POSITION_VERSIONS: undefined,
         V08_RESPONSE_NEUTRAL_ADVANCE_VERSIONS: undefined,

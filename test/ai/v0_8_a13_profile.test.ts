@@ -61,6 +61,7 @@ const ENV_KEYS = [
     "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS",
     "SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS",
     "V08_BLACKSMITH_ROLE_VERSIONS",
+    "V08_NIGHTMARE_ROLE_VERSIONS",
     "V08_SUPPORT_ROLE_VERSIONS",
     "V08_PROTECTED_ADVANCE_GUARDRAILS",
     "V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY",
@@ -175,6 +176,7 @@ describe("v0.8 a13 production profile", () => {
             V08_SUPPORTED_PREPIN_EGRESS_LIVE_ONLY: "0",
             V08_SUPPORTED_PREPIN_EGRESS_VERSIONS: "",
             V08_BLACKSMITH_ROLE_VERSIONS: "v0.8",
+            V08_NIGHTMARE_ROLE_VERSIONS: "v0.8",
             V08_SUPPORT_ROLE_VERSIONS: "v0.8",
             V06_MELEE_DIMS: "0,2",
             V07_PLACEMENT_REVEAL: "on",
@@ -188,6 +190,7 @@ describe("v0.8 a13 production profile", () => {
         expect(source.V06_MELEE_DIMS_VERSIONS).toBe("v0.8s");
         expect(source.V07_PLACEMENT_REVEAL_VERSIONS).toBe("v0.8s");
         expect(source.V08_BLACKSMITH_ROLE_VERSIONS).toBe("v0.8s");
+        expect(source.V08_NIGHTMARE_ROLE_VERSIONS).toBe("v0.8s");
         expect(source.V08_SUPPORT_ROLE_VERSIONS).toBe("v0.8s");
         expect(fingerprintV08AlignedV1(source)).toBe(V08_A13_SOURCE_BEHAVIOR_ENVIRONMENT_SHA256);
 
@@ -216,6 +219,7 @@ describe("v0.8 a13 production profile", () => {
         process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS = "1";
         process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS = "v0.7";
         process.env.V08_BLACKSMITH_ROLE_VERSIONS = "v0.7";
+        process.env.V08_NIGHTMARE_ROLE_VERSIONS = "v0.7";
         process.env.V08_SUPPORT_ROLE_VERSIONS = "v0.7";
         process.env.V08_PROTECTED_ADVANCE_GUARDRAILS = "1";
         process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY = "1";
@@ -321,6 +325,7 @@ describe("v0.8 a13 production profile", () => {
         expect(process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS).toBe("1");
         expect(process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS).toBe("v0.7");
         expect(process.env.V08_BLACKSMITH_ROLE_VERSIONS).toBe("v0.7");
+        expect(process.env.V08_NIGHTMARE_ROLE_VERSIONS).toBe("v0.7");
         expect(process.env.V08_SUPPORT_ROLE_VERSIONS).toBe("v0.7");
         expect(process.env.V08_PROTECTED_ADVANCE_GUARDRAILS).toBe("1");
         expect(process.env.V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY).toBe("1");

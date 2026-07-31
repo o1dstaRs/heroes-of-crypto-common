@@ -19,7 +19,9 @@ import { v08DominantFinishState } from "./v0_8_dominant_finish";
 
 const ASH_MOTH = "Ash Moth";
 const HEALER = "Healer";
+const NIGHTMARE = "Nightmare";
 const SMOKE = "Smoke";
+const FIRE_WALL = "Fire Wall";
 const HEAL = "Heal";
 const MASS_HEAL = "Mass Heal";
 const SPIRITUAL_ARMOR = "Spiritual Armor";
@@ -102,6 +104,38 @@ export function prioritizeV08AshMothSmoke(unit: Unit, context: IDecisionContext,
     const candidates = enumerateSupportCandidates(unit, context, decision);
     if (incumbentGuaranteedKill(unit, context, candidates)) return decision;
     return candidates.find((candidate) => candidate.spellName === SMOKE)?.actions ?? decision;
+}
+
+/**
+ * Nightmare is a melee caster, so the inherited MELEE_MAGIC-only router never exposes Book of Nightmares.
+ * Candidate generation already finds one engine-legal, threat-weighted Fire Wall that blocks an enemy approach;
+ * promote it only over an advance/passive turn so a13's size-two shortlist can compare its delayed value without
+ * spending an immediate attack, cast, or tactical hourglass.
+ */
+export function prioritizeV08NightmareFireWall(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+): GameAction[] {
+    if (
+        unit.getName() !== NIGHTMARE ||
+        decision.some(
+            (action) =>
+                action.type === "wait_turn" ||
+                action.type === "cast_spell" ||
+                action.type === "melee_attack" ||
+                action.type === "range_attack" ||
+                action.type === "area_throw_attack",
+        ) ||
+        v08DominantFinishState(context.unitsHolder, unit.getTeam(), context.fightProperties?.getCurrentLap() ?? 0)
+            .active
+    ) {
+        return decision;
+    }
+    return (
+        enumerateSupportCandidates(unit, context, decision).find((candidate) => candidate.spellName === FIRE_WALL)
+            ?.actions ?? decision
+    );
 }
 
 const spellPower = (unit: Unit, name: string): number =>

@@ -32,7 +32,11 @@ import {
 import { prioritizeV08BlacksmithCraft, v08BlacksmithCraftPlacement } from "./v0_8_blacksmith";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
 import { prioritizeV08RangedPositioning } from "./v0_8_ranged_positioning";
-import { prioritizeV08AshMothSmoke, prioritizeV08HealerSustain } from "./v0_8_support_roles";
+import {
+    prioritizeV08AshMothSmoke,
+    prioritizeV08HealerSustain,
+    prioritizeV08NightmareFireWall,
+} from "./v0_8_support_roles";
 import { prioritizeV08A13FinishDecision } from "./v0_8s_finish";
 
 const MELEE = PBTypes.AttackVals.MELEE;
@@ -67,6 +71,8 @@ export const V08_CASTER_ROUTER_POLICY = Object.freeze({
 export const V08_CASTLING_ROUTER_VERSIONS_ENV = "V08_CASTLING_ROUTER_VERSIONS";
 /** Exact-version A/B scope for Blacksmith's multi-target Craft routing and no-AOE opening cluster. */
 export const V08_BLACKSMITH_ROLE_VERSIONS_ENV = "V08_BLACKSMITH_ROLE_VERSIONS";
+/** Exact-version A/B scope for Nightmare's threat-weighted Fire Wall roadblock router. */
+export const V08_NIGHTMARE_ROLE_VERSIONS_ENV = "V08_NIGHTMARE_ROLE_VERSIONS";
 /** Exact-version A/B scope for the Ash Moth/Healer role routers; absent enables every v0.8-family seat. */
 export const V08_SUPPORT_ROLE_VERSIONS_ENV = "V08_SUPPORT_ROLE_VERSIONS";
 
@@ -588,9 +594,16 @@ export class StrategyV0_8 extends StrategyV0_7 {
         const smokeDecision = supportRolesEnabled
             ? prioritizeV08AshMothSmoke(unit, context, vineDecision)
             : vineDecision;
-        const supportDecision = supportRolesEnabled
-            ? prioritizeV08HealerSustain(unit, context, smokeDecision)
+        const nightmareRolesEnabled = strategyVersionMatchesExperimentScope(
+            this.version,
+            process.env[V08_NIGHTMARE_ROLE_VERSIONS_ENV],
+        );
+        const nightmareDecision = nightmareRolesEnabled
+            ? prioritizeV08NightmareFireWall(unit, context, smokeDecision)
             : smokeDecision;
+        const supportDecision = supportRolesEnabled
+            ? prioritizeV08HealerSustain(unit, context, nightmareDecision)
+            : nightmareDecision;
         const craftDecision = strategyVersionMatchesExperimentScope(
             this.version,
             process.env[V08_BLACKSMITH_ROLE_VERSIONS_ENV],

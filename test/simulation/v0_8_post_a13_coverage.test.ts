@@ -14,6 +14,7 @@ import {
     fingerprintV08PostA13CoveragePlan,
     forceV08PostA13CoverageUnit,
     getV08PostA13CoverageGameCount,
+    getV08PostA13CoverageLanes,
     planV08PostA13CoverageGame,
     summarizeV08PostA13Coverage,
     V08_POST_A13_COVERAGE_LANES,
@@ -72,6 +73,27 @@ describe("v0.8 forced post-A13 creature coverage", () => {
                 V08_POST_A13_COVERAGE_LANES.filter((lane) => lane.unit === target.unit).map(({ owner }) => owner),
             ).toEqual(["candidate", "opponent"]);
         }
+    });
+
+    test("narrows a run to exact requested units without changing pair geometry", () => {
+        const nightmareOnly: IV08PostA13CoverageOptions = { ...OPTIONS, targetUnits: ["Nightmare"] };
+        const lanes = getV08PostA13CoverageLanes(nightmareOnly);
+
+        expect(lanes).toEqual(V08_POST_A13_COVERAGE_LANES.filter((lane) => lane.unit === "Nightmare"));
+        expect(getV08PostA13CoverageGameCount(nightmareOnly)).toBe(16);
+        const candidatePair = planV08PostA13CoverageGame(nightmareOnly, 0);
+        const opponentPair = planV08PostA13CoverageGame(nightmareOnly, 2);
+        expect(candidatePair.lane).toMatchObject({ unit: "Nightmare", owner: "candidate" });
+        expect(opponentPair.lane).toMatchObject({ unit: "Nightmare", owner: "opponent" });
+        expect(planV08PostA13CoverageGame(nightmareOnly, 1)).toMatchObject({
+            seed: candidatePair.seed,
+            mapType: candidatePair.mapType,
+            candidateSide: "red",
+        });
+        expect(() => getV08PostA13CoverageLanes({ ...OPTIONS, targetUnits: [] })).toThrow("at least one");
+        expect(() => getV08PostA13CoverageLanes({ ...OPTIONS, targetUnits: ["Nightmare", "Nightmare"] })).toThrow(
+            "must not repeat",
+        );
     });
 
     test("creates a one-variable target/control pair and removes every incidental post-A13 pick", () => {

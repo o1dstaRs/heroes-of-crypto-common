@@ -33,7 +33,11 @@ export type SecondaryDamageSource =
     // Pikeman Lightning Spin, Hydra Skewer Strike) beyond the primary target.
     | "fire_breath"
     | "lightning_spin"
-    | "skewer_strike";
+    | "skewer_strike"
+    // Devour Essence (Hydra): the killer REJUVENATES after devouring a slain enemy. A HEAL, not a hit —
+    // `amount` is the hp restored to `unitId` (the devourer) and `unitsDied` is always 0; the client
+    // renders it as a green "+N" pop and a "rejuvinated" scene-log line.
+    | "devour_essence";
 
 /**
  * A damage instance dealt by an ability that triggers DURING an attack but isn't the primary hit:

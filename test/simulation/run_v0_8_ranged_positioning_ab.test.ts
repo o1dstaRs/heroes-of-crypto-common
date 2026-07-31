@@ -122,6 +122,9 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
                     "V07_AURA_CASTER_ROUTER_VERSIONS",
                     "V07_DENSE_MM_SALVAGE_ISOLATION_VERSIONS",
                     "V07_PLACEMENT_REVEAL_VERSIONS",
+                    "V08_BLACKSMITH_ROLE_VERSIONS",
+                    "V08_NIGHTMARE_ROLE_VERSIONS",
+                    "V08_SUPPORT_ROLE_VERSIONS",
                 ].includes(key)
             ) {
                 expect(environment[key]).toBe(V08_RANGED_POSITIONING_AB_VERSIONS);
@@ -146,12 +149,15 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS: "0",
             SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS: "v0.8",
             V08_A13_SEARCH: "0",
+            V08_BLACKSMITH_ROLE_VERSIONS: "v0.8,v0.8s",
+            V08_NIGHTMARE_ROLE_VERSIONS: "v0.8,v0.8s",
             V08_PROTECTED_ADVANCE_GUARDRAILS: "0",
             V08_PROTECTED_ADVANCE_GUARDRAILS_LIVE_ONLY: "0",
             V08_PROTECTED_ADVANCE_GUARDRAILS_MODE: "both",
             V08_PROTECTED_ADVANCE_GUARDRAILS_VERSIONS: "",
             V08_RANGED_POSITION_VERSIONS: "v0.8",
             V08_RANGED_POSITION_MODE: "both",
+            V08_SUPPORT_ROLE_VERSIONS: "v0.8,v0.8s",
             V08_SUPPORTED_BAND_ADVANCE: "0",
             V08_SUPPORTED_BAND_ADVANCE_FUNNEL_VERSIONS: "",
             V08_SUPPORTED_BAND_ADVANCE_LEGACY_CONTROL_VERSIONS: "",

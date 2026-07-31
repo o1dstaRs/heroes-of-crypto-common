@@ -44,6 +44,7 @@ import { ARTIFACT_POWER } from "../../src/artifacts/artifact_properties";
 import { LUCK_MAX_VALUE_TOTAL } from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import type { ISecondaryDamage } from "../../src/scene/animations";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
 import {
@@ -962,17 +963,29 @@ describe("ability processors", () => {
         );
 
         devourer.applyDamage(15, 0, new SceneLogMock());
+        const devourSecondary: ISecondaryDamage[] = [];
         processDevourEssenceAbility(
             devourer,
             [killedEnemy.getId(), killedEnemy.getId()],
             unitsHolder,
             new SceneLogMock(),
+            devourSecondary,
         );
 
         expect(shieldResult.unitIdsDied).toEqual([heavyTarget.getId()]);
         expect(shieldResult.increaseMorale).toBeGreaterThan(0);
         expect(stats.get()).toHaveLength(1);
         expect(devourer.getHp()).toBe(20);
+        // The heal rides the attack's secondary payload so RANKED — which rebuilds its scene log and
+        // VFX purely from events, never from the engine's own text — shows the green "+N" pop and the
+        // "rejuvinated" log line too.
+        expect(devourSecondary).toHaveLength(1);
+        const healEntry = devourSecondary[0];
+        expect(healEntry.source).toBe("devour_essence");
+        expect(healEntry.unitId).toBe(devourer.getId());
+        expect(healEntry.amount).toBe(15);
+        expect(healEntry.unitsDied).toBe(0);
+        expect(healEntry.position).toEqual({ x: devourer.getPosition().x, y: devourer.getPosition().y });
     });
 
     it("processes spit ball application, resistance, and exhausted debuff pools", () => {

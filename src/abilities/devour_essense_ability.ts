@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 import type { ISceneLog } from "../scene/scene_log_interface";
+import type { ISecondaryDamage } from "../scene/animations";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { FightStateManager } from "../fights/fight_state_manager";
@@ -18,6 +19,7 @@ export function processDevourEssenceAbility(
     unitIdsDied: string[],
     unitsHolder: UnitsHolder,
     sceneLog: ISceneLog,
+    secondaryDamage?: ISecondaryDamage[],
 ): void {
     if (fromUnit.isDead()) {
         return;
@@ -61,6 +63,15 @@ export function processDevourEssenceAbility(
                 const rejuvinateBy = canRejuvinateUpTo - fromUnit.getHp();
                 fromUnit.applyHeal(rejuvinateBy);
                 sceneLog.updateLog(`${fromUnit.getName()} rejuvinated for ${rejuvinateBy} hp`);
+                // Ride the attack's damage payload so the heal reaches RANKED too — the sceneLog line
+                // above only exists in the local sandbox; ranked rebuilds its log + VFX from events.
+                secondaryDamage?.push({
+                    source: "devour_essence",
+                    unitId: fromUnit.getId(),
+                    position: { ...fromUnit.getPosition() },
+                    amount: rejuvinateBy,
+                    unitsDied: 0,
+                });
             }
         }
     }

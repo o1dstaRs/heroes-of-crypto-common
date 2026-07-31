@@ -97,6 +97,7 @@ export interface IV08PostA13CoverageOptions {
     /** One pair is two games with identical armies/randomness and candidate/opponent physical seats swapped. */
     pairsPerLane: number;
     baseSeed: number;
+    targetUnits?: readonly V08PostA13CoverageUnit[];
     /** Defaults to the live exp-budget stack sizing. */
     amountMode?: StackAmountMode;
     /** Defaults true: both sides receive the shipped SEE_NONE + Armor/Might/Sniper setup. */
@@ -319,7 +320,27 @@ export function getV08PostA13CoverageGameCount(options: IV08PostA13CoverageOptio
     if (!Number.isSafeInteger(options.baseSeed) || options.baseSeed < 0 || options.baseSeed > 0xffffffff) {
         throw new Error("baseSeed must be a uint32 integer");
     }
-    return options.pairsPerLane * V08_POST_A13_COVERAGE_LANES.length * 2;
+    return options.pairsPerLane * getV08PostA13CoverageLanes(options).length * 2;
+}
+
+export function getV08PostA13CoverageLanes(options: IV08PostA13CoverageOptions): readonly IV08PostA13CoverageLane[] {
+    if (options.targetUnits === undefined) {
+        return V08_POST_A13_COVERAGE_LANES;
+    }
+    if (!options.targetUnits.length) {
+        throw new Error("targetUnits must include at least one post-A13 unit");
+    }
+    const requested = new Set(options.targetUnits);
+    if (requested.size !== options.targetUnits.length) {
+        throw new Error("targetUnits must not repeat a post-A13 unit");
+    }
+    const known = new Set<V08PostA13CoverageUnit>(V08_POST_A13_COVERAGE_UNITS);
+    for (const unit of requested) {
+        if (!known.has(unit)) {
+            throw new Error(`Unknown post-A13 coverage unit: ${unit}`);
+        }
+    }
+    return V08_POST_A13_COVERAGE_LANES.filter((lane) => requested.has(lane.unit));
 }
 
 interface IV08PostA13CoverageScheduleCell {
@@ -341,8 +362,9 @@ function scheduleV08PostA13CoverageGame(
         throw new Error(`Coverage game index ${game} is outside [0, ${totalGames})`);
     }
     const pair = Math.floor(game / 2);
-    const lane = V08_POST_A13_COVERAGE_LANES[pair % V08_POST_A13_COVERAGE_LANES.length];
-    const cycle = Math.floor(pair / V08_POST_A13_COVERAGE_LANES.length);
+    const lanes = getV08PostA13CoverageLanes(options);
+    const lane = lanes[pair % lanes.length]!;
+    const cycle = Math.floor(pair / lanes.length);
     const seed = (options.baseSeed + cycle * 0x9e3779b1) >>> 0;
     const candidateSide: Side = game % 2 === 0 ? "green" : "red";
     const targetSide = lane.owner === "candidate" ? candidateSide : candidateSide === "green" ? "red" : "green";
@@ -574,7 +596,7 @@ export function summarizeV08PostA13Coverage(
         throw new Error(`Expected ${expectedGames} post-A13 coverage records, got ${records.length}`);
     }
     const byLane = new Map<string, IV08PostA13CoverageCellSummary>(
-        V08_POST_A13_COVERAGE_LANES.map((lane) => [
+        getV08PostA13CoverageLanes(options).map((lane) => [
             laneKey(lane),
             {
                 lane,
@@ -711,10 +733,11 @@ export function runV08PostA13CoverageConcurrent(
 }
 
 async function main(): Promise<void> {
-    const [candidateVersion, opponentVersion, pairsArg, seedArg, outDirArg, concurrencyArg] = process.argv.slice(2);
+    const [candidateVersion, opponentVersion, pairsArg, seedArg, outDirArg, concurrencyArg, targetUnitsArg] =
+        process.argv.slice(2);
     if (!candidateVersion || !opponentVersion) {
         console.error(
-            "usage: v0_8_post_a13_coverage <candidateVersion> <opponentVersion> [pairsPerLane] [baseSeed] [outDir] [concurrency]",
+            "usage: v0_8_post_a13_coverage <candidateVersion> <opponentVersion> [pairsPerLane] [baseSeed] [outDir] [concurrency] [targetUnits]",
         );
         process.exitCode = 1;
         return;
@@ -725,13 +748,19 @@ async function main(): Promise<void> {
     const pairsPerLane = pairsArg ? Number(pairsArg) : 100;
     const baseSeed = seedArg ? Number(seedArg) : 1;
     const outDir = outDirArg ?? join(process.cwd(), "sim-out");
+    const targetUnits = targetUnitsArg
+        ?.split(",")
+        .map((unit) => unit.trim())
+        .filter(Boolean) as V08PostA13CoverageUnit[] | undefined;
     const options: IV08PostA13CoverageOptions = {
         candidateVersion,
         opponentVersion,
         pairsPerLane,
         baseSeed,
+        targetUnits,
     };
     const total = getV08PostA13CoverageGameCount(options);
+    const laneCount = getV08PostA13CoverageLanes(options).length;
     const concurrency = Math.min(concurrencyArg ? Math.max(1, Number(concurrencyArg)) : availableParallelism(), total);
     mkdirSync(outDir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -742,7 +771,7 @@ async function main(): Promise<void> {
     let completed = 0;
     const started = Date.now();
     console.log(
-        `Running ${total} post-A13 coverage games (${pairsPerLane} pairs/lane, concurrency ${concurrency}) -> ${jsonlPath}`,
+        `Running ${total} post-A13 coverage games (${pairsPerLane} pairs/lane across ${laneCount} lanes, concurrency ${concurrency}) -> ${jsonlPath}`,
     );
     const summary = await runV08PostA13CoverageConcurrent(options, concurrency, (record) => {
         appendFileSync(jsonlPath, `${JSON.stringify(record)}\n`);

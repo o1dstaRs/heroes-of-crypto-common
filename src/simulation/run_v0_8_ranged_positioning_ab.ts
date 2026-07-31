@@ -41,6 +41,9 @@ const A13_VERSION_SCOPE_KEYS = [
     "V07_AURA_CASTER_ROUTER_VERSIONS",
     "V07_DENSE_MM_SALVAGE_ISOLATION_VERSIONS",
     "V07_PLACEMENT_REVEAL_VERSIONS",
+    "V08_BLACKSMITH_ROLE_VERSIONS",
+    "V08_NIGHTMARE_ROLE_VERSIONS",
+    "V08_SUPPORT_ROLE_VERSIONS",
 ] as const;
 
 /** Only execution essentials survive; inherited experiments cannot contaminate this A/B. */

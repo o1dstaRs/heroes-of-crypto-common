@@ -5,14 +5,17 @@ import { getAIStrategy, type IDecisionContext } from "../../src/ai";
 import { enumerateCandidates, findBestLegalStationaryRangeAttack } from "../../src/ai/candidates";
 import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
+import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
+import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Unit } from "../../src/units/unit";
-import { V08_SUPPORT_ROLE_VERSIONS_ENV } from "../../src/ai/versions/v0_8";
+import { V08_NIGHTMARE_ROLE_VERSIONS_ENV, V08_SUPPORT_ROLE_VERSIONS_ENV } from "../../src/ai/versions/v0_8";
 import { isV08DurableHealAnchor, prioritizeV08HealerSustain } from "../../src/ai/versions/v0_8_support_roles";
+import { StrategyV0_7 } from "../../src/ai/versions/v0_7";
 import {
     createCombatTestContext,
     createTestUnit,
@@ -25,9 +28,12 @@ const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
+const savedNightmareScope = process.env[V08_NIGHTMARE_ROLE_VERSIONS_ENV];
 const savedSupportScope = process.env[V08_SUPPORT_ROLE_VERSIONS_ENV];
 
 afterEach(() => {
+    if (savedNightmareScope === undefined) delete process.env[V08_NIGHTMARE_ROLE_VERSIONS_ENV];
+    else process.env[V08_NIGHTMARE_ROLE_VERSIONS_ENV] = savedNightmareScope;
     if (savedSupportScope === undefined) delete process.env[V08_SUPPORT_ROLE_VERSIONS_ENV];
     else process.env[V08_SUPPORT_ROLE_VERSIONS_ENV] = savedSupportScope;
 });
@@ -58,6 +64,24 @@ function contextFor(combat: CombatTestContext): IDecisionContext {
 
 const cast = (actions: readonly GameAction[]) =>
     actions.find((action): action is Extract<GameAction, { type: "cast_spell" }> => action.type === "cast_spell");
+
+function startEngine(combat: CombatTestContext, active: Unit, context: IDecisionContext): GameActionEngine {
+    const fightProperties = context.fightProperties!;
+    fightProperties.startFight();
+    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
+    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.startTurn(active.getTeam(), 1_000);
+    return new GameActionEngine({
+        fightProperties,
+        grid: combat.grid,
+        unitsHolder: combat.unitsHolder,
+        moveHandler: new MoveHandler(testGridSettings, combat.grid, combat.unitsHolder),
+        sceneLog: new SceneLogMock(),
+        attackHandler: combat.attackHandler,
+        getCurrentActiveUnitId: () => active.getId(),
+        getCurrentEnemiesCellsWithinMovementRange: () => [],
+    });
+}
 
 describe("v0.8 Ash Moth anti-ranged role", () => {
     test("promotes a net-positive Smoke cloud to the native decision", () => {
@@ -121,6 +145,53 @@ describe("v0.8 Ash Moth anti-ranged role", () => {
         const friendlyAfter = findBestLegalStationaryRangeAttack(friendlyRanger, context, smokeCells)?.expectedDamage;
         expect(friendlyAfter).toBe(friendlyBefore);
         expect(cast(getAIStrategy("v0.8").decideTurn(moth, context))?.spellName).toBe("Smoke");
+    });
+});
+
+describe("v0.8 Nightmare roadblock role", () => {
+    test("promotes and executes a threat-aware Fire Wall over a pure advance", () => {
+        const combat = createCombatTestContext();
+        const nightmare = nativeUnit(LOWER, "Chaos", "Nightmare", 20);
+        nightmare.setStackPower(5);
+        const threat = createTestUnit({
+            team: UPPER,
+            name: "Approaching threat",
+            attackType: MELEE,
+            speed: 6,
+            damageMax: 20,
+            amountAlive: 20,
+        });
+        placeUnit(combat.grid, combat.unitsHolder, nightmare, { x: 7, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, threat, { x: 7, y: 12 });
+        const context = contextFor(combat);
+
+        expect(new StrategyV0_7().decideTurn(nightmare, context).some((action) => action.type === "move_unit")).toBe(
+            true,
+        );
+        const decision = cast(getAIStrategy("v0.8").decideTurn(nightmare, context));
+        expect(decision).toMatchObject({ spellName: "Fire Wall" });
+        expect(decision?.targetCell).toBeDefined();
+
+        process.env[V08_NIGHTMARE_ROLE_VERSIONS_ENV] = "v0.8";
+        expect(cast(getAIStrategy("v0.8").decideTurn(nightmare, context))?.spellName).toBe("Fire Wall");
+        expect(cast(getAIStrategy("v0.8s").decideTurn(nightmare, context))?.spellName).not.toBe("Fire Wall");
+
+        const result = startEngine(combat, nightmare, context).apply(decision!);
+        expect(result.completed).toBe(true);
+        expect(context.fightProperties!.getFireWalls().size()).toBe(3);
+    });
+
+    test("keeps an immediate melee attack instead of spending the wall", () => {
+        const combat = createCombatTestContext();
+        const nightmare = nativeUnit(LOWER, "Chaos", "Nightmare", 20);
+        nightmare.setStackPower(5);
+        const target = createTestUnit({ team: UPPER, name: "Reachable enemy", attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, nightmare, { x: 7, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 8 });
+
+        const decision = getAIStrategy("v0.8").decideTurn(nightmare, contextFor(combat));
+        expect(cast(decision)?.spellName).not.toBe("Fire Wall");
+        expect(decision.some((action) => action.type === "melee_attack")).toBe(true);
     });
 });
 

@@ -2451,8 +2451,20 @@ export class AttackHandler {
         }
         unitsHolder.refreshStackPowerForAllUnits();
 
-        AllAbilities.processDevourEssenceAbility(attackerUnit, unitIdsDied, unitsHolder, this.sceneLog);
-        AllAbilities.processDevourEssenceAbility(targetUnit, unitIdsDied, unitsHolder, this.sceneLog);
+        AllAbilities.processDevourEssenceAbility(
+            attackerUnit,
+            unitIdsDied,
+            unitsHolder,
+            this.sceneLog,
+            (damageForAnimation.secondary ??= []),
+        );
+        AllAbilities.processDevourEssenceAbility(
+            targetUnit,
+            unitIdsDied,
+            unitsHolder,
+            this.sceneLog,
+            (damageForAnimation.secondary ??= []),
+        );
 
         return { completed: true, unitIdsDied, animationData, abilityStolen };
     }
