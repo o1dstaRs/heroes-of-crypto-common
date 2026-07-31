@@ -83,6 +83,7 @@ function inputFromPlan(options: {
     });
     return {
         mode: options.mode,
+        thermalTelemetry: "observed",
         source: {
             receiptSha256: SHA_B,
             sourceCommit: GIT_COMMIT,
@@ -218,6 +219,33 @@ describe("v0.9 actor lane benchmark", () => {
         expect(validateV09ActorLaneBenchmarkReceipt(JSON.parse(JSON.stringify(receipt)))).toEqual(receipt);
     });
 
+    it("permits an explicit missing-thermal-telemetry override without fabricating telemetry", () => {
+        const overridden = productionInput();
+        overridden.thermalTelemetry = "unavailable_user_override";
+        overridden.host.temperatureSensorCount = 0;
+        overridden.host.throttleCounterCount = 0;
+        for (const run of overridden.runs) {
+            run.peakTemperatureC = 0;
+            run.throttleCountBefore = 0;
+            run.throttleCountAfter = 0;
+        }
+        const receipt = sealV09ActorLaneBenchmarkReceipt(overridden);
+        expect(receipt.eligibleForCampaign).toBe(true);
+        expect(receipt.thermalTelemetry).toBe("unavailable_user_override");
+        expect(receipt.selection.rationale).toContain("explicitly user-overridden");
+
+        const observedWithoutTelemetry = productionInput();
+        observedWithoutTelemetry.host.temperatureSensorCount = 0;
+        observedWithoutTelemetry.host.throttleCounterCount = 0;
+        expect(() => sealV09ActorLaneBenchmarkReceipt(observedWithoutTelemetry)).toThrow(
+            "requires temperature and throttle telemetry",
+        );
+
+        const inconsistentOverride = structuredClone(overridden);
+        inconsistentOverride.host.temperatureSensorCount = 1;
+        expect(() => sealV09ActorLaneBenchmarkReceipt(inconsistentOverride)).toThrow("override is only valid");
+    });
+
     it("keeps tiny fixture receipts ineligible for campaign initialization", () => {
         const input = inputFromPlan({
             mode: "test_fixture",
@@ -266,6 +294,7 @@ describe("v0.9 actor lane benchmark", () => {
         });
         const base: IV09ActorLaneBenchmarkReceiptBase = {
             mode: input.mode,
+            thermalTelemetry: input.thermalTelemetry,
             source: input.source,
             host: input.host,
             idle: input.idle,

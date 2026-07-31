@@ -22,6 +22,9 @@ artifact or promotes v0.9 automatically.
   physical actor lanes on a fixed, counterbalanced panel. The eligible sealed receipt freezes the selected
   worker count, topology, affinity-visible CPU IDs, source receipt, GPU UUID, and thermal evidence into the
   campaign. Teacher actors and training-host qualification then use those exact CPU IDs at nice level 10.
+  Hosts with neither CPU temperature nor throttle telemetry require the explicit
+  `--allow-missing-thermal-telemetry` benchmark override. It seals the absence of both signals and the user
+  override into the receipt; it never fabricates thermal readings.
 - Smoke IL is written only under `il-smoke/`. Full training reads only `il/`, so smoke shards cannot enter
   or satisfy a full-campaign corpus. Never copy, move, or symlink shards between those trees.
 - Every orchestrator command holds the campaign's exclusive lease for its lifetime. Never run `smoke`,
@@ -64,6 +67,9 @@ bun src/simulation/v0_9/actor_lane_benchmark.ts \
   --source-receipt "$SOURCE_RECEIPT" \
   --gpu-uuid GPU-5126d018-ec86-be8b-1bf5-b5ac323d3350 \
   --protect-v08-root "$V08_OUTPUT"
+
+# Only when the host exposes neither CPU temperature nor throttle telemetry:
+# add --allow-missing-thermal-telemetry to the preceding benchmark command.
 
 bun src/simulation/v0_9/supervisor.ts init \
   --out "$CAMPAIGN" \
