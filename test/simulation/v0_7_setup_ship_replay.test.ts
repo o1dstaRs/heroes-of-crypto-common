@@ -115,8 +115,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // the focused local run and clean Linux CI independently produced this byte-identical digest.
 // Re-pinned after the Sniper augment's attack component rose to 8/17/27 (parity with Might):
 // augment EV feeds seeded setup valuation, so every trace re-values from the first augment pick.
-// Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "1cf4c14898c45e8e5835cf4f7734df836414727776531fbfa3b448ea50c42eda";
+// Two isolated runs produced this byte-identical digest. (Re-pinned for Battle Mage hp 21 -> 19:
+// creature stats feed seeded setup valuation, so every trace re-values from the first roster read.)
+const EXPECTED_REPLAY_SHA256 = "fedb9079c1aa13490aaabeeab851b10ac78beba705d16a544bb45c2c82287473";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
