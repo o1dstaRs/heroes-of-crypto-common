@@ -63,6 +63,22 @@ export type GameEvent =
           sourceAbility?: string;
       }
     | { type: "ability_stolen"; thiefId: string; targetId: string; abilityName: string }
+    // Every buff/debuff/effect the action landed (and every debuff a target resisted), captured at the
+    // Unit.applyBuff/applyDebuff/applyEffect funnels — targeted casts, MASS casts and on-hit ability
+    // riders (Stun, Break, Poison, …) alike. Ranked rebuilds its scene log from events, never from the
+    // engine's text, so this is the only way "X gains Riot" / "Y got Stun" reaches the ranked log with
+    // EVERY affected target named. Seeding/refresh noise (markers, artifact/augment carry-buffs, aura
+    // stamps) is filtered at capture time.
+    | {
+          type: "effects_applied";
+          applications: {
+              unitId: string;
+              name: string;
+              kind: "buff" | "debuff" | "effect";
+              laps?: number;
+              resisted?: boolean;
+          }[];
+      }
     | {
           type: "unit_attacked";
           attackType: "melee" | "range";

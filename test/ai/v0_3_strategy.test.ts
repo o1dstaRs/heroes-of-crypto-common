@@ -137,6 +137,58 @@ describe("v0.3 placeArmy — corner shooters, flyer wing, centred wall", () => {
         expect(y(flyer)).toBeGreaterThanOrEqual(Math.max(y(r1), y(r2)));
     });
 
+    it("uses Placement level 3's opened edge line for v0.8 ranged corners", () => {
+        const v08 = getAIStrategy("v0.8");
+        const scenarios = [
+            { team: LOWER, position: PlacementPositionType.LOWER_LEFT, edgeY: 0 },
+            { team: UPPER, position: PlacementPositionType.UPPER_RIGHT, edgeY: 15 },
+        ] as const;
+
+        for (const { team, position, edgeY } of scenarios) {
+            const smallCombat = createCombatTestContext();
+            const smallShooters = ["A", "B"].map((name) =>
+                createTestUnit({ team, name: `Small ${name}`, attackType: RANGE, rangeShots: 5 }),
+            );
+            for (const shooter of smallShooters) smallCombat.unitsHolder.addUnit(shooter);
+            const smallPlacements = v08.placeArmy(smallShooters, {
+                team,
+                grid: smallCombat.grid,
+                unitsHolder: smallCombat.unitsHolder,
+                pathHelper: undefined as never,
+                placement: new RectanglePlacement(testGridSettings, position, 6),
+            });
+            expect(smallShooters.map((shooter) => smallPlacements.get(shooter.getId()))).toEqual([
+                { x: 0, y: edgeY },
+                { x: 15, y: edgeY },
+            ]);
+
+            const largeCombat = createCombatTestContext();
+            const largeShooter = createTestUnit({
+                team,
+                name: "Large",
+                attackType: RANGE,
+                rangeShots: 5,
+                size: PBTypes.UnitSizeVals.LARGE,
+            });
+            largeCombat.unitsHolder.addUnit(largeShooter);
+            const largePlacements = v08.placeArmy([largeShooter], {
+                team,
+                grid: largeCombat.grid,
+                unitsHolder: largeCombat.unitsHolder,
+                pathHelper: undefined as never,
+                placement: new RectanglePlacement(testGridSettings, position, 6),
+            });
+            const base = largePlacements.get(largeShooter.getId())!;
+            const footprint = [
+                base,
+                { x: base.x - 1, y: base.y },
+                { x: base.x, y: base.y - 1 },
+                { x: base.x - 1, y: base.y - 1 },
+            ];
+            expect(footprint).toContainEqual({ x: 15, y: edgeY });
+        }
+    });
+
     it("falls back gracefully when there are no legal placement cells", () => {
         const u = createTestUnit({ name: "Lonely", team: LOWER, attackType: MELEE });
         const emptyZone = { possibleCellHashes: () => new Set<number>() } as unknown as RectanglePlacement;

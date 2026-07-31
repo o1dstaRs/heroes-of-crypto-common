@@ -47,6 +47,7 @@ import type { IWeightedRoute } from "../grid/path_definitions";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { Spell } from "../spells/spell";
+import { recordEffectApplication } from "./effect_application_capture";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, type XY } from "../utils/math";
@@ -796,6 +797,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         ) {
             this.deleteEffect(effect.getName());
             this.effects.push(effect);
+            recordEffectApplication({
+                unitId: this.getId(),
+                name: effect.getName(),
+                kind: "effect",
+                laps: effect.getLaps(),
+            });
             this.unitProperties.applied_effects.push(effect.getName());
             this.unitProperties.applied_effects_laps.push(effect.getLaps());
             this.unitProperties.applied_effects_powers.push(effect.getPower());
@@ -2576,6 +2583,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.buffs.push(
             new AppliedSpell(buff.getName(), buff.getPower(), lapsTotal, firstBuffProperty, secondBuffProperty),
         );
+        recordEffectApplication({ unitId: this.getId(), name: buff.getName(), kind: "buff", laps: lapsTotal });
         this.unitProperties.applied_buffs.push(buff.getName());
         this.unitProperties.applied_buffs_laps.push(lapsTotal);
         this.unitProperties.applied_buffs_descriptions.push(
@@ -2692,6 +2700,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.debuffs.push(
             new AppliedSpell(debuff.getName(), debuff.getPower(), lapsTotal, firstDebuffProperty, secondDebuffProperty),
         );
+        recordEffectApplication({ unitId: this.getId(), name: debuff.getName(), kind: "debuff", laps: lapsTotal });
         this.unitProperties.applied_debuffs.push(debuff.getName());
         this.unitProperties.applied_debuffs_laps.push(lapsTotal);
         this.unitProperties.applied_debuffs_descriptions.push(

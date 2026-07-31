@@ -6,7 +6,7 @@
             "hp": 9,
             "steps": 3.6,
             "speed": 2.5,
-            "armor": 9,
+            "armor": 10,
             "attack_type": "MELEE",
             "attack": 9,
             "attack_damage_min": 2,
@@ -1314,7 +1314,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Chakram", "Rallying Volley Aura"]
+            "abilities": ["Handyman", "Chakram", "Rallying Volley Aura"]
         },
         "Thunderbird": {
             "name": "Thunderbird",

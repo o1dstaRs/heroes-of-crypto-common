@@ -26,6 +26,7 @@ import * as HoCConstants from "../constants";
 import * as AbilityHelper from "../abilities/ability_helper";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
+import { recordEffectApplication } from "../units/effect_application_capture";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
 import * as EffectHelper from "../effects/effect_helper";
@@ -511,6 +512,12 @@ export class AttackHandler {
             this.sceneLog.updateLog(newText);
             if (!applied) {
                 this.sceneLog.updateLog(`${targetUnit.getName()} resisted from ${currentActiveSpell.getName()}`);
+                recordEffectApplication({
+                    unitId: targetUnit.getId(),
+                    name: currentActiveSpell.getName(),
+                    kind: "debuff",
+                    resisted: true,
+                });
             }
             this.sceneLog.updateLog(mirroredStr);
 

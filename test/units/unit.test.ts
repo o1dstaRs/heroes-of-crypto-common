@@ -590,6 +590,25 @@ describe("Unit", () => {
             expect(damage).toBe(5);
             expect(attacker.getRangeShots()).toBe(2);
         });
+
+        it("keeps full melee damage for ranged units WITH Handyman (Centaur, Zena)", () => {
+            const attacker = createTestUnit({
+                attackType: PBTypes.AttackVals.RANGE,
+                attack: 10,
+                damageMin: 10,
+                damageMax: 10,
+                rangeShots: 2,
+                abilities: ["Handyman"],
+            });
+            const target = createTestUnit({
+                team: PBTypes.TeamVals.LOWER,
+                armor: 10,
+            });
+
+            const damage = attacker.calculateAttackDamage(target, PBTypes.AttackVals.MELEE, 0);
+
+            expect(damage).toBe(10);
+        });
     });
 
     describe("armor and penetration", () => {

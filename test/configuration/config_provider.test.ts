@@ -68,6 +68,16 @@ describe("config_provider", () => {
         }
     });
 
+    it("gives Zena Handyman: her kit waives the ranged melee penalty (desc arrays aligned)", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Zena", "zena_512", 0, 141);
+
+        const handymanIndex = creature.abilities.indexOf("Handyman");
+        expect(handymanIndex).toBeGreaterThanOrEqual(0);
+        expect(creature.abilities_descriptions[handymanIndex]).toContain("Melee damage is not reduced");
+        // Ranged kit sanity: the penalty this ability waives only exists for RANGE attackers.
+        expect(creature.attack_type).toBe(PBTypes.AttackVals.RANGE);
+    });
+
     it("derives creature amount from total experience when amount is not positive", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Berserker", "berserker_512", 0, 1);
 

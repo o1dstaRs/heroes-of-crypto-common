@@ -52,6 +52,11 @@ import {
 } from "../spells/fire_walls";
 import { getSpellConfig } from "../configuration/config_provider";
 import { Unit } from "../units/unit";
+import {
+    beginEffectApplicationCapture,
+    endEffectApplicationCapture,
+    recordEffectApplication,
+} from "../units/effect_application_capture";
 import { getLapString, getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
 import type { GameAction } from "./actions";
@@ -130,6 +135,20 @@ export interface IGameActionEngineContext extends ITurnEngineContext {
 }
 
 /** Damage a spell actually dealt to one victim, after its magic resistance. */
+// Fight actions whose applications are captured into an `effects_applied` event. defend_turn is
+// excluded on purpose — see apply().
+const EFFECT_CAPTURED_ACTION_TYPES: ReadonlySet<GameAction["type"]> = new Set<GameAction["type"]>([
+    "end_turn",
+    "wait_turn",
+    "select_attack_type",
+    "move_unit",
+    "melee_attack",
+    "range_attack",
+    "obstacle_attack",
+    "area_throw_attack",
+    "cast_spell",
+]);
+
 const spellDamageDealt = (damaged: { unitId: string; amount: number }[], unitId: string): number =>
     damaged.find((entry) => entry.unitId === unitId)?.amount ?? 0;
 
@@ -145,6 +164,38 @@ export class GameActionEngine {
         this.turnEngine = new TurnEngine(context);
     }
     public apply(action: GameAction): IGameActionResult {
+        // Fight actions run under an effect-application capture: everything the action lands on any
+        // unit through applyBuff/applyDebuff/applyEffect — targeted casts, mass casts, on-hit riders —
+        // is drained into ONE `effects_applied` event, spliced in BEFORE the trailing turn-handoff
+        // events so log builders render the effects under the acting unit's turn, not the next one's.
+        // defend_turn is deliberately NOT captured: its Luck Shield buff is already reported by the
+        // unit_defended event ("uses Luck Shield"), and a second "gains Luck Shield" line is noise.
+        if (!EFFECT_CAPTURED_ACTION_TYPES.has(action.type)) {
+            return this.applyInner(action);
+        }
+        beginEffectApplicationCapture();
+        let result: IGameActionResult;
+        try {
+            result = this.applyInner(action);
+        } finally {
+            // Always drained (even on a throw) so a failed action can never leak captured records into
+            // the next action's event.
+            const applications = endEffectApplicationCapture();
+            if (typeof result! !== "undefined" && result.completed && applications.length) {
+                const effectsEvent: GameEvent = { type: "effects_applied", applications };
+                const handoffIndex = result.events.findIndex(
+                    (event) => event.type === "turn_completed" || event.type === "next_unit_selected",
+                );
+                if (handoffIndex >= 0) {
+                    result.events.splice(handoffIndex, 0, effectsEvent);
+                } else {
+                    result.events.push(effectsEvent);
+                }
+            }
+        }
+        return result;
+    }
+    private applyInner(action: GameAction): IGameActionResult {
         switch (action.type) {
             case "start_fight":
                 return this.startFight();
@@ -2192,6 +2243,14 @@ export class GameActionEngine {
                     unit.getId() === caster.getId(),
                 );
             }
+            // Name every ally the mass buff actually reached — without this the sandbox log said only
+            // "cast X on allies" and the recipients were invisible (ranked reads them from the
+            // effects_applied event instead).
+            this.context.sceneLog.updateLog(
+                `${unit.getName()} gains ${spell.getName()} for ${getLapString(
+                    spell.getLapsTotal() + (unit.getId() === caster.getId() ? 1 : 0),
+                )}`,
+            );
         }
 
         return healed;
@@ -2212,6 +2271,12 @@ export class GameActionEngine {
             }
             if (getRandomInt(0, 100) < Math.floor(debuffTarget.getMagicResist())) {
                 this.context.sceneLog.updateLog(`${debuffTarget.getName()} resisted from ${spell.getName()}`);
+                recordEffectApplication({
+                    unitId: debuffTarget.getId(),
+                    name: spell.getName(),
+                    kind: "debuff",
+                    resisted: true,
+                });
                 continue;
             }
             if (
@@ -2223,6 +2288,13 @@ export class GameActionEngine {
 
             const laps = spell.getLapsTotal();
             debuffTarget.applyDebuff(spell, undefined, undefined, debuffTarget.getId() === caster.getId());
+            // Name every enemy the mass debuff actually landed on — mirrors the "gains" line in
+            // massCastOnAllies; resists above already have their own line.
+            this.context.sceneLog.updateLog(
+                `${debuffTarget.getName()} suffers ${spell.getName()} for ${getLapString(
+                    laps + (debuffTarget.getId() === caster.getId() ? 1 : 0),
+                )}`,
+            );
 
             if (
                 SpellHelper.isMirrored(debuffTarget) &&
