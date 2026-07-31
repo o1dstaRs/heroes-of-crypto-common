@@ -186,9 +186,29 @@ export function isSpellLineOfSightClear(
     from: XY,
     to: XY,
 ): boolean {
+    return firstSpellSightBlocker(grid, isWithinGrid, from, to) === undefined;
+}
+
+/** What refused a thrown spell: the first intercepting cell and who stands on it ("B"/"H" = terrain). */
+export interface ISpellSightBlocker {
+    cell: XY;
+    occupantId: string;
+}
+
+/**
+ * The first cell that intercepts the throw, or undefined when the line is clear — the same walk
+ * isSpellLineOfSightClear answers with a boolean, kept as one loop so the yes/no gate and the
+ * "blocked by X" feedback can never disagree about which body stopped the spell.
+ */
+export function firstSpellSightBlocker(
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    from: XY,
+    to: XY,
+): ISpellSightBlocker | undefined {
     const pathCells = vinePathCells(from, to);
     if (!pathCells.length) {
-        return false;
+        return { cell: from, occupantId: "B" };
     }
     // NEITHER endpoint's own body is an obstacle. A 2x2 creature stands on four cells but is addressed by
     // one base cell, so the straight line to that base cell routinely crosses the creature's other three —
@@ -205,7 +225,7 @@ export function isSpellLineOfSightClear(
     const targetUnitId = grid.getOccupantUnitId(to);
     for (const cell of pathCells.slice(0, -1)) {
         if (!isWithinGrid(cell)) {
-            return false;
+            return { cell, occupantId: "B" };
         }
         const occupant = grid.getOccupantUnitId(cell);
         if (
@@ -215,10 +235,10 @@ export function isSpellLineOfSightClear(
             occupant !== casterUnitId &&
             occupant !== targetUnitId
         ) {
-            return false;
+            return { cell, occupantId: occupant };
         }
     }
-    return true;
+    return undefined;
 }
 
 /**

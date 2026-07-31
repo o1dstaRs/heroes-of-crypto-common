@@ -100,13 +100,13 @@
                 "A non-flying creature pays 1 extra step to cross a vined cell.",
                 "The struck creature also loses 1.5 steps, unless its magic armor shrugs the snare off.",
                 "The vine lands on the cells either way.",
-                "Lasts 2 laps."
+                "Lasts 3 laps."
             ],
             "target": "ANY_ENEMY",
             "power": 1.5,
             "power_type": "COMMON",
             "multiplier_type": "NO_MULTIPLIER",
-            "laps": 2,
+            "laps": 3,
             "is_buff": false,
             "self_cast_allowed": false,
             "self_debuff_applies": false,

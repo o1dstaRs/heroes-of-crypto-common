@@ -11,10 +11,10 @@
 
 import type { XY } from "../utils/math";
 
-// Default lifetime of a freshly thrown vine, in laps. Matches the Vine Throw spell's `laps: 2` config — the
+// Default lifetime of a freshly thrown vine, in laps. Matches the Vine Throw spell's `laps: 3` config — the
 // spell is the only thing that lays vines today, so the two are intentionally coupled. If more sources ever
 // create vines, prefer passing an explicit lap count at the call site instead of this default.
-export const VINE_DEFAULT_LAPS = 2;
+export const VINE_DEFAULT_LAPS = 3;
 
 // Extra steps a non-flying creature pays to enter a vined cell. Flying units step over the vine for free.
 export const VINE_CROSS_PENALTY = 1;
