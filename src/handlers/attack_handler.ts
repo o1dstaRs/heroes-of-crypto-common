@@ -890,6 +890,8 @@ export class AttackHandler {
                 attackerUnit,
                 aoeRangeAttackResult.maxDamage,
                 this.sceneLog,
+
+                (damageForAnimation.luckyStrikeBy ??= []),
             );
             for (const uId of aoeRangeAttackResult.unitIdsDied) {
                 unitIdsDied.push(uId);
@@ -931,6 +933,8 @@ export class AttackHandler {
                     decreaseNumberOfShots,
                 ),
                 this.sceneLog,
+
+                (damageForAnimation.luckyStrikeBy ??= []),
             );
             this.sceneLog.updateLog(
                 `${attackerUnit.getName()} 🏹 ${targetUnit.getName()} (${damageFromAttack})` +
@@ -1009,6 +1013,8 @@ export class AttackHandler {
                     targetUnit,
                     aoeRangeResponseResult.maxDamage,
                     this.sceneLog,
+
+                    (damageForAnimation.luckyStrikeBy ??= []),
                 );
                 for (const uId of aoeRangeResponseResult.unitIdsDied) {
                     unitIdsDied.push(uId);
@@ -1034,6 +1040,8 @@ export class AttackHandler {
                         abilityMultiplier,
                     ),
                     this.sceneLog,
+
+                    (damageForAnimation.luckyStrikeBy ??= []),
                 );
                 petrifyingGazeResponseDamage = damageFromResponse;
 
@@ -1748,6 +1756,8 @@ export class AttackHandler {
                     abilityMultiplier,
                 ),
                 this.sceneLog,
+
+                (damageForAnimation.luckyStrikeBy ??= []),
             ) + AllAbilities.processPenetratingBiteAbility(attackerUnit, targetUnit);
 
         const fightProperties = FightStateManager.getInstance().getFightProperties();
@@ -1992,6 +2002,8 @@ export class AttackHandler {
                                 abilityMultiplier,
                             ),
                             this.sceneLog,
+
+                            (damageForAnimation.luckyStrikeBy ??= []),
                         ) + AllAbilities.processPenetratingBiteAbility(targetUnit, attackerUnit);
                     const petrifyingGazeResponseDamage = damageFromResponse;
 

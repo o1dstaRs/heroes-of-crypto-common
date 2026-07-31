@@ -14,7 +14,15 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
 
-export function processLuckyStrikeAbility(attackerUnit: Unit, damageFromAttack: number, sceneLog: ISceneLog): number {
+export function processLuckyStrikeAbility(
+    attackerUnit: Unit,
+    damageFromAttack: number,
+    sceneLog: ISceneLog,
+    // When provided, a proc records the striker's unit id here (typically
+    // damageForAnimation.luckyStrikeBy) so clients can rebuild the log line and play VFX —
+    // the sceneLog text above never reaches the ranked client.
+    procRegistry?: string[],
+): number {
     const luckyStrikeAbility = attackerUnit.getAbility("Lucky Strike");
 
     if (!luckyStrikeAbility) {
@@ -31,6 +39,7 @@ export function processLuckyStrikeAbility(attackerUnit: Unit, damageFromAttack: 
         )
     ) {
         sceneLog.updateLog(`${attackerUnit.getName()} activates Lucky Strike`);
+        procRegistry?.push(attackerUnit.getId());
         damageFromAttack = Math.floor(
             damageFromAttack *
                 attackerUnit.calculateAbilityMultiplier(

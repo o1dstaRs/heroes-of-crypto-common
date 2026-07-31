@@ -62,6 +62,10 @@ export interface IVisibleDamage {
     // or Boar Saliva. No damage was dealt; the client shows a "MISS" pop over `unitPosition` instead of
     // a damage number. `render` stays false on a miss (there is no damage to draw).
     missed?: boolean;
+    // Unit ids whose Lucky Strike proc'd during this exchange (attacker and/or responder).
+    // Drives the ranked scene-log line and the gold proc VFX: the engine's own sceneLog text
+    // never reaches ranked, which rebuilds its log from these event payloads.
+    luckyStrikeBy?: string[];
     hits?: { amount: number; unitsDied: number }[];
     /**
      * Zena's Chakram: one entry per FULL-circle leg the 1-cell disc flew, in flight order (see
