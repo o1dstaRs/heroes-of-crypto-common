@@ -110,7 +110,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned after the Battle Mage's melee dropped to 2-5 (was 3-6). It trades blows differently, so every
 // seeded trace containing one diverges from that point on. Two isolated runs produced this byte-identical
 // digest.
-const EXPECTED_REPLAY_SHA256 = "221c0b889e902ee7f64871ddb3c6c72359f98e5a54c43a4653b590bf7197d078";
+// Re-pinned after Crown of Command changed from +1 movement/+5 morale to +1 movement/+8 morale/+1 armor.
+// The stronger army-wide artifact legitimately changes seeded setup valuation and downstream combat traces;
+// the focused local run and clean Linux CI independently produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "62d26194ab07f72a65f126f95d7fff5e4ceaa6ec06aa342294119e1544173e59";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
