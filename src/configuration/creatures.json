@@ -654,7 +654,7 @@
         },
         "Arachna Queen": {
             "name": "Arachna Queen",
-            "hp": 180,
+            "hp": 190,
             "steps": 6.3,
             "speed": 5.4,
             "armor": 31,

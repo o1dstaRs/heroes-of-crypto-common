@@ -33,6 +33,7 @@ describe("Arachna Queen configuration", () => {
 
         expect(queen.abilities).toEqual(["Web Aura", "Infest", "Predatory Assimilation"]);
         expect(queen.abilities_stack_powered[queen.abilities.indexOf("Predatory Assimilation")]).toBe(true);
+        expect(queen.max_hp).toBe(190);
         expect(queen.steps).toBe(6.3);
         expect(spider.abilities).toEqual(["Infest"]);
         expect(spider.steps).toBe(6);
