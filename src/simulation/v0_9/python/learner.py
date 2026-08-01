@@ -13,6 +13,7 @@ import contextlib
 import hashlib
 import json
 import math
+import multiprocessing
 import os
 import random
 import subprocess
@@ -111,7 +112,7 @@ class DecisionDataset(IterableDataset[Decision]):
         self,
         paths: Sequence[Path],
         split: str,
-        seed: int,
+        seed: int | Any,
         eligible_paths: frozenset[Path],
         packed_cache: PackedCache,
     ):
@@ -124,11 +125,16 @@ class DecisionDataset(IterableDataset[Decision]):
 
     def __iter__(self) -> Iterator[Decision]:
         worker = get_worker_info()
+        # Training keeps its loader workers alive across epochs so the pinned-memory pipeline and packed mmap
+        # stay hot. A synchronized value carries the immutable epoch seed into those existing processes before
+        # each fresh iterator starts; validation simply receives a plain integer. Reading it once makes one
+        # iterator internally consistent even if its parent has already prepared the next epoch.
+        seed = int(self.seed.value) if hasattr(self.seed, "value") else int(self.seed)
         # Every worker must stride the same permutation. Per-worker permutations can overlap after striding,
         # duplicating some shards while silently omitting others.
         paths = ordered_worker_paths(
             self.paths,
-            self.seed,
+            seed,
             worker.id if worker else 0,
             worker.num_workers if worker else 1,
         )
@@ -1360,31 +1366,32 @@ def main() -> None:
         prefetch_factor=4 if args.workers > 0 else None,
     )
 
+    # The training corpus's order is epoch-specific but entirely determined by this synchronized seed. Keeping
+    # workers alive avoids respawning the eight mmap/pinned-memory producers thirty times per architecture,
+    # which otherwise leaves the 5090 idle at the beginning of every epoch. The seed is set before each new
+    # iterator, so the exact old `training_epoch_seed` permutation and mid-epoch resume semantics remain.
+    training_epoch_seed_shared = multiprocessing.Value("q", 0)
+    training = DataLoader(
+        DecisionDataset(
+            paths,
+            "train",
+            training_epoch_seed_shared,
+            eligible_paths["train"],
+            packed_cache,
+        ),
+        batch_size=args.batch_size,
+        num_workers=args.workers,
+        collate_fn=collate,
+        pin_memory=device.type == "cuda",
+        persistent_workers=args.workers > 0,
+        prefetch_factor=4 if args.workers > 0 else None,
+    )
+
     last_checkpoint = time.monotonic()
     for epoch in range(first_epoch, args.epochs):
         epoch_seed = training_epoch_seed(args.seed, epoch)
-        loader_generator = torch.Generator()
-        loader_generator.manual_seed(epoch_seed)
-        # Rebuild the loader so every epoch receives a different domain-separated shard permutation. The epoch
-        # and base seed fully determine that permutation, so a mid-epoch resume recreates it before skipping the
-        # checkpointed batch cursor. A dedicated generator keeps worker initialization from perturbing the model
-        # RNG when that loader is reconstructed during resume.
-        training = DataLoader(
-            DecisionDataset(
-                paths,
-                "train",
-                epoch_seed,
-                eligible_paths["train"],
-                packed_cache,
-            ),
-            batch_size=args.batch_size,
-            num_workers=args.workers,
-            collate_fn=collate,
-            pin_memory=device.type == "cuda",
-            persistent_workers=False,
-            prefetch_factor=4 if args.workers > 0 else None,
-            generator=loader_generator,
-        )
+        with training_epoch_seed_shared.get_lock():
+            training_epoch_seed_shared.value = epoch_seed
         qat = epoch >= args.epochs - args.qat_epochs
         if qat and qat_layer_shifts is None:
             qat_reference_validation = evaluate(model, validation, device, args.validation_batches)
