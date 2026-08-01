@@ -14,10 +14,14 @@ import { describe, expect, it } from "bun:test";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
+    createValueFeatureScratch,
     expandValueFeaturesV2,
     extractValueFeatures,
     extractValueFeaturesV2,
     extractValueFeaturesV2Raw,
+    fillValueFeatures,
+    fillValueFeaturesV2,
+    fillValueFeaturesV2Raw,
     VALUE_FEATURE_NAMES,
     VALUE_FEATURE_NAMES_V2,
     VALUE_FEATURE_NAMES_V2_RAW,
@@ -76,5 +80,33 @@ describe("value features V2 (Phase-B multi-cohort leaf basis)", () => {
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 3, y: 10 });
         const raw = extractValueFeaturesV2Raw(combat.unitsHolder, fightProperties, LOWER);
         expect(extractValueFeaturesV2(combat.unitsHolder, fightProperties, LOWER)).toEqual(expandValueFeaturesV2(raw));
+    });
+
+    it("fills reusable base, raw, and deployed buffers without changing feature values", () => {
+        const combat = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        const shooter = createTestUnit({ name: "Shooter", team: LOWER, attackType: RANGE, rangeShots: 8 });
+        const bruiser = createTestUnit({ name: "Bruiser", team: LOWER });
+        const enemy = createTestUnit({ name: "Enemy", team: UPPER });
+        placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 3, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, bruiser, { x: 5, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 3, y: 10 });
+
+        const scratch = createValueFeatureScratch();
+        const base = new Array<number>(VALUE_FEATURE_NAMES.length);
+        const raw = new Array<number>(VALUE_FEATURE_NAMES_V2_RAW.length);
+        const deployed = new Array<number>(VALUE_FEATURE_NAMES_V2.length);
+
+        expect(fillValueFeatures(base, combat.unitsHolder, fightProperties, LOWER, scratch)).toBe(base);
+        expect(base).toEqual(extractValueFeatures(combat.unitsHolder, fightProperties, LOWER));
+        expect(fillValueFeaturesV2Raw(raw, combat.unitsHolder, fightProperties, LOWER, scratch)).toBe(raw);
+        expect(raw).toEqual(extractValueFeaturesV2Raw(combat.unitsHolder, fightProperties, LOWER));
+        expect(fillValueFeaturesV2(deployed, combat.unitsHolder, fightProperties, LOWER, scratch)).toBe(deployed);
+        expect(deployed).toEqual(extractValueFeaturesV2(combat.unitsHolder, fightProperties, LOWER));
+
+        const lower = [...deployed];
+        fillValueFeaturesV2(deployed, combat.unitsHolder, fightProperties, UPPER, scratch);
+        expect(lower).toEqual(extractValueFeaturesV2(combat.unitsHolder, fightProperties, LOWER));
+        expect(deployed).toEqual(extractValueFeaturesV2(combat.unitsHolder, fightProperties, UPPER));
     });
 });

@@ -316,6 +316,17 @@ interface IIndexedCandidateScore {
 
 export type SearchRollbackStrategy = "checkpoint" | "snapshot";
 
+function resolveRollbackStrategy(value: string | undefined): SearchRollbackStrategy {
+    const strategy = value?.trim();
+    if (!strategy || strategy === "checkpoint") {
+        return "checkpoint";
+    }
+    if (strategy === "snapshot") {
+        return "snapshot";
+    }
+    throw new Error("SEARCH_ROLLBACK_STRATEGY must be checkpoint or snapshot");
+}
+
 class SearchDecisionDeadlineExceeded extends Error {
     public constructor() {
         super("Search decision deadline exceeded");
@@ -1077,16 +1088,18 @@ export class SearchDriver {
         match: ISearchMatchInfo = {},
         scoredDecisionObserver?: SearchScoredDecisionObserver,
         passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver,
-        rollbackStrategy: SearchRollbackStrategy = "checkpoint",
+        rollbackStrategy?: SearchRollbackStrategy,
     ) {
         this.deps = deps;
         this.match = match;
         this.scoredDecisionObserver = scoredDecisionObserver;
         this.passiveProductiveProbeObserver = passiveProductiveProbeObserver;
-        if (rollbackStrategy !== "checkpoint" && rollbackStrategy !== "snapshot") {
+        const configuredRollbackStrategy =
+            rollbackStrategy ?? resolveRollbackStrategy(process.env.SEARCH_ROLLBACK_STRATEGY);
+        if (configuredRollbackStrategy !== "checkpoint" && configuredRollbackStrategy !== "snapshot") {
             throw new Error("Search rollback strategy must be checkpoint or snapshot");
         }
-        this.rollbackStrategy = rollbackStrategy;
+        this.rollbackStrategy = configuredRollbackStrategy;
         this.mode =
             process.env.Q2_WAIT_ABLATION === "1"
                 ? "ablation"

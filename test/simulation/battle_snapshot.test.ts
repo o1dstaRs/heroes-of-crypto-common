@@ -32,7 +32,7 @@ import type { IDamageStatistic } from "../../src/scene/scene_stats";
 import type { IStatisticHolder } from "../../src/scene/statistic_holder_interface";
 import { buildRoster, createCombatFactories, createUnitFromSpec, makeRng } from "../../src/simulation/army";
 import { GREEN_TEAM, RED_TEAM, simulationGridSettings } from "../../src/simulation/battle_engine";
-import { snapshotBattle, restoreBattle } from "../../src/simulation/battle_snapshot";
+import { BattleRollbackJournal, snapshotBattle, restoreBattle } from "../../src/simulation/battle_snapshot";
 import { Unit } from "../../src/units/unit";
 import { UnitsHolder } from "../../src/units/units_holder";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
@@ -419,6 +419,33 @@ describe("battle snapshot round-trip", () => {
             // (identical RNG stream) from the rolled-back state must reproduce step 3 bit-for-bit.
             // Any un-restored battle field would make this replay diverge.
             setDeterministicRandomSource(makeRng(0xabcdef));
+            h.playTurns(10);
+            expect(dumpUnits(h.unitsHolder)).toEqual(afterUnits);
+            expect(dumpGrid(h.grid)).toEqual(afterGrid);
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+    });
+
+    it("restores a one-shot rollback checkpoint after real engine turns", () => {
+        try {
+            const h = buildBattle(20240627);
+            h.playTurns(14);
+            expect(h.finished()).toBe(false);
+
+            const before = normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties));
+            const checkpoint = new BattleRollbackJournal(h.unitsHolder, h.grid, h.fightProperties).checkpoint();
+
+            setDeterministicRandomSource(makeRng(0x1234abcd));
+            h.playTurns(10);
+            const afterUnits = dumpUnits(h.unitsHolder);
+            const afterGrid = dumpGrid(h.grid);
+
+            checkpoint.rollback();
+            expect(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties))).toEqual(before);
+            expect(() => checkpoint.rollback()).toThrow("already been consumed");
+
+            setDeterministicRandomSource(makeRng(0x1234abcd));
             h.playTurns(10);
             expect(dumpUnits(h.unitsHolder)).toEqual(afterUnits);
             expect(dumpGrid(h.grid)).toEqual(afterGrid);

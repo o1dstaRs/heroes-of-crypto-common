@@ -71,6 +71,7 @@ import {
     SearchRollbackError,
     type ISearchPassiveProductiveProbe,
     type SearchPassiveProductiveProbeObserver,
+    type SearchRollbackStrategy,
 } from "../../src/simulation/search_driver";
 import { runV08BlockCenterActionPanelGame } from "../../src/simulation/v0_8_block_center_action_panel";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "../../src/simulation/v0_7_value_weights";
@@ -88,6 +89,7 @@ const SEARCH_ENV_KEYS = [
     "Q2_DATASET_V2",
     "SEARCH_IL_DATASET",
     "SEARCH_IL_RUN_FINGERPRINT",
+    "SEARCH_ROLLBACK_STRATEGY",
     "SEARCH_IL_COHORT",
     "PHASE_B_RUN_FINGERPRINT",
     "SEARCH_VERSIONS",
@@ -189,7 +191,10 @@ interface Harness {
     pathHelper: PathHelper;
     attackHandler: AttackHandler;
     /** Construct a driver AFTER the desired env is set (the driver reads env in its constructor). */
-    makeDriver: (passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver) => SearchDriver;
+    makeDriver: (
+        passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver,
+        rollbackStrategy?: SearchRollbackStrategy,
+    ) => SearchDriver;
     activeUnit: () => Unit | undefined;
     setActiveUnitId: (id: string) => void;
     failNextActiveUnitRestore: () => void;
@@ -429,12 +434,13 @@ function buildBattle(
         fightProperties,
         pathHelper,
         attackHandler,
-        makeDriver: (passiveProductiveProbeObserver) =>
+        makeDriver: (passiveProductiveProbeObserver, rollbackStrategy) =>
             new SearchDriver(
                 deps,
                 { seed, greenVersion: version, redVersion: version },
                 undefined,
                 passiveProductiveProbeObserver,
+                rollbackStrategy,
             ),
         activeUnit: ensureActive,
         setActiveUnitId: (id) => {
@@ -4134,6 +4140,48 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(chosen.length).toBeGreaterThan(0);
         const after = JSON.stringify(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties)));
         expect(after).toEqual(before);
+    });
+
+    it("owned rollback checkpoints match legacy snapshot decisions and state", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_ROLLOUTS: "2",
+            SEARCH_HORIZON: "4",
+            SEARCH_SHORTLIST: "2",
+        });
+        const run = (rollbackStrategy: SearchRollbackStrategy) => {
+            const h = buildBattle(913, "v0.6");
+            h.playTurns(8);
+            const unit = h.activeUnit();
+            expect(unit).toBeDefined();
+            const incumbent = h.decideActive();
+            const before = stableSnapshot(h);
+            const chosen = JSON.stringify(h.makeDriver(undefined, rollbackStrategy).chooseDecision(unit!, "v0.6", incumbent));
+            const after = stableSnapshot(h);
+            return { before, chosen, after };
+        };
+
+        const legacy = run("snapshot");
+        const checkpoint = run("checkpoint");
+        expect(legacy.after).toEqual(legacy.before);
+        expect(checkpoint.after).toEqual(checkpoint.before);
+        expect(checkpoint).toEqual(legacy);
+    });
+
+    it("accepts only explicit checkpoint or legacy rollback strategies", () => {
+        setEnv({ SEARCH_ROLLBACK_STRATEGY: "snapshot" });
+        const legacy = buildBattle(914, "v0.6").makeDriver() as unknown as { rollbackStrategy: string };
+        expect(legacy.rollbackStrategy).toBe("snapshot");
+
+        setEnv({ SEARCH_ROLLBACK_STRATEGY: "checkpoint" });
+        const checkpoint = buildBattle(915, "v0.6").makeDriver() as unknown as { rollbackStrategy: string };
+        expect(checkpoint.rollbackStrategy).toBe("checkpoint");
+
+        setEnv({ SEARCH_ROLLBACK_STRATEGY: "unsupported" });
+        expect(() => buildBattle(916, "v0.6").makeDriver()).toThrow(
+            "SEARCH_ROLLBACK_STRATEGY must be checkpoint or snapshot",
+        );
     });
 
     it("the real shortlist pre-pass preserves live state and reduces full-horizon candidates", () => {
