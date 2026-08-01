@@ -15,9 +15,12 @@ import { creatureInfo, type ICreatureInfo } from "./creature_score";
 
 /**
  * SITUATIONAL synergy picker. The shipped heuristic picks a FIXED best-per-faction synergy (BEST_SYNERGY_BY_FACTION),
- * score each of the two effects per faction. Double synergies are now a ruleset property: once a faction reaches
- * the two-stack threshold, both of its effects are active. The scorer remains available for historical analysis,
- * while the live picker returns the complete pair rather than selecting an alternative.
+ * but the right synergy is situational — its value scales with how much of YOUR army benefits (e.g. Nature's
+ * +Fly-Armor is dead weight without flyers; Might's +Auras-Range needs aura carriers). Each of the 8 synergies
+ * (2 per faction) has a BENEFICIARY signal counted from the fielded units; the picker scores each synergy as
+ * bias + benefWeight * beneficiaryCount and takes the higher of a faction's two. The 16-dim weight vector is
+ * [bias, benefWeight] per option below; the ANCHOR (bias=1 for the fixed-table pick, 0 else; benefWeight 0)
+ * reproduces the current behavior, so a CEM starting there only learns the situational adjustments.
  */
 
 const F = PBTypes.FactionVals;
@@ -112,12 +115,14 @@ export const loadSynergyWeights = (): number[] => {
 };
 
 /**
- * For each fielded faction (2+ units — the synergy activation threshold), return both effects. `w` is retained
- * for compatibility with historical optimizer callers; no learned score may suppress an effect the ruleset grants.
+ * For each fielded faction (2+ units — the synergy activation threshold), score its two synergies as
+ * bias + benefWeight * (count of the faction's units that benefit) and take the higher. Anchor weights
+ * reproduce the fixed table; trained weights adapt to the actual army (e.g. take +Fly-Armor only with enough
+ * flyers, else Increase-Board-Units).
  */
 export const pickSynergiesSituational = (
     creatureIds: readonly number[],
-    _w: number[],
+    w: number[],
 ): { faction: number; synergy: number }[] => {
     const byFaction = new Map<number, ICreatureInfo[]>();
     for (const id of creatureIds) {
@@ -137,10 +142,21 @@ export const pickSynergiesSituational = (
         if (units.length < 2) {
             continue; // a synergy only reaches level 1 with 2+ units of the faction
         }
-        for (const option of SYNERGY_OPTIONS) {
-            if (option.faction === faction) {
-                out.push({ faction, synergy: option.synergy });
+        let best: ISynergyOption | undefined;
+        let bestScore = -Infinity;
+        SYNERGY_OPTIONS.forEach((o, i) => {
+            if (o.faction !== faction) {
+                return;
             }
+            const benefCount = units.reduce((s, c) => s + o.benef(c), 0);
+            const score = w[2 * i] + w[2 * i + 1] * benefCount;
+            if (score > bestScore) {
+                bestScore = score;
+                best = o;
+            }
+        });
+        if (best) {
+            out.push({ faction, synergy: best.synergy });
         }
     }
     return out;

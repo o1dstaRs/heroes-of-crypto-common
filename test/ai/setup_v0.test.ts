@@ -91,8 +91,8 @@ describe("SetupPolicyV0", () => {
         expect(policy.pickCreature(4, [angel, champion], rangedArmy, [enemyRanger])).toBe(angel);
     });
 
-    test("synergies: both bonuses per faction fielded with 2+ units", () => {
-        // Two Life-faction creatures unlock both Life effects.
+    test("synergies: one measured-best synergy per faction fielded with 2+ units", () => {
+        // Two Life-faction creatures -> Life's measured-best synergy (Supply %).
         const lifeIds = Object.entries(CreatureFactions)
             .filter(([, f]) => f === PBTypes.FactionVals.LIFE)
             .map(([id]) => Number(id))
@@ -102,10 +102,6 @@ describe("SetupPolicyV0", () => {
         expect(picks).toContainEqual({
             faction: PBTypes.FactionVals.LIFE,
             synergy: LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
-        });
-        expect(picks).toContainEqual({
-            faction: PBTypes.FactionVals.LIFE,
-            synergy: LifeSynergy.PLUS_MORALE_AND_LUCK,
         });
     });
 

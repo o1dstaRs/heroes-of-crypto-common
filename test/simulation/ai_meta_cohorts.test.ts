@@ -105,16 +105,16 @@ describe("AI meta cohort generation", () => {
         for (let pair = 0; pair < 80 && !sawChaos; pair += 1) {
             const prepared = prepareMetaPair(options("uniform-mixed", 200), pair);
             for (const army of [prepared.armyA, prepared.armyB]) {
-                const chaos = army.synergies.filter((choice) => choice.faction === 1);
-                if (!chaos.length) continue;
+                const chaos = army.synergies.find((choice) => choice.faction === 1);
+                if (!chaos) continue;
                 sawChaos = true;
-                expect(chaos.map((choice) => choice.synergy).sort()).toEqual([1, 2]);
-                const creatureId = army.creatureIds.find((id) => aiMetaSynergyLevel([id, id], chaos[0]!.faction) === 1);
+                expect(chaos.synergy).toBe(2);
+                const creatureId = army.creatureIds.find((id) => aiMetaSynergyLevel([id, id], chaos.faction) === 1);
                 expect(creatureId).toBeDefined();
-                expect(aiMetaSynergyLevel([creatureId!], chaos[0]!.faction)).toBe(0);
-                expect(aiMetaSynergyLevel([creatureId!, creatureId!], chaos[0]!.faction)).toBe(1);
-                expect(aiMetaSynergyLevel(Array(4).fill(creatureId!), chaos[0]!.faction)).toBe(2);
-                expect(aiMetaSynergyLevel(Array(6).fill(creatureId!), chaos[0]!.faction)).toBe(3);
+                expect(aiMetaSynergyLevel([creatureId!], chaos.faction)).toBe(0);
+                expect(aiMetaSynergyLevel([creatureId!, creatureId!], chaos.faction)).toBe(1);
+                expect(aiMetaSynergyLevel(Array(4).fill(creatureId!), chaos.faction)).toBe(2);
+                expect(aiMetaSynergyLevel(Array(6).fill(creatureId!), chaos.faction)).toBe(3);
             }
         }
         expect(sawChaos).toBe(true);

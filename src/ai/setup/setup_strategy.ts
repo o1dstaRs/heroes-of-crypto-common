@@ -127,7 +127,7 @@ export interface ISetupPolicy {
     ): number;
     /** Best Tier-2 artifact id from the offered set. */
     pickArtifactT2(offered: readonly number[]): number;
-    /** Both synergies per eligible fielded faction (2+ stacks), given the team's creatures. */
+    /** One synergy per fielded faction (the measured-best of that faction's two), given the team's creatures. */
     pickSynergies(creatureIds: readonly number[]): { faction: number; synergy: number }[];
     /** The measured-best synergy id for a faction (FactionVals), or 0 if the faction has no synergy. Lets a
      * caller that already knows its faction composition (e.g. the server's refreshSynergies) pick directly. */

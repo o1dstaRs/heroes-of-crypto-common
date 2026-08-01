@@ -24,7 +24,6 @@ import {
     TIER2_ARTIFACT_WINRATE,
     type ISetupPolicy,
 } from "./setup_strategy";
-import { SYNERGY_OPTIONS } from "./synergy_score";
 
 /** argmax by a scoring function; returns the first candidate on empty/tie. */
 const bestBy = <T>(items: readonly T[], score: (item: T) => number): T | undefined => {
@@ -43,7 +42,7 @@ const bestBy = <T>(items: readonly T[], score: (item: T) => number): T | undefin
 /**
  * Heuristic setup policy v0 — the first server-authoritative "AI does the full draft/setup". Every choice is
  * grounded in the sim measurements (measure_artifacts.ts / measure_setup.ts): pick the highest-win-rate
- * artifact from what's offered, both synergies per eligible fielded faction, spend the augment budget on the
+ * artifact from what's offered, the measured-best synergy per fielded faction, spend the augment budget on the
  * universally-strong Armor/Might augments, take the max-budget doctrine (vision isn't the lever here — the
  * upgrade points are), and score creatures by the shared draft heuristic. Deterministic and vectorizable so a
  * later CEM pass can learn these tables/weights.
@@ -99,10 +98,14 @@ export class SetupPolicyV0 implements ISetupPolicy {
                 countByFaction.set(faction, (countByFaction.get(faction) ?? 0) + 1);
             }
         }
-        return SYNERGY_OPTIONS.filter((option) => (countByFaction.get(option.faction) ?? 0) >= 2).map((option) => ({
-            faction: option.faction,
-            synergy: option.synergy,
-        }));
+        const out: { faction: number; synergy: number }[] = [];
+        for (const [faction, count] of countByFaction) {
+            // A synergy only reaches level 1 with 2+ units of the faction; skip factions that can't trigger.
+            if (count >= 2 && BEST_SYNERGY_BY_FACTION[faction]) {
+                out.push({ faction, synergy: BEST_SYNERGY_BY_FACTION[faction] });
+            }
+        }
+        return out;
     }
     public bestSynergyForFaction(faction: number): number {
         return BEST_SYNERGY_BY_FACTION[faction] ?? 0;
