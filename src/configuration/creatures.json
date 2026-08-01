@@ -1297,7 +1297,7 @@
         },
         "Zena": {
             "name": "Zena",
-            "hp": 66,
+            "hp": 60,
             "steps": 4.7,
             "speed": 4,
             "armor": 17,
