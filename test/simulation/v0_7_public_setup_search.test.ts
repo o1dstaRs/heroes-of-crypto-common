@@ -106,7 +106,7 @@ describe("v0.7 public-roster setup search", () => {
         ).toBe(true);
     });
 
-    test("synergy candidates never duplicate an already-active faction bonus", () => {
+    test("synergy candidates flip the one active faction choice without duplicating it", () => {
         const own = [C.ORC, C.SCAVENGER];
         const candidate = publicSetupCandidate("synergy/chaos/ranged-2plus/flip");
         const inactive = selectPublicSetupChoices(candidate, own, [C.ARBALESTER]);
@@ -125,7 +125,7 @@ describe("v0.7 public-roster setup search", () => {
                 synergy: ChaosSynergy.MOVEMENT,
             },
         ]);
-        expect(new Set(active.synergies.map(({ synergy }) => synergy)).size).toBe(active.synergies.length);
+        expect(new Set(active.synergies.map(({ faction }) => faction)).size).toBe(active.synergies.length);
         expect(active.actionApplied).toBe(true);
         expect(active.matchedRuleIds).toEqual([candidate.id]);
     });
