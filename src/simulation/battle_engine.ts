@@ -24,7 +24,7 @@ import type { PlacementPolicyVariant } from "../ai/setup/setup_ship";
 import type { GameAction } from "../engine/actions";
 import { GameActionEngine } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
-import { createDefaultGameRuntime } from "../engine/runtime";
+import { createDefaultGameRuntime, type IGameRuntime } from "../engine/runtime";
 import { TurnEngine } from "../engine/turn_engine";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
@@ -503,6 +503,25 @@ export function simulationGridSettings(): GridSettings {
     return new GridSettings(GRID_SIZE, MAX_Y, MIN_Y, MAX_X, MIN_X, MOVEMENT_DELTA, UNIT_SIZE_DELTA);
 }
 
+/**
+ * A simulation's seeded combat stream must not be influenced by host elapsed time. Search rollouts restore
+ * the battle snapshot between candidates, while a wall clock continues to advance; using it here made two
+ * otherwise identical workers accumulate different per-turn time budgets and emit divergent training shards.
+ *
+ * Live games retain the default clock. Seeded headless matches model instantaneous decisions, so a fixed
+ * timestamp faithfully keeps their turn-accounting at zero elapsed time and makes the entire match replayable.
+ */
+function createMatchRuntime(seed: number | undefined): IGameRuntime {
+    const runtime = createDefaultGameRuntime();
+    if (seed === undefined) return runtime;
+    return {
+        ...runtime,
+        clock: {
+            nowMillis: () => 0,
+        },
+    };
+}
+
 const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 
 const publicCreatureIdsFromRoster = (roster: readonly IArmyUnitSpec[]): number[] => {
@@ -597,7 +616,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const attackHandler = new AttackHandler(gridSettings, grid, sceneLog, damageStatisticHolder);
     const moveHandler = new MoveHandler(gridSettings, grid, unitsHolder);
     const pathHelper = new PathHelper(gridSettings);
-    const runtime = createDefaultGameRuntime();
+    const runtime = createMatchRuntime(config.seed);
     const { abilityFactory, effectFactory } = createCombatFactories();
 
     const setupBeforePlacement = config.placementAugmentTiming === "setup-before-placement";
