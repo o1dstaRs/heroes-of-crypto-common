@@ -183,40 +183,6 @@ export const empowerMultiplier = (empowerPercentage: number): number => {
     return 1 + empowerPercentage / 100;
 };
 
-export enum MagicDefenseAugment {
-    NO_AUGMENT = 0,
-    LEVEL_1 = 1,
-    LEVEL_2 = 2,
-    LEVEL_3 = 3,
-}
-
-export const ToMagicDefenseAugment: { [magicDefenseAugmentValue: string]: MagicDefenseAugment } = {
-    "": MagicDefenseAugment.NO_AUGMENT,
-    "0": MagicDefenseAugment.NO_AUGMENT,
-    "1": MagicDefenseAugment.LEVEL_1,
-    "2": MagicDefenseAugment.LEVEL_2,
-    "3": MagicDefenseAugment.LEVEL_3,
-};
-
-/**
- * Percentage added to every unit's magic resist — the defensive mirror of Empower, and deliberately the same
- * 7/15/24 curve, so a team can answer an opponent's magic build for the identical point spend.
- */
-export const getMagicDefensePower = (augment: MagicDefenseAugment): number => {
-    switch (augment) {
-        case MagicDefenseAugment.NO_AUGMENT:
-            return 0;
-        case MagicDefenseAugment.LEVEL_1:
-            return 7;
-        case MagicDefenseAugment.LEVEL_2:
-            return 15;
-        case MagicDefenseAugment.LEVEL_3:
-            return 24;
-        default:
-            throw new Error("Invalid magic defense augment");
-    }
-};
-
 export enum SniperAugment {
     NO_AUGMENT = 0,
     LEVEL_1 = 1,
@@ -302,6 +268,5 @@ export type AugmentType =
     | { type: "Armor"; value: ArmorAugment }
     | { type: "Might"; value: MightAugment }
     | { type: "Empower"; value: EmpowerAugment }
-    | { type: "MagicDefense"; value: MagicDefenseAugment }
     | { type: "Sniper"; value: SniperAugment }
     | { type: "Movement"; value: MovementAugment };

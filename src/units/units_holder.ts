@@ -13,7 +13,6 @@ import { EffectHelper, type IPlacement, Spell } from "..";
 import {
     getArmorPower,
     getEmpowerPower,
-    getMagicDefensePower,
     getMightPower,
     getMovementPower,
     getSniperPower,
@@ -340,30 +339,6 @@ export class UnitsHolder {
                 augmentEmpowerBuff.setDesc(infoArr);
                 augmentEmpowerBuff.setPower(augmentEmpowerPower);
                 unit.applyBuff(augmentEmpowerBuff);
-            }
-
-            // Magic Defense is the defensive mirror of Empower: same point cost, same curve, but it raises the
-            // team's magic resist instead of its magic damage. Like Empower it rides on every unit, since the
-            // resist is read per-unit when incoming magic damage is resolved.
-            const augmentMagicDefense = fightProperties.getAugmentMagicDefense(unit.getTeam());
-            const augmentMagicDefensePower = getMagicDefensePower(augmentMagicDefense);
-            unit.deleteBuff("Magic Defense Augment");
-            if (augmentMagicDefense && isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
-                const augmentMagicDefenseBuff = new Spell({
-                    spellProperties: getSpellConfig("System", "Magic Defense Augment", NUMBER_OF_LAPS_TOTAL),
-                    amount: 1,
-                });
-                const infoArr: string[] = [];
-                for (const descStr of augmentMagicDefenseBuff.getDesc()) {
-                    infoArr.push(
-                        descStr
-                            .replace(/\{\}/g, augmentMagicDefensePower.toString())
-                            .replace(/\[\]/g, augmentMagicDefense.toString()),
-                    );
-                }
-                augmentMagicDefenseBuff.setDesc(infoArr);
-                augmentMagicDefenseBuff.setPower(augmentMagicDefensePower);
-                unit.applyBuff(augmentMagicDefenseBuff);
             }
 
             const augmentSniper = fightProperties.getAugmentSniper(unit.getTeam());
