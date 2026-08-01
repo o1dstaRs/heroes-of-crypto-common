@@ -19,6 +19,7 @@ import { createGzip, type Gzip } from "node:zlib";
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { V08_A13_PROFILE } from "../ai/versions/v0_8_a13_profile";
+import { buildV08A19H18SearchEnvironment, V08_A19_H18_PROFILE } from "../ai/versions/v0_8_a19_h18_profile";
 import {
     AI_META_COHORT_DESCRIPTIONS,
     AI_META_COHORTS,
@@ -688,15 +689,76 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
+export type AiMetaFightProfileId = "a13" | "a19-h18";
+
+interface IAiMetaFightProfile {
+    id: AiMetaFightProfileId;
+    title: string;
+    provenance: Readonly<Record<string, unknown>>;
+    workerEnvironment: Readonly<Record<string, string | undefined>>;
+}
+
+const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFightProfile>> = Object.freeze({
+    a13: Object.freeze({
+        id: "a13",
+        title: "Heroes of Crypto — v0.8+a13 AI Meta Balance Cohorts",
+        provenance: Object.freeze({
+            name: AI_META_FIGHT_PROFILE,
+            schema: V08_A13_PROFILE.schema,
+            candidateId: V08_A13_PROFILE.candidateId,
+            genomeSha256: V08_A13_PROFILE.genomeSha256,
+            sourceBindingSha256: V08_A13_PROFILE.sourceBindingSha256,
+            sourceBehaviorEnvironmentSha256: V08_A13_PROFILE.sourceBehaviorEnvironmentSha256,
+            search: V08_A13_PROFILE.search,
+            policy: V08_A13_PROFILE.policy,
+            workerOverride: "V08_A13_SEARCH=1",
+        }),
+        workerEnvironment: Object.freeze({ V08_A13_SEARCH: "1" }),
+    }),
+    "a19-h18": Object.freeze({
+        id: "a19-h18",
+        title: "Heroes of Crypto — v0.8+a19-h18 Research AI Meta Balance Cohorts",
+        provenance: Object.freeze({
+            name: "v0.8+a19-h18-research",
+            schema: V08_A19_H18_PROFILE.schema,
+            candidateId: V08_A19_H18_PROFILE.candidateId,
+            researchOnly: V08_A19_H18_PROFILE.researchOnly,
+            derivesFrom: V08_A19_H18_PROFILE.derivesFrom,
+            genomeSha256: V08_A19_H18_PROFILE.genomeSha256,
+            behaviorEnvironmentSha256: V08_A19_H18_PROFILE.behaviorEnvironmentSha256,
+            search: V08_A19_H18_PROFILE.search,
+            policy: V08_A19_H18_PROFILE.policy,
+            workerOverride: "V07_SEARCH=1; V08_A13_SEARCH=0",
+        }),
+        workerEnvironment: Object.freeze({
+            ...buildV08A19H18SearchEnvironment(),
+            V08_A13_SEARCH: "0",
+        }),
+    }),
+});
+
+export function resolveAiMetaFightProfile(profileId: string | undefined): IAiMetaFightProfile {
+    const normalized = profileId?.trim() || "a13";
+    const profile = AI_META_FIGHT_PROFILES[normalized as AiMetaFightProfileId];
+    if (!profile) {
+        throw new Error(
+            `Unknown AI meta fight profile ${normalized}; expected ${Object.keys(AI_META_FIGHT_PROFILES).join(", ")}`,
+        );
+    }
+    return profile;
+}
+
 const AI_META_FIXED_ENVIRONMENT = {
     SIM_NO_ACTIONS: "1",
     LIVETWIN: "1",
     FIGHT_MELEE_ROSTERS: "0",
-    V08_A13_SEARCH: "1",
 } as const;
 
 /** Remove simulation and model experiment flags before a worker statically imports fight-policy modules. */
-export function sanitizedAiMetaEnvironment(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+export function sanitizedAiMetaEnvironment(
+    source: NodeJS.ProcessEnv = process.env,
+    fightProfile: IAiMetaFightProfile = resolveAiMetaFightProfile(undefined),
+): NodeJS.ProcessEnv {
     const environment = { ...source };
     const exact = new Set([
         "COHORT",
@@ -714,17 +776,19 @@ export function sanitizedAiMetaEnvironment(source: NodeJS.ProcessEnv = process.e
             delete environment[key];
         }
     }
-    return { ...environment, ...AI_META_FIXED_ENVIRONMENT };
+    return { ...environment, ...AI_META_FIXED_ENVIRONMENT, ...fightProfile.workerEnvironment };
 }
 
 async function runWorkerPool(
     options: IAiMetaRunOptions,
     concurrency: number,
+    fightProfile: IAiMetaFightProfile,
     onRecord: (record: IAiMetaPairRecord, completed: number, total: number) => void,
 ): Promise<void> {
     const total = options.games / AI_META_GAMES_PER_MATCHUP;
     const poolSize = Math.max(1, Math.min(Math.floor(concurrency), total));
     const workerUrl = new URL("./ai_meta_cohorts_worker.ts", import.meta.url);
+    const workerEnvironment = sanitizedAiMetaEnvironment(process.env, fightProfile);
     await new Promise<void>((resolvePromise, rejectPromise) => {
         const workers: Worker[] = [];
         let dispatched = 0;
@@ -750,7 +814,7 @@ async function runWorkerPool(
         for (let index = 0; index < poolSize; index += 1) {
             const worker = new Worker(workerUrl, {
                 workerData: { options },
-                env: sanitizedAiMetaEnvironment(),
+                env: workerEnvironment,
             });
             workers.push(worker);
             worker.on("message", (message: WorkerReply) => {
@@ -891,6 +955,7 @@ function writeSummary(
     baseSeed: number,
     concurrency: number,
     parallelCohorts: number,
+    fightProfile: IAiMetaFightProfile,
     runIdentity: IAiMetaSourceIdentity,
     qualities: ICohortQuality[],
     aggregation: AiMetaAggregation,
@@ -900,7 +965,7 @@ function writeSummary(
         complete,
         generatedAt: new Date().toISOString(),
         provenance: {
-            title: "Heroes of Crypto — v0.8+a13 AI Meta Balance Cohorts",
+            title: fightProfile.title,
             startedAt,
             gamesPerCohort,
             requestedCohorts,
@@ -910,17 +975,7 @@ function writeSummary(
             concurrency,
             parallelCohorts,
             fightVersion: AI_META_FIGHT_VERSION,
-            fightProfile: {
-                name: AI_META_FIGHT_PROFILE,
-                schema: V08_A13_PROFILE.schema,
-                candidateId: V08_A13_PROFILE.candidateId,
-                genomeSha256: V08_A13_PROFILE.genomeSha256,
-                sourceBindingSha256: V08_A13_PROFILE.sourceBindingSha256,
-                sourceBehaviorEnvironmentSha256: V08_A13_PROFILE.sourceBehaviorEnvironmentSha256,
-                search: V08_A13_PROFILE.search,
-                policy: V08_A13_PROFILE.policy,
-                workerOverride: "V08_A13_SEARCH=1",
-            },
+            fightProfile: fightProfile.provenance,
             selectionPolicy: AI_META_POLICY,
             rankedDraftPolicy: {
                 spec: AI_META_RANKED_DRAFT_POLICY_SPEC,
@@ -963,6 +1018,7 @@ async function runCohort(
     gamesPerCohort: number,
     baseSeed: number,
     workers: number,
+    fightProfile: IAiMetaFightProfile,
     outDir: string,
     aggregation: AiMetaAggregation,
 ): Promise<ICohortRunResult> {
@@ -975,7 +1031,7 @@ async function runCohort(
     const cohortStarted = Date.now();
     let lastPrinted = 0;
     console.log(`\n[${cohort}] ${AI_META_COHORT_DESCRIPTIONS[cohort]} (${workers} workers)`);
-    await runWorkerPool(options, workers, (record, completed, total) => {
+    await runWorkerPool(options, workers, fightProfile, (record, completed, total) => {
         accumulator.add(record);
         aggregation.add(record);
         gzip.write(`${JSON.stringify(record)}\n`);
@@ -1020,7 +1076,8 @@ async function runCohort(
 
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
-    "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts]";
+    "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
+    "[fight-profile=a13]";
 
 export function validateAiMetaGamesPerCohort(games: number): void {
     const mapCycleGames = AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;
@@ -1053,6 +1110,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         return value as AiMetaCohort;
     });
     const parallelCohorts = Math.min(Number(argv[5] ?? Math.min(3, cohorts.length)), cohorts.length, concurrency);
+    const fightProfile = resolveAiMetaFightProfile(argv[6]);
     if (!Number.isSafeInteger(baseSeed)) throw new RangeError(`baseSeed must be a safe integer; got ${baseSeed}`);
     if (!Number.isInteger(concurrency) || concurrency < 1) {
         throw new RangeError(`concurrency must be a positive integer; got ${concurrency}`);
@@ -1071,7 +1129,8 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
 
     console.log(
         `AI meta: ${cohorts.length} cohorts x ${gamesPerCohort.toLocaleString()} non-mirrored fights, ` +
-            `${concurrency} total workers across ${parallelCohorts} parallel cohorts, seed ${baseSeed} -> ${outDir}`,
+            `${concurrency} total workers across ${parallelCohorts} parallel cohorts, seed ${baseSeed}, ` +
+            `profile ${fightProfile.id} -> ${outDir}`,
     );
     console.log(
         `Policy ${AI_META_POLICY}; exploration ${(AI_META_EXPLORATION_RATE * 100).toFixed(0)}% per setup component.`,
@@ -1089,6 +1148,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
                     gamesPerCohort,
                     baseSeed,
                     workersBase + Number(index < extraWorkers),
+                    fightProfile,
                     outDir,
                     aggregation,
                 ),
@@ -1106,6 +1166,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
             baseSeed,
             concurrency,
             parallelCohorts,
+            fightProfile,
             runIdentity,
             qualities,
             aggregation,
@@ -1121,6 +1182,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
         baseSeed,
         concurrency,
         parallelCohorts,
+        fightProfile,
         runIdentity,
         qualities,
         aggregation,

@@ -42,6 +42,7 @@ import {
     AiMetaAccumulator,
     AiMetaAggregation,
     captureAiMetaSourceIdentity,
+    resolveAiMetaFightProfile,
     sanitizedAiMetaEnvironment,
     validateAiMetaGamesPerCohort,
 } from "../../src/simulation/measure_ai_meta_cohorts";
@@ -240,6 +241,27 @@ describe("AI meta cohort generation", () => {
         expect(environment.LIVETWIN).toBe("1");
         expect(environment.FIGHT_MELEE_ROSTERS).toBe("0");
         expect(environment.V08_A13_SEARCH).toBe("1");
+    });
+
+    it("materializes the explicit a19 h18 worker profile without ambient experiment leakage", () => {
+        const environment = sanitizedAiMetaEnvironment(
+            {
+                SEARCH_HORIZON: "999",
+                V07_SEARCH: "0",
+                V08_A13_SEARCH: "1",
+            },
+            resolveAiMetaFightProfile("a19-h18"),
+        );
+        expect(environment).toMatchObject({
+            V07_SEARCH: "1",
+            SEARCH_HORIZON: "18",
+            SEARCH_DECISION_DEADLINE_MS: "175",
+            SEARCH_CIRCUIT_BREAKER_MS: "275",
+            SEARCH_SHORTLIST: "2",
+            V08_A13_SEARCH: "0",
+        });
+        expect(resolveAiMetaFightProfile(undefined).id).toBe("a13");
+        expect(() => resolveAiMetaFightProfile("a20")).toThrow("Unknown AI meta fight profile a20");
     });
 
     it("records the execution host because a13 search is wall-clock bounded", () => {
