@@ -58,9 +58,9 @@ const V08_VINE_THROW_PROTECTED_ACTION_TYPES = new Set<GameAction["type"]>([
     "cast_spell",
 ]);
 
-/** v0.8 closes Harpy's deterministic Castling omission without changing frozen v0.7 behavior. */
+/** v0.8 closes deterministic Harpy Castling and Satyr Summon Wolves omissions without changing frozen v0.7 behavior. */
 export const V08_CASTER_ROUTER_POLICY = Object.freeze({
-    spells: Object.freeze([...V07_CASTER_ROUTER_POLICY.spells, "castling"] as const),
+    spells: Object.freeze([...V07_CASTER_ROUTER_POLICY.spells, "castling", "summonwolves"] as const),
     resurrectionPreemptsCommitted: V07_CASTER_ROUTER_POLICY.resurrectionPreemptsCommitted,
 }) satisfies ICasterRouterPolicy;
 

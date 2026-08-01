@@ -674,7 +674,7 @@ describe("v0.7 baked caster salvage", () => {
     });
 });
 
-describe("v0.8 baked Castling salvage", () => {
+describe("v0.8 baked caster salvage", () => {
     class ExposedV08 extends StrategyV0_8 {
         public route(unit: Unit, context: IDecisionContext, decision: GameAction[]): GameAction[] {
             return this.routeCasterDecision(unit, context, decision);
@@ -687,10 +687,10 @@ describe("v0.8 baked Castling salvage", () => {
         }
     }
 
-    it("adds only Castling to the frozen v0.7 policy and preserves scoped research extras", () => {
+    it("adds Castling and Summon Wolves to the frozen v0.7 policy and preserves scoped research extras", () => {
         expect(V07_CASTER_ROUTER_POLICY.spells).toEqual(["resurrection", "windflow"]);
         expect(V08_CASTER_ROUTER_POLICY).toEqual({
-            spells: ["resurrection", "windflow", "castling"],
+            spells: ["resurrection", "windflow", "castling", "summonwolves"],
             resurrectionPreemptsCommitted: false,
         });
 
@@ -731,6 +731,23 @@ describe("v0.8 baked Castling salvage", () => {
                 targetId: shooter.getId(),
                 targetCell: shooter.getBaseCell(),
             });
+        }
+    });
+
+    it("casts Satyr Summon Wolves over a self-buff in v0.8/v0.8s while keeping v0.7 frozen", () => {
+        const combat = createCombatTestContext();
+        const satyr = makeReal(LOWER, "Nature", "Satyr");
+        satyr.setStackPower(5);
+        const ally = createTestUnit({ team: LOWER, attackType: MELEE });
+        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, satyr, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, ally, { x: 6, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 10 });
+        const context = contextFor(combat);
+
+        expect(castSpell(new StrategyV0_7().decideTurn(satyr, context))?.spellName).toBe("Courage");
+        for (const strategy of [new StrategyV0_8(), new StrategyV0_8S()]) {
+            expect(castSpell(strategy.decideTurn(satyr, context))?.spellName).toBe("Summon Wolves");
         }
     });
 
