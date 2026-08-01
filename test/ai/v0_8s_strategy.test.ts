@@ -206,7 +206,10 @@ describe("v0.8 search measurement alias", () => {
         // with zero rejected actions, and two clean-source runs reproduced the v0.8 trace below.
         // Re-pinned with the same Tsar Cannon range / Dryad damage balance change; two isolated runs
         // reproduced this digest byte-identically alongside the v0.7 control above.
-        expect(digest("v0.8")).toBe("daf0b2cd3a9cee4402bb71f849cc18cdc1b037d12032dcdf5525d413defff42b");
+        // Re-pinned after Cyclops steps 5 -> 6: the wider reach reshapes v0.8's seeded trace (the v0.7
+        // control above still reproduces byte-identically — its line doesn't move a Cyclops that turn).
+        // Two isolated runs reproduced this digest.
+        expect(digest("v0.8")).toBe("1958918a1f03350be2e334df6baf9cb8f82ee61f6a34333d73bdf19e099c6776");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

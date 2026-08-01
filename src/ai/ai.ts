@@ -1348,10 +1348,7 @@ export function auraCoverageScore(
         if (range < 0) {
             continue;
         }
-        const cellKeys = new Set<number>();
-        for (const c of EffectHelper.getAuraCells(gridSettings, fromCell, range)) {
-            cellKeys.add((c.x << 4) | c.y);
-        }
+        const cellKeys = new Set(EffectHelper.getAuraCellKeysView(gridSettings, fromCell, range));
         const targets = aura.getProperties().is_buff ? allies : enemies;
         for (const t of targets) {
             const bc = t.getBaseCell();
