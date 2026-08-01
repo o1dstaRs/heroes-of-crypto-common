@@ -128,7 +128,7 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // and combat exchanges. Two isolated runs produced this byte-identical digest.
 // Re-pinned when every eligible faction began activating both synergy effects. The same seeded rosters now
 // carry their complete faction bonuses, so their setup and combat traces legitimately change.
-const EXPECTED_REPLAY_SHA256 = "ed90c0f6cf64bbf594a64731c474b636f8776d6d52e603399d3422625d6973d1";
+const EXPECTED_REPLAY_SHA256 = "83eaa57ce5e4fa0363b490a2cccb7598b3882e47606772c4991f3449a3cac308";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

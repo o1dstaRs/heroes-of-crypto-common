@@ -69,8 +69,8 @@ describe("pick_sim", () => {
             [3, 6, 1],
             [11, 14, 2],
         ]);
-        expect(state.lower.tier2Offers).toEqual([1, 2, 3]);
-        expect(state.upper.tier2Offers).toEqual([1, 2, 3]);
+        expect(state.lower.tier2Offers).toEqual([1, 2, 4]);
+        expect(state.upper.tier2Offers).toEqual([1, 2, 4]);
         expect(state.creaturesBanned).toEqual([
             12, 13, 21, 22, 23, 31, 15, 16, 24, 25, 26, 34, 7, 8, 17, 9, 10, 19, 20, 29,
         ]);
@@ -83,16 +83,16 @@ describe("pick_sim", () => {
             15,
             14,
             13, // four globally distinct L2 offers (16-creature pool: Battle Mage in, Zena out to L3)
-            13,
-            12, // lower's distinct T1 pair (13-artifact pool: the arcane ring is in)
-            13,
-            12, // upper's distinct T1 pair
-            13,
             12,
-            11, // lower T2 offer (13-artifact pool)
-            13,
+            11, // lower's distinct T1 pair (12-artifact live pool: the arcane ring is in)
             12,
-            11, // upper T2 offer
+            11, // upper's distinct T1 pair
+            12,
+            11,
+            10, // lower T2 offer (12-artifact live pool)
+            12,
+            11,
+            10, // upper T2 offer
             12,
             11,
             10,
@@ -178,7 +178,7 @@ describe("pick_sim", () => {
         expect(repeated.state).toBe(state);
     });
 
-    it("runs the exact snake order through simultaneous 3-of-12 T2 picks to completion", () => {
+    it("runs the exact snake order through simultaneous Tier-2 picks to completion", () => {
         let state = finishBundlePhase(finishPerkPhase(createPickSimState(first)));
         const creatureActions: PickAction[] = [
             { type: "pick_creature", team: LOWER, creatureId: 2 },
@@ -193,7 +193,7 @@ describe("pick_sim", () => {
         }
         expect(state.phaseSequence).toBe(8);
 
-        const outsideOffer = apply(state, { type: "select_tier2", team: LOWER, artifactId: 4 });
+        const outsideOffer = apply(state, { type: "select_tier2", team: LOWER, artifactId: 5 });
         expect(outsideOffer).toMatchObject({ status: "rejected", reason: "artifact_not_offered" });
         state = accept(state, { type: "select_tier2", team: UPPER, artifactId: 1 });
         expect(state.phaseSequence).toBe(8);

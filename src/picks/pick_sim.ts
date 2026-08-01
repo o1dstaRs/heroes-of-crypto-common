@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { ArtifactTier } from "../artifacts/artifact_properties";
+import { ArtifactTier, TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { getPerkRevealMode, PERKS, Perk } from "../perks/perk_properties";
 import { CreatureLevelList, CreatureLevelMap, CreaturePoolByLevel } from "../units/unit_properties";
@@ -32,6 +32,8 @@ export type PickRandomInt = (maxExclusive: number) => number;
 export const LIVE_AUTO_BANS_BY_LEVEL = [6, 6, 3, 5] as const;
 export const LIVE_TIER1_ARTIFACT_COUNT = 13;
 export const LIVE_TIER2_ARTIFACT_COUNT = 13;
+export const LIVE_TIER1_ARTIFACT_IDS = TIER1_ARTIFACT_LIST.map((artifact) => artifact.id);
+export const LIVE_TIER2_ARTIFACT_IDS = TIER2_ARTIFACT_LIST.map((artifact) => artifact.id);
 export const LIVE_TIER2_OFFER_SIZE = 3;
 export const SERVER_PERSISTED_CREATURE_ORDER = "server-level-sort-after-each-accepted-pick" as const;
 
@@ -229,18 +231,10 @@ const pickDistinct = (pool: readonly number[], count: number, rng: PickRandomInt
  * same two values per team and in the same order the bundles are built in.
  */
 const tier1ArtifactPair = (rng: PickRandomInt): [number, number] =>
-    pickDistinct(
-        Array.from({ length: LIVE_TIER1_ARTIFACT_COUNT }, (_, index) => index + 1),
-        2,
-        rng,
-    ) as [number, number];
+    pickDistinct(LIVE_TIER1_ARTIFACT_IDS, 2, rng) as [number, number];
 
 const artifactOffers = (rng: PickRandomInt): [number, number, number] =>
-    pickDistinct(
-        Array.from({ length: LIVE_TIER2_ARTIFACT_COUNT }, (_, index) => index + 1),
-        LIVE_TIER2_OFFER_SIZE,
-        rng,
-    ) as [number, number, number];
+    pickDistinct(LIVE_TIER2_ARTIFACT_IDS, LIVE_TIER2_OFFER_SIZE, rng) as [number, number, number];
 
 const emptyTeam = (bundles: [PickBundle, PickBundle], tier2Offers: [number, number, number]): IPickTeamState => ({
     perk: Perk.NO_PERK,
@@ -616,11 +610,7 @@ const applyTier2 = (
     if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.ARTIFACT_2)) {
         return rejected(state, isPickSimComplete(state) ? "pick_complete" : "wrong_phase");
     }
-    if (
-        !Number.isInteger(action.artifactId) ||
-        action.artifactId < 1 ||
-        action.artifactId > LIVE_TIER2_ARTIFACT_COUNT
-    ) {
+    if (!Number.isInteger(action.artifactId) || !LIVE_TIER2_ARTIFACT_IDS.includes(action.artifactId)) {
         return rejected(state, "invalid_artifact");
     }
     const own = teamState(state, action.team);

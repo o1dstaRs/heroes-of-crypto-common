@@ -60,6 +60,11 @@ export enum Tier2Artifact {
     ARCHMAGES_RING = 13, // +20% magic damage (army-wide); Tier-2 half of the arcane pair
 }
 
+// Keep retired artifacts addressable for saved games, replays, and balance history, but exclude them from every
+// live selection pool. New ranked drafts and the sandbox both build their choices from the lists below.
+export const DISABLED_TIER1_ARTIFACT_IDS: ReadonlySet<Tier1Artifact> = new Set([Tier1Artifact.BROKEN_AEGIS]);
+export const DISABLED_TIER2_ARTIFACT_IDS: ReadonlySet<Tier2Artifact> = new Set([Tier2Artifact.HOLY_CROSS]);
+
 export type ArtifactType =
     { tier: ArtifactTier.TIER_1; value: Tier1Artifact } | { tier: ArtifactTier.TIER_2; value: Tier2Artifact };
 
@@ -442,9 +447,15 @@ export const getArtifactProperties = (tier: ArtifactTier, id: number): ArtifactP
 
 // Ordered lists (excluding NO_ARTIFACT) for building selection UIs.
 export const TIER1_ARTIFACT_LIST: ArtifactProperties[] = Object.values(Tier1Artifact)
-    .filter((v): v is Tier1Artifact => typeof v === "number" && v !== Tier1Artifact.NO_ARTIFACT)
+    .filter(
+        (v): v is Tier1Artifact =>
+            typeof v === "number" && v !== Tier1Artifact.NO_ARTIFACT && !DISABLED_TIER1_ARTIFACT_IDS.has(v),
+    )
     .map((id) => TIER1_ARTIFACTS[id]);
 
 export const TIER2_ARTIFACT_LIST: ArtifactProperties[] = Object.values(Tier2Artifact)
-    .filter((v): v is Tier2Artifact => typeof v === "number" && v !== Tier2Artifact.NO_ARTIFACT)
+    .filter(
+        (v): v is Tier2Artifact =>
+            typeof v === "number" && v !== Tier2Artifact.NO_ARTIFACT && !DISABLED_TIER2_ARTIFACT_IDS.has(v),
+    )
     .map((id) => TIER2_ARTIFACTS[id]);
