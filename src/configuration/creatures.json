@@ -913,7 +913,7 @@
             "speed": 3.3,
             "armor": 46,
             "attack_type": "MELEE",
-            "attack": 20,
+            "attack": 22,
             "attack_damage_min": 28,
             "attack_damage_max": 52,
             "attack_range": 1,

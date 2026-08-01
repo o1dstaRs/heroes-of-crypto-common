@@ -124,7 +124,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // re-values seeded setups and every downstream exchange it appears in.
 // Re-pinned after Blacksmith gained one base armor (9 -> 10), which changes seeded setup valuation and
 // downstream exchanges. Two clean-source runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "6e264111ac06d60a2e7246e8a8716cd0f5acd37bcb06417150e69557a6886534";
+// Re-pinned after Abomination gained two base attack (20 -> 22), which changes its seeded setup valuation
+// and combat exchanges. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "ba4aceef13ddf662364d8e987788d1c80f68e698825f875c4ccb9f4aaa6193b0";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

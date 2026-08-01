@@ -92,7 +92,7 @@ describe("config_provider", () => {
         expect(creature.steps).toBe(4.2);
         expect(creature.speed).toBe(3.3);
         expect(creature.base_armor).toBe(46);
-        expect(creature.base_attack).toBe(20);
+        expect(creature.base_attack).toBe(22);
         expect(creature.exp).toBe(1000);
         expect(creature.amount_alive).toBe(1);
 
