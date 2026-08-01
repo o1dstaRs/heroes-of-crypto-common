@@ -128,6 +128,10 @@ const footprintForBase = (unit: Unit, base: XY): XY[] =>
               { x: base.x - 1, y: base.y - 1 },
           ];
 
+const canLandOnFootprint = (unit: Unit, context: IDecisionContext, cells: XY[]): boolean =>
+    context.grid.areAllCellsEmpty(cells, unit.getId()) ||
+    context.grid.canOccupyCells(cells, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water"), unit.getId());
+
 const cellDistance = (left: XY, right: XY): number => Math.max(Math.abs(left.x - right.x), Math.abs(left.y - right.y));
 
 const footprintDistance = (left: readonly XY[], right: readonly XY[]): number => {
@@ -482,6 +486,9 @@ const followWard = (
             distance: footprintDistance(footprintForBase(unit, route.cell), ward.getCells()),
         };
         const destination = footprintForBase(unit, route.cell);
+        if (!canLandOnFootprint(unit, context, destination)) {
+            continue;
+        }
         if (candidate.distance >= currentDistance || !catchUpDestinationAllowed(intent, unit, context, destination)) {
             continue;
         }

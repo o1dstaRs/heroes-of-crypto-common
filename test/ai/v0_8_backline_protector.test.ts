@@ -32,6 +32,7 @@ import { getSpellConfig } from "../../src/configuration/config_provider";
 import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { getPositionForCell } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import { PlacementPositionType } from "../../src/grid/placement_properties";
 import { RectanglePlacement } from "../../src/grid/rectangle_placement";
@@ -62,6 +63,33 @@ const placementFootprint = (unit: Unit, base: { x: number; y: number }): Array<{
     unit.isSmallSize()
         ? [{ ...base }]
         : [{ ...base }, { x: base.x - 1, y: base.y }, { x: base.x, y: base.y - 1 }, { x: base.x - 1, y: base.y - 1 }];
+
+const placeLargeUnit = (
+    combat: ReturnType<typeof createCombatTestContext>,
+    unit: Unit,
+    base: { x: number; y: number },
+): void => {
+    const position = getPositionForCell(
+        base,
+        testGridSettings.getMinX(),
+        testGridSettings.getStep(),
+        testGridSettings.getHalfStep(),
+    );
+    unit.setPosition(position.x, position.y);
+    if (
+        !combat.grid.occupyCells(
+            placementFootprint(unit, base),
+            unit.getId(),
+            unit.getTeam(),
+            unit.getAttackRange(),
+            unit.canTraverseLava(),
+            unit.hasAbilityActive("Made of Water"),
+        )
+    ) {
+        throw new Error(`Unable to place ${unit.getName()} at (${base.x}, ${base.y})`);
+    }
+    combat.unitsHolder.addUnit(unit);
+};
 
 const placementDistance = (
     left: readonly { x: number; y: number }[],
@@ -896,6 +924,69 @@ describe("v0.8 back-line protector intent", () => {
 
         const oneWard = angelBoard(8, false);
         expect(buildV08BacklineProtectorIntent(oneWard.angel, oneWard.context)).toBeUndefined();
+    });
+
+    it("keeps a large Angel catch-up route off Lava Center cells it cannot occupy", () => {
+        const combat = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
+        const angel = createTestUnit({
+            team: LOWER,
+            name: "Angel",
+            attackType: MELEE_MAGIC,
+            movementType: FLY,
+            size: PBTypes.UnitSizeVals.LARGE,
+            speed: 3,
+            auraEffects: ["Arrows Wingshield"],
+            auraRanges: [2],
+            auraIsBuff: [true],
+        });
+        const primary = createTestUnit({
+            team: LOWER,
+            name: "Primary Archer",
+            attackType: RANGE,
+            rangeShots: 8,
+            damageMax: 20,
+            amountAlive: 5,
+        });
+        const secondary = createTestUnit({
+            team: LOWER,
+            name: "Secondary Mage",
+            attackType: MELEE_MAGIC,
+            spells: ["Life:Fire Strike"],
+            damageMax: 5,
+            amountAlive: 2,
+        });
+        const enemy = createTestUnit({
+            team: UPPER,
+            name: "Enemy Shooter",
+            attackType: RANGE,
+            rangeShots: 8,
+        });
+        placeLargeUnit(combat, angel, { x: 10, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, primary, { x: 12, y: 9 });
+        placeUnit(combat.grid, combat.unitsHolder, secondary, { x: 11, y: 1 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 1, y: 14 });
+
+        const context = decisionContext(combat);
+        const follow = prioritizeV08BacklineProtector(
+            angel,
+            context,
+            [{ type: "end_turn", unitId: angel.getId(), reason: "manual" }],
+            false,
+        );
+        const move = follow[0];
+        expect(move?.type).toBe("move_unit");
+        if (move?.type !== "move_unit") {
+            throw new Error("Angel should retain a legal catch-up move");
+        }
+        expect(
+            combat.grid.canOccupyCells(
+                move.targetCells,
+                angel.canTraverseLava(),
+                angel.hasAbilityActive("Made of Water"),
+                angel.getId(),
+            ),
+        ).toBe(true);
+        expect(move.targetCells.some((cell) => combat.grid.getOccupantUnitId(cell) === "L")).toBe(false);
     });
 
     it("releases protector roles for the universal late finish", () => {
