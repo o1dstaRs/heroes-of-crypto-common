@@ -126,7 +126,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // downstream exchanges. Two clean-source runs produced this byte-identical digest.
 // Re-pinned after Abomination gained two base attack (20 -> 22), which changes its seeded setup valuation
 // and combat exchanges. Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "ba4aceef13ddf662364d8e987788d1c80f68e698825f875c4ccb9f4aaa6193b0";
+// Re-pinned when every eligible faction began activating both synergy effects. The same seeded rosters now
+// carry their complete faction bonuses, so their setup and combat traces legitimately change.
+const EXPECTED_REPLAY_SHA256 = "ed90c0f6cf64bbf594a64731c474b636f8776d6d52e603399d3422625d6973d1";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
