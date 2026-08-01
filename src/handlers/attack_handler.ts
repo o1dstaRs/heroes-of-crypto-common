@@ -823,10 +823,11 @@ export class AttackHandler {
             rangeResponseUnit = undefined;
         }
 
-        // ABILITY Chakram (Zena): the disc bounces to every enemy standing APART from the last one hit —
-        // 1 empty cell of separation keeps full bounce damage, 2 halves it — nearest first, each enemy at
-        // most once, then it returns to Zena. resolveChakramTrajectory PRECOMPUTES the whole flight,
-        // deterministically, so the client replays it AND the hover preview shows the exact victims.
+        // ABILITY Chakram (Zena): the disc may hit up to the attacker's stack power in TOTAL. After the
+        // primary, it bounces among enemies standing apart — 1 empty cell keeps full bounce damage and 2
+        // halves it — nearest first, each enemy at most once, then it returns to Zena.
+        // resolveChakramTrajectory PRECOMPUTES the whole flight deterministically, so the client replay and
+        // red hover preview use the exact same capped victims.
         // Victims JOIN affectedUnits, so they resolve through the very same AOE tail as Large Caliber /
         // Area Throw (Giant's Maul, status resistance, Flesh Shield ordering, per-unit numbers).
         const chakramTrajectory = AllAbilities.resolveChakramTrajectory(
@@ -953,8 +954,8 @@ export class AttackHandler {
 
         if (rangeResponseUnit && rangeResponseUnits) {
             // ABILITY Chakram (Zena) on the RESPONSE: a counter-throw behaves EXACTLY like the initiating one —
-            // the disc does not care who threw it. Same separation chain, ally exclusion and Angel stop,
-            // with the RESPONDER as the attacker and its shooter as the primary victim.
+            // same stack-power total-target cap, separation chain, ally exclusion and Angel stop, with the
+            // RESPONDER as the attacker and its shooter as the primary victim.
             const responseChakramTrajectory = AllAbilities.resolveChakramTrajectory(
                 targetUnit,
                 rangeResponseUnit,

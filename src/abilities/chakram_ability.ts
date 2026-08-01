@@ -9,9 +9,10 @@
  * -----------------------------------------------------------------------------
  */
 
-import { Grid } from "../grid/grid";
-import { Unit } from "../units/unit";
-import { UnitsHolder } from "../units/units_holder";
+import { MAX_UNIT_STACK_POWER, MIN_UNIT_STACK_POWER } from "../constants";
+import type { Grid } from "../grid/grid";
+import type { Unit } from "../units/unit";
+import type { UnitsHolder } from "../units/units_holder";
 import type { XY } from "../utils/math";
 
 /**
@@ -23,6 +24,18 @@ import type { XY } from "../utils/math";
 export const CHAKRAM_FULL_DAMAGE_GAP = 1;
 export const CHAKRAM_HALF_DAMAGE_GAP = 2;
 export const CHAKRAM_HALF_DAMAGE_FACTOR = 0.5;
+export const CHAKRAM_ABILITY_NAME = "Chakram";
+
+/** Total enemies one throw may hit, INCLUDING the initially chosen target. */
+export function chakramMaxTargets(stackPower: number): number {
+    const normalized = Number.isFinite(stackPower) ? Math.round(stackPower) : MIN_UNIT_STACK_POWER;
+    return Math.max(MIN_UNIT_STACK_POWER, Math.min(MAX_UNIT_STACK_POWER, normalized));
+}
+
+/** Fill the card's target-count placeholder with the same stack tier the trajectory enforces. */
+export function chakramDescription(descriptionTemplate: string, stackPower: number): string {
+    return descriptionTemplate.replace(/\{\}/g, chakramMaxTargets(stackPower).toString());
+}
 
 /**
  * One hop of the disc's flight, PRECOMPUTED by the engine so the client only replays it (identical in
@@ -78,15 +91,16 @@ function lineCells(from: XY, to: XY): XY[] {
  * Precompute the WHOLE chakram flight, deterministically, on the engine — the client only replays it,
  * and the hover preview calls the same function to show exactly who will be struck.
  *
- * The disc sweeps the whole SEPARATED CLUSTER around the shot's target: it repeatedly bounces to the
- * nearest not-yet-hit enemy standing apart from ANY unit already struck — 1 empty cell of separation
- * keeps full bounce damage, 2 empty cells halves it — until nobody within reach remains. Then it flies
- * home to Zena (the return leg is the client's to animate; it deals no damage).
+ * The disc sweeps the SEPARATED CLUSTER around the shot's target, up to the attacker's stack-power target
+ * limit. It repeatedly bounces to the nearest not-yet-hit enemy standing apart from ANY unit already struck —
+ * 1 empty cell of separation keeps full bounce damage, 2 empty cells halves it — until nobody within reach
+ * remains. Then it flies home to Zena (the return leg is the client's to animate; it deals no damage).
  *
  * Rules:
  *  - ALLIES ARE NEVER HIT, and never relay the chain.
  *  - Touching units (no gap) and units more than 2 cells apart are never bounced to.
  *  - Each victim is struck at most once per throw; the primary target never takes a second hit.
+ *  - Total victims, INCLUDING the primary target, cannot exceed the attacker's stack power (1..5).
  *  - Nearest-first: smallest separation to the struck cluster wins; ties break by base-cell distance
  *    to the LAST unit hit, then by unit id — the flight is byte-identical everywhere it is computed.
  *  - Angel's "Arrows Wingshield Aura" owner is never struck and STOPS the whole flight when it is the
@@ -99,7 +113,7 @@ export function resolveChakramTrajectory(
     _grid: Grid,
 ): IChakramTrajectory {
     const empty: IChakramTrajectory = { steps: [], hitUnits: [], damageFactorByUnitId: {}, mountainCells: [] };
-    if (!attackerUnit.getAbility("Chakram") || primaryTarget.isDead()) {
+    if (!attackerUnit.getAbility(CHAKRAM_ABILITY_NAME) || primaryTarget.isDead()) {
         return empty;
     }
 
@@ -111,9 +125,9 @@ export function resolveChakramTrajectory(
     const visited = new Set<string>([primaryTarget.getId()]);
 
     let last = primaryTarget;
-    // Hard bound far above any real board's enemy count, so a pathological state can never loop forever.
-    const MAX_HOPS = 64;
-    for (let hop = 0; hop < MAX_HOPS; hop += 1) {
+    // The primary shot already consumes one slot, leaving at most 0..4 secondary victims.
+    const maxBounces = chakramMaxTargets(attackerUnit.getStackPower()) - 1;
+    for (let hop = 0; hop < maxBounces; hop += 1) {
         let next: Unit | undefined;
         let nextSeparation = Number.MAX_SAFE_INTEGER;
         let nextAnchor: Unit | undefined;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
     CHAKRAM_HALF_DAMAGE_FACTOR,
+    chakramMaxTargets,
     chakramSeparation,
     resolveChakramTrajectory,
 } from "../../src/abilities/chakram_ability";
@@ -11,9 +12,9 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 const GREEN = PBTypes.TeamVals.LOWER;
 const RED = PBTypes.TeamVals.UPPER;
 
-function setup() {
+function setup(stackPower = 5) {
     const context = createCombatTestContext();
-    const zena = createTestUnit({ name: "Zena", team: GREEN, abilities: ["Chakram"] });
+    const zena = createTestUnit({ name: "Zena", team: GREEN, abilities: ["Chakram"], stackPower });
     placeUnit(context.grid, context.unitsHolder, zena, { x: 8, y: 2 });
     return { ...context, zena };
 }
@@ -25,6 +26,45 @@ function enemy(context: ReturnType<typeof setup>, name: string, cell: { x: numbe
 }
 
 describe("Zena's Chakram — separation chain", () => {
+    it("caps total targets at stack power from one through five", () => {
+        for (let stackPower = 1; stackPower <= 5; stackPower += 1) {
+            const context = setup(stackPower);
+            const primary = enemy(context, "Primary", { x: 8, y: 4 });
+            for (let index = 1; index <= 5; index += 1) {
+                enemy(context, `Bounce ${index}`, { x: 8, y: 4 + index * 2 });
+            }
+
+            const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+
+            expect(chakramMaxTargets(context.zena.getStackPower())).toBe(stackPower);
+            expect(trajectory.hitUnits).toHaveLength(stackPower - 1);
+            expect(1 + trajectory.hitUnits.length).toBe(stackPower);
+        }
+    });
+
+    it("automatically prints the live total-target limit on the ability card", () => {
+        for (let stackPower = 1; stackPower <= 5; stackPower += 1) {
+            const context = setup(stackPower);
+            context.zena.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            const properties = context.zena.getUnitProperties();
+            const chakramIndex = properties.abilities.indexOf("Chakram");
+            const description = properties.abilities_descriptions[chakramIndex];
+
+            expect(description).toContain(`Maximum targets: ${stackPower}.`);
+            expect(description).not.toContain("{}");
+        }
+    });
+
+    it("prints the holder's current limit when Chakram is granted at runtime", () => {
+        const holder = createTestUnit({ name: "Borrower", team: GREEN, stackPower: 3 });
+
+        holder.grantAbility("Chakram");
+
+        const properties = holder.getUnitProperties();
+        const chakramIndex = properties.abilities.indexOf("Chakram");
+        expect(properties.abilities_descriptions[chakramIndex]).toContain("Maximum targets: 3.");
+    });
+
     it("bounces only to enemies separated by 1 or 2 empty cells, never to touching ones", () => {
         const context = setup();
         const primary = enemy(context, "Primary", { x: 8, y: 8 });

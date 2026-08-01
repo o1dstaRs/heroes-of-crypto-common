@@ -15,6 +15,7 @@ import { BLIND_FURY_ABILITY_NAME, blindFuryDescription } from "../abilities/blin
 import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
 import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilities/absolving_arrow_ability";
+import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
 import { getCraftChances } from "../abilities/craft_ability";
 import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { empowerMultiplier } from "../augments/augment_properties";
@@ -610,6 +611,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 .replace("{}", Number(((percentage * 7) / 8).toFixed()).toString())
                 .replace("{}", Number(((percentage * 6) / 8).toFixed()).toString())
                 .replace("{}", Number(((percentage * 5) / 8).toFixed()).toString());
+        }
+        if (ability.getName() === CHAKRAM_ABILITY_NAME) {
+            return chakramDescription(ability.getDesc().join("\n"), this.getStackPower());
         }
         if (ability.getName() === "Paralysis") {
             const description = ability.getDesc().join("\n");
@@ -3782,6 +3786,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // living only in RenderableUnit, the sandbox showed the live number while every ranked player kept
         // reading the seeded "0%" for the whole fight.
         this.refreshBlindFuryDescription();
+        // Chakram's maximum TOTAL victims follows the live stack tier, which can change after casualties.
+        this.refreshChakramDescription();
     }
     /**
      * Rewrite Blind Fury's description with the bonus it is CURRENTLY granting.
@@ -3805,6 +3811,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ability.getDesc().join("\n"),
             this.unitProperties.amount_alive,
             this.unitProperties.amount_died,
+        );
+    }
+    private refreshChakramDescription(): void {
+        const index = this.unitProperties.abilities.indexOf(CHAKRAM_ABILITY_NAME);
+        if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
+            return;
+        }
+        const ability = this.abilities.find((candidate) => candidate.getName() === CHAKRAM_ABILITY_NAME);
+        if (!ability) {
+            return;
+        }
+        this.unitProperties.abilities_descriptions[index] = chakramDescription(
+            ability.getDesc().join("\n"),
+            this.getStackPower(),
         );
     }
     protected parseSpellData(spellData: string[]): Map<string, number> {

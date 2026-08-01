@@ -76,6 +76,12 @@ describe("config_provider", () => {
         expect(creature.abilities_descriptions[handymanIndex]).toContain("Melee damage is not reduced");
         // Ranged kit sanity: the penalty this ability waives only exists for RANGE attackers.
         expect(creature.attack_type).toBe(PBTypes.AttackVals.RANGE);
+
+        const chakramIndex = creature.abilities.indexOf("Chakram");
+        expect(chakramIndex).toBeGreaterThanOrEqual(0);
+        expect(creature.abilities_descriptions[chakramIndex]).toContain("Maximum targets: 1.");
+        expect(creature.abilities_descriptions[chakramIndex]).not.toContain("{}");
+        expect(creature.abilities_descriptions[chakramIndex]).not.toContain("100 targets");
     });
 
     it("derives creature amount from total experience when amount is not positive", () => {
