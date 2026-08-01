@@ -15,6 +15,7 @@ import { enumerateCandidates, type IDecisionContext, type IEnumeratedCandidate }
 import type { IReadonlyWeightedRoute } from "../../src/ai/decision_path_catalog";
 import { StrategyV0_5 } from "../../src/ai/versions/v0_5";
 import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
+import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import { repairUnavailableMovePrefixedAttack } from "../../src/engine/post_move_actor_availability";
@@ -23,6 +24,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import {
@@ -131,6 +133,49 @@ function meleeFixture(resurrection = false): {
     return { combat, actor, target, context: contextWithRoutes(combat, [lethal, safe]), lethal, safe };
 }
 
+function cowardlyMeleeFixture(): {
+    combat: CombatTestContext;
+    actor: Unit;
+    target: Unit;
+    context: IDecisionContext;
+    unsafe: IReadonlyWeightedRoute;
+    safe: IReadonlyWeightedRoute;
+} {
+    const combat = createCombatTestContext();
+    const actor = createTestUnit({
+        team: LOWER,
+        name: "Cowardly brawler",
+        attackType: MELEE,
+        speed: 4,
+        amountAlive: 10,
+        maxHp: 10,
+        damageMin: 2,
+        damageMax: 2,
+    });
+    const target = createTestUnit({
+        team: UPPER,
+        name: "Stronger after burn",
+        attackType: MELEE,
+        amountAlive: 6,
+        maxHp: 10,
+    });
+    placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 2 });
+    placeUnit(combat.grid, combat.unitsHolder, target, { x: 5, y: 2 });
+    actor.applyDebuff(new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }));
+    const unsafe = route({ x: 4, y: 2 }, [
+        { x: 2, y: 2 },
+        { x: 3, y: 2 },
+        { x: 4, y: 2 },
+    ]);
+    const safe = route({ x: 4, y: 3 }, [
+        { x: 2, y: 2 },
+        { x: 3, y: 3 },
+        { x: 4, y: 3 },
+    ]);
+    FightStateManager.getInstance().getFightProperties().getFireWalls().add({ x: 3, y: 2 }, 3, 60);
+    return { combat, actor, target, context: contextWithRoutes(combat, [unsafe, safe]), unsafe, safe };
+}
+
 function moveShotFixture(): {
     combat: CombatTestContext;
     shooter: Unit;
@@ -208,6 +253,20 @@ describe("AI post-move actor availability", () => {
         expect(melee).toHaveLength(1);
         expect(melee[0].standCell).toEqual(fixture.safe.cell);
         expect(moveOf(melee[0])?.path).toEqual(fixture.safe.route.map((cell) => ({ ...cell })));
+    });
+
+    it("filters nonlethal move-melee routes that Fire Wall makes Cowardice-illegal", () => {
+        const fixture = cowardlyMeleeFixture();
+        const melee = enumerateCandidates(fixture.actor, fixture.context, endTurn(fixture.actor), {
+            maxMeleePairs: 1,
+        }).candidates.filter((candidate) => candidate.kind === "melee");
+
+        expect(melee).toHaveLength(1);
+        expect(melee[0].standCell).toEqual(fixture.safe.cell);
+        expect(moveOf(melee[0])?.path).toEqual(fixture.safe.route.map((cell) => ({ ...cell })));
+
+        const engine = activateEngine(fixture.combat, fixture.actor, fixture.context);
+        expect(melee[0].actions.map((action) => engine.apply(action).completed)).toEqual([true, true]);
     });
 
     it("retains a lethal move-melee when the mover's live Resurrection charge makes the suffix legal", () => {
@@ -294,6 +353,34 @@ describe("AI post-move actor availability", () => {
         expect(repairUnavailableMovePrefixedAttack(fixture.actor, walls, explicit)).toEqual([move]);
         expect(repairUnavailableMovePrefixedAttack(fixture.actor, walls, standalone)).toBe(standalone);
         expect(repairUnavailableMovePrefixedAttack(fixture.actor, walls, pathBearing)).toBe(pathBearing);
+    });
+
+    it("repairs a surviving move-melee suffix when Fire Wall makes Cowardice reject it", () => {
+        const fixture = cowardlyMeleeFixture();
+        const move: Extract<GameAction, { type: "move_unit" }> = {
+            type: "move_unit",
+            unitId: fixture.actor.getId(),
+            path: fixture.unsafe.route.map((cell) => ({ ...cell })),
+            targetCells: [{ ...fixture.unsafe.cell }],
+        };
+        const strike: Extract<GameAction, { type: "melee_attack" }> = {
+            type: "melee_attack",
+            attackerId: fixture.actor.getId(),
+            targetId: fixture.target.getId(),
+            attackFrom: { ...fixture.unsafe.cell },
+        };
+        const walls = fixture.context.fightProperties!.getFireWalls();
+
+        expect(
+            repairUnavailableMovePrefixedAttack(fixture.actor, walls, [move, strike], (targetId) =>
+                fixture.combat.unitsHolder.getAllUnits().get(targetId),
+            ),
+        ).toEqual([move]);
+
+        const engine = activateEngine(fixture.combat, fixture.actor, fixture.context);
+        expect(engine.apply(move).completed).toBe(true);
+        expect(fixture.actor.getCumulativeHp()).toBeLessThan(fixture.target.getCumulativeHp());
+        expect(engine.apply(strike).completed).toBe(false);
     });
 
     it("v0.5's learned explicit move-melee seam skips a lethal route and selects the safe alternative", () => {

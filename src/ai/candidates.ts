@@ -855,13 +855,16 @@ class CandidateGenerator {
             hasWaterCell: route.hasWaterCell,
         };
     }
-    /** Whether Fire Wall cleanup leaves this mover addressable by a second action in the same decision. */
-    private actorAvailableAfterMove(route: IReadonlyWeightedRoute): boolean {
+    private meleeCumulativeHpAfterMove(route: IReadonlyWeightedRoute): number | undefined {
         const action = this.moveAction(route);
-        return (
-            action.type !== "move_unit" ||
-            projectPostMoveActorAvailability(this.unit, decisionFireWalls(this.context), action).availableAfterMove
-        );
+        if (action.type !== "move_unit") {
+            return this.unit.getCumulativeHp();
+        }
+        const projection = projectPostMoveActorAvailability(this.unit, decisionFireWalls(this.context), action);
+        if (!projection.availableAfterMove) {
+            return undefined;
+        }
+        return (projection.stack.amountAlive - 1) * projection.stack.maxHp + Math.max(0, projection.stack.hp);
     }
     /** Every reachable destination (or nearest-to-enemy top-K when capped). */
     private addMoves(): void {
@@ -1023,15 +1026,21 @@ class CandidateGenerator {
         if (movePath) {
             for (const routeList of movePath.knownPaths.values()) {
                 const route = routeList[0];
-                if (
-                    !route?.route.length ||
-                    !this.footprintOk(route.cell) ||
-                    ((route.cell.x !== base.x || route.cell.y !== base.y) && !this.actorAvailableAfterMove(route))
-                ) {
+                if (!route?.route.length || !this.footprintOk(route.cell)) {
+                    continue;
+                }
+                const moved = route.cell.x !== base.x || route.cell.y !== base.y;
+                const postMoveCumulativeHp = moved
+                    ? this.meleeCumulativeHpAfterMove(route)
+                    : this.unit.getCumulativeHp();
+                if (postMoveCumulativeHp === undefined) {
                     continue;
                 }
                 const fpCells = this.footprintForCell(route.cell);
                 for (const e of targets) {
+                    if (this.unit.hasStatusApplied("Cowardice") && postMoveCumulativeHp < e.getCumulativeHp()) {
+                        continue;
+                    }
                     if (fpCells.some((mc) => e.getCells().some((ec) => isAdjacentCell(mc, ec)))) {
                         pairs.push({ target: e, cell: route.cell, route, ...this.meleeDamage(e) });
                     }

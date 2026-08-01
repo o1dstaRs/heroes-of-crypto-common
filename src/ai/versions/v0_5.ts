@@ -172,7 +172,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // instead of just walking up (it's exposed to that enemy next turn regardless — hitting is strictly
         // better). Fixes the common "unit moved next to the enemy but didn't attack".
         const adjacent = this.takeAdjacentAttack(unit, context, guarded);
-        return repairUnavailableMovePrefixedAttack(unit, decisionFireWalls(context), adjacent);
+        return repairUnavailableMovePrefixedAttack(unit, decisionFireWalls(context), adjacent, (targetId) =>
+            context.unitsHolder.getAllUnits().get(targetId),
+        );
     }
     /**
      * Convert a PURE melee advance that stops next to a live, legally-attackable enemy into a move+strike on

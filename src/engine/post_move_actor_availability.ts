@@ -260,13 +260,15 @@ export function projectPostMoveActorAvailability(
 
 /**
  * Native policies occasionally emit an explicit move followed by an attack.
- * If Fire Wall cleanup removes that actor, preserve the standalone move and
- * only drop actions that would necessarily be rejected afterward.
+ * If Fire Wall cleanup removes that actor or changes Cowardice legality,
+ * preserve the standalone move and only drop actions that would necessarily
+ * be rejected afterward.
  */
 export function repairUnavailableMovePrefixedAttack(
     unit: Unit,
     fireWalls: FireWalls | undefined,
     actions: GameAction[],
+    targetForId?: (targetId: string) => Unit | undefined,
 ): GameAction[] {
     const moveIndex = actions.findIndex(
         (action): action is MoveUnitAction => action.type === "move_unit" && action.unitId === unit.getId(),
@@ -285,7 +287,21 @@ export function repairUnavailableMovePrefixedAttack(
         return actions;
     }
     const move = actions[moveIndex] as MoveUnitAction;
-    return projectPostMoveActorAvailability(unit, fireWalls, move).availableAfterMove
-        ? actions
-        : actions.slice(0, moveIndex + 1);
+    const projection = projectPostMoveActorAvailability(unit, fireWalls, move);
+    if (!projection.availableAfterMove) {
+        return actions.slice(0, moveIndex + 1);
+    }
+    if (!unit.hasStatusApplied("Cowardice") || !targetForId) {
+        return actions;
+    }
+    const postMoveCumulativeHp =
+        (projection.stack.amountAlive - 1) * projection.stack.maxHp + Math.max(0, projection.stack.hp);
+    const cowardiceBlockedMelee = actions.slice(moveIndex + 1).some((action) => {
+        if (action.type !== "melee_attack" || action.attackerId !== unit.getId()) {
+            return false;
+        }
+        const target = targetForId(action.targetId);
+        return !!target && !target.isDead() && postMoveCumulativeHp < target.getCumulativeHp();
+    });
+    return cowardiceBlockedMelee ? actions.slice(0, moveIndex + 1) : actions;
 }
