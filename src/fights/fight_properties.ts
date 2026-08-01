@@ -56,7 +56,6 @@ import {
     NatureSynergy,
     type SpecificSynergy,
     SynergyKeysToPower,
-    SynergyLevel,
     type SynergyWithLevel,
     ToChaosSynergy,
     ToLifeSynergy,
@@ -574,186 +573,56 @@ export class FightProperties {
         const numberOfUnitsLife = Math.floor(nLife);
         this.synergyUnitsLifePerTeam.set(teamType, numberOfUnitsLife);
         const synergyLevelLife = Math.min(Math.floor(numberOfUnitsLife / 2), MAX_SYNERGY_LEVEL);
-        if (synergyLevelLife) {
-            const firstSynergyLevel = this.findSynergyLevel(
-                teamType,
-                PBTypes.FactionVals.LIFE,
-                LifeSynergy.PLUS_MORALE_AND_LUCK,
-            );
-            if (firstSynergyLevel) {
-                this.updateSynergyPerTeam(
-                    teamType,
-                    PBTypes.FactionVals.LIFE,
-                    LifeSynergy.PLUS_MORALE_AND_LUCK,
-                    synergyLevelLife,
-                );
-            } else {
-                const secondSynergyLevel = this.findSynergyLevel(
-                    teamType,
-                    PBTypes.FactionVals.LIFE,
-                    LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
-                );
-                if (secondSynergyLevel) {
-                    this.updateSynergyPerTeam(
-                        teamType,
-                        PBTypes.FactionVals.LIFE,
-                        LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
-                        synergyLevelLife,
-                    );
-                }
-            }
-        } else {
-            this.updateSynergyPerTeam(
-                teamType,
-                PBTypes.FactionVals.LIFE,
-                LifeSynergy.PLUS_MORALE_AND_LUCK,
-                SynergyLevel.NO_SYNERGY,
-            );
-            this.updateSynergyPerTeam(
-                teamType,
-                PBTypes.FactionVals.LIFE,
-                LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
-                SynergyLevel.NO_SYNERGY,
-            );
-        }
+        this.updateSynergyPerTeam(
+            teamType,
+            PBTypes.FactionVals.LIFE,
+            LifeSynergy.PLUS_MORALE_AND_LUCK,
+            synergyLevelLife,
+        );
+        this.updateSynergyPerTeam(
+            teamType,
+            PBTypes.FactionVals.LIFE,
+            LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
+            synergyLevelLife,
+        );
 
         const numberOfUnitsChaos = Math.floor(nChaos);
         this.synergyUnitsChaosPerTeam.set(teamType, numberOfUnitsChaos);
         const synergyLevelChaos = Math.min(Math.floor(numberOfUnitsChaos / 2), MAX_SYNERGY_LEVEL);
-        if (synergyLevelChaos) {
-            const firstSynergyLevel = this.findSynergyLevel(
-                teamType,
-                PBTypes.FactionVals.CHAOS,
-                ChaosSynergy.BREAK_ON_ATTACK,
-            );
-            if (firstSynergyLevel) {
-                this.updateSynergyPerTeam(
-                    teamType,
-                    PBTypes.FactionVals.CHAOS,
-                    ChaosSynergy.BREAK_ON_ATTACK,
-                    synergyLevelChaos,
-                );
-            } else {
-                const secondSynergyLevel = this.findSynergyLevel(
-                    teamType,
-                    PBTypes.FactionVals.CHAOS,
-                    ChaosSynergy.MOVEMENT,
-                );
-                if (secondSynergyLevel) {
-                    this.updateSynergyPerTeam(
-                        teamType,
-                        PBTypes.FactionVals.CHAOS,
-                        ChaosSynergy.MOVEMENT,
-                        synergyLevelChaos,
-                    );
-                }
-            }
-        } else {
-            this.updateSynergyPerTeam(
-                teamType,
-                PBTypes.FactionVals.CHAOS,
-                ChaosSynergy.BREAK_ON_ATTACK,
-                SynergyLevel.NO_SYNERGY,
-            );
-            this.updateSynergyPerTeam(
-                teamType,
-                PBTypes.FactionVals.CHAOS,
-                ChaosSynergy.MOVEMENT,
-                SynergyLevel.NO_SYNERGY,
-            );
-        }
+        this.updateSynergyPerTeam(teamType, PBTypes.FactionVals.CHAOS, ChaosSynergy.BREAK_ON_ATTACK, synergyLevelChaos);
+        this.updateSynergyPerTeam(teamType, PBTypes.FactionVals.CHAOS, ChaosSynergy.MOVEMENT, synergyLevelChaos);
 
         const numberOfUnitsMight = Math.floor(nMight);
         this.synergyUnitsMightPerTeam.set(teamType, numberOfUnitsMight);
         const synergyLevelMight = Math.min(Math.floor(numberOfUnitsMight / 2), MAX_SYNERGY_LEVEL);
-        if (synergyLevelMight) {
-            const firstSynergyLevel = this.findSynergyLevel(
-                teamType,
-                PBTypes.FactionVals.MIGHT,
-                MightSynergy.PLUS_AURAS_RANGE,
-            );
-            if (firstSynergyLevel) {
-                this.updateSynergyPerTeam(
-                    teamType,
-                    PBTypes.FactionVals.MIGHT,
-                    MightSynergy.PLUS_AURAS_RANGE,
-                    synergyLevelMight,
-                );
-            } else {
-                const secondSynergyLevel = this.findSynergyLevel(
-                    teamType,
-                    PBTypes.FactionVals.MIGHT,
-                    MightSynergy.PLUS_STACK_ABILITIES_POWER,
-                );
-                if (secondSynergyLevel) {
-                    this.updateSynergyPerTeam(
-                        teamType,
-                        PBTypes.FactionVals.MIGHT,
-                        MightSynergy.PLUS_STACK_ABILITIES_POWER,
-                        synergyLevelMight,
-                    );
-                }
-            }
-        } else {
-            this.updateSynergyPerTeam(
-                teamType,
-                PBTypes.FactionVals.MIGHT,
-                MightSynergy.PLUS_AURAS_RANGE,
-                SynergyLevel.NO_SYNERGY,
-            );
-            this.updateSynergyPerTeam(
-                teamType,
-                PBTypes.FactionVals.MIGHT,
-                MightSynergy.PLUS_STACK_ABILITIES_POWER,
-                SynergyLevel.NO_SYNERGY,
-            );
-        }
+        this.updateSynergyPerTeam(
+            teamType,
+            PBTypes.FactionVals.MIGHT,
+            MightSynergy.PLUS_AURAS_RANGE,
+            synergyLevelMight,
+        );
+        this.updateSynergyPerTeam(
+            teamType,
+            PBTypes.FactionVals.MIGHT,
+            MightSynergy.PLUS_STACK_ABILITIES_POWER,
+            synergyLevelMight,
+        );
 
         const numberOfUnitsNature = Math.floor(nNature);
         this.synergyUnitsNaturePerTeam.set(teamType, numberOfUnitsNature);
         const synergyLevelNature = Math.min(Math.floor(numberOfUnitsNature / 2), MAX_SYNERGY_LEVEL);
-        if (synergyLevelNature) {
-            const firstSynergyLevel = this.findSynergyLevel(
-                teamType,
-                PBTypes.FactionVals.NATURE,
-                NatureSynergy.INCREASE_BOARD_UNITS,
-            );
-            if (firstSynergyLevel) {
-                this.updateSynergyPerTeam(
-                    teamType,
-                    PBTypes.FactionVals.NATURE,
-                    NatureSynergy.INCREASE_BOARD_UNITS,
-                    synergyLevelNature,
-                );
-            } else {
-                const secondSynergyLevel = this.findSynergyLevel(
-                    teamType,
-                    PBTypes.FactionVals.NATURE,
-                    NatureSynergy.PLUS_FLY_ARMOR,
-                );
-                if (secondSynergyLevel) {
-                    this.updateSynergyPerTeam(
-                        teamType,
-                        PBTypes.FactionVals.NATURE,
-                        NatureSynergy.PLUS_FLY_ARMOR,
-                        synergyLevelNature,
-                    );
-                }
-            }
-        } else {
-            this.updateSynergyPerTeam(
-                teamType,
-                PBTypes.FactionVals.NATURE,
-                NatureSynergy.INCREASE_BOARD_UNITS,
-                SynergyLevel.NO_SYNERGY,
-            );
-            this.updateSynergyPerTeam(
-                teamType,
-                PBTypes.FactionVals.NATURE,
-                NatureSynergy.PLUS_FLY_ARMOR,
-                SynergyLevel.NO_SYNERGY,
-            );
-        }
+        this.updateSynergyPerTeam(
+            teamType,
+            PBTypes.FactionVals.NATURE,
+            NatureSynergy.INCREASE_BOARD_UNITS,
+            synergyLevelNature,
+        );
+        this.updateSynergyPerTeam(
+            teamType,
+            PBTypes.FactionVals.NATURE,
+            NatureSynergy.PLUS_FLY_ARMOR,
+            synergyLevelNature,
+        );
     }
     public getAdditionalAuraRangePerTeam(teamType: TeamType): number {
         const synergyLevel = this.findSynergyLevel(teamType, PBTypes.FactionVals.MIGHT, MightSynergy.PLUS_AURAS_RANGE);
@@ -916,15 +785,7 @@ export class FightProperties {
 
         const newArray = [];
 
-        let prefix: string;
-        let synergyStr: string;
-        if (synergyLevelInt) {
-            prefix = `${ToFactionName[faction]}:`;
-            synergyStr = `${synergy}:`;
-        } else {
-            prefix = `${ToFactionName[faction]}:${synergy}:`;
-            synergyStr = "";
-        }
+        const prefix = `${ToFactionName[faction]}:${synergy}:`;
 
         for (const a of arr) {
             if (!a.startsWith(prefix)) {
@@ -933,7 +794,7 @@ export class FightProperties {
         }
 
         if (synergyLevelInt) {
-            newArray.push(`${prefix}${synergyStr}${synergyLevelInt}`);
+            newArray.push(`${prefix}${synergyLevelInt}`);
         }
 
         this.synergiesPerTeam.set(teamType, newArray);

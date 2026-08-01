@@ -57,7 +57,7 @@ import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import type { Unit } from "../units/unit";
 import { getDeterministicRandomSource, setDeterministicRandomSource } from "../utils/lib";
 import { hashSimulationParts, makeRng } from "./army";
-import { restoreBattle, snapshotBattle } from "./battle_snapshot";
+import { BattleRollbackJournal, restoreBattle, snapshotBattle } from "./battle_snapshot";
 import {
     IL_DATASET_VERSION,
     IL_FEATURE_FINGERPRINTS,
@@ -118,8 +118,10 @@ import {
 } from "./v0_7_pure_ranged_terminal";
 import { DEFAULT_V07_VALUE_WEIGHTS } from "./v0_7_value_weights";
 import {
-    extractValueFeatures,
+    createValueFeatureScratch,
     extractValueFeaturesV2,
+    fillValueFeatures,
+    fillValueFeaturesV2,
     VALUE_FEATURE_NAMES,
     VALUE_FEATURE_NAMES_V2,
 } from "./value_features";
@@ -306,6 +308,13 @@ type WaitDeadlinePolicy = "profile" | "operation_bounded";
 
 /** The slice of a candidate the rollout scorer actually consumes (lets the oracle skip enumeration). */
 type ISearchCandidate = Pick<IEnumeratedCandidate, "kind" | "actions">;
+
+interface IIndexedCandidateScore {
+    score: number;
+    index: number;
+}
+
+export type SearchRollbackStrategy = "checkpoint" | "snapshot";
 
 class SearchDecisionDeadlineExceeded extends Error {
     public constructor() {
@@ -1029,6 +1038,10 @@ export class SearchDriver {
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
      * (raw 30 + rangedness-interaction block); a valid vector wins over the v1/default 20-dim leaf. */
     private readonly learnedV2: ILearnedValue | null;
+    private readonly rollbackStrategy: SearchRollbackStrategy;
+    private readonly leafFeatureScratch = createValueFeatureScratch();
+    private readonly leafFeatures = new Array<number>(VALUE_FEATURE_NAMES_V2.length);
+    private readonly shortlistRankScratch: IIndexedCandidateScore[] = [];
     /** SEARCH_OPP_MODEL — rollouts simulate the searched unit's ENEMY with this strategy (null = true policy). */
     private readonly oppModel: IAIStrategy | null;
     /** The enemy team of the rollout in flight (only meaningful while a rollout runs; null otherwise). */
@@ -1064,11 +1077,16 @@ export class SearchDriver {
         match: ISearchMatchInfo = {},
         scoredDecisionObserver?: SearchScoredDecisionObserver,
         passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver,
+        rollbackStrategy: SearchRollbackStrategy = "checkpoint",
     ) {
         this.deps = deps;
         this.match = match;
         this.scoredDecisionObserver = scoredDecisionObserver;
         this.passiveProductiveProbeObserver = passiveProductiveProbeObserver;
+        if (rollbackStrategy !== "checkpoint" && rollbackStrategy !== "snapshot") {
+            throw new Error("Search rollback strategy must be checkpoint or snapshot");
+        }
+        this.rollbackStrategy = rollbackStrategy;
         this.mode =
             process.env.Q2_WAIT_ABLATION === "1"
                 ? "ablation"
@@ -3466,11 +3484,24 @@ export class SearchDriver {
             return candidates;
         }
         const scores = this.scoreCandidates(unit, candidates, seedBase, "leaf", 1, deadlineAt);
-        const rankedChallengers = scores
-            .map((score, index) => ({ score, index }))
-            .slice(1)
-            .filter(({ score }) => score !== -Infinity)
-            .sort((left, right) => right.score - left.score || left.index - right.index);
+        const rankedChallengers = this.shortlistRankScratch;
+        let rankedCount = 0;
+        for (let index = 1; index < scores.length; index += 1) {
+            const score = scores[index];
+            if (score === -Infinity) {
+                continue;
+            }
+            const ranked = rankedChallengers[rankedCount];
+            if (ranked) {
+                ranked.score = score;
+                ranked.index = index;
+            } else {
+                rankedChallengers[rankedCount] = { score, index };
+            }
+            rankedCount += 1;
+        }
+        rankedChallengers.length = rankedCount;
+        rankedChallengers.sort((left, right) => right.score - left.score || left.index - right.index);
         const directCombat = prioritizeDominantFinish
             ? rankedChallengers.filter(({ index }) => isPositiveDirectCombatCandidate(candidates[index]))
             : [];
@@ -3850,7 +3881,13 @@ export class SearchDriver {
         deadlineAt: number | null = null,
     ): number[] {
         this.assertBeforeDecisionDeadline(deadlineAt);
-        const snapshot = snapshotBattle(this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
+        const journal =
+            this.rollbackStrategy === "checkpoint"
+                ? new BattleRollbackJournal(this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties)
+                : undefined;
+        const snapshot = journal
+            ? undefined
+            : snapshotBattle(this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
         const savedStats = this.deps.captureDamageStats();
         this.assertBeforeDecisionDeadline(deadlineAt);
         const means: number[] = [];
@@ -3861,12 +3898,18 @@ export class SearchDriver {
             for (let r = 0; r < rolloutCount; r += 1) {
                 this.assertBeforeDecisionDeadline(deadlineAt);
                 let score: number;
+                let checkpoint;
                 try {
+                    checkpoint = journal?.checkpoint();
                     score = this.rollout(unit, cand, seedBase, r, horizonMode, deadlineAt);
                 } finally {
                     const cleanupErrors: unknown[] = [];
                     try {
-                        restoreBattle(snapshot, this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
+                        if (checkpoint) {
+                            checkpoint.rollback();
+                        } else if (snapshot) {
+                            restoreBattle(snapshot, this.deps.unitsHolder, this.deps.grid, this.deps.fightProperties);
+                        }
                     } catch (error) {
                         cleanupErrors.push(error);
                     }
@@ -3996,8 +4039,20 @@ export class SearchDriver {
         const model = this.learnedV2 ?? this.learned;
         if (model) {
             const f = this.learnedV2
-                ? extractValueFeaturesV2(this.deps.unitsHolder, this.deps.fightProperties, team)
-                : extractValueFeatures(this.deps.unitsHolder, this.deps.fightProperties, team);
+                ? fillValueFeaturesV2(
+                      this.leafFeatures,
+                      this.deps.unitsHolder,
+                      this.deps.fightProperties,
+                      team,
+                      this.leafFeatureScratch,
+                  )
+                : fillValueFeatures(
+                      this.leafFeatures,
+                      this.deps.unitsHolder,
+                      this.deps.fightProperties,
+                      team,
+                      this.leafFeatureScratch,
+                  );
             let z = model.b;
             for (let i = 0; i < f.length; i += 1) {
                 z += model.w[i] * f[i];

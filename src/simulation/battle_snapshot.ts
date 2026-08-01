@@ -234,10 +234,10 @@ function assertFieldCoverage(
     }
 }
 
-function writeFields(obj: object, fields: readonly string[], bag: Bag): void {
+function writeFields(obj: object, fields: readonly string[], bag: Bag, cloneValues: boolean): void {
     const dst = obj as Bag;
     for (const f of fields) {
-        dst[f] = deepClone(bag[f]);
+        dst[f] = cloneValues ? deepClone(bag[f]) : bag[f];
     }
 }
 
@@ -263,19 +263,74 @@ export interface BattleSnapshot {
     aiTargetMemory: Map<string, string>;
 }
 
+export class BattleRollbackCheckpoint {
+    private snapshot: BattleSnapshot | undefined;
+    private readonly unitsHolder: UnitsHolder;
+    private readonly grid: Grid;
+    private readonly fightProperties: FightProperties;
+    public constructor(
+        snapshot: BattleSnapshot,
+        unitsHolder: UnitsHolder,
+        grid: Grid,
+        fightProperties: FightProperties,
+    ) {
+        this.snapshot = snapshot;
+        this.unitsHolder = unitsHolder;
+        this.grid = grid;
+        this.fightProperties = fightProperties;
+    }
+    public rollback(): void {
+        const snapshot = this.snapshot;
+        if (!snapshot) {
+            throw new Error("Battle rollback checkpoint has already been consumed");
+        }
+        this.snapshot = undefined;
+        restoreBattleSnapshot(snapshot, this.unitsHolder, this.grid, this.fightProperties, false);
+    }
+}
+
+export class BattleRollbackJournal {
+    private readonly unitsHolder: UnitsHolder;
+    private readonly grid: Grid;
+    private readonly fightProperties: FightProperties;
+    public constructor(unitsHolder: UnitsHolder, grid: Grid, fightProperties: FightProperties) {
+        assertBattleSnapshotCoverage(unitsHolder, grid, fightProperties);
+        this.unitsHolder = unitsHolder;
+        this.grid = grid;
+        this.fightProperties = fightProperties;
+    }
+    public checkpoint(): BattleRollbackCheckpoint {
+        return new BattleRollbackCheckpoint(
+            captureBattleSnapshot(this.unitsHolder, this.grid, this.fightProperties),
+            this.unitsHolder,
+            this.grid,
+            this.fightProperties,
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-export function snapshotBattle(unitsHolder: UnitsHolder, grid: Grid, fightProperties: FightProperties): BattleSnapshot {
+export function assertBattleSnapshotCoverage(
+    unitsHolder: UnitsHolder,
+    grid: Grid,
+    fightProperties: FightProperties,
+): void {
     assertFieldCoverage("Grid", grid, GRID_FIELDS, GRID_SHARED_FIELDS);
     assertFieldCoverage("FightProperties", fightProperties, FIGHT_FIELDS);
     assertFieldCoverage("UnitsHolder", unitsHolder, HOLDER_FIELDS, HOLDER_SHARED_FIELDS);
+    for (const unit of unitsHolder.getAllUnits().values()) {
+        assertFieldCoverage("Unit", unit, UNIT_FIELDS, UNIT_SHARED_FIELDS);
+    }
+}
+
+function captureBattleSnapshot(unitsHolder: UnitsHolder, grid: Grid, fightProperties: FightProperties): BattleSnapshot {
     const units = new Map<string, Bag>();
     const unitRefs = new Map<string, Unit>();
     const unitOrder: string[] = [];
     for (const [id, unit] of unitsHolder.getAllUnits()) {
-        assertFieldCoverage("Unit", unit, UNIT_FIELDS, UNIT_SHARED_FIELDS);
         units.set(id, captureFields(unit, UNIT_FIELDS));
         unitRefs.set(id, unit);
         unitOrder.push(id);
@@ -291,19 +346,20 @@ export function snapshotBattle(unitsHolder: UnitsHolder, grid: Grid, fightProper
     };
 }
 
-export function restoreBattle(
+export function snapshotBattle(unitsHolder: UnitsHolder, grid: Grid, fightProperties: FightProperties): BattleSnapshot {
+    assertBattleSnapshotCoverage(unitsHolder, grid, fightProperties);
+    return captureBattleSnapshot(unitsHolder, grid, fightProperties);
+}
+
+function restoreBattleSnapshot(
     snapshot: BattleSnapshot,
     unitsHolder: UnitsHolder,
     grid: Grid,
     fightProperties: FightProperties,
+    cloneValues: boolean,
 ): void {
     const liveUnits = unitsHolder.getAllUnits() as Map<string, Unit>;
 
-    // Rebuild the holder's unit map exactly as it was at capture: same members, same iteration
-    // order. Units that DIED after the snapshot were dropped from the map but survive as references
-    // in `unitRefs`, so they come back; units SUMMONED after the snapshot are simply not re-added
-    // (their grid occupancy is wiped by the grid restore below). Each restored unit's mutable state
-    // is written back into the very same instance the engine still references elsewhere.
     liveUnits.clear();
     for (const id of snapshot.unitOrder) {
         const unit = snapshot.unitRefs.get(id);
@@ -311,12 +367,21 @@ export function restoreBattle(
         if (!unit || !bag) {
             continue;
         }
-        writeFields(unit, UNIT_FIELDS, bag);
+        writeFields(unit, UNIT_FIELDS, bag, cloneValues);
         liveUnits.set(id, unit);
     }
 
-    writeFields(grid, GRID_FIELDS, snapshot.grid);
-    writeFields(fightProperties, FIGHT_FIELDS, snapshot.fight);
-    writeFields(unitsHolder, HOLDER_FIELDS, snapshot.holder);
+    writeFields(grid, GRID_FIELDS, snapshot.grid, cloneValues);
+    writeFields(fightProperties, FIGHT_FIELDS, snapshot.fight, cloneValues);
+    writeFields(unitsHolder, HOLDER_FIELDS, snapshot.holder, cloneValues);
     restoreAITargetMemory(unitsHolder, snapshot.aiTargetMemory);
+}
+
+export function restoreBattle(
+    snapshot: BattleSnapshot,
+    unitsHolder: UnitsHolder,
+    grid: Grid,
+    fightProperties: FightProperties,
+): void {
+    restoreBattleSnapshot(snapshot, unitsHolder, grid, fightProperties, true);
 }

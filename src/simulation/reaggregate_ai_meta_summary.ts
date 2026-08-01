@@ -176,7 +176,7 @@ function validateArmy(value: unknown, context: string): asserts value is IAiMeta
         }
     });
     if (!Array.isArray(value.synergies)) throw new Error(`${context}.synergies must be an array`);
-    const synergyFactions = new Set<number>();
+    const synergyKeys = new Set<string>();
     value.synergies.forEach((choice, index) => {
         if (
             !isRecord(choice) ||
@@ -186,10 +186,11 @@ function validateArmy(value: unknown, context: string): asserts value is IAiMeta
         ) {
             throw new Error(`${context}.synergies[${index}] is invalid`);
         }
-        if (synergyFactions.has(choice.faction)) {
-            throw new Error(`${context}.synergies contains duplicate faction ${choice.faction}`);
+        const synergyKey = `${choice.faction}:${choice.synergy}`;
+        if (synergyKeys.has(synergyKey)) {
+            throw new Error(`${context}.synergies contains duplicate synergy ${synergyKey}`);
         }
-        synergyFactions.add(choice.faction);
+        synergyKeys.add(synergyKey);
         if (!aiMetaSynergyLevel(value.creatureIds as number[], choice.faction)) {
             throw new Error(`${context}.synergies[${index}] is inactive for its roster`);
         }

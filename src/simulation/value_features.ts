@@ -71,10 +71,74 @@ export const VALUE_FEATURE_NAMES_V2: readonly string[] = [
     ...VALUE_FEATURE_NAMES_V2_RAW.map((name) => `xRg_${name}`),
 ] as const;
 
-export function extractValueFeatures(
+export interface IValueFeatureScratch {
+    ourCells: { x: number; y: number }[];
+    enemyCells: { x: number; y: number }[];
+}
+
+export function createValueFeatureScratch(): IValueFeatureScratch {
+    return { ourCells: [], enemyCells: [] };
+}
+
+const normalizedDifference = (a: number, b: number): number => (a - b) / (a + b + 1);
+const chebyshevDistance = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
+    Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+
+function nearestEnemyDistance(
+    own: readonly { x: number; y: number }[],
+    other: readonly { x: number; y: number }[],
+    span: number,
+): number {
+    if (!own.length || !other.length) {
+        return 0;
+    }
+    let sum = 0;
+    for (const cell of own) {
+        let best = Infinity;
+        for (const enemyCell of other) {
+            const distance = chebyshevDistance(cell, enemyCell);
+            if (distance < best) {
+                best = distance;
+            }
+        }
+        sum += best;
+    }
+    return sum / own.length / span;
+}
+
+function averageSpread(cells: readonly { x: number; y: number }[], span: number): number {
+    if (cells.length < 2) {
+        return 0;
+    }
+    let sum = 0;
+    let pairs = 0;
+    for (let i = 0; i < cells.length; i += 1) {
+        for (let j = i + 1; j < cells.length; j += 1) {
+            sum += chebyshevDistance(cells[i], cells[j]);
+            pairs += 1;
+        }
+    }
+    return sum / pairs / span;
+}
+
+function averageCenterDistance(cells: readonly { x: number; y: number }[], span: number): number {
+    if (!cells.length) {
+        return 0;
+    }
+    const center = span / 2;
+    let sum = 0;
+    for (const cell of cells) {
+        sum += Math.max(Math.abs(cell.x - center), Math.abs(cell.y - center));
+    }
+    return sum / cells.length / center;
+}
+
+export function fillValueFeatures(
+    out: number[],
     unitsHolder: UnitsHolder,
     fightProperties: FightProperties,
     team: TeamType,
+    scratch: IValueFeatureScratch = createValueFeatureScratch(),
 ): number[] {
     let ourHP = 0;
     let enemyHP = 0;
@@ -90,8 +154,10 @@ export function extractValueFeatures(
     let enemyAdv = 0;
     let ourYet = 0;
     let enemyYet = 0;
-    const ourCells: { x: number; y: number }[] = [];
-    const enemyCells: { x: number; y: number }[] = [];
+    const ourCells = scratch.ourCells;
+    const enemyCells = scratch.enemyCells;
+    ourCells.length = 0;
+    enemyCells.length = 0;
     for (const u of unitsHolder.getAllUnits().values()) {
         if (u.isDead()) {
             continue;
@@ -127,85 +193,49 @@ export function extractValueFeatures(
             enemyCells.push(cell);
         }
     }
-    const norm = (a: number, b: number): number => (a - b) / (a + b + 1);
     const totalStacks = ourCnt + enemyCnt + 1;
-    // --- spatial block (O(n^2) over <=~16 living stacks — trivially cheap) ---
-    const cheb = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
-        Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
     const span = GRID_SIZE - 1;
-    const nearestEnemyDist = (own: { x: number; y: number }[], other: { x: number; y: number }[]): number => {
-        if (!own.length || !other.length) {
-            return 0;
-        }
-        let sum = 0;
-        for (const c of own) {
-            let best = Infinity;
-            for (const e of other) {
-                const d = cheb(c, e);
-                if (d < best) {
-                    best = d;
-                }
-            }
-            sum += best;
-        }
-        return sum / own.length / span;
-    };
-    const spread = (own: { x: number; y: number }[]): number => {
-        if (own.length < 2) {
-            return 0;
-        }
-        let sum = 0;
-        let pairs = 0;
-        for (let i = 0; i < own.length; i += 1) {
-            for (let j = i + 1; j < own.length; j += 1) {
-                sum += cheb(own[i], own[j]);
-                pairs += 1;
-            }
-        }
-        return sum / pairs / span;
-    };
-    const center = { x: span / 2, y: span / 2 };
-    const centerDist = (own: { x: number; y: number }[]): number => {
-        if (!own.length) {
-            return 0;
-        }
-        let sum = 0;
-        for (const c of own) {
-            sum += Math.max(Math.abs(c.x - center.x), Math.abs(c.y - center.y));
-        }
-        return sum / own.length / (span / 2);
-    };
-    return [
-        norm(ourHP, enemyHP),
-        norm(ourCnt, enemyCnt),
-        norm(ourAtk, enemyAtk),
-        (ourRanged - enemyRanged) / totalStacks,
-        ourCnt ? ourWounded / ourCnt : 0,
-        enemyCnt ? enemyWounded / enemyCnt : 0,
-        ourCnt ? ourAdv / ourCnt : 0,
-        enemyCnt ? enemyAdv / enemyCnt : 0,
-        Math.min(fightProperties.getCurrentLap() / 10, 1),
-        (enemyYet - ourYet) / totalStacks,
-        enemyYet / totalStacks,
-        ourYet / totalStacks,
-        fightProperties.getHourglassQueueSize() / totalStacks,
-        fightProperties.getUpNextQueueSize() / totalStacks,
-        nearestEnemyDist(ourCells, enemyCells),
-        nearestEnemyDist(enemyCells, ourCells),
-        spread(ourCells),
-        spread(enemyCells),
-        centerDist(ourCells),
-        centerDist(enemyCells),
-    ];
+    out.length = VALUE_FEATURE_NAMES.length;
+    out[0] = normalizedDifference(ourHP, enemyHP);
+    out[1] = normalizedDifference(ourCnt, enemyCnt);
+    out[2] = normalizedDifference(ourAtk, enemyAtk);
+    out[3] = (ourRanged - enemyRanged) / totalStacks;
+    out[4] = ourCnt ? ourWounded / ourCnt : 0;
+    out[5] = enemyCnt ? enemyWounded / enemyCnt : 0;
+    out[6] = ourCnt ? ourAdv / ourCnt : 0;
+    out[7] = enemyCnt ? enemyAdv / enemyCnt : 0;
+    out[8] = Math.min(fightProperties.getCurrentLap() / 10, 1);
+    out[9] = (enemyYet - ourYet) / totalStacks;
+    out[10] = enemyYet / totalStacks;
+    out[11] = ourYet / totalStacks;
+    out[12] = fightProperties.getHourglassQueueSize() / totalStacks;
+    out[13] = fightProperties.getUpNextQueueSize() / totalStacks;
+    out[14] = nearestEnemyDistance(ourCells, enemyCells, span);
+    out[15] = nearestEnemyDistance(enemyCells, ourCells, span);
+    out[16] = averageSpread(ourCells, span);
+    out[17] = averageSpread(enemyCells, span);
+    out[18] = averageCenterDistance(ourCells, span);
+    out[19] = averageCenterDistance(enemyCells, span);
+    return out;
 }
 
-/** V2 raw = base 20 (identical to extractValueFeatures) + the class/composition block. Pure, no RNG. */
-export function extractValueFeaturesV2Raw(
+export function extractValueFeatures(
     unitsHolder: UnitsHolder,
     fightProperties: FightProperties,
     team: TeamType,
 ): number[] {
-    const f = extractValueFeatures(unitsHolder, fightProperties, team);
+    return fillValueFeatures(new Array<number>(VALUE_FEATURE_NAMES.length), unitsHolder, fightProperties, team);
+}
+
+/** V2 raw = base 20 (identical to extractValueFeatures) + the class/composition block. Pure, no RNG. */
+export function fillValueFeaturesV2Raw(
+    out: number[],
+    unitsHolder: UnitsHolder,
+    fightProperties: FightProperties,
+    team: TeamType,
+    scratch: IValueFeatureScratch = createValueFeatureScratch(),
+): number[] {
+    const f = fillValueFeatures(out, unitsHolder, fightProperties, team, scratch);
     let ownCnt = 0;
     let enemyCnt = 0;
     let ownRanged = 0;
@@ -260,7 +290,6 @@ export function extractValueFeaturesV2Raw(
             }
         }
     }
-    const norm = (a: number, b: number): number => (a - b) / (a + b + 1);
     const ownRangedFrac = ownCnt ? ownRanged / ownCnt : 0;
     f.push(
         ownRangedFrac,
@@ -271,10 +300,23 @@ export function extractValueFeaturesV2Raw(
         enemyCnt ? enemyCaster / enemyCnt : 0,
         ownHp > 0 ? ownRangedHp / ownHp : 0,
         enemyHp > 0 ? enemyRangedHp / enemyHp : 0,
-        norm(ownShots, enemyShots),
+        normalizedDifference(ownShots, enemyShots),
         ownRangedFrac * f[NEAR_ENEMY_DIST_OURS_IDX],
     );
     return f;
+}
+
+export function extractValueFeaturesV2Raw(
+    unitsHolder: UnitsHolder,
+    fightProperties: FightProperties,
+    team: TeamType,
+): number[] {
+    return fillValueFeaturesV2Raw(
+        new Array<number>(VALUE_FEATURE_NAMES_V2_RAW.length),
+        unitsHolder,
+        fightProperties,
+        team,
+    );
 }
 
 const NEAR_ENEMY_DIST_OURS_IDX = (VALUE_FEATURE_NAMES as readonly string[]).indexOf("nearEnemyDistOurs");
@@ -292,10 +334,27 @@ export function expandValueFeaturesV2(raw: readonly number[]): number[] {
 }
 
 /** The deployed V2 leaf featurization (search_driver V07_VALUE_WEIGHTS_V2). */
+export function fillValueFeaturesV2(
+    out: number[],
+    unitsHolder: UnitsHolder,
+    fightProperties: FightProperties,
+    team: TeamType,
+    scratch: IValueFeatureScratch = createValueFeatureScratch(),
+): number[] {
+    const raw = fillValueFeaturesV2Raw(out, unitsHolder, fightProperties, team, scratch);
+    const rangedness = (raw[OWN_RANGED_FRAC_IDX] + raw[ENEMY_RANGED_FRAC_IDX]) / 2;
+    const rawLength = VALUE_FEATURE_NAMES_V2_RAW.length;
+    raw.length = VALUE_FEATURE_NAMES_V2.length;
+    for (let i = 0; i < rawLength; i += 1) {
+        raw[rawLength + i] = rangedness ? raw[i] * rangedness : 0;
+    }
+    return raw;
+}
+
 export function extractValueFeaturesV2(
     unitsHolder: UnitsHolder,
     fightProperties: FightProperties,
     team: TeamType,
 ): number[] {
-    return expandValueFeaturesV2(extractValueFeaturesV2Raw(unitsHolder, fightProperties, team));
+    return fillValueFeaturesV2(new Array<number>(VALUE_FEATURE_NAMES_V2.length), unitsHolder, fightProperties, team);
 }
