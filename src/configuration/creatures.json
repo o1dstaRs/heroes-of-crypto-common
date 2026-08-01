@@ -1277,7 +1277,7 @@
         "Cyclops": {
             "name": "Cyclops",
             "hp": 72,
-            "steps": 5,
+            "steps": 6,
             "speed": 4,
             "armor": 19,
             "attack_type": "RANGE",
