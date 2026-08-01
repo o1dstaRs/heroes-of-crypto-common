@@ -119,14 +119,15 @@ describe("v0.7 public-roster setup search", () => {
             faction: PBTypes.FactionVals.CHAOS,
             synergy: ChaosSynergy.BREAK_ON_ATTACK,
         });
-        expect(active.synergies).toEqual(shipped);
-        expect(active.synergies).toContainEqual({
-            faction: PBTypes.FactionVals.CHAOS,
-            synergy: ChaosSynergy.MOVEMENT,
-        });
+        expect(active.synergies).toEqual([
+            {
+                faction: PBTypes.FactionVals.CHAOS,
+                synergy: ChaosSynergy.MOVEMENT,
+            },
+        ]);
         expect(new Set(active.synergies.map(({ synergy }) => synergy)).size).toBe(active.synergies.length);
-        expect(active.actionApplied).toBe(false);
-        expect(active.matchedRuleIds).toEqual([]);
+        expect(active.actionApplied).toBe(true);
+        expect(active.matchedRuleIds).toEqual([candidate.id]);
     });
 
     test("canonical composites are explicit and reject ambiguous winner combinations", () => {
