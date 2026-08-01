@@ -32,6 +32,7 @@ import {
     type AugmentType,
     DefaultPlacementLevel1,
     EmpowerAugment,
+    MagicDefenseAugment,
     getPlacementSizes,
     MightAugment,
     MovementAugment,
@@ -100,6 +101,7 @@ export class FightProperties {
     private augmentArmorPerTeam: Map<TeamType, ArmorAugment>;
     private augmentMightPerTeam: Map<TeamType, MightAugment>;
     private augmentEmpowerPerTeam: Map<TeamType, EmpowerAugment>;
+    private augmentMagicDefensePerTeam: Map<TeamType, MagicDefenseAugment>;
     private augmentSniperPerTeam: Map<TeamType, SniperAugment>;
     private augmentMovementPerTeam: Map<TeamType, MovementAugment>;
     private artifactTier1PerTeam: Map<TeamType, Tier1Artifact>;
@@ -157,6 +159,7 @@ export class FightProperties {
         this.augmentArmorPerTeam = new Map();
         this.augmentMightPerTeam = new Map();
         this.augmentEmpowerPerTeam = new Map();
+        this.augmentMagicDefensePerTeam = new Map();
         this.augmentSniperPerTeam = new Map();
         this.augmentMovementPerTeam = new Map();
         this.artifactTier1PerTeam = new Map();
@@ -1077,6 +1080,7 @@ export class FightProperties {
             this.augmentArmorPerTeam.set(teamType, ArmorAugment.NO_AUGMENT);
             this.augmentMightPerTeam.set(teamType, MightAugment.NO_AUGMENT);
             this.augmentEmpowerPerTeam.set(teamType, EmpowerAugment.NO_AUGMENT);
+            this.augmentMagicDefensePerTeam.set(teamType, MagicDefenseAugment.NO_AUGMENT);
             this.augmentSniperPerTeam.set(teamType, SniperAugment.NO_AUGMENT);
             this.augmentMovementPerTeam.set(teamType, MovementAugment.NO_AUGMENT);
             this.artifactTier1PerTeam.set(teamType, Tier1Artifact.NO_ARTIFACT);
@@ -1147,6 +1151,9 @@ export class FightProperties {
             } else if (augmentType.type === "Empower") {
                 this.augmentEmpowerPerTeam.set(teamType, augmentType.value);
                 return true;
+            } else if (augmentType.type === "MagicDefense") {
+                this.augmentMagicDefensePerTeam.set(teamType, augmentType.value);
+                return true;
             } else if (augmentType.type === "Sniper") {
                 this.augmentSniperPerTeam.set(teamType, augmentType.value);
                 return true;
@@ -1189,6 +1196,9 @@ export class FightProperties {
     public getAugmentEmpower(teamType: TeamType): EmpowerAugment {
         return this.augmentEmpowerPerTeam.get(teamType) ?? EmpowerAugment.NO_AUGMENT;
     }
+    public getAugmentMagicDefense(teamType: TeamType): MagicDefenseAugment {
+        return this.augmentMagicDefensePerTeam.get(teamType) ?? MagicDefenseAugment.NO_AUGMENT;
+    }
     public getAugmentSniper(teamType: TeamType): SniperAugment {
         return this.augmentSniperPerTeam.get(teamType) ?? SniperAugment.NO_AUGMENT;
     }
@@ -1229,6 +1239,13 @@ export class FightProperties {
             augmentEmpower = this.augmentEmpowerPerTeam.get(teamType) ?? EmpowerAugment.NO_AUGMENT;
         }
 
+        let augmentMagicDefense;
+        if (augmentType.type === "MagicDefense") {
+            augmentMagicDefense = MagicDefenseAugment.NO_AUGMENT;
+        } else {
+            augmentMagicDefense = this.augmentMagicDefensePerTeam.get(teamType) ?? MagicDefenseAugment.NO_AUGMENT;
+        }
+
         let augmentSniper;
         if (augmentType.type === "Sniper") {
             augmentSniper = SniperAugment.NO_AUGMENT;
@@ -1244,7 +1261,13 @@ export class FightProperties {
         }
 
         const currentAugmentPoints =
-            augmentPlacement + augmentArmor + augmentMight + augmentEmpower + augmentSniper + augmentMovement;
+            augmentPlacement +
+            augmentArmor +
+            augmentMight +
+            augmentEmpower +
+            augmentMagicDefense +
+            augmentSniper +
+            augmentMovement;
         if (currentAugmentPoints + augmentPoints > this.getUpgradePoints(teamType)) {
             return false;
         }

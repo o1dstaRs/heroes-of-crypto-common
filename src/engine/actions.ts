@@ -90,4 +90,4 @@ export type GameAction =
 
 // The five spendable army-augment categories (Placement resizes the placement grid; the others are
 // stat buffs applied by UnitsHolder.applyAugments). Mirrors FightProperties' AugmentType.type union.
-export type AugmentKind = "Placement" | "Armor" | "Might" | "Empower" | "Sniper" | "Movement";
+export type AugmentKind = "Placement" | "Armor" | "Might" | "Empower" | "MagicDefense" | "Sniper" | "Movement";
