@@ -376,8 +376,11 @@ export function selectPublicSetupChoices(
         ) {
             const activeIndex = synergies.findIndex((choice) => choice.faction === rule.faction);
             if (activeIndex >= 0) {
+                const activeFactionSynergies = new Set(
+                    synergies.filter((choice) => choice.faction === rule.faction).map((choice) => choice.synergy),
+                );
                 const alternative = SYNERGY_OPTIONS.find(
-                    (option) => option.faction === rule.faction && option.synergy !== synergies[activeIndex].synergy,
+                    (option) => option.faction === rule.faction && !activeFactionSynergies.has(option.synergy),
                 );
                 if (alternative) {
                     synergies = synergies.map((choice, index) =>

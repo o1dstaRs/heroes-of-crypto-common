@@ -106,23 +106,27 @@ describe("v0.7 public-roster setup search", () => {
         ).toBe(true);
     });
 
-    test("synergy candidates flip only an active faction under their public signal", () => {
+    test("synergy candidates never duplicate an already-active faction bonus", () => {
         const own = [C.ORC, C.SCAVENGER];
         const candidate = publicSetupCandidate("synergy/chaos/ranged-2plus/flip");
         const inactive = selectPublicSetupChoices(candidate, own, [C.ARBALESTER]);
         const active = selectPublicSetupChoices(candidate, own, [C.ARBALESTER, C.ELF]);
+        const shipped = SHIPPED.pickSynergies(own);
 
-        expect(inactive.synergies).toEqual(SHIPPED.pickSynergies(own));
+        expect(inactive.synergies).toEqual(shipped);
         expect(inactive.actionApplied).toBe(false);
-        expect(SHIPPED.pickSynergies(own)).toContainEqual({
+        expect(shipped).toContainEqual({
             faction: PBTypes.FactionVals.CHAOS,
             synergy: ChaosSynergy.BREAK_ON_ATTACK,
         });
+        expect(active.synergies).toEqual(shipped);
         expect(active.synergies).toContainEqual({
             faction: PBTypes.FactionVals.CHAOS,
             synergy: ChaosSynergy.MOVEMENT,
         });
-        expect(active.actionApplied).toBe(true);
+        expect(new Set(active.synergies.map(({ synergy }) => synergy)).size).toBe(active.synergies.length);
+        expect(active.actionApplied).toBe(false);
+        expect(active.matchedRuleIds).toEqual([]);
     });
 
     test("canonical composites are explicit and reject ambiguous winner combinations", () => {
