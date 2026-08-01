@@ -321,7 +321,7 @@ describe("FightProperties", () => {
             ).toBe(true);
             expect(fightProperties.getAdditionalMoralePerTeam(team)).toBe(20);
             expect(fightProperties.getAdditionalLuckPerTeam(team)).toBe(9);
-            expect(fightProperties.getAdditionalSupplyPerTeam(team)).toBe(0);
+            expect(fightProperties.getAdditionalSupplyPerTeam(team)).toBe(19);
 
             expect(
                 fightProperties.updateSynergyPerTeam(
@@ -332,8 +332,8 @@ describe("FightProperties", () => {
                 ),
             ).toBe(true);
             expect(fightProperties.getAdditionalSupplyPerTeam(team)).toBe(19);
-            expect(fightProperties.getAdditionalMoralePerTeam(team)).toBe(0);
-            expect(fightProperties.getAdditionalLuckPerTeam(team)).toBe(0);
+            expect(fightProperties.getAdditionalMoralePerTeam(team)).toBe(20);
+            expect(fightProperties.getAdditionalLuckPerTeam(team)).toBe(9);
 
             expect(
                 fightProperties.updateSynergyPerTeam(
@@ -344,7 +344,7 @@ describe("FightProperties", () => {
                 ),
             ).toBe(true);
             expect(fightProperties.getAdditionalMovementStepsPerTeam(team)).toBe(3);
-            expect(fightProperties.getBreakChancePerTeam(team)).toBe(0);
+            expect(fightProperties.getBreakChancePerTeam(team)).toBe(17);
 
             expect(
                 fightProperties.updateSynergyPerTeam(
@@ -355,7 +355,7 @@ describe("FightProperties", () => {
                 ),
             ).toBe(true);
             expect(fightProperties.getBreakChancePerTeam(team)).toBe(17);
-            expect(fightProperties.getAdditionalMovementStepsPerTeam(team)).toBe(0);
+            expect(fightProperties.getAdditionalMovementStepsPerTeam(team)).toBe(3);
 
             expect(
                 fightProperties.updateSynergyPerTeam(
@@ -366,7 +366,7 @@ describe("FightProperties", () => {
                 ),
             ).toBe(true);
             expect(fightProperties.getAdditionalAuraRangePerTeam(team)).toBe(3);
-            expect(fightProperties.getAdditionalAbilityPowerPerTeam(team)).toBe(0);
+            expect(fightProperties.getAdditionalAbilityPowerPerTeam(team)).toBe(12);
 
             expect(
                 fightProperties.updateSynergyPerTeam(
@@ -377,7 +377,7 @@ describe("FightProperties", () => {
                 ),
             ).toBe(true);
             expect(fightProperties.getAdditionalAbilityPowerPerTeam(team)).toBe(12);
-            expect(fightProperties.getAdditionalAuraRangePerTeam(team)).toBe(0);
+            expect(fightProperties.getAdditionalAuraRangePerTeam(team)).toBe(3);
 
             expect(
                 fightProperties.updateSynergyPerTeam(
@@ -388,6 +388,7 @@ describe("FightProperties", () => {
                 ),
             ).toBe(true);
             expect(fightProperties.getAdditionalFlyArmorPerTeam(team)).toBe(30);
+            expect(fightProperties.getNumberOfUnitsAvailableForPlacement(team)).toBe(9);
 
             expect(
                 fightProperties.updateSynergyPerTeam(
@@ -397,7 +398,7 @@ describe("FightProperties", () => {
                     SynergyLevel.LEVEL_3,
                 ),
             ).toBe(true);
-            expect(fightProperties.getAdditionalFlyArmorPerTeam(team)).toBe(0);
+            expect(fightProperties.getAdditionalFlyArmorPerTeam(team)).toBe(30);
             expect(fightProperties.getNumberOfUnitsAvailableForPlacement(team)).toBe(9);
 
             expect(
@@ -409,6 +410,7 @@ describe("FightProperties", () => {
                 ),
             ).toBe(true);
             expect(fightProperties.getNumberOfUnitsAvailableForPlacement(team)).toBe(6);
+            expect(fightProperties.getAdditionalFlyArmorPerTeam(team)).toBe(30);
             expect(
                 fightProperties.updateSynergyPerTeam(
                     team,
