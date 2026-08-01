@@ -260,6 +260,9 @@ describe("AI meta cohort generation", () => {
             SEARCH_SHORTLIST: "2",
             V08_A13_SEARCH: "0",
         });
+        expect(environment.SEARCH_INCUMBENT_KINDS).toBeUndefined();
+        expect(environment.SEARCH_CHALLENGER_KINDS).toBeUndefined();
+        expect(Object.values(environment)).not.toContain("undefined");
         expect(resolveAiMetaFightProfile(undefined).id).toBe("a13");
         expect(() => resolveAiMetaFightProfile("a20")).toThrow("Unknown AI meta fight profile a20");
     });

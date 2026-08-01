@@ -695,8 +695,17 @@ interface IAiMetaFightProfile {
     id: AiMetaFightProfileId;
     title: string;
     provenance: Readonly<Record<string, unknown>>;
-    workerEnvironment: Readonly<Record<string, string | undefined>>;
+    workerEnvironment: Readonly<Record<string, string>>;
 }
+
+const definedEnvironment = (
+    environment: Readonly<Record<string, string | undefined>>,
+): Readonly<Record<string, string>> =>
+    Object.freeze(
+        Object.fromEntries(
+            Object.entries(environment).filter((entry): entry is [string, string] => entry[1] !== undefined),
+        ),
+    );
 
 const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFightProfile>> = Object.freeze({
     a13: Object.freeze({
@@ -713,7 +722,7 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             policy: V08_A13_PROFILE.policy,
             workerOverride: "V08_A13_SEARCH=1",
         }),
-        workerEnvironment: Object.freeze({ V08_A13_SEARCH: "1" }),
+        workerEnvironment: definedEnvironment({ V08_A13_SEARCH: "1" }),
     }),
     "a19-h18": Object.freeze({
         id: "a19-h18",
@@ -730,7 +739,7 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             policy: V08_A19_H18_PROFILE.policy,
             workerOverride: "V07_SEARCH=1; V08_A13_SEARCH=0",
         }),
-        workerEnvironment: Object.freeze({
+        workerEnvironment: definedEnvironment({
             ...buildV08A19H18SearchEnvironment(),
             V08_A13_SEARCH: "0",
         }),
