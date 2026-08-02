@@ -218,6 +218,66 @@ describe("render_ai_meta_report", () => {
         expect(html).toContain("if(!supported(row)||!finite(row.rate)");
     });
 
+    test("renders adjusted ally combinations and a per-unit counter picker", () => {
+        const html = renderAiMetaReport({
+            complete: false,
+            interactions: {
+                schema: "cross-fitted-ridge-unit-interactions-v1",
+                scope: { maps: [1, 3, 4], cohorts: ["ranked-draft"], pairs: 30_000, games: 60_000 },
+                minimumSupport: { allyPairs: 24, allyTrios: 24, counters: 24 },
+                allyPairs: [
+                    {
+                        key: "alpha|bravo",
+                        name: "Alpha + Bravo",
+                        units: ["Alpha", "Bravo"],
+                        pairs: 80,
+                        games: 160,
+                        scoreRate: 0.62,
+                        expectedScoreRate: 0.51,
+                        adjustedLiftPp: 11,
+                        adjustedCiLowPp: 4,
+                        adjustedCiHighPp: 18,
+                    },
+                ],
+                allyTrios: [],
+                counters: [
+                    {
+                        key: "alpha>nemesis",
+                        name: "Alpha + Nemesis",
+                        units: ["Alpha", "Nemesis"],
+                        unit: "Alpha",
+                        enemyUnit: "Nemesis",
+                        pairs: 75,
+                        games: 150,
+                        scoreRate: 0.61,
+                        expectedScoreRate: 0.5,
+                        adjustedLiftPp: 11,
+                        adjustedCiLowPp: 3,
+                        adjustedCiHighPp: 19,
+                    },
+                ],
+                topCounters: [
+                    { unit: "Alpha", counters: [] },
+                    { unit: "Ghost", counters: [] },
+                ],
+            },
+            rankings: { units: [] },
+        });
+
+        expect(html).toContain("Unit co-play and counters");
+        expect(html).toContain("Partial run — diagnostic only");
+        expect(html).toContain("cohort/map filters above do not apply");
+        expect(html).toContain("uncorrected for multiple comparisons");
+        expect(html).toContain('id="ally-pairs"');
+        expect(html).toContain('id="ally-trios"');
+        expect(html).toContain('id="counter-unit"');
+        expect(html).toContain("Top adjusted co-play residuals");
+        expect(html).toContain('"name":"Alpha + Bravo"');
+        expect(html).toContain('"enemyUnit":"Nemesis"');
+        expect(html).toContain('"counterUnits":["Alpha","Ghost"]');
+        expect(html).toContain("function renderInteractions()");
+    });
+
     test("labels a direct legacy four-map aggregate as non-live evidence", () => {
         const html = renderAiMetaReport({
             provenance: { maps: [1, 2, 3, 4] },
