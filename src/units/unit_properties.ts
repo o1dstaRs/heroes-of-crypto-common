@@ -158,6 +158,14 @@ export class UnitProperties {
     // combat-applied ones absent, a slowed unit was offered its FULL range (the server then rejected the
     // move) and a Battle-Roared one was denied steps it legitimately had.
     public steps_authoritative?: boolean;
+    // The max-HP twin. A ranked snapshot's max_hp is the server's FINAL cap — creature base with the
+    // Pendant of Vitality / Boost Health / Unyielding Power laps already folded in. The client seeds
+    // initialUnitProperties WITH that boosted number, and the ranked refresh also re-applies the artifact
+    // buff objects (applyArtifacts), so re-deriving the cap in adjustBaseStats compounded the pendant a
+    // second time: a 200-HP Arachna Queen showed 313 max (250 snapshot × 1.25 again) over 250 current —
+    // "my army never has full HP". Left undefined for locally-simulated units (sandbox), which own the
+    // whole derivation and must keep running it.
+    public max_hp_authoritative?: boolean;
     // The morale twin of luck_authoritative. A ranked snapshot's morale is the server's FINAL value: base
     // + synergy + artifact deltas (Cursed Ward / Crown of Command) + every gain and loss accumulated during
     // the fight. adjustBaseStats must therefore not rebuild it from initialUnitProperties, because the

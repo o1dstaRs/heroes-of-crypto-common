@@ -51,6 +51,11 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "./ai_meta_cohorts_core";
+import {
+    AI_META_UNIT_INTERACTION_SCHEMA,
+    AiMetaUnitInteractionCollector,
+    type IAiMetaUnitInteractionAnalysis,
+} from "./ai_meta_unit_interactions";
 
 interface ICountedOutcome {
     score: number;
@@ -221,6 +226,7 @@ export interface IAiMetaSummary {
     provenance: Record<string, unknown>;
     cohorts: ICohortQuality[];
     rankings: IAiMetaRankings;
+    interactions?: IAiMetaUnitInteractionAnalysis;
 }
 
 const emptyBucket = (): IMetricBucket => ({
@@ -621,6 +627,7 @@ const dimensionKey = (cohort: string, map: AiMetaMapDimension): string => `${coh
 /** Aggregate every record across cohort and map dimensions without changing the pair-cluster statistics. */
 export class AiMetaAggregation {
     private readonly dimensions = new Map<string, AiMetaAccumulator>();
+    private readonly unitInteractions = new AiMetaUnitInteractionCollector();
     private accumulator(cohort: string, map: AiMetaMapDimension): AiMetaAccumulator {
         const key = dimensionKey(cohort, map);
         let accumulator = this.dimensions.get(key);
@@ -638,6 +645,7 @@ export class AiMetaAggregation {
             throw new Error(`Unknown AI meta map in pair record: ${record.map}`);
         }
         primeUnitLevels(record);
+        this.unitInteractions.add(record);
         for (const [cohort, map] of [
             ["all", "all"],
             [record.cohort, "all"],
@@ -670,6 +678,9 @@ export class AiMetaAggregation {
     }
     public rows(): IAiMetaRankings {
         return mergeRankings(this.accumulators());
+    }
+    public interactions(): IAiMetaUnitInteractionAnalysis {
+        return this.unitInteractions.analyze();
     }
 }
 
@@ -1001,6 +1012,11 @@ function writeSummary(
                 estimand:
                     "Exact active faction/choice/level associative performance; same-key mirrors excluded from scoreRate.",
             },
+            unitInteractionTracking: {
+                schema: AI_META_UNIT_INTERACTION_SCHEMA,
+                scope: "Pooled live-map ally pairs, ally trios, and directional unit counters.",
+                estimator: "Five-fold cross-fitted ridge residuals with unit and setup controls per cohort/map.",
+            },
             maps: AI_META_MAPS,
             rosterSlots: "2xL1, 2xL2, 1xL3, 1xL4",
             stackSizing: "expBudget (1000 XP per stack)",
@@ -1013,6 +1029,7 @@ function writeSummary(
         },
         cohorts: qualities,
         rankings: aggregation.rows(),
+        ...(complete ? { interactions: aggregation.interactions() } : {}),
     };
     writeFileSync(path, `${JSON.stringify(summary, null, 2)}\n`);
 }

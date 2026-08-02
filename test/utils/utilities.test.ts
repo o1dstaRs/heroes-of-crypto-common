@@ -28,6 +28,7 @@ import {
 import {
     base64ToUint8Array,
     createSecureUuid,
+    captureDeterministicRandomState,
     getLapString,
     getRandomInt,
     interval,
@@ -37,6 +38,7 @@ import {
     RefNumber,
     removeItemOnce,
     setDeterministicRandomSource,
+    restoreDeterministicRandomState,
     shuffle,
     stringToBoolean,
     uuidFromBytes,
@@ -303,6 +305,35 @@ describe("utility functions", () => {
             // still not collide inside one simulated fight.
             setDeterministicRandomSource(() => 0);
             expect(createSecureUuid()).not.toBe(createSecureUuid());
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+    });
+
+    it("restores simulation UUID allocation after a speculative seeded scope", () => {
+        const seeded = (): (() => number) => {
+            let state = 0x5eed >>> 0;
+            return () => {
+                state = (state + 0x6d2b79f5) >>> 0;
+                let value = state;
+                value = Math.imul(value ^ (value >>> 15), value | 1);
+                value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+                return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+            };
+        };
+        try {
+            setDeterministicRandomSource(seeded());
+            const firstLiveId = createSecureUuid();
+            const liveState = captureDeterministicRandomState();
+
+            setDeterministicRandomSource(seeded());
+            Array.from({ length: 5 }, () => createSecureUuid());
+            restoreDeterministicRandomState(liveState);
+            const secondLiveId = createSecureUuid();
+
+            setDeterministicRandomSource(undefined);
+            setDeterministicRandomSource(seeded());
+            expect([firstLiveId, secondLiveId]).toEqual([createSecureUuid(), createSecureUuid()]);
         } finally {
             setDeterministicRandomSource(undefined);
         }

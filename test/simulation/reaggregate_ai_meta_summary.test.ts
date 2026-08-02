@@ -173,6 +173,13 @@ test("reaggregates legacy raw files into all, live, and numeric map dimensions w
         expect(enriched.rankings.synergies).toHaveLength(24 * dimensions.size);
         expect(new Set(enriched.rankings.synergies.map((row) => `${row.cohort}/${row.map}`))).toEqual(dimensions);
         expect(enriched.rankings.synergies.every((row) => row.map !== undefined)).toBe(true);
+        expect(enriched.interactions).toMatchObject({
+            schema: "cross-fitted-ridge-unit-interactions-v1",
+            scope: { maps: [1, 3, 4], cohorts: ["uniform-mixed"], pairs: 3, games: 6 },
+            allyPairs: [],
+            allyTrios: [],
+            counters: [],
+        });
     } finally {
         rmSync(run.directory, { recursive: true, force: true });
     }
@@ -192,6 +199,49 @@ test("marks a future live-only summary as having no recorded non-live water data
         );
         expect(new Set(enriched.rankings.artifactsT1.map((row) => row.map))).toEqual(new Set(["all", "live", 1, 3, 4]));
         expect(new Set(enriched.rankings.synergies.map((row) => row.map))).toEqual(new Set(["all", "live", 1, 3, 4]));
+    } finally {
+        rmSync(run.directory, { recursive: true, force: true });
+    }
+});
+
+test("requires an explicit diagnostic flag before reaggregating a partial summary", async () => {
+    const run = fixture(AI_META_MAPS);
+    try {
+        const source = JSON.parse(readFileSync(run.summaryPath, "utf8")) as IAiMetaSummary;
+        source.complete = false;
+        source.provenance.requestedCohorts = ["uniform-mixed", "ranged-heavy"];
+        writeFileSync(run.summaryPath, `${JSON.stringify(source, null, 2)}\n`);
+
+        await expect(reaggregateAiMetaSummary(run.summaryPath)).rejects.toThrow("without allowPartial");
+        await expect(reaggregateAiMetaSummary(run.summaryPath, undefined, { allowPartial: true })).rejects.toThrow(
+            "explicit diagnostic output path",
+        );
+
+        const outputPath = join(run.directory, "partial-interactions.summary.json");
+        await reaggregateAiMetaSummary(run.summaryPath, outputPath, { allowPartial: true });
+        const enriched = JSON.parse(readFileSync(outputPath, "utf8")) as IAiMetaSummary;
+        expect(enriched.complete).toBe(false);
+        expect(enriched.provenance.mapAggregation).toEqual(
+            expect.objectContaining({ sourceComplete: false, partialDiagnostic: true }),
+        );
+        expect(enriched.rankings).toEqual(source.rankings);
+        expect(enriched.interactions?.scope).toMatchObject({ pairs: 3, games: 6 });
+    } finally {
+        rmSync(run.directory, { recursive: true, force: true });
+    }
+});
+
+test("allowPartial does not weaken validation for a complete summary", async () => {
+    const run = fixture(AI_META_MAPS);
+    try {
+        const outputPath = join(run.directory, "complete-with-flag.summary.json");
+        await reaggregateAiMetaSummary(run.summaryPath, outputPath, { allowPartial: true });
+        const enriched = JSON.parse(readFileSync(outputPath, "utf8")) as IAiMetaSummary;
+
+        expect(enriched.provenance.mapAggregation).toEqual(
+            expect.objectContaining({ sourceComplete: true, partialDiagnostic: false }),
+        );
+        expect(enriched.rankings.artifactsT1.some((row) => row.map === "live")).toBe(true);
     } finally {
         rmSync(run.directory, { recursive: true, force: true });
     }

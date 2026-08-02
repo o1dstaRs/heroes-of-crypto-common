@@ -69,6 +69,34 @@ interface INormalizedCohort {
     mapGames: Record<string, number>;
 }
 
+interface INormalizedInteractionRow {
+    key: string;
+    name: string;
+    units: string[];
+    unit: string;
+    enemyUnit: string;
+    pairs: number;
+    games: number;
+    scoreRate: number | null;
+    expectedScoreRate: number | null;
+    adjustedLiftPp: number | null;
+    adjustedCiLowPp: number | null;
+    adjustedCiHighPp: number | null;
+}
+
+interface INormalizedUnitInteractions {
+    schema: string;
+    scopePairs: number | null;
+    scopeGames: number | null;
+    minimumPairSupport: number | null;
+    minimumTrioSupport: number | null;
+    minimumCounterSupport: number | null;
+    counterUnits: string[];
+    allyPairs: INormalizedInteractionRow[];
+    allyTrios: INormalizedInteractionRow[];
+    counters: INormalizedInteractionRow[];
+}
+
 interface IEmbeddedAsset {
     id: string;
     uri: string;
@@ -274,6 +302,57 @@ const normalizeRows = (summary: UnknownRecord): INormalizedRow[] => {
     });
 };
 
+const normalizeInteractionRow = (value: unknown, index: number): INormalizedInteractionRow => {
+    const row = asRecord(value);
+    const units = Array.isArray(row.units)
+        ? row.units.map((unit) => textValue({ unit }, ["unit"])).filter(Boolean)
+        : [];
+    const unit = textValue(row, ["unit"], units[0] ?? "");
+    const enemyUnit = textValue(row, ["enemyUnit", "enemy_unit"], units[1] ?? "");
+    const fallbackName = unit && enemyUnit ? `${unit} → ${enemyUnit}` : units.join(" + ");
+    return {
+        key: textValue(row, ["key"], `interaction-${index + 1}`),
+        name: textValue(row, ["name", "label"], fallbackName || `Interaction ${index + 1}`),
+        units,
+        unit,
+        enemyUnit,
+        pairs: countValue(row, ["pairs", "clusters", "sample"]) ?? 0,
+        games: countValue(row, ["games", "observations"]) ?? 0,
+        scoreRate: clampRate(rateValue(row, ["scoreRate", "score_rate"])),
+        expectedScoreRate: clampRate(rateValue(row, ["expectedScoreRate", "expected_score_rate"])),
+        adjustedLiftPp: finiteNumber(row, ["adjustedLiftPp", "adjusted_lift_pp"]),
+        adjustedCiLowPp: finiteNumber(row, ["adjustedCiLowPp", "adjusted_ci_low_pp"]),
+        adjustedCiHighPp: finiteNumber(row, ["adjustedCiHighPp", "adjusted_ci_high_pp"]),
+    };
+};
+
+const normalizeUnitInteractions = (summary: UnknownRecord): INormalizedUnitInteractions | null => {
+    const interactions = asRecord(summary.interactions);
+    const schema = textValue(interactions, ["schema"]);
+    if (!schema) return null;
+    const scope = asRecord(interactions.scope);
+    const minimumSupport = asRecord(interactions.minimumSupport);
+    const counterUnits = Array.isArray(interactions.topCounters)
+        ? interactions.topCounters.map((value) => textValue(asRecord(value), ["unit"])).filter(Boolean)
+        : [];
+    const rows = (key: "allyPairs" | "allyTrios" | "counters"): INormalizedInteractionRow[] => {
+        const values = interactions[key];
+        return Array.isArray(values) ? values.map(normalizeInteractionRow) : [];
+    };
+    return {
+        schema,
+        scopePairs: countValue(scope, ["pairs"]),
+        scopeGames: countValue(scope, ["games"]),
+        minimumPairSupport: countValue(minimumSupport, ["allyPairs"]),
+        minimumTrioSupport: countValue(minimumSupport, ["allyTrios"]),
+        minimumCounterSupport: countValue(minimumSupport, ["counters"]),
+        counterUnits: [...new Set(counterUnits)].sort((left, right) => left.localeCompare(right)),
+        allyPairs: rows("allyPairs"),
+        allyTrios: rows("allyTrios"),
+        counters: rows("counters"),
+    };
+};
+
 const normalizeCohorts = (summary: UnknownRecord, rows: readonly INormalizedRow[]): INormalizedCohort[] => {
     const output = new Map<string, INormalizedCohort>();
     const input = Array.isArray(summary.cohorts) ? summary.cohorts : [];
@@ -427,6 +506,7 @@ const formatInteger = (value: number): string => new Intl.NumberFormat("en-US").
 export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMetaReportOptions = {}): string {
     const summary = asRecord(summaryValue);
     const rows = normalizeRows(summary);
+    const interactions = normalizeUnitInteractions(summary);
     const cohorts = normalizeCohorts(summary, rows);
     const root = options.repositoryRoot ? resolve(options.repositoryRoot) : DEFAULT_REPOSITORY_ROOT;
     const assets = embedAssets(root, rows);
@@ -445,6 +525,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
     const fightVersion = textValue(provenanceRecord, ["fightVersion", "aiVersion"], "unknown");
     const generatedAt = textValue(summary, ["generatedAt"], "Not reported");
     const totalGames = cohorts.reduce((sum, cohort) => sum + (cohort.games ?? 0), 0);
+    const partialRun = summary.complete !== undefined && summary.complete !== true;
     const provenanceMaps = Array.isArray(provenanceRecord.maps) ? provenanceRecord.maps.map(String) : [];
     const hasWaterData =
         rows.some((row) => row.map === "2") ||
@@ -484,6 +565,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
         assets: assetMap,
         categories: RANKING_DEFINITIONS,
         mapDefinitions,
+        interactions,
     };
     const heroStyle = background ? ` style="--hero-image:url('${background}')"` : "";
 
@@ -499,8 +581,9 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
 :root{color-scheme:dark;--bg:#070808;--bg2:#0d1114;--panel:#11171c;--panel2:#182029;--panel3:#202a33;--ink:#fbf4e8;--white:#fff;--muted:#b8b0a2;--muted2:#8f9aa3;--line:rgba(255,255,255,.13);--line2:rgba(255,255,255,.24);--gold:#f2c75d;--gold2:#ffe4a3;--green:#63d28a;--red:#ef4a3f;--blue:#67aef6;--shadow:0 22px 70px rgba(0,0,0,.42);--radius:16px}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:linear-gradient(180deg,var(--bg),var(--bg2) 44%,var(--bg));color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.5;text-rendering:optimizeLegibility}button,input,select{font:inherit}button{color:inherit}img{display:block;max-width:100%}.shell{width:min(1260px,calc(100vw - 40px));margin:auto}.hero{position:relative;isolation:isolate;min-height:360px;overflow:hidden;border-bottom:1px solid var(--line);background:radial-gradient(circle at 72% 12%,rgba(242,199,93,.15),transparent 34%),linear-gradient(135deg,#0a0c0e,#11171c)}.hero::before{content:"";position:absolute;z-index:-2;inset:0;background-image:linear-gradient(90deg,rgba(7,8,8,.96) 0%,rgba(7,8,8,.73) 48%,rgba(7,8,8,.42)),var(--hero-image);background-size:cover;background-position:center;opacity:.68}.hero::after{content:"";position:absolute;z-index:-1;inset:0;background:linear-gradient(180deg,transparent 55%,var(--bg))}.hero-inner{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:36px;align-items:end;padding:54px 0 66px}.brand{display:flex;align-items:center;gap:13px;margin-bottom:32px;color:var(--gold);font-size:.78rem;font-weight:850;letter-spacing:.15em;text-transform:uppercase}.brand img{width:54px;height:54px;filter:drop-shadow(0 8px 18px rgba(0,0,0,.45))}.eyebrow{margin:0 0 10px;color:var(--gold);font-size:.78rem;font-weight:850;letter-spacing:.12em;text-transform:uppercase}.hero h1{max-width:850px;margin:0 0 15px;color:var(--white);font-size:clamp(2.65rem,6vw,5.65rem);font-weight:900;letter-spacing:-.045em;line-height:.94}.subtitle{max-width:760px;margin:0;color:var(--muted);font-size:clamp(1rem,1.5vw,1.18rem)}.hero-stats{display:grid;grid-template-columns:repeat(2,minmax(132px,1fr));gap:10px;width:min(380px,100%)}.hero-stat{padding:17px 18px;border:1px solid var(--line);border-radius:12px;background:rgba(7,8,8,.7);backdrop-filter:blur(14px)}.hero-stat strong{display:block;color:var(--white);font-size:1.55rem;line-height:1.1}.hero-stat span{display:block;margin-top:4px;color:var(--muted2);font-size:.7rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase}.report-main{padding:28px 0 72px}.notice{display:grid;grid-template-columns:auto 1fr;gap:16px;margin:0 0 22px;padding:19px 22px;border:1px solid rgba(242,199,93,.3);border-left:4px solid var(--gold);border-radius:12px;background:linear-gradient(90deg,rgba(242,199,93,.1),rgba(17,23,28,.88))}.non-live-notice{border-color:rgba(239,74,63,.38);border-left-color:var(--red);background:linear-gradient(90deg,rgba(239,74,63,.12),rgba(17,23,28,.88))}.non-live-notice .notice-mark{border-color:rgba(239,74,63,.45);color:#ff8c82}.notice-mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(242,199,93,.4);border-radius:50%;color:var(--gold);font-weight:900}.notice h2{margin:0 0 5px;font-size:1rem}.notice p{margin:0;color:var(--muted);font-size:.9rem}.sticky-filter{position:sticky;z-index:20;top:0;margin:0 -10px 26px;padding:11px 10px;border-bottom:1px solid var(--line);background:rgba(7,8,8,.9);backdrop-filter:blur(18px)}.filter-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}.cohort-tabs{display:flex;flex:1 1 100%;flex-wrap:wrap;gap:7px;min-width:0}.cohort-tab{flex:0 0 auto;padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:.78rem;font-weight:800;cursor:pointer}.cohort-tab:hover{border-color:var(--line2)}.cohort-tab.active{border-color:rgba(242,199,93,.65);background:rgba(242,199,93,.12);color:var(--gold2)}.map-picker{display:flex;flex:0 0 auto;align-items:center;gap:7px;margin-left:auto;color:var(--muted2);font-size:.68rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.map-filter{min-height:38px;padding:7px 30px 7px 10px;border:1px solid var(--line);border-radius:9px;outline:none;background:#0b0e11;color:var(--ink);font-size:.76rem;font-weight:750;letter-spacing:0;text-transform:none}.map-filter:focus{border-color:rgba(242,199,93,.65)}.filter-coverage{flex:0 0 auto;min-width:130px;color:var(--muted2);font-size:.68rem;line-height:1.25;text-align:right}.filter-coverage strong{display:block;color:var(--white);font-size:.8rem}.filter-coverage.non-live strong,.filter-coverage.non-live span{color:#ff8c82}.section-head{display:flex;justify-content:space-between;gap:18px;align-items:end;margin:38px 0 15px}.section-head h2{margin:0;color:var(--white);font-size:clamp(1.55rem,3vw,2.25rem);letter-spacing:-.025em}.section-head p{max-width:680px;margin:0;color:var(--muted);font-size:.88rem}.leaders{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.leader{position:relative;min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(155deg,rgba(255,255,255,.05),transparent 48%),var(--panel);box-shadow:var(--shadow)}.leader-art{position:relative;height:172px;overflow:hidden;background:radial-gradient(circle at 50% 42%,rgba(242,199,93,.13),transparent 55%),#090b0d}.leader-art::after{content:"";position:absolute;inset:45% 0 0;background:linear-gradient(transparent,rgba(9,11,13,.95))}.leader-art img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 14px 19px rgba(0,0,0,.5))}.leader-copy{position:relative;margin-top:-42px;padding:0 16px 17px}.leader-type{display:block;color:var(--gold);font-size:.66rem;font-weight:850;letter-spacing:.1em;text-transform:uppercase}.leader h3{min-height:2.4em;margin:5px 0 12px;color:var(--white);font-size:1rem;line-height:1.2}.leader-metric{display:flex;align-items:end;justify-content:space-between;gap:8px}.leader-rate{color:var(--white);font-size:1.6rem;font-weight:900;line-height:1}.leader-lift{font-size:.75rem;font-weight:850}.positive{color:var(--green)}.negative{color:var(--red)}.neutral{color:var(--muted2)}.leader-meta{margin-top:8px;color:var(--muted2);font-size:.72rem}.chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.chart-card,.analysis-card,.table-card,.details-card{min-width:0;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(155deg,rgba(255,255,255,.028),transparent 40%),var(--panel);box-shadow:0 15px 40px rgba(0,0,0,.2)}.chart-card{padding:18px}.chart-card:first-child{grid-column:1/-1}.chart-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:15px}.chart-title h3{margin:0;color:var(--white);font-size:1rem}.chart-count{color:var(--muted2);font-size:.72rem}.forest{display:grid;gap:9px}.forest-row{display:grid;grid-template-columns:minmax(150px,210px) minmax(130px,1fr) 65px;gap:10px;align-items:center}.forest-label{display:grid;grid-template-columns:34px minmax(0,1fr);gap:8px;align-items:center;min-width:0}.forest-label img{width:34px;height:34px;border-radius:7px;background:#090b0d;object-fit:contain}.forest-name{overflow:hidden;color:var(--ink);font-size:.76rem;font-weight:750;text-overflow:ellipsis;white-space:nowrap}.forest-sample{display:block;color:var(--muted2);font-size:.63rem;font-weight:500}.forest-track{position:relative;height:22px;border-radius:5px;background:linear-gradient(90deg,rgba(239,74,63,.08),rgba(255,255,255,.025) 50%,rgba(99,210,138,.08));box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}.forest-track::before{content:"";position:absolute;z-index:1;top:0;bottom:0;left:50%;width:1px;background:rgba(242,199,93,.62)}.forest-ci{position:absolute;z-index:2;top:9px;height:4px;border-radius:4px;background:rgba(251,244,232,.55)}.forest-ci::before,.forest-ci::after{content:"";position:absolute;top:-3px;width:1px;height:10px;background:rgba(251,244,232,.72)}.forest-ci::before{left:0}.forest-ci::after{right:0}.forest-dot{position:absolute;z-index:3;top:5px;width:12px;height:12px;margin-left:-6px;border:2px solid #fff;border-radius:50%;background:var(--gold);box-shadow:0 3px 9px rgba(0,0,0,.55)}.forest-rate{text-align:right;color:var(--white);font-size:.78rem;font-weight:850}.empty{display:grid;place-items:center;min-height:110px;padding:20px;color:var(--muted2);font-size:.82rem;text-align:center}.analysis-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:14px}.analysis-card{padding:18px;overflow:hidden}.analysis-card h3{margin:0 0 4px;color:var(--white);font-size:1rem}.analysis-card>p{margin:0 0 13px;color:var(--muted2);font-size:.75rem}.scatter-svg{display:block;width:100%;min-height:310px}.scatter-grid{stroke:rgba(255,255,255,.08);stroke-width:1}.scatter-axis{stroke:rgba(255,255,255,.3);stroke-width:1}.scatter-parity{stroke:var(--gold);stroke-width:1;stroke-dasharray:5 5;opacity:.75}.scatter-label{fill:var(--muted2);font:11px system-ui,sans-serif}.scatter-dot{stroke:#fff;stroke-width:1.5;opacity:.9}.heatmap-wrap{max-height:370px;overflow:auto}.heatmap{width:100%;border-collapse:separate;border-spacing:3px;font-size:.68rem}.heatmap th{position:sticky;top:0;z-index:1;padding:7px;background:var(--panel);color:var(--muted2);font-weight:800;text-align:center}.heatmap th:first-child{left:0;z-index:2;text-align:left}.heatmap td{min-width:60px;padding:8px 6px;border-radius:5px;text-align:center;font-variant-numeric:tabular-nums}.heatmap .heat-name{position:sticky;left:0;min-width:145px;max-width:190px;overflow:hidden;background:var(--panel2);color:var(--ink);font-weight:750;text-align:left;text-overflow:ellipsis;white-space:nowrap}.table-card{overflow:hidden}.table-tools{display:grid;grid-template-columns:minmax(220px,1fr) 220px auto;gap:10px;padding:14px;border-bottom:1px solid var(--line)}.search,.type-filter{width:100%;min-height:42px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;outline:none;background:#0b0e11;color:var(--ink)}.search:focus,.type-filter:focus{border-color:rgba(242,199,93,.65)}.table-total{align-self:center;color:var(--muted2);font-size:.75rem;white-space:nowrap}.table-wrap{overflow:auto}.ranking-table{width:100%;border-collapse:collapse;font-size:.76rem}.ranking-table th{position:sticky;z-index:2;top:0;padding:0;border-bottom:1px solid var(--line);background:var(--panel2);text-align:left;white-space:nowrap}.ranking-table th button{width:100%;padding:11px 10px;border:0;background:transparent;color:var(--gold);font-size:.67rem;font-weight:850;letter-spacing:.07em;text-align:left;text-transform:uppercase;cursor:pointer}.ranking-table td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.07);color:var(--muted);white-space:nowrap}.ranking-table tr:hover td{background:rgba(255,255,255,.025)}.table-entry{display:flex;align-items:center;gap:9px;min-width:200px}.table-entry img{width:35px;height:35px;border-radius:7px;background:#090b0d;object-fit:contain}.table-entry strong{display:block;max-width:230px;overflow:hidden;color:var(--ink);text-overflow:ellipsis}.type-chip{display:inline-flex;padding:4px 7px;border:1px solid var(--line);border-radius:999px;color:var(--muted2);font-size:.62rem;font-weight:800}.rate-cell{color:var(--white)!important;font-weight:850}.details-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.details-card{padding:20px}.details-card h3{margin:0 0 14px;color:var(--white);font-size:1rem}.provenance{display:grid;gap:0}.provenance-row{display:grid;grid-template-columns:minmax(120px,.4fr) minmax(0,1fr);gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.07)}.provenance-row:last-child{border-bottom:0}.provenance-row dt{color:var(--muted2);font-size:.7rem;font-weight:800;overflow-wrap:anywhere}.provenance-row dd{margin:0;color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.7rem;overflow-wrap:anywhere}.cohort-notes{display:grid;gap:8px}.cohort-note{display:grid;gap:2px;padding:10px 12px;border-left:2px solid rgba(242,199,93,.55);background:rgba(255,255,255,.025)}.cohort-note strong{font-size:.76rem}.cohort-note span,.empty-inline{margin:0;color:var(--muted2);font-size:.7rem}.footer{display:flex;justify-content:space-between;gap:18px;margin-top:40px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted2);font-size:.7rem}.noscript{margin:20px;padding:18px;border:1px solid var(--red);background:#21100f;color:#ffd4cf}
 .leaders{grid-template-columns:repeat(auto-fit,minmax(185px,1fr))}
+.interaction-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.interaction-card{min-width:0;padding:18px;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(155deg,rgba(255,255,255,.028),transparent 40%),var(--panel);box-shadow:0 15px 40px rgba(0,0,0,.2)}.interaction-card.wide{grid-column:1/-1}.interaction-card h3{margin:0 0 4px;color:var(--white);font-size:1rem}.interaction-card>p{margin:0 0 13px;color:var(--muted2);font-size:.75rem}.interaction-list{display:grid;gap:7px}.interaction-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}.interaction-row:last-child{border-bottom:0}.interaction-name{overflow:hidden;color:var(--ink);font-size:.78rem;font-weight:800;text-overflow:ellipsis;white-space:nowrap}.interaction-meta{display:block;margin-top:2px;color:var(--muted2);font-size:.66rem}.interaction-lift{color:var(--gold2);font-size:.8rem;font-weight:900;text-align:right;white-space:nowrap}.interaction-ci{display:block;margin-top:2px;color:var(--muted2);font-size:.63rem;font-weight:600}.counter-controls{display:flex;align-items:center;gap:9px;margin:0 0 10px;color:var(--muted2);font-size:.72rem;font-weight:800}.counter-select{min-width:180px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;outline:none;background:#0b0e11;color:var(--ink)}.counter-select:focus{border-color:rgba(242,199,93,.65)}
 @media(max-width:1040px){.hero-inner{grid-template-columns:1fr}.hero-stats{width:100%;grid-template-columns:repeat(4,1fr)}.leaders{grid-template-columns:repeat(3,1fr)}.analysis-grid{grid-template-columns:1fr}.chart-card:first-child{grid-column:auto}.chart-grid{grid-template-columns:1fr}}
-@media(max-width:720px){.shell{width:min(100% - 24px,1260px)}.hero-inner{padding:34px 0 52px}.brand{margin-bottom:24px}.hero-stats{grid-template-columns:repeat(2,1fr)}.notice{grid-template-columns:1fr}.notice-mark{display:none}.filter-row{align-items:stretch}.cohort-tabs{flex-basis:100%;flex-wrap:nowrap;overflow-x:auto;padding-bottom:5px;scrollbar-color:var(--gold) transparent;scrollbar-width:thin}.map-picker{flex:1 1 auto;margin-left:0}.map-filter{flex:1}.filter-coverage{min-width:105px}.leaders{grid-template-columns:repeat(2,1fr)}.forest-row{grid-template-columns:minmax(110px,150px) minmax(100px,1fr) 54px}.table-tools{grid-template-columns:1fr}.details-grid{grid-template-columns:1fr}.section-head{display:block}.section-head p{margin-top:7px}.footer{display:block}.footer span{display:block;margin-top:5px}}
+@media(max-width:720px){.shell{width:min(100% - 24px,1260px)}.hero-inner{padding:34px 0 52px}.brand{margin-bottom:24px}.hero-stats{grid-template-columns:repeat(2,1fr)}.notice{grid-template-columns:1fr}.notice-mark{display:none}.filter-row{align-items:stretch}.cohort-tabs{flex-basis:100%;flex-wrap:nowrap;overflow-x:auto;padding-bottom:5px;scrollbar-color:var(--gold) transparent;scrollbar-width:thin}.map-picker{flex:1 1 auto;margin-left:0}.map-filter{flex:1}.filter-coverage{min-width:105px}.leaders{grid-template-columns:repeat(2,1fr)}.forest-row{grid-template-columns:minmax(110px,150px) minmax(100px,1fr) 54px}.interaction-grid{grid-template-columns:1fr}.interaction-card.wide{grid-column:auto}.table-tools{grid-template-columns:1fr}.details-grid{grid-template-columns:1fr}.section-head{display:block}.section-head p{margin-top:7px}.footer{display:block}.footer span{display:block;margin-top:5px}}
 @media(max-width:460px){.leaders{grid-template-columns:1fr}.leader-art{height:150px}.forest-row{grid-template-columns:112px minmax(90px,1fr) 49px;gap:6px}.forest-label{grid-template-columns:27px minmax(0,1fr);gap:6px}.forest-label img{width:27px;height:27px}.forest-name{font-size:.67rem}.chart-card,.analysis-card{padding:13px}}
 @media print{.sticky-filter,.table-tools{position:static;display:none}.hero{min-height:0}.hero-inner{padding:24px 0}.hero::before{opacity:.16}.report-main{padding-bottom:0}.chart-card,.analysis-card,.table-card,.details-card,.leader{break-inside:avoid;box-shadow:none}.shell{width:100%}.ranking-table th{position:static}}
 </style>
@@ -527,6 +610,11 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
     <div class="notice-mark">!</div>
     <div><h2>Controlled strength and associative composition</h2><p>Artifact and augment score rates use the policy's 20% uniform exploration assignments, breaking the link between a strong army and its usual item choice. Synergy rows instead track exact faction, choice, and active level under the deployed deterministic setup policy; they remain composition-confounded associations, not randomized causal effects. Augment plans are the causal unit; individual levels remain compositional diagnostics.</p></div>
   </aside>
+  ${
+      partialRun
+          ? '<aside class="notice non-live-notice" aria-label="Partial-run notice"><div class="notice-mark">!</div><div><h2>Partial run — diagnostic only</h2><p>This report contains only the completed cohorts present in its source summary. Do not treat it as the requested all-cohort balance result.</p></div></aside>'
+          : ""
+  }
   ${
       hasWaterData
           ? `<aside class="notice non-live-notice" aria-label="Non-live map notice"><div class="notice-mark">!</div><div><h2>${
@@ -558,6 +646,19 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
     </div>
   </section>
 
+  ${
+      interactions
+          ? `<section aria-labelledby="interactions-title">
+    <div class="section-head"><div><p class="eyebrow">Roster interaction</p><h2 id="interactions-title">Unit co-play and counters</h2></div><p>Each lift is held-out performance above an additive model fitted separately for every cohort and live map, controlling unit main effects plus setup choices. Results are pooled across all included cohorts and live maps; the cohort/map filters above do not apply. Rankings are exploratory, uncorrected for multiple comparisons, and show adjusted associations rather than randomized causal effects.</p></div>
+    <div class="interaction-grid" id="unit-interactions">
+      <article class="interaction-card"><h3>2-unit co-play</h3><p id="ally-pair-note"></p><div class="interaction-list" id="ally-pairs"></div></article>
+      <article class="interaction-card"><h3>3-unit co-play</h3><p id="ally-trio-note"></p><div class="interaction-list" id="ally-trios"></div></article>
+      <article class="interaction-card wide"><h3>What each unit is good against</h3><p id="counter-note"></p><label class="counter-controls" for="counter-unit"><span>Unit</span><select class="counter-select" id="counter-unit"></select></label><div class="interaction-list" id="counter-leaders"></div></article>
+    </div>
+  </section>`
+          : ""
+  }
+
   <section aria-labelledby="table-title">
     <div class="section-head"><div><p class="eyebrow">Audit the numbers</p><h2 id="table-title">Full rankings</h2></div><p>Search any unit, synergy, or item within the selected cohort and map, restrict by category, and sort on every reported metric.</p></div>
     <div class="table-card">
@@ -587,6 +688,7 @@ var categories=Array.isArray(DATA.categories)?DATA.categories:[];
 var cohorts=Array.isArray(DATA.cohorts)?DATA.cohorts:[];
 var assets=DATA.assets||{};
 var mapDefinitions=Array.isArray(DATA.mapDefinitions)?DATA.mapDefinitions:[];
+var interactions=DATA.interactions&&typeof DATA.interactions==="object"?DATA.interactions:null;
 var reportedMaps=new Set(rows.map(function(row){return row.map||"all"}));
 var waterContributes=reportedMaps.has("2")||cohorts.some(function(cohort){return finite(cohort.mapGames&&cohort.mapGames["2"])&&cohort.mapGames["2"]>0})||mapDefinitions.some(function(map){return map.id==="all"&&map.nonLive});
 var visibleMaps=availableMapDefinitions();
@@ -624,12 +726,17 @@ function scatterColor(category){return category==="units"?"#67aef6":category==="
 function renderScatter(){var host=document.getElementById("scatter");host.replaceChildren();var points=categories.flatMap(function(category){return exactCohortRows(category.key)}).filter(function(row){return finite(row.pickRate)&&finite(row.rate)});if(points.length<2){host.append(node("div","empty","Pick-rate data is not available for enough entries in the selected cohort and map."));return}var width=760,height=340,p={left:54,right:20,top:18,bottom:45};var maxX=Math.max(.1,Math.min(1,Math.max.apply(null,points.map(function(row){return row.pickRate}))*1.08));var rates=points.map(function(row){return row.rate});var minY=Math.max(0,Math.min(.5,Math.min.apply(null,rates))-.04);var maxY=Math.min(1,Math.max(.5,Math.max.apply(null,rates))+.04);if(maxY-minY<.1){minY=Math.max(0,minY-.05);maxY=Math.min(1,maxY+.05)}var x=function(value){return p.left+(value/maxX)*(width-p.left-p.right)};var y=function(value){return p.top+(maxY-value)/(maxY-minY)*(height-p.top-p.bottom)};var chart=svg("svg",{viewBox:"0 0 "+width+" "+height,class:"scatter-svg",role:"img","aria-label":"Scatter plot of pick rate versus score rate"});for(var i=0;i<=5;i+=1){var gx=p.left+i*(width-p.left-p.right)/5;chart.append(svg("line",{x1:gx,y1:p.top,x2:gx,y2:height-p.bottom,class:"scatter-grid"}));var xt=svg("text",{x:gx,y:height-19,class:"scatter-label","text-anchor":"middle"});xt.textContent=((maxX*i/5)*100).toFixed(0)+"%";chart.append(xt);var gy=p.top+i*(height-p.top-p.bottom)/5;chart.append(svg("line",{x1:p.left,y1:gy,x2:width-p.right,y2:gy,class:"scatter-grid"}));var value=maxY-i*(maxY-minY)/5;var yt=svg("text",{x:p.left-9,y:gy+4,class:"scatter-label","text-anchor":"end"});yt.textContent=(value*100).toFixed(0)+"%";chart.append(yt)}chart.append(svg("line",{x1:p.left,y1:height-p.bottom,x2:width-p.right,y2:height-p.bottom,class:"scatter-axis"}));chart.append(svg("line",{x1:p.left,y1:p.top,x2:p.left,y2:height-p.bottom,class:"scatter-axis"}));if(.5>=minY&&.5<=maxY)chart.append(svg("line",{x1:p.left,y1:y(.5),x2:width-p.right,y2:y(.5),class:"scatter-parity"}));points.forEach(function(row){var circle=svg("circle",{cx:x(row.pickRate),cy:y(row.rate),r:6,fill:scatterColor(row.category),class:"scatter-dot"});var tooltip=svg("title",{});tooltip.textContent=row.name+" · "+mapLabel(row.map)+" · pick "+rate(row.pickRate)+" · score "+rate(row.rate)+" · decisive win "+rate(row.winRate);circle.append(tooltip);chart.append(circle)});var xLabel=svg("text",{x:(p.left+width-p.right)/2,y:height-2,class:"scatter-label","text-anchor":"middle"});xLabel.textContent="Pick rate";chart.append(xLabel);var yLabel=svg("text",{x:13,y:(p.top+height-p.bottom)/2,class:"scatter-label",transform:"rotate(-90 13 "+((p.top+height-p.bottom)/2)+")","text-anchor":"middle"});yLabel.textContent="Score rate";chart.append(yLabel);host.append(chart)}
 function cellColor(delta){var strength=Math.min(.72,.1+Math.abs(delta)/18);return delta>=0?"rgba(99,210,138,"+strength+")":"rgba(239,74,63,"+strength+")"}
 function renderHeatmap(){var host=document.getElementById("heatmap");host.replaceChildren();var cohortIds=cohorts.map(function(item){return item.id});if(cohortIds.length<2){host.append(node("div","empty","At least two named cohorts are needed for a matrix."));return}var groups=new Map();selectedMapRows(rows).forEach(function(row){if(!supported(row)||!finite(row.rate)||!cohortIds.includes(row.cohort))return;var id=row.category+":"+row.key;if(!groups.has(id))groups.set(id,{name:row.name,category:row.category,values:new Map()});groups.get(id).values.set(row.cohort,row.rate)});var ranked=Array.from(groups.values()).filter(function(group){return group.values.size>=2}).sort(function(a,b){return b.values.size-a.values.size}).slice(0,14);if(!ranked.length){host.append(node("div","empty","No entries have rates in two or more cohorts for the selected map."));return}var wrap=node("div","heatmap-wrap");var table=node("table","heatmap");var head=node("thead");var header=node("tr");header.append(node("th","","Entry"));cohorts.forEach(function(cohort){header.append(node("th","",cohort.label))});head.append(header);var body=node("tbody");ranked.forEach(function(group){var line=node("tr");var label=node("td","heat-name",group.name);label.title=categoryLabel(group.category)+" · "+mapLabel(state.map);line.append(label);cohortIds.forEach(function(id){var value=group.values.get(id);var cell=node("td","",finite(value)?rate(value):"—");if(finite(value)){var delta=(value-.5)*100;cell.style.background=cellColor(delta);cell.title=lift(delta)}line.append(cell)});body.append(line)});table.append(head,body);wrap.append(table);host.append(wrap)}
+function interactionRows(key){return interactions&&Array.isArray(interactions[key])?interactions[key].filter(function(row){return row&&finite(row.pairs)&&row.pairs>0}):[]}
+function interactionOrder(left,right){var leftLift=finite(left.adjustedLiftPp)?left.adjustedLiftPp:-Infinity;var rightLift=finite(right.adjustedLiftPp)?right.adjustedLiftPp:-Infinity;return rightLift-leftLift||(right.pairs||0)-(left.pairs||0)||String(left.name||"").localeCompare(String(right.name||""))}
+function interactionMeta(row){var observed=finite(row.scoreRate)?rate(row.scoreRate):"observed rate unavailable";var expected=finite(row.expectedScoreRate)?rate(row.expectedScoreRate):"expected rate unavailable";return "n "+numberFormat.format(row.pairs)+" paired matchups · "+observed+" observed · "+expected+" expected"}
+function renderInteractionRows(host,values,limit,emptyText){host.replaceChildren();var visible=values.slice().sort(interactionOrder).slice(0,limit);if(!visible.length){host.append(node("div","empty",emptyText));return}visible.forEach(function(row){var line=node("div","interaction-row");var copy=node("div");copy.append(node("div","interaction-name",row.name||"Unnamed interaction"));copy.append(node("span","interaction-meta",interactionMeta(row)));var metric=node("div","interaction-lift "+tone(row.adjustedLiftPp),lift(row.adjustedLiftPp));var interval=finite(row.adjustedCiLowPp)&&finite(row.adjustedCiHighPp)?lift(row.adjustedCiLowPp)+" to "+lift(row.adjustedCiHighPp):"95% CI unavailable";metric.append(node("span","interaction-ci",interval));line.append(copy,metric);host.append(line)})}
+function renderInteractions(){if(!interactions)return;var pairRows=interactionRows("allyPairs"),trioRows=interactionRows("allyTrios"),counterRows=interactionRows("counters");var pairNote=document.getElementById("ally-pair-note"),trioNote=document.getElementById("ally-trio-note"),counterNote=document.getElementById("counter-note");var pairMinimum=finite(interactions.minimumPairSupport)?interactions.minimumPairSupport:0,trioMinimum=finite(interactions.minimumTrioSupport)?interactions.minimumTrioSupport:0,counterMinimum=finite(interactions.minimumCounterSupport)?interactions.minimumCounterSupport:0;var scope=finite(interactions.scopePairs)?numberFormat.format(interactions.scopePairs)+" live-map matchup pairs":"pooled live-map matchups";pairNote.textContent="Top adjusted co-play residuals from "+scope+" · minimum n "+numberFormat.format(pairMinimum)+".";trioNote.textContent="Top adjusted three-unit residuals · minimum n "+numberFormat.format(trioMinimum)+".";counterNote.textContent="Choose any unit to see its five strongest adjusted edges against enemy units · minimum n "+numberFormat.format(counterMinimum)+".";renderInteractionRows(document.getElementById("ally-pairs"),pairRows,20,"No two-unit combinations meet the support threshold.");renderInteractionRows(document.getElementById("ally-trios"),trioRows,20,"No three-unit combinations meet the support threshold.");var select=document.getElementById("counter-unit"),host=document.getElementById("counter-leaders");select.replaceChildren();var declaredUnits=Array.isArray(interactions.counterUnits)?interactions.counterUnits:[];var units=Array.from(new Set(declaredUnits.concat(counterRows.map(function(row){return row.unit}).filter(Boolean)))).sort(function(left,right){return left.localeCompare(right)});if(!units.length){renderInteractionRows(host,[],5,"No unit counter rows meet the support threshold.");return}units.forEach(function(unit){var option=document.createElement("option");option.value=unit;option.textContent=unit;select.append(option)});var renderUnit=function(){var unit=select.value;var rowsForUnit=counterRows.filter(function(row){return row.unit===unit}).map(function(row){return Object.assign({},row,{name:unit+" → "+(row.enemyUnit||row.name)})});renderInteractionRows(host,rowsForUnit,5,"No supported counter edges for this unit.")};select.addEventListener("change",renderUnit);renderUnit()}
 function renderTypeFilter(){var select=document.getElementById("type-filter");if(select.options.length>1)return;categories.forEach(function(category){var option=document.createElement("option");option.value=category.key;option.textContent=category.label;select.append(option)})}
 function td(text,className){return node("td",className||"",text)}
 function renderTable(){var body=document.getElementById("ranking-body");var values=tableRows();body.replaceChildren();values.forEach(function(row){var line=node("tr");line.append(td(row.categoryLabel));var entry=td("");var wrap=node("div","table-entry");var img=node("img");img.src=image(row);img.alt="";var copy=node("div");copy.append(node("strong","",row.name));copy.append(node("span","type-chip",row.key));wrap.append(img,copy);entry.append(wrap);line.append(entry);line.append(td(cohortLabel(row.cohort)));line.append(td(mapLabel(row.map),mapIsNonLive(row.map)?"negative":""));line.append(td(sample(row)));line.append(td(finite(row.wins)?numberFormat.format(row.wins):"—"));line.append(td(finite(row.losses)?numberFormat.format(row.losses):"—"));line.append(td(finite(row.draws)?numberFormat.format(row.draws):"—"));line.append(td(rate(row.scoreRate),"rate-cell"));line.append(td(rate(row.winRate)));line.append(td(finite(row.ciLow)&&finite(row.ciHigh)?rate(row.ciLow)+" – "+rate(row.ciHigh):"—"));line.append(td(rate(row.pickRate)));line.append(td(lift(row.liftPp),tone(row.liftPp)));body.append(line)});if(!values.length){var line=node("tr");var empty=td("No ranking rows match the selected cohort, map, and table filters.","empty");empty.colSpan=13;line.append(empty);body.append(line)}document.getElementById("table-total").textContent=numberFormat.format(values.length)+" rows"}
 function bindTable(){var search=document.getElementById("table-search");search.addEventListener("input",function(){state.query=search.value.trim();renderTable()});var select=document.getElementById("type-filter");select.addEventListener("change",function(){state.type=select.value;renderTable()});document.querySelectorAll("[data-sort]").forEach(function(button){button.addEventListener("click",function(){var key=button.getAttribute("data-sort");if(state.sort===key)state.direction*=-1;else{state.sort=key;state.direction=key==="name"||key==="categoryLabel"||key==="cohort"||key==="map"?1:-1}renderTable()})})}
 function renderAll(){renderTabs();renderCoverage();renderLeaders();renderForests();renderScatter();renderHeatmap();renderTable()}
-renderTypeFilter();renderMapFilter();bindTable();renderAll();
+renderTypeFilter();renderMapFilter();bindTable();renderInteractions();renderAll();
 })();
 </script>
 </body>

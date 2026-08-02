@@ -74,6 +74,56 @@ export function chakramSeparation(a: Unit, b: Unit): number {
     return best;
 }
 
+const CHAKRAM_NEIGHBOR_OFFSETS: readonly XY[] = [
+    { x: -1, y: -1 },
+    { x: 0, y: -1 },
+    { x: 1, y: -1 },
+    { x: -1, y: 0 },
+    { x: 1, y: 0 },
+    { x: -1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 1, y: 1 },
+];
+
+/**
+ * Whether the SEPARATING cells between two units are actually open air: an empty-cell chain of length
+ * `gap` linking the two footprints, every link Chebyshev-adjacent. A packed army has the GEOMETRY of a
+ * gap — a diagonal neighbour's neighbour measures two apart — but the cell in between holds a third
+ * body, and the disc cannot cut through a wall: no empty bridge, no bounce. Anything standing there
+ * blocks — enemy, ally, or an obstacle the grid tracks.
+ */
+function hasEmptyBridge(grid: Grid, a: Unit, b: Unit, gap: number): boolean {
+    const aCells = a.isSmallSize() ? [a.getBaseCell()] : a.getCells();
+    const bCells = b.isSmallSize() ? [b.getBaseCell()] : b.getCells();
+    const isEmpty = (cell: XY): boolean => !grid.getOccupantUnitId(cell);
+    const touches = (cell: XY, cells: XY[]): boolean =>
+        cells.some((c) => Math.max(Math.abs(c.x - cell.x), Math.abs(c.y - cell.y)) === 1);
+
+    // Empty cells hugging `a`'s footprint — every bridge starts on one of these.
+    const starts: XY[] = [];
+    const seen = new Set<string>();
+    for (const ac of aCells) {
+        for (const offset of CHAKRAM_NEIGHBOR_OFFSETS) {
+            const cell = { x: ac.x + offset.x, y: ac.y + offset.y };
+            const key = `${cell.x}:${cell.y}`;
+            if (!seen.has(key) && isEmpty(cell)) {
+                seen.add(key);
+                starts.push(cell);
+            }
+        }
+    }
+    if (gap === 1) {
+        return starts.some((cell) => touches(cell, bCells));
+    }
+    // gap === 2: one more empty link between a start cell and `b`.
+    return starts.some((first) =>
+        CHAKRAM_NEIGHBOR_OFFSETS.some((offset) => {
+            const second = { x: first.x + offset.x, y: first.y + offset.y };
+            return isEmpty(second) && touches(second, bCells);
+        }),
+    );
+}
+
 /** The straight run of cells from `from` to `to` (exclusive of `from`), for the hop's flight visual. */
 function lineCells(from: XY, to: XY): XY[] {
     const cells: XY[] = [];
@@ -99,6 +149,8 @@ function lineCells(from: XY, to: XY): XY[] {
  * Rules:
  *  - ALLIES ARE NEVER HIT, and never relay the chain.
  *  - Touching units (no gap) and units more than 2 cells apart are never bounced to.
+ *  - The separating cells must be EMPTY: a unit at the right distance whose gap is filled by another
+ *    body (any team, or an obstacle) is a wall, not a bounce target.
  *  - Each victim is struck at most once per throw; the primary target never takes a second hit.
  *  - Total victims, INCLUDING the primary target, cannot exceed the attacker's stack power (1..5).
  *  - Nearest-first: smallest separation to the struck cluster wins; ties break by base-cell distance
@@ -110,7 +162,7 @@ export function resolveChakramTrajectory(
     attackerUnit: Unit,
     primaryTarget: Unit,
     unitsHolder: UnitsHolder,
-    _grid: Grid,
+    grid: Grid,
 ): IChakramTrajectory {
     const empty: IChakramTrajectory = { steps: [], hitUnits: [], damageFactorByUnitId: {}, mountainCells: [] };
     if (!attackerUnit.getAbility(CHAKRAM_ABILITY_NAME) || primaryTarget.isDead()) {
@@ -136,18 +188,35 @@ export function resolveChakramTrajectory(
             if (visited.has(unit.getId()) || unit.isDead() || unit.getTeam() === attackerUnit.getTeam()) {
                 continue;
             }
-            // Nearest qualifying separation to ANYONE already struck; that unit anchors the hop's visual.
+            // Anyone touching the struck cluster is part of the wall, never a bounce — checked FIRST so a
+            // blocked bridge below can never promote a shoulder-to-shoulder unit through a farther anchor.
+            let minSeparation = Number.MAX_SAFE_INTEGER;
+            for (const member of struck) {
+                minSeparation = Math.min(minSeparation, chakramSeparation(member, unit));
+            }
+            if (minSeparation - 1 < CHAKRAM_FULL_DAMAGE_GAP) {
+                continue;
+            }
+            // Nearest qualifying separation to ANYONE already struck whose separating cells are actually
+            // EMPTY; that unit anchors the hop's visual. Geometry alone is not enough: in a packed army a
+            // diagonal neighbour's neighbour measures two apart with a third body in between, and the disc
+            // cannot cut through a wall (the fight report that pinned this: a solid six-stack block still
+            // got three units chained).
             let separation = Number.MAX_SAFE_INTEGER;
             let anchor: Unit | undefined;
             for (const member of struck) {
                 const memberSeparation = chakramSeparation(member, unit);
-                if (memberSeparation < separation) {
-                    separation = memberSeparation;
-                    anchor = member;
+                const memberGap = memberSeparation - 1;
+                if (memberGap < CHAKRAM_FULL_DAMAGE_GAP || memberGap > CHAKRAM_HALF_DAMAGE_GAP) {
+                    continue;
                 }
+                if (memberSeparation >= separation || !hasEmptyBridge(grid, member, unit, memberGap)) {
+                    continue;
+                }
+                separation = memberSeparation;
+                anchor = member;
             }
-            const gap = separation - 1;
-            if (gap < CHAKRAM_FULL_DAMAGE_GAP || gap > CHAKRAM_HALF_DAMAGE_GAP) {
+            if (!anchor) {
                 continue;
             }
             const from = last.getBaseCell();

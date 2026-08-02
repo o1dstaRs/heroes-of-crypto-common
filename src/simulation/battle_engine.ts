@@ -54,7 +54,11 @@ import type { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { getDistance, type XY } from "../utils/math";
 import { ToFactionName } from "../factions/faction_type";
-import { getDeterministicRandomSource, setDeterministicRandomSource } from "../utils/lib";
+import {
+    captureDeterministicRandomState,
+    restoreDeterministicRandomState,
+    setDeterministicRandomSource,
+} from "../utils/lib";
 import {
     createCombatFactories,
     createUnitFromSpec,
@@ -725,12 +729,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         let battleSnapshot: ReturnType<typeof snapshotBattle>;
         let damageSnapshot: IDamageStatistic[];
         let summonedUnitSequenceSnapshot: number;
-        let liveRandomSource: ReturnType<typeof getDeterministicRandomSource>;
+        let liveRandomState: ReturnType<typeof captureDeterministicRandomState>;
         try {
             battleSnapshot = snapshotBattle(unitsHolder, grid, fightProperties);
             damageSnapshot = damageStatisticHolder.get().map((statistic) => ({ ...statistic }));
             summonedUnitSequenceSnapshot = summonedUnitSequence;
-            liveRandomSource = getDeterministicRandomSource();
+            liveRandomState = captureDeterministicRandomState();
         } catch {
             return {
                 preflightMicros: Math.max(0, Math.round((performance.now() - startedAt) * 1000)),
@@ -778,7 +782,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             failure = "preflight_runtime_error";
         } finally {
             try {
-                setDeterministicRandomSource(liveRandomSource);
+                restoreDeterministicRandomState(liveRandomState);
             } catch (error) {
                 cleanupErrors.push(error);
             }
@@ -865,7 +869,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const v08A13TrajectoryTeams = new Set(config.searchV08A13TrajectoryTeams ?? []);
     const v08A13TrajectorySearch =
         config.searchScoredDecisionObserver && v08A13TrajectoryTeams.size
-            ? createV08A13SearchDriver(driverDeps, searchMatch)
+            ? // The offline teacher has already installed its own unbounded, deterministic SearchDriver
+              // environment. Rebuilding the production a13 profile here would silently restore its 175ms
+              // deadline and make otherwise identical teacher seeds diverge under different host load.
+              new SearchDriver(driverDeps, searchMatch)
             : undefined;
 
     // --- build armies (per-team rosters; identical lists in a mirrored match) ---

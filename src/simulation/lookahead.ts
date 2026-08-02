@@ -24,7 +24,11 @@ import type { AttackHandler } from "../handlers/attack_handler";
 import type { IDamageStatistic } from "../scene/scene_stats";
 import type { Unit } from "../units/unit";
 import type { UnitsHolder } from "../units/units_holder";
-import { getDeterministicRandomSource, setDeterministicRandomSource } from "../utils/lib";
+import {
+    captureDeterministicRandomState,
+    restoreDeterministicRandomState,
+    setDeterministicRandomSource,
+} from "../utils/lib";
 import type { XY } from "../utils/math";
 import { makeRng } from "./army";
 import { restoreBattle, snapshotBattle } from "./battle_snapshot";
@@ -148,7 +152,7 @@ export class LookaheadDriver {
     public chooseDecision(unit: Unit, baseDecision: GameAction[]): GameAction[] {
         const actingTeam = unit.getTeam();
         const seed = this.simSeed(unit);
-        const savedSource = getDeterministicRandomSource();
+        const savedRandomState = captureDeterministicRandomState();
         const savedActive = this.deps.getActiveUnitId();
 
         // Swap the tournament's seeded RNG to a PRIVATE stream around the WHOLE search (candidate building
@@ -189,8 +193,9 @@ export class LookaheadDriver {
             }
             return best;
         } finally {
-            // Restore the tournament's exact RNG source + the engine's active-unit pointer.
-            setDeterministicRandomSource(savedSource);
+            // Restore the tournament's exact RNG + UUID state and the engine's active-unit pointer.
+            // Speculative summons must not perturb the IDs (or subsequent rollout seeds) of live units.
+            restoreDeterministicRandomState(savedRandomState);
             this.deps.setActiveUnitId(savedActive);
             this.finishedSim = false;
         }

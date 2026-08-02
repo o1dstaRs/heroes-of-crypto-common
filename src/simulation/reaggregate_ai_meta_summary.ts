@@ -60,6 +60,10 @@ export interface IReaggregateAiMetaResult {
     cohorts: AiMetaCohort[];
 }
 
+export interface IReaggregateAiMetaOptions {
+    allowPartial?: boolean;
+}
+
 const isRecord = (value: unknown): value is UnknownRecord =>
     !!value && typeof value === "object" && !Array.isArray(value);
 
@@ -446,6 +450,7 @@ function publishJsonAtomically(outputPath: string, value: unknown): void {
 export async function reaggregateAiMetaSummary(
     summaryArgument: string,
     outputArgument?: string,
+    options: IReaggregateAiMetaOptions = {},
 ): Promise<IReaggregateAiMetaResult> {
     const summaryPath = realpathSync(resolve(summaryArgument));
     const outputPath = resolve(outputArgument ?? defaultOutputPath(summaryPath));
@@ -455,7 +460,13 @@ export async function reaggregateAiMetaSummary(
     const parsed = JSON.parse(readFileSync(summaryPath, "utf8")) as unknown;
     if (!isRecord(parsed)) throw new Error("Summary root must be an object");
     if (parsed.schemaVersion !== AI_META_SCHEMA_VERSION) throw new Error("Summary schemaVersion is incompatible");
-    if (parsed.complete !== true) throw new Error("Only a complete AI meta summary can be reaggregated");
+    const partialSource = parsed.complete !== true;
+    if (partialSource && !options.allowPartial) {
+        throw new Error("Only a complete AI meta summary can be reaggregated without allowPartial");
+    }
+    if (partialSource && !outputArgument) {
+        throw new Error("Partial AI meta reaggregation requires an explicit diagnostic output path");
+    }
     if (!isRecord(parsed.provenance)) throw new Error("Summary is missing provenance");
     if (!Array.isArray(parsed.cohorts) || !parsed.cohorts.length) throw new Error("Summary has no cohorts");
     const aggregationToolIdentity = captureAiMetaSourceIdentity();
@@ -466,7 +477,10 @@ export async function reaggregateAiMetaSummary(
     if (new Set(cohorts).size !== cohorts.length) throw new Error("Summary contains duplicate cohorts");
     if (Array.isArray(parsed.provenance.requestedCohorts)) {
         const requested = parsed.provenance.requestedCohorts;
-        if (requested.length !== cohorts.length || requested.some((cohort, index) => cohort !== cohorts[index])) {
+        const matchesRequested = partialSource
+            ? cohorts.length <= requested.length && cohorts.every((cohort, index) => cohort === requested[index])
+            : requested.length === cohorts.length && requested.every((cohort, index) => cohort === cohorts[index]);
+        if (!matchesRequested) {
             throw new Error("Summary cohorts do not match provenance.requestedCohorts");
         }
     }
@@ -520,6 +534,8 @@ export async function reaggregateAiMetaSummary(
             mapAggregation: {
                 generatedAt: new Date().toISOString(),
                 sourceSummary: basename(summaryPath),
+                sourceComplete: parsed.complete === true,
+                partialDiagnostic: partialSource,
                 liveMaps: [...AI_META_MAPS],
                 recordedMaps: [...declaredMaps],
                 defaultDimension: "live",
@@ -530,22 +546,27 @@ export async function reaggregateAiMetaSummary(
                 },
             },
         },
-        rankings: preserveAllMapRankings(parsed, computedRankings),
+        rankings: partialSource
+            ? (parsed.rankings as unknown as IAiMetaRankings)
+            : preserveAllMapRankings(parsed, computedRankings),
+        interactions: aggregation.interactions(),
     };
     publishJsonAtomically(outputPath, enriched);
     return { outputPath, pairs: expectedPairs, games: expectedGames, maps: declaredMaps, cohorts };
 }
 
 const USAGE =
-    "Usage: bun src/simulation/reaggregate_ai_meta_summary.ts <ai-meta.summary.json> [ai-meta.maps.summary.json]";
+    "Usage: bun src/simulation/reaggregate_ai_meta_summary.ts <ai-meta.summary.json> [output.summary.json] [--allow-partial]";
 
 export async function main(argv: readonly string[] = process.argv.slice(2)): Promise<void> {
-    if (argv[0] === "--help" || argv[0] === "-h") {
+    if (argv.includes("--help") || argv.includes("-h")) {
         console.log(USAGE);
         return;
     }
-    if (!argv[0] || argv.length > 2) throw new Error(USAGE);
-    const result = await reaggregateAiMetaSummary(argv[0], argv[1]);
+    const allowPartial = argv.includes("--allow-partial");
+    const positional = argv.filter((argument) => argument !== "--allow-partial");
+    if (!positional[0] || positional.length > 2) throw new Error(USAGE);
+    const result = await reaggregateAiMetaSummary(positional[0], positional[1], { allowPartial });
     console.log(
         `AI meta maps: ${result.games.toLocaleString()} fights, ${result.cohorts.length} cohorts, ` +
             `${result.maps.length} recorded maps -> ${result.outputPath}`,
