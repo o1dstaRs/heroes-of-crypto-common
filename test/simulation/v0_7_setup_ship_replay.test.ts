@@ -131,7 +131,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned for the Arachna Queen buff (hp 190 -> 200, armor 31 -> 33, Web aura reach 1 -> 2): her
 // durability and the wider flyer lockdown re-value seeded setups and every exchange she appears in.
 // Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "25fbc46ecb6a2e8f150be8bbe91e28c941684c91a0e699909c800b1f6b326c91";
+// Re-pinned for the Griffin nerf (armor 24 -> 23): every seeded exchange the Griffin takes part in
+// resolves slightly differently. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "847fca7c34f206170cf77b7713b1c98d7378fbe91e282594855cecc4cf6f59eb";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
