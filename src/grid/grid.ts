@@ -33,6 +33,21 @@ export class Grid {
     // BLOCK_CENTER has two independent mountains; each is cleared to walkable when its own hit points hit 0.
     private leftMountainCleared = false;
     private rightMountainCleared = false;
+    /**
+     * SCATTERED MOUNTAINS — the newer BLOCK_CENTER shape: single-cell mountains dropped at random over the
+     * neutral band instead of two fixed 2x2 blocks.
+     *
+     * It is OPT-IN, and that is deliberate rather than timid. The two-mountain layout is derived from pure
+     * geometry, so client and server reach it independently without exchanging anything; a random layout is
+     * not reproducible that way. Until the server is taught to agree on one, only the sandbox (which is
+     * authoritative over its own fight) may switch this on — a ranked fight left on the classic path can
+     * never disagree with the server about where the rock is.
+     *
+     * Empty layout = classic behaviour, unchanged down to the last cell.
+     */
+    private scatteredMountainLayout: XY[] = [];
+    /** Packed keys of the scattered mountains still standing; a cleared one is simply dropped from here. */
+    private scatteredMountainsStanding: Set<number> = new Set();
     public constructor(gridSettings: GridSettings, gridType: GridType) {
         this.gridSettings = gridSettings;
         const gridSize = gridSettings.getGridSize();
@@ -123,6 +138,67 @@ export class Grid {
             for (const column of columns) {
                 this.boardCoord[row][column] = NO_UNIT;
             }
+        }
+        return true;
+    }
+    /** Packed cell key. GRID_SIZE is 16, so a byte per axis is ample and the key stays a small int. */
+    private static packCell(x: number, y: number): number {
+        return (x << 8) | y;
+    }
+    /**
+     * Install a scattered-mountain layout, replacing whatever BLOCK_CENTER shape was in force. Pass an empty
+     * array to go back to the classic two 2x2 mountains.
+     *
+     * Writes the obstacles straight into the board, so it is safe to call after construction (which is when
+     * the caller knows the layout) and again on every re-roll.
+     */
+    public setScatteredMountains(cells: XY[]): void {
+        if (this.gridType !== PBTypes.GridVals.BLOCK_CENTER) {
+            return;
+        }
+        // Lift the previous layout off the board first, or a re-roll would leave the old rock behind.
+        for (const cell of this.scatteredMountainLayout) {
+            if (this.boardCoord[cell.x]?.[cell.y] === "B") {
+                this.boardCoord[cell.x][cell.y] = NO_UNIT;
+            }
+        }
+        this.scatteredMountainLayout = cells.map((c) => ({ x: c.x, y: c.y }));
+        this.scatteredMountainsStanding = new Set(this.scatteredMountainLayout.map((c) => Grid.packCell(c.x, c.y)));
+        if (cells.length) {
+            // The classic pair and a scattered layout must never be on the board at once.
+            this.leftMountainCleared = true;
+            this.rightMountainCleared = true;
+            const mid = this.gridSettings.getGridSize() >> 1;
+            for (const row of [mid - 3, mid - 2, mid + 1, mid + 2]) {
+                for (const column of [mid - 1, mid]) {
+                    if (this.boardCoord[row]?.[column] === "B") {
+                        this.boardCoord[row][column] = NO_UNIT;
+                    }
+                }
+            }
+        }
+        for (const cell of this.scatteredMountainLayout) {
+            this.boardCoord[cell.x][cell.y] = "B";
+        }
+    }
+    public hasScatteredMountains(): boolean {
+        return this.scatteredMountainLayout.length > 0;
+    }
+    /** The mountains still standing, in layout order — the renderer keeps art per cell, so order matters. */
+    public getScatteredMountainsStanding(): XY[] {
+        return this.scatteredMountainLayout.filter((c) => this.scatteredMountainsStanding.has(Grid.packCell(c.x, c.y)));
+    }
+    /**
+     * Knock out one scattered mountain. Idempotent, and returns false when there was nothing there, so the
+     * caller can tell a real destruction from a stray hit.
+     */
+    public clearScatteredMountainAt(x: number, y: number): boolean {
+        const key = Grid.packCell(x, y);
+        if (!this.scatteredMountainsStanding.delete(key)) {
+            return false;
+        }
+        if (this.boardCoord[x]?.[y] === "B") {
+            this.boardCoord[x][y] = NO_UNIT;
         }
         return true;
     }
@@ -643,6 +719,9 @@ export class Grid {
         // attack targeting + the AI's mining only ever see intact rock. Rows are world-X (left mid-3,mid-2 /
         // right mid+1,mid+2), columns are world-Y (mid-1,mid). excludeInner has no meaning for this shape.
         if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
+            if (this.scatteredMountainLayout.length) {
+                return this.getScatteredMountainsStanding();
+            }
             const mid = this.gridSettings.getGridSize() >> 1;
             const mountainColumns = [mid - 1, mid];
             const cells: XY[] = [];
@@ -735,6 +814,11 @@ export class Grid {
     //   LAVA_CENTER / WATER_CENTER: the full availableCenter square (unchanged).
     private isCenterObstacleCell(row: number, column: number): boolean {
         if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
+            // Scattered layout, when one is installed, is the whole answer: the cells are arbitrary, so
+            // there is no geometry to fall back on.
+            if (this.scatteredMountainLayout.length) {
+                return this.scatteredMountainsStanding.has(Grid.packCell(row, column));
+            }
             // NOTE: in this grid `row` is the horizontal (world-X) axis and `column` is vertical (world-Y).
             // The two mountains sit side by side along X (rows), sharing the middle two Y columns, with a 2x2
             // walkable corridor between them (rows mid-1,mid). This matches the two sprites (offset in world-X).
