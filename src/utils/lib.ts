@@ -53,6 +53,16 @@ export type RandomSource = () => number;
 let deterministicSource: RandomSource | undefined;
 let deterministicUuidSequence = 0;
 
+/**
+ * Simulation-only snapshot of the seeded RNG scope. Search rollouts temporarily replace the global seeded
+ * source and may construct simulated units; restoring only the source would leak their UUID allocations into
+ * the live match. Keep the two pieces of deterministic state together at every speculative boundary.
+ */
+export interface IDeterministicRandomState {
+    source: RandomSource | undefined;
+    uuidSequence: number;
+}
+
 /** Install (or clear, with `undefined`) a seeded randomness source. Simulation/tests only — see above. */
 export function setDeterministicRandomSource(source: RandomSource | undefined): void {
     // A new simulation starts from the secure/live path and installs its own seeded source. Reset the
@@ -66,6 +76,21 @@ export function setDeterministicRandomSource(source: RandomSource | undefined): 
 /** Whether a seeded source is currently installed (true only inside a simulation/test scope). */
 export function isDeterministicRandomActive(): boolean {
     return deterministicSource !== undefined;
+}
+
+/** Capture the complete simulation-only randomness state before a speculative rollout. */
+export function captureDeterministicRandomState(): IDeterministicRandomState {
+    return { source: deterministicSource, uuidSequence: deterministicUuidSequence };
+}
+
+/**
+ * Restore a state captured by {@link captureDeterministicRandomState}. This deliberately bypasses
+ * setDeterministicRandomSource: a speculative search must restore the UUID counter precisely, rather than
+ * applying the public simulation-scope reset rules.
+ */
+export function restoreDeterministicRandomState(state: IDeterministicRandomState): void {
+    deterministicSource = state.source;
+    deterministicUuidSequence = state.uuidSequence;
 }
 
 /**

@@ -54,7 +54,11 @@ import type { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { getDistance, type XY } from "../utils/math";
 import { ToFactionName } from "../factions/faction_type";
-import { getDeterministicRandomSource, setDeterministicRandomSource } from "../utils/lib";
+import {
+    captureDeterministicRandomState,
+    restoreDeterministicRandomState,
+    setDeterministicRandomSource,
+} from "../utils/lib";
 import {
     createCombatFactories,
     createUnitFromSpec,
@@ -725,12 +729,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         let battleSnapshot: ReturnType<typeof snapshotBattle>;
         let damageSnapshot: IDamageStatistic[];
         let summonedUnitSequenceSnapshot: number;
-        let liveRandomSource: ReturnType<typeof getDeterministicRandomSource>;
+        let liveRandomState: ReturnType<typeof captureDeterministicRandomState>;
         try {
             battleSnapshot = snapshotBattle(unitsHolder, grid, fightProperties);
             damageSnapshot = damageStatisticHolder.get().map((statistic) => ({ ...statistic }));
             summonedUnitSequenceSnapshot = summonedUnitSequence;
-            liveRandomSource = getDeterministicRandomSource();
+            liveRandomState = captureDeterministicRandomState();
         } catch {
             return {
                 preflightMicros: Math.max(0, Math.round((performance.now() - startedAt) * 1000)),
@@ -778,7 +782,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             failure = "preflight_runtime_error";
         } finally {
             try {
-                setDeterministicRandomSource(liveRandomSource);
+                restoreDeterministicRandomState(liveRandomState);
             } catch (error) {
                 cleanupErrors.push(error);
             }

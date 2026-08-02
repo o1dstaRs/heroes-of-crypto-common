@@ -55,7 +55,11 @@ import type { GameEvent } from "../engine/events";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import type { Unit } from "../units/unit";
-import { getDeterministicRandomSource, setDeterministicRandomSource } from "../utils/lib";
+import {
+    captureDeterministicRandomState,
+    restoreDeterministicRandomState,
+    setDeterministicRandomSource,
+} from "../utils/lib";
 import { hashSimulationParts, makeRng } from "./army";
 import { BattleRollbackJournal, restoreBattle, snapshotBattle } from "./battle_snapshot";
 import {
@@ -1686,7 +1690,7 @@ export class SearchDriver {
             return incumbent;
         }
         const t0 = performance.now();
-        const savedSource = getDeterministicRandomSource();
+        const savedRandomState = captureDeterministicRandomState();
         const savedActive = this.deps.getActiveUnitId();
         const seedBase = this.simSeed(unit);
         let pendingPassiveProductiveProbe: ISearchPassiveProductiveProbe | undefined;
@@ -2523,7 +2527,9 @@ export class SearchDriver {
             }
             const cleanupErrors: unknown[] = [];
             try {
-                setDeterministicRandomSource(savedSource);
+                // Rollouts can construct simulated units. Restore their UUID allocations along with the live
+                // combat RNG so worker assignment cannot influence later live SearchDriver seeds.
+                restoreDeterministicRandomState(savedRandomState);
             } catch (error) {
                 cleanupErrors.push(error);
             }
