@@ -41,6 +41,7 @@ import { prioritizeV08A13FinishDecision } from "./v0_8s_finish";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const V08_DIRECT_COMBAT_KINDS = new Set<CandidateKind>(["melee", "shot", "area_throw"]);
+const V08_SPLASH_RANGED_KINDS = new Set<CandidateKind>(["shot", "area_throw"]);
 const V08_PASSIVE_ACTION_TYPES = new Set<GameAction["type"]>(["defend_turn", "obstacle_attack", "end_turn"]);
 const V08_POSTURE_PROTECTED_ACTION_TYPES = new Set<GameAction["type"]>([
     "melee_attack",
@@ -179,6 +180,51 @@ export function selectV08DirectCombatCandidate(
         }
     }
     return best;
+}
+
+export function selectV08SplashRangedCandidate(
+    candidates: readonly IEnumeratedCandidate[],
+): IEnumeratedCandidate | undefined {
+    let best: IEnumeratedCandidate | undefined;
+    for (const candidate of candidates) {
+        if (!V08_SPLASH_RANGED_KINDS.has(candidate.kind) || !isV08DirectCombatDecision(candidate.actions)) {
+            continue;
+        }
+        if (!Number.isFinite(candidate.features.expectedDamage)) {
+            continue;
+        }
+        if (!best || candidate.features.expectedDamage > best.features.expectedDamage) {
+            best = candidate;
+        }
+    }
+    return best;
+}
+
+const isV08SplashRangedDecision = (decision: readonly GameAction[]): boolean =>
+    decision.some((action) => action.type === "range_attack" || action.type === "area_throw_attack");
+
+export function prioritizeV08SplashRangedDecision(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+): GameAction[] {
+    if (
+        (!unit.hasAbilityActive("Area Throw") && !unit.hasAbilityActive("Large Caliber")) ||
+        !isV08SplashRangedDecision(decision)
+    ) {
+        return decision;
+    }
+    const candidates = enumerateCandidates(unit, context, decision, {
+        maxMoveDestinations: 1,
+        maxMeleePairs: 1,
+        enrichIncumbentMetadata: true,
+    }).candidates;
+    const incumbent = candidates[0];
+    if (!incumbent?.targetId || !Number.isFinite(incumbent.features.expectedDamage)) {
+        return decision;
+    }
+    const best = selectV08SplashRangedCandidate(candidates);
+    return best && best.features.expectedDamage > incumbent.features.expectedDamage ? best.actions : decision;
 }
 
 const immediateDamagePrecedes = (
@@ -585,7 +631,8 @@ export class StrategyV0_8 extends StrategyV0_7 {
         const finished = prioritizeV08A13FinishDecision(unit, context, active);
         const positioned = prioritizeV08RangedPositioning(unit, context, finished, this.version);
         const legalDecision = repairV08ForbiddenTargetDecision(unit, context, positioned);
-        const spellDecision = prioritizeV08DamageSpell(unit, context, legalDecision);
+        const splashDecision = prioritizeV08SplashRangedDecision(unit, context, legalDecision);
+        const spellDecision = prioritizeV08DamageSpell(unit, context, splashDecision);
         const vineDecision = prioritizeV08VineThrow(unit, context, spellDecision);
         const supportRolesEnabled = strategyVersionMatchesExperimentScope(
             this.version,

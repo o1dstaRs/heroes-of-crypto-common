@@ -206,10 +206,10 @@ describe("v0.8 search measurement alias", () => {
         // with zero rejected actions, and two clean-source runs reproduced the v0.8 trace below.
         // Re-pinned with the same Tsar Cannon range / Dryad damage balance change; two isolated runs
         // reproduced this digest byte-identically alongside the v0.7 control above.
-        // Re-pinned after Cyclops steps 5 -> 6: the wider reach reshapes v0.8's seeded trace (the v0.7
-        // control above still reproduces byte-identically — its line doesn't move a Cyclops that turn).
+        // Re-pinned after splash-target selection makes Gargantuan and Cyclops prefer higher-net-damage clusters.
+        // The v0.7 control above still reproduces byte-identically.
         // Two isolated runs reproduced this digest.
-        expect(digest("v0.8")).toBe("1958918a1f03350be2e334df6baf9cb8f82ee61f6a34333d73bdf19e099c6776");
+        expect(digest("v0.8")).toBe("b52ab590899a743f1296443b60a52acbdaa7385f33684326194f7e53ed7b5831");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {
