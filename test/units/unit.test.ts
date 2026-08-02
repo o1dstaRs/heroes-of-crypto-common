@@ -302,6 +302,25 @@ describe("Unit", () => {
             expect(unit.getHp()).toBe(125);
         });
 
+        it("keeps a ranked snapshot's max HP verbatim — the pendant must not re-boost an already-boosted cap", () => {
+            // Ranked hydrate: the snapshot's 250 already CONTAINS the server's +25% pendant (200 base), and
+            // the ranked refresh re-applies the artifact buff. Without the authoritative guard this read
+            // 250/313 — the exact "army never at full HP" report.
+            const unit = createTestUnit({ maxHp: 250 });
+            // getAllProperties() clones, so reach the live properties the way the ranked hydrate does.
+            (
+                unit as unknown as { unitProperties: { max_hp_authoritative?: boolean } }
+            ).unitProperties.max_hp_authoritative = true;
+            const pendant = spell("System", "Pendant of Vitality");
+            pendant.setPower(25);
+
+            unit.applyBuff(pendant);
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+            expect(unit.getMaxHp()).toBe(250);
+            expect(unit.getHp()).toBe(250);
+        });
+
         it("preserves a wounded unit's current HP when a max-HP buff raises its cap", () => {
             const unit = createTestUnit({ maxHp: 100 });
             const pendant = spell("System", "Pendant of Vitality");
