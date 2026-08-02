@@ -1015,6 +1015,134 @@ describe("GameActionEngine", () => {
         expect(setup.upper.getCumulativeHp()).toBe(hpBefore - (entry?.amount ?? 0));
     });
 
+    it("uses Double Shot's first projectile on a scattered stone and the second on the aimed unit", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerAbilities: ["Double Shot"],
+            lowerRangeShots: 3,
+            lowerCell: { x: 3, y: 3 },
+            supportCell: { x: 3, y: 4 },
+            upperCell: { x: 9, y: 3 },
+        });
+        setup.grid.setScatteredMountains([{ x: 6, y: 3 }]);
+        setup.lower.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.upper.getCumulativeHp();
+        const shotsBefore = setup.lower.getRangeShots();
+
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.lower.getId(),
+            targetId: setup.upper.getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([]);
+        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
+        expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(1);
+        expect(result.events.filter((event) => event.type === "unit_attacked")).toHaveLength(1);
+    });
+
+    it("shows direct obstacle targeting the same trajectory rule: Double Shot destroys the blocker then the aimed stone", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerAbilities: ["Double Shot"],
+            lowerRangeShots: 3,
+            lowerCell: { x: 3, y: 3 },
+            supportCell: { x: 3, y: 4 },
+            upperCell: { x: 10, y: 8 },
+        });
+        const blocker = { x: 5, y: 3 };
+        const aimedStone = { x: 7, y: 3 };
+        setup.grid.setScatteredMountains([blocker, aimedStone]);
+        setup.lower.refreshPossibleAttackTypes(true);
+        const settings = setup.grid.getSettings();
+        const targetPosition = getPositionForCell(
+            aimedStone,
+            settings.getMinX(),
+            settings.getStep(),
+            settings.getHalfStep(),
+        );
+        const shotsBefore = setup.lower.getRangeShots();
+
+        const result = setup.engine.apply({
+            type: "obstacle_attack",
+            attackerId: setup.lower.getId(),
+            targetPosition,
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([]);
+        expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
+        expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
+    });
+
+    it("spends both Double Shot projectiles on the first two scattered stones before the aimed unit", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerAbilities: ["Double Shot"],
+            lowerRangeShots: 3,
+            lowerCell: { x: 3, y: 3 },
+            supportCell: { x: 3, y: 4 },
+            upperCell: { x: 10, y: 3 },
+        });
+        const thirdStone = { x: 8, y: 3 };
+        setup.grid.setScatteredMountains([{ x: 5, y: 3 }, { x: 7, y: 3 }, thirdStone]);
+        setup.lower.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.upper.getCumulativeHp();
+        const shotsBefore = setup.lower.getRangeShots();
+
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.lower.getId(),
+            targetId: setup.upper.getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.upper.getCumulativeHp()).toBe(hpBefore);
+        expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([thirdStone]);
+        expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
+        expect(result.events.filter((event) => event.type === "unit_attacked")).toHaveLength(0);
+    });
+
+    it("Large Caliber ignores scattered stones on its trajectory and destroys every stone in its 3x3 blast", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerAttack: 20,
+            lowerAbilities: ["Large Caliber"],
+            lowerDamageMin: 10,
+            lowerDamageMax: 10,
+            lowerRangeShots: 3,
+            lowerCell: { x: 3, y: 7 },
+            supportCell: { x: 3, y: 6 },
+            upperCell: { x: 8, y: 7 },
+        });
+        const inBlast = [
+            { x: 7, y: 7 },
+            { x: 8, y: 8 },
+        ];
+        const outsideBlast = { x: 11, y: 11 };
+        setup.grid.setScatteredMountains([...inBlast, outsideBlast]);
+        setup.lower.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.upper.getCumulativeHp();
+
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.lower.getId(),
+            targetId: setup.upper.getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([outsideBlast]);
+        expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
+    });
+
     it("lets the actual front intersection retaliate when Large Caliber intentionally aims at a rear stack", () => {
         const setup = setupActionFight({
             lowerAttackType: PBTypes.AttackVals.RANGE,
@@ -1458,6 +1586,40 @@ describe("GameActionEngine", () => {
         const entries = (area.damage.splash ?? []).filter((s) => s.unitId === setup.upper.getId());
         expect(entries.length).toBe(2); // one floating number per shot, not a merged total
         expect(entries.every((e) => e.amount > 0)).toBe(true);
+    });
+
+    it("Area Throw flies over scattered stones and destroys every stone in the landing area", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerAttack: 20,
+            lowerAbilities: ["Area Throw"],
+            lowerDamageMin: 10,
+            lowerDamageMax: 10,
+            lowerRangeShots: 2,
+            lowerCell: { x: 3, y: 7 },
+            supportCell: { x: 3, y: 6 },
+            upperCell: { x: 8, y: 8 },
+        });
+        const inBlast = [
+            { x: 7, y: 7 },
+            { x: 8, y: 7 },
+        ];
+        const outsideBlast = { x: 11, y: 11 };
+        setup.grid.setScatteredMountains([...inBlast, outsideBlast]);
+        setup.lower.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.upper.getCumulativeHp();
+
+        const result = setup.engine.apply({
+            type: "area_throw_attack",
+            attackerId: setup.lower.getId(),
+            targetCell: { x: 7, y: 7 },
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([outsideBlast]);
+        expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
     });
 
     it("projects an area throw onto the first enemy standing on the trajectory", () => {

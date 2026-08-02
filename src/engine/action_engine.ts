@@ -24,6 +24,7 @@ import type { AttackType, FactionType, TeamType } from "../generated/protobuf/v1
 import {
     getCellsAroundCell,
     getCellsAroundFootprint,
+    getCellForPosition,
     getPositionForCell,
     getPositionForCells,
     getRangeAttackSideCenter,
@@ -647,7 +648,7 @@ export class GameActionEngine {
         // a legal edge, so the server geometry can never be compromised.
         const toPosition = this.resolveRangeTargetPosition(attacker, target, action.aimCell, action.aimSide);
 
-        const evalResult = this.context.attackHandler.evaluateRangeAttack(
+        let evalResult = this.context.attackHandler.evaluateRangeAttack(
             this.context.unitsHolder.getAllUnits(),
             attacker,
             attacker.getPosition(),
@@ -656,6 +657,58 @@ export class GameActionEngine {
             false,
             attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
         );
+        const destroyedScatteredCells: XY[] = [];
+        const doubleShot = attacker.getAbility("Double Shot") ?? attacker.getAbility("Crafted Double Shot");
+        const doubleShotObstacleIntersections =
+            this.context.grid.hasScatteredMountains() && doubleShot
+                ? this.context.attackHandler.getObstacleIntersections(attacker.getPosition(), toPosition).slice(0, 2)
+                : [];
+        const interceptedForDoubleShot = doubleShotObstacleIntersections.length > 0;
+        if (interceptedForDoubleShot) {
+            if (
+                !this.context.attackHandler.canLandRangeAttack(
+                    attacker,
+                    this.context.grid.getEnemyAggrMatrixByUnitId(attacker.getId()),
+                )
+            ) {
+                return this.reject("attack_not_available");
+            }
+            for (const obstacle of doubleShotObstacleIntersections) {
+                const obstacleCell = getCellForPosition(this.context.grid.getSettings(), obstacle.position);
+                if (obstacleCell && this.context.grid.clearScatteredMountainAt(obstacleCell.x, obstacleCell.y)) {
+                    destroyedScatteredCells.push(obstacleCell);
+                }
+            }
+            if (destroyedScatteredCells.length >= 2) {
+                // Both projectiles were consumed by the first two stones. The declared creature remains
+                // untouched, and a third stone (if present) continues to block the lane.
+                attacker.decreaseNumberOfShots();
+                this.context.unitsHolder.refreshStackPowerForAllUnits();
+                const events: GameEvent[] = [
+                    ...this.scatteredObstacleDestroyedEvents(attacker, destroyedScatteredCells),
+                    ...this.turnEngine.completeTurn(attacker),
+                ];
+                return { completed: true, events };
+            }
+            // Exactly one blocker: projectile one removes it; projectile two continues to the creature.
+            evalResult = this.context.attackHandler.evaluateRangeAttack(
+                this.context.unitsHolder.getAllUnits(),
+                attacker,
+                attacker.getPosition(),
+                toPosition,
+                attacker.hasAbilityActive("Through Shot"),
+                false,
+                attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
+            );
+        }
+        if (
+            this.context.grid.hasScatteredMountains() &&
+            (attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"))
+        ) {
+            destroyedScatteredCells.push(
+                ...this.context.grid.clearScatteredMountainsInCells(evalResult.affectedCells.flat()),
+            );
+        }
         // `target` is the declared aim anchor used to reconstruct the trajectory. Special shots may legally
         // aim at a rear stack while the authoritative first intersection is a different front stack. Response
         // ownership must follow that actual primary, exactly as damage does; using the aim anchor can suppress
@@ -703,6 +756,7 @@ export class GameActionEngine {
             toPosition,
             false,
             true,
+            interceptedForDoubleShot,
         );
         if (!result.completed) {
             return this.reject("attack_not_available");
@@ -715,6 +769,7 @@ export class GameActionEngine {
             ...(responseTarget && primaryRangeTarget ? [{ victim: responseTarget, killer: primaryRangeTarget }] : []),
         ]);
         const events: GameEvent[] = [
+            ...this.scatteredObstacleDestroyedEvents(attacker, destroyedScatteredCells),
             {
                 type: "unit_attacked",
                 attackType: "range",
@@ -818,10 +873,14 @@ export class GameActionEngine {
         if (!this.context.attackHandler) {
             return this.reject("attack_handler_missing");
         }
+        // A scattered layout has no hit-point counters: what is left to hit is simply what still stands.
+        const scattered = this.context.grid.hasScatteredMountains();
+        const standingCellsBefore = scattered ? this.context.grid.getScatteredMountainsStanding() : [];
+        const standingBefore = standingCellsBefore.length;
         if (
             this.context.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
             this.context.fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
-            this.context.fightProperties.getObstacleHitsLeft() <= 0
+            (scattered ? standingBefore <= 0 : this.context.fightProperties.getObstacleHitsLeft() <= 0)
         ) {
             return this.reject("obstacle_not_available");
         }
@@ -849,38 +908,84 @@ export class GameActionEngine {
             knownPaths,
         );
         const hitsAfter = this.context.fightProperties.getObstacleHitsLeft();
-        if (!result.completed || hitsAfter >= hitsBefore) {
+        const standingAfter = scattered ? this.context.grid.getScatteredMountainsStanding().length : 0;
+        // "Did the attack achieve anything?" — for scattered stones that is one fewer standing, not one
+        // fewer hit point, because their counters never move.
+        const landed = scattered ? standingAfter < standingBefore : hitsAfter < hitsBefore;
+        if (!result.completed || !landed) {
             return this.reject("attack_not_available");
         }
 
         this.context.unitsHolder.refreshStackPowerForAllUnits();
-        const events: GameEvent[] = [
-            {
-                type: "obstacle_attacked",
-                attackerId: attacker.getId(),
-                targetPosition: { ...action.targetPosition },
-                attackFrom: action.attackFrom ? { ...action.attackFrom } : undefined,
-                hitsBefore,
-                hitsAfter,
-                hitsAfterLeft: this.context.fightProperties.getObstacleHitsLeftLeft(),
-                hitsAfterRight: this.context.fightProperties.getObstacleHitsLeftRight(),
-                animations: this.serializeAnimations(result.animationData ?? []),
-            },
-        ];
+        const standingCellsAfter = scattered ? this.context.grid.getScatteredMountainsStanding() : [];
+        const removedCells = scattered
+            ? standingCellsBefore.filter(
+                  (before) => !standingCellsAfter.some((after) => after.x === before.x && after.y === before.y),
+              )
+            : [];
+        const serializedAnimations = this.serializeAnimations(result.animationData ?? []);
+        const events: GameEvent[] = scattered
+            ? this.scatteredObstacleDestroyedEvents(attacker, removedCells).map((event, index) => ({
+                  ...event,
+                  attackFrom: action.attackFrom ? { ...action.attackFrom } : undefined,
+                  animations: serializedAnimations[index] ? [serializedAnimations[index]] : [],
+              }))
+            : [
+                  {
+                      type: "obstacle_attacked",
+                      attackerId: attacker.getId(),
+                      targetPosition: { ...action.targetPosition },
+                      attackFrom: action.attackFrom ? { ...action.attackFrom } : undefined,
+                      hitsBefore,
+                      hitsAfter,
+                      hitsAfterLeft: this.context.fightProperties.getObstacleHitsLeftLeft(),
+                      hitsAfterRight: this.context.fightProperties.getObstacleHitsLeftRight(),
+                      animations: serializedAnimations,
+                  },
+              ];
         // Destroy whichever 2x2 mountain just ran out of hits (each is independent). clearMountainSide is
         // idempotent, so checking both after every obstacle attack is safe and cheap.
         let clearedMountain = false;
-        if (this.context.fightProperties.getObstacleHitsLeftLeft() <= 0 && this.context.grid.clearMountainSide(false)) {
-            clearedMountain = true;
-        }
-        if (this.context.fightProperties.getObstacleHitsLeftRight() <= 0 && this.context.grid.clearMountainSide(true)) {
-            clearedMountain = true;
+        if (scattered) {
+            // The stone was removed from the board by the hit itself; this only reports it.
+            clearedMountain = standingAfter < standingBefore;
+        } else {
+            if (
+                this.context.fightProperties.getObstacleHitsLeftLeft() <= 0 &&
+                this.context.grid.clearMountainSide(false)
+            ) {
+                clearedMountain = true;
+            }
+            if (
+                this.context.fightProperties.getObstacleHitsLeftRight() <= 0 &&
+                this.context.grid.clearMountainSide(true)
+            ) {
+                clearedMountain = true;
+            }
         }
         if (clearedMountain) {
             events.push({ type: "center_obstacle_cleared", gridType: this.context.fightProperties.getGridType() });
         }
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
+    }
+    private scatteredObstacleDestroyedEvents(attacker: Unit, cells: readonly XY[]): GameEvent[] {
+        if (!cells.length) {
+            return [];
+        }
+        const fightProperties = this.context.fightProperties;
+        const hits = fightProperties.getObstacleHitsLeft();
+        const settings = this.context.grid.getSettings();
+        return cells.map((cell) => ({
+            type: "obstacle_attacked" as const,
+            attackerId: attacker.getId(),
+            targetPosition: getPositionForCell(cell, settings.getMinX(), settings.getStep(), settings.getHalfStep()),
+            hitsBefore: hits,
+            hitsAfter: hits,
+            hitsAfterLeft: fightProperties.getObstacleHitsLeftLeft(),
+            hitsAfterRight: fightProperties.getObstacleHitsLeftRight(),
+            animations: [],
+        }));
     }
     private areaThrowAttack(action: Extract<GameAction, { type: "area_throw_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
@@ -899,7 +1004,12 @@ export class GameActionEngine {
             return this.reject("attack_not_available");
         }
         const occupantId = this.context.grid.getOccupantUnitId(action.targetCell);
-        if (occupantId && occupantId !== "L" && occupantId !== "W") {
+        if (
+            occupantId &&
+            occupantId !== "L" &&
+            occupantId !== "W" &&
+            !(occupantId === "B" && this.context.grid.hasScatteredMountains())
+        ) {
             return this.reject("attack_not_available");
         }
 
@@ -920,6 +1030,9 @@ export class GameActionEngine {
         );
         const affectedCells = [...getCellsAroundCell(this.context.grid.getSettings(), targetCell), targetCell];
         const affectedUnits = evaluateAffectedUnits(affectedCells, this.context.unitsHolder, this.context.grid);
+        const destroyedScatteredCells = this.context.grid.hasScatteredMountains()
+            ? this.context.grid.clearScatteredMountainsInCells(affectedCells)
+            : [];
         const divisor = this.context.attackHandler.getRangeAttackDivisor(attacker, targetPosition);
         const damage = this.createVisibleDamage();
         const result = this.context.attackHandler.handleRangeAttack(
@@ -948,6 +1061,7 @@ export class GameActionEngine {
             .map((victim) => ({ victim, killer: attacker }));
         const killAttributions = this.createDirectKillAttributions(unitIdsDied, areaVictims);
         const events: GameEvent[] = [
+            ...this.scatteredObstacleDestroyedEvents(attacker, destroyedScatteredCells),
             {
                 type: "area_attacked",
                 attackType: "area_throw",

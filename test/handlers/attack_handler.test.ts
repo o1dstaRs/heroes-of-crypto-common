@@ -1055,6 +1055,32 @@ describe("AttackHandler", () => {
             expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN);
         });
 
+        it("destroys only the targeted scattered tombstone and makes its cell walkable", () => {
+            const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
+            const target = { x: 6, y: 7 };
+            const survivor = { x: 10, y: 8 };
+            grid.setScatteredMountains([target, survivor]);
+            const attacker = createTestUnit({
+                team: PBTypes.TeamVals.UPPER,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+            });
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+
+            const result = attackHandler.handleObstacleAttack(
+                positionForCell(target),
+                unitsHolder,
+                moveHandler,
+                attacker,
+            );
+
+            expect(result.completed).toBe(true);
+            expect(grid.getOccupantUnitId(target)).toBe("");
+            expect(grid.getOccupantUnitId(survivor)).toBe("B");
+            expect(grid.getScatteredMountainsStanding()).toEqual([survivor]);
+            expect(fightProperties.getObstacleHitsLeft()).toBe(2 * HITS_PER_MOUNTAIN);
+        });
+
         it("small melee unit strikes the left mountain from an outer (non-corridor) cell", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
             const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });

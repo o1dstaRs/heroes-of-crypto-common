@@ -174,6 +174,27 @@ export class AttackHandler {
             hypotheticalSmokeCells,
         );
     }
+    /** Ordered, de-duplicated obstacle cells crossed before the supplied aim point. */
+    public getObstacleIntersections(fromPosition: HoCMath.XY, toPosition: HoCMath.XY): IAttackObstacle[] {
+        const seen = new Set<string>();
+        const obstacles: IAttackObstacle[] = [];
+        for (const [cell, position] of traceGridRayCells(this.gridSettings, fromPosition, toPosition)) {
+            if (this.grid.getOccupantUnitId(cell) !== "B") {
+                continue;
+            }
+            const key = `${cell.x}:${cell.y}`;
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            obstacles.push({
+                position: { ...position },
+                size: 1,
+                distance: HoCMath.getDistance(fromPosition, position),
+            });
+        }
+        return obstacles;
+    }
     /**
      * Area Throw projection (e.g. Gargantuan): a thrown AOE shot is intercepted by the first enemy
      * unit standing on the straight line between the attacker and the aimed cell. Returns that
@@ -537,6 +558,7 @@ export class AttackHandler {
         hoverRangeAttackPosition?: HoCMath.XY,
         isAOE = false,
         decreaseNumberOfShots = true,
+        suppressDoubleShot = false,
     ): IAttackResult {
         const unitIdsDied: string[] = [];
         const animationData: IAnimationData[] = [];
@@ -675,7 +697,12 @@ export class AttackHandler {
             // multiplier: 100% for the base ability, stack-scaled 20/40/60/80/100% + luck for the crafted one.
             const doubleShotAbility =
                 attackerUnit.getAbility("Double Shot") ?? attackerUnit.getAbility("Crafted Double Shot");
-            if (doubleShotAbility && !attackerUnit.isDead() && !attackerUnit.isSkippingThisTurn()) {
+            if (
+                !suppressDoubleShot &&
+                doubleShotAbility &&
+                !attackerUnit.isDead() &&
+                !attackerUnit.isSkippingThisTurn()
+            ) {
                 let secondVolleyMultiplier = attackerUnit.calculateAbilityMultiplier(
                     doubleShotAbility,
                     FightStateManager.getInstance()
@@ -1412,19 +1439,31 @@ export class AttackHandler {
         // Capture health state before second shot to calculate units died
         const preSecondShotAmount = targetUnit.getAmountAlive();
 
-        const secondShotResult = AllAbilities.processDoubleShotAbility(
-            attackerUnit,
-            targetUnit,
-            affectedUnits,
-            this.sceneLog,
-            unitsHolder,
-            this.grid,
-            hoverRangeAttackDivisor,
-            hoverRangeAttackPosition,
-            damageForAnimation,
-            this.damageStatisticHolder,
-            isAOE,
-        );
+        const secondShotResult = suppressDoubleShot
+            ? {
+                  applied: false,
+                  damage: 0,
+                  moraleDecreaseForTheUnitTeam: {},
+                  animationData: [],
+                  unitIdsDied: [],
+                  aoeRangeAttackLanded: false,
+                  waterShieldAbsorbed: false,
+                  petrifyingGazeDamage: 0,
+                  moraleIncrease: 0,
+              }
+            : AllAbilities.processDoubleShotAbility(
+                  attackerUnit,
+                  targetUnit,
+                  affectedUnits,
+                  this.sceneLog,
+                  unitsHolder,
+                  this.grid,
+                  hoverRangeAttackDivisor,
+                  hoverRangeAttackPosition,
+                  damageForAnimation,
+                  this.damageStatisticHolder,
+                  isAOE,
+              );
         this.updateMoraleDecreaseForTheUnitTeam(
             moraleDecreaseForTheUnitTeam,
             secondShotResult.moraleDecreaseForTheUnitTeam,
@@ -2502,6 +2541,33 @@ export class AttackHandler {
 
         return { completed: true, unitIdsDied, animationData, abilityStolen };
     }
+    /**
+     * Does anything still stand to be hit?
+     *
+     * The classic BLOCK_CENTER keeps two hit-point counters (left mountain / right mountain). A scattered
+     * layout has no sides and no per-object counters at all — each stone is simply there or gone — so the
+     * question has to be asked of the grid instead.
+     */
+    private obstacleStillStands(): boolean {
+        if (this.grid.hasScatteredMountains()) {
+            return this.grid.getScatteredMountainsStanding().length > 0;
+        }
+        return FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() > 0;
+    }
+    /**
+     * Land ONE hit on the obstacle at this cell.
+     *
+     * Scattered stones die outright — that is their whole hit-point model. The classic mountains keep
+     * spending from their side's counter, untouched. Funnelling every hit site through here is what keeps
+     * the two models from drifting: there are six of them (range, double-shot, and the melee variants).
+     */
+    private spendObstacleHit(targetCell: HoCMath.XY, isRightMountain: boolean): void {
+        if (this.grid.hasScatteredMountains()) {
+            this.grid.clearScatteredMountainAt(targetCell.x, targetCell.y);
+            return;
+        }
+        FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
+    }
     public handleObstacleAttack(
         targetPosition: HoCMath.XY,
         unitsHolder: UnitsHolder,
@@ -2518,7 +2584,7 @@ export class AttackHandler {
         if (
             this.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
             FightStateManager.getInstance().getFightProperties().getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
-            FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() <= 0 ||
+            !this.obstacleStillStands() ||
             !attackerUnit ||
             attackerUnit.isDead() ||
             !GridMath.isPositionWithinGrid(this.gridSettings, targetPosition) ||
@@ -2554,36 +2620,26 @@ export class AttackHandler {
             attackerUnit.getAttackTypeSelection() === PBTypes.AttackVals.RANGE &&
             this.canLandRangeAttack(attackerUnit, this.grid.getEnemyAggrMatrixByUnitId(attackerUnit.getId()))
         ) {
-            animationData.push({
-                fromPosition: attackerUnit.getPosition(),
-                toPosition: targetPosition,
-                affectedUnit: new AttackTarget(targetPosition, 1),
-            });
-            FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
-            attackerUnit.decreaseNumberOfShots();
-            this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
-            rangeLanded = true;
-        }
-
-        // range second attack
-        if (FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft()) {
             const doubleShotAbility =
                 attackerUnit.getAbility("Double Shot") ?? attackerUnit.getAbility("Crafted Double Shot");
-            if (
-                doubleShotAbility &&
-                attackerUnit.getAttackTypeSelection() === PBTypes.AttackVals.RANGE &&
-                this.canLandRangeAttack(attackerUnit, this.grid.getEnemyAggrMatrixByUnitId(attackerUnit.getId()))
-            ) {
+            const trajectoryTargets = this.grid.hasScatteredMountains()
+                ? this.getObstacleIntersections(attackerUnit.getPosition(), targetPosition).slice(
+                      0,
+                      doubleShotAbility ? 2 : 1,
+                  )
+                : [{ position: targetPosition }];
+            for (const trajectoryTarget of trajectoryTargets) {
+                const hitCell = GridMath.getCellForPosition(this.gridSettings, trajectoryTarget.position);
                 animationData.push({
                     fromPosition: attackerUnit.getPosition(),
-                    toPosition: targetPosition,
-                    affectedUnit: new AttackTarget(targetPosition, 1),
+                    toPosition: trajectoryTarget.position,
+                    affectedUnit: new AttackTarget(trajectoryTarget.position, 1),
                 });
-                FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
-                attackerUnit.decreaseNumberOfShots();
+                this.spendObstacleHit(hitCell, hitCell.x >= this.gridSettings.getGridSize() >> 1);
                 this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
-                rangeLanded = true;
             }
+            attackerUnit.decreaseNumberOfShots();
+            rangeLanded = trajectoryTargets.length > 0;
         }
 
         // land melee attack
@@ -2680,13 +2736,13 @@ export class AttackHandler {
                         bodyUnit: attackerUnit,
                     });
 
-                    FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
+                    this.spendObstacleHit(targetCell, isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
                     if (
-                        FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() &&
+                        this.obstacleStillStands() &&
                         (attackerUnit.getAbility("Double Punch") ?? attackerUnit.getAbility("Crafted Double Punch"))
                     ) {
-                        FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
+                        this.spendObstacleHit(targetCell, isRightMountain);
                         this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
                     }
                 } else {
@@ -2752,14 +2808,14 @@ export class AttackHandler {
                         bodyUnit: attackerUnit,
                     });
 
-                    FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
+                    this.spendObstacleHit(targetCell, isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
 
                     if (
-                        FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() &&
+                        this.obstacleStillStands() &&
                         (attackerUnit.getAbility("Double Punch") ?? attackerUnit.getAbility("Crafted Double Punch"))
                     ) {
-                        FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
+                        this.spendObstacleHit(targetCell, isRightMountain);
                         this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
                     }
                 } else {

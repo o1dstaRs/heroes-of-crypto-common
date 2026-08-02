@@ -202,6 +202,16 @@ export class Grid {
         }
         return true;
     }
+    /** Destroy every standing scattered mountain contained in the supplied cells. */
+    public clearScatteredMountainsInCells(cells: readonly XY[]): XY[] {
+        const cleared: XY[] = [];
+        for (const cell of cells) {
+            if (this.clearScatteredMountainAt(cell.x, cell.y)) {
+                cleared.push({ x: cell.x, y: cell.y });
+            }
+        }
+        return cleared;
+    }
     public refreshWithNewType(gridType: GridType): void {
         this.gridType = gridType;
 
