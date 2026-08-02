@@ -181,6 +181,14 @@ export class Grid {
 
         return false;
     }
+    /**
+     * The cells this grid currently has REGISTERED for a unit (empty if none). Read-only view for
+     * occupancy audits: ranked's snapshot reconcile compares this against the authoritative cells to
+     * self-heal a stale registration (a missed move -> phantom reachability the server then rejects).
+     */
+    public getRegisteredCells(unitId: string): XY[] {
+        return this.cellsByUnitId[unitId] ? this.cellsByUnitId[unitId].map((cell) => ({ ...cell })) : [];
+    }
     public cleanupAll(unitId: string, attackRange: number, isSmallUnit: boolean) {
         const occupiedCells = this.cellsByUnitId[unitId];
         const team = this.unitIdToTeam[unitId];
