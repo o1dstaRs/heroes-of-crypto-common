@@ -437,7 +437,11 @@ describe("v0.8 search measurement alias", () => {
             sourceCommit: "a".repeat(40),
             sourceDirty: false,
         } as const;
-        const plan = planV08BlockCenterActionGame(options, 782);
+        // Moved from game 782 after Beholder attack 15 -> 16 flipped that seed's winner to red (the
+        // fixture's Elf line lost its screened win). Game 308 — scanned from the same plan space — keeps
+        // an Elf+Angel green line and the whole contract: green elimination win in 8 laps, native ray
+        // fired, every Elf activation productive, zero rejection recovery.
+        const plan = planV08BlockCenterActionGame(options, 308);
         const setup = liveTwinSetup();
         const nativeDecisions: GameAction[][] = [];
         const chosenDecisions: GameAction[][] = [];
@@ -477,7 +481,7 @@ describe("v0.8 search measurement alias", () => {
                 })),
         );
 
-        expect(plan.seed).toBe(1_109_576_960);
+        expect(plan.seed).toBe(3_368_494_115);
         // Angel screens this Elf/Arbalester/Valkyrie line and turns the former lap-nine chase into a six-lap win.
         // Keep the original failure contract underneath that stronger outcome: every Elf activation is useful,
         // it fires whenever the native ray exists, and a13 never needs rejection recovery.
