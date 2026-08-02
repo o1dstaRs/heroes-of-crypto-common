@@ -808,7 +808,7 @@
             "speed": 4,
             "armor": 14,
             "attack_type": "RANGE",
-            "attack": 15,
+            "attack": 16,
             "attack_damage_min": 8,
             "attack_damage_max": 11,
             "attack_range": 1,
