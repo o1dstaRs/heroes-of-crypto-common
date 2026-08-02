@@ -26,6 +26,59 @@ function enemy(context: ReturnType<typeof setup>, name: string, cell: { x: numbe
 }
 
 describe("Zena's Chakram — separation chain", () => {
+    it("never bounces through occupied gaps: a solid block yields the primary hit only", () => {
+        // The live report that pinned this: a shoulder-to-shoulder army with "no single hole". Diagonal
+        // neighbours-of-neighbours measure two apart — the GEOMETRY of a gap — but every separating cell
+        // holds a body, and the disc cannot cut through a wall.
+        const context = setup();
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        enemy(context, "WallA", { x: 9, y: 9 }); // diagonal-adjacent to the primary
+        const behindWall = enemy(context, "BehindWall", { x: 10, y: 10 }); // sep 2 from primary, gap filled by WallA
+
+        const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+
+        expect(trajectory.hitUnits).toEqual([]);
+        expect(behindWall.getId() in trajectory.damageFactorByUnitId).toBe(false);
+    });
+
+    it("bounces again once the blocking body is gone — same geometry, open air", () => {
+        const context = setup();
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        const reachable = enemy(context, "Reachable", { x: 10, y: 10 }); // sep 2, bridge (9,9) EMPTY
+
+        const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+
+        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["Reachable"]);
+        expect(trajectory.damageFactorByUnitId[reachable.getId()]).toBe(1);
+    });
+
+    it("an ally's body blocks the gap exactly like an enemy's", () => {
+        const context = setup();
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        const ally = createTestUnit({ name: "Ally", team: GREEN });
+        placeUnit(context.grid, context.unitsHolder, ally, { x: 9, y: 9 });
+        enemy(context, "BehindAllyWall", { x: 10, y: 10 });
+
+        const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+
+        expect(trajectory.hitUnits).toEqual([]);
+    });
+
+    it("a walled-off half-damage bounce is blocked too", () => {
+        const context = setup();
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        // A vertical wall hugging the primary's right side seals every 2-cell chain toward the far target.
+        enemy(context, "WallTop", { x: 9, y: 9 });
+        enemy(context, "WallMid", { x: 9, y: 8 });
+        enemy(context, "WallBot", { x: 9, y: 7 });
+        enemy(context, "FarBehindWall", { x: 11, y: 8 }); // sep 3 from primary — gap 2, fully sealed
+
+        const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+
+        // The wall units touch the struck primary (never bounced to), and the far target has no open bridge.
+        expect(trajectory.hitUnits).toEqual([]);
+    });
+
     it("caps total targets at stack power from one through five", () => {
         for (let stackPower = 1; stackPower <= 5; stackPower += 1) {
             const context = setup(stackPower);
