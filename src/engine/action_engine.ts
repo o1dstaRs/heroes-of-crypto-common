@@ -1168,7 +1168,11 @@ export class GameActionEngine {
         if (!allPlaceable) {
             return this.reject("spell_not_available");
         }
-        const laps = spell.getLapsTotal();
+        // "Lasts 3 laps" means three FULL laps (owner call 2026-08-02): a cast always lands mid-lap, and
+        // the lap-flip decrement would otherwise charge that partial cast lap as the first of the three
+        // (live report: smoke faded a lap early). One extra charge absorbs the partial lap; the wire
+        // format (lapsRemaining) is unchanged.
+        const laps = spell.getLapsTotal() + 1;
         const placed: XY[] = [];
         for (const cell of cells) {
             this.context.fightProperties.getSmokeClouds().add(cell, laps);
@@ -1186,7 +1190,14 @@ export class GameActionEngine {
             },
         ];
         if (placed.length > 0) {
-            events.push({ type: "smoke_placed", casterId: caster.getId(), cells: placed, lapsRemaining: laps });
+            // The event reports the NOMINAL duration (what the card promises, in full laps); the store
+            // carries one extra charge to absorb the partial cast lap — an internal accounting detail.
+            events.push({
+                type: "smoke_placed",
+                casterId: caster.getId(),
+                cells: placed,
+                lapsRemaining: spell.getLapsTotal(),
+            });
         }
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
