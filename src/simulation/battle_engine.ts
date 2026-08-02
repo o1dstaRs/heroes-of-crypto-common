@@ -869,7 +869,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const v08A13TrajectoryTeams = new Set(config.searchV08A13TrajectoryTeams ?? []);
     const v08A13TrajectorySearch =
         config.searchScoredDecisionObserver && v08A13TrajectoryTeams.size
-            ? createV08A13SearchDriver(driverDeps, searchMatch)
+            ? // The offline teacher has already installed its own unbounded, deterministic SearchDriver
+              // environment. Rebuilding the production a13 profile here would silently restore its 175ms
+              // deadline and make otherwise identical teacher seeds diverge under different host load.
+              new SearchDriver(driverDeps, searchMatch)
             : undefined;
 
     // --- build armies (per-team rosters; identical lists in a mirrored match) ---

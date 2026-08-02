@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { IAIPolicyEvent, IAIStrategy, IDecisionContext } from "../../src/ai/ai_strategy";
 import { STRATEGY_V0_1 } from "../../src/ai/versions/v0_1";
+import { buildV08A13SearchEnvironment } from "../../src/ai/versions/v0_8_a13_profile";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import type { GameAction } from "../../src/engine/actions";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -15,6 +16,7 @@ import { buildRoster, makeRng, type IArmyUnitSpec } from "../../src/simulation/a
 import { runMatch, type IMatchResult, type ITurnExecutionObservation } from "../../src/simulation/battle_engine";
 import { LookaheadDriver } from "../../src/simulation/lookahead";
 import { SearchDriver } from "../../src/simulation/search_driver";
+import { withScopedAIEnvironment } from "../../src/simulation/v0_8_a13_search";
 import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
 
@@ -65,6 +67,62 @@ const runObservedMatchWithV01Transform = (
 };
 
 describe("battle engine turn execution observer", () => {
+    test("keeps the offline a13 trajectory search unbounded", () => {
+        const originalChooseDecision = SearchDriver.prototype.chooseDecision;
+        const trajectoryDeadlines: Array<{ deadline: number | null; circuitBreaker: number | null }> = [];
+        SearchDriver.prototype.chooseDecision = function (unit, version, incumbent, context): GameAction[] {
+            const driver = this as unknown as {
+                scoredDecisionObserver: unknown;
+                decisionDeadlineMs: number | null;
+                circuitBreakerMs: number | null;
+            };
+            if (driver.scoredDecisionObserver === undefined && version === "v0.8") {
+                trajectoryDeadlines.push({
+                    deadline: driver.decisionDeadlineMs,
+                    circuitBreaker: driver.circuitBreakerMs,
+                });
+            }
+            return originalChooseDecision.call(this, unit, version, incumbent, context);
+        };
+        try {
+            withScopedAIEnvironment(
+                {
+                    ...buildV08A13SearchEnvironment(),
+                    V07_SEARCH: "1",
+                    SEARCH_VERSIONS: "v0.8",
+                    SEARCH_GATE: "0",
+                    SEARCH_HORIZON: "1",
+                    SEARCH_ROLLOUTS: "1",
+                    SEARCH_INCLUDE_MOVES: "1",
+                    SEARCH_OBSERVE_ONLY: "1",
+                    // A teacher corpus must not depend on host timing. These explicitly override the bounded
+                    // production a13 defaults above and must reach its frozen-trajectory driver unchanged.
+                    SEARCH_DECISION_DEADLINE_MS: undefined,
+                    SEARCH_CIRCUIT_BREAKER_MS: undefined,
+                },
+                () => {
+                    runMatch({
+                        greenVersion: "v0.8",
+                        redVersion: "v0.8",
+                        roster: buildRoster(makeRng(91_004)),
+                        seed: 91_004,
+                        maxLaps: 2,
+                        searchScoredDecisionObserver: () => {},
+                        searchShadowOnly: true,
+                        searchV08A13TrajectoryTeams: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+                    });
+                },
+            );
+        } finally {
+            SearchDriver.prototype.chooseDecision = originalChooseDecision;
+        }
+
+        expect(trajectoryDeadlines.length).toBeGreaterThan(0);
+        expect(trajectoryDeadlines).toEqual(
+            Array.from({ length: trajectoryDeadlines.length }, () => ({ deadline: null, circuitBreaker: null })),
+        );
+    });
+
     test("keeps active AI-Driven roots out of research search and trajectory selectors", () => {
         const previousSearch = process.env.V07_SEARCH;
         const previousVersions = process.env.SEARCH_VERSIONS;
