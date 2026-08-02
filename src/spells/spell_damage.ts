@@ -11,7 +11,7 @@
 
 import { empowerMultiplier } from "../augments/augment_properties";
 import { MAX_UNIT_STACK_POWER } from "../constants";
-import { SpellMultiplierType } from "./spell_properties";
+import { SpellElement, SpellMultiplierType } from "./spell_properties";
 
 /** The bare minimum of a unit this module needs, so it stays free of a Unit import cycle. */
 interface IEmpowerableCaster {
@@ -155,6 +155,43 @@ export function isOffensiveSpellMultiplier(multiplierType: SpellMultiplierType):
 
 /** A Fireforged Sword blade burns 50% hotter against water. */
 export const FIREFORGED_SWORD_WATER_MULTIPLIER = 1.5;
+
+/** Fire against water, wherever it comes from: the same 50% edge the enchanted blade has. */
+export const FIRE_AGAINST_WATER_MULTIPLIER = FIREFORGED_SWORD_WATER_MULTIPLIER;
+
+/**
+ * How much of an elemental spell a target actually takes, before magic resistance.
+ *
+ * The rules are not new — they are the ones already written into the abilities: a Fire Element IS the fire
+ * and cannot be burned (Fire Shield, Fire Breath, the Fireforged blade all say so), a Water Element takes
+ * fire half again as hard, and a Wind Element lets lightning pass straight through (Chain Lightning skips
+ * it outright). Water spells wash over a Water Element for the same reason fire cannot burn a Fire Element.
+ * An elementless spell — every spell but the Tome of Elements' four — is unaffected and returns 1.
+ *
+ * Pure and Unit-free so the spellbook card, the hover preview, the engine and the tests all price an
+ * elemental hit identically.
+ */
+export function elementalSpellMultiplier(params: {
+    element: SpellElement;
+    targetIsFireElement: boolean;
+    targetIsWaterElement: boolean;
+    targetIsWindElement: boolean;
+}): number {
+    const { element, targetIsFireElement, targetIsWaterElement, targetIsWindElement } = params;
+    if (element === SpellElement.FIRE) {
+        if (targetIsFireElement) {
+            return 0;
+        }
+        return targetIsWaterElement ? FIRE_AGAINST_WATER_MULTIPLIER : 1;
+    }
+    if (element === SpellElement.WATER) {
+        return targetIsWaterElement ? 0 : 1;
+    }
+    if (element === SpellElement.AIR) {
+        return targetIsWindElement ? 0 : 1;
+    }
+    return 1;
+}
 
 /**
  * The FIRE damage a Fireforged Sword rider deals on top of the swing that carried it.

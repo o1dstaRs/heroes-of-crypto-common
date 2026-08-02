@@ -29,6 +29,7 @@ import {
     targetedSpellRequiresLineOfSight,
 } from "../../src/spells/spell_helper";
 import {
+    SpellElement,
     SpellMultiplierType,
     SpellPowerType,
     SpellProperties,
@@ -599,6 +600,7 @@ function customSpell(
         conflictsWith?: string[];
         maximumGiftLevel?: number;
         minimalCasterStackPower?: number;
+        element?: SpellElement;
         powerType?: SpellPowerType;
         selfCastAllowed?: boolean;
     } = {},
@@ -612,6 +614,7 @@ function customSpell(
             targetType,
             0,
             options.powerType ?? SpellPowerType.COMMON,
+            options.element ?? SpellElement.NO_ELEMENT,
             SpellMultiplierType.NO_MULTIPLIER,
             1,
             isBuff,

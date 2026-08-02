@@ -20,10 +20,12 @@ import { AbilityProperties, ToAbilityPowerType, ToAbilityType } from "../abiliti
 import { getCraftChances } from "../abilities/craft_chances";
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
 import {
+    SpellElement,
     SpellMultiplierType,
     SpellPowerType,
     SpellProperties,
     SpellTargetType,
+    ToSpellElement,
     ToSpellMultiplierType,
     ToSpellPowerType,
     ToSpellTargetType,
@@ -453,6 +455,16 @@ export const getSpellConfig = (factionName: string, spellName: string, laps?: nu
         throw new TypeError(`Invalid power type for spell ${spellName} = ${powerType}`);
     }
 
+    // Element is the one classification a spell is allowed NOT to have: only the elemental spells declare
+    // one, everything else carries "" and resolves to NO_ELEMENT. An unknown string is still a config bug.
+    const element =
+        spellConfig.element && spellConfig.element.constructor === String
+            ? ToSpellElement[spellConfig.element as string]
+            : SpellElement.NO_ELEMENT;
+    if (element === undefined) {
+        throw new TypeError(`Invalid element for spell ${spellName} = ${spellConfig.element}`);
+    }
+
     const multiplierType =
         spellConfig.multiplier_type && spellConfig.multiplier_type.constructor === String
             ? ToSpellMultiplierType[spellConfig.multiplier_type as string]
@@ -469,6 +481,7 @@ export const getSpellConfig = (factionName: string, spellName: string, laps?: nu
         targetType,
         spellConfig.power,
         powerType,
+        element,
         multiplierType,
         laps !== undefined ? laps : spellConfig.laps,
         spellConfig.is_buff,

@@ -176,6 +176,10 @@ const FIGHT_FIELDS = [
     "synergyUnitsNaturePerTeam",
     "damageDealFactPerLap",
     "synergiesPerTeam",
+    // Which synergy variant each faction awards this fight. Set once from the draft, but still per-fight
+    // state a rollout has to restore — resuming with a different variant map would score the candidate
+    // against synergies the live army never had.
+    "synergyVariants",
     "obstacleHitsLeftLeft",
     "obstacleHitsLeftRight",
     "additionalNarrowingLaps",

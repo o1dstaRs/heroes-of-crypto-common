@@ -120,6 +120,32 @@ export const ToSpellMultiplierType: { [spellMultiplierTypeName: string]: SpellMu
     UNIT_AMOUNT_DAMAGE: SpellMultiplierType.UNIT_AMOUNT_DAMAGE,
 };
 
+/**
+ * The element a spell is made of, for the spells that are made of one at all.
+ *
+ * The board already knows this language on the receiving side: a creature carrying "Fire Element" cannot be
+ * burned, "Water Element" takes fire 50% harder, and "Wind Element" shrugs off lightning. Naming the caster's
+ * side here is what closes the loop — an elemental spell answers to those same abilities instead of every
+ * cast handler growing its own table of exceptions. Most spells are elementless and stay NO_ELEMENT.
+ */
+export enum SpellElement {
+    NO_ELEMENT = 0,
+    FIRE = 1,
+    WATER = 2,
+    AIR = 3,
+}
+
+export const AllSpellElements = [SpellElement.FIRE, SpellElement.WATER, SpellElement.AIR];
+
+export type AllSpellElement = (typeof AllSpellElements)[number];
+
+export const ToSpellElement: { [spellElementName: string]: SpellElement } = {
+    "": SpellElement.NO_ELEMENT,
+    FIRE: SpellElement.FIRE,
+    WATER: SpellElement.WATER,
+    AIR: SpellElement.AIR,
+};
+
 export class SpellProperties {
     public readonly name: string;
     public readonly faction: FactionType;
@@ -128,6 +154,7 @@ export class SpellProperties {
     public readonly spell_target_type: SpellTargetType;
     public power: number;
     public readonly power_type: SpellPowerType;
+    public readonly element: SpellElement;
     public readonly multiplier_type: SpellMultiplierType;
     public readonly laps: number;
     public readonly is_buff: boolean;
@@ -145,6 +172,7 @@ export class SpellProperties {
         spell_target_type: SpellTargetType,
         power: number,
         power_type: SpellPowerType,
+        element: SpellElement,
         multiplier_type: SpellMultiplierType,
         laps: number,
         is_buff: boolean,
@@ -162,6 +190,7 @@ export class SpellProperties {
         this.spell_target_type = spell_target_type;
         this.power = power;
         this.power_type = power_type;
+        this.element = element;
         this.multiplier_type = multiplier_type;
         this.laps = laps;
         this.is_buff = is_buff;

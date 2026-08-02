@@ -353,7 +353,8 @@ describe("v0.8 damage-spell policy", () => {
         expect(applyCast(showerSetup.combat, showerSetup.dragon, showerSetup.context, shower!)).toBe(true);
         expect(showerCharge.getAmount()).toBe(0);
         expect([showerSetup.aim, showerSetup.first, showerSetup.second].map((unit) => unit.getCumulativeHp())).toEqual(
-            hpBefore.map((hp) => hp - 100),
+            // Meteor Shower at power 21.6: 1 dragon x stack power 5 x 21.6, floored.
+            hpBefore.map((hp) => hp - 108),
         );
 
         const ringSetup = setup();

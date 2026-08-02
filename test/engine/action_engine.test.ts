@@ -1916,6 +1916,7 @@ describe("GameActionEngine", () => {
             SpellTargetType.ALL_ENEMIES,
             weaknessProperties.power,
             weaknessProperties.power_type,
+            weaknessProperties.element,
             weaknessProperties.multiplier_type,
             weaknessProperties.laps,
             weaknessProperties.is_buff,
