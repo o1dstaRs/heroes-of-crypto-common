@@ -41,7 +41,7 @@ import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { isSmokeableCell } from "../spells/smoke_clouds";
-import { applyMagicResistToSpellDamage, calculateSpellDamage } from "../spells/spell_damage";
+import { applyMagicResistToSpellDamage, calculateSpellDamage, elementalSpellMultiplier } from "../spells/spell_damage";
 import { VINE_STRIDE_COST_MULTIPLIER, isVineCrossableCell, vinePathCells } from "../spells/vines";
 import {
     fireWallBurnDamage,
@@ -1667,6 +1667,28 @@ export class GameActionEngine {
      * Two rebounding targets in one splash therefore hit the caster twice. The caster is never asked to
      * rebound a spell onto itself, so a mirror-carrying caster caught in its own blast cannot loop.
      */
+    /**
+     * What `rawDamage` of this spell actually does to `unit`: element first, magic resistance second.
+     *
+     * A Fire Element caught in a Ring of Fire takes nothing at all and never reaches the resistance step —
+     * it IS the fire. A Water Element takes half again as much and then resists that. Lightning passes
+     * straight through a Wind Element, and a Whirlpool washes over a Water Element. Every spell that is not
+     * elemental — which is all of them but the Tome of Elements' four — comes through here unchanged, right
+     * down to the fractional raw damage the old call site passed through untouched.
+     */
+    private elementalDamageAgainst(spell: Spell, rawDamage: number, unit: Unit): number {
+        const multiplier = elementalSpellMultiplier({
+            element: spell.getElement(),
+            targetIsFireElement: unit.hasAbilityActive("Fire Element"),
+            targetIsWaterElement: unit.hasAbilityActive("Water Element"),
+            targetIsWindElement: unit.hasAbilityActive("Wind Element"),
+        });
+        if (multiplier <= 0) {
+            return 0;
+        }
+        const scaled = multiplier === 1 ? rawDamage : Math.floor(rawDamage * multiplier);
+        return applyMagicResistToSpellDamage(scaled, unit.getMagicResist());
+    }
     private resolveSpellVictims(
         caster: Unit,
         spell: Spell,
@@ -1680,7 +1702,7 @@ export class GameActionEngine {
             reboundedFromUnitId?: string;
         }> = [];
         for (const unit of targets) {
-            const landedDamage = applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist());
+            const landedDamage = this.elementalDamageAgainst(spell, rawDamage, unit);
             victims.push({ unit, damage: landedDamage });
             if (unit.getId() !== caster.getId() && SpellHelper.reboundsSpell(unit)) {
                 // A mirror returns what it REFLECTS, not the whole spell: the caster takes the mirror's own
@@ -1691,7 +1713,9 @@ export class GameActionEngine {
                 // The caster's own magic resistance cuts the rebound down, so this is what it actually takes —
                 // say so. The line used to name the rebound without a number, which left the player guessing
                 // what a Magic Mirror had just cost them.
-                const reboundDamage = applyMagicResistToSpellDamage(reflected, caster.getMagicResist());
+                // The caster's OWN element answers the rebound: a Fire Element that mirrored a Ring of Fire
+                // back at another Fire Element sends home a spell neither of them can be burned by.
+                const reboundDamage = this.elementalDamageAgainst(spell, reflected, caster);
                 this.context.sceneLog.updateLog(
                     `${unit.getName()} rebounded ${share}% of ${spell.getName()} back at ${caster.getName()} (${reboundDamage})`,
                 );

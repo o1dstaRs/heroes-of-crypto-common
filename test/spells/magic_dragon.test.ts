@@ -22,7 +22,7 @@ import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { amountForCreatureExperienceBudget, STACK_EXPERIENCE_BUDGET } from "../../src/simulation/army";
 import { calculateStackPoweredSpellDamage, isThrownOffensiveSpell } from "../../src/spells/spell_damage";
-import { SpellMultiplierType, SpellTargetType } from "../../src/spells/spell_properties";
+import { SpellElement, SpellMultiplierType, SpellTargetType } from "../../src/spells/spell_properties";
 import { getMagicMirrorAbilityChance } from "../../src/spells/spell_helper";
 import type { Unit } from "../../src/units/unit";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
@@ -238,25 +238,39 @@ describe("Tome of Elements spell configuration", () => {
 
         expect(getSpellConfig("Nature", "Whirlpool").minimal_caster_stack_power).toBe(3);
         expect(getSpellConfig("Nature", "Lightning Strike").minimal_caster_stack_power).toBe(1);
-        expect(getSpellConfig("Nature", "Ring of Fire").minimal_caster_stack_power).toBe(3);
+        expect(getSpellConfig("Nature", "Ring of Fire").minimal_caster_stack_power).toBe(4);
         expect(getSpellConfig("Nature", "Meteor Shower").minimal_caster_stack_power).toBe(5);
     });
 
-    // The three damage spells are priced as explicit PER-DRAGON targets rather than as a chained ladder
-    // (they used to be "Ring of Fire = bolt less 20%, Meteor Shower = ring less 10%", which these numbers
-    // deliberately break). A full stack is 2 dragons — exp 500 against the 1000-point stack budget — so
-    // these are the numbers the spellbook actually reads on the board.
+    // The three damage spells are a chained LADDER, which is the design as briefed: the bolt is the number
+    // everything else is priced off, the ring is the bolt less 20%, and the shower is the ring less 10% for
+    // covering the most ground. Every power was then halved across the board, so the ladder reads
+    // 30 -> 24 -> 21.6 in the config. A full stack is 2 dragons — exp 500 against the 1000-point stack
+    // budget — so the two-dragon row is what the spellbook actually reads on the board.
     it("prices each spell at its per-dragon damage target at full stack power", () => {
         const damage = (name: string, alive: number): number =>
             calculateStackPoweredSpellDamage(natureSpells[name].power, alive, MAX_UNIT_STACK_POWER);
 
         expect(damage("Lightning Strike", 1)).toBe(150);
-        expect(damage("Ring of Fire", 1)).toBe(125);
-        expect(damage("Meteor Shower", 1)).toBe(100);
+        expect(damage("Ring of Fire", 1)).toBe(120);
+        expect(damage("Meteor Shower", 1)).toBe(108);
 
         expect(damage("Lightning Strike", 2)).toBe(300);
-        expect(damage("Ring of Fire", 2)).toBe(250);
-        expect(damage("Meteor Shower", 2)).toBe(200);
+        expect(damage("Ring of Fire", 2)).toBe(240);
+        expect(damage("Meteor Shower", 2)).toBe(216);
+    });
+
+    it("keeps the ladder percentages the brief set", () => {
+        expect(natureSpells["Ring of Fire"].power).toBeCloseTo(natureSpells["Lightning Strike"].power * 0.8, 5);
+        expect(natureSpells["Meteor Shower"].power).toBeCloseTo(natureSpells["Ring of Fire"].power * 0.9, 5);
+    });
+
+    it("gives each Tome of Elements spell its element, and leaves ordinary spells elementless", () => {
+        expect(getSpellConfig("Nature", "Whirlpool").element).toBe(SpellElement.WATER);
+        expect(getSpellConfig("Nature", "Lightning Strike").element).toBe(SpellElement.AIR);
+        expect(getSpellConfig("Nature", "Ring of Fire").element).toBe(SpellElement.FIRE);
+        expect(getSpellConfig("Nature", "Meteor Shower").element).toBe(SpellElement.FIRE);
+        expect(getSpellConfig("Life", "Heal").element).toBe(SpellElement.NO_ELEMENT);
     });
 
     // The exact ladder percentages are gone, but the ORDER is still design intent: the single-target bolt
@@ -385,9 +399,9 @@ describe("action engine — Ring of Fire", () => {
 
         expect(result.completed).toBe(true);
         expect(before[0] - setup.enemies[0].getHp()).toBe(0); // the aimed target is inside the ring, untouched
-        expect(before[1] - setup.enemies[1].getHp()).toBe(125); // (7,3) touches (6,3): 1 x 5 x 25
+        expect(before[1] - setup.enemies[1].getHp()).toBe(120); // (7,3) touches (6,3): 1 x 5 x 24
         expect(before[2] - setup.enemies[2].getHp()).toBe(0); // (9,3) is two cells away
-        expect(before[3] - setup.allies[0].getHp()).toBe(125); // an ally next to the target burns too
+        expect(before[3] - setup.allies[0].getHp()).toBe(120); // an ally next to the target burns too
         expect(setup.caster.getHp()).toBe(casterHpBefore);
     });
 
@@ -411,7 +425,7 @@ describe("action engine — Ring of Fire", () => {
 
         expect(result.completed).toBe(true);
         expect(before[0] - setup.enemies[0].getHp()).toBe(0); // the large target is spared like any other
-        expect(before[1] - setup.enemies[1].getHp()).toBe(125); // hugs the block, outside a base-cell-only ring
+        expect(before[1] - setup.enemies[1].getHp()).toBe(120); // hugs the block, outside a base-cell-only ring
         expect(before[2] - setup.enemies[2].getHp()).toBe(0); // far away, clear of even the wider ring
     });
 
@@ -483,10 +497,35 @@ describe("action engine — Meteor Shower", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(before[0] - setup.enemies[0].getHp()).toBe(100); // 1 x 5 x 20
-        expect(before[1] - setup.enemies[1].getHp()).toBe(100);
+        expect(before[0] - setup.enemies[0].getHp()).toBe(108); // 1 x 5 x 21.6
+        expect(before[1] - setup.enemies[1].getHp()).toBe(108);
         expect(before[2] - setup.enemies[2].getHp()).toBe(0); // outside the block
         expect(before[3] - setup.allies[0].getHp()).toBe(0); // allies are not caught
+    });
+
+    it("cannot burn a Fire Element caught in the block, and burns a Water Element half again as hard", () => {
+        const setup = setupDragonFight({
+            casterAmountAlive: 1,
+            casterStackPower: 5,
+            enemies: [
+                { cell: { x: 6, y: 6 }, abilities: ["Fire Element"] },
+                { cell: { x: 8, y: 8 }, abilities: ["Water Element"] },
+                { cell: { x: 7, y: 8 } },
+            ],
+        });
+        const before = setup.enemies.map((unit) => unit.getHp());
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Meteor Shower",
+            targetCell: { x: 7, y: 7 },
+        });
+
+        expect(result.completed).toBe(true);
+        expect(before[0] - setup.enemies[0].getHp()).toBe(0); // it IS the fire
+        expect(before[1] - setup.enemies[1].getHp()).toBe(162); // 108 x 1.5
+        expect(before[2] - setup.enemies[2].getHp()).toBe(108); // elementless, the plain number
     });
 
     it("refuses a drop that catches nobody rather than burn the only scroll", () => {
@@ -538,6 +577,48 @@ describe("action engine — Whirlpool", () => {
         // Pinned, not silenced: it deals no damage and the target keeps its turn and its retaliation.
         expect(target.getHp()).toBe(hpBefore);
         expect(target.hasEffectActive("Stun")).toBe(false);
+    });
+
+    // The element gate is a TARGETING rule, not a damage one, which matters most for Whirlpool: it deals no
+    // damage at all, so the only way a Water Element can shrug it off is for the cast to be refused outright.
+    it("cannot chain a Water Element, and lightning cannot be aimed at a Wind Element", () => {
+        const setup = setupDragonFight({
+            casterAmountAlive: 1,
+            casterStackPower: 5,
+            enemies: [
+                { cell: { x: 6, y: 3 }, abilities: ["Water Element"] },
+                { cell: { x: 6, y: 5 }, abilities: ["Wind Element"] },
+            ],
+        });
+        const [water, wind] = setup.enemies;
+
+        const whirlpool = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Whirlpool",
+            targetId: water.getId(),
+        });
+        expect(whirlpool.completed).toBe(false);
+        expect(water.hasDebuffActive("Whirlpool")).toBe(false);
+        expect(water.canMove()).toBe(true);
+
+        const bolt = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Lightning Strike",
+            targetId: wind.getId(),
+        });
+        expect(bolt.completed).toBe(false);
+        expect(wind.getHp()).toBe(wind.getMaxHp());
+
+        // The charges are still on the page: a refused cast must not cost the dragon a scroll.
+        const charges = (name: string) =>
+            setup.caster
+                .getSpells()
+                .find((entry) => entry.getName() === name)
+                ?.getAmount();
+        expect(charges("Whirlpool")).toBe(1);
+        expect(charges("Lightning Strike")).toBe(4);
     });
 });
 
@@ -712,9 +793,9 @@ describe("Magic Reflection (passive)", () => {
         });
 
         expect(before[0] - setup.enemies[0].getHp()).toBe(0); // aimed at, so spared
-        expect(before[1] - setup.enemies[1].getHp()).toBe(125);
-        expect(before[2] - setup.enemies[2].getHp()).toBe(125);
-        expect(casterHpBefore - setup.caster.getHp()).toBe(186); // 75% of 125 back off each mirror: 93 + 93
+        expect(before[1] - setup.enemies[1].getHp()).toBe(120);
+        expect(before[2] - setup.enemies[2].getHp()).toBe(120);
+        expect(casterHpBefore - setup.caster.getHp()).toBe(180); // 75% of 120 back off each mirror: 90 + 90
     });
 
     it("does not apply a later rebound to a caster an earlier mirror already killed", () => {
@@ -793,12 +874,12 @@ describe("Magic Reflection (passive)", () => {
             expect.objectContaining({
                 source: "flesh_shield",
                 unitId: abomination.getId(),
-                amount: 125,
+                amount: 120,
             }),
             expect.objectContaining({
                 source: "flesh_shield",
                 unitId: abomination.getId(),
-                amount: 93,
+                amount: 90,
                 rebounded: true,
             }),
         ]);

@@ -2477,7 +2477,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const dragon = makeReal(LOWER, "Nature", "Magic Dragon");
         dragon.setStackPower(5);
         const first = makeReal(UPPER, "Nature", "Gargantuan");
-        const second = makeReal(UPPER, "Chaos", "Black Dragon");
+        // Deliberately NOT a Black Dragon: it carries Fire Element, and Meteor Shower is a fire spell, so it
+        // would soak the whole shower and this geometry assertion would read as a footprint miss.
+        const second = makeReal(UPPER, "Chaos", "Hydra");
         placeLarge(c, dragon, { x: 3, y: 3 });
         // The 3x3 centered at (8,8) catches non-base footprint cells of both large targets. Its centre is
         // two cells away from either base on one axis, outside the old base-seeded offset set.

@@ -128,6 +128,12 @@ const GRID_FIELDS = [
     "cleanedUpCenter",
     "leftMountainCleared",
     "rightMountainCleared",
+    // The scattered-mountain map: where the peaks stand (XY[]) and which are still up (Set of packed cells).
+    // Both are per-fight mutable state — a rollout that restored the layout but not the standing set would
+    // resume a search against mountains that had already been cleared. deepClone handles the array and the
+    // Set, so listing them here is all the capture needs.
+    "scatteredMountainLayout",
+    "scatteredMountainsStanding",
 ] as const;
 
 const GRID_SHARED_FIELDS = ["gridSettings"] as const;
@@ -176,6 +182,10 @@ const FIGHT_FIELDS = [
     "synergyUnitsNaturePerTeam",
     "damageDealFactPerLap",
     "synergiesPerTeam",
+    // Which synergy variant each faction awards this fight. Set once from the draft, but still per-fight
+    // state a rollout has to restore — resuming with a different variant map would score the candidate
+    // against synergies the live army never had.
+    "synergyVariants",
     "obstacleHitsLeftLeft",
     "obstacleHitsLeftRight",
     "additionalNarrowingLaps",
