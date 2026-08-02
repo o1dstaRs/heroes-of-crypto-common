@@ -33,7 +33,7 @@ describe("Arachna Queen configuration", () => {
 
         expect(queen.abilities).toEqual(["Web Aura", "Infest", "Predatory Assimilation"]);
         expect(queen.abilities_stack_powered[queen.abilities.indexOf("Predatory Assimilation")]).toBe(true);
-        expect(queen.max_hp).toBe(190);
+        expect(queen.max_hp).toBe(200);
         expect(queen.steps).toBe(6.3);
         expect(spider.abilities).toEqual(["Infest"]);
         expect(spider.steps).toBe(6);
@@ -193,7 +193,8 @@ describe("Predatory Assimilation", () => {
         expect(target.getAllProperties().aura_ranges).toEqual([0]);
         expect(thief.hasAbilityActive("Web Aura")).toBe(true);
         expect(thief.getAuraEffects().map((aura) => aura.getName())).toContain("Web");
-        expect(thief.getAllProperties().aura_ranges).toEqual([0, 1]);
+        // Web reaches 2 cells since the 2026-08-01 Arachna Queen buff (range rides the stolen aura).
+        expect(thief.getAllProperties().aura_ranges).toEqual([0, 2]);
 
         const effectFactory = new EffectFactory();
         const restored = Unit.createUnit(

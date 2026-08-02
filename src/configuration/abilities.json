@@ -1313,8 +1313,8 @@
     "Web Aura": {
         "name": "Web Aura",
         "type": "DEBUFF_AURA",
-        "desc": ["Enemy flying units that start their turn within {} cell of this unit cannot move that turn"],
-        "power": 1,
+        "desc": ["Enemy flying units that start their turn within {} cells of this unit cannot move that turn"],
+        "power": 2,
         "power_type": "DISABLE_FLY_MOVEMENT",
         "skip_reponse": false,
         "stack_powered": false,

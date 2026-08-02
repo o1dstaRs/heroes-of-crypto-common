@@ -98,7 +98,7 @@
     },
     "Web": {
         "name": "Web",
-        "range": 1,
+        "range": 2,
         "desc": "A flying unit standing in this web when its turn starts cannot move that turn.",
         "power": 0,
         "is_buff": false,

@@ -128,7 +128,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // and combat exchanges. Two isolated runs produced this byte-identical digest.
 // Re-pinned after withdrawing automatic double synergies. Disabled artifacts remain excluded from the
 // draft pool, so this intentionally differs from the pre-double-synergy trace.
-const EXPECTED_REPLAY_SHA256 = "2abb964a4ea89d963db7be0e462790ceea09712824617901bd862f0ea256c7e9";
+// Re-pinned for the Arachna Queen buff (hp 190 -> 200, armor 31 -> 33, Web aura reach 1 -> 2): her
+// durability and the wider flyer lockdown re-value seeded setups and every exchange she appears in.
+// Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "25fbc46ecb6a2e8f150be8bbe91e28c941684c91a0e699909c800b1f6b326c91";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
