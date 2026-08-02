@@ -12,7 +12,13 @@
 import type { FactionType } from "../generated/protobuf/v1/types_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { IModifyableUnitProperties } from "../units/unit_properties";
-import { SpellMultiplierType, SpellPowerType, SpellProperties, SpellTargetType } from "./spell_properties";
+import {
+    SpellElement,
+    SpellMultiplierType,
+    SpellPowerType,
+    SpellProperties,
+    SpellTargetType,
+} from "./spell_properties";
 
 export interface ICalculatedBuffsDebuffsEffect {
     baseStats: IModifyableUnitProperties;
@@ -64,6 +70,9 @@ export class Spell {
     }
     public getMultiplierType(): SpellMultiplierType {
         return this.spellProperties.multiplier_type;
+    }
+    public getElement(): SpellElement {
+        return this.spellProperties.element;
     }
     public getLapsTotal(): number {
         return this.spellProperties.laps;

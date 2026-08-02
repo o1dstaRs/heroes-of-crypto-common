@@ -140,6 +140,51 @@ export type NatureSynergyNamesType = keyof typeof NatureSynergyNames;
 
 export type SpecificSynergy = LifeSynergy | ChaosSynergy | MightSynergy | NatureSynergy;
 
+/**
+ * The two synergies each faction can field. A match uses exactly ONE of each pair — there is no in-game
+ * choice any more: the variant is drawn per game (see synergyVariantsForSeed) and then levels itself from
+ * the drafted army, so both players see the same four synergies from the first pick of the draft.
+ */
+export const FACTION_SYNERGY_PAIRS: { [factionName: string]: [SpecificSynergy, SpecificSynergy] } = {
+    Life: [LifeSynergy.PLUS_SUPPLY_PERCENTAGE, LifeSynergy.PLUS_MORALE_AND_LUCK],
+    Nature: [NatureSynergy.INCREASE_BOARD_UNITS, NatureSynergy.PLUS_FLY_ARMOR],
+    Chaos: [ChaosSynergy.MOVEMENT, ChaosSynergy.BREAK_ON_ATTACK],
+    Might: [MightSynergy.PLUS_AURAS_RANGE, MightSynergy.PLUS_STACK_ABILITIES_POWER],
+};
+
+/** Faction order the variants are drawn in — also the order the draft rails show them. */
+export const SYNERGY_FACTION_ORDER = ["Life", "Nature", "Chaos", "Might"] as const;
+
+/**
+ * Which variant of each pair this match fields, derived from the game id alone.
+ *
+ * Deterministic on purpose: the server, both clients and every replay hash the SAME id and land on the
+ * same four synergies without a single extra wire field, so the draft can show them before any unit is
+ * picked and nothing can drift between the seats.
+ */
+export const synergyVariantsForSeed = (seed: string): { [factionName: string]: SpecificSynergy } => {
+    // FNV-1a: tiny, stable across runtimes, and well spread over short ids.
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < seed.length; i++) {
+        hash ^= seed.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    const variants: { [factionName: string]: SpecificSynergy } = {};
+    SYNERGY_FACTION_ORDER.forEach((faction, index) => {
+        const pair = FACTION_SYNERGY_PAIRS[faction];
+        variants[faction] = pair[(hash >>> (index * 3)) & 1];
+    });
+    return variants;
+};
+
+/** The variants a fight falls back to when no seed was supplied (sandbox, unit tests, legacy saves). */
+export const DEFAULT_SYNERGY_VARIANTS: { [factionName: string]: SpecificSynergy } = {
+    Life: LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
+    Nature: NatureSynergy.PLUS_FLY_ARMOR,
+    Chaos: ChaosSynergy.MOVEMENT,
+    Might: MightSynergy.PLUS_AURAS_RANGE,
+};
+
 export enum SynergyLevel {
     NO_SYNERGY = 0,
     LEVEL_1 = 1,

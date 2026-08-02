@@ -18,7 +18,7 @@ import { getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
 import { AppliedSpell } from "./applied_spell";
 import type { ICalculatedBuffsDebuffsEffect, Spell } from "./spell";
-import { isThrownOffensiveSpell } from "./spell_damage";
+import { elementalSpellMultiplier, isThrownOffensiveSpell } from "./spell_damage";
 import { SpellPowerType, SpellTargetType } from "./spell_properties";
 import { vinePathCells } from "./vines";
 
@@ -368,6 +368,22 @@ export function canCastSpell(
         return false;
     };
 
+    /**
+     * An element cannot be aimed at the creature that IS it: no Whirlpool on a Water Element, no Lightning
+     * Strike on a Wind Element, no Ring of Fire on a Fire Element. This mirrors the MIND-resistance gate one
+     * block below — the target simply is not a legal one, so the UI greys it out instead of letting a player
+     * spend a charge on a spell that would land for nothing. Damage that merely SPLASHES onto such a creature
+     * is a separate question, answered where the damage is dealt.
+     */
+    const targetIsImmuneToSpellElement = (): boolean =>
+        !!targetUnit &&
+        elementalSpellMultiplier({
+            element: spell.getElement(),
+            targetIsFireElement: targetUnit.hasAbilityActive("Fire Element"),
+            targetIsWaterElement: targetUnit.hasAbilityActive("Water Element"),
+            targetIsWindElement: targetUnit.hasAbilityActive("Wind Element"),
+        }) <= 0;
+
     const notAlreadyApplied = (): boolean => {
         const willConclictWith = spell.getConflictsWith();
         if (!targetUnit) {
@@ -431,6 +447,7 @@ export function canCastSpell(
         if (
             (toUnitMagicResistance && toUnitMagicResistance === 100) ||
             (spell.getPowerType() === SpellPowerType.MIND && toUnitHasMindResistance) ||
+            targetIsImmuneToSpellElement() ||
             !targetUnit ||
             (targetUnit && forcedUnitId && forcedUnitId !== targetUnit.getId())
         ) {
