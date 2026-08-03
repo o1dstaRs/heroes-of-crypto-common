@@ -36,7 +36,7 @@ describe("v0.8 a19 h18 research profile", () => {
             SEARCH_HORIZON: "18",
             SEARCH_DECISION_DEADLINE_MS: "175",
             SEARCH_CIRCUIT_BREAKER_MS: "275",
-            SEARCH_SHORTLIST: "2",
+            SEARCH_SHORTLIST: "3",
             SEARCH_VERSIONS: "v0.8",
         });
         expect(fingerprintV08AlignedV1(environment)).toBe(V08_A19_H18_BEHAVIOR_ENVIRONMENT_SHA256);

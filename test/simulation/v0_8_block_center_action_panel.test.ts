@@ -390,12 +390,9 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         ).toBe(true);
     });
 
-    // Re-derived after Arachna Queen hp rose 180 -> 190 and Battle Mage hp fell 19 -> 17: game 16071
-    // now loses and produces three informational turns, so it no longer isolates this classification.
-    // Game 16251 restores the strict scenario: Thunderbird waits exactly once despite an engine-valid
-    // melee option, the event remains informational rather than urgent, and its allies finish the fight
-    // with a candidate elimination win and zero rejections.
-    test("keeps game 16251's Thunderbird wait informational while allies finish", () => {
+    // Re-derived for the A13 shortlist-three profile. The former shortlist-two policy waited despite an
+    // engine-valid melee option on lap three; the promoted policy now takes all three direct actions.
+    test("keeps game 16251's Thunderbird productive through all direct-action turns", () => {
         const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 16_251);
 
         expect(record).toMatchObject({
@@ -412,9 +409,9 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             observedTurns: 3,
             oracleDirectEligibleTurns: 3,
             sharedCatalogDirectEligibleTurns: 3,
-            chosenDirectActionTurns: 2,
-            noncombatWithDirectOptionTurns: 1,
-            eligibleCombatMisses: 1,
+            chosenDirectActionTurns: 3,
+            noncombatWithDirectOptionTurns: 0,
+            eligibleCombatMisses: 0,
             pureMoveTurns: 0,
             nonProgressMoves: 0,
             abaOscillations: 0,
@@ -426,14 +423,11 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             strategyRejectedActions: 0,
             recoveryTurns: 0,
         });
-        const informational = record.failureSamples.filter(({ issue }) => issue === "noncombat_with_direct_option");
-        expect(informational).toHaveLength(1);
-        expect(informational[0]).toMatchObject({
-            creatureName: "Thunderbird",
-            lap: 3,
-            chosenDecision: [{ type: "wait_turn" }],
-            oracleOption: { kind: "melee" },
-        });
+        expect(
+            record.failureSamples.some(
+                ({ creatureName, issue }) => creatureName === "Thunderbird" && issue === "noncombat_with_direct_option",
+            ),
+        ).toBe(false);
         // The invariant: an ABA oscillation, wherever it turns up, is informational and never an urgent miss.
         for (const sample of record.failureSamples.filter((f) => f.issue === "aba_oscillation")) {
             expect(sample.creatureName).toBeTruthy();
