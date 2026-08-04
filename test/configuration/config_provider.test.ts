@@ -71,6 +71,9 @@ describe("config_provider", () => {
     it("gives Zena Handyman: her kit waives the ranged melee penalty (desc arrays aligned)", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Zena", "zena_512", 0, 141);
 
+        expect(creature.hp).toBe(58);
+        expect(creature.base_armor).toBe(15);
+
         const handymanIndex = creature.abilities.indexOf("Handyman");
         expect(handymanIndex).toBeGreaterThanOrEqual(0);
         expect(creature.abilities_descriptions[handymanIndex]).toContain("Melee damage is not reduced");
@@ -82,6 +85,19 @@ describe("config_provider", () => {
         expect(creature.abilities_descriptions[chakramIndex]).toContain("Maximum targets: 1.");
         expect(creature.abilities_descriptions[chakramIndex]).not.toContain("{}");
         expect(creature.abilities_descriptions[chakramIndex]).not.toContain("100 targets");
+    });
+
+    it("loads Hydra's reduced durability", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Chaos", "Hydra", "hydra_512", 0, 500);
+
+        expect(creature.hp).toBe(185);
+        expect(creature.base_armor).toBe(33);
+    });
+
+    it("loads Hyena's reduced attack", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Hyena", "hyena_512", 0, 40);
+
+        expect(creature.base_attack).toBe(21);
     });
 
     it("derives creature amount from total experience when amount is not positive", () => {

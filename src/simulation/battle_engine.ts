@@ -279,6 +279,8 @@ export interface IMatchConfig {
     seed: number;
     /** Hard cap on laps before the match is called a draw-on-points. Default 60. */
     maxLaps?: number;
+    /** Emit only lifecycle/destruction events required to drive an in-process simulation. */
+    headlessEvents?: boolean;
     /** Board layout for this match. Defaults to NORMAL (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER). */
     gridType?: number;
     /**
@@ -715,6 +717,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             }
         },
         runtime,
+        eventMode: config.headlessEvents ? ("headless" as const) : ("full" as const),
     };
 
     const engine = new GameActionEngine(engineContext);
@@ -1479,7 +1482,16 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     cause,
                 });
             }
-            recordAction(actions, action, unit, fromCell, result, unitsHolder, fightProperties.getCurrentLap());
+            recordAction(
+                actions,
+                action,
+                unit,
+                fromCell,
+                result,
+                unitsHolder,
+                fightProperties.getCurrentLap(),
+                config.headlessEvents,
+            );
             applyEvents(result.events);
             if (finished) {
                 break;
@@ -1535,7 +1547,16 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     recoveryForObservation = recoveryAttempt;
                     turnEventsForObservation!.push(...observedEvents);
                 }
-                recordAction(actions, action, unit, fromCell, r, unitsHolder, fightProperties.getCurrentLap());
+                recordAction(
+                    actions,
+                    action,
+                    unit,
+                    fromCell,
+                    r,
+                    unitsHolder,
+                    fightProperties.getCurrentLap(),
+                    config.headlessEvents,
+                );
                 applyEvents(r.events);
                 return r.completed;
             };
@@ -1740,11 +1761,12 @@ function recordAction(
     result: { completed: boolean; events: GameEvent[]; rejectionReason?: string },
     unitsHolder: UnitsHolder,
     lap: number,
+    headlessEvents = false,
 ): void {
     // Large/long runs (e.g. 1M-game per-unit win-rate sweeps) don't need the per-action log; skipping it
     // keeps each match record tiny so the worker->main serialisation stays cheap. Winner/attrition/outcome
     // are computed from unit state, not from this array, so they're unaffected.
-    if (process.env.SIM_NO_ACTIONS) {
+    if (headlessEvents || process.env.SIM_NO_ACTIONS) {
         return;
     }
     if (action.type === "select_attack_type") {

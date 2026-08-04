@@ -26,7 +26,7 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { Spell } from "../spells/spell";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
-import type { GameEvent } from "./events";
+import { isHeadlessSimulationEvent, type GameEvent, type GameEventMode } from "./events";
 import { createDefaultGameRuntime, type IGameRuntime, shuffleWithRng } from "./runtime";
 
 export interface ITurnEngineContext {
@@ -38,6 +38,7 @@ export interface ITurnEngineContext {
     getCurrentActiveUnitId?: () => string | undefined;
     canLandRangeAttack?: (unit: Unit) => boolean;
     runtime?: IGameRuntime;
+    eventMode?: GameEventMode;
 }
 
 export interface IAdvanceTurnOptions {
@@ -67,6 +68,7 @@ export class TurnEngine {
     private readonly sceneLog: ISceneLog;
     private readonly canLandRangeAttack?: (unit: Unit) => boolean;
     private readonly runtime: IGameRuntime;
+    private readonly headlessEvents: boolean;
     public constructor(context: ITurnEngineContext) {
         this.fightProperties = context.fightProperties;
         this.grid = context.grid;
@@ -75,6 +77,7 @@ export class TurnEngine {
         this.sceneLog = context.sceneLog;
         this.canLandRangeAttack = context.canLandRangeAttack;
         this.runtime = context.runtime ?? createDefaultGameRuntime();
+        this.headlessEvents = context.eventMode === "headless";
     }
     public completeTurn(
         unit: Unit,
@@ -111,7 +114,7 @@ export class TurnEngine {
             hourglass,
         });
 
-        return events;
+        return this.compactEvents(events);
     }
     public advanceAfterNoActiveUnit(opts: IAdvanceTurnOptions = {}): IAdvanceTurnResult {
         const events: GameEvent[] = [];
@@ -120,7 +123,7 @@ export class TurnEngine {
         const finishEvent = this.finishFightIfNeeded(ordered.unitsLower, ordered.unitsUpper);
         if (finishEvent) {
             events.push(finishEvent);
-            return { events, fightFinished: true };
+            return { events: this.compactEvents(events), fightFinished: true };
         }
 
         const initFirstLap =
@@ -137,13 +140,13 @@ export class TurnEngine {
         }
 
         if (this.fightProperties.hasFightFinished()) {
-            return { events, fightFinished: true };
+            return { events: this.compactEvents(events), fightFinished: true };
         }
 
         const afterTransitionFinish = this.finishFightIfNeeded(ordered.unitsLower, ordered.unitsUpper);
         if (afterTransitionFinish) {
             events.push(afterTransitionFinish);
-            return { events, fightFinished: true };
+            return { events: this.compactEvents(events), fightFinished: true };
         }
 
         this.fightProperties.prefetchNextUnitsToTurn(
@@ -171,11 +174,11 @@ export class TurnEngine {
             events.push({ type: "next_unit_selected", unitId: nextUnit.getId(), team: nextUnit.getTeam() });
             events.push(...activationEvents);
             if (activationEvents.some((event) => event.type === "unit_skipped")) {
-                return { events, fightFinished: false };
+                return { events: this.compactEvents(events), fightFinished: false };
             }
         }
 
-        return { events, nextUnit, fightFinished: false };
+        return { events: this.compactEvents(events), nextUnit, fightFinished: false };
     }
     private handleLapTransition(
         unitsUpper: Unit[],
@@ -509,5 +512,8 @@ export class TurnEngine {
     }
     private getAliveTeamUnits(team: TeamType): Unit[] {
         return this.unitsHolder.getAllAllies(team).filter((unit) => !unit.isDead());
+    }
+    private compactEvents(events: GameEvent[]): GameEvent[] {
+        return this.headlessEvents ? events.filter(isHeadlessSimulationEvent) : events;
     }
 }
