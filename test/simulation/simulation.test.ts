@@ -14,6 +14,7 @@ import { describe, expect, it } from "bun:test";
 import { AI_VERSIONS, getAIStrategy, LATEST_AI_VERSION } from "../../src/ai";
 import type { IDecisionContext } from "../../src/ai";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import type { GameEvent } from "../../src/engine/events";
 import type { AttackHandler } from "../../src/handlers/attack_handler";
 import { PathHelper } from "../../src/grid/path_helper";
 import { PlacementPositionType } from "../../src/grid/placement_properties";
@@ -92,6 +93,62 @@ describe("battle engine", () => {
             expect(["green", "red"]).toContain(action.side);
             expect(action.creatureName.length).toBeGreaterThan(0);
         }
+    });
+
+    it("preserves seeded outcomes with compact headless events", () => {
+        const roster = buildRoster(makeRng(8080));
+        const headlessEvents: GameEvent[] = [];
+        for (const gridType of [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER, PBTypes.GridVals.BLOCK_CENTER]) {
+            const full = runMatch({
+                greenVersion: "v0.1",
+                redVersion: "v0.1",
+                roster,
+                seed: 8080,
+                maxLaps: 60,
+                gridType,
+            });
+            const headless = runMatch({
+                greenVersion: "v0.1",
+                redVersion: "v0.1",
+                roster,
+                seed: 8080,
+                maxLaps: 60,
+                gridType,
+                headlessEvents: true,
+                turnExecutionObserver: (observation) => headlessEvents.push(...observation.events),
+            });
+
+            expect({
+                winner: headless.winner,
+                endReason: headless.endReason,
+                laps: headless.laps,
+                placements: headless.placements,
+                outcome: headless.outcome,
+                attrition: headless.attrition,
+                rejectedGreen: headless.rejectedGreen,
+                rejectedRed: headless.rejectedRed,
+            }).toEqual({
+                winner: full.winner,
+                endReason: full.endReason,
+                laps: full.laps,
+                placements: full.placements,
+                outcome: full.outcome,
+                attrition: full.attrition,
+                rejectedGreen: full.rejectedGreen,
+                rejectedRed: full.rejectedRed,
+            });
+            expect(headless.actions).toEqual([]);
+        }
+
+        const allowed = new Set<GameEvent["type"]>([
+            "turn_completed",
+            "next_unit_selected",
+            "fight_finished",
+            "unit_destroyed",
+            "armageddon_applied",
+            "unit_skipped",
+        ]);
+        expect(headlessEvents.every((event) => allowed.has(event.type))).toBe(true);
     });
 });
 

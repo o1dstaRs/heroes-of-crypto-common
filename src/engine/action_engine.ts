@@ -60,7 +60,7 @@ import {
 import { getLapString, getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
 import type { GameAction } from "./actions";
-import type { GameEvent, IGameAnimationEvent } from "./events";
+import { isHeadlessSimulationEvent, type GameEvent, type IGameAnimationEvent } from "./events";
 import {
     enteredFireWallCells,
     isMovePathFootprintOnly,
@@ -159,9 +159,11 @@ const spellDamageTotal = (damaged: { unitId: string; amount: number; rebounded?:
 export class GameActionEngine {
     private readonly context: IGameActionEngineContext;
     private readonly turnEngine: TurnEngine;
+    private readonly headlessEvents: boolean;
     public constructor(context: IGameActionEngineContext) {
         this.context = context;
         this.turnEngine = new TurnEngine(context);
+        this.headlessEvents = context.eventMode === "headless";
     }
     public apply(action: GameAction): IGameActionResult {
         // Fight actions run under an effect-application capture: everything the action lands on any
@@ -170,8 +172,8 @@ export class GameActionEngine {
         // events so log builders render the effects under the acting unit's turn, not the next one's.
         // defend_turn is deliberately NOT captured: its Luck Shield buff is already reported by the
         // unit_defended event ("uses Luck Shield"), and a second "gains Luck Shield" line is noise.
-        if (!EFFECT_CAPTURED_ACTION_TYPES.has(action.type)) {
-            return this.applyInner(action);
+        if (this.headlessEvents || !EFFECT_CAPTURED_ACTION_TYPES.has(action.type)) {
+            return this.compactResult(this.applyInner(action));
         }
         beginEffectApplicationCapture();
         let result: IGameActionResult;
@@ -193,7 +195,10 @@ export class GameActionEngine {
                 }
             }
         }
-        return result;
+        return this.compactResult(result);
+    }
+    private compactResult(result: IGameActionResult): IGameActionResult {
+        return this.headlessEvents ? { ...result, events: result.events.filter(isHeadlessSimulationEvent) } : result;
     }
     private applyInner(action: GameAction): IGameActionResult {
         switch (action.type) {
@@ -489,17 +494,18 @@ export class GameActionEngine {
         unit.setMovedThisTurn(true);
         unit.setMovedRouteCellsThisTurn(pathIsFootprintOnly ? 1 : (knownMoveRoute?.route.length ?? action.path.length));
 
-        const events: GameEvent[] = [
-            {
+        const events: GameEvent[] = [];
+        if (!this.headlessEvents) {
+            events.push({
                 type: "unit_moved",
                 unitId: unit.getId(),
                 from,
                 to: { ...result.newPosition },
                 path: structuredClone(action.path),
                 targetCells: structuredClone(targetCells),
-            },
-        ];
-        if (result.dispelledSmokeCells?.length) {
+            });
+        }
+        if (!this.headlessEvents && result.dispelledSmokeCells?.length) {
             events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
         }
         // Fire Wall: sear the mover for every burning cell the walk entered. A footprint-only large-unit
@@ -530,7 +536,7 @@ export class GameActionEngine {
             return [];
         }
 
-        const position = { ...unit.getPosition() };
+        const position = this.headlessEvents ? undefined : { ...unit.getPosition() };
         const amountAliveBefore = unit.getAmountAlive();
         let total = 0;
         for (let i = 0; i < burning.length; i++) {
@@ -551,16 +557,17 @@ export class GameActionEngine {
         this.context.sceneLog.updateLog(
             `${unit.getName()} was seared by the Fire Wall for ${total} damage crossing ${burning.length} of it`,
         );
-        const events: GameEvent[] = [
-            {
+        const events: GameEvent[] = [];
+        if (!this.headlessEvents) {
+            events.push({
                 type: "fire_wall_burned",
                 unitId: unit.getId(),
                 cells: burning,
-                position,
+                position: position!,
                 amount: total,
                 unitsDied,
-            },
-        ];
+            });
+        }
         if (unit.isDead()) {
             events.push(...this.cleanupDeadUnits([unit.getId()]));
         }
@@ -605,8 +612,9 @@ export class GameActionEngine {
             { victim: target, killer: attacker },
             { victim: attacker, killer: target },
         ]);
-        const events: GameEvent[] = [
-            {
+        const events: GameEvent[] = [];
+        if (!this.headlessEvents) {
+            events.push({
                 type: "unit_attacked",
                 attackType: "melee",
                 attackerId: attacker.getId(),
@@ -614,8 +622,8 @@ export class GameActionEngine {
                 unitIdsDied,
                 damage: this.cloneVisibleDamage(damage),
                 animations: this.serializeAnimations(result.animationData ?? []),
-            },
-        ];
+            });
+        }
         events.push(...this.createAbilityStolenEvents(result.abilityStolen));
         events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
         events.push(...this.turnEngine.completeTurn(attacker));
@@ -714,8 +722,9 @@ export class GameActionEngine {
             ...(primaryRangeTarget ? [{ victim: primaryRangeTarget, killer: attacker }] : []),
             ...(responseTarget && primaryRangeTarget ? [{ victim: responseTarget, killer: primaryRangeTarget }] : []),
         ]);
-        const events: GameEvent[] = [
-            {
+        const events: GameEvent[] = [];
+        if (!this.headlessEvents) {
+            events.push({
                 type: "unit_attacked",
                 attackType: "range",
                 attackerId: attacker.getId(),
@@ -723,8 +732,8 @@ export class GameActionEngine {
                 unitIdsDied,
                 damage: this.cloneVisibleDamage(damage),
                 animations: this.serializeAnimations(result.animationData ?? []),
-            },
-        ];
+            });
+        }
         events.push(...this.createAbilityStolenEvents(result.abilityStolen));
         events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
         events.push(...this.turnEngine.completeTurn(attacker));
@@ -854,8 +863,9 @@ export class GameActionEngine {
         }
 
         this.context.unitsHolder.refreshStackPowerForAllUnits();
-        const events: GameEvent[] = [
-            {
+        const events: GameEvent[] = [];
+        if (!this.headlessEvents) {
+            events.push({
                 type: "obstacle_attacked",
                 attackerId: attacker.getId(),
                 targetPosition: { ...action.targetPosition },
@@ -865,8 +875,8 @@ export class GameActionEngine {
                 hitsAfterLeft: this.context.fightProperties.getObstacleHitsLeftLeft(),
                 hitsAfterRight: this.context.fightProperties.getObstacleHitsLeftRight(),
                 animations: this.serializeAnimations(result.animationData ?? []),
-            },
-        ];
+            });
+        }
         // Destroy whichever 2x2 mountain just ran out of hits (each is independent). clearMountainSide is
         // idempotent, so checking both after every obstacle attack is safe and cheap.
         let clearedMountain = false;
@@ -876,7 +886,7 @@ export class GameActionEngine {
         if (this.context.fightProperties.getObstacleHitsLeftRight() <= 0 && this.context.grid.clearMountainSide(true)) {
             clearedMountain = true;
         }
-        if (clearedMountain) {
+        if (!this.headlessEvents && clearedMountain) {
             events.push({ type: "center_obstacle_cleared", gridType: this.context.fightProperties.getGridType() });
         }
         events.push(...this.turnEngine.completeTurn(attacker));
@@ -947,8 +957,9 @@ export class GameActionEngine {
             .filter((unit) => unit.getTeam() !== attacker.getTeam())
             .map((victim) => ({ victim, killer: attacker }));
         const killAttributions = this.createDirectKillAttributions(unitIdsDied, areaVictims);
-        const events: GameEvent[] = [
-            {
+        const events: GameEvent[] = [];
+        if (!this.headlessEvents) {
+            events.push({
                 type: "area_attacked",
                 attackType: "area_throw",
                 attackerId: attacker.getId(),
@@ -958,8 +969,8 @@ export class GameActionEngine {
                 unitIdsDied,
                 damage: this.cloneVisibleDamage(damage),
                 animations: this.serializeAnimations(result.animationData ?? []),
-            },
-        ];
+            });
+        }
         events.push(...this.createAbilityStolenEvents(result.abilityStolen));
         events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
         events.push(...this.turnEngine.completeTurn(attacker));
@@ -2909,6 +2920,9 @@ export class GameActionEngine {
         };
     }
     private serializeAnimations(animationData: IAnimationData[]): IGameAnimationEvent[] {
+        if (this.headlessEvents) {
+            return [];
+        }
         return animationData.map((animation): IGameAnimationEvent => ({
             toPosition: { ...animation.toPosition },
             fromPosition: animation.fromPosition ? { ...animation.fromPosition } : undefined,
@@ -2919,6 +2933,9 @@ export class GameActionEngine {
     private createAbilityStolenEvents(
         stolen: Array<{ thiefId: string; targetId: string; abilityName: string }> | undefined,
     ): GameEvent[] {
+        if (this.headlessEvents) {
+            return [];
+        }
         return (stolen ?? []).map((entry) => ({ type: "ability_stolen", ...entry }));
     }
     /** Only explicitly resolved hit/response pairs may trigger Infest; unrelated exchange deaths stay unattributed. */
@@ -2950,8 +2967,8 @@ export class GameActionEngine {
                 continue;
             }
 
-            const unitName = unit.getName();
-            const corpseCells = structuredClone(unit.getCells());
+            const unitName = this.headlessEvents ? "" : unit.getName();
+            const corpseCells = unit.getCells();
             const corpseLevel = unit.getLevel();
             const deleted = this.context.unitsHolder.deleteUnitById(unitId, true);
             if (deleted) {
@@ -2967,7 +2984,7 @@ export class GameActionEngine {
             }
 
             const resurrected = this.context.unitsHolder.getAllUnits().get(unitId);
-            if (resurrected && !resurrected.isDead()) {
+            if (!this.headlessEvents && resurrected && !resurrected.isDead()) {
                 this.context.sceneLog.updateLog(`${unitName} is resurrecting!`);
                 events.push({
                     type: "unit_resurrected",
@@ -3028,12 +3045,17 @@ export class GameActionEngine {
             spawned.hasAbilityActive("Made of Water"),
         );
         if (!occupied) {
-            this.context.sceneLog.updateLog(`${killer.getName()}'s Infest found no room for ${unitName}`);
+            if (!this.headlessEvents) {
+                this.context.sceneLog.updateLog(`${killer.getName()}'s Infest found no room for ${unitName}`);
+            }
             return undefined;
         }
 
         spawned.setPosition(position.x, position.y);
         this.context.unitsHolder.addUnit(spawned);
+        if (this.headlessEvents) {
+            return undefined;
+        }
         this.context.sceneLog.updateLog(`${killer.getName()} infested the fallen stack with ${unitName}`);
         const spawnCell = spawned.getBaseCell();
         this.context.sceneLog.updateLog(`${unitName} spawned at (${spawnCell.x}, ${spawnCell.y})`);

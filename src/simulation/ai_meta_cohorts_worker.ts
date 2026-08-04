@@ -61,6 +61,7 @@ const configFor = (
     greenSynergies: green.synergies,
     redSynergies: red.synergies,
     placementAugmentTiming: "setup-before-placement",
+    headlessEvents: true,
 });
 
 function gameOutcome(result: IMatchResult, aIsGreen: boolean): IAiMetaGameOutcome {
