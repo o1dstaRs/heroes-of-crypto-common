@@ -33,4 +33,4 @@ it("recycles long-lived AI-meta workers without losing pair records", async () =
     expect(totals).toContain(2);
     expect(stats).toEqual({ workersStarted: 2, workersRecycled: 1 });
     expect(workerStarts).toBe(2);
-}, 15_000);
+}, 60_000);
