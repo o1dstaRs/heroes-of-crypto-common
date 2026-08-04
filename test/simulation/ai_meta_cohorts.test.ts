@@ -257,7 +257,7 @@ describe("AI meta cohort generation", () => {
             SEARCH_HORIZON: "18",
             SEARCH_DECISION_DEADLINE_MS: "175",
             SEARCH_CIRCUIT_BREAKER_MS: "275",
-            SEARCH_SHORTLIST: "2",
+            SEARCH_SHORTLIST: "3",
             V08_A13_SEARCH: "0",
         });
         expect(environment.SEARCH_INCUMBENT_KINDS).toBeUndefined();

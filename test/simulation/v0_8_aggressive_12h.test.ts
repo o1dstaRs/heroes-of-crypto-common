@@ -59,6 +59,7 @@ import {
     V08_CAMPAIGN_CHILD_ENVIRONMENT_STRATEGY,
     V08_CAMPAIGN_DEFAULT_LANES,
     V08_CAMPAIGN_DEFAULT_TOP_CANDIDATES,
+    V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256,
     V08_CAMPAIGN_EXACT_ANCHOR_ID,
     V08_CAMPAIGN_EXACT_ANCHOR_INDEX,
     V08_CAMPAIGN_EXACT_ANCHOR_REQUIRED_FINISH_MUTATIONS,
@@ -76,7 +77,7 @@ import {
     V08_CAMPAIGN_SELECTION_VERSION,
     V08_CAMPAIGN_VALIDATION_SELECTION_SOURCE_KINDS,
 } from "../../src/simulation/v0_8_aggressive_12h";
-import { V08_A13_GENOME_SHA256 } from "../../src/ai/versions/v0_8_a13_profile";
+import { V08_A13_GENOME, V08_A13_GENOME_SHA256 } from "../../src/ai/versions/v0_8_a13_profile";
 import { buildV08AlignedV1ProductionCandidateCatalog } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_catalog";
 import {
     fingerprintV08AlignedV1,
@@ -292,7 +293,7 @@ describe("v0.8 aggressive campaign orchestration", () => {
         expect(() => buildWorkerPlan(2, 3)).toThrow("lanes cannot exceed");
     });
 
-    it("extends the unchanged production 48 with the exact shipped A13 genome as c48", () => {
+    it("extends the unchanged production 48 with generator v7's historical A13 anchor as c48", () => {
         const production = buildV08AlignedV1ProductionCandidateCatalog();
         const campaign = buildV08CampaignBaseGenomes();
         const productionHashes = production.map(fingerprintV08AlignedV1CandidateGenome);
@@ -303,7 +304,10 @@ describe("v0.8 aggressive campaign orchestration", () => {
         expect(V08_CAMPAIGN_EXACT_ANCHOR_INDEX).toBe(48);
         expect(V08_CAMPAIGN_EXACT_ANCHOR_ID).toBe("c48");
         expect(campaignHashes.slice(0, 48)).toEqual(productionHashes);
-        expect(campaignHashes[48]).toBe(V08_A13_GENOME_SHA256);
+        expect(campaignHashes[48]).toBe(V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256);
+        expect(campaign[48]!.controls.shortlist).toBe(2);
+        expect(V08_A13_GENOME.controls.shortlist).toBe(3);
+        expect(V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256).not.toBe(V08_A13_GENOME_SHA256);
         expect(new Set(campaignHashes).size).toBe(49);
     });
 
@@ -735,7 +739,7 @@ describe("v0.8 aggressive campaign orchestration", () => {
 
         const exactAnchor = {
             ...binding,
-            genomeSha256: V08_A13_GENOME_SHA256,
+            genomeSha256: V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256,
         } as IV08AlignedV1CandidateBinding;
         expect(effectiveBehaviorEnvironment(exactAnchor, "audit.jsonl", false).SEARCH_WAIT_DEADLINE_POLICY).toBe(
             "operation_bounded",
@@ -1001,7 +1005,10 @@ describe("v0.8 aggressive campaign orchestration", () => {
             scheduler: { version: V08_CAMPAIGN_SCHEDULER_VERSION },
             campaignBaseIdentity: {
                 campaignCandidateCount: 49,
-                exactAnchor: { id: V08_CAMPAIGN_EXACT_ANCHOR_ID, genomeSha256: V08_A13_GENOME_SHA256 },
+                exactAnchor: {
+                    id: V08_CAMPAIGN_EXACT_ANCHOR_ID,
+                    genomeSha256: V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256,
+                },
                 inactiveControls: V08_CAMPAIGN_INACTIVE_CONTROL_IDS.map((id) => ({ id })),
             },
             selection: {
@@ -1061,7 +1068,7 @@ describe("v0.8 aggressive campaign orchestration", () => {
             manifestFingerprint: expected.manifestFingerprint,
             generatorVersion: V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION,
             sourceCampaignBaseIdentitySha256: expected.campaignBaseIdentitySha256,
-            exactAnchorGenomeSha256: V08_A13_GENOME_SHA256,
+            exactAnchorGenomeSha256: V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256,
         };
 
         expect(isV08CampaignAdaptiveCatalogProvenanceCurrent(persisted, expected)).toBe(true);

@@ -25,9 +25,9 @@ export const V08_A19_H18_GENOME = Object.freeze({
     }),
 });
 
-export const V08_A19_H18_GENOME_SHA256 = "603b433472b9f75167726ee2bd11296a6e8d8baf2817c53ccca09d8983d3a28e" as const;
+export const V08_A19_H18_GENOME_SHA256 = "fb6acdc8e9b60431c12bfd0435e3710ce21c51ca85b26cd960ddfe031a86ea3a" as const;
 export const V08_A19_H18_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "aa61152b5dcafc8aadce0d93b3dd1db9809089eefc7bb0d64eaa3c1046992990" as const;
+    "984a5e10453f74f2042a861f8b356a0b0106c1e278e2a77caa3628b494a9e695" as const;
 
 export function buildV08A19H18SearchEnvironment(
     version: typeof V08_A13_PRODUCTION_VERSION | typeof V08_A13_SOURCE_VERSION = V08_A13_PRODUCTION_VERSION,

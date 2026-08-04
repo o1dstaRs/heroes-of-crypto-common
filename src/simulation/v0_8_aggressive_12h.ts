@@ -24,7 +24,7 @@ import {
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { V08_A13_GENOME, V08_A13_GENOME_SHA256, V08_A13_SEARCH } from "../ai/versions/v0_8_a13_profile";
+import { V08_A13_GENOME, V08_A13_SEARCH } from "../ai/versions/v0_8_a13_profile";
 import type { ITournamentSummary } from "./tournament";
 import {
     buildV08AlignedV1ProductionCandidateCatalog,
@@ -140,6 +140,15 @@ const PRODUCTION_CANDIDATE_COUNT = 48;
 const BASE_CANDIDATE_COUNT = 49;
 export const V08_CAMPAIGN_EXACT_ANCHOR_INDEX = 48 as const;
 export const V08_CAMPAIGN_EXACT_ANCHOR_ID = "c48" as const;
+/**
+ * The exact shortlist-two A13 anchor that sealed campaign schema v12 and adaptive generator v7.
+ *
+ * Production can promote a later A13 profile without rewriting completed campaign identities or changing the
+ * generator's collision set. A new campaign must explicitly rev its schema and generator instead.
+ */
+export const V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256 =
+    "25331ab6910440daa8a21ac81bfd4a452df2e2281c829fd735fedfda354d7362" as const;
+const V08_CAMPAIGN_EXACT_ANCHOR_SHORTLIST = 2 as const;
 export const V08_CAMPAIGN_INACTIVE_CONTROL_IDS = ["c37", "c38"] as const;
 export const V08_CAMPAIGN_VALIDATION_SELECTION_SOURCE_KINDS = [
     "screen",
@@ -376,7 +385,7 @@ interface IAdaptiveCatalog {
     manifestFingerprint: string;
     generatorVersion: typeof ADAPTIVE_GENERATOR_VERSION;
     sourceCampaignBaseIdentitySha256: string;
-    exactAnchorGenomeSha256: typeof V08_A13_GENOME_SHA256;
+    exactAnchorGenomeSha256: typeof V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256;
     exactAnchorMutationFields: string[];
     exactAnchorMutationPlanSha256: string;
     parentEvidenceSha256: string;
@@ -401,7 +410,7 @@ interface IValidationSelection {
     manifestFingerprint: string;
     sourceEvidenceSha256: string;
     exactAnchorCandidateId: typeof V08_CAMPAIGN_EXACT_ANCHOR_ID;
-    exactAnchorGenomeSha256: typeof V08_A13_GENOME_SHA256;
+    exactAnchorGenomeSha256: typeof V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256;
     inactiveControlCandidateId: (typeof V08_CAMPAIGN_INACTIVE_CONTROL_IDS)[number];
     inactiveControlGenomeSha256: string;
     candidateIds: string[];
@@ -1210,19 +1219,19 @@ function candidateId(index: number): string {
     return `c${String(index).padStart(2, "0")}`;
 }
 
-/** The pinned production-48 catalog plus the exact currently shipped A13 genome as c48. */
+/** The pinned production-48 catalog plus generator v7's immutable shortlist-two A13 anchor as c48. */
 export function buildV08CampaignBaseGenomes(): IV08AlignedV1CandidateGenome[] {
     const production = buildV08AlignedV1ProductionCandidateCatalog();
     if (production.length !== PRODUCTION_CANDIDATE_COUNT) {
         throw new Error(`Expected exact ${PRODUCTION_CANDIDATE_COUNT}-candidate production catalog`);
     }
-    const exactAnchor = normalizeV08AlignedV1CandidateGenome(
-        structuredClone(V08_A13_GENOME) as unknown as IV08AlignedV1CandidateGenome,
-    );
+    const archivedAnchor = structuredClone(V08_A13_GENOME) as unknown as IV08AlignedV1CandidateGenome;
+    archivedAnchor.controls.shortlist = V08_CAMPAIGN_EXACT_ANCHOR_SHORTLIST;
+    const exactAnchor = normalizeV08AlignedV1CandidateGenome(archivedAnchor);
     const exactAnchorHash = fingerprintV08AlignedV1CandidateGenome(exactAnchor);
     const productionHashes = production.map(fingerprintV08AlignedV1CandidateGenome);
-    if (exactAnchorHash !== V08_A13_GENOME_SHA256 || productionHashes.includes(exactAnchorHash)) {
-        throw new Error("Exact v0.8 A13 anchor identity drifted or duplicates the production catalog");
+    if (exactAnchorHash !== V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256 || productionHashes.includes(exactAnchorHash)) {
+        throw new Error("Exact historical v0.8 A13 anchor identity drifted or duplicates the production catalog");
     }
     const campaign = [...production, exactAnchor];
     if (
@@ -1246,7 +1255,7 @@ export function effectiveBehaviorEnvironment(
         V08_AGGRESSIVE: "1",
         LIVETWIN: "1",
         // This is the campaign-wide operational timing policy, not a genome gene. Keeping it constant makes
-        // base candidates, adaptive children, and the exact production anchor comparable under contention.
+        // base candidates, adaptive children, and the exact historical anchor comparable under contention.
         SEARCH_WAIT_DEADLINE_POLICY: V08_A13_SEARCH.waitDeadlinePolicy,
     };
     if (unboundedSearch) {
@@ -1583,7 +1592,8 @@ export function selectV08CampaignAdaptiveChildProposals(
     }
     if (
         parent.candidateId === V08_CAMPAIGN_EXACT_ANCHOR_ID &&
-        (parent.candidateIndex !== V08_CAMPAIGN_EXACT_ANCHOR_INDEX || parent.genomeSha256 !== V08_A13_GENOME_SHA256)
+        (parent.candidateIndex !== V08_CAMPAIGN_EXACT_ANCHOR_INDEX ||
+            parent.genomeSha256 !== V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256)
     ) {
         throw new Error("Exact c48 adaptive parent identity drifted");
     }
@@ -1992,7 +2002,7 @@ export interface IV08CampaignPromotionEvidence
     level4ArmageddonRate: number;
 }
 
-/** Common-random post-A13 evidence must not regress against the exact shipped A13 anchor. */
+/** Common-random post-A13 evidence must not regress against generator v7's exact historical A13 anchor. */
 export function isV08CampaignPostA13StrengthQualified(
     candidate: IV08CampaignPostA13StrengthEvidence,
     exactAnchor: IV08CampaignPostA13StrengthEvidence,
@@ -2861,7 +2871,7 @@ export function isV08CampaignManifestProvenanceCurrent(value: unknown): boolean 
         manifest.scheduler?.version === V08_CAMPAIGN_SCHEDULER_VERSION &&
         manifest.campaignBaseIdentity?.campaignCandidateCount === BASE_CANDIDATE_COUNT &&
         manifest.campaignBaseIdentity.exactAnchor?.id === V08_CAMPAIGN_EXACT_ANCHOR_ID &&
-        manifest.campaignBaseIdentity.exactAnchor.genomeSha256 === V08_A13_GENOME_SHA256 &&
+        manifest.campaignBaseIdentity.exactAnchor.genomeSha256 === V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256 &&
         Array.isArray(manifest.campaignBaseIdentity.inactiveControls) &&
         fingerprintV08AlignedV1(manifest.campaignBaseIdentity.inactiveControls.map(({ id }) => id)) ===
             fingerprintV08AlignedV1(V08_CAMPAIGN_INACTIVE_CONTROL_IDS) &&
@@ -2898,7 +2908,7 @@ export function isV08CampaignAdaptiveCatalogProvenanceCurrent(
         catalog.manifestFingerprint === expected.manifestFingerprint &&
         catalog.generatorVersion === V08_CAMPAIGN_ADAPTIVE_GENERATOR_VERSION &&
         catalog.sourceCampaignBaseIdentitySha256 === expected.campaignBaseIdentitySha256 &&
-        catalog.exactAnchorGenomeSha256 === V08_A13_GENOME_SHA256
+        catalog.exactAnchorGenomeSha256 === V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256
     );
 }
 
@@ -2929,7 +2939,7 @@ function buildCampaignBaseIdentity(candidates: readonly IManifestCandidate[]): I
         candidates.length !== BASE_CANDIDATE_COUNT ||
         !exactAnchor ||
         exactAnchor.id !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
-        exactAnchor.genomeSha256 !== V08_A13_GENOME_SHA256 ||
+        exactAnchor.genomeSha256 !== V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256 ||
         inactiveControls.some((candidate) => candidate === undefined)
     ) {
         throw new Error("Campaign base candidates do not contain the pinned anchor/control identities");
@@ -3703,7 +3713,7 @@ function assertValidationSelectionHeader(selection: IValidationSelection, manife
         selection.version !== V08_CAMPAIGN_SELECTION_VERSION ||
         selection.manifestFingerprint !== manifest.fingerprint ||
         selection.exactAnchorCandidateId !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
-        selection.exactAnchorGenomeSha256 !== V08_A13_GENOME_SHA256 ||
+        selection.exactAnchorGenomeSha256 !== V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256 ||
         !V08_CAMPAIGN_INACTIVE_CONTROL_IDS.includes(selection.inactiveControlCandidateId) ||
         !inactive ||
         selection.inactiveControlGenomeSha256 !== inactive.genomeSha256 ||
@@ -3716,7 +3726,7 @@ function assertValidationSelectionHeader(selection: IValidationSelection, manife
             (genomeSha256) => typeof genomeSha256 !== "string" || !/^[a-f0-9]{64}$/.test(genomeSha256),
         ) ||
         selection.candidateIds[0] !== V08_CAMPAIGN_EXACT_ANCHOR_ID ||
-        selection.candidateGenomeSha256[0] !== V08_A13_GENOME_SHA256 ||
+        selection.candidateGenomeSha256[0] !== V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256 ||
         selection.candidateIds[1] !== selection.inactiveControlCandidateId ||
         selection.candidateGenomeSha256[1] !== selection.inactiveControlGenomeSha256 ||
         !selection.candidateIds.includes(V08_CAMPAIGN_EXACT_ANCHOR_ID) ||
@@ -4425,7 +4435,7 @@ function buildValidationSelection(
         manifestFingerprint: manifest.fingerprint,
         sourceEvidenceSha256: validationSelectionEvidenceSha256(manifest, checkpoint, rows),
         exactAnchorCandidateId: V08_CAMPAIGN_EXACT_ANCHOR_ID,
-        exactAnchorGenomeSha256: V08_A13_GENOME_SHA256,
+        exactAnchorGenomeSha256: V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256,
         inactiveControlCandidateId: inactiveControlCandidateId as IValidationSelection["inactiveControlCandidateId"],
         inactiveControlGenomeSha256: selected[1]!.genomeSha256,
         candidateIds,
@@ -4663,7 +4673,7 @@ function buildAdaptiveCatalog(
         manifestFingerprint: manifest.fingerprint,
         generatorVersion: ADAPTIVE_GENERATOR_VERSION as typeof ADAPTIVE_GENERATOR_VERSION,
         sourceCampaignBaseIdentitySha256: manifest.campaignBaseIdentity.identitySha256,
-        exactAnchorGenomeSha256: V08_A13_GENOME_SHA256,
+        exactAnchorGenomeSha256: V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256,
         exactAnchorMutationFields,
         exactAnchorMutationPlanSha256,
         parentEvidenceSha256,
@@ -4695,7 +4705,7 @@ function validateAdaptiveCatalog(
         adaptive.automaticDeploy !== false ||
         adaptive.manifestFingerprint !== manifest.fingerprint ||
         adaptive.generatorVersion !== ADAPTIVE_GENERATOR_VERSION ||
-        adaptive.exactAnchorGenomeSha256 !== V08_A13_GENOME_SHA256 ||
+        adaptive.exactAnchorGenomeSha256 !== V08_CAMPAIGN_EXACT_ANCHOR_GENOME_SHA256 ||
         !Array.isArray(adaptive.exactAnchorMutationFields) ||
         adaptive.exactAnchorMutationFields.some((field) => typeof field !== "string" || !field) ||
         !/^[a-f0-9]{64}$/.test(adaptive.exactAnchorMutationPlanSha256) ||

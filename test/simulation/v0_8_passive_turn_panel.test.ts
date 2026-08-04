@@ -1211,16 +1211,16 @@ describe("v0.8 random-roster passive-turn panel", () => {
         // Block-center game 3443 has no attacks, casts, catch-up, local threat, or newly covered ward available
         // to Harpy/Abomination on its post-hourglass holds. The shared Flesh-Shield retaliation-risk predicate
         // now rejects the tempting raw Abomination hit before passive arbitration, so no avoidable shield needs
-        // repair. Screen holds remain protected; the response-before-damage correction adds one genuinely forced
-        // Abomination shield after the role releases, with no productive candidate left.
+        // repair. Screen holds remain protected; after S3 restores the campaign shortlist, one genuinely forced
+        // Abomination shield remains after the role releases, with no productive candidate left.
         const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 3_443);
         expect(record.endReason).toBe("elimination");
         expect(record.metrics.rawAvoidableDefendTurns).toBe(0);
         expect(record.metrics.repairedRawAvoidableDefendTurns).toBe(0);
         expect(record.metrics.avoidableDefendTurns).toBe(0);
-        // Sniper 8/17/27 re-valued this trace: one additional GENUINELY forced shield appears. The
+        // The S3 shortlist admits the productive branch that removes the other historical forced hold. The
         // guarded classification is untouched — every avoidable-defend counter above stays zero.
-        expect(record.metrics.forcedDefendTurns).toBe(2);
+        expect(record.metrics.forcedDefendTurns).toBe(1);
         expect(record.metrics.finalDefendTurns).toBe(
             record.metrics.protectedDefendTurns + record.metrics.forcedDefendTurns,
         );
