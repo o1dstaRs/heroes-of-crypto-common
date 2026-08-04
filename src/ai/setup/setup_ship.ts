@@ -28,6 +28,13 @@ import frozenV07PublicRosterArtifact from "./setup_policies/v07_nonfight_0847c0f
 import frozenV07CohortSafePublicRosterArtifact from "./setup_policies/v07_nonfight_5ae5533cea45.json";
 import frozenV07NonFightArtifact from "./setup_policies/v07_nonfight_4eda84635fe7.json";
 import {
+    RANKED_REPLAY_TACTICS_BASE_SPEC,
+    RANKED_REPLAY_TACTICS_BUDGET,
+    RANKED_REPLAY_TACTICS_SETUP_ARTIFACT,
+    RANKED_REPLAY_TACTICS_SETUP_SPEC,
+    replayTacticsAugmentPlan,
+} from "./setup_replay_tactics";
+import {
     TIER2_ARTIFACT_WINRATE,
     type IPlacementSetupDecisionContext,
     type ITier2ArtifactDecisionContext,
@@ -600,7 +607,7 @@ export const V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT = parseSetupPolicyArti
     frozenV07CohortSafePublicRosterArtifact,
 );
 
-export type ResolvedSetupPolicyMode = "setup-v0" | "conditional-v1" | "optimized-v07";
+export type ResolvedSetupPolicyMode = "setup-v0" | "conditional-v1" | "optimized-v07" | "replay-tactics-v1";
 
 export interface IResolvedSetupPolicy {
     readonly configured: boolean;
@@ -673,6 +680,40 @@ export function compileNonFightSetupPolicy(
     });
 }
 
+/**
+ * Compile the replay-derived augment head over the exact frozen v0.7 non-fight policy. Tier-2 artifacts,
+ * synergies, placement visibility and every non-seven-point fallback remain byte-for-byte delegated to the
+ * base policy; only a complete, known own roster at the fair seven-point budget selects a replay plan.
+ */
+export function compileReplayTacticsSetupPolicy(): IResolvedSetupPolicy {
+    if (
+        RANKED_REPLAY_TACTICS_BASE_SPEC !== V07_NONFIGHT_SETUP_SPEC ||
+        RANKED_REPLAY_TACTICS_SETUP_ARTIFACT.policy.baseSpec !== V07_NONFIGHT_SETUP_SPEC
+    ) {
+        throw new Error("ranked replay tactics base setup spec is unavailable");
+    }
+    const base = compileNonFightSetupPolicy(V07_NONFIGHT_SETUP_ARTIFACT.policy, V07_NONFIGHT_SETUP_SPEC);
+    return Object.freeze({
+        ...base,
+        mode: "replay-tactics-v1" as const,
+        spec: RANKED_REPLAY_TACTICS_SETUP_SPEC,
+        journalVersion: RANKED_REPLAY_TACTICS_SETUP_SPEC,
+        pickAugments: (
+            budget: number,
+            ownCreatureIds: readonly number[],
+            context?: Readonly<IPlacementSetupDecisionContext>,
+        ): ISetupAugmentChoice[] => {
+            if (
+                budget !== RANKED_REPLAY_TACTICS_BUDGET ||
+                setupRosterFeatures([...new Set(ownCreatureIds)]).total === 0
+            ) {
+                return base.pickAugments(budget, ownCreatureIds, context);
+            }
+            return setupAugmentsForPlan(replayTacticsAugmentPlan(ownCreatureIds));
+        },
+    });
+}
+
 const conditionalPolicy = (rules: ReadonlySet<ConditionalSetupRule>): IResolvedSetupPolicy => {
     const ruleSnapshot = new Set(rules);
     const enabled = CONDITIONAL_SETUP_RULES.filter((rule) => ruleSnapshot.has(rule));
@@ -714,6 +755,9 @@ export function resolveSetupPolicy(spec: string | undefined): IResolvedSetupPoli
     if (!normalized || normalized === "off" || normalized === "0" || normalized === SETUP_V0_SPEC) {
         return conditionalPolicy(new Set());
     }
+    if (normalized === RANKED_REPLAY_TACTICS_SETUP_SPEC) {
+        return compileReplayTacticsSetupPolicy();
+    }
     if (normalized === V07_NONFIGHT_SETUP_SPEC) {
         return compileNonFightSetupPolicy(V07_NONFIGHT_SETUP_ARTIFACT.policy, V07_NONFIGHT_SETUP_SPEC);
     }
@@ -729,7 +773,7 @@ export function resolveSetupPolicy(spec: string | undefined): IResolvedSetupPoli
     const rules = conditionalRulesForSpec(normalized);
     if (rules) return conditionalPolicy(rules);
     throw new Error(
-        `Invalid setup policy spec ${JSON.stringify(spec)}; expected ${V07_NONFIGHT_SETUP_SPEC}, ${V07_PUBLIC_ROSTER_SETUP_SPEC}, ${V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC}, ${CONDITIONAL_SETUP_V1_SPEC}, ${SETUP_V0_SPEC}, or conditional rule names`,
+        `Invalid setup policy spec ${JSON.stringify(spec)}; expected ${RANKED_REPLAY_TACTICS_SETUP_SPEC}, ${V07_NONFIGHT_SETUP_SPEC}, ${V07_PUBLIC_ROSTER_SETUP_SPEC}, ${V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC}, ${CONDITIONAL_SETUP_V1_SPEC}, ${SETUP_V0_SPEC}, or conditional rule names`,
     );
 }
 

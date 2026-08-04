@@ -32,7 +32,8 @@ import {
     applyWaitScorerWeightsV2,
     applyWaitScorerWeightsV3,
     v07BakedWaitWeights,
-    v07WaitWeightsV2,
+    v07WaitWeightsV2ForVersion,
+    v07WaitWeightsV2SupportsGrid,
     v07WaitWeightsV3,
 } from "./wait_scorer";
 
@@ -122,10 +123,21 @@ interface IV07ArmyProfile {
     auraSaturated: boolean;
     denseMeleeMagic: boolean;
     meleeMagicAnchor: boolean;
+    initialRanged: number;
 }
 
 export const DENSE_MELEE_MAGIC_ISOLATION_VERSIONS_ENV = "V07_DENSE_MM_SALVAGE_ISOLATION_VERSIONS";
 export const AURA_CASTER_ROUTER_VERSIONS_ENV = "V07_AURA_CASTER_ROUTER_VERSIONS";
+export const V07_WAIT_WEIGHTS_V2_MAX_INITIAL_RANGED_ENV = "V07_WAIT_WEIGHTS_V2_MAX_INITIAL_RANGED";
+
+/** Absent preserves the historical all-roster experiment; empty/malformed input fails closed. */
+export function v07WaitWeightsV2SupportsInitialRangedCount(initialRanged: number): boolean {
+    const raw = process.env[V07_WAIT_WEIGHTS_V2_MAX_INITIAL_RANGED_ENV];
+    if (raw === undefined) return true;
+    if (!raw.trim()) return false;
+    const maximum = Number(raw);
+    return Number.isInteger(maximum) && maximum >= 0 && initialRanged <= maximum;
+}
 
 /** Candidate-only scope is optional so historical one-seat experiments keep their original behavior. */
 export const denseMeleeMagicIsolationEnabled = (strategyVersion?: string): boolean =>
@@ -223,6 +235,7 @@ export class StrategyV0_7 extends StrategyV0_6 {
                 auraSaturated: isAuraSaturatedArmy(units),
                 denseMeleeMagic: isDenseMeleeMagicArmy(units),
                 meleeMagicAnchor: isMeleeMagicAnchorArmy(units),
+                initialRanged: units.filter((unit) => unit.getAttackType() === RANGE).length,
             };
             byTeam.set(team, profile);
         }
@@ -314,11 +327,15 @@ export class StrategyV0_7 extends StrategyV0_6 {
         }
         // Phase-B env candidate: V07_WAIT_WEIGHTS_V2 (valid, non-zero) swaps in the multi-cohort V2 scorer;
         // all-zero disables the wait stage entirely; absent/malformed keeps the baked v1 path byte-identical.
-        const v2 = v07WaitWeightsV2();
+        const v2 = v07WaitWeightsV2ForVersion(this.version);
         if (v2 === "disabled") {
             return decision;
         }
-        if (v2) {
+        if (
+            v2 &&
+            v07WaitWeightsV2SupportsGrid(context.grid.getGridType()) &&
+            v07WaitWeightsV2SupportsInitialRangedCount(profile.initialRanged)
+        ) {
             return applyWaitScorerWeightsV2(unit, context, decision, v2);
         }
         return applyWaitScorerWeights(unit, context, decision, v07BakedWaitWeights());

@@ -20,6 +20,7 @@ import { createGzip, type Gzip } from "node:zlib";
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { V08_A13_PROFILE } from "../ai/versions/v0_8_a13_profile";
 import { buildV08A19H18SearchEnvironment, V08_A19_H18_PROFILE } from "../ai/versions/v0_8_a19_h18_profile";
+import { V08_A19_H18_RANKED_PLACEMENT_PROFILE } from "../ai/versions/v0_8_a19_h18_ranked_placement_profile";
 import {
     AI_META_COHORT_DESCRIPTIONS,
     AI_META_COHORTS,
@@ -51,6 +52,11 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "./ai_meta_cohorts_core";
+import {
+    AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
+    AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+    type AiMetaStrategyProfileId,
+} from "./ai_meta_strategy_profile";
 import {
     AI_META_UNIT_INTERACTION_SCHEMA,
     AiMetaUnitInteractionCollector,
@@ -700,13 +706,14 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
-export type AiMetaFightProfileId = "a13" | "a19-h18";
+export type AiMetaFightProfileId = "a13" | "a19-h18" | "a19-h18-ranked-placement";
 
-interface IAiMetaFightProfile {
+export interface IAiMetaFightProfile {
     id: AiMetaFightProfileId;
     title: string;
     provenance: Readonly<Record<string, unknown>>;
     workerEnvironment: Readonly<Record<string, string>>;
+    strategyProfileId: AiMetaStrategyProfileId;
 }
 
 const definedEnvironment = (
@@ -734,6 +741,7 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             workerOverride: "V08_A13_SEARCH=1",
         }),
         workerEnvironment: definedEnvironment({ V08_A13_SEARCH: "1" }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
     }),
     "a19-h18": Object.freeze({
         id: "a19-h18",
@@ -754,6 +762,31 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             ...buildV08A19H18SearchEnvironment(),
             V08_A13_SEARCH: "0",
         }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+    }),
+    "a19-h18-ranked-placement": Object.freeze({
+        id: "a19-h18-ranked-placement",
+        title: "Heroes of Crypto — v0.8+a19-h18 Ranked Placement Research AI Meta Balance Cohorts",
+        provenance: Object.freeze({
+            name: "v0.8+a19-h18-ranked-placement-v8-research",
+            schema: V08_A19_H18_RANKED_PLACEMENT_PROFILE.schema,
+            candidateId: V08_A19_H18_RANKED_PLACEMENT_PROFILE.candidateId,
+            researchOnly: V08_A19_H18_RANKED_PLACEMENT_PROFILE.researchOnly,
+            baseVersion: V08_A19_H18_RANKED_PLACEMENT_PROFILE.baseVersion,
+            derivesFrom: V08_A19_H18_RANKED_PLACEMENT_PROFILE.derivesFrom,
+            genomeSha256: V08_A19_H18_RANKED_PLACEMENT_PROFILE.genomeSha256,
+            behaviorEnvironmentSha256: V08_A19_H18_RANKED_PLACEMENT_PROFILE.behaviorEnvironmentSha256,
+            search: V08_A19_H18_RANKED_PLACEMENT_PROFILE.search,
+            policy: V08_A19_H18_RANKED_PLACEMENT_PROFILE.policy,
+            placementPolicy: V08_A19_H18_RANKED_PLACEMENT_PROFILE.placementPolicy,
+            strategyProfileId: AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
+            workerOverride: "V07_SEARCH=1; V08_A13_SEARCH=0",
+        }),
+        workerEnvironment: definedEnvironment({
+            ...buildV08A19H18SearchEnvironment(),
+            V08_A13_SEARCH: "0",
+        }),
+        strategyProfileId: AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
     }),
 });
 
@@ -853,7 +886,7 @@ export async function runAiMetaWorkerPool(
                 return;
             }
             const worker = new Worker(workerUrl, {
-                workerData: { options },
+                workerData: { options, strategyProfileId: fightProfile.strategyProfileId },
                 env: workerEnvironment,
             });
             workers.add(worker);
@@ -1164,7 +1197,7 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "[fight-profile=a13]";
+    "[fight-profile=a13|a19-h18|a19-h18-ranked-placement]";
 
 export function validateAiMetaGamesPerCohort(games: number): void {
     const mapCycleGames = AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;

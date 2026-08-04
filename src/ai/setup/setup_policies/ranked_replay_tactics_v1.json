@@ -1,0 +1,55 @@
+{
+    "schemaVersion": 1,
+    "spec": "ranked-replay-tactics-v1",
+    "behaviorSha256": "c0f246a501d0089b7f407ce0a5ccefd4d8db37a2e815d5969fede96f7b00aa90",
+    "policy": {
+        "baseSpec": "v07-nonfight-4eda84635fe7",
+        "classifier": {
+            "precedence": [
+                "ranged-battery",
+                "rapid-charge-core",
+                "healer-durable-carry",
+                "broad-mobile-melee",
+                "ordinary"
+            ],
+            "rangedBatteryMinRanged": 2,
+            "rapidChargeAbility": "Rapid Charge",
+            "rapidChargeMinMelee": 2,
+            "broadMobileAbility": "Sky Runner",
+            "broadMobileMinSpeed": 7,
+            "broadMobileMinMelee": 4,
+            "healerName": "Healer",
+            "durableCarryNames": ["Abomination", "Frenzied Boar", "Goblin Knight", "Angel"]
+        },
+        "augmentPlansByIdentity": {
+            "ranged-battery": {
+                "placement": 2,
+                "armor": 2,
+                "might": 0,
+                "sniper": 3,
+                "movement": 0
+            },
+            "fast-mobile-melee": {
+                "placement": 1,
+                "armor": 1,
+                "might": 3,
+                "sniper": 0,
+                "movement": 2
+            },
+            "healer-durable-carry": {
+                "placement": 1,
+                "armor": 3,
+                "might": 2,
+                "sniper": 0,
+                "movement": 1
+            },
+            "ordinary": {
+                "placement": 0,
+                "armor": 3,
+                "might": 3,
+                "sniper": 0,
+                "movement": 1
+            }
+        }
+    }
+}

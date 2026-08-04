@@ -16,6 +16,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "bun:test";
 
+import { Tier1Artifact } from "../../src/artifacts/artifact_properties";
+
 import {
     draftGenomeCreatureScore,
     embedIntrinsicDraftWeights,
@@ -81,6 +83,60 @@ describe("draft ship genome", () => {
         expect(pickDraftGenomeCreature(genome, [abomination, champion], [], [])).toBe(champion);
         expect(pickDraftGenomeCreature(genome, [abomination, champion], [ward], [])).toBe(champion);
         expect(pickDraftGenomeCreature(genome, [abomination, champion], [ward, secondWard], [])).toBe(abomination);
+    });
+
+    it("layers own-artifact build coherence without changing the frozen genome", () => {
+        const genome = parseDraftGenome(LEAGUE_ROUND1_DRAFT_SPEC);
+        const frozenWeights = [...genome.weights];
+
+        expect(
+            pickDraftGenomeCreature(
+                genome,
+                [PBTypes.CreatureVals.HYDRA, PBTypes.CreatureVals.TSAR_CANNON],
+                [],
+                [],
+                Tier1Artifact.HUNTERS_LONGBOW,
+            ),
+        ).toBe(PBTypes.CreatureVals.TSAR_CANNON);
+        expect(
+            pickDraftGenomeCreature(
+                genome,
+                [PBTypes.CreatureVals.CYCLOPS, PBTypes.CreatureVals.GRIFFIN],
+                [],
+                [],
+                Tier1Artifact.WINGED_BOOTS,
+            ),
+        ).toBe(PBTypes.CreatureVals.GRIFFIN);
+        expect(
+            pickDraftGenomeCreature(
+                genome,
+                [PBTypes.CreatureVals.SCAVENGER, PBTypes.CreatureVals.BERSERKER],
+                [],
+                [],
+                Tier1Artifact.WOUNDING_CHARM,
+            ),
+        ).toBe(PBTypes.CreatureVals.BERSERKER);
+
+        const backline = [PBTypes.CreatureVals.ARBALESTER, PBTypes.CreatureVals.BATTLE_MAGE];
+        expect(
+            pickDraftGenomeCreature(
+                genome,
+                [PBTypes.CreatureVals.ABOMINATION, PBTypes.CreatureVals.TSAR_CANNON],
+                backline,
+                [],
+                Tier1Artifact.HUNTERS_LONGBOW,
+            ),
+        ).toBe(PBTypes.CreatureVals.ABOMINATION);
+        expect(
+            pickDraftGenomeCreature(
+                genome,
+                [PBTypes.CreatureVals.ABOMINATION, PBTypes.CreatureVals.THUNDERBIRD],
+                backline,
+                [],
+                Tier1Artifact.WINGED_BOOTS,
+            ),
+        ).toBe(PBTypes.CreatureVals.ABOMINATION);
+        expect(genome.weights).toEqual(frozenWeights);
     });
 
     it("makes role fit a monotone boost for both positive and negative learned scores", () => {

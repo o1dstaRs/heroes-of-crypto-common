@@ -33,6 +33,10 @@ import { prioritizeV08BlacksmithCraft, v08BlacksmithCraftPlacement } from "./v0_
 import { isV08DirectCombatDecision, v08DominantFinishState } from "./v0_8_dominant_finish";
 import { prioritizeV08RangedPositioning } from "./v0_8_ranged_positioning";
 import {
+    prioritizeV08RankedReplayCombatTactics,
+    V08_RANKED_REPLAY_TACTICS_VERSIONS_ENV,
+} from "./v0_8_ranked_replay_tactics";
+import {
     prioritizeV08AshMothSmoke,
     prioritizeV08HealerSustain,
     prioritizeV08NightmareFireWall,
@@ -657,10 +661,16 @@ export class StrategyV0_8 extends StrategyV0_7 {
         )
             ? prioritizeV08BlacksmithCraft(unit, context, supportDecision)
             : supportDecision;
+        const rankedReplayTacticsScope = process.env[V08_RANKED_REPLAY_TACTICS_VERSIONS_ENV];
+        const rankedReplayDecision =
+            rankedReplayTacticsScope !== undefined &&
+            strategyVersionMatchesExperimentScope(this.version, rankedReplayTacticsScope)
+                ? prioritizeV08RankedReplayCombatTactics(unit, context, craftDecision)
+                : craftDecision;
         const protectedDecision = prioritizeV08BacklineProtector(
             unit,
             context,
-            craftDecision,
+            rankedReplayDecision,
             this.canHourglass(unit, context),
         );
         return repairV08BacklineWardDecision(unit, context, protectedDecision);

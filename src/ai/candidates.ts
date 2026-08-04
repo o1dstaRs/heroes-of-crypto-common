@@ -55,6 +55,7 @@ import type { IDecisionContext } from "./ai_strategy";
 import { decisionFireWalls } from "./decision_fight_state";
 import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
+import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -429,6 +430,8 @@ export interface IEnumeratedCandidate {
     standCell?: XY;
     /** Deterministic shot-only metadata; absent for non-shot candidates. */
     shotFeatures?: IShotCandidateFeatures;
+    /** Research-only marker for the one exact Rapid Charge challenger retained across a capped melee catalog. */
+    researchRapidChargeDifferentTargetReserved?: true;
     features: ICandidateFeatures;
 }
 
@@ -450,6 +453,12 @@ export interface IEnumerateOptions {
     preserveMovePostureDiversity?: boolean;
     /** Cap on melee (target x stand-cell) pairs, kept by expected damage (0/undefined = all). */
     maxMeleePairs?: number;
+    /**
+     * Research-only Rapid Charge catalog arm. When the incumbent is a non-lethal melee attack, preserve at most
+     * one strictly stronger, supported long-charge challenger against a different target across maxMeleePairs.
+     * Default false leaves candidate values, ordering, and caps byte-identical for every production consumer.
+     */
+    researchReserveRapidChargeDifferentTarget?: boolean;
     /** Cap on ranged aims, kept by expected damage (0/undefined = all distinct hit sets). */
     maxShotAims?: number;
     /**
@@ -1013,12 +1022,20 @@ class CandidateGenerator {
             route?: IReadonlyWeightedRoute;
             effective: number;
             kill: 0 | 1;
+            sourceIndex: number;
         }
         const pairs: IMeleePair[] = [];
+        const pair = (target: Unit, cell: XY, route?: IReadonlyWeightedRoute): IMeleePair => ({
+            target,
+            cell,
+            route,
+            ...this.meleeDamage(target),
+            sourceIndex: pairs.length,
+        });
         // In-place strikes: enemies already adjacent to the current footprint.
         for (const e of targets) {
             if (e.getCells().some((ec) => myCells.some((mc) => isAdjacentCell(mc, ec)))) {
-                pairs.push({ target: e, cell: base, ...this.meleeDamage(e) });
+                pairs.push(pair(e, base));
             }
         }
         // Move-and-strike: every reachable stand cell whose footprint is adjacent to a target.
@@ -1042,23 +1059,13 @@ class CandidateGenerator {
                         continue;
                     }
                     if (fpCells.some((mc) => e.getCells().some((ec) => isAdjacentCell(mc, ec)))) {
-                        pairs.push({ target: e, cell: route.cell, route, ...this.meleeDamage(e) });
+                        pairs.push(pair(e, route.cell, route));
                     }
                 }
             }
         }
-        const cap = this.options.maxMeleePairs ?? 0;
-        let kept = pairs;
-        if (cap > 0 && pairs.length > cap) {
-            kept = capAttackCandidates(pairs, cap, this.options.preserveAttackTargetCoverage === true, (pair) => ({
-                targetId: pair.target.getId(),
-                expectedDamage: pair.effective,
-                expectedKill: pair.kill,
-                stationary: pair.route === undefined,
-            }));
-            if (kept.length < pairs.length) this.truncated.push("melee");
-        }
-        const candidateOf = (p: IMeleePair): IEnumeratedCandidate => {
+
+        const actionsOf = (p: IMeleePair): GameAction[] => {
             const actions: GameAction[] = [...prefix];
             // Move-and-strike is emitted as a SEPARATE move_unit + stationary melee_attack — the pattern
             // v0.5 measured ~+2.5pp over folding the path into the melee_attack (the standalone move runs
@@ -1072,11 +1079,92 @@ class CandidateGenerator {
                 targetId: p.target.getId(),
                 attackFrom: { x: p.cell.x, y: p.cell.y },
             });
+            return actions;
+        };
+
+        let reservedRapidChargePair: IMeleePair | undefined;
+        if (
+            this.options.researchReserveRapidChargeDifferentTarget === true &&
+            this.unit.hasAbilityActive("Rapid Charge")
+        ) {
+            const incumbentActions = this.candidates[0]?.actions;
+            const incumbentMelee = incumbentActions?.find(
+                (action): action is Extract<GameAction, { type: "melee_attack" }> =>
+                    action.type === "melee_attack" && action.attackerId === this.unit.getId(),
+            );
+            const incumbentTarget = incumbentMelee
+                ? this.context.unitsHolder.getAllUnits().get(incumbentMelee.targetId)
+                : undefined;
+            const incumbentEstimate =
+                incumbentActions && incumbentMelee && incumbentTarget && !incumbentTarget.isDead()
+                    ? estimatePrimaryMeleeDamage(
+                          this.unit,
+                          incumbentTarget,
+                          this.context,
+                          incumbentMelee.attackFrom,
+                          incumbentActions,
+                      )
+                    : undefined;
+            if (incumbentMelee && incumbentEstimate && !incumbentEstimate.secureKill) {
+                let bestDamage = incumbentEstimate.expectedEffectiveDamage;
+                let bestRouteLength = -1;
+                let bestSourceIndex = Number.MAX_SAFE_INTEGER;
+                for (const candidate of pairs) {
+                    const routeLength = candidate.route?.route.length ?? 0;
+                    if (
+                        candidate.target.getId() === incumbentMelee.targetId ||
+                        routeLength < 3 ||
+                        candidate.route?.hasLavaCell ||
+                        candidate.route?.hasWaterCell
+                    ) {
+                        continue;
+                    }
+                    const estimate = estimatePrimaryMeleeDamage(
+                        this.unit,
+                        candidate.target,
+                        this.context,
+                        candidate.cell,
+                        actionsOf(candidate),
+                    );
+                    if (!estimate || estimate.expectedEffectiveDamage <= incumbentEstimate.expectedEffectiveDamage) {
+                        continue;
+                    }
+                    if (
+                        estimate.expectedEffectiveDamage > bestDamage ||
+                        (estimate.expectedEffectiveDamage === bestDamage &&
+                            (routeLength > bestRouteLength ||
+                                (routeLength === bestRouteLength && candidate.sourceIndex < bestSourceIndex)))
+                    ) {
+                        reservedRapidChargePair = candidate;
+                        bestDamage = estimate.expectedEffectiveDamage;
+                        bestRouteLength = routeLength;
+                        bestSourceIndex = candidate.sourceIndex;
+                    }
+                }
+            }
+        }
+
+        const cap = this.options.maxMeleePairs ?? 0;
+        let kept = pairs;
+        if (cap > 0 && pairs.length > cap) {
+            kept = capAttackCandidates(pairs, cap, this.options.preserveAttackTargetCoverage === true, (pair) => ({
+                targetId: pair.target.getId(),
+                expectedDamage: pair.effective,
+                expectedKill: pair.kill,
+                stationary: pair.route === undefined,
+            }));
+            if (kept.length < pairs.length) this.truncated.push("melee");
+            if (reservedRapidChargePair && !kept.includes(reservedRapidChargePair)) {
+                kept = [...kept, reservedRapidChargePair];
+            }
+        }
+        const candidateOf = (p: IMeleePair): IEnumeratedCandidate => {
             return {
                 kind: "melee",
-                actions,
+                actions: actionsOf(p),
                 targetId: p.target.getId(),
                 standCell: { x: p.cell.x, y: p.cell.y },
+                ...(p === reservedRapidChargePair ? { researchRapidChargeDifferentTargetReserved: true as const } : {}),
                 features: this.features({ expectedDamage: p.effective, expectedKill: p.kill }),
             };
         };

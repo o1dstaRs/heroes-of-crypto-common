@@ -69,9 +69,10 @@ const outcome = (aIsGreen: boolean, winner: "a" | "b" | "draw"): IAiMetaGameOutc
 
 const runMetaPairInWorker = (cohort: (typeof AI_META_COHORTS)[number], pair: number): Promise<IAiMetaPairRecord> =>
     new Promise((resolve, reject) => {
+        const fightProfile = resolveAiMetaFightProfile("a13");
         const worker = new Worker(new URL("../../src/simulation/ai_meta_cohorts_worker.ts", import.meta.url), {
-            workerData: { options: options(cohort, 150_000) },
-            env: sanitizedAiMetaEnvironment(),
+            workerData: { options: options(cohort, 150_000), strategyProfileId: fightProfile.strategyProfileId },
+            env: sanitizedAiMetaEnvironment(process.env, fightProfile),
         });
         const fail = (error: unknown): void => {
             void worker.terminate();
@@ -217,6 +218,19 @@ describe("AI meta cohort generation", () => {
         expect(exploited).toBeGreaterThan(explored);
     });
 
+    it("can prepare setup choices for a preregistered map without changing the seeded rosters", () => {
+        const generatedMap = prepareMetaPair(options("uniform-mixed", 1000), 1);
+        const forcedNormal = prepareMetaPair(options("uniform-mixed", 1000), 1, PBTypes.GridVals.NORMAL);
+
+        expect(generatedMap.map).toBe(PBTypes.GridVals.LAVA_CENTER);
+        expect(forcedNormal.map).toBe(PBTypes.GridVals.NORMAL);
+        expect(forcedNormal.setupSeed).toBe(generatedMap.setupSeed);
+        expect(forcedNormal.combatSeed).toBe(generatedMap.combatSeed);
+        expect(forcedNormal.armyA.roster).toEqual(generatedMap.armyA.roster);
+        expect(forcedNormal.armyB.roster).toEqual(generatedMap.armyB.roster);
+        expect(prepareMetaPair(options("uniform-mixed", 1000), 1, PBTypes.GridVals.NORMAL)).toEqual(forcedNormal);
+    });
+
     it("sanitizes experiment flags before worker module initialization", () => {
         const environment = sanitizedAiMetaEnvironment({
             PATH: "/bin",
@@ -244,13 +258,14 @@ describe("AI meta cohort generation", () => {
     });
 
     it("materializes the explicit a19 h18 worker profile without ambient experiment leakage", () => {
+        const baseProfile = resolveAiMetaFightProfile("a19-h18");
         const environment = sanitizedAiMetaEnvironment(
             {
                 SEARCH_HORIZON: "999",
                 V07_SEARCH: "0",
                 V08_A13_SEARCH: "1",
             },
-            resolveAiMetaFightProfile("a19-h18"),
+            baseProfile,
         );
         expect(environment).toMatchObject({
             V07_SEARCH: "1",
@@ -263,7 +278,23 @@ describe("AI meta cohort generation", () => {
         expect(environment.SEARCH_INCUMBENT_KINDS).toBeUndefined();
         expect(environment.SEARCH_CHALLENGER_KINDS).toBeUndefined();
         expect(Object.values(environment)).not.toContain("undefined");
+        expect(baseProfile.strategyProfileId).toBe("registered-version");
+
+        const placementProfile = resolveAiMetaFightProfile("a19-h18-ranked-placement");
+        expect(placementProfile.strategyProfileId).toBe("a19-h18-ranked-placement-v8");
+        expect(placementProfile.provenance).toMatchObject({
+            name: "v0.8+a19-h18-ranked-placement-v8-research",
+            researchOnly: true,
+            strategyProfileId: "a19-h18-ranked-placement-v8",
+            placementPolicy: {
+                informationRequirement: "public-roster",
+                scope: { map: "NORMAL" },
+            },
+        });
+        expect(placementProfile.workerEnvironment).toEqual(baseProfile.workerEnvironment);
+
         expect(resolveAiMetaFightProfile(undefined).id).toBe("a13");
+        expect(resolveAiMetaFightProfile(undefined).strategyProfileId).toBe("registered-version");
         expect(() => resolveAiMetaFightProfile("a20")).toThrow("Unknown AI meta fight profile a20");
     });
 

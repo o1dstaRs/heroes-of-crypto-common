@@ -806,27 +806,32 @@ export function chooseMetaArmy(
     };
 }
 
-export function prepareMetaPair(options: IAiMetaRunOptions, pair: number): Omit<IAiMetaPairRecord, "games"> {
+export function prepareMetaPair(
+    options: IAiMetaRunOptions,
+    pair: number,
+    mapOverride?: AiMetaMap,
+): Omit<IAiMetaPairRecord, "games"> {
     const matchup = generateMetaMatchup(options, pair);
+    const map = mapOverride ?? matchup.map;
     return {
         schemaVersion: AI_META_SCHEMA_VERSION,
         cohort: options.cohort,
         pair,
         setupSeed: matchup.setupSeed,
         combatSeed: matchup.combatSeed,
-        map: matchup.map,
+        map,
         armyA: chooseMetaArmy(
             matchup.archetypeA,
             matchup.rosterA,
             matchup.rosterB,
-            matchup.map,
+            map,
             hashSimulationParts(matchup.setupSeed, "a"),
         ),
         armyB: chooseMetaArmy(
             matchup.archetypeB,
             matchup.rosterB,
             matchup.rosterA,
-            matchup.map,
+            map,
             hashSimulationParts(matchup.setupSeed, "b"),
         ),
     };

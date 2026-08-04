@@ -18,6 +18,7 @@ import {
     type IPlacementSetupDecisionContext,
     type ITier2ArtifactDecisionContext,
 } from "../../src/ai/setup/setup_strategy";
+import { RANKED_REPLAY_TACTICS_SETUP_SPEC } from "../../src/ai/setup/setup_replay_tactics";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 
 const ownCreatureIds = Object.freeze([1, 2, 7, 15]);
@@ -67,6 +68,27 @@ describe("fair setup decision context", () => {
         expect(Object.isFrozen(context.ownArtifactIds)).toBe(true);
     });
 
+    test("marks a private Setup roster as partial without changing the public Board default", () => {
+        const privateSetup = createPlacementSetupDecisionContext({
+            publicOpponentCreatureIds: [9],
+            opponentRosterVisibility: "partial",
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            gridSize: 16,
+        });
+        const publicBoard = createPlacementSetupDecisionContext({
+            publicOpponentCreatureIds: [9, 15, 37],
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            gridSize: 16,
+        });
+
+        expect(privateSetup).toMatchObject({
+            decisionPhase: "placement",
+            opponentRosterVisibility: "partial",
+            publicOpponentCreatureIds: [9],
+        });
+        expect(publicBoard.opponentRosterVisibility).toBe("complete");
+    });
+
     test("Tier-2 context is necessarily partial and strips private fields", () => {
         const context = createTier2ArtifactDecisionContext({
             publicOpponentCreatureIds: [9, 9, 15],
@@ -110,6 +132,7 @@ describe("fair setup decision context", () => {
         for (const spec of [
             undefined,
             "conditional-v1",
+            RANKED_REPLAY_TACTICS_SETUP_SPEC,
             V07_NONFIGHT_SETUP_SPEC,
             V07_PUBLIC_ROSTER_SETUP_SPEC,
             V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,

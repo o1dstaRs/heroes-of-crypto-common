@@ -136,6 +136,8 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned for the Abomination buff (hp 550 -> 600, armor 46 -> 48): the tank's added durability
 // re-values seeded setups and every exchange it appears in. Two isolated runs produced this
 // byte-identical digest.
+// Re-pinned after the fair, own-roster-only draft-coherence overlay landed. It changes the seeded
+// production draft selections while preserving the resolver's deterministic replay contract.
 const EXPECTED_REPLAY_SHA256 = "52e8a38589b4dd18fd0786e1dcf5982c3f14f21adcdacf9a8fe2eb66517a37d7";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {

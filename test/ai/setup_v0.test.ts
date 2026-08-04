@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { SETUP_POLICY_V0 } from "../../src/ai/setup/setup_v0";
+import { SETUP_POLICY_V0, SETUP_POLICY_V0_DRAFT_ROLLBACK } from "../../src/ai/setup/setup_v0";
 import { eligibleBacklineProtectorChoices, creatureInfo, scoreCreature } from "../../src/ai/setup/creature_score";
 import { CreatureFactions } from "../../src/generated/protobuf/v1/creature_gen";
 import { Perk } from "../../src/perks/perk_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { Tier2Artifact } from "../../src/artifacts/artifact_properties";
+import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { LifeSynergy } from "../../src/synergies/synergy_properties";
 
 const policy = SETUP_POLICY_V0;
@@ -126,5 +126,37 @@ describe("SetupPolicyV0", () => {
         const pick = policy.pickBundle([a, b]);
         expect(pick === 0 || pick === 1).toBe(true);
         expect(policy.pickBundle([a, b])).toBe(pick);
+    });
+
+    test("bundle and later creature picks preserve a coherent Tier-1 build", () => {
+        const longbow = [PBTypes.CreatureVals.ORC, PBTypes.CreatureVals.MEDUSA, Tier1Artifact.HUNTERS_LONGBOW] as const;
+        const generic = [PBTypes.CreatureVals.ORC, PBTypes.CreatureVals.MEDUSA, Tier1Artifact.CURSED_WARD] as const;
+        expect(policy.pickBundle([longbow, generic])).toBe(0);
+        expect(
+            policy.pickCreature(
+                3,
+                [PBTypes.CreatureVals.MANTIS, PBTypes.CreatureVals.CYCLOPS],
+                [PBTypes.CreatureVals.ORC, PBTypes.CreatureVals.MEDUSA],
+                [],
+                Tier1Artifact.HUNTERS_LONGBOW,
+            ),
+        ).toBe(PBTypes.CreatureVals.CYCLOPS);
+    });
+
+    test("keeps an exact pre-overlay draft rollback", () => {
+        const longbow = [PBTypes.CreatureVals.ORC, PBTypes.CreatureVals.MEDUSA, Tier1Artifact.HUNTERS_LONGBOW] as const;
+        const generic = [PBTypes.CreatureVals.ORC, PBTypes.CreatureVals.MEDUSA, Tier1Artifact.CURSED_WARD] as const;
+
+        expect(SETUP_POLICY_V0.pickBundle([longbow, generic])).toBe(0);
+        expect(SETUP_POLICY_V0_DRAFT_ROLLBACK.pickBundle([longbow, generic])).toBe(1);
+        expect(
+            SETUP_POLICY_V0_DRAFT_ROLLBACK.pickCreature(
+                3,
+                [PBTypes.CreatureVals.CYCLOPS, PBTypes.CreatureVals.GRIFFIN],
+                [],
+                [],
+                Tier1Artifact.WINGED_BOOTS,
+            ),
+        ).toBe(PBTypes.CreatureVals.CYCLOPS);
     });
 });

@@ -28,6 +28,7 @@ import {
     creatureRoleFitMultiplier,
     eligibleBacklineProtectorChoices,
 } from "./creature_score";
+import { pickCoherentDraftCreature } from "./draft_coherence";
 import leagueRound1CandidateGenome from "./draft_genomes/league_round1_br_57de5a2d_candidate.json";
 import leagueRound3ProjectedGenome from "./draft_genomes/league_round3_br_52752642_projected.json";
 import v07NonfightDraftGenome from "./draft_genomes/v07_nonfight_draft_48d23ac4461_projected.json";
@@ -178,27 +179,24 @@ export function draftGenomeCreatureScore(genome: ILeagueGenome, creatureId: numb
 
 /**
  * Live-ranked creature argmax with the same role-safety gate used by league training. Genome scores remain
- * immutable; roster and fair revealed-opponent context only remove an inapplicable Queen/Abomination when at
- * least one ordinary legal choice exists.
+ * immutable; the post-score coherence overlay consumes only the acting seat's own roster/artifact, while fair
+ * revealed-opponent context only gates an inapplicable Queen/Abomination when an ordinary choice exists.
  */
 export function pickDraftGenomeCreature(
     genome: ILeagueGenome,
     available: readonly number[],
     ownCreatureIds: readonly number[],
     knownOpponentCreatureIds: readonly number[],
+    tier1ArtifactId?: number,
 ): number | undefined {
     const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
-    let best: number | undefined;
-    let bestScore = -Infinity;
-    for (const creatureId of eligible) {
-        const score = applyCreatureRoleFitMultiplier(
-            draftGenomeCreatureScore(genome, creatureId),
-            creatureRoleFitMultiplier(creatureId, ownCreatureIds, knownOpponentCreatureIds),
-        );
-        if (score > bestScore) {
-            best = creatureId;
-            bestScore = score;
-        }
-    }
-    return best;
+    return pickCoherentDraftCreature(
+        eligible,
+        (creatureId) =>
+            applyCreatureRoleFitMultiplier(
+                draftGenomeCreatureScore(genome, creatureId),
+                creatureRoleFitMultiplier(creatureId, ownCreatureIds, knownOpponentCreatureIds),
+            ),
+        { ownCreatureIds, tier1ArtifactId },
+    );
 }

@@ -21,9 +21,11 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "./ai_meta_cohorts_core";
+import { createAiMetaMatchStrategyOverrides, type AiMetaStrategyProfileId } from "./ai_meta_strategy_profile";
 
 interface IAiMetaWorkerData {
     options: IAiMetaRunOptions;
+    strategyProfileId: AiMetaStrategyProfileId;
 }
 
 type WorkerRequest = { type: "pair"; pair: number } | { type: "stop" };
@@ -43,6 +45,7 @@ const configFor = (
     red: IAiMetaArmy,
     seed: number,
     map: number,
+    strategyProfileId: AiMetaStrategyProfileId,
 ): Parameters<typeof runMatch>[0] => ({
     greenVersion: AI_META_FIGHT_VERSION,
     redVersion: AI_META_FIGHT_VERSION,
@@ -62,6 +65,10 @@ const configFor = (
     redSynergies: red.synergies,
     placementAugmentTiming: "setup-before-placement",
     headlessEvents: true,
+    ...createAiMetaMatchStrategyOverrides(strategyProfileId, {
+        greenOpponentCreatureIds: red.creatureIds,
+        redOpponentCreatureIds: green.creatureIds,
+    }),
 });
 
 function gameOutcome(result: IMatchResult, aIsGreen: boolean): IAiMetaGameOutcome {
@@ -84,11 +91,19 @@ function gameOutcome(result: IMatchResult, aIsGreen: boolean): IAiMetaGameOutcom
     };
 }
 
-export function playMetaPair(options: IAiMetaRunOptions, pair: number): IAiMetaPairRecord {
+export function playMetaPair(
+    options: IAiMetaRunOptions,
+    pair: number,
+    strategyProfileId: AiMetaStrategyProfileId,
+): IAiMetaPairRecord {
     const prepared = prepareMetaPair(options, pair);
     FightStateManager.getInstance();
-    const aGreen = runMatch(configFor(prepared.armyA, prepared.armyB, prepared.combatSeed, prepared.map));
-    const bGreen = runMatch(configFor(prepared.armyB, prepared.armyA, prepared.combatSeed, prepared.map));
+    const aGreen = runMatch(
+        configFor(prepared.armyA, prepared.armyB, prepared.combatSeed, prepared.map, strategyProfileId),
+    );
+    const bGreen = runMatch(
+        configFor(prepared.armyB, prepared.armyA, prepared.combatSeed, prepared.map, strategyProfileId),
+    );
     return {
         ...prepared,
         games: [gameOutcome(aGreen, true), gameOutcome(bGreen, false)],
@@ -96,7 +111,7 @@ export function playMetaPair(options: IAiMetaRunOptions, pair: number): IAiMetaP
 }
 
 if (!parentPort) throw new Error("ai_meta_cohorts_worker must run in a worker thread");
-const options = (workerData as IAiMetaWorkerData).options;
+const { options, strategyProfileId } = workerData as IAiMetaWorkerData;
 
 parentPort.on("message", (message: WorkerRequest) => {
     if (message.type === "stop") {
@@ -106,7 +121,7 @@ parentPort.on("message", (message: WorkerRequest) => {
     try {
         parentPort!.postMessage({
             type: "result",
-            record: playMetaPair(options, message.pair),
+            record: playMetaPair(options, message.pair, strategyProfileId),
         } satisfies WorkerResponse);
     } catch (error) {
         parentPort!.postMessage({
