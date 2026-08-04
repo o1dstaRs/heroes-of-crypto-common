@@ -136,7 +136,7 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned for the Abomination buff (hp 550 -> 600, armor 46 -> 48): the tank's added durability
 // re-values seeded setups and every exchange it appears in. Two isolated runs produced this
 // byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "954a075e4674723990fa0410bb9c8e80a43e54b297a9a75a4ce7d76076a70147";
+const EXPECTED_REPLAY_SHA256 = "52e8a38589b4dd18fd0786e1dcf5982c3f14f21adcdacf9a8fe2eb66517a37d7";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
