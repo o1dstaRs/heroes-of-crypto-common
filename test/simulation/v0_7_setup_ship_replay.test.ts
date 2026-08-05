@@ -140,11 +140,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // production draft selections while preserving the resolver's deterministic replay contract.
 // Re-pinned for the Trent buff (hp 29 -> 31, armor 19 -> 20, attack 21 -> 22): the sturdier L2
 // re-values every seeded exchange it appears in. Two isolated runs produced this byte-identical digest.
-// Re-pinned after the Water Shield break line started naming the striker ("absorbs Orc's hit and
-// breaks"): the trace hashes scene-log text, so every seeded fight where a Mermaid's shield pops moves
-// legitimately. Digest confirmed deterministic on the committed tree (CI reproduced it exactly).
-// Re-pinned for Battle Mage's hp reduction (17 -> 14): the lower survivability changes the seeded setup
-// valuation and downstream exchanges. Two isolated runs produced this byte-identical digest.
+// Re-pinned after Water Shield break events joined the authoritative action trace and began naming the
+// striker. The event is intentionally replay-visible; Linux CI and two local runs produced this digest.
+// Re-pinned again for Battle Mage's hp reduction (17 -> 14): the lower survivability changes the seeded
+// setup valuation and downstream exchanges. Two isolated runs produced this byte-identical digest.
 const EXPECTED_REPLAY_SHA256 = "66ae33f5f040fa4cd2580ca90e9aa47d81a2ddc72ab7df36ede4bb5edaafee82";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {

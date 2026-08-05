@@ -190,7 +190,7 @@
             "exp": 20,
             "size": 1,
             "level": 2,
-            "spells": ["Life:Fire Strike", "Life:Fire Strike", "Life:Fire Strike", "Life:Meteorite"],
+            "spells": ["Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Meteorite"],
             "abilities": ["Basic Tome of Battle Magic"]
         },
         "Crusader": {

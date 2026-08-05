@@ -42,7 +42,7 @@ const battleMage = (creaturesJson as unknown as Record<string, Record<string, Re
     spells: string[];
     abilities: string[];
 };
-const lifeSpells = (spellsJson as unknown as Record<string, Record<string, { power: number }>>).Life;
+const chaosSpells = (spellsJson as unknown as Record<string, Record<string, { power: number }>>).Chaos;
 
 /**
  * A fight with the Battle Mage on the LOWER team and whatever enemies a test asks for. Deliberately local
@@ -68,7 +68,7 @@ const setupMageFight = (opts: {
         name: "Battle Mage",
         team: PBTypes.TeamVals.LOWER,
         attackType: PBTypes.AttackVals.MELEE_MAGIC,
-        spells: opts.spells ?? ["Life:Fire Strike", "Life:Fire Strike", "Life:Fire Strike", "Life:Meteorite"],
+        spells: opts.spells ?? ["Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Meteorite"],
         amountAlive: opts.casterAmountAlive,
         stackPower: opts.casterStackPower,
         speed: 5,
@@ -157,25 +157,32 @@ describe("stack-powered spell damage formula", () => {
 // a whole 2x2 at once. Pin that in the config so a later tweak cannot silently break the relationship.
 describe("Battle Mage spell configuration", () => {
     it("prices Fire Strike at 6 per mage and Meteorite a third under it, at 4", () => {
-        expect(lifeSpells["Fire Strike"].power).toBe(6);
-        expect(lifeSpells.Meteorite.power).toBe(4);
+        expect(chaosSpells["Fire Strike"].power).toBe(6);
+        expect(chaosSpells.Meteorite.power).toBe(4);
     });
 
     it("gives Fire Strike 3 scrolls at stack power 1 and Meteorite 1 scroll at stack power 5", () => {
-        const fireStrikes = battleMage.spells.filter((entry) => entry === "Life:Fire Strike");
-        const meteorites = battleMage.spells.filter((entry) => entry === "Life:Meteorite");
+        const fireStrikes = battleMage.spells.filter((entry) => entry === "Chaos:Fire Strike");
+        const meteorites = battleMage.spells.filter((entry) => entry === "Chaos:Meteorite");
         expect(fireStrikes).toHaveLength(3);
         expect(meteorites).toHaveLength(1);
 
-        expect(getSpellConfig("Life", "Fire Strike").minimal_caster_stack_power).toBe(1);
-        expect(getSpellConfig("Life", "Meteorite").minimal_caster_stack_power).toBe(5);
+        expect(getSpellConfig("Chaos", "Fire Strike").minimal_caster_stack_power).toBe(1);
+        expect(getSpellConfig("Chaos", "Meteorite").minimal_caster_stack_power).toBe(5);
+        expect(getSpellConfig("Chaos", "Fire Strike").faction).toBe(PBTypes.FactionVals.CHAOS);
+        expect(getSpellConfig("Chaos", "Meteorite").faction).toBe(PBTypes.FactionVals.CHAOS);
+
+        // Old fights and saved armies can still carry the former Life prefix; they must migrate to
+        // the same Chaos SpellProperties so their spellbook corners cannot regress to Life artwork.
+        expect(getSpellConfig("Life", "Fire Strike").faction).toBe(PBTypes.FactionVals.CHAOS);
+        expect(getSpellConfig("Life", "Meteorite").faction).toBe(PBTypes.FactionVals.CHAOS);
     });
 
     // Head-count damage, NOT stack-powered: stack power is only the gate on casting (the scroll counts
     // above), so a worn-down stack throws full-strength fireballs — there are just fewer mages left.
     it("marks both spells as head-count damage aimed the way the brief asked", () => {
-        const fireStrike = getSpellConfig("Life", "Fire Strike");
-        const meteorite = getSpellConfig("Life", "Meteorite");
+        const fireStrike = getSpellConfig("Chaos", "Fire Strike");
+        const meteorite = getSpellConfig("Chaos", "Meteorite");
 
         for (const spell of [fireStrike, meteorite]) {
             expect(spell.multiplier_type).toBe(SpellMultiplierType.UNIT_AMOUNT_DAMAGE);

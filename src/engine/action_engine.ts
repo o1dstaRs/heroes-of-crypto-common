@@ -963,11 +963,28 @@ export class GameActionEngine {
 
         this.context.unitsHolder.refreshStackPowerForAllUnits();
         const standingCellsAfter = scattered ? this.context.grid.getScatteredMountainsStanding() : [];
-        const removedCells = scattered
+        const removedCellCandidates = scattered
             ? standingCellsBefore.filter(
                   (before) => !standingCellsAfter.some((after) => after.x === before.x && after.y === before.y),
               )
             : [];
+        // Preserve the actual projectile order, not the random layout-array order. Double Shot can clear two
+        // aligned tombstones in one action; replay must emit the nearer impact first so clients can animate
+        // shot one -> stone one, then shot two -> stone two. Any non-trajectory removals fall back to stable
+        // layout order after the ordered impacts.
+        const removedByKey = new Map(removedCellCandidates.map((cell) => [`${cell.x}:${cell.y}`, cell]));
+        const removedCells: XY[] = [];
+        for (const animation of result.animationData ?? []) {
+            const cell = getCellForPosition(this.context.grid.getSettings(), animation.toPosition);
+            const key = `${cell.x}:${cell.y}`;
+            const removed = removedByKey.get(key);
+            if (!removed) {
+                continue;
+            }
+            removedCells.push(removed);
+            removedByKey.delete(key);
+        }
+        removedCells.push(...removedByKey.values());
         const serializedAnimations = this.serializeAnimations(result.animationData ?? []);
         const events: GameEvent[] = [];
         if (!this.headlessEvents) {
