@@ -1056,7 +1056,8 @@ describe("GameActionEngine", () => {
         });
         const blocker = { x: 5, y: 3 };
         const aimedStone = { x: 7, y: 3 };
-        setup.grid.setScatteredMountains([blocker, aimedStone]);
+        // Deliberately reverse layout order: emitted events must still follow projectile/trajectory order.
+        setup.grid.setScatteredMountains([aimedStone, blocker]);
         setup.lower.refreshPossibleAttackTypes(true);
         const settings = setup.grid.getSettings();
         const targetPosition = getPositionForCell(
@@ -1076,7 +1077,12 @@ describe("GameActionEngine", () => {
         expect(result.completed).toBe(true);
         expect(setup.grid.getScatteredMountainsStanding()).toEqual([]);
         expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
-        expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
+        const obstacleEvents = result.events.filter((event) => event.type === "obstacle_attacked");
+        expect(obstacleEvents).toHaveLength(2);
+        expect(obstacleEvents.map((event) => event.targetPosition)).toEqual([
+            getPositionForCell(blocker, settings.getMinX(), settings.getStep(), settings.getHalfStep()),
+            targetPosition,
+        ]);
     });
 
     it("spends both Double Shot projectiles on the first two scattered stones before the aimed unit", () => {

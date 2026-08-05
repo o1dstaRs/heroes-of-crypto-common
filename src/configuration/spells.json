@@ -1050,48 +1050,6 @@
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
-        },
-        "Fire Strike": {
-            "name": "Fire Strike",
-            "level": 1,
-            "desc": [
-                "Sends a small fireball at an enemy in line of sight, dealing {} damage.",
-                "Magical: it ignores armor, but magic resistance cuts it down."
-            ],
-            "target": "ANY_ENEMY",
-            "power": 6,
-            "power_type": "COMMON",
-            "element": "",
-            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
-            "laps": 1,
-            "is_buff": false,
-            "self_cast_allowed": false,
-            "self_debuff_applies": false,
-            "minimal_caster_stack_power": 1,
-            "conflicts_with": [],
-            "is_giftable": false,
-            "maximum_gift_level": 0
-        },
-        "Meteorite": {
-            "name": "Meteorite",
-            "level": 2,
-            "desc": [
-                "Calls a meteorite down on any 2x2 block of the battlefield.",
-                "Every enemy caught under it takes {} damage."
-            ],
-            "target": "FREE_CELL",
-            "power": 4,
-            "power_type": "COMMON",
-            "element": "",
-            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
-            "laps": 1,
-            "is_buff": false,
-            "self_cast_allowed": false,
-            "self_debuff_applies": false,
-            "minimal_caster_stack_power": 5,
-            "conflicts_with": [],
-            "is_giftable": false,
-            "maximum_gift_level": 0
         }
     },
     "Nature": {
@@ -1389,6 +1347,48 @@
             "self_cast_allowed": false,
             "self_debuff_applies": false,
             "minimal_caster_stack_power": 4,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Fire Strike": {
+            "name": "Fire Strike",
+            "level": 1,
+            "desc": [
+                "Sends a small fireball at an enemy in line of sight, dealing {} damage.",
+                "Magical: it ignores armor, but magic resistance cuts it down."
+            ],
+            "target": "ANY_ENEMY",
+            "power": 6,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
+        "Meteorite": {
+            "name": "Meteorite",
+            "level": 2,
+            "desc": [
+                "Calls a meteorite down on any 2x2 block of the battlefield.",
+                "Every enemy caught under it takes {} damage."
+            ],
+            "target": "FREE_CELL",
+            "power": 4,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 5,
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0

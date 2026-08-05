@@ -391,9 +391,16 @@ export const getCreatureConfig = (
     );
 };
 
+// Fire Strike and Meteorite moved from Life to Chaos with the Battle Mage spellbook redesign. Accept old
+// saved/replay payloads that still carry the former prefix, but resolve them to the real Chaos definition
+// (including its faction value, so the client renders Chaos corners rather than Life corners).
+const LEGACY_LIFE_TO_CHAOS_SPELLS: ReadonlySet<string> = new Set(["Fire Strike", "Meteorite"]);
+
 export const getSpellConfig = (factionName: string, spellName: string, laps?: number): SpellProperties => {
+    const resolvedFactionName =
+        factionName === "Life" && LEGACY_LIFE_TO_CHAOS_SPELLS.has(spellName) ? "Chaos" : factionName || "System";
     // @ts-ignore: we do not know the type here yet
-    const raceSpells = spellsJson[factionName ? factionName : "System"];
+    const raceSpells = spellsJson[resolvedFactionName];
     if (!raceSpells) {
         throw TypeError(`Unknown race ${factionName} for the spell - ${spellName}`);
     }
@@ -474,7 +481,7 @@ export const getSpellConfig = (factionName: string, spellName: string, laps?: nu
     }
 
     return new SpellProperties(
-        ToFactionType[factionName],
+        ToFactionType[resolvedFactionName],
         spellConfig.name,
         spellConfig.level,
         spellConfig.desc,

@@ -153,7 +153,10 @@ export class Grid {
      * the caller knows the layout) and again on every re-roll.
      */
     public setScatteredMountains(cells: XY[]): void {
-        if (this.gridType !== PBTypes.GridVals.BLOCK_CENTER) {
+        // Clearing must ALWAYS be honoured. The caller switches the board type first and installs the new
+        // layout second, so a type guard here would swallow the "wipe it" call on the way out of the
+        // mountain board — leaving stones standing on lava and their cells still impassable.
+        if (cells.length && this.gridType !== PBTypes.GridVals.BLOCK_CENTER) {
             return;
         }
         // Lift the previous layout off the board first, or a re-roll would leave the old rock behind.

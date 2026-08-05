@@ -1081,6 +1081,37 @@ describe("AttackHandler", () => {
             expect(fightProperties.getObstacleHitsLeft()).toBe(2 * HITS_PER_MOUNTAIN);
         });
 
+        it("Double Shot destroys two aligned scattered tombstones in trajectory order", () => {
+            const { grid, unitsHolder, attackHandler, moveHandler } = setupMountainFight();
+            const first = { x: 5, y: 7 };
+            const second = { x: 9, y: 7 };
+            const survivor = { x: 10, y: 8 };
+            grid.setScatteredMountains([first, second, survivor]);
+            const attacker = createTestUnit({
+                team: PBTypes.TeamVals.UPPER,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                abilities: ["Double Shot"],
+            });
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 7 });
+
+            const result = attackHandler.handleObstacleAttack(
+                positionForCell(second),
+                unitsHolder,
+                moveHandler,
+                attacker,
+            );
+
+            expect(result.completed).toBe(true);
+            expect(result.animationData).toHaveLength(2);
+            expect(result.animationData![0].toPosition.x).toBeLessThan(result.animationData![1].toPosition.x);
+            expect(result.animationData![0].toPosition.y).toBe(result.animationData![1].toPosition.y);
+            expect(grid.getOccupantUnitId(first)).toBe("");
+            expect(grid.getOccupantUnitId(second)).toBe("");
+            expect(grid.getScatteredMountainsStanding()).toEqual([survivor]);
+            expect(attacker.getRangeShots()).toBe(2);
+        });
+
         it("small melee unit strikes the left mountain from an outer (non-corridor) cell", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
             const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
