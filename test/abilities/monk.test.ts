@@ -78,7 +78,7 @@ describe("Monk configuration", () => {
         expect(monk.abilities).toEqual(["Magic Shield", "Borrowed Grace", "Absolving Arrow"]);
     });
 
-    it("trades 10-20% of the Cyclops' defence for 25-35% more offence", () => {
+    it("trades 10-20% of the Cyclops' defence for a harder but tighter shot", () => {
         const monk = config("Life", "Monk");
         const cyclops = config("Might", "Cyclops");
 
@@ -91,14 +91,18 @@ describe("Monk configuration", () => {
         expect(softer(monk.magic_resist, cyclops.magic_resist)).toBeGreaterThanOrEqual(0.8);
         expect(softer(monk.magic_resist, cyclops.magic_resist)).toBeLessThanOrEqual(0.9);
 
-        // Offence: attack power and both damage ends land in the +25%..+35% band.
+        // Offence: attack power keeps the original +25%..+35% edge; the damage dice were re-priced by
+        // the owner (2026-08-05) from 22-29 to a tighter, more reliable 20-25 — still strictly above
+        // the Cyclops' 17-22 on both ends (+10%..+25%), with the spread tightened from 7 to 5 (now
+        // matching the Cyclops'): the shot hits harder on average without the old spike ceiling.
         const harder = (monkStat: number, cyclopsStat: number) => monkStat / cyclopsStat;
         expect(harder(monk.base_attack, cyclops.base_attack)).toBeGreaterThanOrEqual(1.25);
         expect(harder(monk.base_attack, cyclops.base_attack)).toBeLessThanOrEqual(1.35);
-        expect(harder(monk.attack_damage_min, cyclops.attack_damage_min)).toBeGreaterThanOrEqual(1.25);
-        expect(harder(monk.attack_damage_min, cyclops.attack_damage_min)).toBeLessThanOrEqual(1.35);
-        expect(harder(monk.attack_damage_max, cyclops.attack_damage_max)).toBeGreaterThanOrEqual(1.25);
-        expect(harder(monk.attack_damage_max, cyclops.attack_damage_max)).toBeLessThanOrEqual(1.35);
+        expect(monk.attack_damage_min).toBe(20);
+        expect(monk.attack_damage_max).toBe(25);
+        expect(harder(monk.attack_damage_min, cyclops.attack_damage_min)).toBeGreaterThanOrEqual(1.1);
+        expect(harder(monk.attack_damage_max, cyclops.attack_damage_max)).toBeGreaterThanOrEqual(1.1);
+        expect(harder(monk.attack_damage_max, cyclops.attack_damage_max)).toBeLessThanOrEqual(1.25);
 
         // Reach and ammunition are untouched — the shot got harder, not longer.
         expect(monk.range_shots).toBe(cyclops.range_shots);
