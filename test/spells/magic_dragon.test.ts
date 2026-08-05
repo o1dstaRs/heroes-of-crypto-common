@@ -298,6 +298,7 @@ describe("Tome of Elements spell configuration", () => {
         expect(whirlpool.laps).toBe(1);
         expect(whirlpool.power).toBe(0);
         expect(whirlpool.multiplier_type).toBe(SpellMultiplierType.NO_MULTIPLIER);
+        expect(whirlpool.desc.join(" ")).toContain("skips its next turn");
     });
 
     // Only the THROWN spells need a clear line. Getting this wrong does not crash anything — it silently
@@ -554,7 +555,7 @@ describe("action engine — Meteor Shower", () => {
 });
 
 describe("action engine — Whirlpool", () => {
-    it("chains the target to the spot without stunning it", () => {
+    it("marks the target to skip its next activation without dealing damage", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -574,7 +575,8 @@ describe("action engine — Whirlpool", () => {
         expect(result.completed).toBe(true);
         expect(target.hasDebuffActive("Whirlpool")).toBe(true);
         expect(target.canMove()).toBe(false);
-        // Pinned, not silenced: it deals no damage and the target keeps its turn and its retaliation.
+        expect(target.isSkippingThisTurn()).toBe(true);
+        // The vortex controls the activation rather than masquerading as a Stun effect, and deals no damage.
         expect(target.getHp()).toBe(hpBefore);
         expect(target.hasEffectActive("Stun")).toBe(false);
     });

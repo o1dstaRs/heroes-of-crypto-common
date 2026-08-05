@@ -96,6 +96,7 @@ describe("authoritative stat mods", () => {
 
     // Paralysis and Whirlpool stop movement. Both are applied in COMBAT, so ranked carries them only in the
     // display list — canMove() read the object arrays and answered "yes" for a unit the server had frozen.
+    // Whirlpool additionally consumes the activation, which must resolve from that same serialized list.
     it("honours Paralysis and Whirlpool from the authoritative display list", () => {
         for (const status of ["Paralysis", "Whirlpool"]) {
             const unit = createTestUnit({ name: "Peasant", amountAlive: 5, maxHp: 100 });
@@ -103,6 +104,7 @@ describe("authoritative stat mods", () => {
             unit.getUnitProperties().applied_debuffs.push(status);
             expect(unit.hasStatusApplied(status)).toBe(true);
             expect(unit.canMove()).toBe(false);
+            expect(unit.isSkippingThisTurn()).toBe(status === "Whirlpool");
         }
     });
 
