@@ -48,7 +48,7 @@ import type { IWeightedRoute } from "../grid/path_definitions";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { Spell } from "../spells/spell";
-import { recordEffectApplication } from "./effect_application_capture";
+import { recordEffectApplication, recordWaterShieldAbsorb } from "./effect_application_capture";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
 import { winningAtLeastOneEventProbability, type XY } from "../utils/math";
@@ -1570,7 +1570,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (this.willWaterShieldAbsorb(attacker)) {
             this.waterShieldSpent = true;
             this.deleteBuff("Water Shield");
-            sceneLog.updateLog(`${this.getName()}'s Water Shield absorbs the hit and breaks`);
+            // Name the striker when the caller passed one — "the shield broke" without a culprit reads
+            // like a bug. The capture below is what carries this to RANKED: its log rebuilds from events,
+            // so the engine drains the record into the action's damage payload (source "water_shield").
+            sceneLog.updateLog(
+                `${this.getName()}'s Water Shield absorbs ${
+                    attacker ? `${attacker.getName()}'s hit` : "the hit"
+                } and breaks`,
+            );
+            recordWaterShieldAbsorb({ unitId: this.getId(), amount: minusHp });
             return 0;
         }
 

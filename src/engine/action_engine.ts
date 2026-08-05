@@ -56,6 +56,7 @@ import { Unit } from "../units/unit";
 import {
     beginEffectApplicationCapture,
     endEffectApplicationCapture,
+    endWaterShieldAbsorbCapture,
     recordEffectApplication,
 } from "../units/effect_application_capture";
 import { getLapString, getRandomInt } from "../utils/lib";
@@ -193,6 +194,41 @@ export class GameActionEngine {
                     result.events.splice(handoffIndex, 0, effectsEvent);
                 } else {
                     result.events.push(effectsEvent);
+                }
+            }
+            // Water Shield absorbs ride the action's damage payload as `secondary` entries (the
+            // fire_shield/flesh_shield pattern): the absorb is decided deep in Unit.applyDamage where no
+            // handler sees it, yet ranked's log — rebuilt from events, never engine text — must say the
+            // shield broke and under whose blow (the event's attacker/caster names the striker).
+            const waterShieldAbsorbs = endWaterShieldAbsorbCapture();
+            if (typeof result! !== "undefined" && result.completed && waterShieldAbsorbs.length) {
+                const attackEvent = result.events.find(
+                    (event): event is Extract<GameEvent, { type: "unit_attacked" | "area_attacked" }> =>
+                        event.type === "unit_attacked" || event.type === "area_attacked",
+                );
+                const spellEvent = attackEvent
+                    ? undefined
+                    : result.events.find(
+                          (
+                              event,
+                          ): event is Extract<GameEvent, { type: "spell_cast" }> & {
+                              secondary?: ISecondaryDamage[];
+                          } => event.type === "spell_cast",
+                      );
+                for (const absorb of waterShieldAbsorbs) {
+                    const owner = this.context.unitsHolder.getAllUnits().get(absorb.unitId);
+                    const entry: ISecondaryDamage = {
+                        source: "water_shield",
+                        unitId: absorb.unitId,
+                        position: owner?.getPosition() ?? { x: 0, y: 0 },
+                        amount: absorb.amount,
+                        unitsDied: 0,
+                    };
+                    if (attackEvent) {
+                        (attackEvent.damage.secondary ??= []).push(entry);
+                    } else if (spellEvent) {
+                        (spellEvent.secondary ??= []).push(entry);
+                    }
                 }
             }
         }

@@ -37,7 +37,10 @@ export type SecondaryDamageSource =
     // Devour Essence (Hydra): the killer REJUVENATES after devouring a slain enemy. A HEAL, not a hit —
     // `amount` is the hp restored to `unitId` (the devourer) and `unitsDied` is always 0; the client
     // renders it as a green "+N" pop and a "rejuvinated" scene-log line.
-    | "devour_essence";
+    | "devour_essence"
+    // Water Shield: the one-per-battle absorb — the shield ate the WHOLE hit (owner took nothing) and
+    // broke. Log/ABSORBED-pop material only; renderers must never draw it as damage taken.
+    | "water_shield";
 
 /**
  * A damage instance dealt by an ability that triggers DURING an attack but isn't the primary hit:
