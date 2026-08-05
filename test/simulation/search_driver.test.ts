@@ -67,6 +67,8 @@ import { parsePhaseBQ2Row } from "../../src/simulation/phase_b_dataset";
 import { MIXED_SUPPORTED_PARETO_NO_MELEE_FOCUS_FUNNEL_STAGES } from "../../src/simulation/pure_ranged_pareto_no_melee_focus";
 import {
     classifyActions,
+    isV08SoleAbominationArmageddonDefendOpportunity,
+    SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV,
     SearchDriver,
     SearchRollbackError,
     type ISearchMatchInfo,
@@ -100,7 +102,14 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_AUDIT",
     "SEARCH_AUDIT_TURNS",
     "SEARCH_ACTIVE_CHALLENGERS",
+    "SEARCH_A19_ABOMINATION_MIRROR_RELEASE",
+    "SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE",
+    "SEARCH_A19_EXACT_TERMINAL_RESULTS",
+    "SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION",
+    "SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE",
+    "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY",
     "SEARCH_A19_FAST_FLYER_COHESION",
+    "SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES",
     "V08_AGGRESSIVE",
     "SEARCH_OBSERVE_ONLY",
     "SEARCH_SHORTLIST",
@@ -518,6 +527,116 @@ describe("search driver — gating, hygiene, determinism", () => {
         return calls;
     };
 
+    const soleAbominationArmageddonFixture = (
+        keepExtraStacks = false,
+    ): { harness: Harness; actor: Unit; enemy: Unit; extras: Unit[] } => {
+        const harness = buildBattle(9_001, "v0.8", undefined, [
+            { faction: "Chaos", creatureName: "Abomination", level: 4, size: 2, amount: 8 },
+            { faction: "Life", creatureName: "Squire", level: 1, size: 1, amount: 1 },
+        ]);
+        const named = (team: TeamType, name: string): Unit =>
+            harness.unitsHolder
+                .getAllAllies(team)
+                .find((candidate) => !candidate.isDead() && candidate.getName() === name)!;
+        const actor = named(GREEN_TEAM, "Abomination");
+        const enemy = named(RED_TEAM, "Abomination");
+        const extras = [named(GREEN_TEAM, "Squire"), named(RED_TEAM, "Squire")];
+        if (!keepExtraStacks) {
+            for (const extra of extras) harness.unitsHolder.deleteUnitById(extra.getId());
+        }
+        actor.applyDamage(964, 0, new SceneLogMock());
+        enemy.applyDamage(1_416, 0, new SceneLogMock());
+        while (harness.fightProperties.getCurrentLap() < 9) harness.fightProperties.flipLap();
+        harness.setActiveUnitId(actor.getId());
+        return { harness, actor, enemy, extras };
+    };
+
+    it("keeps the sole-Abomination Armageddon policy default-off and validates its flag", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8" });
+        const fixture = soleAbominationArmageddonFixture();
+        expect(
+            isV08SoleAbominationArmageddonDefendOpportunity(
+                fixture.actor,
+                fixture.harness.unitsHolder,
+                fixture.harness.fightProperties.getCurrentLap(),
+            ),
+        ).toBe(true);
+        expect(
+            (
+                fixture.harness.makeDriver() as unknown as {
+                    soleAbominationArmageddonDefendPolicy: boolean;
+                }
+            ).soleAbominationArmageddonDefendPolicy,
+        ).toBe(false);
+
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            [SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV]: "invalid",
+        });
+        expect(() => fixture.harness.makeDriver()).toThrow(
+            `${SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV} must be 0 or 1`,
+        );
+    });
+
+    it("requires exactly one living Abomination per side", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8" });
+        const { harness, actor, extras } = soleAbominationArmageddonFixture(true);
+        expect(
+            isV08SoleAbominationArmageddonDefendOpportunity(
+                actor,
+                harness.unitsHolder,
+                harness.fightProperties.getCurrentLap(),
+            ),
+        ).toBe(false);
+
+        for (const extra of extras) harness.unitsHolder.deleteUnitById(extra.getId());
+        expect(
+            isV08SoleAbominationArmageddonDefendOpportunity(
+                actor,
+                harness.unitsHolder,
+                harness.fightProperties.getCurrentLap(),
+            ),
+        ).toBe(true);
+    });
+
+    it("uses the same sole-Abomination Armageddon defend policy live and in own-side rollouts", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            [SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV]: "1",
+        });
+        const live = soleAbominationArmageddonFixture();
+        const liveDriver = live.harness.makeDriver() as unknown as {
+            counters: { decisions: number; soleAbominationArmageddonDefends: number };
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: live.actor.getId() }];
+        expect(liveDriver.chooseDecision(live.actor, "v0.8", incumbent)).toEqual([
+            { type: "defend_turn", unitId: live.actor.getId() },
+        ]);
+        expect(liveDriver.counters).toMatchObject({ decisions: 1, soleAbominationArmageddonDefends: 1 });
+
+        const rollout = soleAbominationArmageddonFixture();
+        const rolloutActions: GameAction[] = [];
+        const interceptedEngine = rollout.harness.engine as unknown as {
+            apply(action: GameAction): ReturnType<GameActionEngine["apply"]>;
+        };
+        interceptedEngine.apply = (action) => {
+            rolloutActions.push(action);
+            return { completed: true, events: [] };
+        };
+        const rolloutDriver = rollout.harness.makeDriver() as unknown as {
+            counters: { soleAbominationArmageddonDefends: number };
+            rolloutEnemyTeam: TeamType | null;
+            simPlayTurn(unit: Unit): void;
+        };
+        rolloutDriver.rolloutEnemyTeam = RED_TEAM;
+        rolloutDriver.simPlayTurn(rollout.actor);
+        expect(rolloutActions[0]).toEqual({ type: "defend_turn", unitId: rollout.actor.getId() });
+        expect(rolloutDriver.counters.soleAbominationArmageddonDefends).toBe(0);
+    });
+
     it("raises a typed fatal error when rollout cleanup cannot prove the state restored", () => {
         setEnv({
             V07_SEARCH: "1",
@@ -678,6 +797,105 @@ describe("search driver — gating, hygiene, determinism", () => {
             ["incumbent", "wait", "mine", "spell", "move"],
             ["incumbent", "spell"],
         ]);
+    });
+
+    it("A19 repairs a hard passive only with a nonregressive productive rollout", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "1",
+            SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE: "1",
+        });
+        const harness = buildBattle(91, "v0.8");
+        const unit = harness.activeUnit()!;
+        const id = unit.getId();
+        const incumbent: GameAction[] = [{ type: "defend_turn", unitId: id }];
+        const spell: GameAction[] = [{ type: "cast_spell", casterId: id, spellName: "productive" }];
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "spell", actions: spell },
+        ] as unknown as IEnumeratedCandidate[];
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates(): number[];
+            search(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+                prioritizeProductiveActions?: boolean,
+            ): GameAction[];
+        };
+
+        driver.scoreCandidates = () => [0.99, 0.01];
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true)).toBe(incumbent);
+
+        driver.scoreCandidates = () => [0.5, 0.5];
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true)).toBe(spell);
+    });
+
+    it("A19 validates only a provisional override and requires the full gate in an independent paired bank", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "0.03",
+            SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "1",
+        });
+        const harness = buildBattle(92, "v0.8");
+        const unit = harness.activeUnit()!;
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const attack: GameAction[] = [
+            { type: "melee_attack", attackerId: unit.getId(), targetId: "enemy", attackFrom: { x: 4, y: 4 } },
+        ];
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "melee", actions: attack },
+        ] as unknown as IEnumeratedCandidate[];
+        const driver = harness.makeDriver() as unknown as {
+            counters: {
+                nonregressiveOverrideValidationAttempts: number;
+                nonregressiveOverrideValidationPasses: number;
+                nonregressiveOverrideValidationRejects: number;
+            };
+            scoreCandidates(): number[];
+            search(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+            ): GameAction[];
+        };
+
+        let call = 0;
+        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.42] : [0, 1]);
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(incumbent);
+        expect(call).toBe(1);
+        expect(driver.counters).toMatchObject({
+            nonregressiveOverrideValidationAttempts: 0,
+            nonregressiveOverrideValidationPasses: 0,
+            nonregressiveOverrideValidationRejects: 0,
+        });
+
+        call = 0;
+        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.8] : [0.7, 0.72]);
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(incumbent);
+        expect(call).toBe(2);
+        expect(driver.counters).toMatchObject({
+            nonregressiveOverrideValidationAttempts: 1,
+            nonregressiveOverrideValidationPasses: 0,
+            nonregressiveOverrideValidationRejects: 1,
+        });
+
+        call = 0;
+        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.8] : [0.5, 0.54]);
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(attack);
+        expect(call).toBe(2);
+        expect(driver.counters).toMatchObject({
+            nonregressiveOverrideValidationAttempts: 2,
+            nonregressiveOverrideValidationPasses: 1,
+            nonregressiveOverrideValidationRejects: 1,
+        });
     });
 
     it("does not treat a move-then-mountain incumbent as productive", () => {
@@ -2078,6 +2296,25 @@ describe("search driver — gating, hygiene, determinism", () => {
             finishPressureLeaves: 1,
             finishPressureNonzeroLeaves: 1,
         });
+    });
+
+    it("scores completed rollout battles by their exact result instead of the approximate leaf", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8", SEARCH_A19_EXACT_TERMINAL_RESULTS: "1" });
+        const harness = buildBattle(8101, "v0.8");
+        const driver = harness.makeDriver();
+        const actingTeam = harness.activeUnit()!.getTeam();
+        const enemyTeam = actingTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+        const internals = driver as unknown as {
+            processEvents(events: GameEvent[]): void;
+            leafValue(team: TeamType): number;
+        };
+
+        internals.processEvents([{ type: "fight_finished", winningTeam: actingTeam }]);
+        expect(internals.leafValue(actingTeam)).toBe(1);
+        expect(internals.leafValue(enemyTeam)).toBe(0);
+
+        internals.processEvents([{ type: "fight_finished", winningTeam: PBTypes.TeamVals.NO_TEAM }]);
+        expect(internals.leafValue(actingTeam)).toBe(0.5);
     });
 
     it("uses the committed LiveTwin leaf by default and keeps an explicit material fallback", () => {
@@ -3660,6 +3897,20 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.appliesTo("v0.5")).toBe(false);
     });
 
+    it("optionally scopes a shared version label to one physical team", () => {
+        setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8" });
+        const h = buildBattle(202, "v0.8");
+        const scoped = h.makeDriver(undefined, undefined, { searchTeamScope: [GREEN_TEAM] });
+
+        expect(scoped.appliesTo("v0.8")).toBe(false);
+        expect(scoped.appliesTo("v0.8", GREEN_TEAM)).toBe(true);
+        expect(scoped.appliesTo("v0.8", RED_TEAM)).toBe(false);
+
+        expect(() => h.makeDriver(undefined, undefined, { searchTeamScope: [PBTypes.TeamVals.NO_TEAM] })).toThrow(
+            "Search team scope may contain only LOWER and UPPER",
+        );
+    });
+
     it("keeps wait and defend challengers when SEARCH_ACTIVE_CHALLENGERS is default-off", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
         const h = buildBattle(203, "v0.6");
@@ -3795,6 +4046,28 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(tiedChoice).not.toBe(tiedWait);
         expect(hasProductiveAction(tiedChoice)).toBe(true);
         expectEngineAcceptsProductiveDecision(tiedHarness, tiedChoice);
+
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "1",
+            V08_AGGRESSIVE: "1",
+            SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES: "1",
+        });
+        const strictHarness = buildBattle(206, "v0.8");
+        const strictUnit = strictHarness.activeUnit()!;
+        const strictWait: GameAction[] = [{ type: "wait_turn", unitId: strictUnit.getId() }];
+        const strictDriver = strictHarness.makeDriver() as unknown as {
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                mode: string,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        strictDriver.scoreCandidates = (_unit, candidates) => candidates.map(() => 0.5);
+        expect(strictDriver.chooseDecision(strictUnit, "v0.8", strictWait)).toBe(strictWait);
 
         const rejectedHarness = buildBattle(206, "v0.8s");
         const rejectedUnit = rejectedHarness.activeUnit()!;

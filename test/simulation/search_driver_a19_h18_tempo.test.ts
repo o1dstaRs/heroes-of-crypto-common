@@ -11,6 +11,7 @@ import type { XY } from "../../src/utils/math";
 interface MockUnitOptions {
     id: string;
     cells: XY[];
+    name?: string;
     level?: number;
     steps?: number;
     flying?: boolean;
@@ -19,6 +20,7 @@ interface MockUnitOptions {
 const mockUnit = ({
     id,
     cells,
+    name = "Ally",
     level = PBTypes.UnitLevelVals.FIRST,
     steps = 5,
     flying = false,
@@ -28,13 +30,14 @@ const mockUnit = ({
         getCells: () => cells,
         getId: () => id,
         getLevel: () => level,
+        getName: () => name,
         getSteps: () => steps,
         getTeam: () => PBTypes.TeamVals.UPPER,
         isDead: () => false,
     }) as unknown as Unit;
 
 const holderWith = (...units: Unit[]): ILookaheadDeps["unitsHolder"] =>
-    ({ getAllAllies: () => units }) as unknown as ILookaheadDeps["unitsHolder"];
+    ({ getAllAllies: () => units, getAllEnemyUnits: () => [] }) as unknown as ILookaheadDeps["unitsHolder"];
 
 const moveCandidate = (targetCells: XY[], extraActions: GameAction[] = []): Pick<IEnumeratedCandidate, "actions"> => ({
     actions: [
@@ -64,6 +67,7 @@ describe("A19 H18 opening-tempo guard", () => {
     const dragon = mockUnit({
         id: "dragon",
         cells: dragonCells,
+        name: "Black Dragon",
         level: PBTypes.UnitLevelVals.FOURTH,
         steps: 8,
         flying: true,
@@ -84,7 +88,7 @@ describe("A19 H18 opening-tempo guard", () => {
         expect(isEarlyIsolatingFastFlyerWaitMove(dragon, allies, 1, moveCandidate(isolatedDestination))).toBe(true);
     });
 
-    it("does not block later movement, supported movement, or a move that delivers an attack", () => {
+    it("blocks the unsupported Black Dragon move-and-strike hole but preserves supported attacks", () => {
         expect(isEarlyIsolatingFastFlyerWaitMove(dragon, allies, 2, moveCandidate(isolatedDestination))).toBe(false);
         expect(
             isEarlyIsolatingFastFlyerWaitMove(
@@ -112,6 +116,77 @@ describe("A19 H18 opening-tempo guard", () => {
                         attackFrom: { x: 7, y: 8 },
                     },
                 ]),
+            ),
+        ).toBe(true);
+        expect(
+            isEarlyIsolatingFastFlyerWaitMove(
+                dragon,
+                allies,
+                1,
+                moveCandidate(
+                    [
+                        { x: 10, y: 11 },
+                        { x: 9, y: 11 },
+                        { x: 10, y: 10 },
+                        { x: 9, y: 10 },
+                    ],
+                    [
+                        {
+                            type: "melee_attack",
+                            attackerId: "dragon",
+                            targetId: "enemy",
+                            attackFrom: { x: 10, y: 11 },
+                        },
+                    ],
+                ),
+            ),
+        ).toBe(false);
+    });
+
+    it("does not apply the move-and-strike extension to other fast flyers", () => {
+        const thunderbird = mockUnit({
+            id: "dragon",
+            cells: dragonCells,
+            name: "Thunderbird",
+            level: PBTypes.UnitLevelVals.FOURTH,
+            steps: 8,
+            flying: true,
+        });
+        expect(
+            isEarlyIsolatingFastFlyerWaitMove(
+                thunderbird,
+                holderWith(thunderbird, ...allies.getAllAllies(PBTypes.TeamVals.UPPER).slice(1)),
+                1,
+                moveCandidate(isolatedDestination, [
+                    {
+                        type: "melee_attack",
+                        attackerId: "dragon",
+                        targetId: "enemy",
+                        attackFrom: { x: 7, y: 8 },
+                    },
+                ]),
+            ),
+        ).toBe(false);
+    });
+
+    it("allows an already-isolated Black Dragon to move back toward its army", () => {
+        const isolatedDragon = mockUnit({
+            id: "dragon",
+            cells: [{ x: 0, y: 0 }],
+            name: "Black Dragon",
+            level: PBTypes.UnitLevelVals.FOURTH,
+            steps: 8,
+            flying: true,
+        });
+        const recoveringMove = moveCandidate([{ x: 5, y: 0 }]);
+        const distantAlly = mockUnit({ id: "ally", cells: [{ x: 10, y: 0 }] });
+
+        expect(
+            isEarlyIsolatingFastFlyerWaitMove(
+                isolatedDragon,
+                holderWith(isolatedDragon, distantAlly),
+                1,
+                recoveringMove,
             ),
         ).toBe(false);
     });

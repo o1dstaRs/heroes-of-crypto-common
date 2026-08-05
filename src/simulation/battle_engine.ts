@@ -284,6 +284,11 @@ export interface IMatchConfig {
      * Omitted/false preserves the production deadline and circuit-breaker semantics used by bounded qualification.
      */
     searchOfflineDeterministicWork?: boolean;
+    /**
+     * Optional physical-team scope for SearchDriver arbitration. Omission preserves version-only production
+     * routing; research tournaments use a one-team scope when entrant and control share the same version label.
+     */
+    searchTeamScope?: readonly TeamType[];
     /** Emit only lifecycle/destruction events required to drive an in-process simulation. */
     headlessEvents?: boolean;
     /** Board layout for this match. Defaults to NORMAL (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER). */
@@ -863,6 +868,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         seed: config.seed,
         greenVersion: config.greenVersion,
         redVersion: config.redVersion,
+        ...(config.searchTeamScope === undefined ? {} : { searchTeamScope: config.searchTeamScope }),
         // Deterministic operation-bounded work is deliberately opt-in. Omission must retain the same wall-clock
         // deadline/circuit behavior as ranked and every existing operational-bounded qualification runner.
         offlineDeterministicWork: config.searchOfflineDeterministicWork === true,
@@ -1214,11 +1220,11 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // The per-unit pin is an authoritative control invariant, not merely a version default. An
         // experimental `SEARCH_VERSIONS=v0.1` must not put a mindless live turn back through a generic
         // selector, and the separate trajectory driver must obey the same boundary.
-        const searchApplies = !mindlessUnit && search.appliesTo(strategy.version);
+        const searchApplies = !mindlessUnit && search.appliesTo(strategy.version, unit.getTeam());
         const trajectorySearchApplies =
             !mindlessUnit &&
             v08A13TrajectoryTeams.has(unit.getTeam()) &&
-            v08A13TrajectorySearch?.appliesTo(strategy.version) === true;
+            v08A13TrajectorySearch?.appliesTo(strategy.version, unit.getTeam()) === true;
         const decisionPathCatalog =
             searchApplies || trajectorySearchApplies
                 ? createDecisionPathCatalog(grid, pathHelper, unit, matrix, config.decisionObserver !== undefined)

@@ -43,6 +43,7 @@ import {
     preservesV08BacklineProtectorIntent,
     preservesV08BacklineWardIntent,
 } from "../ai/versions/v0_8_backline_protector";
+import { v08ArmageddonPreservationOpportunity } from "../ai/versions/v0_8_armageddon_endgame";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
 import {
     reserveV08ReplayLeafChallenger,
@@ -147,6 +148,8 @@ export const SEARCH_RESEARCH_HORIZON_VERSIONS_ENV = "SEARCH_RESEARCH_HORIZON_VER
 export const SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV = "SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES";
 export const SEARCH_RESEARCH_SHORTLIST_ENV = "SEARCH_RESEARCH_SHORTLIST";
 export const SEARCH_RESEARCH_SHORTLIST_VERSIONS_ENV = "SEARCH_RESEARCH_SHORTLIST_VERSIONS";
+export const SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV =
+    "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY";
 
 /** Keep one marked charger alternative beside the ordinary leaf winner; option-off is an exact identity. */
 export function reserveResearchRapidChargeShortlist(
@@ -675,8 +678,10 @@ const footprintDistance = (
 
 /**
  * H18 opening-tempo guard. A high-tier fast flyer that is still screened by its army should not turn a native
- * initiative wait into a move-only solo dive. Attacks and move-attacks are deliberately outside this predicate,
- * as are later turns and flyers that started the decision already isolated.
+ * initiative wait into a move-only solo dive. Black Dragon also keeps the wait instead of an unsupported opening
+ * move-and-strike: paired loss census showed that its apparent immediate damage repeatedly invites the packed
+ * enemy army to surround the isolated stack. Other flyers' attacks, stationary attacks, and later turns retain
+ * their historical behavior.
  */
 export function isEarlyIsolatingFastFlyerWaitMove(
     unit: Unit,
@@ -684,16 +689,22 @@ export function isEarlyIsolatingFastFlyerWaitMove(
     currentLap: number,
     candidate: Pick<IEnumeratedCandidate, "actions">,
 ): boolean {
+    const pureMove = isPureMoveCandidate(candidate);
+    const blackDragonOpeningMove = unit.getName() === "Black Dragon" && pureMove;
+    const blackDragonMoveAttack =
+        unit.getName() === "Black Dragon" &&
+        candidate.actions.some((action) => action.type === "move_unit") &&
+        candidate.actions.some((action) => action.type === "melee_attack");
     if (
         currentLap !== 1 ||
         !unit.canFly() ||
         unit.getLevel() < PBTypes.UnitLevelVals.FOURTH ||
         unit.getSteps() < 7 ||
-        !isPureMoveCandidate(candidate)
+        (!pureMove && !blackDragonMoveAttack)
     ) {
         return false;
     }
-    const move = candidate.actions.at(-1);
+    const move = candidate.actions.find((action) => action.type === "move_unit");
     if (move?.type !== "move_unit" || !move.targetCells?.length) return false;
 
     const allyCells = unitsHolder
@@ -704,7 +715,47 @@ export function isEarlyIsolatingFastFlyerWaitMove(
 
     const currentDistance = Math.min(...allyCells.map((cells) => footprintDistance(unit.getCells(), cells)));
     const destinationDistance = Math.min(...allyCells.map((cells) => footprintDistance(move.targetCells!, cells)));
-    return currentDistance <= 2 && destinationDistance >= 4 && destinationDistance - currentDistance >= 2;
+    // An already-isolated Black Dragon closing back toward its army is recovery, not a new solo dive.
+    if (unit.getName() === "Black Dragon" && destinationDistance < currentDistance) return false;
+    return (
+        destinationDistance >= 4 &&
+        (blackDragonOpeningMove ||
+            blackDragonMoveAttack ||
+            (currentDistance <= 2 && destinationDistance - currentDistance >= 2))
+    );
+}
+
+/** A narrow late-game state where preserving Abomination HP deserves an exact rollout comparison. */
+export function isV08ArmageddonDefendOpportunity(
+    unit: Unit,
+    unitsHolder: ILookaheadDeps["unitsHolder"],
+    currentLap: number,
+): boolean {
+    if (unit.getName() !== "Abomination" || unit.isDead()) return false;
+    const opposingAbomination = unitsHolder
+        .getAllEnemyUnits(unit.getTeam())
+        .find((enemy) => !enemy.isDead() && enemy.getName() === "Abomination");
+    return (
+        opposingAbomination !== undefined &&
+        v08ArmageddonPreservationOpportunity(unit, opposingAbomination, currentLap) !== undefined
+    );
+}
+
+/**
+ * Deterministic terminal policy gate: no ally or enemy besides the two original Abominations may remain.
+ * Keeping this stricter than the research candidate opportunity prevents a rollout-only multi-stack defend.
+ */
+export function isV08SoleAbominationArmageddonDefendOpportunity(
+    unit: Unit,
+    unitsHolder: ILookaheadDeps["unitsHolder"],
+    currentLap: number,
+): boolean {
+    if (unit.getName() !== "Abomination" || unit.isDead()) return false;
+    const livingAllies = unitsHolder.getAllAllies(unit.getTeam()).filter((ally) => !ally.isDead());
+    if (livingAllies.length !== 1 || livingAllies[0].getId() !== unit.getId()) return false;
+    const livingEnemies = unitsHolder.getAllEnemyUnits(unit.getTeam()).filter((enemy) => !enemy.isDead());
+    if (livingEnemies.length !== 1 || livingEnemies[0].getName() !== "Abomination") return false;
+    return v08ArmageddonPreservationOpportunity(unit, livingEnemies[0], currentLap) !== undefined;
 }
 
 /**
@@ -820,6 +871,16 @@ interface ISearchCounters {
     deadlineFallbacks: number;
     /** H18 opening decisions where at least one move-only fast-flyer solo dive was removed from the catalog. */
     isolatingFastFlyerMoveRejects: number;
+    /** Late Abomination turns that admitted defend into exact-terminal rollout arbitration. */
+    armageddonDefendOpportunities: number;
+    /** Live turns where the strict sole-Abomination terminal policy deterministically defended. */
+    soleAbominationArmageddonDefends: number;
+    /** Provisional A19 overrides that reached the independent paired validation bank. */
+    nonregressiveOverrideValidationAttempts: number;
+    /** Paired validation banks whose challenger cleared the configured gate. */
+    nonregressiveOverrideValidationPasses: number;
+    /** Paired validation banks that failed closed to the incumbent. */
+    nonregressiveOverrideValidationRejects: number;
     /** Finite operation-bounded wait arbitrations entered after the per-match timing circuit has opened. */
     circuitWaitArbitrations: number;
     /** v0.8 turns that entered the fixed late two-to-one-HP finish window. */
@@ -990,6 +1051,11 @@ const emptyCounters = (): ISearchCounters => ({
     scoredCandidatesTotal: 0,
     deadlineFallbacks: 0,
     isolatingFastFlyerMoveRejects: 0,
+    armageddonDefendOpportunities: 0,
+    soleAbominationArmageddonDefends: 0,
+    nonregressiveOverrideValidationAttempts: 0,
+    nonregressiveOverrideValidationPasses: 0,
+    nonregressiveOverrideValidationRejects: 0,
     circuitWaitArbitrations: 0,
     dominantFinishTurns: 0,
     dominantFinishCombatOverrides: 0,
@@ -1104,6 +1170,12 @@ export interface ISearchMatchInfo {
     greenVersion?: string;
     redVersion?: string;
     /**
+     * Optional physical-team scope for this driver. Omission preserves the historical version-only routing;
+     * an explicit scope lets a research entrant share a version label with its control without searching the
+     * control seat. The battle engine must pass the acting team to appliesTo/chooseDecision when this is set.
+     */
+    searchTeamScope?: readonly TeamType[];
+    /**
      * Offline simulations have finite candidate, shortlist, rollout, and horizon caps. When true, those fixed
      * operation bounds decide behavior and wall-clock watchdogs remain diagnostic-only. Ranked/live callers omit
      * this flag and retain the production deadline and circuit-breaker fail-safe.
@@ -1209,12 +1281,20 @@ export class SearchDriver {
     private readonly scoredDecisionObserver: SearchScoredDecisionObserver | undefined;
     private readonly passiveProductiveProbeObserver: SearchPassiveProductiveProbeObserver | undefined;
     private readonly versions: ReadonlySet<string>;
+    private readonly teamScope: ReadonlySet<TeamType> | null;
     private readonly gate: number;
     private readonly rankedReplayTiebreakEpsilon: number;
     private readonly rankedReplayTiebreakVersions: ReadonlySet<string>;
     private readonly rapidChargeReservationVersions: ReadonlySet<string>;
     /** Explicit A19-H18-v2 policy gate; horizon alone must never opt another profile into this rule. */
     private readonly fastFlyerCohesion: boolean;
+    private readonly armageddonDefendCandidate: boolean;
+    private readonly soleAbominationArmageddonDefendPolicy: boolean;
+    private readonly abominationMirrorRelease: boolean;
+    private readonly strictAggressiveWaitTies: boolean;
+    private readonly nonregressiveProductiveOverride: boolean;
+    private readonly exactTerminalResults: boolean;
+    private readonly nonregressiveOverrideValidation: boolean;
     private readonly horizon: number;
     private readonly researchHorizon: number | null;
     private readonly researchHorizonVersions: ReadonlySet<string>;
@@ -1285,6 +1365,7 @@ export class SearchDriver {
     private pureRangedTerminalState: PureRangedTerminalState | null = null;
     private researchHorizonEligibleTeams: ReadonlySet<TeamType> | null = null;
     private finishedSim = false;
+    private finishedWinningTeam: TeamType | null = null;
     private circuitOpen = false;
     public constructor(
         deps: ILookaheadDeps,
@@ -1318,6 +1399,15 @@ export class SearchDriver {
                 .map((v) => v.trim())
                 .filter(Boolean),
         );
+        if (match.searchTeamScope === undefined) {
+            this.teamScope = null;
+        } else {
+            const validTeams = new Set<TeamType>([PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER]);
+            if (match.searchTeamScope.some((team) => !validTeams.has(team))) {
+                throw new Error("Search team scope may contain only LOWER and UPPER");
+            }
+            this.teamScope = new Set(match.searchTeamScope);
+        }
         this.gate = envNum("SEARCH_GATE", 0.01, 0);
         this.rankedReplayTiebreakEpsilon = envNum(V08_RANKED_REPLAY_TIEBREAK_EPSILON_ENV, 0, 0);
         if (this.rankedReplayTiebreakEpsilon > 0.05) {
@@ -1357,6 +1447,78 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_FAST_FLYER_COHESION must be 0 or 1");
         }
         this.fastFlyerCohesion = this.mode === "search" && rawFastFlyerCohesion === "1";
+        const rawArmageddonDefendCandidate = process.env.SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE;
+        if (
+            rawArmageddonDefendCandidate !== undefined &&
+            rawArmageddonDefendCandidate !== "" &&
+            rawArmageddonDefendCandidate !== "0" &&
+            rawArmageddonDefendCandidate !== "1"
+        ) {
+            throw new Error("SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE must be 0 or 1");
+        }
+        this.armageddonDefendCandidate = this.mode === "search" && rawArmageddonDefendCandidate === "1";
+        const rawSoleAbominationArmageddonDefendPolicy =
+            process.env[SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV];
+        if (
+            rawSoleAbominationArmageddonDefendPolicy !== undefined &&
+            rawSoleAbominationArmageddonDefendPolicy !== "" &&
+            rawSoleAbominationArmageddonDefendPolicy !== "0" &&
+            rawSoleAbominationArmageddonDefendPolicy !== "1"
+        ) {
+            throw new Error(`${SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV} must be 0 or 1`);
+        }
+        this.soleAbominationArmageddonDefendPolicy =
+            this.mode === "search" && rawSoleAbominationArmageddonDefendPolicy === "1";
+        const rawAbominationMirrorRelease = process.env.SEARCH_A19_ABOMINATION_MIRROR_RELEASE;
+        if (
+            rawAbominationMirrorRelease !== undefined &&
+            rawAbominationMirrorRelease !== "" &&
+            rawAbominationMirrorRelease !== "0" &&
+            rawAbominationMirrorRelease !== "1"
+        ) {
+            throw new Error("SEARCH_A19_ABOMINATION_MIRROR_RELEASE must be 0 or 1");
+        }
+        this.abominationMirrorRelease = this.mode === "search" && rawAbominationMirrorRelease === "1";
+        const rawStrictAggressiveWaitTies = process.env.SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES;
+        if (
+            rawStrictAggressiveWaitTies !== undefined &&
+            rawStrictAggressiveWaitTies !== "" &&
+            rawStrictAggressiveWaitTies !== "0" &&
+            rawStrictAggressiveWaitTies !== "1"
+        ) {
+            throw new Error("SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES must be 0 or 1");
+        }
+        this.strictAggressiveWaitTies = this.mode === "search" && rawStrictAggressiveWaitTies === "1";
+        const rawNonregressiveProductiveOverride = process.env.SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE;
+        if (
+            rawNonregressiveProductiveOverride !== undefined &&
+            rawNonregressiveProductiveOverride !== "" &&
+            rawNonregressiveProductiveOverride !== "0" &&
+            rawNonregressiveProductiveOverride !== "1"
+        ) {
+            throw new Error("SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE must be 0 or 1");
+        }
+        this.nonregressiveProductiveOverride = this.mode === "search" && rawNonregressiveProductiveOverride === "1";
+        const rawExactTerminalResults = process.env.SEARCH_A19_EXACT_TERMINAL_RESULTS;
+        if (
+            rawExactTerminalResults !== undefined &&
+            rawExactTerminalResults !== "" &&
+            rawExactTerminalResults !== "0" &&
+            rawExactTerminalResults !== "1"
+        ) {
+            throw new Error("SEARCH_A19_EXACT_TERMINAL_RESULTS must be 0 or 1");
+        }
+        this.exactTerminalResults = this.mode === "search" && rawExactTerminalResults === "1";
+        const rawNonregressiveOverrideValidation = process.env.SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION;
+        if (
+            rawNonregressiveOverrideValidation !== undefined &&
+            rawNonregressiveOverrideValidation !== "" &&
+            rawNonregressiveOverrideValidation !== "0" &&
+            rawNonregressiveOverrideValidation !== "1"
+        ) {
+            throw new Error("SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION must be 0 or 1");
+        }
+        this.nonregressiveOverrideValidation = this.mode === "search" && rawNonregressiveOverrideValidation === "1";
         this.horizon = Math.floor(envNum("SEARCH_HORIZON", 12, 1));
         const researchHorizon = parseSearchResearchHorizon(this.mode, this.versions);
         this.researchHorizon = researchHorizon?.horizon ?? null;
@@ -1731,8 +1893,26 @@ export class SearchDriver {
         };
     }
     /** Whether this driver re-decides turns for the given strategy version. */
-    public appliesTo(version: string): boolean {
-        return this.enabled && this.versions.has(version);
+    public appliesTo(version: string, team?: TeamType): boolean {
+        return (
+            this.enabled &&
+            this.versions.has(version) &&
+            (this.teamScope === null || (team !== undefined && this.teamScope.has(team)))
+        );
+    }
+    /** The exact same deterministic terminal policy is consulted by live play and by future own-side rollout turns. */
+    private shouldUseSoleAbominationArmageddonDefend(unit: Unit): boolean {
+        return (
+            this.soleAbominationArmageddonDefendPolicy &&
+            !this.observeOnly &&
+            (this.teamScope === null || this.teamScope.has(unit.getTeam())) &&
+            (this.rolloutEnemyTeam === null || unit.getTeam() !== this.rolloutEnemyTeam) &&
+            isV08SoleAbominationArmageddonDefendOpportunity(
+                unit,
+                this.deps.unitsHolder,
+                this.deps.fightProperties.getCurrentLap(),
+            )
+        );
     }
     /** Seat-local action-space switch; lets one searched version remain an otherwise identical control. */
     private moveShotCapForVersion(version: string): number {
@@ -1802,8 +1982,19 @@ export class SearchDriver {
         incumbent: GameAction[],
         rootDecisionContext?: IDecisionContext,
     ): GameAction[] {
-        if (!this.appliesTo(version)) {
+        // Preserve the historical version-only fast path: an unscoped driver must not
+        // inspect the unit at all when this strategy version is excluded. Team lookup
+        // is necessary only for the explicit entrant-team research scope.
+        if (!this.enabled || !this.versions.has(version)) {
             return incumbent;
+        }
+        if (this.teamScope !== null && !this.teamScope.has(unit.getTeam())) {
+            return incumbent;
+        }
+        if (this.shouldUseSoleAbominationArmageddonDefend(unit)) {
+            this.counters.decisions += 1;
+            this.counters.soleAbominationArmageddonDefends += 1;
+            return [{ type: "defend_turn", unitId: unit.getId() }];
         }
         const incumbentKind = classifyActions(incumbent);
         const passiveIncumbentKind = searchPassiveActionKind(incumbent);
@@ -1813,6 +2004,10 @@ export class SearchDriver {
             return incumbent;
         }
         const currentLap = this.deps.fightProperties.getCurrentLap();
+        const armageddonDefendOpportunity =
+            !this.soleAbominationArmageddonDefendPolicy &&
+            this.armageddonDefendCandidate &&
+            isV08ArmageddonDefendOpportunity(unit, this.deps.unitsHolder, currentLap);
         const isV08TargetPressurePolicy = isV08Search && V08_TARGET_PRESSURE_VERSIONS.has(version);
         const pureRangedNoMeleePressureSeat =
             this.pureRangedNoMeleePressure && this.pureRangedNoMeleePressureVersions.has(version);
@@ -2022,8 +2217,22 @@ export class SearchDriver {
                 prioritizeV08SUrgency ||
                 pureRangedParetoNoMeleeFocusCatalogBoard ||
                 pureRangedJitNoMeleeFocusCatalogBoard;
-            const backlineProtectorIntent = isV08Search ? buildV08BacklineProtectorIntent(unit, context) : undefined;
-            const backlineWardIntent = isV08Search ? buildV08BacklineWardIntent(unit, context) : undefined;
+            // A mirrored Abomination fight is a strict pre-Armageddon damage race. Native v0.8's protector role
+            // is still the incumbent, but the A19 arm must be allowed to compare attacks and advances instead of
+            // filtering every action that leaves Flesh Shield range. Non-mirror fights retain the established
+            // protector/ward contract exactly.
+            const releaseAbominationMirror =
+                this.abominationMirrorRelease &&
+                this.deps.unitsHolder
+                    .getAllAllies(unit.getTeam())
+                    .some((ally) => !ally.isDead() && ally.getName() === "Abomination") &&
+                this.deps.unitsHolder
+                    .getAllEnemyUnits(unit.getTeam())
+                    .some((enemy) => !enemy.isDead() && enemy.getName() === "Abomination");
+            const backlineProtectorIntent =
+                isV08Search && !releaseAbominationMirror ? buildV08BacklineProtectorIntent(unit, context) : undefined;
+            const backlineWardIntent =
+                isV08Search && !releaseAbominationMirror ? buildV08BacklineWardIntent(unit, context) : undefined;
             const passiveAudit: ISearchPassiveAuditContext | undefined =
                 this.passiveProductiveProbeObserver && passiveIncumbentKind
                     ? {
@@ -2133,7 +2342,10 @@ export class SearchDriver {
                 }
                 // Search may compare a strategic wait, but it must never introduce a new Luck Shield or mountain
                 // hit. Retaining candidate zero above still permits either action as a fail-closed/true fallback.
-                if (isV08Search && (candidate.kind === "defend" || candidate.kind === "mine")) {
+                if (
+                    isV08Search &&
+                    (candidate.kind === "mine" || (candidate.kind === "defend" && !armageddonDefendOpportunity))
+                ) {
                     return false;
                 }
                 // Every v0.8 search keeps the enumerator's nearest legal move even when the catalog arm does not
@@ -2143,9 +2355,21 @@ export class SearchDriver {
                 if (!this.includeMoves && candidate.kind === "move" && !isV08Search) {
                     return false;
                 }
+                if (armageddonDefendOpportunity && candidate.kind === "defend") return true;
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             };
             const enumeratedCandidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates;
+            if (
+                armageddonDefendOpportunity &&
+                enumeratedCandidates.some(
+                    (candidate) =>
+                        candidate.kind === "defend" ||
+                        (candidate.kind === "incumbent" &&
+                            candidate.actions.some((action) => action.type === "defend_turn")),
+                )
+            ) {
+                this.counters.armageddonDefendOpportunities += 1;
+            }
             let candidates = enumeratedCandidates.filter(keepCandidate);
             const urgentMoveShotFallback =
                 prioritizeV08SUrgency &&
@@ -2731,7 +2955,9 @@ export class SearchDriver {
                 if (isDominantFinishCombatReplacement(prioritizeDominantFinish, productiveFallback, incumbent)) {
                     this.counters.dominantFinishCombatFallbacks += 1;
                 }
-                const fallbackActions = productiveFallback?.actions ?? incumbent;
+                const fallbackActions = this.nonregressiveOverrideValidation
+                    ? incumbent
+                    : (productiveFallback?.actions ?? incumbent);
                 const counterfactual = this.scorePassiveCounterfactual(
                     passiveAudit,
                     unit,
@@ -2759,6 +2985,7 @@ export class SearchDriver {
             // already-probed action avoids spending the deadline on an inevitable screen-preserving move and
             // materially lowers protector decision latency without changing candidate identity or posture.
             if (
+                !this.nonregressiveOverrideValidation &&
                 prioritizeProductiveActions &&
                 productiveFallback &&
                 candidates.filter(isForceTierProductiveCandidate).length === 1
@@ -2788,7 +3015,9 @@ export class SearchDriver {
             }
             if (candidates.length <= 1) {
                 this.counters.singleCandidate += 1;
-                const fallbackActions = productiveFallback?.actions ?? incumbent;
+                const fallbackActions = this.nonregressiveOverrideValidation
+                    ? incumbent
+                    : (productiveFallback?.actions ?? incumbent);
                 this.capturePassiveProductiveProbe(
                     passiveAudit,
                     unit,
@@ -2838,6 +3067,7 @@ export class SearchDriver {
                 cleanupErrors.push(error);
             }
             this.finishedSim = false;
+            this.finishedWinningTeam = null;
             this.rolloutEnemyTeam = null;
             if (cleanupErrors.length) throw new SearchRollbackError(cleanupErrors);
             if (pendingPassiveProductiveProbe) {
@@ -2952,6 +3182,13 @@ export class SearchDriver {
             deadlineFallbacks: c.deadlineFallbacks,
             offlineDeterministicWork: this.match.offlineDeterministicWork === true,
             isolatingFastFlyerMoveRejects: c.isolatingFastFlyerMoveRejects,
+            armageddonDefendOpportunities: c.armageddonDefendOpportunities,
+            soleAbominationArmageddonDefendPolicy: this.soleAbominationArmageddonDefendPolicy,
+            soleAbominationArmageddonDefends: c.soleAbominationArmageddonDefends,
+            nonregressiveOverrideValidation: this.nonregressiveOverrideValidation,
+            nonregressiveOverrideValidationAttempts: c.nonregressiveOverrideValidationAttempts,
+            nonregressiveOverrideValidationPasses: c.nonregressiveOverrideValidationPasses,
+            nonregressiveOverrideValidationRejects: c.nonregressiveOverrideValidationRejects,
             waitDeadlinePolicy: this.waitDeadlinePolicy,
             circuitWaitArbitrations: c.circuitWaitArbitrations,
             passiveCatalogExpansions: c.passiveCatalogExpansions,
@@ -3324,6 +3561,10 @@ export class SearchDriver {
         let bestIdx = 0;
         let bestChallengerIdx = -1;
         let hasPreferredV08STarget = false;
+        let armageddonDefendArbitration = false;
+        let provisionalWouldOverride = false;
+        let nonregressiveOverrideValidationPass = true;
+        let nonregressiveOverrideValidationDelta: number | null = null;
         let validationMeans: number[] | null = null;
         const turnHorizon = this.turnHorizonForVersion(version, unit.getTeam());
         try {
@@ -3347,6 +3588,20 @@ export class SearchDriver {
                 deadlineAt,
                 turnHorizon,
             );
+            armageddonDefendArbitration =
+                !this.soleAbominationArmageddonDefendPolicy &&
+                this.armageddonDefendCandidate &&
+                isV08ArmageddonDefendOpportunity(
+                    unit,
+                    this.deps.unitsHolder,
+                    this.deps.fightProperties.getCurrentLap(),
+                ) &&
+                scoredCandidates.some(
+                    (candidate) =>
+                        candidate.kind === "defend" ||
+                        (candidate.kind === "incumbent" &&
+                            candidate.actions.some((action) => action.type === "defend_turn")),
+                );
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
             const legalProductiveIndices = scoredCandidates
                 .map((candidate, index) => ({ candidate, index }))
@@ -3397,7 +3652,7 @@ export class SearchDriver {
                     : legalAdvanceIndices.length
                       ? legalAdvanceIndices
                       : legalForceTierProductiveIndices;
-            const selectionIndices =
+            const policySelectionIndices =
                 prioritizeV08SUrgency && preferredUrgentDamageIndex >= 0
                     ? [preferredUrgentDamageIndex]
                     : prioritizeV08STargetPressure && preferredV08STargetIndex >= 0
@@ -3419,17 +3674,26 @@ export class SearchDriver {
                             : aggressiveWaitComparison
                               ? [0, ...legalProductiveIndices.filter((index) => index > 0)]
                               : scoredCandidates.map((_candidate, index) => index);
+            // In this one environmental-preservation state, ordinary rollout value must arbitrate. The late
+            // productive/urgent layers were designed to prevent passive draws and would otherwise discard the
+            // very defend action whose H64 terminal result distinguishes a draw from a surviving win.
+            const selectionIndices = armageddonDefendArbitration
+                ? scoredCandidates.map((_candidate, index) => index)
+                : policySelectionIndices;
             bestIdx = selectionIndices[0];
             for (const index of selectionIndices) {
                 if (
                     means[index] > means[bestIdx] ||
-                    (prioritizeV08STargetPressure &&
+                    (!armageddonDefendArbitration &&
+                        prioritizeV08STargetPressure &&
                         !prioritizeV08SUrgency &&
                         bestIdx === 0 &&
                         index > 0 &&
                         means[index] !== -Infinity &&
                         means[index] === means[bestIdx]) ||
-                    (aggressiveWaitComparison &&
+                    (!armageddonDefendArbitration &&
+                        !this.strictAggressiveWaitTies &&
+                        aggressiveWaitComparison &&
                         bestIdx === 0 &&
                         index > 0 &&
                         means[index] !== -Infinity &&
@@ -3440,6 +3704,19 @@ export class SearchDriver {
                 if (index > 0 && (bestChallengerIdx === -1 || means[index] > means[bestChallengerIdx])) {
                     bestChallengerIdx = index;
                 }
+            }
+            // The historical passive-repair tier intentionally prefers any productive action, even when the
+            // rollout says it is materially worse. A19 retains that zero-gate repair for ties and improvements,
+            // but never converts a high-value Angel defend into a losing Resurrection solely because it is
+            // classified as productive.
+            if (
+                this.nonregressiveProductiveOverride &&
+                prioritizeProductiveActions &&
+                bestIdx > 0 &&
+                means[0] !== -Infinity &&
+                means[bestIdx] < means[0]
+            ) {
+                bestIdx = 0;
             }
             if (
                 this.rankedReplayTiebreakEpsilon > 0 &&
@@ -3481,6 +3758,49 @@ export class SearchDriver {
                     bestChallengerIdx = replayTiebreakIndex;
                 }
             }
+            provisionalWouldOverride =
+                bestIdx !== 0 &&
+                means[bestIdx] !== -Infinity &&
+                (means[0] === -Infinity ||
+                    (!armageddonDefendArbitration &&
+                        ((prioritizeProductiveActions &&
+                            isProductiveCandidate(scoredCandidates[bestIdx]) &&
+                            !isProductiveCandidate(scoredCandidates[0])) ||
+                            (prioritizeV08STargetPressure && hasPreferredV08STarget) ||
+                            (prioritizeV08SUrgency && isProductiveCandidate(scoredCandidates[bestIdx])) ||
+                            (prioritizeDominantFinish && isProductiveCandidate(scoredCandidates[bestIdx])) ||
+                            (aggressiveWaitComparison &&
+                                isProductiveCandidate(scoredCandidates[bestIdx]) &&
+                                (this.strictAggressiveWaitTies
+                                    ? means[bestIdx] > means[0]
+                                    : means[bestIdx] >= means[0])))) ||
+                    means[bestIdx] - means[0] >= this.gate);
+            if (this.nonregressiveOverrideValidation && provisionalWouldOverride && means[0] !== -Infinity) {
+                this.counters.nonregressiveOverrideValidationAttempts += 1;
+                const pairedMeans = this.scoreCandidates(
+                    unit,
+                    [scoredCandidates[0], scoredCandidates[bestIdx]],
+                    hashSimulationParts("a19-nonregressive-override-validation-v2", seedBase),
+                    "turns",
+                    2,
+                    deadlineAt,
+                    turnHorizon,
+                );
+                nonregressiveOverrideValidationDelta =
+                    pairedMeans[0] === -Infinity || pairedMeans[1] === -Infinity
+                        ? null
+                        : pairedMeans[1] - pairedMeans[0];
+                if (
+                    pairedMeans[0] === -Infinity ||
+                    pairedMeans[1] === -Infinity ||
+                    pairedMeans[1] - pairedMeans[0] < this.gate
+                ) {
+                    nonregressiveOverrideValidationPass = false;
+                    this.counters.nonregressiveOverrideValidationRejects += 1;
+                } else {
+                    this.counters.nonregressiveOverrideValidationPasses += 1;
+                }
+            }
             if (this.validationRollouts !== null && bestChallengerIdx !== -1) {
                 const validationSeedBase = hashSimulationParts("search-validation-v1", seedBase);
                 validationMeans = this.scoreCandidates(
@@ -3512,8 +3832,11 @@ export class SearchDriver {
             // may force the valid fallback. Qualification scores the wait/action pair after behavior is frozen.
             const forceProductiveFallback =
                 prioritizeProductiveActions || prioritizeDominantFinish || prioritizeV08SUrgency;
-            const selectedFallback =
-                aggressiveWaitComparison && !forceProductiveFallback ? undefined : productiveFallback;
+            const selectedFallback = this.nonregressiveOverrideValidation
+                ? undefined
+                : aggressiveWaitComparison && !forceProductiveFallback
+                  ? undefined
+                  : productiveFallback;
             const fallbackActions = selectedFallback?.actions ?? incumbent;
             if (isDominantFinishCombatReplacement(prioritizeDominantFinish, selectedFallback, incumbent)) {
                 this.counters.dominantFinishCombatFallbacks += 1;
@@ -3541,6 +3864,17 @@ export class SearchDriver {
                         ms: Math.round(ms * 10) / 10,
                         deadlineFallback: 1,
                         productiveFallback: Number(selectedFallback !== undefined),
+                        ...(this.nonregressiveOverrideValidation
+                            ? {
+                                  provisionalWouldOverride: provisionalWouldOverride ? 1 : 0,
+                                  nonregressiveOverrideValidationRollouts: provisionalWouldOverride ? 2 : 0,
+                                  nonregressiveOverrideValidationDelta:
+                                      nonregressiveOverrideValidationDelta === null
+                                          ? null
+                                          : Number(nonregressiveOverrideValidationDelta.toFixed(4)),
+                                  nonregressiveOverrideValidationPass: 0,
+                              }
+                            : {}),
                         ...(this.observeOnly
                             ? {
                                   observeOnly: 1,
@@ -3570,20 +3904,7 @@ export class SearchDriver {
         }
         // The GATE: trust the policy unless a challenger clearly beats it on mean rollout value. An
         // incumbent that is illegal in sim is always replaced by the best legal candidate.
-        const wouldOverride =
-            bestIdx !== 0 &&
-            means[bestIdx] !== -Infinity &&
-            (incumbentIllegal ||
-                (prioritizeProductiveActions &&
-                    isProductiveCandidate(scoredCandidates[bestIdx]) &&
-                    !isProductiveCandidate(scoredCandidates[0])) ||
-                (prioritizeV08STargetPressure && hasPreferredV08STarget) ||
-                (prioritizeV08SUrgency && isProductiveCandidate(scoredCandidates[bestIdx])) ||
-                (prioritizeDominantFinish && isProductiveCandidate(scoredCandidates[bestIdx])) ||
-                (aggressiveWaitComparison &&
-                    isProductiveCandidate(scoredCandidates[bestIdx]) &&
-                    means[bestIdx] >= means[0]) ||
-                means[bestIdx] - means[0] >= this.gate);
+        const wouldOverride = provisionalWouldOverride && nonregressiveOverrideValidationPass;
         const overridden = wouldOverride && !this.observeOnly;
         if (wouldOverride && this.observeOnly) {
             this.counters.shadowRecommendations += 1;
@@ -3687,6 +4008,19 @@ export class SearchDriver {
                             ? null
                             : Number((means[bestIdx] - means[0]).toFixed(4)),
                     ms: Math.round(ms * 10) / 10,
+                    ...(this.nonregressiveOverrideValidation
+                        ? {
+                              provisionalWouldOverride: provisionalWouldOverride ? 1 : 0,
+                              nonregressiveOverrideValidationRollouts:
+                                  provisionalWouldOverride && !incumbentIllegal ? 2 : 0,
+                              nonregressiveOverrideValidationDelta:
+                                  nonregressiveOverrideValidationDelta === null
+                                      ? null
+                                      : Number(nonregressiveOverrideValidationDelta.toFixed(4)),
+                              nonregressiveOverrideValidationPass:
+                                  provisionalWouldOverride && nonregressiveOverrideValidationPass ? 1 : 0,
+                          }
+                        : {}),
                     ...(this.observeOnly
                         ? {
                               observeOnly: 1,
@@ -4040,6 +4374,15 @@ export class SearchDriver {
         if (reservedVine && !challengers.includes(reservedVine)) {
             challengers = [...challengers, reservedVine];
         }
+        const reservedArmageddonDefend =
+            !this.soleAbominationArmageddonDefendPolicy &&
+            this.armageddonDefendCandidate &&
+            isV08ArmageddonDefendOpportunity(unit, this.deps.unitsHolder, this.deps.fightProperties.getCurrentLap())
+                ? candidates.find((candidate) => candidate.kind === "defend")
+                : undefined;
+        if (reservedArmageddonDefend && !challengers.includes(reservedArmageddonDefend)) {
+            challengers = [...challengers, reservedArmageddonDefend];
+        }
         challengers = reserveResearchRapidChargeShortlist(candidates, challengers);
         return [candidates[0], ...challengers];
     }
@@ -4392,6 +4735,7 @@ export class SearchDriver {
         this.assertBeforeDecisionDeadline(deadlineAt);
         setDeterministicRandomSource(makeRng((seedBase + r * 0x9e3779b1) >>> 0));
         this.finishedSim = false;
+        this.finishedWinningTeam = null;
         this.deps.setActiveUnitId(unit.getId());
         const actingTeam = unit.getTeam();
         this.rolloutEnemyTeam = otherTeam(actingTeam);
@@ -4477,6 +4821,10 @@ export class SearchDriver {
     }
     /** Leaf eval as P(win) for `team`: learned logistic value when configured, else normalized material. */
     private leafValue(team: TeamType): number {
+        if (this.exactTerminalResults && this.finishedSim && this.finishedWinningTeam !== null) {
+            if (this.finishedWinningTeam === PBTypes.TeamVals.NO_TEAM) return 0.5;
+            return this.finishedWinningTeam === team ? 1 : 0;
+        }
         const model = this.learnedV2 ?? this.learned;
         if (model) {
             const f = this.learnedV2
@@ -4581,16 +4929,36 @@ export class SearchDriver {
         let decided: GameAction[];
         try {
             const matrix = this.deps.grid.getMatrix();
-            decided = strat.decideTurn(unit, {
-                grid: this.deps.grid,
-                matrix,
-                unitsHolder: this.deps.unitsHolder,
-                pathHelper: this.deps.pathHelper,
-                decisionPathCatalog: createDecisionPathCatalog(this.deps.grid, this.deps.pathHelper, unit, matrix),
-                attackHandler: this.deps.attackHandler,
-                fightProperties: this.deps.fightProperties,
-                decisionOrigin: "rollout",
-            });
+            // Search itself is intentionally non-recursive, so future same-team turns normally use the native
+            // strategy. Stateful Armageddon policies must therefore recur here exactly as they do in live play.
+            // The strict policy reuses one shared gate; the earlier broad research arm remains isolated behind its
+            // own flag and is suppressed whenever strict mode is selected. The opponent keeps its configured model.
+            decided =
+                this.shouldUseSoleAbominationArmageddonDefend(unit) ||
+                (!this.soleAbominationArmageddonDefendPolicy &&
+                    this.armageddonDefendCandidate &&
+                    unit.getTeam() !== this.rolloutEnemyTeam &&
+                    isV08ArmageddonDefendOpportunity(
+                        unit,
+                        this.deps.unitsHolder,
+                        this.deps.fightProperties.getCurrentLap(),
+                    ))
+                    ? [{ type: "defend_turn", unitId: id }]
+                    : strat.decideTurn(unit, {
+                          grid: this.deps.grid,
+                          matrix,
+                          unitsHolder: this.deps.unitsHolder,
+                          pathHelper: this.deps.pathHelper,
+                          decisionPathCatalog: createDecisionPathCatalog(
+                              this.deps.grid,
+                              this.deps.pathHelper,
+                              unit,
+                              matrix,
+                          ),
+                          attackHandler: this.deps.attackHandler,
+                          fightProperties: this.deps.fightProperties,
+                          decisionOrigin: "rollout",
+                      });
         } catch {
             decided = [];
         }
@@ -4670,6 +5038,7 @@ export class SearchDriver {
             } else if (event.type === "fight_finished") {
                 this.deps.setActiveUnitId("");
                 this.finishedSim = true;
+                this.finishedWinningTeam = event.winningTeam;
             } else if (event.type === "unit_destroyed") {
                 if (this.deps.getActiveUnitId() === event.unitId) {
                     this.deps.setActiveUnitId("");
