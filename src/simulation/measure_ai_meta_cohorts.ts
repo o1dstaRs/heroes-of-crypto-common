@@ -62,6 +62,7 @@ import {
     AiMetaUnitInteractionCollector,
     type IAiMetaUnitInteractionAnalysis,
 } from "./ai_meta_unit_interactions";
+import { creaturesByLevel, DEFAULT_ROSTER_COMPOSITION } from "./army";
 
 interface ICountedOutcome {
     score: number;
@@ -313,6 +314,11 @@ export class AiMetaAccumulator {
         public readonly cohort: string,
         public readonly map: AiMetaMapDimension = "all",
     ) {
+        for (const { level } of DEFAULT_ROSTER_COMPOSITION) {
+            for (const creature of creaturesByLevel(level)) {
+                this.units.set(creature.creatureName, emptyBucket());
+            }
+        }
         for (const artifact of TIER1_ARTIFACT_LIST) this.artifactsT1.set(String(artifact.id), emptyBucket());
         for (const artifact of TIER2_ARTIFACT_LIST) this.artifactsT2.set(String(artifact.id), emptyBucket());
         for (const plan of allAugmentPlans()) this.augmentPlans.set(planKey(plan), emptyBucket());

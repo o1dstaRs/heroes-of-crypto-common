@@ -2525,7 +2525,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         setEnv({ ...pureRangedDeadlineEnvironment });
         const h = buildBattle(8_222_701, "v0.8", undefined, pureRangedDeadlineRoster());
         const medusa = greenUnitNamed(h, "Medusa");
-        medusa.setAmountAlive(32);
+        medusa.setAmountAlive(34);
         h.setActiveUnitId(medusa.getId());
         const driver = h.makeDriver();
         driver.onFightReady();
@@ -2575,7 +2575,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         setEnv({ ...pureRangedDeadlineEnvironment });
         const h = buildBattle(8_222_701, "v0.8", undefined, pureRangedDeadlineRoster());
         const unit = greenUnitNamed(h, "Medusa");
-        unit.setAmountAlive(32);
+        unit.setAmountAlive(34);
         h.setActiveUnitId(unit.getId());
         const driver = h.makeDriver();
         driver.onFightReady();

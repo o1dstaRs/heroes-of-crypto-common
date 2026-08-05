@@ -303,6 +303,10 @@ function equivalentRankingValue(left: unknown, right: unknown): boolean {
     return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function isZeroSupportMetricRow(row: IAiMetaMetricRow): boolean {
+    return row.pairs === 0 && row.games === 0 && row.selected === 0;
+}
+
 /** Keep the run's historical all-map rows exactly, after verifying that raw reaggregation reproduces them. */
 function preserveAllMapRankings(source: UnknownRecord, computed: IAiMetaRankings): IAiMetaRankings {
     if (!isRecord(source.rankings)) throw new Error("Summary is missing rankings");
@@ -333,16 +337,17 @@ function preserveAllMapRankings(source: UnknownRecord, computed: IAiMetaRankings
             sourceById.set(id, row);
         }
         const computedAllRows = computed[category].filter((row) => row.map === "all");
-        if (sourceById.size !== computedAllRows.length) {
-            throw new Error(
-                `Summary rankings.${category} has ${sourceById.size} all-map rows; raw data produced ${computedAllRows.length}`,
-            );
-        }
         const replacement = new Map<string, IAiMetaMetricRow>();
         for (const row of computedAllRows) {
             const id = `${row.cohort}\u0000${row.key}`;
             const historical = sourceById.get(id);
-            if (!historical) throw new Error(`Summary rankings.${category} is missing ${row.cohort}/${row.key}`);
+            if (!historical) {
+                if (!isZeroSupportMetricRow(row)) {
+                    throw new Error(`Summary rankings.${category} is missing ${row.cohort}/${row.key}`);
+                }
+                replacement.set(id, row);
+                continue;
+            }
             for (const [key, expected] of Object.entries(row)) {
                 if (key === "map") continue;
                 if (!equivalentRankingValue(historical[key], expected)) {
@@ -352,6 +357,9 @@ function preserveAllMapRankings(source: UnknownRecord, computed: IAiMetaRankings
                 }
             }
             replacement.set(id, { ...historical, map: "all" } as unknown as IAiMetaMetricRow);
+        }
+        for (const id of sourceById.keys()) {
+            if (!replacement.has(id)) throw new Error(`Summary rankings.${category} has an unknown all-map row ${id}`);
         }
         preserved[category] = computed[category].map((row) =>
             row.map === "all" ? replacement.get(`${row.cohort}\u0000${row.key}`)! : row,

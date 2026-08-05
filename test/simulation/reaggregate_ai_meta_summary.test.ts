@@ -204,6 +204,26 @@ test("marks a future live-only summary as having no recorded non-live water data
     }
 });
 
+test("restores omitted zero-support unit rows from complete raw data", async () => {
+    const run = fixture(AI_META_MAPS);
+    try {
+        const source = JSON.parse(readFileSync(run.summaryPath, "utf8")) as IAiMetaSummary;
+        source.rankings.units = source.rankings.units.filter((row) => row.selected > 0);
+        writeFileSync(run.summaryPath, `${JSON.stringify(source, null, 2)}\n`);
+
+        const result = await reaggregateAiMetaSummary(run.summaryPath);
+        const enriched = JSON.parse(readFileSync(result.outputPath, "utf8")) as IAiMetaSummary;
+        const restored = enriched.rankings.units.filter(
+            (row) => row.map === "all" && row.selected === 0 && row.games === 0 && row.pairs === 0,
+        );
+
+        expect(restored.length).toBeGreaterThan(0);
+        expect(restored.every((row) => row.pickRate === 0 && row.scoreRate === 0.5)).toBe(true);
+    } finally {
+        rmSync(run.directory, { recursive: true, force: true });
+    }
+});
+
 test("requires an explicit diagnostic flag before reaggregating a partial summary", async () => {
     const run = fixture(AI_META_MAPS);
     try {

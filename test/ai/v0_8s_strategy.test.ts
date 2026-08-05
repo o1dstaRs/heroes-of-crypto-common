@@ -192,10 +192,10 @@ describe("v0.8 search measurement alias", () => {
         // Re-pinned after primary v0.1 move-and-strike began using the same explicit move lifecycle as its
         // fallback route. Fire Wall, Vine, smoke, moved-state, and movement events now resolve before the
         // stationary strike instead of being bypassed by an integrated path. Two isolated runs reproduced it.
-        // Re-pinned after Tsar Cannon's shot range grew 8 -> 8.5 and Dryad's damage rose 2-4 -> 3-5; both
-        // sides field these units across the seeded draws, so every trace containing one diverges from that
+        // Re-pinned after Tsar Cannon's shot range grew 8.5 -> 9.5 and its damage, attack, and armor increased;
+        // both sides field these units across the seeded draws, so every trace containing one diverges from that
         // point on. Two isolated runs reproduced this digest byte-identically.
-        expect(digest("v0.7")).toBe("7da4702b3b60163c99d97cbbbb6e46e3520fe5e8ff6624bb2a73a40a490e98a4");
+        expect(digest("v0.7")).toBe("99cf5165c71a4388468c6beb4c81f076ce1a4da61222e65a1db59e5c1e1de704");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -206,10 +206,11 @@ describe("v0.8 search measurement alias", () => {
         // with zero rejected actions, and two clean-source runs reproduced the v0.8 trace below.
         // Re-pinned with the same Tsar Cannon range / Dryad damage balance change; two isolated runs
         // reproduced this digest byte-identically alongside the v0.7 control above.
-        // Re-pinned after splash-target selection makes Gargantuan and Cyclops prefer higher-net-damage clusters.
-        // The v0.7 control above still reproduces byte-identically.
+        // Re-pinned after splash-target selection makes Gargantuan and Cyclops prefer higher-net-damage clusters,
+        // then again after Tsar Cannon's range, damage, attack, and armor buff. The v0.7 control above still
+        // reproduces byte-identically.
         // Two isolated runs reproduced this digest.
-        expect(digest("v0.8")).toBe("b52ab590899a743f1296443b60a52acbdaa7385f33684326194f7e53ed7b5831");
+        expect(digest("v0.8")).toBe("7a1cf0c7419237dd6d8af292e289dda022abaebb65ade2678b0d1f055a1d9123");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {
