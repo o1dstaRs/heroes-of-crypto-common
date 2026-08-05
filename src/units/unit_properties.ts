@@ -173,6 +173,15 @@ export class UnitProperties {
     // delta a second time on every refreshUnits() — the "-18 morale from one Cursed Ward" bug. Left
     // undefined for locally-simulated units (sandbox), which own the whole computation.
     public morale_authoritative?: boolean;
+    // The BASE-stat twins of armor_mod/attack_mod_authoritative, for the drifts that live in base_armor /
+    // base_attack rather than the mods: Bitter Experience (+1 base armor per stack death), Made of Fire's
+    // +10% boost, Unyielding Power's per-lap attack. A ranked client re-derives both bases from its local
+    // creature config on every adjustBaseStats pass, so a server-side base gain was invisible in the HUD —
+    // a Peasant with Bitter Experience showed its config armor forever ("the ability isn't working").
+    // When set, adjustBaseStats keeps the snapshot's FINAL base value verbatim instead of re-deriving it.
+    // Left undefined for locally-simulated units (sandbox), which own the whole derivation.
+    public base_armor_authoritative?: boolean;
+    public base_attack_authoritative?: boolean;
     public constructor(
         faction: FactionType,
         name: string,

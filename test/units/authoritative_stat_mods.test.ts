@@ -108,6 +108,76 @@ describe("authoritative stat mods", () => {
         }
     });
 
+    // BASE stats drift too — Bitter Experience (+1 base armor per stack death), Made of Fire, Unyielding
+    // Power all mutate base_armor/base_attack rather than the mods. A ranked client re-derives both bases
+    // from its local creature config every pass, so the server-side gain was invisible: a Peasant with
+    // Bitter Experience showed its config armor for the whole fight.
+    it("keeps an authoritative base_armor instead of re-deriving it from the local config", () => {
+        const unit = createTestUnit({ name: "Peasant", amountAlive: 5, maxHp: 100 });
+        const props = unit.getUnitProperties();
+        const configBaseArmor = props.base_armor;
+        props.base_armor = configBaseArmor + 2;
+        props.base_armor_authoritative = true;
+
+        adjust(unit);
+
+        expect(props.base_armor).toBe(configBaseArmor + 2);
+        expect(unit.getArmor()).toBe(configBaseArmor + 2 + props.armor_mod);
+        // Ranged armor derives from the restored base, so the gain guards both attack types.
+        expect(props.range_armor).toBeGreaterThanOrEqual(configBaseArmor + 2);
+    });
+
+    it("keeps an authoritative base_attack the same way", () => {
+        const unit = createTestUnit({ name: "Peasant", amountAlive: 5, maxHp: 100 });
+        const props = unit.getUnitProperties();
+        const configBaseAttack = props.base_attack;
+        props.base_attack = configBaseAttack + 3;
+        props.base_attack_authoritative = true;
+
+        adjust(unit);
+
+        expect(props.base_attack).toBe(configBaseAttack + 3);
+    });
+
+    it("still re-derives the bases locally when they are not authoritative", () => {
+        const unit = createTestUnit({ name: "Peasant", amountAlive: 5, maxHp: 100 });
+        const props = unit.getUnitProperties();
+        const configBaseArmor = props.base_armor;
+        const configBaseAttack = props.base_attack;
+        props.base_armor = 99;
+        props.base_attack = 99;
+
+        adjust(unit);
+
+        expect(props.base_armor).toBe(configBaseArmor);
+        expect(props.base_attack).toBe(configBaseAttack);
+    });
+
+    // End to end on the real ability: a Bitter Experience unit that loses stack members gains base armor,
+    // and the ranked twin handed that FINAL base as authoritative keeps it through the refresh.
+    it("agrees with the base armor a locally-applied Bitter Experience derives", () => {
+        const local = createTestUnit({
+            name: "Peasant",
+            abilities: ["Bitter Experience"],
+            amountAlive: 5,
+            maxHp: 100,
+        });
+        const before = local.getUnitProperties().base_armor;
+        // One full creature dies (100 HP each), the stack survives -> +1 base armor, +1 step.
+        local.applyDamage(100, local.getId());
+        adjust(local);
+        const after = local.getUnitProperties().base_armor;
+        expect(after).toBe(before + 1);
+
+        const ranked = createTestUnit({ name: "Peasant", amountAlive: 5, maxHp: 100 });
+        ranked.getUnitProperties().base_armor = after;
+        ranked.getUnitProperties().base_armor_authoritative = true;
+        adjust(ranked);
+
+        expect(ranked.getUnitProperties().base_armor).toBe(after);
+        expect(ranked.getArmor()).toBe(local.getArmor());
+    });
+
     // End to end on the real ability: sandbox derives the same number the server would ship.
     it("agrees with the value a locally-applied Shatter Armor derives", () => {
         const log = new SceneLogMock();
