@@ -1208,19 +1208,21 @@ describe("v0.8 random-roster passive-turn panel", () => {
     });
 
     test("classifies the known protector screen holds without manufacturing movement work", () => {
-        // Block-center game 3443 has no attacks, casts, catch-up, local threat, or newly covered ward available
-        // to Harpy/Abomination on its post-hourglass holds. The shared Flesh-Shield retaliation-risk predicate
-        // now rejects the tempting raw Abomination hit before passive arbitration, so no avoidable shield needs
-        // repair. Screen holds remain protected; after S3 restores the campaign shortlist, one genuinely forced
-        // Abomination shield remains after the role releases, with no productive candidate left.
-        const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 3_443);
+        // Block-center game 1555 pins the protector-screen scenario: Harpy and Abomination hold
+        // post-hourglass screens with no productive candidate available, every hold classifies as
+        // protected (all avoidable-defend counters stay zero, nothing manufactures movement work),
+        // and the genuinely forced Abomination shields classify as forced. Game 3443 carried this
+        // fixture until the Trent buff (hp 29 -> 31, armor 19 -> 20, attack 21 -> 22) let its one
+        // historical forced hold resolve productively; a full scan of the 4096-game panel chose this
+        // replacement as the nearest game still exhibiting the complete scenario (2026-08-04).
+        const record = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 1_555);
         expect(record.endReason).toBe("elimination");
         expect(record.metrics.rawAvoidableDefendTurns).toBe(0);
         expect(record.metrics.repairedRawAvoidableDefendTurns).toBe(0);
         expect(record.metrics.avoidableDefendTurns).toBe(0);
-        // The S3 shortlist admits the productive branch that removes the other historical forced hold. The
-        // guarded classification is untouched — every avoidable-defend counter above stays zero.
-        expect(record.metrics.forcedDefendTurns).toBe(1);
+        // The guarded classification is untouched — every avoidable-defend counter above stays zero,
+        // and only the two genuinely forced Abomination shields land in the forced bucket.
+        expect(record.metrics.forcedDefendTurns).toBe(2);
         expect(record.metrics.finalDefendTurns).toBe(
             record.metrics.protectedDefendTurns + record.metrics.forcedDefendTurns,
         );

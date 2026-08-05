@@ -138,7 +138,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // byte-identical digest.
 // Re-pinned after the fair, own-roster-only draft-coherence overlay landed. It changes the seeded
 // production draft selections while preserving the resolver's deterministic replay contract.
-const EXPECTED_REPLAY_SHA256 = "52e8a38589b4dd18fd0786e1dcf5982c3f14f21adcdacf9a8fe2eb66517a37d7";
+// Re-pinned for the Trent buff (hp 29 -> 31, armor 19 -> 20, attack 21 -> 22): the sturdier L2
+// re-values every seeded exchange it appears in. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "f648dc80fdbacf3b1c37703a23ab7f17cebe937e784f3aa6ceaaf2c6863c3d79";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
