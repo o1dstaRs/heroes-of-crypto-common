@@ -142,7 +142,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // re-values every seeded exchange it appears in. Two isolated runs produced this byte-identical digest.
 // Re-pinned after Water Shield break events joined the authoritative action trace and began naming the
 // striker. The event is intentionally replay-visible; Linux CI and two local runs produced this digest.
-const EXPECTED_REPLAY_SHA256 = "a22ffdda9e63fec5b348376f9f33b765c04f122d315c9eb2f81edb1961fcb8ef";
+// Re-pinned again for Battle Mage's hp reduction (17 -> 14): the lower survivability changes the seeded
+// setup valuation and downstream exchanges. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "66ae33f5f040fa4cd2580ca90e9aa47d81a2ddc72ab7df36ede4bb5edaafee82";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
