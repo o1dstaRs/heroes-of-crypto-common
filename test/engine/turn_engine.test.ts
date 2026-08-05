@@ -360,6 +360,49 @@ describe("TurnEngine", () => {
         });
     });
 
+    it("forces a Whirlpool target to skip exactly one activation", () => {
+        const setup = setupStartedFight();
+        setup.lower.applyDebuff(new Spell({ spellProperties: getSpellConfig("Nature", "Whirlpool"), amount: 1 }));
+        expect(setup.lower.isSkippingThisTurn()).toBe(true);
+
+        const engine = new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            runtime: createSequenceGameRuntime({
+                ints: queuedZeros(40),
+                nowMillis: [1000, 1250, 1500, 1750, 2000],
+            }),
+        });
+
+        const skipped = engine.advanceAfterNoActiveUnit();
+        expect(skipped.nextUnit).toBeUndefined();
+        expect(skipped.events).toContainEqual({
+            type: "unit_skipped",
+            unitId: setup.lower.getId(),
+            team: PBTypes.TeamVals.LOWER,
+            reason: "effect",
+        });
+        expect(setup.lower.hasDebuffActive("Whirlpool")).toBe(false);
+        expect(setup.lower.isSkippingThisTurn()).toBe(false);
+
+        const upperTurn = engine.advanceAfterNoActiveUnit();
+        expect(upperTurn.nextUnit?.getId()).toBe(setup.upper.getId());
+        engine.completeTurn(setup.upper);
+
+        let nextLap = engine.advanceAfterNoActiveUnit();
+        // Morale/tie ordering may let Upper lead the new lap. Complete it if so; Lower must then activate
+        // normally instead of carrying Whirlpool into a second activation.
+        if (nextLap.nextUnit?.getId() === setup.upper.getId()) {
+            engine.completeTurn(setup.upper);
+            nextLap = engine.advanceAfterNoActiveUnit();
+        }
+        expect(nextLap.nextUnit?.getId()).toBe(setup.lower.getId());
+        expect(nextLap.events.some((event) => event.type === "unit_skipped")).toBe(false);
+    });
+
     it("finishes the fight through common turn advancement when one team has no living units", () => {
         const setup = setupStartedFight();
         setup.unitsHolder.deleteUnitById(setup.upper.getId(), true);

@@ -790,7 +790,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        return false;
+        // Whirlpool is a debuff rather than an Effect, so it is not present in the object list above. Read
+        // the shared status seam as well: the authoritative server sees the live debuff object, while a
+        // ranked client sees the same name in the serialized display list.
+        return this.hasStatusApplied("Whirlpool");
     }
     public applyEffect(effect: Effect): boolean {
         // not checking for duplicates here, do it on a caller side
@@ -1442,11 +1445,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public setWebMovementLocked(locked: boolean): void {
         this.unitProperties.web_movement_locked = locked;
     }
-    /**
-     * Whether the unit may leave the cells it stands on. A unit that cannot move is NOT stunned: it still
-     * takes its turn, still attacks whatever it can already reach, and still retaliates (see the
-     * !canMove() branch of the attack-cell search) — it simply has nowhere to step.
-     */
+    /** Whether the unit may leave the cells it stands on. Paralysis/Web only immobilize; Whirlpool also
+     * consumes the affected unit's activation through isSkippingThisTurn(). */
     public canMove(): boolean {
         return (
             !this.hasStatusApplied("Paralysis") && !this.hasStatusApplied("Whirlpool") && !this.isWebMovementLocked()
