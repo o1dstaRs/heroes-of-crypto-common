@@ -390,15 +390,15 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         ).toBe(true);
     });
 
-    // Re-derived for the A13 shortlist-three profile. The former shortlist-two policy waited despite an
-    // engine-valid melee option on lap three; the promoted policy now takes all three direct actions.
-    test("keeps game 16251's Thunderbird productive through all direct-action turns", () => {
-        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 16_251);
+    // Re-derived after Battle Mage hp fell from 17 to 14. The old encounter ends a lap sooner and no longer
+    // exercises the intended invariant; this replacement keeps Thunderbird productive on every direct-action turn.
+    test("keeps game 16459's Thunderbird productive through all direct-action turns", () => {
+        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 16_459);
 
         expect(record).toMatchObject({
-            game: 16_251,
-            pair: 8_125,
-            seed: 572_077_654,
+            game: 16_459,
+            pair: 8_229,
+            seed: 1_755_489_854,
             candidateSide: "red",
             winner: "candidate",
             laps: 5,
@@ -406,10 +406,10 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             candidateEngineRejections: 0,
         });
         expect(record.byCreature.Thunderbird).toMatchObject({
-            observedTurns: 3,
-            oracleDirectEligibleTurns: 3,
-            sharedCatalogDirectEligibleTurns: 3,
-            chosenDirectActionTurns: 3,
+            observedTurns: 4,
+            oracleDirectEligibleTurns: 4,
+            sharedCatalogDirectEligibleTurns: 4,
+            chosenDirectActionTurns: 4,
             noncombatWithDirectOptionTurns: 0,
             eligibleCombatMisses: 0,
             pureMoveTurns: 0,

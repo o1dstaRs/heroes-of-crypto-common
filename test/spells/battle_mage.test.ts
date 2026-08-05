@@ -231,21 +231,15 @@ describe("Battle Mage spell configuration", () => {
         expect(amountForCreatureExperienceBudget("Battle Mage", STACK_EXPERIENCE_BUDGET, 30)).toBe(50);
     });
 
-    // The Battle Mage pays for an OFFENSIVE book on ARMOR, not on health. It used to sit at or below the
-    // weakest level 2 casters (Healer, Satyr) on both, but a rebalance took health 14 -> 26 and armor 11 -> 10:
-    // the stack now survives a hit while still folding to sustained damage, so it plays as a body with a book
-    // rather than as glass. Armor stays the cheapest of the three, which is where the price is now paid.
-    // Health later came back down 26 -> 21 -> 19 -> 17: still clearly the healthiest of the three, but no
-    // longer so far ahead that the armor discount stopped being felt.
-    it("is the softest-armoured level 2 caster, and buys health with it", () => {
+    // The Battle Mage pays for its offensive book with the lowest armor of the level-2 casters. Its health
+    // returned from 26 -> 21 -> 19 -> 17 -> 14, so pin that balance value independently of the other casters.
+    it("is the softest-armoured level 2 caster with 14 health", () => {
         const creatures = creaturesJson as unknown as Record<string, Record<string, { hp: number; armor: number }>>;
         const healer = creatures.Life.Healer;
         const satyr = creatures.Nature.Satyr;
 
         expect(battleMage.armor).toBeLessThan(Math.min(healer.armor, satyr.armor));
-        // Pinned outright rather than relative, so drifting back under the old floor has to be deliberate.
-        expect(battleMage.hp).toBe(17);
-        expect(battleMage.hp).toBeGreaterThan(Math.max(healer.hp, satyr.hp));
+        expect(battleMage.hp).toBe(14);
     });
 });
 
