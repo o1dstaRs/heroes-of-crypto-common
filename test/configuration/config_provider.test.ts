@@ -71,8 +71,8 @@ describe("config_provider", () => {
     it("gives Zena Handyman: her kit waives the ranged melee penalty (desc arrays aligned)", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Zena", "zena_512", 0, 141);
 
-        expect(creature.hp).toBe(58);
-        expect(creature.base_armor).toBe(15);
+        expect(creature.hp).toBe(55);
+        expect(creature.base_armor).toBe(17);
 
         const handymanIndex = creature.abilities.indexOf("Handyman");
         expect(handymanIndex).toBeGreaterThanOrEqual(0);

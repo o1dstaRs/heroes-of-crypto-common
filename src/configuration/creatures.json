@@ -1297,10 +1297,10 @@
         },
         "Zena": {
             "name": "Zena",
-            "hp": 58,
+            "hp": 55,
             "steps": 4.7,
             "speed": 4,
-            "armor": 15,
+            "armor": 17,
             "attack_type": "RANGE",
             "attack": 24,
             "attack_damage_min": 19,
