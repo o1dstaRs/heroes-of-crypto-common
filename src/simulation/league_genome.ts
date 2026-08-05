@@ -17,6 +17,18 @@ import {
     DEFAULT_DRAFT_W,
     eligibleBacklineProtectorChoices,
 } from "../ai/setup/creature_score";
+import {
+    applyRankedDraftInteractionOverlay,
+    isRankedDraftInteractionPrior,
+    rankedDraftBundleInteractionAffinity,
+    rankedDraftInteractionAffinity,
+    type RankedDraftInteractionPriorId,
+} from "../ai/setup/draft_interaction_prior";
+import {
+    isRankedDraftVarietyPolicy,
+    pickRankedDraftVarietyCreature,
+    type RankedDraftVarietyPolicyId,
+} from "../ai/setup/draft_variety";
 import { TIER1_ARTIFACT_WINRATE, TIER2_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import {
     getKnownOpponentCreatures,
@@ -153,6 +165,16 @@ export interface ILeagueGenome {
      * historical draft bytes while new-creature training can match ranked's protector eligibility.
      */
     backlineProtectorDraftSafety?: boolean;
+    /** Optional, versioned evidence overlay. Omitted means the historical scorer remains exact. */
+    draftInteractionPrior?: RankedDraftInteractionPriorId;
+    /** Optional, score-bounded public-context variety selector. Omitted retains the historical argmax. */
+    draftVarietyPolicy?: RankedDraftVarietyPolicyId;
+}
+
+export interface ILeagueGenomeOptions {
+    backlineProtectorDraftSafety?: boolean;
+    draftInteractionPrior?: RankedDraftInteractionPriorId;
+    draftVarietyPolicy?: RankedDraftVarietyPolicyId;
 }
 
 export interface ILeagueAugment {
@@ -181,16 +203,26 @@ export function createLeagueGenome(
     id: string,
     weights: readonly number[] = LEAGUE_ANCHOR_GENOME,
     omniscientDraft: boolean = false,
+    options: ILeagueGenomeOptions = {},
 ): ILeagueGenome {
     assertLeagueWeights(weights);
     if (!id.trim()) {
         throw new TypeError("League genome id must not be empty");
+    }
+    if (options.draftInteractionPrior !== undefined && !isRankedDraftInteractionPrior(options.draftInteractionPrior)) {
+        throw new TypeError(`Unsupported ranked draft interaction prior ${String(options.draftInteractionPrior)}`);
+    }
+    if (options.draftVarietyPolicy !== undefined && !isRankedDraftVarietyPolicy(options.draftVarietyPolicy)) {
+        throw new TypeError(`Unsupported ranked draft variety policy ${String(options.draftVarietyPolicy)}`);
     }
     return {
         schemaVersion: LEAGUE_SCHEMA_VERSION,
         id,
         weights: [...weights],
         ...(omniscientDraft ? { omniscientDraft: true } : {}),
+        ...(options.backlineProtectorDraftSafety ? { backlineProtectorDraftSafety: true } : {}),
+        ...(options.draftInteractionPrior ? { draftInteractionPrior: options.draftInteractionPrior } : {}),
+        ...(options.draftVarietyPolicy ? { draftVarietyPolicy: options.draftVarietyPolicy } : {}),
     };
 }
 
@@ -290,6 +322,34 @@ export function pickLeagueBundle(state: IPickSimState, team: PickTeam, genome: I
     const view = getPickTeamView(state, team);
     const own = teamState(state, team).creatures;
     const opponent = leagueOpponentCreatures(state, team, !!genome.omniscientDraft);
+    if (isRankedDraftInteractionPrior(genome.draftInteractionPrior)) {
+        const baseScores = view.bundles.map(([level1, level2, artifact]) => {
+            const bundleOwn = [...own, level1, level2];
+            return (
+                scoreLeagueCreature(level1, bundleOwn, opponent, genome.weights) +
+                scoreLeagueCreature(level2, bundleOwn, opponent, genome.weights) +
+                artifactHeadWeight(genome.weights, LEAGUE_GENOME_LAYOUT.tier1, artifact)
+            );
+        });
+        const scores = applyRankedDraftInteractionOverlay(
+            baseScores,
+            view.bundles.map(([level1, level2]) =>
+                rankedDraftBundleInteractionAffinity([level1, level2], {
+                    ownCreatureIds: own,
+                    knownOpponentCreatureIds: opponent,
+                }),
+            ),
+        );
+        let bestIndex: 0 | 1 = 0;
+        let bestScore = -Infinity;
+        scores.forEach((score, index) => {
+            if (score > bestScore) {
+                bestScore = score;
+                bestIndex = index as 0 | 1;
+            }
+        });
+        return bestIndex;
+    }
     let bestIndex: 0 | 1 = 0;
     let bestScore = -Infinity;
     view.bundles.forEach((bundle: PickBundle, index) => {
@@ -316,10 +376,31 @@ export function pickLeagueCreature(state: IPickSimState, team: PickTeam, genome:
     const choices = genome.backlineProtectorDraftSafety
         ? eligibleBacklineProtectorChoices(visibleChoices, own, opponent)
         : visibleChoices;
+    const baseScores = choices.map((creatureId) => scoreLeagueCreature(creatureId, own, opponent, genome.weights));
+    const scores = isRankedDraftInteractionPrior(genome.draftInteractionPrior)
+        ? applyRankedDraftInteractionOverlay(
+              baseScores,
+              choices.map((creatureId) =>
+                  rankedDraftInteractionAffinity(creatureId, {
+                      ownCreatureIds: own,
+                      knownOpponentCreatureIds: opponent,
+                  }),
+              ),
+          )
+        : baseScores;
+    if (isRankedDraftVarietyPolicy(genome.draftVarietyPolicy)) {
+        return (
+            pickRankedDraftVarietyCreature(choices, scores, {
+                ownCreatureIds: own,
+                knownOpponentCreatureIds: opponent,
+                tier1ArtifactId: teamState(state, team).tier1Artifact,
+            }) ?? 0
+        );
+    }
     let best = choices[0] ?? 0;
     let bestScore = -Infinity;
-    for (const creatureId of choices) {
-        const score = scoreLeagueCreature(creatureId, own, opponent, genome.weights);
+    for (const [index, creatureId] of choices.entries()) {
+        const score = scores[index];
         if (score > bestScore) {
             bestScore = score;
             best = creatureId;

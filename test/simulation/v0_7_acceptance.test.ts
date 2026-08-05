@@ -122,6 +122,7 @@ function tournamentSummary(
         a: { version: candidate, wins: candidateWins, winsAsGreen: 0, winsAsRed: 0 },
         b: { version: opponent, wins: opponentWins, winsAsGreen: 0, winsAsRed: 0 },
         draws,
+        rawWinRateA: records.length > 0 ? candidateWins / records.length : 0,
         winRateA: candidateWins + opponentWins > 0 ? candidateWins / (candidateWins + opponentWins) : 0.5,
         avgLaps: 4,
         endReasons: {},

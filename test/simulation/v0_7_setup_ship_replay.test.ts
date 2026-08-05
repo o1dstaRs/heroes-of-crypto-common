@@ -136,7 +136,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned for the Abomination buff (hp 550 -> 600, armor 46 -> 48): the tank's added durability
 // re-values seeded setups and every exchange it appears in. Two isolated runs produced this
 // byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "954a075e4674723990fa0410bb9c8e80a43e54b297a9a75a4ce7d76076a70147";
+// Re-pinned after the fair, own-roster-only draft-coherence overlay landed. It changes the seeded
+// production draft selections while preserving the resolver's deterministic replay contract.
+// Re-pinned for the Trent buff (hp 29 -> 31, armor 19 -> 20, attack 21 -> 22): the sturdier L2
+// re-values every seeded exchange it appears in. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "f648dc80fdbacf3b1c37703a23ab7f17cebe937e784f3aa6ceaaf2c6863c3d79";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

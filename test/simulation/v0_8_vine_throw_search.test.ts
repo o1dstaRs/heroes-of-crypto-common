@@ -17,7 +17,7 @@ import { runMatch } from "../../src/simulation/battle_engine";
 import { withScopedAIEnvironment } from "../../src/simulation/v0_8_a13_search";
 
 describe("v0.8 a13 Vine Throw search coverage", () => {
-    it("keeps one legal Vine Throw beside the ordinary top challenger at shortlist two", () => {
+    it("keeps one legal Vine Throw beside the ordinary top challengers at shortlist three", () => {
         const scored: Array<readonly IEnumeratedCandidate[]> = [];
         withScopedAIEnvironment(buildV08A13SearchEnvironment(), () =>
             runMatch({
@@ -42,9 +42,9 @@ describe("v0.8 a13 Vine Throw search coverage", () => {
         expect(scored[0].some((candidate) => candidate.kind === "spell" && candidate.spellName === "Vine Throw")).toBe(
             true,
         );
-        // shortlist=2 normally means incumbent + one challenger. The reserved Vine is additive so the best
-        // ordinary challenger is not silently displaced. The exact move-melee duplicate is now enriched into
+        // shortlist=3 normally means incumbent + two challengers. The reserved Vine is additive so the best
+        // ordinary challengers are not silently displaced. The exact move-melee duplicate is now enriched into
         // the incumbent rather than repeated as a separate melee candidate.
-        expect(scored[0]).toHaveLength(3);
+        expect(scored[0]).toHaveLength(4);
     });
 });

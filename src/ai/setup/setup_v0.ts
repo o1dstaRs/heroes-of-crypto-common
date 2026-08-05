@@ -17,6 +17,7 @@ import {
     eligibleBacklineProtectorChoices,
     scoreCreature,
 } from "./creature_score";
+import { pickCoherentDraftBundle, pickCoherentDraftCreature } from "./draft_coherence";
 import {
     AUGMENT_PRIORITY,
     BEST_SYNERGY_BY_FACTION,
@@ -41,51 +42,59 @@ const bestBy = <T>(items: readonly T[], score: (item: T) => number): T | undefin
 
 /**
  * Heuristic setup policy v0 — the first server-authoritative "AI does the full draft/setup". Every choice is
- * grounded in the sim measurements (measure_artifacts.ts / measure_setup.ts): pick the highest-win-rate
- * artifact from what's offered, the measured-best synergy per fielded faction, spend the augment budget on the
- * universally-strong Armor/Might augments, take the max-budget doctrine (vision isn't the lever here — the
+ * grounded in the sim measurements (measure_artifacts.ts / measure_setup.ts): combine measured artifact value
+ * with coherent army-building, pick the measured-best synergy per fielded faction, spend the augment budget on
+ * the universally-strong Armor/Might augments, take the max-budget doctrine (vision isn't the lever here — the
  * upgrade points are), and score creatures by the shared draft heuristic. Deterministic and vectorizable so a
  * later CEM pass can learn these tables/weights.
  */
+export interface ISetupPolicyV0Options {
+    /** Disable only the post-score draft overlay to reproduce the exact pre-coherence picks for rollback. */
+    draftCoherence?: boolean;
+}
+
 export class SetupPolicyV0 implements ISetupPolicy {
     public readonly version: string = "setup-v0";
+    private readonly draftCoherence: boolean;
+    public constructor(options: Readonly<ISetupPolicyV0Options> = {}) {
+        this.draftCoherence = options.draftCoherence !== false;
+    }
     /** Max upgrade-point budget among the real doctrines (SEE_NONE = 7) so the AI can afford Armor L3 + Might
      * L3. Vision isn't modelled/decisive here; the points are. */
     public pickPerk(): number {
         return Perk.SEE_NONE;
     }
     public pickBundle(bundles: readonly (readonly [number, number, number])[]): number {
-        if (!bundles.length) {
-            return 0;
+        if (!this.draftCoherence) {
+            return (
+                bestBy(
+                    bundles.map((bundle, index) => ({ bundle, index })),
+                    ({ bundle: [level1, level2, artifactId] }) =>
+                        scoreCreature(level1) + scoreCreature(level2) + (TIER1_ARTIFACT_WINRATE[artifactId] ?? 50),
+                )?.index ?? 0
+            );
         }
-        let bestIdx = 0;
-        let bestScore = -Infinity;
-        bundles.forEach(([l1, l2, t1], idx) => {
-            const score = scoreCreature(l1) + scoreCreature(l2) + (TIER1_ARTIFACT_WINRATE[t1] ?? 50);
-            if (score > bestScore) {
-                bestScore = score;
-                bestIdx = idx;
-            }
-        });
-        return bestIdx;
+        return pickCoherentDraftBundle(
+            bundles,
+            scoreCreature,
+            (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+        );
     }
     public pickCreature(
         _level: number,
         available: readonly number[],
         ownCreatureIds: readonly number[],
         knownOpponentCreatureIds: readonly number[],
+        tier1ArtifactId?: number,
     ): number {
         const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
-        return (
-            bestBy(eligible, (id) =>
-                applyCreatureRoleFitMultiplier(
-                    scoreCreature(id),
-                    creatureRoleFitMultiplier(id, ownCreatureIds, knownOpponentCreatureIds),
-                ),
-            ) ??
-            available[0] ??
-            0
-        );
+        const baseScore = (id: number): number =>
+            applyCreatureRoleFitMultiplier(
+                scoreCreature(id),
+                creatureRoleFitMultiplier(id, ownCreatureIds, knownOpponentCreatureIds),
+            );
+        if (!this.draftCoherence) return bestBy(eligible, baseScore) ?? available[0] ?? 0;
+        return pickCoherentDraftCreature(eligible, baseScore, { ownCreatureIds, tier1ArtifactId }) ?? available[0] ?? 0;
     }
     public pickArtifactT2(offered: readonly number[]): number {
         return bestBy(offered, (id) => TIER2_ARTIFACT_WINRATE[id] ?? 0) ?? offered[0] ?? 0;
@@ -135,3 +144,6 @@ export class SetupPolicyV0 implements ISetupPolicy {
 
 /** Shared singleton — the policy is stateless. */
 export const SETUP_POLICY_V0 = new SetupPolicyV0();
+
+/** Exact pre-coherence draft behavior used only by the ranked operational rollback. */
+export const SETUP_POLICY_V0_DRAFT_ROLLBACK = new SetupPolicyV0({ draftCoherence: false });

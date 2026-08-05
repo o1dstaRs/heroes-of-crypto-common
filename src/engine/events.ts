@@ -20,6 +20,8 @@ export interface IGameAnimationEvent {
     bodyUnitId?: string;
 }
 
+export type GameEventMode = "full" | "headless";
+
 export type GameEvent =
     | { type: "fight_started"; lowerUnitsAlive: number; upperUnitsAlive: number }
     | { type: "turn_completed"; unitId: string; team: TeamType; hourglass: boolean }
@@ -227,3 +229,14 @@ export type GameEvent =
           unitsDied: number;
       }
     | { type: "fight_finished"; winningTeam: TeamType };
+
+export function isHeadlessSimulationEvent(event: GameEvent): boolean {
+    return (
+        event.type === "turn_completed" ||
+        event.type === "next_unit_selected" ||
+        event.type === "fight_finished" ||
+        event.type === "unit_destroyed" ||
+        event.type === "armageddon_applied" ||
+        event.type === "unit_skipped"
+    );
+}

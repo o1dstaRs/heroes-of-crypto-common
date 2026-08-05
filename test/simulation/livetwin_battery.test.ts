@@ -47,6 +47,7 @@ const summary = (winsA: number, winsB: number, draws = 0): ITournamentSummary =>
     a: { version: "v0.6", wins: winsA, winsAsGreen: Math.ceil(winsA / 2), winsAsRed: Math.floor(winsA / 2) },
     b: { version: "v0.4", wins: winsB, winsAsGreen: Math.ceil(winsB / 2), winsAsRed: Math.floor(winsB / 2) },
     draws,
+    rawWinRateA: winsA + winsB + draws > 0 ? winsA / (winsA + winsB + draws) : 0,
     winRateA: winsA + winsB > 0 ? winsA / (winsA + winsB) : 0.5,
     avgLaps: 8,
     endReasons: { elimination: winsA + winsB + draws },

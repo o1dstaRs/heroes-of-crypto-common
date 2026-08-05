@@ -128,6 +128,8 @@ export interface IV08PassiveTurnPanelOptions {
      * to preserve the exact candidate environment they already installed.
      */
     inheritCandidateEnvironment?: boolean;
+    /** Defaults true for this offline panel; false only when the panel is explicitly testing live watchdogs. */
+    searchOfflineDeterministicWork?: boolean;
     maxLaps?: number;
     /** Defaults 250 for the 4,096-game qualification panel. */
     minCreatureAppearances?: number;
@@ -1046,6 +1048,7 @@ export function runV08PassiveTurnPanelGame(
         seed: plan.seed,
         gridType: plan.mapType,
         maxLaps: options.maxLaps,
+        searchOfflineDeterministicWork: options.searchOfflineDeterministicWork ?? true,
         greenPerk: setup?.perk,
         redPerk: setup?.perk,
         greenAugments: setup?.augments,

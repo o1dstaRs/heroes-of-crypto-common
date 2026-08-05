@@ -15,6 +15,7 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import { extractValueFeatures, VALUE_FEATURE_NAMES } from "../../simulation/value_features";
 import type { Unit } from "../../units/unit";
+import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
 import type { UnitsHolder } from "../../units/units_holder";
 import type { IDecisionContext } from "../ai_strategy";
 
@@ -551,6 +552,8 @@ const v2Slot: { raw: string | undefined | null; resolved: IWaitWeights | "disabl
     raw: null,
     resolved: null,
 };
+export const V07_WAIT_WEIGHTS_V2_VERSIONS_ENV = "V07_WAIT_WEIGHTS_V2_VERSIONS";
+export const V07_WAIT_WEIGHTS_V2_GRIDS_ENV = "V07_WAIT_WEIGHTS_V2_GRIDS";
 export function v07WaitWeightsV2(): IWaitWeights | "disabled" | null {
     const raw = process.env.V07_WAIT_WEIGHTS_V2;
     if (raw !== v2Slot.raw) {
@@ -559,6 +562,24 @@ export function v07WaitWeightsV2(): IWaitWeights | "disabled" | null {
         v2Slot.resolved = parsed ? (parsed.b === 0 && parsed.w.every((x) => x === 0) ? "disabled" : parsed) : null;
     }
     return v2Slot.resolved;
+}
+
+/** Preserve the historical all-version behavior when no scope is supplied, while enabling clean seat A/Bs. */
+export function v07WaitWeightsV2ForVersion(version: string): IWaitWeights | "disabled" | null {
+    return strategyVersionMatchesExperimentScope(version, process.env[V07_WAIT_WEIGHTS_V2_VERSIONS_ENV])
+        ? v07WaitWeightsV2()
+        : null;
+}
+
+/** An absent scope preserves the historical all-map experiment; an empty or malformed scope fails closed. */
+export function v07WaitWeightsV2SupportsGrid(gridType: number): boolean {
+    const raw = process.env[V07_WAIT_WEIGHTS_V2_GRIDS_ENV];
+    if (raw === undefined) return true;
+    return raw
+        .split(",")
+        .map((value) => Number(value.trim()))
+        .filter((value) => Number.isInteger(value))
+        .includes(gridType);
 }
 
 /** Parse {b, w[WAIT_FEATURE_NAMES_V3.length]} -- malformed/absent => null. */

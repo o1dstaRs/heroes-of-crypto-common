@@ -25,6 +25,7 @@ import {
     isMeleeMagicAnchorArmy,
     shouldUseArchetypePlacementAnchor,
     StrategyV0_7,
+    v07WaitWeightsV2SupportsInitialRangedCount,
 } from "../../src/ai/versions/v0_7";
 import {
     applyWaitScorerWeights,
@@ -53,6 +54,7 @@ const ENV_KEYS = [
     "V07_WAIT_SCORER",
     "V07_WAIT_WEIGHTS",
     "V07_WAIT_WEIGHTS_V2",
+    "V07_WAIT_WEIGHTS_V2_MAX_INITIAL_RANGED",
     "V07_WAIT_WEIGHTS_V3",
     "V07_WAIT_WEIGHTS_B",
     "V07_WAIT_VERSIONS",
@@ -163,6 +165,17 @@ describe("v0.7 registry", () => {
 });
 
 describe("v0.7 baked weight resolution", () => {
+    it("scopes V2 by initial ranged count and fails closed on malformed limits", () => {
+        expect(v07WaitWeightsV2SupportsInitialRangedCount(6)).toBe(true);
+        process.env.V07_WAIT_WEIGHTS_V2_MAX_INITIAL_RANGED = "1";
+        expect(v07WaitWeightsV2SupportsInitialRangedCount(1)).toBe(true);
+        expect(v07WaitWeightsV2SupportsInitialRangedCount(2)).toBe(false);
+        process.env.V07_WAIT_WEIGHTS_V2_MAX_INITIAL_RANGED = "";
+        expect(v07WaitWeightsV2SupportsInitialRangedCount(0)).toBe(false);
+        process.env.V07_WAIT_WEIGHTS_V2_MAX_INITIAL_RANGED = "bad";
+        expect(v07WaitWeightsV2SupportsInitialRangedCount(0)).toBe(false);
+    });
+
     it("defaults to the committed DISTILLED_WAIT_WEIGHTS_2026_07_10 with no env and no gate", () => {
         expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
         // The env-gated pattern's gate is NOT consulted — v0.7's scorer is always armed.

@@ -28,6 +28,8 @@ import {
     parseWaitWeightsV2,
     parseWaitWeightsV3,
     v07WaitWeightsV2,
+    v07WaitWeightsV2ForVersion,
+    v07WaitWeightsV2SupportsGrid,
     v07WaitWeightsV3,
     WAIT_FEATURE_NAMES,
     WAIT_FEATURE_NAMES_V2,
@@ -65,6 +67,8 @@ const ENV_KEYS = [
     "V07_WAIT_VERSIONS_B",
     "V07_WAIT_GUARD",
     "V07_WAIT_WEIGHTS_V2",
+    "V07_WAIT_WEIGHTS_V2_VERSIONS",
+    "V07_WAIT_WEIGHTS_V2_GRIDS",
     "V07_WAIT_WEIGHTS_V3",
 ] as const;
 const savedEnv: Record<string, string | undefined> = {};
@@ -444,6 +448,32 @@ describe("wait scorer V2 (Phase-B multi-cohort env candidate)", () => {
         expect(resolved).not.toBe("disabled");
         setEnv({ V07_WAIT_WEIGHTS_V2: "garbage" });
         expect(v07WaitWeightsV2()).toBeNull();
+    });
+
+    it("scopes V2 weights to one strategy alias without changing the absent-scope contract", () => {
+        setEnv({ V07_WAIT_WEIGHTS_V2: biasOnlyV2(0.25) });
+        expect(v07WaitWeightsV2ForVersion("v0.8")).not.toBeNull();
+        expect(v07WaitWeightsV2ForVersion("v0.8s")).not.toBeNull();
+
+        setEnv({
+            V07_WAIT_WEIGHTS_V2: biasOnlyV2(0.25),
+            V07_WAIT_WEIGHTS_V2_VERSIONS: "v0.8",
+        });
+        expect(v07WaitWeightsV2ForVersion("v0.8")).not.toBeNull();
+        expect(v07WaitWeightsV2ForVersion("v0.8s")).toBeNull();
+    });
+
+    it("scopes V2 to declared grids and fails closed on an empty or malformed map scope", () => {
+        setEnv({});
+        expect(v07WaitWeightsV2SupportsGrid(PBTypes.GridVals.BLOCK_CENTER)).toBe(true);
+        setEnv({ V07_WAIT_WEIGHTS_V2_GRIDS: String(PBTypes.GridVals.NORMAL) });
+        expect(v07WaitWeightsV2SupportsGrid(PBTypes.GridVals.NORMAL)).toBe(true);
+        expect(v07WaitWeightsV2SupportsGrid(PBTypes.GridVals.LAVA_CENTER)).toBe(false);
+        expect(v07WaitWeightsV2SupportsGrid(PBTypes.GridVals.BLOCK_CENTER)).toBe(false);
+        setEnv({ V07_WAIT_WEIGHTS_V2_GRIDS: "" });
+        expect(v07WaitWeightsV2SupportsGrid(PBTypes.GridVals.NORMAL)).toBe(false);
+        setEnv({ V07_WAIT_WEIGHTS_V2_GRIDS: "not-a-grid" });
+        expect(v07WaitWeightsV2SupportsGrid(PBTypes.GridVals.NORMAL)).toBe(false);
     });
 
     it("V2 stage fires for a RANGE actor at z > 0 — the v1 training-support guard does NOT apply", () => {

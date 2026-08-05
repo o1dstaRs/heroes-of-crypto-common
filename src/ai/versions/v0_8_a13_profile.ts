@@ -24,17 +24,15 @@ export const V08_A13_PRODUCTION_VERSION = "v0.8" as const;
 export const V08_A13_OPPONENT_VERSION = "v0.7" as const;
 export const V08_A13_SOURCE_COMMIT = "80059c9f34d918285eeb996589c9e3335efc240a" as const;
 export const V08_A13_SOURCE_TREE = "b72339469be9b2b5a950e0844da31805d4da3a23" as const;
-// Fingerprint of the genome this file actually ships, so the pin stays a real tamper check. The
-// 2026-07-21 campaign originally selected shortlist=3, whose fingerprint was
-// a46ac7ef0c18da1f3fb3b82a3fc1cd53e5565747d4d1673ac5340af5bf92ba49; the 2026-07-23 shortlist tuning
-// below re-fingerprinted it. Campaign provenance lives in V08_A13_SOURCE_COMMIT/_TREE above.
-export const V08_A13_GENOME_SHA256 = "25331ab6910440daa8a21ac81bfd4a452df2e2281c829fd735fedfda354d7362" as const;
+// Fingerprint of the exact campaign genome this file ships. Campaign provenance lives in
+// V08_A13_SOURCE_COMMIT/_TREE above.
+export const V08_A13_GENOME_SHA256 = "a46ac7ef0c18da1f3fb3b82a3fc1cd53e5565747d4d1673ac5340af5bf92ba49" as const;
 export const V08_A13_SOURCE_BINDING_SHA256 =
     "e68485b177e98f4fb98228a6595e29b08c50726ef4882ee44ea53652a4613459" as const;
 export const V08_A13_SOURCE_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "fd9fa86ba7c80196d4509a9dbb955b4dd0aa20341c24dbd6518032fd77a0d04e" as const;
+    "206010abe73f94ee489dfb4363f46a2dac4339b5280dc302b98bcc7dd72f21ae" as const;
 export const V08_A13_PRODUCTION_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "d86c65e7fa028654f19bd64f844e2b964621f0a1196612cc45f3d9e1a1aea445" as const;
+    "76973c361a5d08650e09e86e6ed53139d2717811c5849f160b05b6e564c9cae0" as const;
 
 export const V08_A13_VALUE_LEAF = Object.freeze({
     b: 0.06534069459644987,
@@ -64,7 +62,7 @@ export const V08_A13_SEARCH = Object.freeze({
     maxShots: 4,
     maxThrows: 2,
     activeChallengers: true,
-    shortlist: 2,
+    shortlist: 3,
     decisionDeadlineMs: 175,
     waitDeadlinePolicy: "operation_bounded" as const,
     circuitBreakerMs: 275,
@@ -81,12 +79,7 @@ export const V08_A13_POLICY = Object.freeze({
     aggressive: true,
 });
 
-/**
- * Campaign genome with `controls.shortlist` tuned from the campaign's 3 down to 2 on 2026-07-23:
- * a head-to-head vs full search (1200 fights, both seat-ways) measured 49.7% ±2.8% — no strength loss —
- * while running ~27% faster (the shortlist effect saturates; the top-2 candidates almost always already
- * contain the best move). V08_A13_GENOME_SHA256 was regenerated for this tuned genome.
- */
+/** Canonical campaign genome; its fingerprint must equal V08_A13_GENOME_SHA256. */
 export const V08_A13_GENOME = Object.freeze({
     search: Object.freeze({
         leafMode: "model" as const,
@@ -127,6 +120,14 @@ export function buildV08A13SearchEnvironment(
         Q2_ORACLE: "0",
         Q2_WAIT_ABLATION: "0",
         SEARCH_ACTIVE_CHALLENGERS: "1",
+        SEARCH_A19_ABOMINATION_MIRROR_RELEASE: undefined,
+        SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE: undefined,
+        SEARCH_A19_EXACT_TERMINAL_RESULTS: undefined,
+        SEARCH_A19_FAST_FLYER_COHESION: undefined,
+        SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: undefined,
+        SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE: undefined,
+        SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY: undefined,
+        SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES: undefined,
         SEARCH_AUDIT: "0",
         SEARCH_AUDIT_TURNS: "0",
         SEARCH_CHALLENGER_KINDS: undefined,

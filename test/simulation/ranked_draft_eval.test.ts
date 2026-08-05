@@ -14,6 +14,8 @@ import { SETUP_POLICY_V0 } from "../../src/ai/setup/setup_v0";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { IMatchConfig, IMatchResult } from "../../src/simulation/battle_engine";
 import { LEAGUE_ANCHOR_GENOME, LEAGUE_GENOME_LAYOUT } from "../../src/simulation/league_genome";
+import { RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../../src/ai/setup/draft_interaction_prior";
+import { RANKED_DRAFT_VARIETY_POLICY_ID } from "../../src/ai/setup/draft_variety";
 import {
     normalizeRankedDraftGenome,
     permuteRankedDraftSeed,
@@ -22,6 +24,8 @@ import {
     rankedDraftBehaviorTraceSha256,
     RANKED_DRAFT_COHORT_DEFINITIONS,
     rankedDraftCurrentIncumbent,
+    rankedDraftInteractionPriorCandidate,
+    rankedDraftVersatileCandidate,
     evaluateRankedDraftTasks,
     inspectRankedDraftBoard,
     resolveRankedDraftPick,
@@ -110,6 +114,22 @@ describe("exact ranked draft evaluator", () => {
         );
     });
 
+    it("preserves opt-in interaction and variety metadata through ranked normalization", () => {
+        const incumbent = rankedDraftCurrentIncumbent();
+        const interactionCandidate = rankedDraftInteractionPriorCandidate();
+        const versatileCandidate = rankedDraftVersatileCandidate();
+        const interactionNormalized = normalizeRankedDraftGenome(interactionCandidate);
+        const versatileNormalized = normalizeRankedDraftGenome(versatileCandidate);
+        expect(interactionCandidate.weights).toEqual(incumbent.weights);
+        expect(interactionNormalized.draftInteractionPrior).toBe(RANKED_DRAFT_INTERACTION_PRIOR_ID);
+        expect(interactionNormalized.weights).toEqual(incumbent.weights);
+        expect(versatileNormalized.draftInteractionPrior).toBe(RANKED_DRAFT_INTERACTION_PRIOR_ID);
+        expect(versatileNormalized.draftVarietyPolicy).toBe(RANKED_DRAFT_VARIETY_POLICY_ID);
+        expect(versatileNormalized.weights).toEqual(incumbent.weights);
+        expect(incumbent.draftInteractionPrior).toBeUndefined();
+        expect(incumbent.draftVarietyPolicy).toBeUndefined();
+    });
+
     it("uses a collision-free uint32 seed permutation", () => {
         const values = Array.from({ length: 100_000 }, (_, index) => permuteRankedDraftSeed(91_000_000 + index));
         expect(new Set(values).size).toBe(values.length);
@@ -180,9 +200,12 @@ describe("exact ranked draft evaluator", () => {
         expect(new Set(records.map((record) => record.battleSeed)).size).toBe(1);
         expect(records.map((record) => record.candidateResult)).toEqual(["win", "loss", "loss", "win"]);
         expect(records.every((record) => /^[0-9a-f]{64}$/.test(record.behaviorTraceSha256))).toBeTrue();
-        expect(configs[1].roster).toEqual(configs[0].redRoster);
+        const firstRedRoster = configs[0].redRoster;
+        const thirdRedRoster = configs[2].redRoster;
+        if (!firstRedRoster || !thirdRedRoster) throw new Error("Mirrored config omitted an opposing roster");
+        expect(configs[1].roster).toEqual(firstRedRoster);
         expect(configs[1].redRoster).toEqual(configs[0].roster);
-        expect(configs[3].roster).toEqual(configs[2].redRoster);
+        expect(configs[3].roster).toEqual(thirdRedRoster);
         expect(configs[3].redRoster).toEqual(configs[2].roster);
     });
 

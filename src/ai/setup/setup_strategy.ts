@@ -40,12 +40,13 @@ export interface ITier2ArtifactDecisionContext extends ISetupDecisionContextBase
 }
 
 /**
- * Fair information available during placement. Both final rosters and the selected map are public, while
- * opponent placement, stack sizes, setup choices, and live engine objects remain outside this boundary.
+ * Fair information available during placement. A mode may keep the opponent roster partial during its private
+ * Setup sub-stage; Board placement exposes the completed roster. Opponent placement, stack sizes, setup choices,
+ * and live engine objects remain outside this boundary in either case.
  */
 export interface IPlacementSetupDecisionContext extends ISetupDecisionContextBase {
     readonly decisionPhase: "placement";
-    readonly opponentRosterVisibility: "complete";
+    readonly opponentRosterVisibility: "partial" | "complete";
     /** Public map topology selected for this match. */
     readonly gridType: GridType;
     /** Number of cells along one side of the square combat grid. */
@@ -67,7 +68,10 @@ type Tier2ArtifactDecisionContextInput = Omit<
 type PlacementSetupDecisionContextInput = Omit<
     IPlacementSetupDecisionContext,
     "decisionPhase" | "opponentRosterVisibility"
->;
+> & {
+    /** Omitted for the ordinary public-placement contract; private Setup must opt into the partial marker. */
+    readonly opponentRosterVisibility?: IPlacementSetupDecisionContext["opponentRosterVisibility"];
+};
 
 const freezePublicSetupFields = (context: ISetupDecisionContextBase): Readonly<ISetupDecisionContextBase> =>
     Object.freeze({
@@ -89,14 +93,14 @@ export const createTier2ArtifactDecisionContext = (
         opponentRosterVisibility: "partial",
     });
 
-/** Construct the complete public-roster context used after the ranked draft reaches placement. */
+/** Construct placement context, defaulting to the complete public roster used once Board placement is visible. */
 export const createPlacementSetupDecisionContext = (
     context: PlacementSetupDecisionContextInput,
 ): Readonly<IPlacementSetupDecisionContext> =>
     Object.freeze({
         ...freezePublicSetupFields(context),
         decisionPhase: "placement",
-        opponentRosterVisibility: "complete",
+        opponentRosterVisibility: context.opponentRosterVisibility ?? "complete",
         gridType: context.gridType,
         gridSize: context.gridSize,
     });
@@ -117,13 +121,15 @@ export interface ISetupPolicy {
     pickBundle(bundles: readonly (readonly [number, number, number])[]): number;
     /**
      * Best creature id of the required level from the legal pool. `ownCreatureIds` is the acting seat's
-     * already-public own roster, so role-dependent choices never need hidden opponent information.
+     * already-public own roster, so role-dependent choices never need hidden opponent information. The
+     * optional artifact is the acting seat's own Tier-1 pick and keeps older policy callers compatible.
      */
     pickCreature(
         level: number,
         available: readonly number[],
         ownCreatureIds: readonly number[],
         knownOpponentCreatureIds: readonly number[],
+        tier1ArtifactId?: number,
     ): number;
     /** Best Tier-2 artifact id from the offered set. */
     pickArtifactT2(offered: readonly number[]): number;

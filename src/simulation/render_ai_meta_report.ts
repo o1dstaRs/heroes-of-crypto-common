@@ -111,6 +111,22 @@ export interface IRenderAiMetaReportOptions {
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPOSITORY_ROOT = resolve(MODULE_DIR, "../../../..");
 
+const isRepositoryRoot = (root: string): boolean =>
+    existsSync(resolve(root, "game/core")) && existsSync(resolve(root, "site/public/assets/images"));
+
+export function resolveAiMetaReportRepositoryRoot(summaryPath: string): string {
+    const configuredRoot = process.env.HOC_CLIENT_ROOT;
+    if (configuredRoot && isRepositoryRoot(resolve(configuredRoot))) return resolve(configuredRoot);
+
+    let candidate = dirname(resolve(summaryPath));
+    while (true) {
+        if (isRepositoryRoot(candidate)) return candidate;
+        const parent = dirname(candidate);
+        if (parent === candidate) return DEFAULT_REPOSITORY_ROOT;
+        candidate = parent;
+    }
+}
+
 const isRecord = (value: unknown): value is UnknownRecord =>
     !!value && typeof value === "object" && !Array.isArray(value);
 
@@ -755,7 +771,7 @@ export function main(argv: readonly string[] = process.argv.slice(2)): void {
           ? `${summaryPath.slice(0, -5)}.html`
           : `${summaryPath}.html`;
     const parsed = JSON.parse(readFileSync(summaryPath, "utf8")) as unknown;
-    const html = renderAiMetaReport(parsed);
+    const html = renderAiMetaReport(parsed, { repositoryRoot: resolveAiMetaReportRepositoryRoot(summaryPath) });
     mkdirSync(dirname(outputPath), { recursive: true });
     writeFileSync(outputPath, html);
     console.log(`AI meta report -> ${outputPath}`);

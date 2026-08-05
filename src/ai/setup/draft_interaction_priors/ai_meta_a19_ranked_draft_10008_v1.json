@@ -1,0 +1,158 @@
+{
+    "schemaVersion": 1,
+    "id": "ai-meta-a19-ranked-draft-10008-v1",
+    "source": {
+        "sourceSha256": "b35f9fb1bbedff9710643709a1390d3332a706f865c85ca52ef77cc5de302a83",
+        "sourceRelativePath": "sim-out/ai-meta-v0_8-a19-h18-head-70056-total-all-cohorts-2026-08-04T04-42-40-319Z/ranked-draft.pairs.jsonl.gz",
+        "generatedAt": "2026-08-04T09:42:30.768Z",
+        "matchupPairs": 5004,
+        "games": 10008,
+        "cohorts": ["ranked-draft"],
+        "maps": [1, 3, 4]
+    },
+    "selection": {
+        "allyPair": {
+            "minimumSupport": 50,
+            "minimumAbsoluteConfidencePp": 2
+        },
+        "counter": {
+            "minimumSupport": 50,
+            "minimumAbsoluteConfidencePp": 2
+        },
+        "allyTrio": {
+            "minimumSupport": 150,
+            "minimumConfidencePp": 4
+        }
+    },
+    "allyPairs": [
+        {
+            "units": ["Abomination", "Berserker"],
+            "support": 296,
+            "conservativeLiftPp": -3.0119325614815735
+        },
+        {
+            "units": ["Arbalester", "Black Dragon"],
+            "support": 69,
+            "conservativeLiftPp": 5.150394942496522
+        },
+        {
+            "units": ["Berserker", "Wolf Rider"],
+            "support": 240,
+            "conservativeLiftPp": 2.8458349445253925
+        },
+        {
+            "units": ["Griffin", "Harpy"],
+            "support": 94,
+            "conservativeLiftPp": -2.718962416084784
+        },
+        {
+            "units": ["Harpy", "Troll"],
+            "support": 115,
+            "conservativeLiftPp": -5.899366280357498
+        },
+        {
+            "units": ["White Tiger", "Wyvern"],
+            "support": 54,
+            "conservativeLiftPp": 2.690892380244028
+        }
+    ],
+    "counters": [
+        {
+            "unit": "Abomination",
+            "enemyUnit": "Arbalester",
+            "support": 72,
+            "conservativeLiftPp": -4.914025447022054
+        },
+        {
+            "unit": "Abomination",
+            "enemyUnit": "Battle Mage",
+            "support": 104,
+            "conservativeLiftPp": -3.9035902348726497
+        },
+        {
+            "unit": "Abomination",
+            "enemyUnit": "Black Dragon",
+            "support": 1190,
+            "conservativeLiftPp": -2.668268254244122
+        },
+        {
+            "unit": "Abomination",
+            "enemyUnit": "Blacksmith",
+            "support": 322,
+            "conservativeLiftPp": -2.253679425038853
+        },
+        {
+            "unit": "Arbalester",
+            "enemyUnit": "Abomination",
+            "support": 72,
+            "conservativeLiftPp": 4.914025447022052
+        },
+        {
+            "unit": "Ash Moth",
+            "enemyUnit": "Nomad",
+            "support": 91,
+            "conservativeLiftPp": -2.968762598134172
+        },
+        {
+            "unit": "Battle Mage",
+            "enemyUnit": "Abomination",
+            "support": 104,
+            "conservativeLiftPp": 3.903590234872649
+        },
+        {
+            "unit": "Black Dragon",
+            "enemyUnit": "Abomination",
+            "support": 1190,
+            "conservativeLiftPp": 2.6682682542441194
+        },
+        {
+            "unit": "Black Dragon",
+            "enemyUnit": "Fairy",
+            "support": 184,
+            "conservativeLiftPp": -2.005407041885085
+        },
+        {
+            "unit": "Black Dragon",
+            "enemyUnit": "Frenzied Boar",
+            "support": 940,
+            "conservativeLiftPp": -2.3604231680866197
+        },
+        {
+            "unit": "Blacksmith",
+            "enemyUnit": "Abomination",
+            "support": 322,
+            "conservativeLiftPp": 2.253679425038856
+        },
+        {
+            "unit": "Fairy",
+            "enemyUnit": "Black Dragon",
+            "support": 184,
+            "conservativeLiftPp": 2.005407041885087
+        },
+        {
+            "unit": "Frenzied Boar",
+            "enemyUnit": "Black Dragon",
+            "support": 940,
+            "conservativeLiftPp": 2.3604231680866157
+        },
+        {
+            "unit": "Leprechaun",
+            "enemyUnit": "Wolf Rider",
+            "support": 93,
+            "conservativeLiftPp": 2.542329848579314
+        },
+        {
+            "unit": "Nomad",
+            "enemyUnit": "Ash Moth",
+            "support": 91,
+            "conservativeLiftPp": 2.968762598134166
+        },
+        {
+            "unit": "Wolf Rider",
+            "enemyUnit": "Leprechaun",
+            "support": 93,
+            "conservativeLiftPp": -2.5423298485793193
+        }
+    ],
+    "allyTrios": []
+}

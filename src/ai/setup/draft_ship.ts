@@ -21,6 +21,7 @@ import {
     LEAGUE_SCHEMA_VERSION,
     scoreLeagueCreature,
     type ILeagueGenome,
+    type ILeagueGenomeOptions,
 } from "../../simulation/league_genome";
 import {
     DRAFT_FEATURE_DIM,
@@ -28,6 +29,17 @@ import {
     creatureRoleFitMultiplier,
     eligibleBacklineProtectorChoices,
 } from "./creature_score";
+import { pickCoherentDraftCreature } from "./draft_coherence";
+import {
+    isRankedDraftInteractionPrior,
+    RANKED_DRAFT_INTERACTION_PRIOR_ID,
+    type RankedDraftInteractionPriorId,
+} from "./draft_interaction_prior";
+import {
+    isRankedDraftVarietyPolicy,
+    RANKED_DRAFT_VARIETY_POLICY_ID,
+    type RankedDraftVarietyPolicyId,
+} from "./draft_variety";
 import leagueRound1CandidateGenome from "./draft_genomes/league_round1_br_57de5a2d_candidate.json";
 import leagueRound3ProjectedGenome from "./draft_genomes/league_round3_br_52752642_projected.json";
 import v07NonfightDraftGenome from "./draft_genomes/v07_nonfight_draft_48d23ac4461_projected.json";
@@ -55,6 +67,12 @@ export const LEAGUE_ROUND3_DRAFT_SPEC = "league-r3-br-52752642";
 /** Fresh overnight non-fight candidate. Explicit opt-in; not the fallback default. */
 export const V07_NONFIGHT_DRAFT_SPEC = "v07-nonfight-draft-48d23ac4461";
 
+/** Candidate that layers live-ranked co-play/counter evidence over the current ranked incumbent. */
+export const RANKED_INTERACTION_DRAFT_SPEC = "ranked-interactions-a19-ranked-draft-10008-v1";
+
+/** Candidate that combines public co-play/counters with bounded, deterministic close-offer variety. */
+export const RANKED_VERSATILE_DRAFT_SPEC = "ranked-versatile-a19-v3";
+
 /**
  * Embed either the legacy 11-weight creature score or the full 15-weight intrinsic draft head into the league
  * anchor. With the legacy shape, the four extra intrinsic features stay at the anchor's zeros. Counter-draft
@@ -75,14 +93,14 @@ export function embedIntrinsicDraftWeights(intrinsic: readonly number[]): number
     return weights;
 }
 
-const genomeFromParsedJson = (parsed: unknown, id: string): ILeagueGenome => {
+const genomeFromParsedJson = (parsed: unknown, id: string, options: ILeagueGenomeOptions = {}): ILeagueGenome => {
     if (Array.isArray(parsed)) {
         const weights = parsed as number[];
         if (weights.length === DRAFT_FEATURE_DIM || weights.length === LEAGUE_GENOME_LAYOUT.draftIntrinsic.length) {
-            return createLeagueGenome(id, embedIntrinsicDraftWeights(weights));
+            return createLeagueGenome(id, embedIntrinsicDraftWeights(weights), false, options);
         }
         if (weights.length === LEAGUE_GENOME_DIM) {
-            return createLeagueGenome(id, weights);
+            return createLeagueGenome(id, weights, false, options);
         }
         throw new RangeError(
             `Draft weights array has ${weights.length} entries; expected ${DRAFT_FEATURE_DIM} (legacy intrinsic), ${LEAGUE_GENOME_LAYOUT.draftIntrinsic.length} (full intrinsic), or ${LEAGUE_GENOME_DIM} (league genome)`,
@@ -93,6 +111,8 @@ const genomeFromParsedJson = (parsed: unknown, id: string): ILeagueGenome => {
             id?: unknown;
             omniscientDraft?: unknown;
             schemaVersion?: unknown;
+            draftInteractionPrior?: unknown;
+            draftVarietyPolicy?: unknown;
             weights?: unknown;
         };
         if (value.schemaVersion !== undefined && value.schemaVersion !== LEAGUE_SCHEMA_VERSION) {
@@ -104,8 +124,22 @@ const genomeFromParsedJson = (parsed: unknown, id: string): ILeagueGenome => {
         if (value.id !== undefined && (typeof value.id !== "string" || !value.id.trim())) {
             throw new TypeError("Draft genome id must be a non-empty string when provided");
         }
+        if (value.draftInteractionPrior !== undefined && !isRankedDraftInteractionPrior(value.draftInteractionPrior)) {
+            throw new TypeError(`Unsupported ranked draft interaction prior ${String(value.draftInteractionPrior)}`);
+        }
+        if (value.draftVarietyPolicy !== undefined && !isRankedDraftVarietyPolicy(value.draftVarietyPolicy)) {
+            throw new TypeError(`Unsupported ranked draft variety policy ${String(value.draftVarietyPolicy)}`);
+        }
         if (Array.isArray(value.weights)) {
-            return genomeFromParsedJson(value.weights, typeof value.id === "string" ? value.id : id);
+            return genomeFromParsedJson(value.weights, typeof value.id === "string" ? value.id : id, {
+                ...options,
+                ...(value.draftInteractionPrior
+                    ? { draftInteractionPrior: value.draftInteractionPrior as RankedDraftInteractionPriorId }
+                    : {}),
+                ...(value.draftVarietyPolicy
+                    ? { draftVarietyPolicy: value.draftVarietyPolicy as RankedDraftVarietyPolicyId }
+                    : {}),
+            });
         }
     }
     throw new TypeError("Draft genome JSON must be a weights array or an object with a weights array");
@@ -119,6 +153,8 @@ const genomeFromParsedJson = (parsed: unknown, id: string): ILeagueGenome => {
  * - "league-r1-br-57de5a2d-candidate": compatibility alias for the same immutable round-1 weights;
  * - "league-r3-br-52752642": the fresh-v0.7-accepted projected League round-3 candidate;
  * - "v07-nonfight-draft-48d23ac4461": the fresh overnight non-fight candidate;
+ * - "ranked-interactions-a19-ranked-draft-10008-v1": incumbent plus a confidence-gated live-ranked prior;
+ * - "ranked-versatile-a19-v1": co-play/counters plus score-bounded public-context variety;
  * - inline JSON array of 11 legacy or 15 full intrinsic weights (embedded into the anchor genome);
  * - inline JSON array of 95 league-genome weights, or an object with { id?, weights } of any accepted length;
  * - anything else: path to a JSON file containing one of the above (a league champion artifact).
@@ -147,6 +183,27 @@ export function parseDraftGenome(
     if (trimmed === V07_NONFIGHT_DRAFT_SPEC) {
         return genomeFromParsedJson(v07NonfightDraftGenome, V07_NONFIGHT_DRAFT_SPEC);
     }
+    if (trimmed === RANKED_INTERACTION_DRAFT_SPEC) {
+        return genomeFromParsedJson(
+            {
+                ...leagueRound1CandidateGenome,
+                id: RANKED_INTERACTION_DRAFT_SPEC,
+                draftInteractionPrior: RANKED_DRAFT_INTERACTION_PRIOR_ID,
+            },
+            RANKED_INTERACTION_DRAFT_SPEC,
+        );
+    }
+    if (trimmed === RANKED_VERSATILE_DRAFT_SPEC) {
+        return genomeFromParsedJson(
+            {
+                ...leagueRound1CandidateGenome,
+                id: RANKED_VERSATILE_DRAFT_SPEC,
+                draftInteractionPrior: RANKED_DRAFT_INTERACTION_PRIOR_ID,
+                draftVarietyPolicy: RANKED_DRAFT_VARIETY_POLICY_ID,
+            },
+            RANKED_VERSATILE_DRAFT_SPEC,
+        );
+    }
     const raw =
         trimmed.startsWith("[") || trimmed.startsWith("{") ? trimmed : readFileSync(resolve(cwd, trimmed), "utf8");
     return genomeFromParsedJson(JSON.parse(raw) as unknown, id);
@@ -158,14 +215,20 @@ export function parseDraftGenome(
  * This projection is also applied by the acceptance harness, preventing an unused head from earning a pass.
  */
 export function projectDraftGenomeForShipping(genome: ILeagueGenome): ILeagueGenome {
-    const validated = createLeagueGenome(genome.id, genome.weights, !!genome.omniscientDraft);
+    const validated = createLeagueGenome(genome.id, genome.weights, !!genome.omniscientDraft, {
+        ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
+        ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
+    });
     if (validated.omniscientDraft) {
         throw new TypeError("A deployable draft genome cannot use omniscientDraft");
     }
     const weights = [...LEAGUE_ANCHOR_GENOME];
     const { offset, length } = LEAGUE_GENOME_LAYOUT.draftIntrinsic;
     weights.splice(offset, length, ...validated.weights.slice(offset, offset + length));
-    return createLeagueGenome(validated.id, weights);
+    return createLeagueGenome(validated.id, weights, false, {
+        ...(validated.draftInteractionPrior ? { draftInteractionPrior: validated.draftInteractionPrior } : {}),
+        ...(validated.draftVarietyPolicy ? { draftVarietyPolicy: validated.draftVarietyPolicy } : {}),
+    });
 }
 
 /**
@@ -178,27 +241,30 @@ export function draftGenomeCreatureScore(genome: ILeagueGenome, creatureId: numb
 
 /**
  * Live-ranked creature argmax with the same role-safety gate used by league training. Genome scores remain
- * immutable; roster and fair revealed-opponent context only remove an inapplicable Queen/Abomination when at
- * least one ordinary legal choice exists.
+ * immutable; the post-score coherence overlay consumes only the acting seat's own roster/artifact, while fair
+ * revealed-opponent context only gates an inapplicable Queen/Abomination when an ordinary choice exists.
  */
 export function pickDraftGenomeCreature(
     genome: ILeagueGenome,
     available: readonly number[],
     ownCreatureIds: readonly number[],
     knownOpponentCreatureIds: readonly number[],
+    tier1ArtifactId?: number,
 ): number | undefined {
     const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
-    let best: number | undefined;
-    let bestScore = -Infinity;
-    for (const creatureId of eligible) {
-        const score = applyCreatureRoleFitMultiplier(
-            draftGenomeCreatureScore(genome, creatureId),
-            creatureRoleFitMultiplier(creatureId, ownCreatureIds, knownOpponentCreatureIds),
-        );
-        if (score > bestScore) {
-            best = creatureId;
-            bestScore = score;
-        }
-    }
-    return best;
+    return pickCoherentDraftCreature(
+        eligible,
+        (creatureId) =>
+            applyCreatureRoleFitMultiplier(
+                draftGenomeCreatureScore(genome, creatureId),
+                creatureRoleFitMultiplier(creatureId, ownCreatureIds, knownOpponentCreatureIds),
+            ),
+        {
+            ownCreatureIds,
+            tier1ArtifactId,
+            knownOpponentCreatureIds,
+            ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
+            ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
+        },
+    );
 }

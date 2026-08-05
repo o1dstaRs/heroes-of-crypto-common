@@ -454,6 +454,55 @@ describe("battle snapshot round-trip", () => {
         }
     });
 
+    it("captures only first-touched battle objects and restores transient terrain", () => {
+        try {
+            const h = buildBattle(20240701);
+            h.playTurns(8);
+            const before = normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties));
+            const [unit, enemy] = [...h.unitsHolder.getAllUnits().values()];
+            expect(unit).toBeDefined();
+            expect(enemy).toBeDefined();
+
+            const checkpoint = new BattleRollbackJournal(h.unitsHolder, h.grid, h.fightProperties).checkpoint();
+            expect(checkpoint.getCapturedObjectCounts()).toEqual({ units: 0, grid: 0, fight: 0, holder: 0 });
+
+            unit!.setTarget(enemy!.getId());
+            expect(checkpoint.getCapturedObjectCounts()).toEqual({ units: 1, grid: 0, fight: 0, holder: 0 });
+
+            h.unitsHolder.haveDistancesToClosestEnemiesDecreased();
+            h.grid.occupyByHole({ x: 0, y: 0 });
+            h.fightProperties.getSmokeClouds().add({ x: 0, y: 0 });
+            h.fightProperties.getVines().add({ x: 1, y: 0 }, 2, GREEN_TEAM);
+            h.fightProperties.getFireWalls().add({ x: 2, y: 0 }, 2, 30);
+            expect(checkpoint.getCapturedObjectCounts()).toEqual({ units: 1, grid: 1, fight: 1, holder: 1 });
+
+            checkpoint.rollback();
+            expect(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties))).toEqual(before);
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+    });
+
+    it("restores deleted baseline stacks in their original map order", () => {
+        try {
+            const h = buildBattle(20240702);
+            const before = normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties));
+            const ids = [...h.unitsHolder.getAllUnits().keys()];
+            const deletedId = ids[0];
+            expect(deletedId).toBeDefined();
+
+            const checkpoint = new BattleRollbackJournal(h.unitsHolder, h.grid, h.fightProperties).checkpoint();
+            expect(h.unitsHolder.deleteUnitById(deletedId!)).toBe(true);
+            expect([...h.unitsHolder.getAllUnits().keys()]).not.toContain(deletedId);
+
+            checkpoint.rollback();
+            expect([...h.unitsHolder.getAllUnits().keys()]).toEqual(ids);
+            expect(normalize(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties))).toEqual(before);
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+    });
+
     it("restores identically when called repeatedly from the same snapshot", () => {
         try {
             const h = buildBattle(777);

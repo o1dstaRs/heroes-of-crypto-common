@@ -115,6 +115,7 @@ export const FLYER_SCREEN_THRESHOLD = 2;
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
+const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 
 export interface IRevealedThreats {
     splashAoe: number;
@@ -158,10 +159,20 @@ export interface IRevealLayoutOptions {
     excludedGuardUnitIds?: readonly string[];
     /** v0.8-only stable priority order for the protected assets. */
     preferredBacklineUnitIds?: readonly string[];
+    /**
+     * A19-only physical-role correction: a MELEE_MAGIC unit without a native spellbook remains a melee body.
+     * Direct-cast utility such as Wind Flow, Wild Regeneration, or Castling must not turn a flyer/tank into a
+     * rear-line caster. Omitted preserves the historical v0.7 layout byte-for-byte.
+     */
+    physicalMeleeMagicRoles?: boolean;
 }
 
 const isRangeUnit = (u: Unit): boolean => u.getAttackType() === RANGE;
-const isMeleeUnit = (u: Unit): boolean => u.getAttackType() === MELEE;
+const hasNativeSpellbook = (unit: Unit): boolean => {
+    const creatureId = creatureIdForUnit(unit);
+    return creatureId !== undefined && creatureInfo(creatureId)?.nativeSpellbook === true;
+};
+const isMeleeUnit = (unit: Unit): boolean => unit.getAttackType() === MELEE;
 const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1);
 
 /**
@@ -232,11 +243,18 @@ export function layoutRevealPlacement(
             }
         }
     };
-    const isBackline = (unit: Unit): boolean =>
-        isRangeUnit(unit) ||
-        (!!options.screenBacklineProtectors &&
+    const isPhysicalMelee = (unit: Unit): boolean =>
+        unit.getAttackType() === MELEE ||
+        (!!options.physicalMeleeMagicRoles && unit.getAttackType() === MELEE_MAGIC && !hasNativeSpellbook(unit));
+    const isBackline = (unit: Unit): boolean => {
+        if (isRangeUnit(unit)) return true;
+        if (options.physicalMeleeMagicRoles && hasNativeSpellbook(unit)) return true;
+        return (
+            !!options.screenBacklineProtectors &&
             unit.getCanCastSpells() &&
-            unit.getSpells().some((spell) => isSpellUsableByCaster(unit, spell)));
+            unit.getSpells().some((spell) => isSpellUsableByCaster(unit, spell))
+        );
+    };
     const preference = (unit: Unit, ids: readonly string[] | undefined): number => {
         const index = ids?.indexOf(unit.getId()) ?? -1;
         return index < 0 ? Number.MAX_SAFE_INTEGER : index;
@@ -252,11 +270,18 @@ export function layoutRevealPlacement(
     const backline = units.filter(isBackline).sort(byBacklinePriority);
     // When v0.8 treats an exact-MELEE spellcaster as a ward, keep the role partitions disjoint. Otherwise the
     // front-wall pass would place it a second time, overwrite its deep placement, and leave ghost occupancy.
-    const melee = units.filter((unit) => isMeleeUnit(unit) && !isBackline(unit)).sort(bySizeLargeFirst);
-    const support = units.filter((u) => !isBackline(u) && !isMeleeUnit(u)).sort(bySizeLargeFirst);
-    const isFlyer = (u: Unit): boolean => u.canFly();
-    const groundMelee = melee.filter((u) => !isFlyer(u));
-    const flyers = melee.filter(isFlyer);
+    const melee = units.filter((unit) => isPhysicalMelee(unit) && !isBackline(unit)).sort(bySizeLargeFirst);
+    const support = units.filter((u) => !isBackline(u) && !isPhysicalMelee(u)).sort(bySizeLargeFirst);
+    const isForwardPhysical = (unit: Unit): boolean =>
+        unit.canFly() ||
+        (!!options.physicalMeleeMagicRoles &&
+            unit.getAttackType() === MELEE_MAGIC &&
+            !hasNativeSpellbook(unit) &&
+            ((unit.isSmallSize() && unit.getSteps() >= 7) ||
+                unit.hasAbilityActive("Rapid Charge") ||
+                unit.hasAbilityActive("Sky Runner")));
+    const groundMelee = melee.filter((unit) => !isForwardPhysical(unit));
+    const flyers = melee.filter(isForwardPhysical);
 
     for (const u of backline) {
         placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(b) - edgeness(a)); // deep + cornered

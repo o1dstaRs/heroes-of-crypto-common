@@ -14,11 +14,17 @@ import { dirname, resolve } from "node:path";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
 
 import {
+    draftGenomeCreatureScore,
     LEAGUE_ROUND1_DRAFT_SPEC,
     LEAGUE_ROUND3_DRAFT_SPEC,
     parseDraftGenome,
+    pickDraftGenomeCreature,
     projectDraftGenomeForShipping,
+    RANKED_VERSATILE_DRAFT_SPEC,
 } from "../ai/setup/draft_ship";
+import { pickCoherentDraftBundle } from "../ai/setup/draft_coherence";
+import { isRankedDraftInteractionPrior, RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../ai/setup/draft_interaction_prior";
+import { isRankedDraftVarietyPolicy, RANKED_DRAFT_VARIETY_POLICY_ID } from "../ai/setup/draft_variety";
 import {
     conditionalArtifactT2,
     conditionalAugments,
@@ -27,12 +33,14 @@ import {
 } from "../ai/setup/setup_conditional";
 import { creatureInfo } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
+import { TIER1_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { getUpgradePoints } from "../perks/perk_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
     getKnownOpponentCreatures,
+    getVisibleCreatureChoices,
     isPickSimComplete,
     transitionPickSim,
     type IPickSimState,
@@ -55,8 +63,6 @@ import {
     createMeleeLeagueGenome,
     LEAGUE_ANCHOR_GENOME,
     LEAGUE_GENOME_LAYOUT,
-    pickLeagueBundle,
-    pickLeagueCreature,
     type ILeagueGenome,
 } from "./league_genome";
 
@@ -85,6 +91,8 @@ const SEED_CHANNELS_PER_BOARD = 3;
 export const RANKED_DRAFT_INTRINSIC_OFFSET = LEAGUE_GENOME_LAYOUT.draftIntrinsic.offset;
 export const RANKED_DRAFT_INTRINSIC_DIM = LEAGUE_GENOME_LAYOUT.draftIntrinsic.length;
 export const RANKED_DRAFT_CURRENT_INCUMBENT_ID = CURRENT_INCUMBENT_ID;
+export const RANKED_DRAFT_INTERACTION_PRIOR_CANDIDATE_ID = "ranked-interactions-a19-ranked-draft-10008-v1";
+export const RANKED_DRAFT_VERSATILE_CANDIDATE_ID = RANKED_VERSATILE_DRAFT_SPEC;
 export const RANKED_DRAFT_LIVE_MAP_TYPES = [
     PBTypes.GridVals.NORMAL,
     PBTypes.GridVals.LAVA_CENTER,
@@ -310,11 +318,31 @@ export function rankedDraftBehaviorTraceSetSha256(records: readonly IRankedDraft
 
 export function normalizeRankedDraftGenome(genome: ILeagueGenome, id: string = genome.id): ILeagueGenome {
     const projected = projectDraftGenomeForShipping(genome);
-    return createLeagueGenome(id, projected.weights);
+    return createLeagueGenome(id, projected.weights, false, {
+        ...(projected.draftInteractionPrior ? { draftInteractionPrior: projected.draftInteractionPrior } : {}),
+        ...(projected.draftVarietyPolicy ? { draftVarietyPolicy: projected.draftVarietyPolicy } : {}),
+    });
 }
 
 export function rankedDraftCurrentIncumbent(): ILeagueGenome {
     return normalizeRankedDraftGenome(parseDraftGenome(LEAGUE_ROUND1_DRAFT_SPEC), CURRENT_INCUMBENT_ID);
+}
+
+/** Frozen incumbent weights plus the candidate-only, fair-information interaction evidence overlay. */
+export function rankedDraftInteractionPriorCandidate(): ILeagueGenome {
+    const incumbent = rankedDraftCurrentIncumbent();
+    return createLeagueGenome(RANKED_DRAFT_INTERACTION_PRIOR_CANDIDATE_ID, incumbent.weights, false, {
+        draftInteractionPrior: RANKED_DRAFT_INTERACTION_PRIOR_ID,
+    });
+}
+
+/** Frozen incumbent plus public interaction evidence and score-bounded deterministic archetype variety. */
+export function rankedDraftVersatileCandidate(): ILeagueGenome {
+    const incumbent = rankedDraftCurrentIncumbent();
+    return createLeagueGenome(RANKED_DRAFT_VERSATILE_CANDIDATE_ID, incumbent.weights, false, {
+        draftInteractionPrior: RANKED_DRAFT_INTERACTION_PRIOR_ID,
+        draftVarietyPolicy: RANKED_DRAFT_VARIETY_POLICY_ID,
+    });
 }
 
 export function defaultRankedDraftPool(): IRankedDraftPoolEntry[] {
@@ -340,11 +368,29 @@ export function loadRankedDraftPool(specifier?: string, cwd: string = process.cw
     if (!entries) throw new TypeError("Ranked draft pool must be an array or { entries: [...] }");
     return entries.map((entry, index) => {
         if (!entry || typeof entry !== "object") throw new TypeError(`Invalid ranked draft pool entry ${index}`);
-        const value = entry as { id?: unknown; weights?: unknown; prior?: unknown };
+        const value = entry as {
+            id?: unknown;
+            weights?: unknown;
+            prior?: unknown;
+            draftInteractionPrior?: unknown;
+            draftVarietyPolicy?: unknown;
+        };
         const id = typeof value.id === "string" && value.id.trim() ? value.id : `opponent-${index}`;
         if (!Array.isArray(value.weights)) throw new TypeError(`Ranked draft pool entry ${id} omitted weights`);
+        if (value.draftInteractionPrior !== undefined && !isRankedDraftInteractionPrior(value.draftInteractionPrior)) {
+            throw new TypeError(`Ranked draft pool entry ${id} has an unsupported interaction prior`);
+        }
+        if (value.draftVarietyPolicy !== undefined && !isRankedDraftVarietyPolicy(value.draftVarietyPolicy)) {
+            throw new TypeError(`Ranked draft pool entry ${id} has an unsupported variety policy`);
+        }
         return {
-            ...normalizeRankedDraftGenome(createLeagueGenome(id, value.weights as number[]), id),
+            ...normalizeRankedDraftGenome(
+                createLeagueGenome(id, value.weights as number[], false, {
+                    ...(value.draftInteractionPrior ? { draftInteractionPrior: value.draftInteractionPrior } : {}),
+                    ...(value.draftVarietyPolicy ? { draftVarietyPolicy: value.draftVarietyPolicy } : {}),
+                }),
+                id,
+            ),
             ...(value.prior === undefined ? {} : { prior: Number(value.prior) }),
         };
     });
@@ -480,7 +526,6 @@ export function resolveRankedDraftPick(
     const upperGenome = normalizeRankedDraftGenome(upperInput);
     const rng = randomInt(seed);
     let state = createPickSimState(rng);
-    const genomeFor = (team: PickTeam): ILeagueGenome => (team === LOWER ? lowerGenome : upperGenome);
     const teamState = (team: PickTeam): IPickTeamState => (team === LOWER ? state.lower : state.upper);
 
     const perk = SETUP_POLICY_V0.pickPerk();
@@ -488,8 +533,16 @@ export function resolveRankedDraftPick(
     state = applyAccepted(state, { type: "select_perk", team: UPPER, perk }, rng);
 
     // Both simultaneous policies decide from the same pre-commit state.
-    const lowerBundle = pickLeagueBundle(state, LOWER, lowerGenome);
-    const upperBundle = pickLeagueBundle(state, UPPER, upperGenome);
+    const lowerBundle = pickCoherentDraftBundle(
+        state.lower.bundles,
+        (creatureId) => draftGenomeCreatureScore(lowerGenome, creatureId),
+        (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+    );
+    const upperBundle = pickCoherentDraftBundle(
+        state.upper.bundles,
+        (creatureId) => draftGenomeCreatureScore(upperGenome, creatureId),
+        (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+    );
     state = applyAccepted(state, { type: "select_bundle", team: LOWER, bundleIndex: lowerBundle }, rng);
     state = applyAccepted(state, { type: "select_bundle", team: UPPER, bundleIndex: upperBundle }, rng);
 
@@ -510,7 +563,17 @@ export function resolveRankedDraftPick(
             throw new Error(`Unexpected live ranked pick phase ${phase.phase} at sequence ${state.phaseSequence}`);
         }
         const team = phase.actors[0];
-        const creatureId = pickLeagueCreature(state, team, genomeFor(team));
+        const own = teamState(team);
+        const creatureId = pickDraftGenomeCreature(
+            team === LOWER ? lowerGenome : upperGenome,
+            getVisibleCreatureChoices(state, team),
+            own.creatures,
+            getKnownOpponentCreatures(state, team),
+            own.tier1Artifact,
+        );
+        if (creatureId === undefined) {
+            throw new Error(`Ranked draft creature policy found no visible L${phase.creatureLevel} creature`);
+        }
         const result = transitionPickSim(state, { type: "pick_creature", team, creatureId }, rng);
         if (result.status === "rejected") {
             throw new Error(`Ranked draft creature policy was rejected as ${result.reason}`);

@@ -217,6 +217,230 @@ const HOLDER_SHARED_FIELDS = ["grid", "allUnits", "gridSettings"] as const;
 
 type Bag = Record<string, unknown>;
 
+type JournalMutationMethod = (this: object, ...args: unknown[]) => unknown;
+
+const journalMutationHook = Symbol("battleRollbackJournalMutationHook");
+const mutationHookedPrototypes = new WeakSet<object>();
+
+type JournalWrappedMethod = JournalMutationMethod & {
+    [journalMutationHook]?: true;
+};
+
+const UNIT_MUTATION_METHODS = [
+    "deleteAbility",
+    "grantAbility",
+    "addAbility",
+    "grantStolenAbility",
+    "disableAbilityAsStolen",
+    "takeAbilitySpellEntries",
+    "registerAbility",
+    "removeAbilityMechanics",
+    "setTarget",
+    "resetTarget",
+    "setForbiddenTarget",
+    "resetForbiddenTarget",
+    "applyEffect",
+    "refreshPreTurnState",
+    "deleteEffect",
+    "deleteAllEffects",
+    "deleteBuff",
+    "deleteAllBuffs",
+    "deleteDebuff",
+    "deleteAllDebuffs",
+    "minusLap",
+    "spendShotsAgainst",
+    "decreaseNumberOfShots",
+    "setSynergies",
+    "setPosition",
+    "setRenderPosition",
+    "reviveAfterDeath",
+    "setWebMovementLocked",
+    "increaseAmountAlive",
+    "increaseAttackMod",
+    "cleanupAttackModIncrease",
+    "decreaseAmountDied",
+    "randomizeLuckPerTurn",
+    "applyLuckShield",
+    "applyArmageddonDamage",
+    "applyDamage",
+    "setAmountAlive",
+    "increaseMorale",
+    "decreaseBaseArmor",
+    "increaseBaseArmor",
+    "increaseSupply",
+    "decreaseMorale",
+    "applyTravelledDistanceModifier",
+    "applyLavaWaterModifier",
+    "trySeedWaterShield",
+    "setResponded",
+    "setOnHourglass",
+    "setMovedThisTurn",
+    "setMovedRouteCellsThisTurn",
+    "refreshPossibleAttackTypes",
+    "selectNextAttackType",
+    "selectAttackType",
+    "cleanAuraEffects",
+    "applyAuraEffect",
+    "applyBuff",
+    "takeBuffFrom",
+    "applyDebuff",
+    "useSpell",
+    "applyResurrection",
+    "applyHeal",
+    "reduceBaseAttack",
+    "adjustBaseStats",
+    "setRangeShotDistance",
+    "setStackPower",
+    "parseAbilities",
+    "refreshAbilitiesDescriptions",
+    "refreshBlindFuryDescription",
+    "refreshChakramDescription",
+    "parseSpells",
+    "parseAuraEffects",
+    "refreshAndGetAdjustedMaxHp",
+] as const;
+
+const GRID_MUTATION_METHODS = [
+    "cleanupCenterObstacle",
+    "clearMountainSide",
+    "refreshWithNewType",
+    "cleanupAll",
+    "occupyCell",
+    "occupyByHole",
+    "occupyCells",
+    "rebuildAggrBoards",
+    "updateAggrGrid",
+] as const;
+
+const FIGHT_MUTATION_METHODS = [
+    "setSmokeClouds",
+    "setVines",
+    "setFireWalls",
+    "setObstacleHitsLeft",
+    "setObstacleHitsPerMountain",
+    "encounterDamageDealFact",
+    "encounterObstacleHit",
+    "restoreStepsMoraleMultiplier",
+    "setGridType",
+    "dequeueNextUnitId",
+    "dequeueMoraleMinus",
+    "dequeueMoralePlus",
+    "dequeueHourglassQueue",
+    "setHighestSpeedThisTurn",
+    "startTurn",
+    "requestAdditionalTurnTime",
+    "markFirstTurn",
+    "startFight",
+    "finishFight",
+    "flipLap",
+    "encounterAdditionalNarrowingLap",
+    "setTeamUnitsAlive",
+    "setSynergyVariants",
+    "setSynergyUnitsPerFactions",
+    "setSynergiesPerTeam",
+    "updateSynergyPerTeam",
+    "addRepliedAttack",
+    "addAlreadyMadeTurn",
+    "enqueueHourglass",
+    "restoreAlreadyHourglass",
+    "enqueueMoraleMinus",
+    "enqueueMoralePlus",
+    "enqueueUpNext",
+    "removeFromUpNext",
+    "removeFromHourglassQueue",
+    "removeFromMoraleMinusQueue",
+    "removeFromMoralePlusQueue",
+    "increaseStepsMoraleMultiplier",
+    "updatePreviousTurnTeam",
+    "setDefaultPlacementPerTeam",
+    "setArtifactPerTeam",
+    "setPerkPerTeam",
+    "setAugmentPerTeam",
+    "prefetchNextUnitsToTurn",
+    "setUnitsCalculatedStacksPower",
+    "removeItemOnce",
+    "getNextTurnUnitId",
+] as const;
+
+const HOLDER_MUTATION_METHODS = [
+    "haveDistancesToClosestEnemiesDecreased",
+    "applyAugments",
+    "applyArtifacts",
+    "refreshUnitsForAllTeams",
+    "deleteUnitById",
+    "refreshAngelicHostForAllUnits",
+    "refreshWaterShieldForAllUnits",
+    "refreshStackPowerForAllUnits",
+    "refreshAuraEffectsIfNeeded",
+    "refreshAuraEffectsForAllUnits",
+    "addUnit",
+    "decreaseMoraleForTheSameUnitsOfTheTeam",
+    "increaseUnitsSupplyIfNeededPerTeam",
+    "deleteUnitIfNotAllowed",
+] as const;
+
+const SMOKE_MUTATION_METHODS = ["add", "dispel", "clear", "minusAllLaps"] as const;
+const VINE_MUTATION_METHODS = ["add", "addAll", "remove", "clear", "minusAllLaps"] as const;
+const FIRE_WALL_MUTATION_METHODS = ["add", "addAll", "remove", "clear", "minusAllLaps"] as const;
+
+let activeRollbackCheckpoint: BattleRollbackCheckpoint | undefined;
+
+function installMutationHooks(unitsHolder: UnitsHolder, grid: Grid, fightProperties: FightProperties): void {
+    wrapMutationMethods(unitsHolder, HOLDER_MUTATION_METHODS, (target) =>
+        activeRollbackCheckpoint?.recordHolderMutation(target as UnitsHolder),
+    );
+    wrapMutationMethods(grid, GRID_MUTATION_METHODS, (target) =>
+        activeRollbackCheckpoint?.recordGridMutation(target as Grid),
+    );
+    wrapMutationMethods(fightProperties, FIGHT_MUTATION_METHODS, (target) =>
+        activeRollbackCheckpoint?.recordFightMutation(target as FightProperties),
+    );
+    for (const unit of unitsHolder.getAllUnits().values()) {
+        wrapMutationMethods(unit, UNIT_MUTATION_METHODS, (target) =>
+            activeRollbackCheckpoint?.recordUnitMutation(target as Unit),
+        );
+    }
+    wrapMutationMethods(fightProperties.getSmokeClouds(), SMOKE_MUTATION_METHODS, (target) =>
+        activeRollbackCheckpoint?.recordTerrainMutation(target),
+    );
+    wrapMutationMethods(fightProperties.getVines(), VINE_MUTATION_METHODS, (target) =>
+        activeRollbackCheckpoint?.recordTerrainMutation(target),
+    );
+    wrapMutationMethods(fightProperties.getFireWalls(), FIRE_WALL_MUTATION_METHODS, (target) =>
+        activeRollbackCheckpoint?.recordTerrainMutation(target),
+    );
+}
+
+function wrapMutationMethods(
+    instance: object,
+    methods: readonly string[],
+    recordMutation: (target: object) => void,
+): void {
+    let prototype = Object.getPrototypeOf(instance);
+    while (prototype && prototype !== Object.prototype) {
+        if (!mutationHookedPrototypes.has(prototype)) {
+            for (const methodName of methods) {
+                const descriptor = Object.getOwnPropertyDescriptor(prototype, methodName);
+                if (!descriptor || typeof descriptor.value !== "function") {
+                    continue;
+                }
+                const original = descriptor.value as JournalWrappedMethod;
+                if (original[journalMutationHook]) {
+                    continue;
+                }
+                const wrapped: JournalWrappedMethod = function (this: object, ...args: unknown[]): unknown {
+                    recordMutation(this);
+                    return original.apply(this, args);
+                };
+                Object.defineProperty(wrapped, journalMutationHook, { value: true });
+                Object.defineProperty(prototype, methodName, { ...descriptor, value: wrapped });
+            }
+            mutationHookedPrototypes.add(prototype);
+        }
+        prototype = Object.getPrototypeOf(prototype);
+    }
+}
+
 function captureFields(obj: object, fields: readonly string[]): Bag {
     const bag: Bag = {};
     const src = obj as Bag;
@@ -274,28 +498,107 @@ export interface BattleSnapshot {
 }
 
 export class BattleRollbackCheckpoint {
-    private snapshot: BattleSnapshot | undefined;
     private readonly unitsHolder: UnitsHolder;
     private readonly grid: Grid;
     private readonly fightProperties: FightProperties;
+    private readonly unitRefs: Map<string, Unit>;
+    private readonly unitOrder: string[];
+    private readonly aiTargetMemory: Map<string, string>;
+    private readonly smokeClouds: object;
+    private readonly vines: object;
+    private readonly fireWalls: object;
+    private readonly units = new Map<string, Bag>();
+    private gridSnapshot: Bag | undefined;
+    private fightSnapshot: Bag | undefined;
+    private holderSnapshot: Bag | undefined;
+    private consumed = false;
     public constructor(
-        snapshot: BattleSnapshot,
         unitsHolder: UnitsHolder,
         grid: Grid,
         fightProperties: FightProperties,
+        unitRefs: Map<string, Unit>,
+        unitOrder: string[],
     ) {
-        this.snapshot = snapshot;
         this.unitsHolder = unitsHolder;
         this.grid = grid;
         this.fightProperties = fightProperties;
+        this.unitRefs = unitRefs;
+        this.unitOrder = unitOrder;
+        this.aiTargetMemory = captureAITargetMemory(unitsHolder);
+        this.smokeClouds = fightProperties.getSmokeClouds();
+        this.vines = fightProperties.getVines();
+        this.fireWalls = fightProperties.getFireWalls();
+    }
+    public recordUnitMutation(unit: Unit): void {
+        const id = unit.getId();
+        if (this.unitRefs.get(id) !== unit || this.units.has(id)) {
+            return;
+        }
+        this.units.set(id, captureFields(unit, UNIT_FIELDS));
+    }
+    public recordGridMutation(grid: Grid): void {
+        if (grid !== this.grid || this.gridSnapshot) {
+            return;
+        }
+        this.gridSnapshot = captureFields(grid, GRID_FIELDS);
+    }
+    public recordFightMutation(fightProperties: FightProperties): void {
+        if (fightProperties !== this.fightProperties || this.fightSnapshot) {
+            return;
+        }
+        this.fightSnapshot = captureFields(fightProperties, FIGHT_FIELDS);
+    }
+    public recordHolderMutation(unitsHolder: UnitsHolder): void {
+        if (unitsHolder !== this.unitsHolder || this.holderSnapshot) {
+            return;
+        }
+        this.holderSnapshot = captureFields(unitsHolder, HOLDER_FIELDS);
+    }
+    public recordTerrainMutation(terrain: object): void {
+        if (terrain === this.smokeClouds || terrain === this.vines || terrain === this.fireWalls) {
+            this.recordFightMutation(this.fightProperties);
+        }
+    }
+    public getCapturedObjectCounts(): { units: number; grid: number; fight: number; holder: number } {
+        return {
+            units: this.units.size,
+            grid: this.gridSnapshot ? 1 : 0,
+            fight: this.fightSnapshot ? 1 : 0,
+            holder: this.holderSnapshot ? 1 : 0,
+        };
     }
     public rollback(): void {
-        const snapshot = this.snapshot;
-        if (!snapshot) {
+        if (this.consumed) {
             throw new Error("Battle rollback checkpoint has already been consumed");
         }
-        this.snapshot = undefined;
-        restoreBattleSnapshot(snapshot, this.unitsHolder, this.grid, this.fightProperties, false);
+        if (activeRollbackCheckpoint !== this) {
+            throw new Error("Battle rollback checkpoints must be consumed in creation order");
+        }
+        this.consumed = true;
+        activeRollbackCheckpoint = undefined;
+        const liveUnits = this.unitsHolder.getAllUnits() as Map<string, Unit>;
+        liveUnits.clear();
+        for (const id of this.unitOrder) {
+            const unit = this.unitRefs.get(id);
+            if (!unit) {
+                continue;
+            }
+            const snapshot = this.units.get(id);
+            if (snapshot) {
+                writeFields(unit, UNIT_FIELDS, snapshot, false);
+            }
+            liveUnits.set(id, unit);
+        }
+        if (this.gridSnapshot) {
+            writeFields(this.grid, GRID_FIELDS, this.gridSnapshot, false);
+        }
+        if (this.fightSnapshot) {
+            writeFields(this.fightProperties, FIGHT_FIELDS, this.fightSnapshot, false);
+        }
+        if (this.holderSnapshot) {
+            writeFields(this.unitsHolder, HOLDER_FIELDS, this.holderSnapshot, false);
+        }
+        restoreAITargetMemory(this.unitsHolder, this.aiTargetMemory);
     }
 }
 
@@ -308,14 +611,18 @@ export class BattleRollbackJournal {
         this.unitsHolder = unitsHolder;
         this.grid = grid;
         this.fightProperties = fightProperties;
+        installMutationHooks(unitsHolder, grid, fightProperties);
     }
     public checkpoint(): BattleRollbackCheckpoint {
-        return new BattleRollbackCheckpoint(
-            captureBattleSnapshot(this.unitsHolder, this.grid, this.fightProperties),
-            this.unitsHolder,
-            this.grid,
-            this.fightProperties,
-        );
+        if (activeRollbackCheckpoint) {
+            throw new Error("Cannot create a battle rollback checkpoint while another checkpoint is active");
+        }
+        const unitRefs = new Map(this.unitsHolder.getAllUnits());
+        const checkpoint = new BattleRollbackCheckpoint(this.unitsHolder, this.grid, this.fightProperties, unitRefs, [
+            ...unitRefs.keys(),
+        ]);
+        activeRollbackCheckpoint = checkpoint;
+        return checkpoint;
     }
 }
 

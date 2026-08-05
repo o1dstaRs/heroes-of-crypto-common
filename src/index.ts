@@ -70,6 +70,7 @@ export * from "./factions/faction_type";
 export * as HoCLib from "./utils/lib";
 export * as HoCMath from "./utils/math";
 export * as AI from "./ai/ai";
+export * from "./ai/tactical_split_placement";
 export {
     getAIStrategy,
     aiVersionForUnit,
@@ -125,7 +126,8 @@ export type {
     IV09QualificationReceipt,
 } from "./ai";
 // Setup AI (draft/placement policy) — perk, bundle, creatures, artifacts, synergies, augments.
-export { SETUP_POLICY_V0, SetupPolicyV0 } from "./ai/setup/setup_v0";
+export { SETUP_POLICY_V0, SETUP_POLICY_V0_DRAFT_ROLLBACK, SetupPolicyV0 } from "./ai/setup/setup_v0";
+export type { ISetupPolicyV0Options } from "./ai/setup/setup_v0";
 export { createPlacementSetupDecisionContext, createTier2ArtifactDecisionContext } from "./ai/setup/setup_strategy";
 export type {
     IPlacementSetupDecisionContext,
@@ -135,7 +137,17 @@ export type {
 } from "./ai/setup/setup_strategy";
 export { creatureIdForName, creatureInfo, scoreCreature } from "./ai/setup/creature_score";
 export {
+    applyDraftCoherenceOverlay,
+    DRAFT_COHERENCE_WEIGHT,
+    draftBundleCoherenceAffinity,
+    draftCreatureCoherenceAffinity,
+    pickCoherentDraftBundle,
+    pickCoherentDraftCreature,
+} from "./ai/setup/draft_coherence";
+export type { DraftBundle, IDraftCoherenceContext } from "./ai/setup/draft_coherence";
+export {
     compileNonFightSetupPolicy,
+    compileReplayTacticsSetupPolicy,
     COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
     placementOpponentVisibility,
     resolveSetupPolicy,
@@ -151,6 +163,18 @@ export {
     V07_PUBLIC_ROSTER_SETUP_ARTIFACT,
     V07_PUBLIC_ROSTER_SETUP_SPEC,
 } from "./ai/setup/setup_ship";
+export {
+    canonicalReplayTacticsSetupBehavior,
+    parseReplayTacticsSetupArtifact,
+    RANKED_REPLAY_TACTICS_BASE_SPEC,
+    RANKED_REPLAY_TACTICS_BEHAVIOR_SHA256,
+    RANKED_REPLAY_TACTICS_BUDGET,
+    RANKED_REPLAY_TACTICS_SETUP_ARTIFACT,
+    RANKED_REPLAY_TACTICS_SETUP_SPEC,
+    REPLAY_TACTICS_ARMY_IDENTITIES,
+    replayTacticsArmyIdentity,
+    replayTacticsAugmentPlan,
+} from "./ai/setup/setup_replay_tactics";
 export type {
     IResolvedSetupPolicy,
     ISetupAugmentChoice,
@@ -161,6 +185,13 @@ export type {
     V07SetupPolicyBehaviorSha256,
     V07SetupPolicySpec,
 } from "./ai/setup/setup_ship";
+export type {
+    IReplayTacticsAugmentPlan,
+    IReplayTacticsClassifier,
+    IReplayTacticsSetupArtifact,
+    IReplayTacticsSetupBehavior,
+    ReplayTacticsArmyIdentity,
+} from "./ai/setup/setup_replay_tactics";
 export * as HoCConstants from "./constants";
 export * from "./generated/protobuf/v1";
 export { default as CREATURES_JSON } from "./configuration/creatures.json";

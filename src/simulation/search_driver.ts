@@ -43,7 +43,18 @@ import {
     preservesV08BacklineProtectorIntent,
     preservesV08BacklineWardIntent,
 } from "../ai/versions/v0_8_backline_protector";
+import { v08ArmageddonPreservationOpportunity } from "../ai/versions/v0_8_armageddon_endgame";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
+import {
+    reserveV08ReplayLeafChallenger,
+    selectV08ReplayNearTieCandidateIndex,
+    selectV08ReplayShortlistFocusCandidate,
+    v08ReplayNativeRangedMatchupEligible,
+    v08RankedReplayTiebreakSupportsGrid,
+    V08_RANKED_REPLAY_TIEBREAK_EPSILON_ENV,
+    V08_RANKED_REPLAY_TIEBREAK_VERSIONS_ENV,
+} from "../ai/versions/v0_8_ranked_replay_tactics";
+
 import {
     selectV08STargetPressureCandidate,
     V08S_URGENT_FINISH_START_LAP,
@@ -129,6 +140,25 @@ import {
     VALUE_FEATURE_NAMES,
     VALUE_FEATURE_NAMES_V2,
 } from "./value_features";
+
+export const V08_RAPID_CHARGE_RESERVATION_ENV = "SEARCH_V08_RAPID_CHARGE_RESERVATION";
+export const V08_RAPID_CHARGE_RESERVATION_VERSIONS_ENV = "SEARCH_V08_RAPID_CHARGE_RESERVATION_VERSIONS";
+export const SEARCH_RESEARCH_HORIZON_ENV = "SEARCH_RESEARCH_HORIZON";
+export const SEARCH_RESEARCH_HORIZON_VERSIONS_ENV = "SEARCH_RESEARCH_HORIZON_VERSIONS";
+export const SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV = "SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES";
+export const SEARCH_RESEARCH_SHORTLIST_ENV = "SEARCH_RESEARCH_SHORTLIST";
+export const SEARCH_RESEARCH_SHORTLIST_VERSIONS_ENV = "SEARCH_RESEARCH_SHORTLIST_VERSIONS";
+export const SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV =
+    "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY";
+
+/** Keep one marked charger alternative beside the ordinary leaf winner; option-off is an exact identity. */
+export function reserveResearchRapidChargeShortlist(
+    candidates: readonly IEnumeratedCandidate[],
+    challengers: readonly IEnumeratedCandidate[],
+): readonly IEnumeratedCandidate[] {
+    const reserved = candidates.find((candidate) => candidate.researchRapidChargeDifferentTargetReserved === true);
+    return reserved && !challengers.includes(reserved) ? [...challengers, reserved] : challengers;
+}
 
 /**
  * B2 / RAWS — the WIDE-CANDIDATE ROLLOUT SEARCH driver (v0.7 roadmap).
@@ -217,6 +247,25 @@ import {
  * excluded; each surviving ordered action list is still applied through the real engine before it can win.
  * SEARCH_MOVE_SHOT_VERSIONS=<csv> scopes that probe to selected seats (for example `v0.8` while an identical
  * `v0.8s` seat remains the control). Unset defaults to SEARCH_VERSIONS; it is ignored while the max is zero.
+ * SEARCH_RESEARCH_HORIZON=<positive integer> is a research-only override for normal full-turn rollouts.
+ * SEARCH_RESEARCH_HORIZON_VERSIONS=<csv> is required with it and scopes the override to selected searched
+ * versions, so one seat can test H18 while an otherwise identical control keeps SEARCH_HORIZON=12. Discovery
+ * and domain-separated validation use the same seat-local cap; leaf, lap, and first-reply horizons are unchanged.
+ * SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES=<positive integer> optionally narrows that override to acting teams
+ * whose immutable post-setup army contains at least that many distinct, living, non-summoned native RANGE
+ * creature names. Unset preserves the broad version-scoped override exactly; the key is invalid without the
+ * research horizon pair.
+ * SEARCH_RESEARCH_SHORTLIST=<integer >= 2> is a research-only override for SEARCH_SHORTLIST and requires an
+ * explicit production shortlist. SEARCH_RESEARCH_SHORTLIST_VERSIONS=<csv> is required with it and scopes the
+ * override to selected searched versions, so a candidate seat can score three finalists while its otherwise
+ * identical control retains SEARCH_SHORTLIST=2. Immediate-leaf ranking and every full-turn shortlist consumer
+ * use the acting seat's version; unset preserves the production shortlist exactly.
+ * SEARCH_V08_RANKED_REPLAY_TIEBREAK_EPSILON=<0..0.05> adds a default-zero post-score preference among the
+ * existing shortlist only. A replay-qualified focus/dive candidate may replace the raw best only when both
+ * challengers independently clear SEARCH_GATE and their rollout means differ by no more than epsilon. It never
+ * changes candidate enumeration, shortlisting, rollouts, incumbent gates, or search-disabled decisions.
+ * SEARCH_V08_RANKED_REPLAY_TIEBREAK_VERSIONS=<csv> scopes that preference; unset inherits SEARCH_VERSIONS.
+ * SEARCH_V08_RANKED_REPLAY_TIEBREAK_GRIDS=<numeric GridVals csv> scopes it by map; unset preserves all maps.
  * SEARCH_CIRCUIT_BREAKER_MS=<positive ms> provides a lower-bound research emulation of the ranked server's
  * outer per-match circuit: the first over-budget result still applies, then historical versions retain each later
  * incumbent. Under the operation-bounded wait policy, every later aggressive v0.8/v0.8s wait (ordinary or
@@ -388,6 +437,105 @@ const envNum = (name: string, fallback: number, min: number): number => {
     return Number.isFinite(v) && v >= min ? v : fallback;
 };
 
+interface ISearchResearchHorizon {
+    readonly horizon: number;
+    readonly versions: ReadonlySet<string>;
+    readonly minRangedTypes: number | null;
+}
+
+interface ISearchResearchShortlist {
+    readonly shortlist: number;
+    readonly versions: ReadonlySet<string>;
+}
+
+/** Strict, fail-closed parsing prevents a typo from silently turning a causal seat comparison into identity. */
+function parseSearchResearchHorizon(
+    mode: SearchMode,
+    searchVersions: ReadonlySet<string>,
+): ISearchResearchHorizon | null {
+    const rawHorizon = process.env[SEARCH_RESEARCH_HORIZON_ENV];
+    const rawVersions = process.env[SEARCH_RESEARCH_HORIZON_VERSIONS_ENV];
+    const rawMinRangedTypes = process.env[SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV];
+    if (rawHorizon === undefined && rawVersions === undefined && rawMinRangedTypes === undefined) return null;
+    if (rawMinRangedTypes !== undefined && rawHorizon === undefined) {
+        throw new Error(`${SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV} requires ${SEARCH_RESEARCH_HORIZON_ENV}`);
+    }
+    if (mode !== "search") {
+        throw new Error(`${SEARCH_RESEARCH_HORIZON_ENV} requires V07_SEARCH=1`);
+    }
+    if (rawHorizon === undefined || rawHorizon.trim() === "") {
+        throw new Error(`${SEARCH_RESEARCH_HORIZON_ENV} must be a positive integer`);
+    }
+    const horizon = Number(rawHorizon);
+    if (!Number.isSafeInteger(horizon) || horizon <= 0) {
+        throw new Error(`${SEARCH_RESEARCH_HORIZON_ENV} must be a positive integer`);
+    }
+    if (rawVersions === undefined || rawVersions.trim() === "") {
+        throw new Error(
+            `${SEARCH_RESEARCH_HORIZON_VERSIONS_ENV} must be a comma-separated list of unique searched versions`,
+        );
+    }
+    const versions = rawVersions.split(",").map((version) => version.trim());
+    if (
+        versions.some((version) => !version) ||
+        new Set(versions).size !== versions.length ||
+        versions.some((version) => !searchVersions.has(version))
+    ) {
+        throw new Error(
+            `${SEARCH_RESEARCH_HORIZON_VERSIONS_ENV} must be a comma-separated list of unique searched versions`,
+        );
+    }
+    let minRangedTypes: number | null = null;
+    if (rawMinRangedTypes !== undefined) {
+        const parsedMinRangedTypes = Number(rawMinRangedTypes);
+        if (!Number.isSafeInteger(parsedMinRangedTypes) || parsedMinRangedTypes <= 0) {
+            throw new Error(`${SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV} must be a positive integer`);
+        }
+        minRangedTypes = parsedMinRangedTypes;
+    }
+    return { horizon, versions: new Set(versions), minRangedTypes };
+}
+
+/** Require an explicit baseline and a valid searched-seat scope so an A/B typo cannot silently change both arms. */
+function parseSearchResearchShortlist(
+    mode: SearchMode,
+    searchVersions: ReadonlySet<string>,
+    baseShortlist: number | null,
+): ISearchResearchShortlist | null {
+    const rawShortlist = process.env[SEARCH_RESEARCH_SHORTLIST_ENV];
+    const rawVersions = process.env[SEARCH_RESEARCH_SHORTLIST_VERSIONS_ENV];
+    if (rawShortlist === undefined && rawVersions === undefined) return null;
+    if (mode !== "search") {
+        throw new Error(`${SEARCH_RESEARCH_SHORTLIST_ENV} requires V07_SEARCH=1`);
+    }
+    if (baseShortlist === null) {
+        throw new Error(`${SEARCH_RESEARCH_SHORTLIST_ENV} requires SEARCH_SHORTLIST`);
+    }
+    if (rawShortlist === undefined || rawShortlist.trim() === "") {
+        throw new Error(`${SEARCH_RESEARCH_SHORTLIST_ENV} must be an integer >= 2`);
+    }
+    const shortlist = Number(rawShortlist);
+    if (!Number.isSafeInteger(shortlist) || shortlist < 2) {
+        throw new Error(`${SEARCH_RESEARCH_SHORTLIST_ENV} must be an integer >= 2`);
+    }
+    if (rawVersions === undefined || rawVersions.trim() === "") {
+        throw new Error(
+            `${SEARCH_RESEARCH_SHORTLIST_VERSIONS_ENV} must be a comma-separated list of unique searched versions`,
+        );
+    }
+    const versions = rawVersions.split(",").map((version) => version.trim());
+    if (
+        versions.some((version) => !version) ||
+        new Set(versions).size !== versions.length ||
+        versions.some((version) => !searchVersions.has(version))
+    ) {
+        throw new Error(
+            `${SEARCH_RESEARCH_SHORTLIST_VERSIONS_ENV} must be a comma-separated list of unique searched versions`,
+        );
+    }
+    return { shortlist, versions: new Set(versions) };
+}
+
 const INCUMBENT_KINDS = new Set(["idle", "defend", "wait", "move", "melee", "shot", "area_throw", "spell", "mine"]);
 const CHALLENGER_KINDS = new Set<CandidateKind>([
     "wait",
@@ -529,6 +677,88 @@ const footprintDistance = (
 };
 
 /**
+ * H18 opening-tempo guard. A high-tier fast flyer that is still screened by its army should not turn a native
+ * initiative wait into a move-only solo dive. Black Dragon also keeps the wait instead of an unsupported opening
+ * move-and-strike: paired loss census showed that its apparent immediate damage repeatedly invites the packed
+ * enemy army to surround the isolated stack. Other flyers' attacks, stationary attacks, and later turns retain
+ * their historical behavior.
+ */
+export function isEarlyIsolatingFastFlyerWaitMove(
+    unit: Unit,
+    unitsHolder: ILookaheadDeps["unitsHolder"],
+    currentLap: number,
+    candidate: Pick<IEnumeratedCandidate, "actions">,
+): boolean {
+    const pureMove = isPureMoveCandidate(candidate);
+    const blackDragonOpeningMove = unit.getName() === "Black Dragon" && pureMove;
+    const blackDragonMoveAttack =
+        unit.getName() === "Black Dragon" &&
+        candidate.actions.some((action) => action.type === "move_unit") &&
+        candidate.actions.some((action) => action.type === "melee_attack");
+    if (
+        currentLap !== 1 ||
+        !unit.canFly() ||
+        unit.getLevel() < PBTypes.UnitLevelVals.FOURTH ||
+        unit.getSteps() < 7 ||
+        (!pureMove && !blackDragonMoveAttack)
+    ) {
+        return false;
+    }
+    const move = candidate.actions.find((action) => action.type === "move_unit");
+    if (move?.type !== "move_unit" || !move.targetCells?.length) return false;
+
+    const allyCells = unitsHolder
+        .getAllAllies(unit.getTeam())
+        .filter((ally) => ally.getId() !== unit.getId() && !ally.isDead())
+        .map((ally) => ally.getCells());
+    if (!allyCells.length) return false;
+
+    const currentDistance = Math.min(...allyCells.map((cells) => footprintDistance(unit.getCells(), cells)));
+    const destinationDistance = Math.min(...allyCells.map((cells) => footprintDistance(move.targetCells!, cells)));
+    // An already-isolated Black Dragon closing back toward its army is recovery, not a new solo dive.
+    if (unit.getName() === "Black Dragon" && destinationDistance < currentDistance) return false;
+    return (
+        destinationDistance >= 4 &&
+        (blackDragonOpeningMove ||
+            blackDragonMoveAttack ||
+            (currentDistance <= 2 && destinationDistance - currentDistance >= 2))
+    );
+}
+
+/** A narrow late-game state where preserving Abomination HP deserves an exact rollout comparison. */
+export function isV08ArmageddonDefendOpportunity(
+    unit: Unit,
+    unitsHolder: ILookaheadDeps["unitsHolder"],
+    currentLap: number,
+): boolean {
+    if (unit.getName() !== "Abomination" || unit.isDead()) return false;
+    const opposingAbomination = unitsHolder
+        .getAllEnemyUnits(unit.getTeam())
+        .find((enemy) => !enemy.isDead() && enemy.getName() === "Abomination");
+    return (
+        opposingAbomination !== undefined &&
+        v08ArmageddonPreservationOpportunity(unit, opposingAbomination, currentLap) !== undefined
+    );
+}
+
+/**
+ * Deterministic terminal policy gate: no ally or enemy besides the two original Abominations may remain.
+ * Keeping this stricter than the research candidate opportunity prevents a rollout-only multi-stack defend.
+ */
+export function isV08SoleAbominationArmageddonDefendOpportunity(
+    unit: Unit,
+    unitsHolder: ILookaheadDeps["unitsHolder"],
+    currentLap: number,
+): boolean {
+    if (unit.getName() !== "Abomination" || unit.isDead()) return false;
+    const livingAllies = unitsHolder.getAllAllies(unit.getTeam()).filter((ally) => !ally.isDead());
+    if (livingAllies.length !== 1 || livingAllies[0].getId() !== unit.getId()) return false;
+    const livingEnemies = unitsHolder.getAllEnemyUnits(unit.getTeam()).filter((enemy) => !enemy.isDead());
+    if (livingEnemies.length !== 1 || livingEnemies[0].getName() !== "Abomination") return false;
+    return v08ArmageddonPreservationOpportunity(unit, livingEnemies[0], currentLap) !== undefined;
+}
+
+/**
  * Immediate geometric progress for a pure move. The terminal mountain fallback uses footprint distance rather
  * than route length: a lateral route around BLOCK_CENTER that finishes no closer to any living enemy is exactly
  * the non-progress class that can alternate forever, while a genuinely closing move remains authoritative.
@@ -639,6 +869,18 @@ interface ISearchCounters {
     scoredCandidatesTotal: number;
     /** Searches abandoned before every shortlisted candidate received a comparable full score. */
     deadlineFallbacks: number;
+    /** H18 opening decisions where at least one move-only fast-flyer solo dive was removed from the catalog. */
+    isolatingFastFlyerMoveRejects: number;
+    /** Late Abomination turns that admitted defend into exact-terminal rollout arbitration. */
+    armageddonDefendOpportunities: number;
+    /** Live turns where the strict sole-Abomination terminal policy deterministically defended. */
+    soleAbominationArmageddonDefends: number;
+    /** Provisional A19 overrides that reached the independent paired validation bank. */
+    nonregressiveOverrideValidationAttempts: number;
+    /** Paired validation banks whose challenger cleared the configured gate. */
+    nonregressiveOverrideValidationPasses: number;
+    /** Paired validation banks that failed closed to the incumbent. */
+    nonregressiveOverrideValidationRejects: number;
     /** Finite operation-bounded wait arbitrations entered after the per-match timing circuit has opened. */
     circuitWaitArbitrations: number;
     /** v0.8 turns that entered the fixed late two-to-one-HP finish window. */
@@ -808,6 +1050,12 @@ const emptyCounters = (): ISearchCounters => ({
     candidatesTotal: 0,
     scoredCandidatesTotal: 0,
     deadlineFallbacks: 0,
+    isolatingFastFlyerMoveRejects: 0,
+    armageddonDefendOpportunities: 0,
+    soleAbominationArmageddonDefends: 0,
+    nonregressiveOverrideValidationAttempts: 0,
+    nonregressiveOverrideValidationPasses: 0,
+    nonregressiveOverrideValidationRejects: 0,
     circuitWaitArbitrations: 0,
     dominantFinishTurns: 0,
     dominantFinishCombatOverrides: 0,
@@ -921,6 +1169,18 @@ export interface ISearchMatchInfo {
     seed?: number;
     greenVersion?: string;
     redVersion?: string;
+    /**
+     * Optional physical-team scope for this driver. Omission preserves the historical version-only routing;
+     * an explicit scope lets a research entrant share a version label with its control without searching the
+     * control seat. The battle engine must pass the acting team to appliesTo/chooseDecision when this is set.
+     */
+    searchTeamScope?: readonly TeamType[];
+    /**
+     * Offline simulations have finite candidate, shortlist, rollout, and horizon caps. When true, those fixed
+     * operation bounds decide behavior and wall-clock watchdogs remain diagnostic-only. Ranked/live callers omit
+     * this flag and retain the production deadline and circuit-breaker fail-safe.
+     */
+    offlineDeterministicWork?: boolean;
 }
 
 /**
@@ -1021,8 +1281,24 @@ export class SearchDriver {
     private readonly scoredDecisionObserver: SearchScoredDecisionObserver | undefined;
     private readonly passiveProductiveProbeObserver: SearchPassiveProductiveProbeObserver | undefined;
     private readonly versions: ReadonlySet<string>;
+    private readonly teamScope: ReadonlySet<TeamType> | null;
     private readonly gate: number;
+    private readonly rankedReplayTiebreakEpsilon: number;
+    private readonly rankedReplayTiebreakVersions: ReadonlySet<string>;
+    private readonly rapidChargeReservationVersions: ReadonlySet<string>;
+    /** Explicit A19-H18-v2 policy gate; horizon alone must never opt another profile into this rule. */
+    private readonly fastFlyerCohesion: boolean;
+    private readonly armageddonDefendCandidate: boolean;
+    private readonly soleAbominationArmageddonDefendPolicy: boolean;
+    private readonly abominationMirrorRelease: boolean;
+    private readonly strictAggressiveWaitTies: boolean;
+    private readonly nonregressiveProductiveOverride: boolean;
+    private readonly exactTerminalResults: boolean;
+    private readonly nonregressiveOverrideValidation: boolean;
     private readonly horizon: number;
+    private readonly researchHorizon: number | null;
+    private readonly researchHorizonVersions: ReadonlySet<string>;
+    private readonly researchHorizonMinRangedTypes: number | null;
     private readonly rollouts: number;
     private readonly includeMoves: boolean;
     private readonly maxMoveShotComposites: number;
@@ -1034,6 +1310,8 @@ export class SearchDriver {
     private readonly challengerKinds: ReadonlySet<CandidateKind> | null;
     private readonly validationRollouts: number | null;
     private readonly shortlist: number | null;
+    private readonly researchShortlist: number | null;
+    private readonly researchShortlistVersions: ReadonlySet<string>;
     private readonly decisionDeadlineMs: number | null;
     private readonly waitDeadlinePolicy: WaitDeadlinePolicy;
     private readonly lateRangedFinishWeight: number;
@@ -1085,7 +1363,9 @@ export class SearchDriver {
     private readonly turnRows: string[] = [];
     private finishPressureState: FinishPressureState | null = null;
     private pureRangedTerminalState: PureRangedTerminalState | null = null;
+    private researchHorizonEligibleTeams: ReadonlySet<TeamType> | null = null;
     private finishedSim = false;
+    private finishedWinningTeam: TeamType | null = null;
     private circuitOpen = false;
     public constructor(
         deps: ILookaheadDeps,
@@ -1119,8 +1399,131 @@ export class SearchDriver {
                 .map((v) => v.trim())
                 .filter(Boolean),
         );
+        if (match.searchTeamScope === undefined) {
+            this.teamScope = null;
+        } else {
+            const validTeams = new Set<TeamType>([PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER]);
+            if (match.searchTeamScope.some((team) => !validTeams.has(team))) {
+                throw new Error("Search team scope may contain only LOWER and UPPER");
+            }
+            this.teamScope = new Set(match.searchTeamScope);
+        }
         this.gate = envNum("SEARCH_GATE", 0.01, 0);
+        this.rankedReplayTiebreakEpsilon = envNum(V08_RANKED_REPLAY_TIEBREAK_EPSILON_ENV, 0, 0);
+        if (this.rankedReplayTiebreakEpsilon > 0.05) {
+            throw new Error(`${V08_RANKED_REPLAY_TIEBREAK_EPSILON_ENV} must be between 0 and 0.05`);
+        }
+        const rawRankedReplayTiebreakVersions = process.env[V08_RANKED_REPLAY_TIEBREAK_VERSIONS_ENV];
+        this.rankedReplayTiebreakVersions =
+            this.rankedReplayTiebreakEpsilon === 0 || rawRankedReplayTiebreakVersions === ""
+                ? new Set()
+                : new Set(
+                      (rawRankedReplayTiebreakVersions ?? [...this.versions].join(","))
+                          .split(",")
+                          .map((version) => version.trim())
+                          .filter(Boolean),
+                  );
+        const rapidChargeReservation = process.env[V08_RAPID_CHARGE_RESERVATION_ENV];
+        if (rapidChargeReservation !== undefined && rapidChargeReservation !== "0" && rapidChargeReservation !== "1") {
+            throw new Error(`${V08_RAPID_CHARGE_RESERVATION_ENV} must be 0 or 1`);
+        }
+        const rawRapidChargeVersions = process.env[V08_RAPID_CHARGE_RESERVATION_VERSIONS_ENV];
+        this.rapidChargeReservationVersions =
+            rapidChargeReservation !== "1" || rawRapidChargeVersions === ""
+                ? new Set()
+                : new Set(
+                      (rawRapidChargeVersions ?? [...this.versions].join(","))
+                          .split(",")
+                          .map((version) => version.trim())
+                          .filter(Boolean),
+                  );
+        const rawFastFlyerCohesion = process.env.SEARCH_A19_FAST_FLYER_COHESION;
+        if (
+            rawFastFlyerCohesion !== undefined &&
+            rawFastFlyerCohesion !== "" &&
+            rawFastFlyerCohesion !== "0" &&
+            rawFastFlyerCohesion !== "1"
+        ) {
+            throw new Error("SEARCH_A19_FAST_FLYER_COHESION must be 0 or 1");
+        }
+        this.fastFlyerCohesion = this.mode === "search" && rawFastFlyerCohesion === "1";
+        const rawArmageddonDefendCandidate = process.env.SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE;
+        if (
+            rawArmageddonDefendCandidate !== undefined &&
+            rawArmageddonDefendCandidate !== "" &&
+            rawArmageddonDefendCandidate !== "0" &&
+            rawArmageddonDefendCandidate !== "1"
+        ) {
+            throw new Error("SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE must be 0 or 1");
+        }
+        this.armageddonDefendCandidate = this.mode === "search" && rawArmageddonDefendCandidate === "1";
+        const rawSoleAbominationArmageddonDefendPolicy =
+            process.env[SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV];
+        if (
+            rawSoleAbominationArmageddonDefendPolicy !== undefined &&
+            rawSoleAbominationArmageddonDefendPolicy !== "" &&
+            rawSoleAbominationArmageddonDefendPolicy !== "0" &&
+            rawSoleAbominationArmageddonDefendPolicy !== "1"
+        ) {
+            throw new Error(`${SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV} must be 0 or 1`);
+        }
+        this.soleAbominationArmageddonDefendPolicy =
+            this.mode === "search" && rawSoleAbominationArmageddonDefendPolicy === "1";
+        const rawAbominationMirrorRelease = process.env.SEARCH_A19_ABOMINATION_MIRROR_RELEASE;
+        if (
+            rawAbominationMirrorRelease !== undefined &&
+            rawAbominationMirrorRelease !== "" &&
+            rawAbominationMirrorRelease !== "0" &&
+            rawAbominationMirrorRelease !== "1"
+        ) {
+            throw new Error("SEARCH_A19_ABOMINATION_MIRROR_RELEASE must be 0 or 1");
+        }
+        this.abominationMirrorRelease = this.mode === "search" && rawAbominationMirrorRelease === "1";
+        const rawStrictAggressiveWaitTies = process.env.SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES;
+        if (
+            rawStrictAggressiveWaitTies !== undefined &&
+            rawStrictAggressiveWaitTies !== "" &&
+            rawStrictAggressiveWaitTies !== "0" &&
+            rawStrictAggressiveWaitTies !== "1"
+        ) {
+            throw new Error("SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES must be 0 or 1");
+        }
+        this.strictAggressiveWaitTies = this.mode === "search" && rawStrictAggressiveWaitTies === "1";
+        const rawNonregressiveProductiveOverride = process.env.SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE;
+        if (
+            rawNonregressiveProductiveOverride !== undefined &&
+            rawNonregressiveProductiveOverride !== "" &&
+            rawNonregressiveProductiveOverride !== "0" &&
+            rawNonregressiveProductiveOverride !== "1"
+        ) {
+            throw new Error("SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE must be 0 or 1");
+        }
+        this.nonregressiveProductiveOverride = this.mode === "search" && rawNonregressiveProductiveOverride === "1";
+        const rawExactTerminalResults = process.env.SEARCH_A19_EXACT_TERMINAL_RESULTS;
+        if (
+            rawExactTerminalResults !== undefined &&
+            rawExactTerminalResults !== "" &&
+            rawExactTerminalResults !== "0" &&
+            rawExactTerminalResults !== "1"
+        ) {
+            throw new Error("SEARCH_A19_EXACT_TERMINAL_RESULTS must be 0 or 1");
+        }
+        this.exactTerminalResults = this.mode === "search" && rawExactTerminalResults === "1";
+        const rawNonregressiveOverrideValidation = process.env.SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION;
+        if (
+            rawNonregressiveOverrideValidation !== undefined &&
+            rawNonregressiveOverrideValidation !== "" &&
+            rawNonregressiveOverrideValidation !== "0" &&
+            rawNonregressiveOverrideValidation !== "1"
+        ) {
+            throw new Error("SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION must be 0 or 1");
+        }
+        this.nonregressiveOverrideValidation = this.mode === "search" && rawNonregressiveOverrideValidation === "1";
         this.horizon = Math.floor(envNum("SEARCH_HORIZON", 12, 1));
+        const researchHorizon = parseSearchResearchHorizon(this.mode, this.versions);
+        this.researchHorizon = researchHorizon?.horizon ?? null;
+        this.researchHorizonVersions = researchHorizon?.versions ?? new Set();
+        this.researchHorizonMinRangedTypes = researchHorizon?.minRangedTypes ?? null;
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
         this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
         const rawMaxMoveShots = process.env.SEARCH_MAX_MOVE_SHOTS;
@@ -1199,6 +1602,9 @@ export class SearchDriver {
             }
             this.shortlist = shortlist;
         }
+        const researchShortlist = parseSearchResearchShortlist(this.mode, this.versions, this.shortlist);
+        this.researchShortlist = researchShortlist?.shortlist ?? null;
+        this.researchShortlistVersions = researchShortlist?.versions ?? new Set();
         const rawDecisionDeadline = process.env.SEARCH_DECISION_DEADLINE_MS;
         if (this.mode !== "search" || rawDecisionDeadline === undefined || rawDecisionDeadline === "") {
             this.decisionDeadlineMs = null;
@@ -1487,15 +1893,67 @@ export class SearchDriver {
         };
     }
     /** Whether this driver re-decides turns for the given strategy version. */
-    public appliesTo(version: string): boolean {
-        return this.enabled && this.versions.has(version);
+    public appliesTo(version: string, team?: TeamType): boolean {
+        return (
+            this.enabled &&
+            this.versions.has(version) &&
+            (this.teamScope === null || (team !== undefined && this.teamScope.has(team)))
+        );
+    }
+    /** The exact same deterministic terminal policy is consulted by live play and by future own-side rollout turns. */
+    private shouldUseSoleAbominationArmageddonDefend(unit: Unit): boolean {
+        return (
+            this.soleAbominationArmageddonDefendPolicy &&
+            !this.observeOnly &&
+            (this.teamScope === null || this.teamScope.has(unit.getTeam())) &&
+            (this.rolloutEnemyTeam === null || unit.getTeam() !== this.rolloutEnemyTeam) &&
+            isV08SoleAbominationArmageddonDefendOpportunity(
+                unit,
+                this.deps.unitsHolder,
+                this.deps.fightProperties.getCurrentLap(),
+            )
+        );
     }
     /** Seat-local action-space switch; lets one searched version remain an otherwise identical control. */
     private moveShotCapForVersion(version: string): number {
         return this.moveShotVersions.has(version) ? this.maxMoveShotComposites : 0;
     }
+    /** Immediate-leaf finalist cap for one acting seat; unscoped seats retain the production setting. */
+    private shortlistForVersion(version: string): number | null {
+        return this.researchShortlist !== null && this.researchShortlistVersions.has(version)
+            ? this.researchShortlist
+            : this.shortlist;
+    }
+    /** Normal-turn rollout cap for one acting seat; fixed leaf/lap/reply modes do not consult this value. */
+    private turnHorizonForVersion(version: string, actingTeam: TeamType): number {
+        if (this.researchHorizon === null || !this.researchHorizonVersions.has(version)) {
+            return this.horizon;
+        }
+        if (this.researchHorizonMinRangedTypes === null) {
+            return this.researchHorizon;
+        }
+        this.onFightReady();
+        return this.researchHorizonEligibleTeams?.has(actingTeam) ? this.researchHorizon : this.horizon;
+    }
     /** Capture the immutable post-setup armies before either side takes a combat turn. */
     public onFightReady(): void {
+        const minRangedTypes = this.researchHorizonMinRangedTypes;
+        if (minRangedTypes !== null && this.researchHorizonEligibleTeams === null) {
+            const rangedNamesByTeam = new Map<TeamType, Set<string>>();
+            for (const unit of this.deps.unitsHolder.getAllUnits().values()) {
+                if (unit.isDead() || unit.isSummoned() || unit.getAttackType() !== PBTypes.AttackVals.RANGE) {
+                    continue;
+                }
+                const names = rangedNamesByTeam.get(unit.getTeam()) ?? new Set<string>();
+                names.add(unit.getName());
+                rangedNamesByTeam.set(unit.getTeam(), names);
+            }
+            this.researchHorizonEligibleTeams = new Set(
+                [...rangedNamesByTeam.entries()]
+                    .filter(([, names]) => names.size >= minRangedTypes)
+                    .map(([team]) => team),
+            );
+        }
         if (this.lateRangedFinishWeight > 0 && this.finishPressureState === null) {
             this.finishPressureState = captureFinishPressureState(this.deps.unitsHolder);
         }
@@ -1524,8 +1982,19 @@ export class SearchDriver {
         incumbent: GameAction[],
         rootDecisionContext?: IDecisionContext,
     ): GameAction[] {
-        if (!this.appliesTo(version)) {
+        // Preserve the historical version-only fast path: an unscoped driver must not
+        // inspect the unit at all when this strategy version is excluded. Team lookup
+        // is necessary only for the explicit entrant-team research scope.
+        if (!this.enabled || !this.versions.has(version)) {
             return incumbent;
+        }
+        if (this.teamScope !== null && !this.teamScope.has(unit.getTeam())) {
+            return incumbent;
+        }
+        if (this.shouldUseSoleAbominationArmageddonDefend(unit)) {
+            this.counters.decisions += 1;
+            this.counters.soleAbominationArmageddonDefends += 1;
+            return [{ type: "defend_turn", unitId: unit.getId() }];
         }
         const incumbentKind = classifyActions(incumbent);
         const passiveIncumbentKind = searchPassiveActionKind(incumbent);
@@ -1535,6 +2004,10 @@ export class SearchDriver {
             return incumbent;
         }
         const currentLap = this.deps.fightProperties.getCurrentLap();
+        const armageddonDefendOpportunity =
+            !this.soleAbominationArmageddonDefendPolicy &&
+            this.armageddonDefendCandidate &&
+            isV08ArmageddonDefendOpportunity(unit, this.deps.unitsHolder, currentLap);
         const isV08TargetPressurePolicy = isV08Search && V08_TARGET_PRESSURE_VERSIONS.has(version);
         const pureRangedNoMeleePressureSeat =
             this.pureRangedNoMeleePressure && this.pureRangedNoMeleePressureVersions.has(version);
@@ -1744,8 +2217,22 @@ export class SearchDriver {
                 prioritizeV08SUrgency ||
                 pureRangedParetoNoMeleeFocusCatalogBoard ||
                 pureRangedJitNoMeleeFocusCatalogBoard;
-            const backlineProtectorIntent = isV08Search ? buildV08BacklineProtectorIntent(unit, context) : undefined;
-            const backlineWardIntent = isV08Search ? buildV08BacklineWardIntent(unit, context) : undefined;
+            // A mirrored Abomination fight is a strict pre-Armageddon damage race. Native v0.8's protector role
+            // is still the incumbent, but the A19 arm must be allowed to compare attacks and advances instead of
+            // filtering every action that leaves Flesh Shield range. Non-mirror fights retain the established
+            // protector/ward contract exactly.
+            const releaseAbominationMirror =
+                this.abominationMirrorRelease &&
+                this.deps.unitsHolder
+                    .getAllAllies(unit.getTeam())
+                    .some((ally) => !ally.isDead() && ally.getName() === "Abomination") &&
+                this.deps.unitsHolder
+                    .getAllEnemyUnits(unit.getTeam())
+                    .some((enemy) => !enemy.isDead() && enemy.getName() === "Abomination");
+            const backlineProtectorIntent =
+                isV08Search && !releaseAbominationMirror ? buildV08BacklineProtectorIntent(unit, context) : undefined;
+            const backlineWardIntent =
+                isV08Search && !releaseAbominationMirror ? buildV08BacklineWardIntent(unit, context) : undefined;
             const passiveAudit: ISearchPassiveAuditContext | undefined =
                 this.passiveProductiveProbeObserver && passiveIncumbentKind
                     ? {
@@ -1818,10 +2305,26 @@ export class SearchDriver {
                         !prioritizeV08SUrgency),
                 preserveAttackTargetCoverage:
                     this.scoredDecisionObserver !== undefined || preserveBaselineAttackTargetCoverage,
+                researchReserveRapidChargeDifferentTarget:
+                    !this.observeOnly && this.rapidChargeReservationVersions.has(version),
             };
+            let rejectedIsolatingFastFlyerMove = false;
             const keepCandidate = (candidate: IEnumeratedCandidate): boolean => {
                 if (candidate.kind === "incumbent") return true;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
+                if (
+                    this.fastFlyerCohesion &&
+                    isV08Search &&
+                    this.horizon >= 18 &&
+                    incumbentKind === "wait" &&
+                    isEarlyIsolatingFastFlyerWaitMove(unit, this.deps.unitsHolder, currentLap, candidate)
+                ) {
+                    if (!rejectedIsolatingFastFlyerMove) {
+                        rejectedIsolatingFastFlyerMove = true;
+                        this.counters.isolatingFastFlyerMoveRejects += 1;
+                    }
+                    return false;
+                }
                 // Abomination/Arachna Queen are drafted and deployed as back-line protectors. Native v0.8
                 // establishes that intent; every a13 challenger must preserve its ward geometry (or answer an
                 // intruder) so rollout search cannot turn the role-aware hold into an unsupported charge.
@@ -1839,7 +2342,10 @@ export class SearchDriver {
                 }
                 // Search may compare a strategic wait, but it must never introduce a new Luck Shield or mountain
                 // hit. Retaining candidate zero above still permits either action as a fail-closed/true fallback.
-                if (isV08Search && (candidate.kind === "defend" || candidate.kind === "mine")) {
+                if (
+                    isV08Search &&
+                    (candidate.kind === "mine" || (candidate.kind === "defend" && !armageddonDefendOpportunity))
+                ) {
                     return false;
                 }
                 // Every v0.8 search keeps the enumerator's nearest legal move even when the catalog arm does not
@@ -1849,9 +2355,21 @@ export class SearchDriver {
                 if (!this.includeMoves && candidate.kind === "move" && !isV08Search) {
                     return false;
                 }
+                if (armageddonDefendOpportunity && candidate.kind === "defend") return true;
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             };
             const enumeratedCandidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates;
+            if (
+                armageddonDefendOpportunity &&
+                enumeratedCandidates.some(
+                    (candidate) =>
+                        candidate.kind === "defend" ||
+                        (candidate.kind === "incumbent" &&
+                            candidate.actions.some((action) => action.type === "defend_turn")),
+                )
+            ) {
+                this.counters.armageddonDefendOpportunities += 1;
+            }
             let candidates = enumeratedCandidates.filter(keepCandidate);
             const urgentMoveShotFallback =
                 prioritizeV08SUrgency &&
@@ -1988,6 +2506,7 @@ export class SearchDriver {
                     prioritizeV08SUrgency,
                     passiveAudit,
                     "operation_bounded",
+                    version,
                 );
             }
             if (auditCircuitPassiveReturn) {
@@ -2004,6 +2523,7 @@ export class SearchDriver {
                     prioritizeDominantFinish,
                     prioritizeV08STargetPressure,
                     prioritizeV08SUrgency,
+                    version,
                 );
                 this.capturePassiveProductiveProbe(
                     passiveAudit,
@@ -2435,7 +2955,9 @@ export class SearchDriver {
                 if (isDominantFinishCombatReplacement(prioritizeDominantFinish, productiveFallback, incumbent)) {
                     this.counters.dominantFinishCombatFallbacks += 1;
                 }
-                const fallbackActions = productiveFallback?.actions ?? incumbent;
+                const fallbackActions = this.nonregressiveOverrideValidation
+                    ? incumbent
+                    : (productiveFallback?.actions ?? incumbent);
                 const counterfactual = this.scorePassiveCounterfactual(
                     passiveAudit,
                     unit,
@@ -2445,6 +2967,7 @@ export class SearchDriver {
                     prioritizeDominantFinish,
                     prioritizeV08STargetPressure,
                     prioritizeV08SUrgency,
+                    version,
                 );
                 this.capturePassiveProductiveProbe(
                     passiveAudit,
@@ -2462,6 +2985,7 @@ export class SearchDriver {
             // already-probed action avoids spending the deadline on an inevitable screen-preserving move and
             // materially lowers protector decision latency without changing candidate identity or posture.
             if (
+                !this.nonregressiveOverrideValidation &&
                 prioritizeProductiveActions &&
                 productiveFallback &&
                 candidates.filter(isForceTierProductiveCandidate).length === 1
@@ -2491,7 +3015,9 @@ export class SearchDriver {
             }
             if (candidates.length <= 1) {
                 this.counters.singleCandidate += 1;
-                const fallbackActions = productiveFallback?.actions ?? incumbent;
+                const fallbackActions = this.nonregressiveOverrideValidation
+                    ? incumbent
+                    : (productiveFallback?.actions ?? incumbent);
                 this.capturePassiveProductiveProbe(
                     passiveAudit,
                     unit,
@@ -2517,9 +3043,11 @@ export class SearchDriver {
                 prioritizeV08SUrgency,
                 passiveAudit,
                 operationBoundedWaitComparison ? "operation_bounded" : "profile",
+                version,
             );
         } finally {
             if (
+                !this.match.offlineDeterministicWork &&
                 this.circuitBreakerMs !== null &&
                 (behaviorElapsedMs ?? performance.now() - t0) > this.circuitBreakerMs
             ) {
@@ -2539,6 +3067,7 @@ export class SearchDriver {
                 cleanupErrors.push(error);
             }
             this.finishedSim = false;
+            this.finishedWinningTeam = null;
             this.rolloutEnemyTeam = null;
             if (cleanupErrors.length) throw new SearchRollbackError(cleanupErrors);
             if (pendingPassiveProductiveProbe) {
@@ -2608,6 +3137,24 @@ export class SearchDriver {
             endReason,
             gate: this.gate,
             horizon: this.mode === "oracle" ? "lap" : this.horizon,
+            ...(this.researchHorizon === null
+                ? {}
+                : {
+                      researchHorizon: this.researchHorizon,
+                      researchHorizonVersions: [...this.researchHorizonVersions],
+                      ...(this.researchHorizonMinRangedTypes === null
+                          ? {}
+                          : {
+                                researchHorizonMinRangedTypes: this.researchHorizonMinRangedTypes,
+                                researchHorizonEligibleTeams: [...(this.researchHorizonEligibleTeams ?? [])],
+                            }),
+                  }),
+            ...(this.researchShortlist === null
+                ? {}
+                : {
+                      researchShortlist: this.researchShortlist,
+                      researchShortlistVersions: [...this.researchShortlistVersions],
+                  }),
             rollouts: this.rollouts,
             leaf: this.learnedV2 ? "learned_v2" : this.learned ? "learned" : "material",
             aggressiveV08: this.aggressiveV08,
@@ -2633,6 +3180,15 @@ export class SearchDriver {
             shortlist: this.shortlist,
             decisionDeadlineMs: this.decisionDeadlineMs,
             deadlineFallbacks: c.deadlineFallbacks,
+            offlineDeterministicWork: this.match.offlineDeterministicWork === true,
+            isolatingFastFlyerMoveRejects: c.isolatingFastFlyerMoveRejects,
+            armageddonDefendOpportunities: c.armageddonDefendOpportunities,
+            soleAbominationArmageddonDefendPolicy: this.soleAbominationArmageddonDefendPolicy,
+            soleAbominationArmageddonDefends: c.soleAbominationArmageddonDefends,
+            nonregressiveOverrideValidation: this.nonregressiveOverrideValidation,
+            nonregressiveOverrideValidationAttempts: c.nonregressiveOverrideValidationAttempts,
+            nonregressiveOverrideValidationPasses: c.nonregressiveOverrideValidationPasses,
+            nonregressiveOverrideValidationRejects: c.nonregressiveOverrideValidationRejects,
             waitDeadlinePolicy: this.waitDeadlinePolicy,
             circuitWaitArbitrations: c.circuitWaitArbitrations,
             passiveCatalogExpansions: c.passiveCatalogExpansions,
@@ -2923,6 +3479,7 @@ export class SearchDriver {
         prioritizeDominantFinish: boolean,
         prioritizeV08STargetPressure: boolean,
         prioritizeV08SUrgency: boolean,
+        version: string,
     ): { candidates: readonly IEnumeratedCandidate[]; means: readonly number[] } | undefined {
         if (!audit) return undefined;
         audit.beforeCounterfactual();
@@ -2933,12 +3490,21 @@ export class SearchDriver {
                 candidates,
                 seedBase,
                 null,
+                version,
                 prioritizeProductiveActions,
                 prioritizeDominantFinish,
                 prioritizeV08STargetPressure,
                 prioritizeV08SUrgency,
             );
-            const means = this.scoreCandidates(unit, scoredCandidates, seedBase, "turns", this.rollouts, null);
+            const means = this.scoreCandidates(
+                unit,
+                scoredCandidates,
+                seedBase,
+                "turns",
+                this.rollouts,
+                null,
+                this.turnHorizonForVersion(version, unit.getTeam()),
+            );
             return { candidates: scoredCandidates, means };
         } catch (error) {
             if (error instanceof SearchRollbackError) throw error;
@@ -2963,6 +3529,7 @@ export class SearchDriver {
         prioritizeV08SUrgency = false,
         passiveAudit?: ISearchPassiveAuditContext,
         deadlinePolicy: WaitDeadlinePolicy = "profile",
+        version = "",
     ): GameAction[] {
         const incumbentKind = classifyActions(incumbent);
         this.counters.searched += 1;
@@ -2984,7 +3551,9 @@ export class SearchDriver {
             : undefined;
 
         const deadlineAt =
-            deadlinePolicy === "operation_bounded" || this.decisionDeadlineMs === null
+            this.match.offlineDeterministicWork ||
+            deadlinePolicy === "operation_bounded" ||
+            this.decisionDeadlineMs === null
                 ? null
                 : t0 + this.decisionDeadlineMs;
         let scoredCandidates: readonly IEnumeratedCandidate[];
@@ -2992,19 +3561,47 @@ export class SearchDriver {
         let bestIdx = 0;
         let bestChallengerIdx = -1;
         let hasPreferredV08STarget = false;
+        let armageddonDefendArbitration = false;
+        let provisionalWouldOverride = false;
+        let nonregressiveOverrideValidationPass = true;
+        let nonregressiveOverrideValidationDelta: number | null = null;
         let validationMeans: number[] | null = null;
+        const turnHorizon = this.turnHorizonForVersion(version, unit.getTeam());
         try {
             scoredCandidates = this.shortlistCandidates(
                 unit,
                 candidates,
                 seedBase,
                 deadlineAt,
+                version,
                 prioritizeProductiveActions,
                 prioritizeDominantFinish,
                 prioritizeV08STargetPressure,
                 prioritizeV08SUrgency,
             );
-            means = this.scoreCandidates(unit, scoredCandidates, seedBase, "turns", this.rollouts, deadlineAt);
+            means = this.scoreCandidates(
+                unit,
+                scoredCandidates,
+                seedBase,
+                "turns",
+                this.rollouts,
+                deadlineAt,
+                turnHorizon,
+            );
+            armageddonDefendArbitration =
+                !this.soleAbominationArmageddonDefendPolicy &&
+                this.armageddonDefendCandidate &&
+                isV08ArmageddonDefendOpportunity(
+                    unit,
+                    this.deps.unitsHolder,
+                    this.deps.fightProperties.getCurrentLap(),
+                ) &&
+                scoredCandidates.some(
+                    (candidate) =>
+                        candidate.kind === "defend" ||
+                        (candidate.kind === "incumbent" &&
+                            candidate.actions.some((action) => action.type === "defend_turn")),
+                );
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
             const legalProductiveIndices = scoredCandidates
                 .map((candidate, index) => ({ candidate, index }))
@@ -3055,7 +3652,7 @@ export class SearchDriver {
                     : legalAdvanceIndices.length
                       ? legalAdvanceIndices
                       : legalForceTierProductiveIndices;
-            const selectionIndices =
+            const policySelectionIndices =
                 prioritizeV08SUrgency && preferredUrgentDamageIndex >= 0
                     ? [preferredUrgentDamageIndex]
                     : prioritizeV08STargetPressure && preferredV08STargetIndex >= 0
@@ -3077,17 +3674,26 @@ export class SearchDriver {
                             : aggressiveWaitComparison
                               ? [0, ...legalProductiveIndices.filter((index) => index > 0)]
                               : scoredCandidates.map((_candidate, index) => index);
+            // In this one environmental-preservation state, ordinary rollout value must arbitrate. The late
+            // productive/urgent layers were designed to prevent passive draws and would otherwise discard the
+            // very defend action whose H64 terminal result distinguishes a draw from a surviving win.
+            const selectionIndices = armageddonDefendArbitration
+                ? scoredCandidates.map((_candidate, index) => index)
+                : policySelectionIndices;
             bestIdx = selectionIndices[0];
             for (const index of selectionIndices) {
                 if (
                     means[index] > means[bestIdx] ||
-                    (prioritizeV08STargetPressure &&
+                    (!armageddonDefendArbitration &&
+                        prioritizeV08STargetPressure &&
                         !prioritizeV08SUrgency &&
                         bestIdx === 0 &&
                         index > 0 &&
                         means[index] !== -Infinity &&
                         means[index] === means[bestIdx]) ||
-                    (aggressiveWaitComparison &&
+                    (!armageddonDefendArbitration &&
+                        !this.strictAggressiveWaitTies &&
+                        aggressiveWaitComparison &&
                         bestIdx === 0 &&
                         index > 0 &&
                         means[index] !== -Infinity &&
@@ -3099,6 +3705,102 @@ export class SearchDriver {
                     bestChallengerIdx = index;
                 }
             }
+            // The historical passive-repair tier intentionally prefers any productive action, even when the
+            // rollout says it is materially worse. A19 retains that zero-gate repair for ties and improvements,
+            // but never converts a high-value Angel defend into a losing Resurrection solely because it is
+            // classified as productive.
+            if (
+                this.nonregressiveProductiveOverride &&
+                prioritizeProductiveActions &&
+                bestIdx > 0 &&
+                means[0] !== -Infinity &&
+                means[bestIdx] < means[0]
+            ) {
+                bestIdx = 0;
+            }
+            if (
+                this.rankedReplayTiebreakEpsilon > 0 &&
+                this.rankedReplayTiebreakVersions.has(version) &&
+                v08RankedReplayTiebreakSupportsGrid(this.deps.grid.getGridType()) &&
+                v08ReplayNativeRangedMatchupEligible({
+                    grid: this.deps.grid,
+                    matrix: this.deps.grid.getMatrix(),
+                    unitsHolder: this.deps.unitsHolder,
+                    pathHelper: this.deps.pathHelper,
+                    attackHandler: this.deps.attackHandler,
+                    fightProperties: this.deps.fightProperties,
+                    decisionOrigin: "root",
+                }) &&
+                !this.observeOnly
+            ) {
+                const replayTiebreakIndex = selectV08ReplayNearTieCandidateIndex(
+                    unit,
+                    {
+                        grid: this.deps.grid,
+                        matrix: this.deps.grid.getMatrix(),
+                        unitsHolder: this.deps.unitsHolder,
+                        pathHelper: this.deps.pathHelper,
+                        attackHandler: this.deps.attackHandler,
+                        fightProperties: this.deps.fightProperties,
+                        decisionOrigin: "root",
+                    },
+                    scoredCandidates,
+                    means,
+                    bestIdx,
+                    this.rankedReplayTiebreakEpsilon,
+                    this.gate,
+                    new Set(selectionIndices),
+                );
+                if (replayTiebreakIndex !== undefined && replayTiebreakIndex !== bestIdx) {
+                    bestIdx = replayTiebreakIndex;
+                    // Validation and scored-decision diagnostics must follow the action search will actually
+                    // select, not the raw maximum that the tactical near-tie preference just replaced.
+                    bestChallengerIdx = replayTiebreakIndex;
+                }
+            }
+            provisionalWouldOverride =
+                bestIdx !== 0 &&
+                means[bestIdx] !== -Infinity &&
+                (means[0] === -Infinity ||
+                    (!armageddonDefendArbitration &&
+                        ((prioritizeProductiveActions &&
+                            isProductiveCandidate(scoredCandidates[bestIdx]) &&
+                            !isProductiveCandidate(scoredCandidates[0])) ||
+                            (prioritizeV08STargetPressure && hasPreferredV08STarget) ||
+                            (prioritizeV08SUrgency && isProductiveCandidate(scoredCandidates[bestIdx])) ||
+                            (prioritizeDominantFinish && isProductiveCandidate(scoredCandidates[bestIdx])) ||
+                            (aggressiveWaitComparison &&
+                                isProductiveCandidate(scoredCandidates[bestIdx]) &&
+                                (this.strictAggressiveWaitTies
+                                    ? means[bestIdx] > means[0]
+                                    : means[bestIdx] >= means[0])))) ||
+                    means[bestIdx] - means[0] >= this.gate);
+            if (this.nonregressiveOverrideValidation && provisionalWouldOverride && means[0] !== -Infinity) {
+                this.counters.nonregressiveOverrideValidationAttempts += 1;
+                const pairedMeans = this.scoreCandidates(
+                    unit,
+                    [scoredCandidates[0], scoredCandidates[bestIdx]],
+                    hashSimulationParts("a19-nonregressive-override-validation-v2", seedBase),
+                    "turns",
+                    2,
+                    deadlineAt,
+                    turnHorizon,
+                );
+                nonregressiveOverrideValidationDelta =
+                    pairedMeans[0] === -Infinity || pairedMeans[1] === -Infinity
+                        ? null
+                        : pairedMeans[1] - pairedMeans[0];
+                if (
+                    pairedMeans[0] === -Infinity ||
+                    pairedMeans[1] === -Infinity ||
+                    pairedMeans[1] - pairedMeans[0] < this.gate
+                ) {
+                    nonregressiveOverrideValidationPass = false;
+                    this.counters.nonregressiveOverrideValidationRejects += 1;
+                } else {
+                    this.counters.nonregressiveOverrideValidationPasses += 1;
+                }
+            }
             if (this.validationRollouts !== null && bestChallengerIdx !== -1) {
                 const validationSeedBase = hashSimulationParts("search-validation-v1", seedBase);
                 validationMeans = this.scoreCandidates(
@@ -3108,6 +3810,7 @@ export class SearchDriver {
                     "turns",
                     this.validationRollouts,
                     deadlineAt,
+                    turnHorizon,
                 );
             }
         } catch (error) {
@@ -3122,14 +3825,18 @@ export class SearchDriver {
                 prioritizeDominantFinish,
                 prioritizeV08STargetPressure,
                 prioritizeV08SUrgency,
+                version,
             );
             // A timeout contains no value comparison. Ordinary tactical waits therefore fail closed even when
             // an engine-valid action exists; only an independently established lexicographic finish/passive tier
             // may force the valid fallback. Qualification scores the wait/action pair after behavior is frozen.
             const forceProductiveFallback =
                 prioritizeProductiveActions || prioritizeDominantFinish || prioritizeV08SUrgency;
-            const selectedFallback =
-                aggressiveWaitComparison && !forceProductiveFallback ? undefined : productiveFallback;
+            const selectedFallback = this.nonregressiveOverrideValidation
+                ? undefined
+                : aggressiveWaitComparison && !forceProductiveFallback
+                  ? undefined
+                  : productiveFallback;
             const fallbackActions = selectedFallback?.actions ?? incumbent;
             if (isDominantFinishCombatReplacement(prioritizeDominantFinish, selectedFallback, incumbent)) {
                 this.counters.dominantFinishCombatFallbacks += 1;
@@ -3157,6 +3864,17 @@ export class SearchDriver {
                         ms: Math.round(ms * 10) / 10,
                         deadlineFallback: 1,
                         productiveFallback: Number(selectedFallback !== undefined),
+                        ...(this.nonregressiveOverrideValidation
+                            ? {
+                                  provisionalWouldOverride: provisionalWouldOverride ? 1 : 0,
+                                  nonregressiveOverrideValidationRollouts: provisionalWouldOverride ? 2 : 0,
+                                  nonregressiveOverrideValidationDelta:
+                                      nonregressiveOverrideValidationDelta === null
+                                          ? null
+                                          : Number(nonregressiveOverrideValidationDelta.toFixed(4)),
+                                  nonregressiveOverrideValidationPass: 0,
+                              }
+                            : {}),
                         ...(this.observeOnly
                             ? {
                                   observeOnly: 1,
@@ -3186,20 +3904,7 @@ export class SearchDriver {
         }
         // The GATE: trust the policy unless a challenger clearly beats it on mean rollout value. An
         // incumbent that is illegal in sim is always replaced by the best legal candidate.
-        const wouldOverride =
-            bestIdx !== 0 &&
-            means[bestIdx] !== -Infinity &&
-            (incumbentIllegal ||
-                (prioritizeProductiveActions &&
-                    isProductiveCandidate(scoredCandidates[bestIdx]) &&
-                    !isProductiveCandidate(scoredCandidates[0])) ||
-                (prioritizeV08STargetPressure && hasPreferredV08STarget) ||
-                (prioritizeV08SUrgency && isProductiveCandidate(scoredCandidates[bestIdx])) ||
-                (prioritizeDominantFinish && isProductiveCandidate(scoredCandidates[bestIdx])) ||
-                (aggressiveWaitComparison &&
-                    isProductiveCandidate(scoredCandidates[bestIdx]) &&
-                    means[bestIdx] >= means[0]) ||
-                means[bestIdx] - means[0] >= this.gate);
+        const wouldOverride = provisionalWouldOverride && nonregressiveOverrideValidationPass;
         const overridden = wouldOverride && !this.observeOnly;
         if (wouldOverride && this.observeOnly) {
             this.counters.shadowRecommendations += 1;
@@ -3303,6 +4008,19 @@ export class SearchDriver {
                             ? null
                             : Number((means[bestIdx] - means[0]).toFixed(4)),
                     ms: Math.round(ms * 10) / 10,
+                    ...(this.nonregressiveOverrideValidation
+                        ? {
+                              provisionalWouldOverride: provisionalWouldOverride ? 1 : 0,
+                              nonregressiveOverrideValidationRollouts:
+                                  provisionalWouldOverride && !incumbentIllegal ? 2 : 0,
+                              nonregressiveOverrideValidationDelta:
+                                  nonregressiveOverrideValidationDelta === null
+                                      ? null
+                                      : Number(nonregressiveOverrideValidationDelta.toFixed(4)),
+                              nonregressiveOverrideValidationPass:
+                                  provisionalWouldOverride && nonregressiveOverrideValidationPass ? 1 : 0,
+                          }
+                        : {}),
                     ...(this.observeOnly
                         ? {
                               observeOnly: 1,
@@ -3494,12 +4212,14 @@ export class SearchDriver {
         candidates: readonly IEnumeratedCandidate[],
         seedBase: number,
         deadlineAt: number | null,
+        version: string,
         prioritizeProductiveActions = false,
         prioritizeDominantFinish = false,
         prioritizeV08STargetPressure = false,
         prioritizeV08SUrgency = false,
     ): readonly IEnumeratedCandidate[] {
-        if (this.shortlist === null || candidates.length <= this.shortlist) {
+        const shortlist = this.shortlistForVersion(version);
+        if (shortlist === null || candidates.length <= shortlist) {
             return candidates;
         }
         const scores = this.scoreCandidates(unit, candidates, seedBase, "leaf", 1, deadlineAt);
@@ -3607,7 +4327,40 @@ export class SearchDriver {
                             ),
                         ]
                       : rankedChallengers;
-        const challengers = ordered.slice(0, this.shortlist - 1).map(({ index }) => candidates[index]);
+        let shortlistedRanks: readonly { score: number; index: number }[] = ordered.slice(0, shortlist - 1);
+        if (
+            this.rankedReplayTiebreakEpsilon > 0 &&
+            this.rankedReplayTiebreakVersions.has(version) &&
+            v08RankedReplayTiebreakSupportsGrid(this.deps.grid.getGridType()) &&
+            v08ReplayNativeRangedMatchupEligible({
+                grid: this.deps.grid,
+                matrix: this.deps.grid.getMatrix(),
+                unitsHolder: this.deps.unitsHolder,
+                pathHelper: this.deps.pathHelper,
+                attackHandler: this.deps.attackHandler,
+                fightProperties: this.deps.fightProperties,
+                decisionOrigin: "root",
+            }) &&
+            !this.observeOnly
+        ) {
+            const replayContext: IDecisionContext = {
+                grid: this.deps.grid,
+                matrix: this.deps.grid.getMatrix(),
+                unitsHolder: this.deps.unitsHolder,
+                pathHelper: this.deps.pathHelper,
+                attackHandler: this.deps.attackHandler,
+                fightProperties: this.deps.fightProperties,
+                decisionOrigin: "root",
+            };
+            const preferred = selectV08ReplayShortlistFocusCandidate(replayContext, candidates);
+            shortlistedRanks = reserveV08ReplayLeafChallenger(
+                ordered,
+                preferred ? candidates.indexOf(preferred) : undefined,
+                shortlist - 1,
+                this.rankedReplayTiebreakEpsilon,
+            );
+        }
+        let challengers: readonly IEnumeratedCandidate[] = shortlistedRanks.map(({ index }) => candidates[index]);
         // Vine Throw changes future path costs and applies a two-lap snare, neither of which an immediate leaf can
         // value reliably. Preserve the normal top-K challenger and add at most one best legal Vine candidate for
         // production a13's full 12-turn comparison. This expands only Trent/borrowed-Vine turns and leaves every
@@ -3619,8 +4372,18 @@ export class SearchDriver {
               )
             : undefined;
         if (reservedVine && !challengers.includes(reservedVine)) {
-            challengers.push(reservedVine);
+            challengers = [...challengers, reservedVine];
         }
+        const reservedArmageddonDefend =
+            !this.soleAbominationArmageddonDefendPolicy &&
+            this.armageddonDefendCandidate &&
+            isV08ArmageddonDefendOpportunity(unit, this.deps.unitsHolder, this.deps.fightProperties.getCurrentLap())
+                ? candidates.find((candidate) => candidate.kind === "defend")
+                : undefined;
+        if (reservedArmageddonDefend && !challengers.includes(reservedArmageddonDefend)) {
+            challengers = [...challengers, reservedArmageddonDefend];
+        }
+        challengers = reserveResearchRapidChargeShortlist(candidates, challengers);
         return [candidates[0], ...challengers];
     }
     // ---- Q2 gate-0 ablation ---------------------------------------------------------------------
@@ -3898,6 +4661,7 @@ export class SearchDriver {
         horizonMode: HorizonMode,
         rolloutCount = this.rollouts,
         deadlineAt: number | null = null,
+        turnHorizon = this.horizon,
     ): number[] {
         this.assertBeforeDecisionDeadline(deadlineAt);
         const journal =
@@ -3920,7 +4684,7 @@ export class SearchDriver {
                 let checkpoint;
                 try {
                     checkpoint = journal?.checkpoint();
-                    score = this.rollout(unit, cand, seedBase, r, horizonMode, deadlineAt);
+                    score = this.rollout(unit, cand, seedBase, r, horizonMode, deadlineAt, turnHorizon);
                 } finally {
                     const cleanupErrors: unknown[] = [];
                     try {
@@ -3966,10 +4730,12 @@ export class SearchDriver {
         r: number,
         horizonMode: HorizonMode,
         deadlineAt: number | null = null,
+        turnHorizon = this.horizon,
     ): number {
         this.assertBeforeDecisionDeadline(deadlineAt);
         setDeterministicRandomSource(makeRng((seedBase + r * 0x9e3779b1) >>> 0));
         this.finishedSim = false;
+        this.finishedWinningTeam = null;
         this.deps.setActiveUnitId(unit.getId());
         const actingTeam = unit.getTeam();
         this.rolloutEnemyTeam = otherTeam(actingTeam);
@@ -4022,7 +4788,7 @@ export class SearchDriver {
                   ? MAX_LAP_HORIZON_TURNS
                   : horizonMode === "reply"
                     ? MAX_REPLY_HORIZON_TURNS
-                    : this.horizon;
+                    : turnHorizon;
         let turns = 0;
         while (!this.finishedSim && turns < cap) {
             this.assertBeforeDecisionDeadline(deadlineAt);
@@ -4055,6 +4821,10 @@ export class SearchDriver {
     }
     /** Leaf eval as P(win) for `team`: learned logistic value when configured, else normalized material. */
     private leafValue(team: TeamType): number {
+        if (this.exactTerminalResults && this.finishedSim && this.finishedWinningTeam !== null) {
+            if (this.finishedWinningTeam === PBTypes.TeamVals.NO_TEAM) return 0.5;
+            return this.finishedWinningTeam === team ? 1 : 0;
+        }
         const model = this.learnedV2 ?? this.learned;
         if (model) {
             const f = this.learnedV2
@@ -4159,16 +4929,36 @@ export class SearchDriver {
         let decided: GameAction[];
         try {
             const matrix = this.deps.grid.getMatrix();
-            decided = strat.decideTurn(unit, {
-                grid: this.deps.grid,
-                matrix,
-                unitsHolder: this.deps.unitsHolder,
-                pathHelper: this.deps.pathHelper,
-                decisionPathCatalog: createDecisionPathCatalog(this.deps.grid, this.deps.pathHelper, unit, matrix),
-                attackHandler: this.deps.attackHandler,
-                fightProperties: this.deps.fightProperties,
-                decisionOrigin: "rollout",
-            });
+            // Search itself is intentionally non-recursive, so future same-team turns normally use the native
+            // strategy. Stateful Armageddon policies must therefore recur here exactly as they do in live play.
+            // The strict policy reuses one shared gate; the earlier broad research arm remains isolated behind its
+            // own flag and is suppressed whenever strict mode is selected. The opponent keeps its configured model.
+            decided =
+                this.shouldUseSoleAbominationArmageddonDefend(unit) ||
+                (!this.soleAbominationArmageddonDefendPolicy &&
+                    this.armageddonDefendCandidate &&
+                    unit.getTeam() !== this.rolloutEnemyTeam &&
+                    isV08ArmageddonDefendOpportunity(
+                        unit,
+                        this.deps.unitsHolder,
+                        this.deps.fightProperties.getCurrentLap(),
+                    ))
+                    ? [{ type: "defend_turn", unitId: id }]
+                    : strat.decideTurn(unit, {
+                          grid: this.deps.grid,
+                          matrix,
+                          unitsHolder: this.deps.unitsHolder,
+                          pathHelper: this.deps.pathHelper,
+                          decisionPathCatalog: createDecisionPathCatalog(
+                              this.deps.grid,
+                              this.deps.pathHelper,
+                              unit,
+                              matrix,
+                          ),
+                          attackHandler: this.deps.attackHandler,
+                          fightProperties: this.deps.fightProperties,
+                          decisionOrigin: "rollout",
+                      });
         } catch {
             decided = [];
         }
@@ -4248,6 +5038,7 @@ export class SearchDriver {
             } else if (event.type === "fight_finished") {
                 this.deps.setActiveUnitId("");
                 this.finishedSim = true;
+                this.finishedWinningTeam = event.winningTeam;
             } else if (event.type === "unit_destroyed") {
                 if (this.deps.getActiveUnitId() === event.unitId) {
                     this.deps.setActiveUnitId("");

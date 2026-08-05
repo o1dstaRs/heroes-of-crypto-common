@@ -10,11 +10,32 @@
  */
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
+import type { IAIStrategy } from "../ai/ai_strategy";
 import { Perk, getUpgradePoints } from "../perks/perk_properties";
 import { creatureInfo, DEFAULT_DRAFT_W, DRAFT_ANCHOR_W, loadDraftWeights } from "../ai/setup/creature_score";
 import { loadSynergyWeights, pickSynergiesSituational } from "../ai/setup/synergy_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { SetupPolicyWeighted } from "../ai/setup/setup_policy_weighted";
+import {
+    buildV08A19H64FinalistV6SearchEnvironment,
+    buildV08A19H18F184LowerHumanRankedFallbackSearchEnvironment,
+    buildV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactValidatedSearchEnvironment,
+    buildV08A19H64F184LowerHumanRankedFallbackScoreSafeSearchEnvironment,
+    createV08A19H18F184LowerHumanRankedFallbackStrategy,
+    createV08A19H64FinalistV6Strategy,
+    createV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactStrategy,
+    createV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactValidatedStrategy,
+    V08_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK_PROFILE,
+    V08_A19_H64_FINALIST_V6_PLACEMENT_IMPLEMENTATION_SHA256,
+    V08_A19_H64_FINALIST_V6_PROFILE,
+    V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER,
+    V08_A19_H64_FINALIST_V6_SEARCH_IMPLEMENTATION_SHA256,
+    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_IMPLEMENTATION_SHA256,
+    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_PROFILE,
+    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_IMPLEMENTATION_SHA256,
+    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_PLACEMENT_IMPLEMENTATION_SHA256,
+    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_PROFILE,
+} from "../ai/versions/v0_8_a19_h18_f184_lower_human_placement_profile";
 import {
     buildRoster,
     makeRng,
@@ -24,9 +45,34 @@ import {
     type IRosterComposition,
     type StackAmountMode,
 } from "./army";
-import { runMatch, type IMatchResult, type ISetupAugment, type ISetupSynergy, type Side } from "./battle_engine";
+import {
+    GREEN_TEAM,
+    RED_TEAM,
+    runMatch,
+    type IMatchConfig,
+    type IMatchResult,
+    type ISetupAugment,
+    type ISetupSynergy,
+    type Side,
+} from "./battle_engine";
 import { creatureIdForName, DEFAULT_OFFER_K, draftRoster } from "./draft";
 import { isLiveTwin, LIVETWIN_PRESET, liveTwinMeleeFraction, liveTwinSetup } from "./livetwin";
+import { withScopedAIEnvironment } from "./v0_8_a13_search";
+
+export const TOURNAMENT_RESEARCH_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK =
+    "v0.8-a19-h18-f184-lower-human-ranked-fallback" as const;
+export const TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT =
+    "v0.8-a19-h64-f184-lower-human-ranked-fallback-score-safe-compact" as const;
+export const TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED =
+    "v0.8-a19-h64-f184-lower-human-ranked-fallback-score-safe-compact-validated" as const;
+export const TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6 = "v0.8-a19-h64-finalist-v6" as const;
+export const TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID =
+    "entrant-a-physical-team-search-scope-v1" as const;
+export type TournamentResearchEntrantAStrategyProfile =
+    | typeof TOURNAMENT_RESEARCH_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK
+    | typeof TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT
+    | typeof TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED
+    | typeof TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6;
 
 export interface ITournamentOptions {
     versionA: string;
@@ -36,6 +82,16 @@ export interface ITournamentOptions {
     /** Base seed; game i uses a seed derived from it, so a whole run reproduces from one number. */
     baseSeed: number;
     maxLaps?: number;
+    /**
+     * Explicitly ignore wall-clock search watchdogs and rely on finite operation caps. Omitted/false retains
+     * production-bounded timing, including operational qualification runs.
+     */
+    searchOfflineDeterministicWork?: boolean;
+    /**
+     * Research-only, structured-clone-safe strategy selector for entrant A. The worker materializes fresh
+     * match-local strategy state on A's current physical side; omitted preserves registered-version behavior.
+     */
+    researchEntrantAStrategyProfile?: TournamentResearchEntrantAStrategyProfile;
     composition?: readonly IRosterComposition[];
     amountByLevel?: Readonly<Record<number, number>>;
     /**
@@ -314,6 +370,8 @@ export interface IGameRecord {
     /** In a `cemSetup` run: whether GREEN drafted via the weighted (trained) policy this game (else FROZEN).
      * The CEM fitness is the weighted policy's win rate = games where the weighted side won. */
     greenIsWeighted?: boolean;
+    /** Immutable identity of entrant A's opt-in research profile, when one is selected. */
+    entrantAResearchProfile?: ITournamentResearchProfileProvenance;
     result: IMatchResult;
 }
 
@@ -324,14 +382,38 @@ export interface IVersionStats {
     winsAsRed: number;
 }
 
+export interface ITournamentResearchProfileProvenance {
+    selector: TournamentResearchEntrantAStrategyProfile;
+    schema: string;
+    candidateId: string;
+    behaviorEnvironmentSha256: string;
+    genomeSha256: string;
+    placementPolicyId: string;
+    placementImplementationSha256?: string;
+    searchImplementationSha256?: string;
+    /** Explicit router identity proving that version-equal controls remain outside entrant A's SearchDriver. */
+    searchTeamScopePolicyId?: typeof TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID;
+    /** Ordered source-byte ledger for a composite research runtime. */
+    runtimeSourceLedger?: readonly ITournamentResearchRuntimeSourcePin[];
+}
+
+export interface ITournamentResearchRuntimeSourcePin {
+    role: string;
+    source: string;
+    sha256: string;
+}
+
 export interface ITournamentSummary {
     versionA: string;
     versionB: string;
     games: number;
     baseSeed: number;
+    entrantAResearchProfile?: ITournamentResearchProfileProvenance;
     a: IVersionStats;
     b: IVersionStats;
     draws: number;
+    /** Share of all games won outright by A; draws remain in the denominator. */
+    rawWinRateA: number;
     /** Share of decisive games won by A (draws excluded). 0.5 = no improvement. */
     winRateA: number;
     avgLaps: number;
@@ -344,6 +426,118 @@ export interface ITournamentSummary {
 }
 
 const emptyStats = (version: string): IVersionStats => ({ version, wins: 0, winsAsGreen: 0, winsAsRed: 0 });
+
+type TournamentResearchStrategyOverrides = Pick<
+    IMatchConfig,
+    "greenStrategyOverride" | "redStrategyOverride" | "searchTeamScope"
+>;
+
+interface IResolvedTournamentResearchProfile {
+    readonly createStrategy: () => IAIStrategy;
+    readonly environment: Readonly<Record<string, string | undefined>>;
+    readonly provenance: ITournamentResearchProfileProvenance;
+}
+
+const resolveTournamentResearchProfile = (
+    selector: TournamentResearchEntrantAStrategyProfile,
+): IResolvedTournamentResearchProfile => {
+    if (selector === TOURNAMENT_RESEARCH_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK) {
+        const profile = V08_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK_PROFILE;
+        return {
+            createStrategy: createV08A19H18F184LowerHumanRankedFallbackStrategy,
+            environment: buildV08A19H18F184LowerHumanRankedFallbackSearchEnvironment(),
+            provenance: Object.freeze({
+                selector,
+                schema: profile.schema,
+                candidateId: profile.candidateId,
+                behaviorEnvironmentSha256: profile.behaviorEnvironmentSha256,
+                genomeSha256: profile.genomeSha256,
+                placementPolicyId: profile.placementPolicy.policyId,
+                searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
+            }),
+        };
+    }
+    if (selector === TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT) {
+        const profile = V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_PROFILE;
+        return {
+            createStrategy: createV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactStrategy,
+            environment: buildV08A19H64F184LowerHumanRankedFallbackScoreSafeSearchEnvironment(),
+            provenance: Object.freeze({
+                selector,
+                schema: profile.schema,
+                candidateId: profile.candidateId,
+                behaviorEnvironmentSha256: profile.behaviorEnvironmentSha256,
+                genomeSha256: profile.genomeSha256,
+                placementPolicyId: profile.placementPolicy.policyId,
+                placementImplementationSha256:
+                    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_IMPLEMENTATION_SHA256,
+                searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
+            }),
+        };
+    }
+    if (selector === TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED) {
+        const profile = V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_PROFILE;
+        return {
+            createStrategy: createV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactValidatedStrategy,
+            environment: buildV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactValidatedSearchEnvironment(),
+            provenance: Object.freeze({
+                selector,
+                schema: profile.schema,
+                candidateId: profile.candidateId,
+                behaviorEnvironmentSha256: profile.behaviorEnvironmentSha256,
+                genomeSha256: profile.genomeSha256,
+                placementPolicyId: profile.placementPolicy.policyId,
+                placementImplementationSha256:
+                    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_PLACEMENT_IMPLEMENTATION_SHA256,
+                searchImplementationSha256:
+                    V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_IMPLEMENTATION_SHA256,
+                searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
+            }),
+        };
+    }
+    if (selector === TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6) {
+        const profile = V08_A19_H64_FINALIST_V6_PROFILE;
+        return {
+            createStrategy: createV08A19H64FinalistV6Strategy,
+            environment: buildV08A19H64FinalistV6SearchEnvironment(),
+            provenance: Object.freeze({
+                selector,
+                schema: profile.schema,
+                candidateId: profile.candidateId,
+                behaviorEnvironmentSha256: profile.behaviorEnvironmentSha256,
+                genomeSha256: profile.genomeSha256,
+                placementPolicyId: profile.placementPolicy.policyId,
+                placementImplementationSha256: V08_A19_H64_FINALIST_V6_PLACEMENT_IMPLEMENTATION_SHA256,
+                searchImplementationSha256: V08_A19_H64_FINALIST_V6_SEARCH_IMPLEMENTATION_SHA256,
+                searchTeamScopePolicyId: TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
+                runtimeSourceLedger: V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER,
+            }),
+        };
+    }
+    throw new Error(`Unknown tournament entrant-A research strategy profile ${String(selector)}`);
+};
+
+const createResearchEntrantAStrategyOverrides = (
+    profile: TournamentResearchEntrantAStrategyProfile | undefined,
+    versionA: string,
+    aIsGreen: boolean,
+): TournamentResearchStrategyOverrides & {
+    readonly environment?: Readonly<Record<string, string | undefined>>;
+    readonly provenance?: ITournamentResearchProfileProvenance;
+} => {
+    if (profile === undefined) return {};
+    if (versionA !== "v0.8") {
+        throw new Error(`Tournament research profile ${profile} requires entrant A version v0.8, got ${versionA}`);
+    }
+    const resolved = resolveTournamentResearchProfile(profile);
+    const strategy = resolved.createStrategy();
+    return {
+        ...(aIsGreen ? { greenStrategyOverride: strategy } : { redStrategyOverride: strategy }),
+        searchTeamScope: Object.freeze([aIsGreen ? GREEN_TEAM : RED_TEAM]),
+        environment: resolved.environment,
+        provenance: resolved.provenance,
+    };
+};
 
 /**
  * Play a single game by its index. Fully self-contained — the seed (and thus the mirrored roster) and
@@ -406,6 +600,16 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     const aIsGreen = game % 2 === 0;
     const greenVersion = aIsGreen ? options.versionA : options.versionB;
     const redVersion = aIsGreen ? options.versionB : options.versionA;
+    const researchStrategyOverrides = createResearchEntrantAStrategyOverrides(
+        options.researchEntrantAStrategyProfile,
+        options.versionA,
+        aIsGreen,
+    );
+    const {
+        environment: researchEnvironment,
+        provenance: entrantAResearchProfile,
+        ...matchResearchStrategyOverrides
+    } = researchStrategyOverrides;
 
     // Optional artifact A/B test (either tier). The pair draws two DISTINCT artifacts (A,B) from a
     // decorrelated pair seed; game 2k gives green A / red B, game 2k+1 swaps them. Swapping across the pair
@@ -646,25 +850,31 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         }
     }
 
-    const result = runMatch({
-        greenVersion,
-        redVersion,
-        roster,
-        redRoster,
-        seed,
-        gridType,
-        maxLaps: options.maxLaps,
-        greenArtifactT1,
-        redArtifactT1,
-        greenArtifactT2,
-        redArtifactT2,
-        greenPerk,
-        redPerk,
-        greenAugments,
-        redAugments,
-        greenSynergies,
-        redSynergies,
-    });
+    const runConfiguredMatch = (): IMatchResult =>
+        runMatch({
+            greenVersion,
+            redVersion,
+            roster,
+            redRoster,
+            seed,
+            gridType,
+            maxLaps: options.maxLaps,
+            searchOfflineDeterministicWork: options.searchOfflineDeterministicWork,
+            greenArtifactT1,
+            redArtifactT1,
+            greenArtifactT2,
+            redArtifactT2,
+            greenPerk,
+            redPerk,
+            greenAugments,
+            redAugments,
+            greenSynergies,
+            redSynergies,
+            ...matchResearchStrategyOverrides,
+        });
+    const result = researchEnvironment
+        ? withScopedAIEnvironment(researchEnvironment, runConfiguredMatch)
+        : runConfiguredMatch();
 
     const winnerSide: Side | "draw" = result.winner;
     const winnerVersion = winnerSide === "draw" ? "draw" : winnerSide === "green" ? greenVersion : redVersion;
@@ -683,6 +893,7 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         greenSynergy,
         redSynergy,
         greenIsWeighted,
+        ...(entrantAResearchProfile === undefined ? {} : { entrantAResearchProfile }),
         result,
     };
 }
@@ -739,9 +950,16 @@ export function finalizeTally(tally: ITournamentTally, options: ITournamentOptio
         versionB: options.versionB,
         games: options.games,
         baseSeed: options.baseSeed,
+        ...(options.researchEntrantAStrategyProfile === undefined
+            ? {}
+            : {
+                  entrantAResearchProfile: resolveTournamentResearchProfile(options.researchEntrantAStrategyProfile)
+                      .provenance,
+              }),
         a: tally.a,
         b: tally.b,
         draws: tally.draws,
+        rawWinRateA: options.games > 0 ? tally.a.wins / options.games : 0,
         winRateA: decisive > 0 ? tally.a.wins / decisive : 0.5,
         avgLaps: tally.counted ? tally.totalLaps / tally.counted : 0,
         endReasons: tally.endReasons,

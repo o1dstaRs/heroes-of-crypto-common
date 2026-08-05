@@ -279,6 +279,18 @@ export interface IMatchConfig {
     seed: number;
     /** Hard cap on laps before the match is called a draw-on-points. Default 60. */
     maxLaps?: number;
+    /**
+     * Explicit offline-only opt-in: finite search operation caps, rather than host timing, decide behavior.
+     * Omitted/false preserves the production deadline and circuit-breaker semantics used by bounded qualification.
+     */
+    searchOfflineDeterministicWork?: boolean;
+    /**
+     * Optional physical-team scope for SearchDriver arbitration. Omission preserves version-only production
+     * routing; research tournaments use a one-team scope when entrant and control share the same version label.
+     */
+    searchTeamScope?: readonly TeamType[];
+    /** Emit only lifecycle/destruction events required to drive an in-process simulation. */
+    headlessEvents?: boolean;
     /** Board layout for this match. Defaults to NORMAL (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER). */
     gridType?: number;
     /**
@@ -715,6 +727,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             }
         },
         runtime,
+        eventMode: config.headlessEvents ? ("headless" as const) : ("full" as const),
     };
 
     const engine = new GameActionEngine(engineContext);
@@ -855,6 +868,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         seed: config.seed,
         greenVersion: config.greenVersion,
         redVersion: config.redVersion,
+        ...(config.searchTeamScope === undefined ? {} : { searchTeamScope: config.searchTeamScope }),
+        // Deterministic operation-bounded work is deliberately opt-in. Omission must retain the same wall-clock
+        // deadline/circuit behavior as ranked and every existing operational-bounded qualification runner.
+        offlineDeterministicWork: config.searchOfflineDeterministicWork === true,
     };
     const search = config.searchScoredDecisionObserver
         ? new SearchDriver(
@@ -1203,11 +1220,11 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // The per-unit pin is an authoritative control invariant, not merely a version default. An
         // experimental `SEARCH_VERSIONS=v0.1` must not put a mindless live turn back through a generic
         // selector, and the separate trajectory driver must obey the same boundary.
-        const searchApplies = !mindlessUnit && search.appliesTo(strategy.version);
+        const searchApplies = !mindlessUnit && search.appliesTo(strategy.version, unit.getTeam());
         const trajectorySearchApplies =
             !mindlessUnit &&
             v08A13TrajectoryTeams.has(unit.getTeam()) &&
-            v08A13TrajectorySearch?.appliesTo(strategy.version) === true;
+            v08A13TrajectorySearch?.appliesTo(strategy.version, unit.getTeam()) === true;
         const decisionPathCatalog =
             searchApplies || trajectorySearchApplies
                 ? createDecisionPathCatalog(grid, pathHelper, unit, matrix, config.decisionObserver !== undefined)
@@ -1479,7 +1496,16 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     cause,
                 });
             }
-            recordAction(actions, action, unit, fromCell, result, unitsHolder, fightProperties.getCurrentLap());
+            recordAction(
+                actions,
+                action,
+                unit,
+                fromCell,
+                result,
+                unitsHolder,
+                fightProperties.getCurrentLap(),
+                config.headlessEvents,
+            );
             applyEvents(result.events);
             if (finished) {
                 break;
@@ -1535,7 +1561,16 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     recoveryForObservation = recoveryAttempt;
                     turnEventsForObservation!.push(...observedEvents);
                 }
-                recordAction(actions, action, unit, fromCell, r, unitsHolder, fightProperties.getCurrentLap());
+                recordAction(
+                    actions,
+                    action,
+                    unit,
+                    fromCell,
+                    r,
+                    unitsHolder,
+                    fightProperties.getCurrentLap(),
+                    config.headlessEvents,
+                );
                 applyEvents(r.events);
                 return r.completed;
             };
@@ -1740,11 +1775,12 @@ function recordAction(
     result: { completed: boolean; events: GameEvent[]; rejectionReason?: string },
     unitsHolder: UnitsHolder,
     lap: number,
+    headlessEvents = false,
 ): void {
     // Large/long runs (e.g. 1M-game per-unit win-rate sweeps) don't need the per-action log; skipping it
     // keeps each match record tiny so the worker->main serialisation stays cheap. Winner/attrition/outcome
     // are computed from unit state, not from this array, so they're unaffected.
-    if (process.env.SIM_NO_ACTIONS) {
+    if (headlessEvents || process.env.SIM_NO_ACTIONS) {
         return;
     }
     if (action.type === "select_attack_type") {

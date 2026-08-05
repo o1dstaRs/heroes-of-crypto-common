@@ -33,6 +33,8 @@ export interface ICreatureInfo {
     mage: boolean;
     /** Owns at least one native spell charge or castable ability, including MELEE_MAGIC hybrids. */
     caster: boolean;
+    /** Owns at least one configured native spellbook entry; excludes direct-cast abilities. */
+    nativeSpellbook: boolean;
     maxDamage: number;
     shots: number;
     distance: number;
@@ -144,6 +146,7 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 ranged: cfg.attack_type === "RANGE",
                 mage: cfg.attack_type === "MAGIC",
                 caster: spellList.length > 0 || abilityList.some(isCastableAbility),
+                nativeSpellbook: spellList.length > 0,
                 maxDamage: cfg.attack_damage_max ?? 0,
                 shots: cfg.range_shots ?? 0,
                 distance: cfg.shot_distance ?? 0,

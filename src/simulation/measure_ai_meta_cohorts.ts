@@ -20,6 +20,7 @@ import { createGzip, type Gzip } from "node:zlib";
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { V08_A13_PROFILE } from "../ai/versions/v0_8_a13_profile";
 import { buildV08A19H18SearchEnvironment, V08_A19_H18_PROFILE } from "../ai/versions/v0_8_a19_h18_profile";
+import { V08_A19_H18_RANKED_PLACEMENT_PROFILE } from "../ai/versions/v0_8_a19_h18_ranked_placement_profile";
 import {
     AI_META_COHORT_DESCRIPTIONS,
     AI_META_COHORTS,
@@ -51,6 +52,11 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "./ai_meta_cohorts_core";
+import {
+    AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
+    AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+    type AiMetaStrategyProfileId,
+} from "./ai_meta_strategy_profile";
 import {
     AI_META_UNIT_INTERACTION_SCHEMA,
     AiMetaUnitInteractionCollector,
@@ -700,13 +706,14 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
-export type AiMetaFightProfileId = "a13" | "a19-h18";
+export type AiMetaFightProfileId = "a13" | "a19-h18" | "a19-h18-ranked-placement";
 
-interface IAiMetaFightProfile {
+export interface IAiMetaFightProfile {
     id: AiMetaFightProfileId;
     title: string;
     provenance: Readonly<Record<string, unknown>>;
     workerEnvironment: Readonly<Record<string, string>>;
+    strategyProfileId: AiMetaStrategyProfileId;
 }
 
 const definedEnvironment = (
@@ -734,6 +741,7 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             workerOverride: "V08_A13_SEARCH=1",
         }),
         workerEnvironment: definedEnvironment({ V08_A13_SEARCH: "1" }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
     }),
     "a19-h18": Object.freeze({
         id: "a19-h18",
@@ -754,6 +762,31 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             ...buildV08A19H18SearchEnvironment(),
             V08_A13_SEARCH: "0",
         }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+    }),
+    "a19-h18-ranked-placement": Object.freeze({
+        id: "a19-h18-ranked-placement",
+        title: "Heroes of Crypto — v0.8+a19-h18 Ranked Placement Research AI Meta Balance Cohorts",
+        provenance: Object.freeze({
+            name: "v0.8+a19-h18-ranked-placement-v8-research",
+            schema: V08_A19_H18_RANKED_PLACEMENT_PROFILE.schema,
+            candidateId: V08_A19_H18_RANKED_PLACEMENT_PROFILE.candidateId,
+            researchOnly: V08_A19_H18_RANKED_PLACEMENT_PROFILE.researchOnly,
+            baseVersion: V08_A19_H18_RANKED_PLACEMENT_PROFILE.baseVersion,
+            derivesFrom: V08_A19_H18_RANKED_PLACEMENT_PROFILE.derivesFrom,
+            genomeSha256: V08_A19_H18_RANKED_PLACEMENT_PROFILE.genomeSha256,
+            behaviorEnvironmentSha256: V08_A19_H18_RANKED_PLACEMENT_PROFILE.behaviorEnvironmentSha256,
+            search: V08_A19_H18_RANKED_PLACEMENT_PROFILE.search,
+            policy: V08_A19_H18_RANKED_PLACEMENT_PROFILE.policy,
+            placementPolicy: V08_A19_H18_RANKED_PLACEMENT_PROFILE.placementPolicy,
+            strategyProfileId: AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
+            workerOverride: "V07_SEARCH=1; V08_A13_SEARCH=0",
+        }),
+        workerEnvironment: definedEnvironment({
+            ...buildV08A19H18SearchEnvironment(),
+            V08_A13_SEARCH: "0",
+        }),
+        strategyProfileId: AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
     }),
 });
 
@@ -799,23 +832,43 @@ export function sanitizedAiMetaEnvironment(
     return { ...environment, ...AI_META_FIXED_ENVIRONMENT, ...fightProfile.workerEnvironment };
 }
 
-async function runWorkerPool(
+export const AI_META_WORKER_RECYCLE_PAIRS = 500;
+
+export interface IAiMetaWorkerPoolStats {
+    workersStarted: number;
+    workersRecycled: number;
+}
+
+export interface IAiMetaWorkerPoolOptions {
+    recycleAfterPairs?: number;
+    beforeWorkerStart?: () => void;
+}
+
+export async function runAiMetaWorkerPool(
     options: IAiMetaRunOptions,
     concurrency: number,
     fightProfile: IAiMetaFightProfile,
     onRecord: (record: IAiMetaPairRecord, completed: number, total: number) => void,
-): Promise<void> {
+    workerPoolOptions: IAiMetaWorkerPoolOptions = {},
+): Promise<IAiMetaWorkerPoolStats> {
+    const recycleAfterPairs = workerPoolOptions.recycleAfterPairs ?? AI_META_WORKER_RECYCLE_PAIRS;
+    if (!Number.isSafeInteger(recycleAfterPairs) || recycleAfterPairs < 1) {
+        throw new RangeError(`recycleAfterPairs must be a positive safe integer; got ${recycleAfterPairs}`);
+    }
     const total = options.games / AI_META_GAMES_PER_MATCHUP;
     const poolSize = Math.max(1, Math.min(Math.floor(concurrency), total));
     const workerUrl = new URL("./ai_meta_cohorts_worker.ts", import.meta.url);
     const workerEnvironment = sanitizedAiMetaEnvironment(process.env, fightProfile);
-    await new Promise<void>((resolvePromise, rejectPromise) => {
-        const workers: Worker[] = [];
+    return new Promise<IAiMetaWorkerPoolStats>((resolvePromise, rejectPromise) => {
+        const workers = new Set<Worker>();
         let dispatched = 0;
         let completed = 0;
         let settled = false;
+        let workersStarted = 0;
+        let workersRecycled = 0;
         const cleanup = (): void => {
             for (const worker of workers) void worker.terminate();
+            workers.clear();
         };
         const fail = (error: unknown): void => {
             if (settled) return;
@@ -823,24 +876,43 @@ async function runWorkerPool(
             cleanup();
             rejectPromise(error instanceof Error ? error : new Error(String(error)));
         };
-        const dispatch = (worker: Worker): void => {
-            if (dispatched >= total) {
-                worker.postMessage({ type: "stop" });
+
+        const startWorker = (recycled = false): void => {
+            if (settled) return;
+            try {
+                workerPoolOptions.beforeWorkerStart?.();
+            } catch (error) {
+                fail(error);
                 return;
             }
-            worker.postMessage({ type: "pair", pair: dispatched });
-            dispatched += 1;
-        };
-        for (let index = 0; index < poolSize; index += 1) {
             const worker = new Worker(workerUrl, {
-                workerData: { options },
+                workerData: { options, strategyProfileId: fightProfile.strategyProfileId },
                 env: workerEnvironment,
             });
-            workers.push(worker);
+            workers.add(worker);
+            workersStarted += 1;
+            workersRecycled += Number(recycled);
+            let pairsHandled = 0;
+            let expectedExit = false;
+            let recycleOnExit = false;
+            const stop = (recycle = false): void => {
+                if (expectedExit) return;
+                expectedExit = true;
+                recycleOnExit = recycle;
+                void worker.terminate();
+            };
+            const dispatch = (): void => {
+                if (dispatched >= total) {
+                    stop();
+                    return;
+                }
+                worker.postMessage({ type: "pair", pair: dispatched });
+                dispatched += 1;
+            };
             worker.on("message", (message: WorkerReply) => {
                 if (settled) return;
                 if (message.type === "ready") {
-                    dispatch(worker);
+                    dispatch();
                     return;
                 }
                 if (message.type === "error") {
@@ -848,20 +920,35 @@ async function runWorkerPool(
                     return;
                 }
                 completed += 1;
-                onRecord(message.record, completed, total);
+                pairsHandled += 1;
+                try {
+                    onRecord(message.record, completed, total);
+                } catch (error) {
+                    fail(error);
+                    return;
+                }
                 if (completed === total) {
                     settled = true;
                     cleanup();
-                    resolvePromise();
+                    resolvePromise({ workersStarted, workersRecycled });
+                } else if (pairsHandled >= recycleAfterPairs && dispatched < total) {
+                    stop(true);
                 } else {
-                    dispatch(worker);
+                    dispatch();
                 }
             });
             worker.on("error", fail);
             worker.on("exit", (code) => {
-                if (!settled && code !== 0) fail(new Error(`AI meta worker exited with code ${code}`));
+                workers.delete(worker);
+                if (settled) return;
+                if (expectedExit) {
+                    if (recycleOnExit && dispatched < total) startWorker(true);
+                    return;
+                }
+                fail(new Error(`AI meta worker exited with code ${code}`));
             });
-        }
+        };
+        for (let index = 0; index < poolSize; index += 1) startWorker();
     });
 }
 
@@ -1047,6 +1134,7 @@ async function runCohort(
     fightProfile: IAiMetaFightProfile,
     outDir: string,
     aggregation: AiMetaAggregation,
+    runIdentity: IAiMetaSourceIdentity,
 ): Promise<ICohortRunResult> {
     const options: IAiMetaRunOptions = { cohort, games: gamesPerCohort, baseSeed };
     const accumulator = new AiMetaAccumulator(cohort);
@@ -1057,21 +1145,27 @@ async function runCohort(
     const cohortStarted = Date.now();
     let lastPrinted = 0;
     console.log(`\n[${cohort}] ${AI_META_COHORT_DESCRIPTIONS[cohort]} (${workers} workers)`);
-    await runWorkerPool(options, workers, fightProfile, (record, completed, total) => {
-        accumulator.add(record);
-        aggregation.add(record);
-        gzip.write(`${JSON.stringify(record)}\n`);
-        const now = Date.now();
-        if (completed === total || now - lastPrinted >= 10_000) {
-            const games = completed * AI_META_GAMES_PER_MATCHUP;
-            const elapsed = Math.max(0.001, (now - cohortStarted) / 1000);
-            console.log(
-                `  [${cohort}] ${games.toLocaleString()}/${gamesPerCohort.toLocaleString()} games ` +
-                    `(${(games / elapsed).toFixed(1)}/s, ${Math.floor((100 * completed) / total)}%)`,
-            );
-            lastPrinted = now;
-        }
-    });
+    await runAiMetaWorkerPool(
+        options,
+        workers,
+        fightProfile,
+        (record, completed, total) => {
+            accumulator.add(record);
+            aggregation.add(record);
+            gzip.write(`${JSON.stringify(record)}\n`);
+            const now = Date.now();
+            if (completed === total || now - lastPrinted >= 10_000) {
+                const games = completed * AI_META_GAMES_PER_MATCHUP;
+                const elapsed = Math.max(0.001, (now - cohortStarted) / 1000);
+                console.log(
+                    `  [${cohort}] ${games.toLocaleString()}/${gamesPerCohort.toLocaleString()} games ` +
+                        `(${(games / elapsed).toFixed(1)}/s, ${Math.floor((100 * completed) / total)}%)`,
+                );
+                lastPrinted = now;
+            }
+        },
+        { beforeWorkerStart: () => assertAiMetaSourceIdentity(runIdentity) },
+    );
     await finishGzip(gzip, output);
     const seconds = (Date.now() - cohortStarted) / 1000;
     const quality: ICohortQuality = {
@@ -1103,7 +1197,7 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "[fight-profile=a13]";
+    "[fight-profile=a13|a19-h18|a19-h18-ranked-placement]";
 
 export function validateAiMetaGamesPerCohort(games: number): void {
     const mapCycleGames = AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;
@@ -1177,6 +1271,7 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
                     fightProfile,
                     outDir,
                     aggregation,
+                    runIdentity,
                 ),
             ),
         );
