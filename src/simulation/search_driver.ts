@@ -674,6 +674,40 @@ const footprintDistance = (
 };
 
 /**
+ * H18 opening-tempo guard. A high-tier fast flyer that is still screened by its army should not turn a native
+ * initiative wait into a move-only solo dive. Attacks and move-attacks are deliberately outside this predicate,
+ * as are later turns and flyers that started the decision already isolated.
+ */
+export function isEarlyIsolatingFastFlyerWaitMove(
+    unit: Unit,
+    unitsHolder: ILookaheadDeps["unitsHolder"],
+    currentLap: number,
+    candidate: Pick<IEnumeratedCandidate, "actions">,
+): boolean {
+    if (
+        currentLap !== 1 ||
+        !unit.canFly() ||
+        unit.getLevel() < PBTypes.UnitLevelVals.FOURTH ||
+        unit.getSteps() < 7 ||
+        !isPureMoveCandidate(candidate)
+    ) {
+        return false;
+    }
+    const move = candidate.actions.at(-1);
+    if (move?.type !== "move_unit" || !move.targetCells?.length) return false;
+
+    const allyCells = unitsHolder
+        .getAllAllies(unit.getTeam())
+        .filter((ally) => ally.getId() !== unit.getId() && !ally.isDead())
+        .map((ally) => ally.getCells());
+    if (!allyCells.length) return false;
+
+    const currentDistance = Math.min(...allyCells.map((cells) => footprintDistance(unit.getCells(), cells)));
+    const destinationDistance = Math.min(...allyCells.map((cells) => footprintDistance(move.targetCells!, cells)));
+    return currentDistance <= 2 && destinationDistance >= 4 && destinationDistance - currentDistance >= 2;
+}
+
+/**
  * Immediate geometric progress for a pure move. The terminal mountain fallback uses footprint distance rather
  * than route length: a lateral route around BLOCK_CENTER that finishes no closer to any living enemy is exactly
  * the non-progress class that can alternate forever, while a genuinely closing move remains authoritative.
@@ -784,6 +818,8 @@ interface ISearchCounters {
     scoredCandidatesTotal: number;
     /** Searches abandoned before every shortlisted candidate received a comparable full score. */
     deadlineFallbacks: number;
+    /** H18 opening decisions where at least one move-only fast-flyer solo dive was removed from the catalog. */
+    isolatingFastFlyerMoveRejects: number;
     /** Finite operation-bounded wait arbitrations entered after the per-match timing circuit has opened. */
     circuitWaitArbitrations: number;
     /** v0.8 turns that entered the fixed late two-to-one-HP finish window. */
@@ -953,6 +989,7 @@ const emptyCounters = (): ISearchCounters => ({
     candidatesTotal: 0,
     scoredCandidatesTotal: 0,
     deadlineFallbacks: 0,
+    isolatingFastFlyerMoveRejects: 0,
     circuitWaitArbitrations: 0,
     dominantFinishTurns: 0,
     dominantFinishCombatOverrides: 0,
@@ -1066,6 +1103,12 @@ export interface ISearchMatchInfo {
     seed?: number;
     greenVersion?: string;
     redVersion?: string;
+    /**
+     * Offline simulations have finite candidate, shortlist, rollout, and horizon caps. When true, those fixed
+     * operation bounds decide behavior and wall-clock watchdogs remain diagnostic-only. Ranked/live callers omit
+     * this flag and retain the production deadline and circuit-breaker fail-safe.
+     */
+    offlineDeterministicWork?: boolean;
 }
 
 /**
@@ -1170,6 +1213,8 @@ export class SearchDriver {
     private readonly rankedReplayTiebreakEpsilon: number;
     private readonly rankedReplayTiebreakVersions: ReadonlySet<string>;
     private readonly rapidChargeReservationVersions: ReadonlySet<string>;
+    /** Explicit A19-H18-v2 policy gate; horizon alone must never opt another profile into this rule. */
+    private readonly fastFlyerCohesion: boolean;
     private readonly horizon: number;
     private readonly researchHorizon: number | null;
     private readonly researchHorizonVersions: ReadonlySet<string>;
@@ -1302,6 +1347,16 @@ export class SearchDriver {
                           .map((version) => version.trim())
                           .filter(Boolean),
                   );
+        const rawFastFlyerCohesion = process.env.SEARCH_A19_FAST_FLYER_COHESION;
+        if (
+            rawFastFlyerCohesion !== undefined &&
+            rawFastFlyerCohesion !== "" &&
+            rawFastFlyerCohesion !== "0" &&
+            rawFastFlyerCohesion !== "1"
+        ) {
+            throw new Error("SEARCH_A19_FAST_FLYER_COHESION must be 0 or 1");
+        }
+        this.fastFlyerCohesion = this.mode === "search" && rawFastFlyerCohesion === "1";
         this.horizon = Math.floor(envNum("SEARCH_HORIZON", 12, 1));
         const researchHorizon = parseSearchResearchHorizon(this.mode, this.versions);
         this.researchHorizon = researchHorizon?.horizon ?? null;
@@ -2044,9 +2099,23 @@ export class SearchDriver {
                 researchReserveRapidChargeDifferentTarget:
                     !this.observeOnly && this.rapidChargeReservationVersions.has(version),
             };
+            let rejectedIsolatingFastFlyerMove = false;
             const keepCandidate = (candidate: IEnumeratedCandidate): boolean => {
                 if (candidate.kind === "incumbent") return true;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
+                if (
+                    this.fastFlyerCohesion &&
+                    isV08Search &&
+                    this.horizon >= 18 &&
+                    incumbentKind === "wait" &&
+                    isEarlyIsolatingFastFlyerWaitMove(unit, this.deps.unitsHolder, currentLap, candidate)
+                ) {
+                    if (!rejectedIsolatingFastFlyerMove) {
+                        rejectedIsolatingFastFlyerMove = true;
+                        this.counters.isolatingFastFlyerMoveRejects += 1;
+                    }
+                    return false;
+                }
                 // Abomination/Arachna Queen are drafted and deployed as back-line protectors. Native v0.8
                 // establishes that intent; every a13 challenger must preserve its ward geometry (or answer an
                 // intruder) so rollout search cannot turn the role-aware hold into an unsupported charge.
@@ -2749,6 +2818,7 @@ export class SearchDriver {
             );
         } finally {
             if (
+                !this.match.offlineDeterministicWork &&
                 this.circuitBreakerMs !== null &&
                 (behaviorElapsedMs ?? performance.now() - t0) > this.circuitBreakerMs
             ) {
@@ -2880,6 +2950,8 @@ export class SearchDriver {
             shortlist: this.shortlist,
             decisionDeadlineMs: this.decisionDeadlineMs,
             deadlineFallbacks: c.deadlineFallbacks,
+            offlineDeterministicWork: this.match.offlineDeterministicWork === true,
+            isolatingFastFlyerMoveRejects: c.isolatingFastFlyerMoveRejects,
             waitDeadlinePolicy: this.waitDeadlinePolicy,
             circuitWaitArbitrations: c.circuitWaitArbitrations,
             passiveCatalogExpansions: c.passiveCatalogExpansions,
@@ -3242,7 +3314,9 @@ export class SearchDriver {
             : undefined;
 
         const deadlineAt =
-            deadlinePolicy === "operation_bounded" || this.decisionDeadlineMs === null
+            this.match.offlineDeterministicWork ||
+            deadlinePolicy === "operation_bounded" ||
+            this.decisionDeadlineMs === null
                 ? null
                 : t0 + this.decisionDeadlineMs;
         let scoredCandidates: readonly IEnumeratedCandidate[];

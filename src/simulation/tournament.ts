@@ -36,6 +36,11 @@ export interface ITournamentOptions {
     /** Base seed; game i uses a seed derived from it, so a whole run reproduces from one number. */
     baseSeed: number;
     maxLaps?: number;
+    /**
+     * Explicitly ignore wall-clock search watchdogs and rely on finite operation caps. Omitted/false retains
+     * production-bounded timing, including operational qualification runs.
+     */
+    searchOfflineDeterministicWork?: boolean;
     composition?: readonly IRosterComposition[];
     amountByLevel?: Readonly<Record<number, number>>;
     /**
@@ -654,6 +659,7 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         seed,
         gridType,
         maxLaps: options.maxLaps,
+        searchOfflineDeterministicWork: options.searchOfflineDeterministicWork,
         greenArtifactT1,
         redArtifactT1,
         greenArtifactT2,

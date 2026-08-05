@@ -461,6 +461,8 @@ function tournamentOptions(variant: V08ArmageddonRegressionVariant): ITournament
         games: V08_ARMAGEDDON_REGRESSION_BASELINE_GAMES,
         baseSeed: V08_ARMAGEDDON_REGRESSION_BASE_SEED,
         mapTypes: MAP_TYPES,
+        // This panel qualifies the operational 175/275ms watchdog envelope, not operation-bounded offline work.
+        searchOfflineDeterministicWork: false,
     };
 }
 

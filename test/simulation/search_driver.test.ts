@@ -69,6 +69,7 @@ import {
     classifyActions,
     SearchDriver,
     SearchRollbackError,
+    type ISearchMatchInfo,
     type ISearchPassiveProductiveProbe,
     type SearchPassiveProductiveProbeObserver,
     type SearchRollbackStrategy,
@@ -99,6 +100,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_AUDIT",
     "SEARCH_AUDIT_TURNS",
     "SEARCH_ACTIVE_CHALLENGERS",
+    "SEARCH_A19_FAST_FLYER_COHESION",
     "V08_AGGRESSIVE",
     "SEARCH_OBSERVE_ONLY",
     "SEARCH_SHORTLIST",
@@ -194,6 +196,7 @@ interface Harness {
     makeDriver: (
         passiveProductiveProbeObserver?: SearchPassiveProductiveProbeObserver,
         rollbackStrategy?: SearchRollbackStrategy,
+        matchPatch?: Partial<ISearchMatchInfo>,
     ) => SearchDriver;
     activeUnit: () => Unit | undefined;
     setActiveUnitId: (id: string) => void;
@@ -434,10 +437,10 @@ function buildBattle(
         fightProperties,
         pathHelper,
         attackHandler,
-        makeDriver: (passiveProductiveProbeObserver, rollbackStrategy) =>
+        makeDriver: (passiveProductiveProbeObserver, rollbackStrategy, matchPatch) =>
             new SearchDriver(
                 deps,
-                { seed, greenVersion: version, redVersion: version },
+                { seed, greenVersion: version, redVersion: version, ...matchPatch },
                 undefined,
                 passiveProductiveProbeObserver,
                 rollbackStrategy,
@@ -4057,6 +4060,69 @@ describe("search driver — gating, hygiene, determinism", () => {
         });
     });
 
+    it("uses fixed offline work bounds while an omitted match flag retains live deadline and circuit behavior", () => {
+        const run = (offlineDeterministicWork: boolean | undefined): Record<string, unknown> => {
+            const auditPath = join(
+                mkdtempSync(join(tmpdir(), offlineDeterministicWork ? "search-offline-work-" : "search-live-work-")),
+                "audit.jsonl",
+            );
+            process.env.SEARCH_AUDIT = auditPath;
+            const h = buildBattle(204, "v0.6");
+            h.playTurns(10);
+            const unit = h.activeUnit();
+            expect(unit).toBeDefined();
+            const incumbent: GameAction[] = [{ type: "end_turn", unitId: unit!.getId(), reason: "skip" }];
+            const driver = h.makeDriver(undefined, undefined, { offlineDeterministicWork });
+            const observedDeadlines: Array<number | null> = [];
+            const intercepted = driver as unknown as {
+                shortlistCandidates(
+                    unit: Unit,
+                    candidates: IEnumeratedCandidate[],
+                    seedBase: number,
+                    deadlineAt: number | null,
+                ): IEnumeratedCandidate[];
+                scoreCandidates(
+                    unit: Unit,
+                    candidates: readonly IEnumeratedCandidate[],
+                    seedBase: number,
+                    horizonMode: string,
+                    rolloutCount: number,
+                    deadlineAt: number | null,
+                ): number[];
+            };
+            intercepted.shortlistCandidates = (_unit, candidates, _seedBase, deadlineAt) => {
+                observedDeadlines.push(deadlineAt);
+                return candidates.slice(0, 2);
+            };
+            intercepted.scoreCandidates = (_unit, candidates) => candidates.map(() => 0);
+
+            driver.chooseDecision(unit!, "v0.6", incumbent);
+            driver.onMatchEnd("draw", "turn_cap");
+            expect(observedDeadlines).toHaveLength(1);
+            expect(observedDeadlines[0] === null).toBe(offlineDeterministicWork === true);
+            return JSON.parse(readFileSync(auditPath, "utf8").trim()) as Record<string, unknown>;
+        };
+
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.6",
+            SEARCH_HORIZON: "1",
+            SEARCH_ROLLOUTS: "1",
+            SEARCH_DECISION_DEADLINE_MS: "0.000001",
+            SEARCH_CIRCUIT_BREAKER_MS: "0.00001",
+        });
+        expect(run(undefined)).toMatchObject({
+            offlineDeterministicWork: false,
+            circuitOpened: true,
+        });
+        expect(run(true)).toMatchObject({
+            offlineDeterministicWork: true,
+            deadlineFallbacks: 0,
+            circuitOpened: false,
+            circuitSkipped: 0,
+        });
+    });
+
     it("repairs hard v0.8 passives but preserves a strategic wait after its search circuit opens", () => {
         const auditPath = join(mkdtempSync(join(tmpdir(), "search-v08-circuit-")), "audit.jsonl");
         setEnv({
@@ -4157,7 +4223,9 @@ describe("search driver — gating, hygiene, determinism", () => {
             expect(unit).toBeDefined();
             const incumbent = h.decideActive();
             const before = stableSnapshot(h);
-            const chosen = JSON.stringify(h.makeDriver(undefined, rollbackStrategy).chooseDecision(unit!, "v0.6", incumbent));
+            const chosen = JSON.stringify(
+                h.makeDriver(undefined, rollbackStrategy).chooseDecision(unit!, "v0.6", incumbent),
+            );
             const after = stableSnapshot(h);
             return { before, chosen, after };
         };

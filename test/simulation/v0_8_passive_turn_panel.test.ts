@@ -1246,6 +1246,7 @@ describe("v0.8 random-roster passive-turn panel", () => {
         const options: IV08PassiveTurnPanelOptions = {
             ...PRODUCTION_REGRESSION_OPTIONS,
             inheritCandidateEnvironment: true,
+            searchOfflineDeterministicWork: false,
         };
         const records = withScopedAIEnvironment(forcedCircuitEnvironment, () =>
             [756, 758].map((game) => runV08PassiveTurnPanelGame(options, game)),

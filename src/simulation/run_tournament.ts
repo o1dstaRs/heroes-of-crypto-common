@@ -40,6 +40,7 @@ async function main(): Promise<void> {
     const flags = argv.filter((a) => a.startsWith("--"));
     const [versionA, versionB, gamesArg, seedArg, outDirArg, concurrencyArg] = argv.filter((a) => !a.startsWith("--"));
     const randomizePicks = flags.includes("--random") || flags.includes("--randomize-picks");
+    const searchOfflineDeterministicWork = flags.includes("--offline-deterministic-work");
     // --livetwin (or env LIVETWIN=1): the committed live-faithful eval preset — exp-budget stacks
     // (ceil(1000/exp) per creature), melee-drafted rosters (FIGHT_MELEE_ROSTERS default 1), SEE_NONE shipped
     // setup on both sides, paired side-swap seeds (the tournament default). Set BEFORE workers spawn so the
@@ -58,7 +59,7 @@ async function main(): Promise<void> {
         : undefined;
     if (!versionA || !versionB) {
         console.error(
-            "usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency] [--random] [--maps[=normal,water,lava,block]] [--livetwin]",
+            "usage: run_tournament <versionA> <versionB> [games] [baseSeed] [outDir] [concurrency] [--random] [--maps[=normal,water,lava,block]] [--livetwin] [--offline-deterministic-work]",
         );
         console.error(`known versions: ${AI_VERSIONS.join(", ")}`);
         process.exit(1);
@@ -92,10 +93,11 @@ async function main(): Promise<void> {
     console.log(
         `Running ${games} games: ${versionA} vs ${versionB} (seed ${baseSeed}, concurrency ${concurrency}, ` +
             `picks ${randomizePicks ? "RANDOM per team" : "mirrored"}, maps ${mapTypes ? mapTypes.join("/") : "NORMAL"}, ` +
-            `LIVETWIN ${liveTwin ? "ON [expBudget stacks + melee drafts + SEE_NONE setup]" : "off"}) -> ${jsonlPath}`,
+            `LIVETWIN ${liveTwin ? "ON [expBudget stacks + melee drafts + SEE_NONE setup]" : "off"}, ` +
+            `search work ${searchOfflineDeterministicWork ? "offline deterministic" : "live bounded"}) -> ${jsonlPath}`,
     );
     const summary = await runTournamentConcurrent(
-        { versionA, versionB, games, baseSeed, randomizePicks, mapTypes },
+        { versionA, versionB, games, baseSeed, randomizePicks, mapTypes, searchOfflineDeterministicWork },
         concurrency,
         (record) => {
             buffer.push(`${JSON.stringify(record)}\n`);

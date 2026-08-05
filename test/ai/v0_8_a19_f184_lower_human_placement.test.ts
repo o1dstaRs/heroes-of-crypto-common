@@ -9,6 +9,8 @@ import {
     type V08A19F184LowerHumanOpeningId,
     type V08A19F184LowerHumanPlacementFallbackReason,
 } from "../../src/ai/versions/v0_8_a19_f184_lower_human_placement";
+import { createV08A19H18F184LowerHumanRankedFallbackStrategy } from "../../src/ai/versions/v0_8_a19_h18_f184_lower_human_placement_profile";
+import { V08A19RankedPlacementStrategy } from "../../src/ai/versions/v0_8_a19_ranked_placement";
 import { layoutRevealPlacement } from "../../src/ai/versions/v0_7_placement_reveal";
 import type { GameAction } from "../../src/engine/actions";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -226,6 +228,54 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
                 fixture.incumbent,
             );
         }
+    });
+
+    test("keeps the exact f184 opening above a generic ranked-placement correction", () => {
+        const fixture = scenario(UPPER_ROSTER, LOWER_IDS);
+        const strategy = createV08A19H18F184LowerHumanRankedFallbackStrategy();
+        const generic = (strategy as unknown as { base: V08A19RankedPlacementStrategy }).base;
+        const selected = strategy.placeArmy(fixture.units, fixture.context);
+
+        expect(generic.getLastPlacementAudit()).toMatchObject({
+            treatmentApplied: true,
+            placementChanged: true,
+            correctedPhysicalUnits: 1,
+            correctedForwardPhysicals: 1,
+            fallbackReason: null,
+        });
+        for (const unit of fixture.units) {
+            expect(selected.get(unit.getId())).toEqual(upperTemplateNormalizedToLower[unit.getName()]);
+        }
+        expect(strategy.getLastPlacementAudit()).toMatchObject({
+            treatmentApplied: true,
+            placementChanged: true,
+            openingId: "prod-f184-upper-roster",
+            fallbackReason: null,
+        });
+    });
+
+    test("uses the generic correction when a LOWER public roster does not match f184", () => {
+        const fixture = scenario(UPPER_ROSTER, [PBTypes.CreatureVals.BLACK_DRAGON, PBTypes.CreatureVals.GRIFFIN]);
+        const strategy = createV08A19H18F184LowerHumanRankedFallbackStrategy();
+        const generic = (strategy as unknown as { base: V08A19RankedPlacementStrategy }).base;
+        const selected = strategy.placeArmy(fixture.units, fixture.context);
+        const valkyrie = fixture.units.find((unit) => unit.getName() === "Valkyrie")!;
+
+        expect(selected).not.toBe(fixture.incumbent);
+        expect(selected.get(valkyrie.getId())?.y).toBeGreaterThan(fixture.incumbent.get(valkyrie.getId())!.y);
+        expect(generic.getLastPlacementAudit()).toMatchObject({
+            treatmentApplied: true,
+            placementChanged: true,
+            correctedPhysicalUnits: 1,
+            correctedForwardPhysicals: 1,
+            fallbackReason: null,
+        });
+        expect(strategy.getLastPlacementAudit()).toMatchObject({
+            treatmentApplied: false,
+            placementChanged: false,
+            openingId: null,
+            fallbackReason: "invalid-public-roster",
+        });
     });
 
     test("retains the v10 lower-side fail-closed gates", () => {

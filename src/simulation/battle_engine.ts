@@ -279,6 +279,11 @@ export interface IMatchConfig {
     seed: number;
     /** Hard cap on laps before the match is called a draw-on-points. Default 60. */
     maxLaps?: number;
+    /**
+     * Explicit offline-only opt-in: finite search operation caps, rather than host timing, decide behavior.
+     * Omitted/false preserves the production deadline and circuit-breaker semantics used by bounded qualification.
+     */
+    searchOfflineDeterministicWork?: boolean;
     /** Emit only lifecycle/destruction events required to drive an in-process simulation. */
     headlessEvents?: boolean;
     /** Board layout for this match. Defaults to NORMAL (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER). */
@@ -858,6 +863,9 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         seed: config.seed,
         greenVersion: config.greenVersion,
         redVersion: config.redVersion,
+        // Deterministic operation-bounded work is deliberately opt-in. Omission must retain the same wall-clock
+        // deadline/circuit behavior as ranked and every existing operational-bounded qualification runner.
+        offlineDeterministicWork: config.searchOfflineDeterministicWork === true,
     };
     const search = config.searchScoredDecisionObserver
         ? new SearchDriver(

@@ -87,6 +87,7 @@ describe("pinned v0.8 candidate tournament runner", () => {
             "12",
         ]);
         expect(invocation.args).toContain("--maps=normal,lava,block");
+        expect(invocation.args).not.toContain("--offline-deterministic-work");
         expect(invocation.environment).toMatchObject({
             PATH: "/bin",
             LANG: "en_US.UTF-8",
