@@ -55,13 +55,42 @@ export const isEffectApplicationNoise = (name: string): boolean =>
     name.endsWith(" Aura") ||
     name.endsWith(" Augment");
 
+/**
+ * One Water Shield absorb observed while an action was applied: the shield ate the whole hit and broke.
+ * Captured at the Unit.applyDamage funnel — the only place the absorb is decided — because the handlers
+ * never see it (the call just returns 0), yet the ranked log (rebuilt from events, never engine text)
+ * has to say the shield broke and under whose blow. The action engine drains these into the action's
+ * damage-carrying event as `secondary` entries with source "water_shield".
+ */
+export interface IWaterShieldAbsorbRecord {
+    unitId: string;
+    amount: number;
+}
+
 let captureActive = false;
 let records: IEffectApplicationRecord[] = [];
+let waterShieldAbsorbs: IWaterShieldAbsorbRecord[] = [];
 
 /** Start capturing applications. Callers MUST pair with endEffectApplicationCapture. */
 export const beginEffectApplicationCapture = (): void => {
     captureActive = true;
     records = [];
+    waterShieldAbsorbs = [];
+};
+
+/** Record one Water Shield absorb; a no-op outside a capture window. */
+export const recordWaterShieldAbsorb = (record: IWaterShieldAbsorbRecord): void => {
+    if (!captureActive) {
+        return;
+    }
+    waterShieldAbsorbs.push(record);
+};
+
+/** Drain the absorbs recorded since begin — the engine calls this alongside endEffectApplicationCapture. */
+export const endWaterShieldAbsorbCapture = (): IWaterShieldAbsorbRecord[] => {
+    const out = waterShieldAbsorbs;
+    waterShieldAbsorbs = [];
+    return out;
 };
 
 /** Stop capturing and return everything recorded since begin (empty array when nothing landed). */
