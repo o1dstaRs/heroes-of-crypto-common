@@ -477,8 +477,15 @@ export const pickAiMetaRankedCreature = (
     available: readonly number[],
     ownCreatureIds: readonly number[],
     knownOpponentCreatureIds: readonly number[],
+    tier1ArtifactId?: number,
 ): number | undefined =>
-    pickDraftGenomeCreature(AI_META_RANKED_DRAFT_GENOME, available, ownCreatureIds, knownOpponentCreatureIds);
+    pickDraftGenomeCreature(
+        AI_META_RANKED_DRAFT_GENOME,
+        available,
+        ownCreatureIds,
+        knownOpponentCreatureIds,
+        tier1ArtifactId,
+    );
 
 const materializeRankedRoster = (creatureIds: readonly number[]): IArmyUnitSpec[] =>
     creatureIds.map((creatureId) => {
@@ -530,12 +537,14 @@ function generateRankedRosters(seed: number): [IArmyUnitSpec[], IArmyUnitSpec[]]
             throw new Error(`Unexpected AI meta ranked pick phase ${phase.phase} at sequence ${state.phaseSequence}`);
         }
         const team = phase.actors[0];
-        const ownCreatureIds = rankedTeamState(state, team).creatures;
+        const teamState = rankedTeamState(state, team);
+        const ownCreatureIds = teamState.creatures;
         const knownOpponentCreatureIds = getKnownOpponentCreatures(state, team);
         const creatureId = pickAiMetaRankedCreature(
             getVisibleCreatureChoices(state, team),
             ownCreatureIds,
             knownOpponentCreatureIds,
+            teamState.tier1Artifact,
         );
         if (creatureId === undefined) {
             throw new Error(`AI meta ranked draft found no visible L${phase.creatureLevel} creature`);

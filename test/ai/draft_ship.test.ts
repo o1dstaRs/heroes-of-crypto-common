@@ -27,8 +27,12 @@ import {
     parseDraftGenome,
     pickDraftGenomeCreature,
     projectDraftGenomeForShipping,
+    RANKED_INTERACTION_DRAFT_SPEC,
+    RANKED_VERSATILE_DRAFT_SPEC,
     V07_NONFIGHT_DRAFT_SPEC,
 } from "../../src/ai/setup/draft_ship";
+import { RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../../src/ai/setup/draft_interaction_prior";
+import { RANKED_DRAFT_VARIETY_POLICY_ID } from "../../src/ai/setup/draft_variety";
 import {
     DRAFT_ANCHOR_W,
     DRAFT_FEATURE_DIM,
@@ -241,6 +245,52 @@ describe("draft ship genome", () => {
         expect(() => parseDraftGenome(JSON.stringify({ id: 7, weights: LEAGUE_ANCHOR_GENOME }))).toThrow(
             "id must be a non-empty string",
         );
+    });
+
+    it("keeps the interaction prior as an explicit, projected ranked candidate", () => {
+        const incumbent = parseDraftGenome(LEAGUE_ROUND1_DRAFT_SPEC);
+        const candidate = parseDraftGenome(RANKED_INTERACTION_DRAFT_SPEC);
+        expect(candidate.id).toBe(RANKED_INTERACTION_DRAFT_SPEC);
+        expect(candidate.weights).toEqual(incumbent.weights);
+        expect(candidate.draftInteractionPrior).toBe(RANKED_DRAFT_INTERACTION_PRIOR_ID);
+        expect(projectDraftGenomeForShipping(candidate).draftInteractionPrior).toBe(RANKED_DRAFT_INTERACTION_PRIOR_ID);
+        expect(
+            parseDraftGenome(
+                JSON.stringify({
+                    id: "inline-prior",
+                    weights: LEAGUE_ANCHOR_GENOME,
+                    draftInteractionPrior: RANKED_DRAFT_INTERACTION_PRIOR_ID,
+                }),
+            ).draftInteractionPrior,
+        ).toBe(RANKED_DRAFT_INTERACTION_PRIOR_ID);
+        expect(() =>
+            parseDraftGenome(JSON.stringify({ weights: LEAGUE_ANCHOR_GENOME, draftInteractionPrior: "unknown" })),
+        ).toThrow("Unsupported ranked draft interaction prior");
+        expect(() =>
+            parseDraftGenome(JSON.stringify({ weights: LEAGUE_ANCHOR_GENOME, draftInteractionPrior: "toString" })),
+        ).toThrow("Unsupported ranked draft interaction prior");
+    });
+
+    it("keeps score-bounded variety explicit and projected with its supporting evidence", () => {
+        const incumbent = parseDraftGenome(LEAGUE_ROUND1_DRAFT_SPEC);
+        const candidate = parseDraftGenome(RANKED_VERSATILE_DRAFT_SPEC);
+        expect(candidate.id).toBe(RANKED_VERSATILE_DRAFT_SPEC);
+        expect(candidate.weights).toEqual(incumbent.weights);
+        expect(candidate.draftInteractionPrior).toBe(RANKED_DRAFT_INTERACTION_PRIOR_ID);
+        expect(candidate.draftVarietyPolicy).toBe(RANKED_DRAFT_VARIETY_POLICY_ID);
+        expect(projectDraftGenomeForShipping(candidate).draftVarietyPolicy).toBe(RANKED_DRAFT_VARIETY_POLICY_ID);
+        expect(
+            parseDraftGenome(
+                JSON.stringify({
+                    id: "inline-variety",
+                    weights: LEAGUE_ANCHOR_GENOME,
+                    draftVarietyPolicy: RANKED_DRAFT_VARIETY_POLICY_ID,
+                }),
+            ).draftVarietyPolicy,
+        ).toBe(RANKED_DRAFT_VARIETY_POLICY_ID);
+        expect(() =>
+            parseDraftGenome(JSON.stringify({ weights: LEAGUE_ANCHOR_GENOME, draftVarietyPolicy: "unknown" })),
+        ).toThrow("Unsupported ranked draft variety policy");
     });
 
     it("exposes the accepted League round-3 projection as an explicit opt-in", () => {

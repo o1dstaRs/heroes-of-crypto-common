@@ -11,6 +11,17 @@
 
 import { Tier1Artifact } from "../../artifacts/artifact_properties";
 import { backlineProtectionBeneficiaryCount, creatureInfo } from "./creature_score";
+import {
+    isRankedDraftInteractionPrior,
+    rankedDraftInteractionAffinity,
+    RANKED_DRAFT_INTERACTION_PRIOR_WEIGHT,
+    type RankedDraftInteractionPriorId,
+} from "./draft_interaction_prior";
+import {
+    isRankedDraftVarietyPolicy,
+    pickRankedDraftVarietyCreature,
+    type RankedDraftVarietyPolicyId,
+} from "./draft_variety";
 
 export type DraftBundle = readonly [number, number, number];
 
@@ -19,10 +30,18 @@ export interface IDraftCoherenceContext {
     ownCreatureIds: readonly number[];
     /** The acting seat's selected Tier-1 artifact, when the bundle phase has already resolved. */
     tier1ArtifactId?: number;
+    /** Only public enemy picks. Required when an interaction-prior candidate uses counter evidence. */
+    knownOpponentCreatureIds?: readonly number[];
+    /** Candidate-only evidence overlay; omitted preserves the existing coherence policy exactly. */
+    draftInteractionPrior?: RankedDraftInteractionPriorId;
+    /** Candidate-only close-offer selector; omitted preserves the existing coherence policy exactly. */
+    draftVarietyPolicy?: RankedDraftVarietyPolicyId;
 }
 
 /** Keep replay-derived build fit influential without making it lexicographically stronger than the genome. */
 export const DRAFT_COHERENCE_WEIGHT = 0.35;
+
+const INTERACTION_TO_COHERENCE_SCALE = RANKED_DRAFT_INTERACTION_PRIOR_WEIGHT / DRAFT_COHERENCE_WEIGHT;
 
 const MULTI_HIT_MELEE_ABILITIES = [
     "Double Punch",
@@ -130,8 +149,18 @@ export function pickCoherentDraftCreature(
 ): number | undefined {
     if (!available.length) return undefined;
     const baseScores = available.map(baseScore);
-    const affinities = available.map((creatureId) => draftCreatureCoherenceAffinity(creatureId, context));
-    return available[bestScoreIndex(applyDraftCoherenceOverlay(baseScores, affinities))];
+    const affinities = available.map(
+        (creatureId) =>
+            draftCreatureCoherenceAffinity(creatureId, context) +
+            (isRankedDraftInteractionPrior(context.draftInteractionPrior)
+                ? rankedDraftInteractionAffinity(creatureId, context) * INTERACTION_TO_COHERENCE_SCALE
+                : 0),
+    );
+    const scores = applyDraftCoherenceOverlay(baseScores, affinities);
+    if (isRankedDraftVarietyPolicy(context.draftVarietyPolicy)) {
+        return pickRankedDraftVarietyCreature(available, scores, context);
+    }
+    return available[bestScoreIndex(scores)];
 }
 
 /** Build-plan fit available at bundle time, before later creature offers have resolved. */
