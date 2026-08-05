@@ -140,7 +140,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // production draft selections while preserving the resolver's deterministic replay contract.
 // Re-pinned for the Trent buff (hp 29 -> 31, armor 19 -> 20, attack 21 -> 22): the sturdier L2
 // re-values every seeded exchange it appears in. Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "f648dc80fdbacf3b1c37703a23ab7f17cebe937e784f3aa6ceaaf2c6863c3d79";
+// Re-pinned after Water Shield break events joined the authoritative action trace and began naming the
+// striker. The event is intentionally replay-visible; Linux CI and two local runs produced this digest.
+const EXPECTED_REPLAY_SHA256 = "a22ffdda9e63fec5b348376f9f33b765c04f122d315c9eb2f81edb1961fcb8ef";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
