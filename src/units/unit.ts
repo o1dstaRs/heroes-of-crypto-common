@@ -2824,6 +2824,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const authoritativeSteps = this.unitProperties.steps_authoritative
             ? { steps: this.unitProperties.steps, mod: this.unitProperties.steps_mod }
             : undefined;
+        // Base-stat twins: drifts that live in base_armor/base_attack (Bitter Experience, Made of Fire,
+        // Unyielding Power) never reach a ranked client's buff/effect arrays, so the re-derivation below
+        // would silently reset them to the local config base every pass.
+        const authoritativeBaseArmor = this.unitProperties.base_armor_authoritative
+            ? this.unitProperties.base_armor
+            : undefined;
+        const authoritativeBaseAttack = this.unitProperties.base_attack_authoritative
+            ? this.unitProperties.base_attack
+            : undefined;
 
         // target
         if (!this.hasEffectActive("Aggr")) {
@@ -3084,6 +3093,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         this.unitProperties.base_armor = roundUnitStat(this.unitProperties.base_armor * baseArmorMultiplier, 2);
+        if (authoritativeBaseArmor !== undefined) {
+            this.unitProperties.base_armor = authoritativeBaseArmor;
+        }
 
         // mod
         const shatterArmorEffect = this.getEffect("Shatter Armor");
@@ -3505,6 +3517,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.attack_mod = authoritativeAttackMod;
         }
         this.unitProperties.base_attack = roundUnitStat(this.unitProperties.base_attack * baseAttackMultiplier, 2);
+        if (authoritativeBaseAttack !== undefined) {
+            this.unitProperties.base_attack = authoritativeBaseAttack;
+        }
         this.unitProperties.shot_distance = roundUnitStat(this.unitProperties.shot_distance, 2);
 
         this.unitProperties.range_armor = roundUnitStat(this.unitProperties.base_armor * rangeArmorMultiplier, 2);

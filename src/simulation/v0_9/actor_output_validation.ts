@@ -108,7 +108,7 @@ function runValidationWorker(
             results = message;
         });
         worker.once("error", (error) => {
-            workerError = error;
+            workerError = error instanceof Error ? error : new Error(String(error));
         });
         worker.once("exit", (code) => {
             if (workerError) {
