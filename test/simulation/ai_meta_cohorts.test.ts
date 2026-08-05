@@ -15,6 +15,7 @@ import { Worker } from "node:worker_threads";
 import { LEAGUE_ROUND1_DRAFT_SPEC } from "../../src/ai/setup/draft_ship";
 import { isBacklineProtectionBeneficiaryCreature } from "../../src/ai/setup/creature_score";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { creaturesByLevel, DEFAULT_ROSTER_COMPOSITION } from "../../src/simulation/army";
 import {
     AI_META_COHORTS,
     AI_META_FIGHT_PROFILE,
@@ -399,6 +400,14 @@ describe("AI meta aggregation", () => {
             const row = rows.find((candidate) => candidate.name === unit.creatureName);
             expect(row?.scoreRate).toBe(0);
         }
+        const draftableNames = new Set(
+            DEFAULT_ROSTER_COMPOSITION.flatMap(({ level }) =>
+                creaturesByLevel(level).map((creature) => creature.creatureName),
+            ),
+        );
+        expect(rows).toHaveLength(draftableNames.size);
+        const zeroSupportRow = rows.find((row) => row.selected === 0);
+        expect(zeroSupportRow).toMatchObject({ games: 0, pairs: 0, pickRate: 0, scoreRate: 0.5 });
         expect(accumulator.greenWins).toBe(1);
         expect(accumulator.redWins).toBe(1);
         expect(accumulator.distinctRosterViolations).toBe(0);

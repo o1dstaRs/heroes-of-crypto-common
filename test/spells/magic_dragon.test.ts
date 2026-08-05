@@ -180,19 +180,30 @@ describe("Magic Dragon creature configuration", () => {
         expect(dragon.abilities).toEqual(["Tome of Elements", "Magic Reflection"]);
     });
 
-    // The brief: the Tsar Cannon and the Gargantuan, roughly 10-15% weaker across the board, with an attack
-    // that is much weaker still, because the creature's damage is meant to come out of its spellbook.
-    it("sits 10-15% under the Tsar Cannon / Gargantuan average on every stat but attack", () => {
+    // The brief: the Tsar Cannon and the Gargantuan, roughly 10-15% weaker on shared mobility and upper damage,
+    // with an attack that is much weaker still, because the creature's damage is meant to come out of its spellbook.
+    it("sits 10-15% under the Tsar Cannon / Gargantuan average on shared mobility and upper damage", () => {
         const cannon = creatures.Life["Tsar Cannon"];
         const gargantuan = creatures.Nature.Gargantuan;
         const midpoint = (key: keyof IRawCreature): number =>
             ((cannon[key] as number) + (gargantuan[key] as number)) / 2;
 
-        for (const key of ["steps", "speed", "armor", "attack_damage_min", "attack_damage_max"] as const) {
+        for (const key of ["steps", "speed", "attack_damage_max"] as const) {
             const ratio = dragon[key] / midpoint(key);
             expect(ratio).toBeGreaterThanOrEqual(0.85);
             expect(ratio).toBeLessThanOrEqual(0.9);
         }
+    });
+
+    it("keeps its deliberately lower armor and damage floor after the Tsar Cannon buff", () => {
+        const cannon = creatures.Life["Tsar Cannon"];
+        const gargantuan = creatures.Nature.Gargantuan;
+        const midpoint = (key: "armor" | "attack_damage_min"): number => (cannon[key] + gargantuan[key]) / 2;
+
+        expect(dragon.armor).toBe(25);
+        expect(dragon.attack_damage_min).toBe(28);
+        expect(dragon.armor / midpoint("armor")).toBeLessThan(0.85);
+        expect(dragon.attack_damage_min / midpoint("attack_damage_min")).toBeLessThan(0.85);
     });
 
     // hp is a DELIBERATE exception to the band above, taken together with the 25% cut to the spellbook's

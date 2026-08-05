@@ -100,6 +100,16 @@ describe("config_provider", () => {
         expect(creature.base_attack).toBe(21);
     });
 
+    it("loads Tsar Cannon's improved ranged profile", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Life", "Tsar Cannon", "tsar_cannon_512", 0, 500);
+
+        expect(creature.base_armor).toBe(32);
+        expect(creature.base_attack).toBe(46);
+        expect(creature.attack_damage_min).toBe(40);
+        expect(creature.attack_damage_max).toBe(52);
+        expect(creature.shot_distance).toBe(9.5);
+    });
+
     it("derives creature amount from total experience when amount is not positive", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Berserker", "berserker_512", 0, 1);
 
