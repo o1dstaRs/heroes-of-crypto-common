@@ -1758,6 +1758,37 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
     });
 
+    it("reports a gifted ability on the authoritative spell event", () => {
+        const setup = setupActionFight({
+            lowerAbilities: ["Wild Regeneration"],
+            lowerSpells: ["System:Wild Regeneration"],
+        });
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Wild Regeneration",
+            targetId: setup.lowerSupport.getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "spell_cast",
+                abilityTransfers: [
+                    {
+                        abilityName: "Wild Regeneration",
+                        fromUnitId: setup.lower.getId(),
+                        toUnitId: setup.lowerSupport.getId(),
+                        mode: "gifted",
+                    },
+                ],
+            }),
+        );
+        expect(setup.lowerSupport.hasAbilityActive("Wild Regeneration")).toBe(true);
+        expect(setup.lower.hasAbilityActive("Wild Regeneration")).toBe(false);
+    });
+
     it("casts Castling (POSITION_CHANGE) and swaps the caster with the in-range small enemy", () => {
         const enemyCell = { x: 5, y: 3 };
         const setup = setupActionFight({

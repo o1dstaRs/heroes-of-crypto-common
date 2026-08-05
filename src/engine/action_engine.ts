@@ -1275,6 +1275,7 @@ export class GameActionEngine {
                 targetCell: target?.getBaseCell(),
                 unitIdsDied,
                 animations: this.serializeAnimations(result.animationData ?? []),
+                abilityTransfers: result.abilityTransfers?.length ? result.abilityTransfers : undefined,
                 healed: result.healed?.length ? result.healed : undefined,
                 resurrected: result.resurrected?.length ? result.resurrected : undefined,
             },

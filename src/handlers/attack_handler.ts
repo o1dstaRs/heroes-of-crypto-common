@@ -62,6 +62,13 @@ export interface IAttackResult {
     healed?: { unitId: string; amount: number }[];
     /** Stacks and health a RESURRECT cast brought back, for the spell_cast event. Same contract as `healed`. */
     resurrected?: { unitId: string; amount: number; hp: number; position: HoCMath.XY }[];
+    /** Giftable ability cards delivered by this cast, for authoritative ranked narration. */
+    abilityTransfers?: {
+        abilityName: string;
+        fromUnitId: string;
+        toUnitId: string;
+        mode: "gifted" | "copied";
+    }[];
 }
 
 export interface IAttackObstacle {
@@ -282,6 +289,7 @@ export class AttackHandler {
         // Stacks the cast raised, reported on the result so the spell_cast event can carry them (ranked's
         // scene log and resurrection VFX are both rebuilt from events, not from this handler's log text).
         const resurrectedUnits: { unitId: string; amount: number; hp: number; position: HoCMath.XY }[] = [];
+        const abilityTransfers: NonNullable<IAttackResult["abilityTransfers"]> = [];
         if (!currentActiveSpell || !attackerUnit) {
             return { completed: false, unitIdsDied, animationData };
         }
@@ -322,6 +330,12 @@ export class AttackHandler {
                             : attackerUnit.deleteAbility(currentActiveSpell.getName());
                         if (!targetUnit.hasAbilityActive(currentActiveSpell.getName()) && deletedAbility) {
                             targetUnit.addAbility(deletedAbility);
+                            abilityTransfers.push({
+                                abilityName: currentActiveSpell.getName(),
+                                fromUnitId: attackerUnit.getId(),
+                                toUnitId: targetUnit.getId(),
+                                mode: holyCrossBuff ? "copied" : "gifted",
+                            });
                         }
                         clarifyingStr = holyCrossBuff ? `=> copied` : `=> gifted`;
                     } else {
@@ -542,7 +556,14 @@ export class AttackHandler {
             }
             this.sceneLog.updateLog(mirroredStr);
 
-            return { completed: true, unitIdsDied, animationData, healed: healedUnits, resurrected: resurrectedUnits };
+            return {
+                completed: true,
+                unitIdsDied,
+                animationData,
+                healed: healedUnits,
+                resurrected: resurrectedUnits,
+                abilityTransfers,
+            };
         }
 
         return { completed: false, unitIdsDied, animationData };

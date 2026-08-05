@@ -126,6 +126,16 @@ export type GameEvent =
           unitIdsDied: string[];
           animations: IGameAnimationEvent[];
           /**
+           * Ability cards delivered by the cast. Giftable spells mutate the unit ability lists directly,
+           * so ranked clients need this payload to restore the sandbox's gifted/copied narration.
+           */
+          abilityTransfers?: {
+              abilityName: string;
+              fromUnitId: string;
+              toUnitId: string;
+              mode: "gifted" | "copied";
+          }[];
+          /**
            * How much each unit was actually healed (after magic resist, Holy Cross and the missing-HP
            * cap). Ranked rebuilds its scene log from these events rather than from the engine's own text,
            * so without this a heal reads as a bare "cast Heal on X" with no number — see
