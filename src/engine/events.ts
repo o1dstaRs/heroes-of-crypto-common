@@ -20,6 +20,19 @@ export interface IGameAnimationEvent {
     bodyUnitId?: string;
 }
 
+/**
+ * A cast moved an ability card from one unit to another. Wild Regeneration uses `gifted` for its normal
+ * one-way transfer and `copied` while Holy Cross lets the caster retain the original card. This belongs on
+ * the authoritative spell event because ranked replays cannot infer a transfer reliably from snapshots: a
+ * reconnect may already contain the post-cast ability lists, and a copied card leaves the caster unchanged.
+ */
+export interface IAbilityTransfer {
+    abilityName: string;
+    fromUnitId: string;
+    toUnitId: string;
+    mode: "gifted" | "copied";
+}
+
 export type GameEventMode = "full" | "headless";
 
 export type GameEvent =
@@ -172,6 +185,11 @@ export type GameEvent =
            * which is where the effect belongs.
            */
           resurrected?: { unitId: string; amount: number; hp: number; position: XY }[];
+          /**
+           * Ability cards this cast actually delivered. Drives the shared sandbox/ranked transfer VFX and
+           * lets ranked reconstruct the engine's `=> gifted` / `=> copied` scene-log wording.
+           */
+          abilityTransfers?: IAbilityTransfer[];
           /**
            * Per-target outcome of a cast whose result is a ROLL rather than a state change: the Blacksmith's
            * Craft ("stun" / "nothing" / "double" / "frozen") and the Armor/Weapon Runes ("enchanted" /

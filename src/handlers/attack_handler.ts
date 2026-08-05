@@ -25,6 +25,7 @@ import { SmokeClouds } from "../spells/smoke_clouds";
 import * as HoCConstants from "../constants";
 import * as AbilityHelper from "../abilities/ability_helper";
 import type { ISceneLog } from "../scene/scene_log_interface";
+import type { IAbilityTransfer } from "../engine/events";
 import { Unit } from "../units/unit";
 import { recordEffectApplication } from "../units/effect_application_capture";
 import { FightStateManager } from "../fights/fight_state_manager";
@@ -62,6 +63,8 @@ export interface IAttackResult {
     healed?: { unitId: string; amount: number }[];
     /** Stacks and health a RESURRECT cast brought back, for the spell_cast event. Same contract as `healed`. */
     resurrected?: { unitId: string; amount: number; hp: number; position: HoCMath.XY }[];
+    /** Ability cards a giftable cast actually delivered, for authoritative replay/log/VFX. */
+    abilityTransfers?: IAbilityTransfer[];
 }
 
 export interface IAttackObstacle {
@@ -282,6 +285,10 @@ export class AttackHandler {
         // Stacks the cast raised, reported on the result so the spell_cast event can carry them (ranked's
         // scene log and resurrection VFX are both rebuilt from events, not from this handler's log text).
         const resurrectedUnits: { unitId: string; amount: number; hp: number; position: HoCMath.XY }[] = [];
+        // Ability cards this cast moved. A snapshot can show the resulting card lists, but it cannot say
+        // WHEN the transfer happened (or distinguish Holy Cross copy from a pre-existing caster card), so
+        // ranked needs the exact outcome on the spell event just like heals and resurrection do.
+        const abilityTransfers: IAbilityTransfer[] = [];
         if (!currentActiveSpell || !attackerUnit) {
             return { completed: false, unitIdsDied, animationData };
         }
@@ -320,8 +327,27 @@ export class AttackHandler {
                         const deletedAbility = holyCrossBuff
                             ? attackerUnit.getAbility(currentActiveSpell.getName())
                             : attackerUnit.deleteAbility(currentActiveSpell.getName());
-                        if (!targetUnit.hasAbilityActive(currentActiveSpell.getName()) && deletedAbility) {
+                        // Break disables `hasAbilityActive`, but does not remove the durable card. Use the
+                        // stored lists here so a broken ally can genuinely receive a new gift (and an ally
+                        // that already owns the disabled card is not mistaken for an empty recipient).
+                        const targetProperties = targetUnit.getUnitProperties();
+                        const targetAlreadyOwnsAbility =
+                            targetProperties.abilities.includes(currentActiveSpell.getName()) &&
+                            !targetProperties.stolen_abilities?.includes(currentActiveSpell.getName());
+                        if (!targetAlreadyOwnsAbility && deletedAbility) {
                             targetUnit.addAbility(deletedAbility);
+                            const recipientProperties = targetUnit.getUnitProperties();
+                            const delivered =
+                                recipientProperties.abilities.includes(deletedAbility.getName()) &&
+                                !recipientProperties.stolen_abilities?.includes(deletedAbility.getName());
+                            if (delivered) {
+                                abilityTransfers.push({
+                                    abilityName: deletedAbility.getName(),
+                                    fromUnitId: attackerUnit.getId(),
+                                    toUnitId: targetUnit.getId(),
+                                    mode: holyCrossBuff ? "copied" : "gifted",
+                                });
+                            }
                         }
                         clarifyingStr = holyCrossBuff ? `=> copied` : `=> gifted`;
                     } else {
@@ -542,7 +568,14 @@ export class AttackHandler {
             }
             this.sceneLog.updateLog(mirroredStr);
 
-            return { completed: true, unitIdsDied, animationData, healed: healedUnits, resurrected: resurrectedUnits };
+            return {
+                completed: true,
+                unitIdsDied,
+                animationData,
+                healed: healedUnits,
+                resurrected: resurrectedUnits,
+                abilityTransfers,
+            };
         }
 
         return { completed: false, unitIdsDied, animationData };

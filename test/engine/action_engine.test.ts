@@ -17,6 +17,7 @@ import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine, type IGameActionEngineContext } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import { createSequenceGameRuntime } from "../../src/engine/runtime";
+import { EffectFactory } from "../../src/effects/effect_factory";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { AttackType, GridType, MovementType, UnitSizeType } from "../../src/generated/protobuf/v1/types_gen";
@@ -1750,6 +1751,103 @@ describe("GameActionEngine", () => {
         expect(setup.upper.hasDebuffActive("Weakness")).toBe(true);
         expect(setup.lower.hasSpellRemaining("Weakness")).toBe(false);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+    });
+
+    it("reports Wild Regeneration's delivered ability on the authoritative spell event", () => {
+        const setup = setupActionFight({ lowerAbilities: ["Wild Regeneration"] });
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Wild Regeneration",
+            targetId: setup.lowerSupport.getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "spell_cast",
+                casterId: setup.lower.getId(),
+                spellName: "Wild Regeneration",
+                targetId: setup.lowerSupport.getId(),
+                abilityTransfers: [
+                    {
+                        abilityName: "Wild Regeneration",
+                        fromUnitId: setup.lower.getId(),
+                        toUnitId: setup.lowerSupport.getId(),
+                        mode: "gifted",
+                    },
+                ],
+            }),
+        );
+        expect(setup.lower.hasAbilityActive("Wild Regeneration")).toBe(false);
+        expect(setup.lowerSupport.hasAbilityActive("Wild Regeneration")).toBe(true);
+        expect(setup.lower.hasSpellRemaining("Wild Regeneration")).toBe(false);
+    });
+
+    it("reports Holy Cross copying Wild Regeneration while both allies retain the ability", () => {
+        const setup = setupActionFight({ lowerAbilities: ["Wild Regeneration"] });
+        setup.lower.applyBuff(
+            new Spell({
+                spellProperties: getSpellConfig("System", "Holy Cross"),
+                amount: 1,
+            }),
+        );
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Wild Regeneration",
+            targetId: setup.lowerSupport.getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "spell_cast",
+                casterId: setup.lower.getId(),
+                spellName: "Wild Regeneration",
+                targetId: setup.lowerSupport.getId(),
+                abilityTransfers: [
+                    {
+                        abilityName: "Wild Regeneration",
+                        fromUnitId: setup.lower.getId(),
+                        toUnitId: setup.lowerSupport.getId(),
+                        mode: "copied",
+                    },
+                ],
+            }),
+        );
+        expect(setup.lower.hasAbilityActive("Wild Regeneration")).toBe(true);
+        expect(setup.lowerSupport.hasAbilityActive("Wild Regeneration")).toBe(true);
+    });
+
+    it("reports a Wild Regeneration gift delivered while Break temporarily disables the recipient", () => {
+        const setup = setupActionFight({ lowerAbilities: ["Wild Regeneration"] });
+        setup.lowerSupport.applyEffect(new EffectFactory().makeEffect("Break")!);
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.lower.getId(),
+            spellName: "Wild Regeneration",
+            targetId: setup.lowerSupport.getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "spell_cast",
+                abilityTransfers: [
+                    expect.objectContaining({
+                        abilityName: "Wild Regeneration",
+                        toUnitId: setup.lowerSupport.getId(),
+                        mode: "gifted",
+                    }),
+                ],
+            }),
+        );
+        expect(setup.lowerSupport.hasAbilityActive("Wild Regeneration")).toBe(false);
+        expect(setup.lowerSupport.getUnitProperties().abilities).toContain("Wild Regeneration");
     });
 
     it("casts Castling (POSITION_CHANGE) and swaps the caster with the in-range small enemy", () => {
