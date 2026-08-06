@@ -144,7 +144,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // striker. The event is intentionally replay-visible; Linux CI and two local runs produced this digest.
 // Re-pinned again for Battle Mage's hp reduction (17 -> 14): the lower survivability changes the seeded
 // setup valuation and downstream exchanges. Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "66ae33f5f040fa4cd2580ca90e9aa47d81a2ddc72ab7df36ede4bb5edaafee82";
+// Re-pinned for the pure-fractional steps call (getSteps no longer rounds, 2026-08-06): every
+// x.5-x.9-step unit reaches one straight cell less, so all seeded movement diverges. Two isolated runs
+// produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "b09772d98c83237a81614988e396c1f4e0289783f785b0ab94831f3f4966615a";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

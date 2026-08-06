@@ -1130,9 +1130,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.unitProperties.max_hp;
     }
     public getSteps(): number {
-        // Round: %-based buffs can leave steps fractional, which breaks integer-only movement math.
-        // A no-op for un-buffed integer steps.
-        return Math.round(this.unitProperties.steps + this.unitProperties.steps_mod);
+        // OWNER call (2026-08-06): the movement budget is the PURE fractional stat — no rounding, no
+        // flooring, server and client alike. The path walk always priced cells fractionally (straight 1,
+        // diagonal ~1.414, Trent's own vines 0.5), so a 3.9-step unit reaches 3 straight cells with 0.9
+        // left over — enough for a vine stride, never for a fourth plain cell. The old Math.round here
+        // silently gifted every x.5–x.9 creature a whole extra cell.
+        return this.unitProperties.steps + this.unitProperties.steps_mod;
     }
     public getMorale(): number {
         // Round: integer-semantic stat that %-buffs can leave fractional (feeds integer-only RNG/checks).

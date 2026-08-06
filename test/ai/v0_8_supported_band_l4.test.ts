@@ -39,21 +39,22 @@ const LEVEL4_UNITS = [
         name: "Champion",
         abilities: ["Tie up the Horses Aura", "Crusade", "Rapid Charge"],
         configuredSteps: 5.2,
-        effectiveSteps: 5,
+        // Pure fractional budget since the no-rounding owner call: getSteps() IS the configured stat.
+        effectiveSteps: 5.2,
     },
     {
         faction: "Nature",
         name: "Arachna Queen",
         abilities: ["Web Aura", "Infest", "Predatory Assimilation"],
         configuredSteps: 6.3,
-        effectiveSteps: 6,
+        effectiveSteps: 6.3,
     },
     {
         faction: "Chaos",
         name: "Abomination",
         abilities: ["Dense Flesh", "Flesh Shield Aura"],
         configuredSteps: 4.2,
-        effectiveSteps: 4,
+        effectiveSteps: 4.2,
     },
     {
         faction: "Might",

@@ -154,7 +154,10 @@ describe("v0.8 Vine Throw policy", () => {
         const adjacentTrent = makeTrent();
         const adjacent = createTestUnit({ team: UPPER, name: "Reachable enemy", attackType: MELEE });
         placeUnit(adjacentCombat.grid, adjacentCombat.unitsHolder, adjacentTrent, { x: 7, y: 3 });
-        placeUnit(adjacentCombat.grid, adjacentCombat.unitsHolder, adjacent, { x: 7, y: 8 });
+        // One cell closer than the original fixture: Trent's 3.9 steps no longer round up to 4 (the
+        // pure-fractional owner call), and this test is about PREFERRING melee when it is genuinely
+        // reachable — three straight cells to (7,6), then the swing.
+        placeUnit(adjacentCombat.grid, adjacentCombat.unitsHolder, adjacent, { x: 7, y: 7 });
         const immediate = new StrategyV0_8().decideTurn(adjacentTrent, contextFor(adjacentCombat));
         expect(castAction(immediate)).toBeUndefined();
         expect(immediate.some((action) => action.type === "melee_attack")).toBe(true);
