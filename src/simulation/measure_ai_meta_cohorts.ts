@@ -797,7 +797,12 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
 });
 
 export function resolveAiMetaFightProfile(profileId: string | undefined): IAiMetaFightProfile {
-    const normalized = profileId?.trim() || "a13";
+    const normalized = profileId?.trim();
+    if (!normalized) {
+        throw new Error(
+            `AI meta fight profile is required; expected ${Object.keys(AI_META_FIGHT_PROFILES).join(", ")}`,
+        );
+    }
     const profile = AI_META_FIGHT_PROFILES[normalized as AiMetaFightProfileId];
     if (!profile) {
         throw new Error(
@@ -815,8 +820,8 @@ const AI_META_FIXED_ENVIRONMENT = {
 
 /** Remove simulation and model experiment flags before a worker statically imports fight-policy modules. */
 export function sanitizedAiMetaEnvironment(
-    source: NodeJS.ProcessEnv = process.env,
-    fightProfile: IAiMetaFightProfile = resolveAiMetaFightProfile(undefined),
+    source: NodeJS.ProcessEnv,
+    fightProfile: IAiMetaFightProfile,
 ): NodeJS.ProcessEnv {
     const environment = { ...source };
     const exact = new Set([
@@ -1203,7 +1208,7 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "[fight-profile=a13|a19-h18|a19-h18-ranked-placement]";
+    "<fight-profile=a13|a19-h18|a19-h18-ranked-placement>";
 
 export function validateAiMetaGamesPerCohort(games: number): void {
     const mapCycleGames = AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;

@@ -233,17 +233,20 @@ describe("AI meta cohort generation", () => {
     });
 
     it("sanitizes experiment flags before worker module initialization", () => {
-        const environment = sanitizedAiMetaEnvironment({
-            PATH: "/bin",
-            V05_WEIGHTS: "injected",
-            V07_SEARCH: "1",
-            SEARCH_IL_DATASET: "/tmp/injected",
-            VALUE_DATA: "/tmp/injected.jsonl",
-            VALUE_DATA_FEATURES: "v2",
-            PHASE_B_RUN_FINGERPRINT: "injected",
-            FORCE_CREATURES: "Wolf",
-            FIGHT_MELEE_ROSTERS: "1",
-        });
+        const environment = sanitizedAiMetaEnvironment(
+            {
+                PATH: "/bin",
+                V05_WEIGHTS: "injected",
+                V07_SEARCH: "1",
+                SEARCH_IL_DATASET: "/tmp/injected",
+                VALUE_DATA: "/tmp/injected.jsonl",
+                VALUE_DATA_FEATURES: "v2",
+                PHASE_B_RUN_FINGERPRINT: "injected",
+                FORCE_CREATURES: "Wolf",
+                FIGHT_MELEE_ROSTERS: "1",
+            },
+            resolveAiMetaFightProfile("a13"),
+        );
         expect(environment.PATH).toBe("/bin");
         expect(environment.V05_WEIGHTS).toBeUndefined();
         expect(environment.V07_SEARCH).toBeUndefined();
@@ -294,8 +297,8 @@ describe("AI meta cohort generation", () => {
         });
         expect(placementProfile.workerEnvironment).toEqual(baseProfile.workerEnvironment);
 
-        expect(resolveAiMetaFightProfile(undefined).id).toBe("a13");
-        expect(resolveAiMetaFightProfile(undefined).strategyProfileId).toBe("registered-version");
+        expect(() => resolveAiMetaFightProfile(undefined)).toThrow("AI meta fight profile is required");
+        expect(() => resolveAiMetaFightProfile("   ")).toThrow("AI meta fight profile is required");
         expect(() => resolveAiMetaFightProfile("a20")).toThrow("Unknown AI meta fight profile a20");
     });
 
