@@ -16,6 +16,7 @@ import { creatureInfo, DEFAULT_DRAFT_W, DRAFT_ANCHOR_W, loadDraftWeights } from 
 import { loadSynergyWeights, pickSynergiesSituational } from "../ai/setup/synergy_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { SetupPolicyWeighted } from "../ai/setup/setup_policy_weighted";
+import { StrategyV0_8 } from "../ai/versions/v0_8";
 import {
     buildV08A19H64FinalistV6SearchEnvironment,
     buildV08A19H18F184LowerHumanRankedFallbackSearchEnvironment,
@@ -520,6 +521,7 @@ const resolveTournamentResearchProfile = (
 const createResearchEntrantAStrategyOverrides = (
     profile: TournamentResearchEntrantAStrategyProfile | undefined,
     versionA: string,
+    versionB: string,
     aIsGreen: boolean,
 ): TournamentResearchStrategyOverrides & {
     readonly environment?: Readonly<Record<string, string | undefined>>;
@@ -529,10 +531,18 @@ const createResearchEntrantAStrategyOverrides = (
     if (versionA !== "v0.8") {
         throw new Error(`Tournament research profile ${profile} requires entrant A version v0.8, got ${versionA}`);
     }
+    if (versionB !== "v0.8") {
+        throw new Error(`Tournament research profile ${profile} requires entrant B version v0.8, got ${versionB}`);
+    }
     const resolved = resolveTournamentResearchProfile(profile);
     const strategy = resolved.createStrategy();
+    // These selectors encode historical A19-vs-native-v0.8 experiments. Keep the control explicit now that
+    // the registered v0.8 production strategy itself resolves to A19.
+    const nativeControl = new StrategyV0_8();
     return {
-        ...(aIsGreen ? { greenStrategyOverride: strategy } : { redStrategyOverride: strategy }),
+        ...(aIsGreen
+            ? { greenStrategyOverride: strategy, redStrategyOverride: nativeControl }
+            : { greenStrategyOverride: nativeControl, redStrategyOverride: strategy }),
         searchTeamScope: Object.freeze([aIsGreen ? GREEN_TEAM : RED_TEAM]),
         environment: resolved.environment,
         provenance: resolved.provenance,
@@ -603,6 +613,7 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     const researchStrategyOverrides = createResearchEntrantAStrategyOverrides(
         options.researchEntrantAStrategyProfile,
         options.versionA,
+        options.versionB,
         aIsGreen,
     );
     const {

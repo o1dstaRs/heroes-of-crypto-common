@@ -26,3 +26,4 @@ export {
     V08_A13_SEARCH_OVERRIDE_ENV,
     withScopedAIEnvironment,
 } from "./v0_8_a13_search";
+export { createV08A19SearchDriver, shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";

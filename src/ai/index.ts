@@ -19,8 +19,8 @@ import { STRATEGY_V0_6 } from "./versions/v0_6";
 import { STRATEGY_V0_6S } from "./versions/v0_6s";
 import { STRATEGY_V0_7 } from "./versions/v0_7";
 import { STRATEGY_V0_7S } from "./versions/v0_7s";
-import { STRATEGY_V0_8 } from "./versions/v0_8";
 import { STRATEGY_V0_8S } from "./versions/v0_8s";
+import { createV08A19Strategy, V08_A19_PRODUCTION_VERSION } from "./versions/v0_8_a19_profile";
 import { STRATEGY_V0_9 } from "./versions/v0_9";
 
 export type {
@@ -46,9 +46,9 @@ export type {
     V09DecisionFallbackReason,
 } from "./ai_strategy";
 
-// Browser-safe identity and immutable configuration for the promoted v0.8+a13
-// composite. The Node-only SearchDriver factory is exported separately from
-// `src/simulation` so importing the shared game API never pulls in node:fs/path.
+// Browser-safe identities and immutable configuration for the promoted v0.8+A19 composite and its a13
+// rollback. Node-only SearchDriver factories are exported separately from `src/simulation` so importing the
+// shared game API never pulls in node:fs/path.
 export {
     buildV08A13SearchEnvironment,
     V08_A13_CANDIDATE_ID,
@@ -68,6 +68,15 @@ export {
     V08_A13_SOURCE_VERSION,
     V08_A13_VALUE_LEAF,
 } from "./versions/v0_8_a13_profile";
+export {
+    buildV08A19SearchEnvironment,
+    createV08A19Strategy,
+    V08_A19_CANDIDATE_ID,
+    V08_A19_PRODUCTION_VERSION,
+    V08_A19_PROFILE,
+    V08_A19_PROFILE_SCHEMA,
+    V08_A19_PRODUCTION_ROUTING_SOURCE_LEDGER,
+} from "./versions/v0_8_a19_profile";
 
 // F4 — the shared enumerated candidate generator (./candidates.ts): every engine-legal candidate turn
 // for the acting unit (moves, melee target x stand-cell, shot aims, area throws, all castable spells,
@@ -158,10 +167,10 @@ const STRATEGIES: readonly IAIStrategy[] = [
     // strategy is now identical to v0.8; the distinct version string remains useful for historical artifacts
     // and seat-scoped research. Keep it before v0.8 so it can never become LATEST/DEFAULT by registration.
     STRATEGY_V0_8S,
-    // v0.8 is the promoted a13 composite's native strategy. Search-capable simulation/server runtimes pair it
-    // with the exact bounded a13 SearchDriver exported from `src/simulation`; browser-only callers retain every
-    // baked native policy advancement without importing Node-only simulation dependencies.
-    STRATEGY_V0_8,
+    // v0.8 now resolves to the qualified A19 finalist: exact/far-flank/compact/ranked placement layered over
+    // the native v0.8 combat strategy. Search-capable runtimes add the matching H64 A19 SearchDriver; browser-only
+    // callers retain the native combat policy without importing Node-only simulation dependencies.
+    createV08A19Strategy(),
 ];
 
 // Mindless-unit AI pin ("AI Driven" -> v0.1). Re-exported here so the simulation engine and the client
@@ -185,12 +194,11 @@ export const LATEST_AI_VERSION: string = STRATEGIES[STRATEGIES.length - 1].versi
  * (non-LLM) AI opponent. Kept separate from LATEST_AI_VERSION so in-development versions (e.g. v0.4)
  * can be registered and tournament-tested without shipping them to live games.
  *
- * Promoted to v0.8+a13 — the shipped default for in-game AI (was v0.7). The registered strategy contains the
- * a13 native policy: productive legal-action recovery, target pressure, dominant/urgent finishing, learned
- * melee targeting and reveal placement, while preserving intentional waits when its ranged army is stronger.
- * Search-capable runtimes complete the composite with the exact bounded a13 SearchDriver from `src/simulation`.
+ * v0.8+A19 is the shipped default. Its registered strategy adds the qualified A19 placement composition around
+ * the native v0.8 combat policy, while search-capable runtimes complete it with the matching H64 A19 profile.
+ * The public version remains v0.8 so persisted AI seats and replays remain compatible.
  */
-export const DEFAULT_AI_VERSION = "v0.8";
+export const DEFAULT_AI_VERSION = V08_A19_PRODUCTION_VERSION;
 
 export function getAIStrategy(version: string): IAIStrategy {
     const strategy = STRATEGY_BY_VERSION.get(version);

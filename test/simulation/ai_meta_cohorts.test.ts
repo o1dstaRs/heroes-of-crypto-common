@@ -282,7 +282,8 @@ describe("AI meta cohort generation", () => {
         expect(environment.SEARCH_INCUMBENT_KINDS).toBeUndefined();
         expect(environment.SEARCH_CHALLENGER_KINDS).toBeUndefined();
         expect(Object.values(environment)).not.toContain("undefined");
-        expect(baseProfile.strategyProfileId).toBe("registered-version");
+        expect(baseProfile.strategyProfileId).toBe("native-v0.8");
+        expect(baseProfile.provenance).toMatchObject({ strategyProfileId: "native-v0.8" });
 
         const placementProfile = resolveAiMetaFightProfile("a19-h18-ranked-placement");
         expect(placementProfile.strategyProfileId).toBe("a19-h18-ranked-placement-v8");
@@ -296,6 +297,21 @@ describe("AI meta cohort generation", () => {
             },
         });
         expect(placementProfile.workerEnvironment).toEqual(baseProfile.workerEnvironment);
+
+        const productionProfile = resolveAiMetaFightProfile("a19");
+        const productionEnvironment = sanitizedAiMetaEnvironment({ V08_A13_SEARCH: "1" }, productionProfile);
+        expect(productionProfile.provenance).toMatchObject({
+            name: "v0.8+a19",
+            candidateId: "a19",
+            researchOnly: false,
+            productionVersion: "v0.8",
+            search: { horizon: 64 },
+        });
+        expect(productionEnvironment).toMatchObject({
+            SEARCH_HORIZON: "64",
+            V08_A19_SEARCH: "1",
+        });
+        expect(productionEnvironment.V08_A13_SEARCH).toBeUndefined();
 
         expect(() => resolveAiMetaFightProfile(undefined)).toThrow("AI meta fight profile is required");
         expect(() => resolveAiMetaFightProfile("   ")).toThrow("AI meta fight profile is required");

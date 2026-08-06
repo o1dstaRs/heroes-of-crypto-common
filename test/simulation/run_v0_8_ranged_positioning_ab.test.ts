@@ -210,6 +210,7 @@ describe("v0.8 ranged-positioning mirrored A/B runner", () => {
             expect(argValue(invocation.args, "--livetwin")).toBe("1");
             expect(argValue(invocation.args, "--vA")).toBe("v0.8");
             expect(argValue(invocation.args, "--vB")).toBe("v0.8s");
+            expect(invocation.args).toContain("--native-v08-strategy");
             expect(invocation.args).not.toContain("--diag");
             expect(argValue(invocation.args, "--out")).toBe(`/tmp/hoc-v08-ranged-ab-test/${invocation.cohort}`);
             expect(invocation.environment.SEARCH_MAX_MOVE_SHOTS).toBe("0");

@@ -390,10 +390,10 @@ describe("v0.8 a13 production profile", () => {
         expect(process.env.V07_VALUE_WEIGHTS).toBe("material");
     });
 
-    it("defaults ordinary v0.8 matches to a13 while preserving explicit research and rollback controls", () => {
+    it("keeps a13 behind the explicit v0.8 rollback control", () => {
         for (const key of ENV_KEYS) delete process.env[key];
         const match = { greenVersion: "v0.8", redVersion: "v0.7" };
-        expect(shouldUseDefaultV08A13Search(match)).toBe(true);
+        expect(shouldUseDefaultV08A13Search(match)).toBe(false);
         expect(shouldUseDefaultV08A13Search({ greenVersion: "v0.8s", redVersion: "v0.7" })).toBe(false);
 
         process.env.V07_SEARCH = "1";

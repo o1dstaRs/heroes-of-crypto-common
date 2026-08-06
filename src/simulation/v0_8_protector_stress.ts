@@ -454,7 +454,7 @@ const resultRejectionCauses = (result: IMatchResult): Record<string, number> => 
     return causes;
 };
 
-/** One production v0.8+a13 game, with observers only; the engine and policies are not reimplemented. */
+/** One production v0.8+A19 game, with observers only; the engine and policies are not reimplemented. */
 export function runV08ProtectorStressGame(
     options: Pick<IV08ProtectorStressOptions, "baseSeed" | "maxLaps">,
     game: number,
@@ -1095,7 +1095,7 @@ async function cliMain(): Promise<void> {
           );
     process.env.SIM_NO_ACTIONS = "1";
     console.error(
-        `v0.8+a13 protector stress: ${options.games} games, seed ${options.baseSeed}, concurrency ${options.concurrency}`,
+        `v0.8+A19 protector stress: ${options.games} games, seed ${options.baseSeed}, concurrency ${options.concurrency}`,
     );
     const started = performance.now();
     const records = await runProtectorStressPool(options);

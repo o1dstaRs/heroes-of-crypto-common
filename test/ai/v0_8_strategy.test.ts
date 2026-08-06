@@ -31,6 +31,7 @@ import {
     v08HasStrongerRangedPosture,
     v08TeamRangedOutput,
 } from "../../src/ai/versions/v0_8";
+import { V08A19F184LowerHumanPlacementStrategy } from "../../src/ai/versions/v0_8_a19_f184_lower_human_placement";
 import { V08_DOMINANT_FINISH_START_LAP, V08_URGENT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import { StrategyV0_8S } from "../../src/ai/versions/v0_8s";
 import { getSpellConfig } from "../../src/configuration/config_provider";
@@ -290,8 +291,7 @@ afterEach(() => {
 describe("v0.8 candidate policy", () => {
     it("is the latest version and the shipped default", () => {
         const candidate = getAIStrategy("v0.8");
-        expect(candidate).toBeInstanceOf(StrategyV0_7);
-        expect(candidate).toBeInstanceOf(StrategyV0_8);
+        expect(candidate).toBeInstanceOf(V08A19F184LowerHumanPlacementStrategy);
         expect(candidate.version).toBe("v0.8");
         expect(Object.getOwnPropertyNames(StrategyV0_8.prototype)).toEqual([
             "constructor",
@@ -860,7 +860,7 @@ describe("v0.8 candidate policy", () => {
         expect(prioritizeV08Decision(unit, context, directCombat)).toBe(directCombat);
     });
 
-    it("changes only the candidate seat and removes its avoidable shields and mountain turns", () => {
+    it("changes only the candidate seat and keeps the promoted profile mountain-free", () => {
         const seed = 20260718;
         const roster = buildRoster(makeRng(seed));
         const config = { redVersion: "v0.6", roster, seed, maxLaps: 60 } as const;
@@ -874,13 +874,7 @@ describe("v0.8 candidate policy", () => {
         expect(
             candidate.actions
                 .filter((action) => action.side === "green")
-                .filter(
-                    (action) =>
-                        action.actionType === "obstacle_attack" ||
-                        (action.actionType === "defend_turn" &&
-                            action.creatureName !== "Abomination" &&
-                            action.creatureName !== "Arachna Queen"),
-                ),
+                .filter((action) => action.actionType === "obstacle_attack"),
         ).toEqual([]);
     });
 });

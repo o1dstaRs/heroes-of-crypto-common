@@ -1103,7 +1103,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         ]);
     });
 
-    it("keeps searched v0.8s candidate enumeration identical to v0.8 before target pressure starts", () => {
+    it("keeps searched v0.8s candidate kinds aligned with promoted v0.8 before target pressure starts", () => {
         setEnv({
             V07_SEARCH: "1",
             SEARCH_VERSIONS: "v0.8s,v0.8",
@@ -1145,7 +1145,11 @@ describe("search driver — gating, hygiene, determinism", () => {
             return captured!;
         };
 
-        expect(capture("v0.8s")).toEqual(capture("v0.8"));
+        const sourceAlias = capture("v0.8s");
+        const production = capture("v0.8");
+        // A19 promotion intentionally changes v0.8 deployment coordinates. Before target pressure, it must still
+        // expose the same bounded action classes as the v0.8s source alias; exact paths/aim cells may differ.
+        expect(sourceAlias.map(({ kind }) => kind)).toEqual(production.map(({ kind }) => kind));
     });
 
     it("keeps the preferred v0.8s target shortlisted but requires a non-worse rollout before lap 9", () => {

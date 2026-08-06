@@ -576,7 +576,7 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
         expect(baseOf(first)).not.toBe(baseOf(second));
     });
 
-    it("pins the self-contained v6 environment and complete runtime source ledger", () => {
+    it("pins the self-contained v6 environment and immutable qualification source ledger", () => {
         const v5Environment = buildV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactValidatedSearchEnvironment();
         const v6Environment = buildV08A19H64FinalistV6SearchEnvironment();
         const changedKeys = [...new Set([...Object.keys(v5Environment), ...Object.keys(v6Environment)])]
@@ -600,7 +600,17 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             "tournament-entrant-a-router",
             "battle-engine-search-team-scope",
         ]);
-        for (const { source, sha256 } of V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER) {
+        // Promotion intentionally changed the registry/search router and the tournament's native control. Those
+        // current bytes are pinned by the production profile; retain these two entries here as immutable
+        // qualification provenance while continuing to verify the unchanged policy implementations.
+        const currentImplementationRoles = new Set([
+            "search-driver",
+            "armageddon-endgame",
+            "boar-battle-mage-flank-placement",
+            "compact-placement",
+        ]);
+        for (const { role, source, sha256 } of V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER) {
+            if (!currentImplementationRoles.has(role)) continue;
             const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));
             expect(createHash("sha256").update(bytes).digest("hex")).toBe(sha256);
         }

@@ -121,6 +121,19 @@ describe("tournament entrant-A research strategy profile", () => {
         ).toThrow("requires entrant A version v0.8");
     });
 
+    test("rejects a native-v0.8 control when entrant B is labeled as another version", () => {
+        expect(() =>
+            playGame(
+                {
+                    ...baseOptions(),
+                    versionB: "v0.1",
+                    researchEntrantAStrategyProfile: TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6,
+                },
+                0,
+            ),
+        ).toThrow("requires entrant B version v0.8");
+    });
+
     test("reports the exact historical v5 qualification hashes", () => {
         const record = playGame(
             {

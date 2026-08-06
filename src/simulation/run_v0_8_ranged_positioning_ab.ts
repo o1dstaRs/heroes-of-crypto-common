@@ -1353,6 +1353,10 @@ export function buildV08RangedPositioningABInvocations(
                 V08_A13_PRODUCTION_VERSION,
                 "--vB",
                 V08_A13_SOURCE_VERSION,
+                // v0.8's registry now resolves to production A19 placement. This historical policy A/B needs
+                // the pre-promotion native v0.8 strategy on that labelled seat while retaining v0.8-specific
+                // experiment scopes against the native v0.8s control.
+                "--native-v08-strategy",
                 ...(options.diag ? ["--diag"] : []),
                 "--out",
                 outBase,

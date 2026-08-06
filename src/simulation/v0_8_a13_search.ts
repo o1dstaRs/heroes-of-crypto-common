@@ -15,8 +15,6 @@ import { SearchDriver, type ISearchMatchInfo, type SearchPassiveProductiveProbeO
 
 export const V08_A13_SEARCH_OVERRIDE_ENV = "V08_A13_SEARCH" as const;
 
-const SEARCH_MODE_ENVIRONMENT_KEYS = ["V07_SEARCH", "Q2_WAIT_ABLATION", "Q2_ORACLE"] as const;
-
 /**
  * Run a synchronous constructor under an exact environment and restore every
  * process variable before returning. SearchDriver snapshots its settings in its
@@ -43,21 +41,17 @@ export function withScopedAIEnvironment<T>(environment: Readonly<Record<string, 
 }
 
 /**
- * Plain `v0.8` means the promoted composite policy in ordinary simulations.
- * Any explicit research mode preserves the caller's requested SearchDriver
- * configuration. `V08_A13_SEARCH=0/1` is the explicit rollback/force switch.
+ * a13 remains the explicit v0.8 rollback profile after A19 promotion. The legacy switch is retained for
+ * operators and historical studies: only `V08_A13_SEARCH=1` selects it.
  */
 export function shouldUseDefaultV08A13Search(match: ISearchMatchInfo): boolean {
     const hasProductionSeat =
         match.greenVersion === V08_A13_PRODUCTION_VERSION || match.redVersion === V08_A13_PRODUCTION_VERSION;
     if (!hasProductionSeat) return false;
-    const override = process.env[V08_A13_SEARCH_OVERRIDE_ENV];
-    if (override === "0") return false;
-    if (override === "1") return true;
-    return SEARCH_MODE_ENVIRONMENT_KEYS.every((key) => process.env[key] === undefined);
+    return process.env[V08_A13_SEARCH_OVERRIDE_ENV] === "1";
 }
 
-/** Construct the exact bounded a13 SearchDriver rebound to production v0.8. */
+/** Construct the exact bounded a13 SearchDriver rebound to v0.8 for rollback and historical comparisons. */
 export function createV08A13SearchDriver(
     deps: ILookaheadDeps,
     match: ISearchMatchInfo,

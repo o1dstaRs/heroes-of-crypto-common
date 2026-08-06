@@ -19,6 +19,7 @@ import { createGzip, type Gzip } from "node:zlib";
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { V08_A13_PROFILE } from "../ai/versions/v0_8_a13_profile";
+import { buildV08A19SearchEnvironment, V08_A19_PROFILE } from "../ai/versions/v0_8_a19_profile";
 import { buildV08A19H18SearchEnvironment, V08_A19_H18_PROFILE } from "../ai/versions/v0_8_a19_h18_profile";
 import { V08_A19_H18_RANKED_PLACEMENT_PROFILE } from "../ai/versions/v0_8_a19_h18_ranked_placement_profile";
 import {
@@ -54,6 +55,7 @@ import {
 } from "./ai_meta_cohorts_core";
 import {
     AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
+    AI_META_NATIVE_V08_STRATEGY_PROFILE,
     AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
     type AiMetaStrategyProfileId,
 } from "./ai_meta_strategy_profile";
@@ -712,7 +714,7 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
-export type AiMetaFightProfileId = "a13" | "a19-h18" | "a19-h18-ranked-placement";
+export type AiMetaFightProfileId = "a13" | "a19" | "a19-h18" | "a19-h18-ranked-placement";
 
 export interface IAiMetaFightProfile {
     id: AiMetaFightProfileId;
@@ -749,6 +751,30 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
         workerEnvironment: definedEnvironment({ V08_A13_SEARCH: "1" }),
         strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
     }),
+    a19: Object.freeze({
+        id: "a19",
+        title: "Heroes of Crypto — v0.8+a19 AI Meta Balance Cohorts",
+        provenance: Object.freeze({
+            name: "v0.8+a19",
+            schema: V08_A19_PROFILE.schema,
+            candidateId: V08_A19_PROFILE.candidateId,
+            researchOnly: V08_A19_PROFILE.researchOnly,
+            productionVersion: V08_A19_PROFILE.productionVersion,
+            promotedFrom: V08_A19_PROFILE.promotedFrom,
+            genomeSha256: V08_A19_PROFILE.genomeSha256,
+            behaviorEnvironmentSha256: V08_A19_PROFILE.behaviorEnvironmentSha256,
+            search: V08_A19_PROFILE.search,
+            policy: V08_A19_PROFILE.policy,
+            searchPolicy: V08_A19_PROFILE.searchPolicy,
+            placementPolicy: V08_A19_PROFILE.placementPolicy,
+            workerOverride: "V08_A19_SEARCH=1",
+        }),
+        workerEnvironment: definedEnvironment({
+            ...buildV08A19SearchEnvironment(),
+            V08_A19_SEARCH: "1",
+        }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+    }),
     "a19-h18": Object.freeze({
         id: "a19-h18",
         title: "Heroes of Crypto — v0.8+a19-h18 Research AI Meta Balance Cohorts",
@@ -762,13 +788,14 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             behaviorEnvironmentSha256: V08_A19_H18_PROFILE.behaviorEnvironmentSha256,
             search: V08_A19_H18_PROFILE.search,
             policy: V08_A19_H18_PROFILE.policy,
+            strategyProfileId: AI_META_NATIVE_V08_STRATEGY_PROFILE,
             workerOverride: "V07_SEARCH=1; V08_A13_SEARCH=0",
         }),
         workerEnvironment: definedEnvironment({
             ...buildV08A19H18SearchEnvironment(),
             V08_A13_SEARCH: "0",
         }),
-        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+        strategyProfileId: AI_META_NATIVE_V08_STRATEGY_PROFILE,
     }),
     "a19-h18-ranked-placement": Object.freeze({
         id: "a19-h18-ranked-placement",
@@ -1208,7 +1235,7 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "<fight-profile=a13|a19-h18|a19-h18-ranked-placement>";
+    "<fight-profile=a13|a19|a19-h18|a19-h18-ranked-placement>";
 
 export function validateAiMetaGamesPerCohort(games: number): void {
     const mapCycleGames = AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;

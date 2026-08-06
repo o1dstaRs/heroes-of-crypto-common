@@ -11,9 +11,11 @@
 
 import { describe, expect, it } from "bun:test";
 
+import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { V08A19RankedPlacementStrategy } from "../../src/ai/versions/v0_8_a19_ranked_placement";
 import {
     AI_META_A19_H18_RANKED_PLACEMENT_STRATEGY_PROFILE,
+    AI_META_NATIVE_V08_STRATEGY_PROFILE,
     AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
     createAiMetaMatchStrategyOverrides,
     type AiMetaStrategyProfileId,
@@ -33,6 +35,23 @@ describe("AI-meta match strategy profiles", () => {
 
         expect(overrides).toEqual({});
         expect(Object.keys(overrides)).toHaveLength(0);
+    });
+
+    it("creates independent native v0.8 controls without promoted A19 placement decorators", () => {
+        const first = createAiMetaMatchStrategyOverrides(AI_META_NATIVE_V08_STRATEGY_PROFILE, publicOpponents);
+        const second = createAiMetaMatchStrategyOverrides(AI_META_NATIVE_V08_STRATEGY_PROFILE, publicOpponents);
+
+        expect(first.greenStrategyOverride).toBeInstanceOf(StrategyV0_8);
+        expect(first.redStrategyOverride).toBeInstanceOf(StrategyV0_8);
+        expect(first.greenStrategyOverride).not.toBeInstanceOf(V08A19RankedPlacementStrategy);
+        expect(first.redStrategyOverride).not.toBeInstanceOf(V08A19RankedPlacementStrategy);
+        expect(first.greenStrategyOverride).not.toBe(first.redStrategyOverride);
+        expect(second.greenStrategyOverride).not.toBe(first.greenStrategyOverride);
+        expect(second.redStrategyOverride).not.toBe(first.redStrategyOverride);
+        expect(first.greenStrategyOverride?.version).toBe("v0.8");
+        expect(first.redStrategyOverride?.version).toBe("v0.8");
+        expect(first.greenSetupPlacementPolicy).toBeUndefined();
+        expect(first.redSetupPlacementPolicy).toBeUndefined();
     });
 
     it("creates independent A19 placement decorators and complete public-roster contexts per match", () => {

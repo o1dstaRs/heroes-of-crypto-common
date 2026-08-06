@@ -25,6 +25,7 @@ import {
     V08_SUPPORTED_BAND_ADVANCE_FUNNEL_STAGES,
     V08_SUPPORTED_RANGED_ESCAPE_FUNNEL_STAGES,
 } from "../../src/ai/ai_strategy";
+import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { setupForArchetype } from "../../src/simulation/archetype_payoff";
 import {
     aggregateMirrorDiag,
@@ -394,6 +395,31 @@ describe("measure_mirror_cohorts", () => {
         // Green won both fakes: game 0 credits vA, game 1 credits vB.
         expect(first.winnerVersion).toBe("v0.7");
         expect(second.winnerVersion).toBe("v0.6");
+    });
+
+    test("can pin v0.8-labelled historical controls to fresh native strategies across side swaps", () => {
+        const configs: IMatchConfig[] = [];
+        const matchRunner = (config: IMatchConfig): IMatchResult => {
+            configs.push(config);
+            return fakeResult(config, "draw");
+        };
+        const config: IMirrorRunConfig = {
+            ...BASE_CFG,
+            vA: "v0.8",
+            vB: "v0.8s",
+            nativeV08Strategy: true,
+        };
+
+        playMirrorGame(config, 0, { matchRunner });
+        playMirrorGame(config, 1, { matchRunner });
+
+        expect(configs[0].greenStrategyOverride).toBeInstanceOf(StrategyV0_8);
+        expect(configs[0].redStrategyOverride).toBeUndefined();
+        expect(configs[1].greenStrategyOverride).toBeUndefined();
+        expect(configs[1].redStrategyOverride).toBeInstanceOf(StrategyV0_8);
+        expect(configs[0].greenStrategyOverride).not.toBe(configs[1].redStrategyOverride);
+        expect(configs[0].greenStrategyOverride?.version).toBe("v0.8");
+        expect(configs[1].redStrategyOverride?.version).toBe("v0.8");
     });
 
     test("both seats field the identical symmetric roster", () => {

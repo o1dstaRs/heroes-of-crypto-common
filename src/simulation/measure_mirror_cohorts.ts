@@ -62,6 +62,7 @@ import {
     type V08SupportedPrepinEgressFunnelStage,
     type V08SupportedRangedEscapeFunnelStage,
 } from "../ai/ai_strategy";
+import { StrategyV0_8 } from "../ai/versions/v0_8";
 import {
     canWaitOnHourglassMirror,
     DISTILLED_WAIT_WEIGHTS_2026_07_10,
@@ -142,6 +143,8 @@ export interface IMirrorRunConfig {
     livetwin: boolean;
     diag: boolean;
     zeroScorer: boolean;
+    /** Use fresh native StrategyV0_8 controls for v0.8-labelled seats instead of the promoted registry entry. */
+    nativeV08Strategy?: boolean;
     /** V07_WAIT_GUARD arm for the run: "" = code default ("support"); "off" reproduces the pre-fix scorer. */
     guard?: "" | "support" | "class" | "off";
 }
@@ -1002,6 +1005,10 @@ export function playMirrorGame(
             FightStateManager.getInstance();
             return runMatch(config);
         });
+    const nativeV08Strategy = (version: string): StrategyV0_8 | undefined =>
+        cfg.nativeV08Strategy && version === "v0.8" ? new StrategyV0_8() : undefined;
+    const greenNativeV08Strategy = nativeV08Strategy(greenVersion);
+    const redNativeV08Strategy = nativeV08Strategy(redVersion);
     const result = matchRunner({
         greenVersion,
         redVersion,
@@ -1013,6 +1020,8 @@ export function playMirrorGame(
         redPerk: setup.perk,
         greenAugments: setup.augments.map((augment) => ({ ...augment })),
         redAugments: setup.augments.map((augment) => ({ ...augment })),
+        ...(greenNativeV08Strategy ? { greenStrategyOverride: greenNativeV08Strategy } : {}),
+        ...(redNativeV08Strategy ? { redStrategyOverride: redNativeV08Strategy } : {}),
         ...(observer ? { decisionObserver: observer } : {}),
         ...(policyProposalObserver ? { policyProposalObserver } : {}),
         ...(policyEventObserver ? { policyEventObserver } : {}),
@@ -1102,6 +1111,7 @@ export interface IMirrorSummary {
     amountMode: StackAmountMode;
     livetwin: boolean;
     zeroScorer: boolean;
+    nativeV08Strategy?: true;
     guard: string;
     pairedSideSwap: true;
     symmetricRosters: true;
@@ -1141,6 +1151,7 @@ export function summarizeMirrorRecords(records: readonly IMirrorGameRecord[], cf
         amountMode: cfg.amountMode,
         livetwin: cfg.livetwin,
         zeroScorer: cfg.zeroScorer,
+        ...(cfg.nativeV08Strategy ? { nativeV08Strategy: true as const } : {}),
         guard: cfg.guard || "default(support)",
         pairedSideSwap: true,
         symmetricRosters: true,
@@ -1574,6 +1585,7 @@ export async function main(): Promise<void> {
             vB: { type: "string", default: "v0.6" },
             diag: { type: "boolean", default: false },
             "zero-scorer": { type: "boolean", default: false },
+            "native-v08-strategy": { type: "boolean", default: false },
             guard: { type: "string", default: "" },
             out: { type: "string", default: "sim-out/mirror_cohort" },
         },
@@ -1590,6 +1602,7 @@ export async function main(): Promise<void> {
         livetwin: values.livetwin === "1",
         diag: values.diag!,
         zeroScorer: values["zero-scorer"]!,
+        nativeV08Strategy: values["native-v08-strategy"]!,
         guard: values.guard as IMirrorRunConfig["guard"],
     };
     if (cfg.guard && !["support", "class", "off"].includes(cfg.guard)) {

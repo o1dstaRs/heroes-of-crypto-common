@@ -21,6 +21,13 @@ import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import { captureAITargetMemory, clearAITargetMemory, recordAITargetMemory, restoreAITargetMemory } from "../ai/ai";
 import { createDecisionPathCatalog } from "../ai/decision_path_catalog";
 import type { PlacementPolicyVariant } from "../ai/setup/setup_ship";
+import { StrategyV0_8 } from "../ai/versions/v0_8";
+import { V08_A13_PRODUCTION_VERSION } from "../ai/versions/v0_8_a13_profile";
+import {
+    buildV08A19SearchEnvironment,
+    createV08A19Strategy,
+    V08_A19_PRODUCTION_VERSION,
+} from "../ai/versions/v0_8_a19_profile";
 import type { GameAction } from "../engine/actions";
 import { GameActionEngine } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
@@ -82,7 +89,8 @@ import {
     type SearchPassiveProductiveProbeObserver,
     type SearchScoredDecisionObserver,
 } from "./search_driver";
-import { createV08A13SearchDriver, shouldUseDefaultV08A13Search } from "./v0_8_a13_search";
+import { createV08A13SearchDriver, shouldUseDefaultV08A13Search, withScopedAIEnvironment } from "./v0_8_a13_search";
+import { createV08A19SearchDriver, shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { extractValueFeatures, extractValueFeaturesV2Raw } from "./value_features";
 
@@ -359,7 +367,7 @@ export interface IMatchConfig {
     v09ServerPreflightObserver?: (observation: IV09ServerPreflightTimingObservation) => void;
     /**
      * Offline v0.9 teacher seam. When supplied, the match uses an explicitly configured SearchDriver and emits
-     * scored candidates only after rollback; ordinary matches and the production v0.8 a13 factory are unchanged.
+     * scored candidates only after rollback; ordinary matches and the selected production v0.8 factory are unchanged.
      */
     searchScoredDecisionObserver?: SearchScoredDecisionObserver;
     /**
@@ -602,15 +610,39 @@ export function runMatch(config: IMatchConfig): IMatchResult {
     // Construct the singleton before installing the seeded source. Otherwise a worker's first match creates
     // one FightProperties in getInstance() and another in reset(), consuming a different seeded RNG prefix
     // from every subsequent match in that worker.
-    FightStateManager.getInstance();
-    if (config.seed !== undefined) {
-        setDeterministicRandomSource(makeRng((config.seed ^ 0x6d2b79f5) >>> 0));
+    const executeMatch = (): IMatchResult => {
+        FightStateManager.getInstance();
+        if (config.seed !== undefined) {
+            setDeterministicRandomSource(makeRng((config.seed ^ 0x6d2b79f5) >>> 0));
+        }
+        try {
+            return runMatchInner(config);
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+    };
+
+    const searchMatch = {
+        seed: config.seed,
+        greenVersion: config.greenVersion,
+        redVersion: config.redVersion,
+        ...(config.searchTeamScope === undefined ? {} : { searchTeamScope: config.searchTeamScope }),
+        offlineDeterministicWork: config.searchOfflineDeterministicWork === true,
+    };
+    if (!shouldUseDefaultV08A19Search(searchMatch)) {
+        return executeMatch();
     }
-    try {
-        return runMatchInner(config);
-    } finally {
-        setDeterministicRandomSource(undefined);
-    }
+
+    // StrategyV0_8 reads several shipped/research gates at decision time, after SearchDriver construction.
+    // Keep the complete qualified A19 environment active for the synchronous match so hostile shell flags
+    // cannot mutate its live policy; the force marker lets the inner router recognize this deliberate scope.
+    return withScopedAIEnvironment(
+        {
+            ...buildV08A19SearchEnvironment(),
+            [V08_A19_SEARCH_OVERRIDE_ENV]: "1",
+        },
+        executeMatch,
+    );
 }
 
 function runMatchInner(config: IMatchConfig): IMatchResult {
@@ -830,8 +862,24 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         };
     };
 
-    const greenStrategy = config.greenStrategyOverride ?? getAIStrategy(config.greenVersion);
-    const redStrategy = config.redStrategyOverride ?? getAIStrategy(config.redVersion);
+    const searchMatch = {
+        seed: config.seed,
+        greenVersion: config.greenVersion,
+        redVersion: config.redVersion,
+        ...(config.searchTeamScope === undefined ? {} : { searchTeamScope: config.searchTeamScope }),
+        // Deterministic operation-bounded work is deliberately opt-in. Omission must retain the same wall-clock
+        // deadline/circuit behavior as ranked and every existing operational-bounded qualification runner.
+        offlineDeterministicWork: config.searchOfflineDeterministicWork === true,
+    };
+    const a13Rollback = shouldUseDefaultV08A13Search(searchMatch);
+    const strategyForVersion = (version: string): IAIStrategy => {
+        if (version !== V08_A19_PRODUCTION_VERSION) {
+            return getAIStrategy(version);
+        }
+        return a13Rollback && version === V08_A13_PRODUCTION_VERSION ? new StrategyV0_8() : createV08A19Strategy();
+    };
+    const greenStrategy = config.greenStrategyOverride ?? strategyForVersion(config.greenVersion);
+    const redStrategy = config.redStrategyOverride ?? strategyForVersion(config.redVersion);
 
     // STAGE 2: 2-ply lookahead driver (env-gated V05_LOOKAHEAD, default OFF -> baseline unchanged). When
     // enabled it replaces a v0.5 unit's single decision with the best-by-simulation candidate (see
@@ -860,19 +908,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         },
     };
     const lookahead = new LookaheadDriver(driverDeps);
-    // B2/RAWS wide-candidate rollout SEARCH driver (env-gated V07_SEARCH=1, or Q2_WAIT_ABLATION=1 for the
-    // observational wait-horizon ablation; default OFF -> byte-identical). Shares the lookahead's dependency
-    // seam; candidate enumeration, paired-seed rollouts, override gate and SEARCH_AUDIT live in
-    // ./search_driver.ts.
-    const searchMatch = {
-        seed: config.seed,
-        greenVersion: config.greenVersion,
-        redVersion: config.redVersion,
-        ...(config.searchTeamScope === undefined ? {} : { searchTeamScope: config.searchTeamScope }),
-        // Deterministic operation-bounded work is deliberately opt-in. Omission must retain the same wall-clock
-        // deadline/circuit behavior as ranked and every existing operational-bounded qualification runner.
-        offlineDeterministicWork: config.searchOfflineDeterministicWork === true,
-    };
+    // B2/RAWS wide-candidate rollout SEARCH driver. Plain v0.8 uses promoted A19; explicit A19/a13 switches
+    // select rollout profiles and V07_SEARCH/Q2_* retain their isolated research modes. All paths share the
+    // lookahead dependency seam; candidate enumeration, paired-seed rollouts, override gate and SEARCH_AUDIT
+    // live in ./search_driver.ts.
     const search = config.searchScoredDecisionObserver
         ? new SearchDriver(
               driverDeps,
@@ -880,9 +919,11 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
               config.searchScoredDecisionObserver,
               config.searchPassiveProductiveProbeObserver,
           )
-        : shouldUseDefaultV08A13Search(searchMatch)
+        : a13Rollback
           ? createV08A13SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver)
-          : new SearchDriver(driverDeps, searchMatch, undefined, config.searchPassiveProductiveProbeObserver);
+          : shouldUseDefaultV08A19Search(searchMatch)
+            ? createV08A19SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver)
+            : new SearchDriver(driverDeps, searchMatch, undefined, config.searchPassiveProductiveProbeObserver);
     const v08A13TrajectoryTeams = new Set(config.searchV08A13TrajectoryTeams ?? []);
     const v08A13TrajectorySearch =
         config.searchScoredDecisionObserver && v08A13TrajectoryTeams.size
