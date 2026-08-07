@@ -74,6 +74,8 @@ export * as AI from "./ai/ai";
 export * from "./ai/tactical_split_placement";
 export {
     getAIStrategy,
+    createAIStrategy,
+    getRankedAIProfile,
     aiVersionForUnit,
     isMindlessAiUnit,
     MINDLESS_AI_ABILITY,
@@ -81,6 +83,8 @@ export {
     enumerateCandidates,
     getEnemiesCellsWithinMovementRange,
     AI_VERSIONS,
+    RANKED_AI_PROFILES,
+    RANKED_SETUP_POLICY_V0,
     LATEST_AI_VERSION,
     DEFAULT_AI_VERSION,
     buildV08A13SearchEnvironment,
@@ -121,6 +125,8 @@ export {
 export type {
     IAIPolicyEvent,
     IAIStrategy,
+    IRankedAIProfile,
+    IRankedAISetupPolicy,
     IDecisionContext,
     IPlacementContext,
     CandidateKind,

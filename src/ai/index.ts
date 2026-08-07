@@ -10,6 +10,7 @@
  */
 
 import type { IAIStrategy } from "./ai_strategy";
+import { AI_VERSIONS } from "./ranked_profile";
 import { STRATEGY_V0_1 } from "./versions/v0_1";
 import { STRATEGY_V0_2 } from "./versions/v0_2";
 import { STRATEGY_V0_3 } from "./versions/v0_3";
@@ -45,6 +46,15 @@ export type {
     V09ArtifactStatus,
     V09DecisionFallbackReason,
 } from "./ai_strategy";
+
+export {
+    AI_VERSIONS,
+    createAIStrategy,
+    getRankedAIProfile,
+    RANKED_AI_PROFILES,
+    RANKED_SETUP_POLICY_V0,
+} from "./ranked_profile";
+export type { IRankedAIProfile, IRankedAISetupPolicy } from "./ranked_profile";
 
 // Browser-safe identities and immutable configuration for the promoted v0.8+A19 composite and its a13
 // rollback. Node-only SearchDriver factories are exported separately from `src/simulation` so importing the
@@ -183,9 +193,18 @@ export {
     type IAiOverrideUnit,
 } from "./unit_ai_overrides";
 
-const STRATEGY_BY_VERSION: ReadonlyMap<string, IAIStrategy> = new Map(STRATEGIES.map((s) => [s.version, s]));
-
-export const AI_VERSIONS: readonly string[] = STRATEGIES.map((s) => s.version);
+const STRATEGY_BY_VERSION: ReadonlyMap<string, IAIStrategy> = new Map(
+    STRATEGIES.map((strategy) => [strategy.version, strategy]),
+);
+const LEGACY_STRATEGY_VERSIONS = STRATEGIES.map((strategy) => strategy.version);
+if (
+    LEGACY_STRATEGY_VERSIONS.length !== AI_VERSIONS.length ||
+    LEGACY_STRATEGY_VERSIONS.some((version, index) => version !== AI_VERSIONS[index])
+) {
+    throw new Error(
+        `ranked_ai_profile_registry_mismatch:combat=${LEGACY_STRATEGY_VERSIONS.join(",")}:ranked=${AI_VERSIONS.join(",")}`,
+    );
+}
 
 export const LATEST_AI_VERSION: string = STRATEGIES[STRATEGIES.length - 1].version;
 

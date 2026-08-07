@@ -21,7 +21,7 @@ export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = "v0.8" as const;
 export const V08_A19_PRODUCTION_REGISTRY_IMPLEMENTATION_SOURCE = "src/ai/index.ts" as const;
 export const V08_A19_PRODUCTION_REGISTRY_IMPLEMENTATION_SHA256 =
-    "0fda438d2dc093f0ad432ea5a85047226ed247872c7fe9ddcaf225c217b34c45" as const;
+    "acb7db54470a37856a980f5b23b8348451633d91fd90bf1ef33f9310d011cb70" as const;
 export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SOURCE = "src/simulation/v0_8_a19_search.ts" as const;
 export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SHA256 =
     "9c1d70f719c8f6db786a0d00b04a40e4bfa9b90b22c0f22d1ae4374905faf134" as const;
