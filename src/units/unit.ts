@@ -633,6 +633,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 .replace(/\{\}/g, Number(absolvingArrowFirstLiftChance(this, 0).toFixed(2)).toString());
         }
         if (
+            ability.getName() === "Stun Aura" ||
             ability.getName() === "Warding Mane Aura" ||
             ability.getName() === "Arcane Ward Aura" ||
             ability.getName() === "Guiding Winds Aura" ||
@@ -1882,6 +1883,21 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_BASE_ATTACK_AND_ARMOR) {
             return auraEffect.getPower();
+        }
+
+        // Stun Aura is stack-powered and rolled against the OWNER's luck (calculateStunAuraApplyChance),
+        // so the stored power must be that same live chance — otherwise the card and the debuff row on the
+        // seized enemy would promise the flat configured 25 while the field rolls something else.
+        if (auraEffect.getPowerType() === AbilityPowerType.STUN_CHANCE) {
+            return Math.min(
+                100,
+                Math.max(
+                    0,
+                    (auraEffect.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                        this.getLuck() +
+                        synergyAbilityPowerIncrease,
+                ),
+            );
         }
 
         // Poison Cloud is not stack-powered: the affected ally applies the flat base % (its own luck is
@@ -3826,6 +3842,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // living only in RenderableUnit, the sandbox showed the live number while every ranked player kept
         // reading the seeded "0%" for the whole fight.
         this.refreshBlindFuryDescription();
+        // The Stun Aura card is a live chance: stack-scaled power plus the owner's CURRENT luck.
+        this.refreshStunAuraDescription(_synergyAbilityPowerIncrease);
         // Chakram's maximum TOTAL victims follows the live stack tier, which can change after casualties.
         this.refreshChakramDescription();
     }
@@ -3837,6 +3855,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * changes, this line sits close enough to change with it. The number on the card is the number in the
      * attack.
      */
+    /** Rewrite the Stun Aura card with the chance the field is CURRENTLY rolling (luck included). */
+    private refreshStunAuraDescription(synergyAbilityPowerIncrease: number): void {
+        const index = this.unitProperties.abilities.indexOf("Stun Aura");
+        if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
+            return;
+        }
+        const ability = this.abilities.find((candidate) => candidate.getName() === "Stun Aura");
+        if (!ability) {
+            return;
+        }
+        const chance = Number(this.calculateAbilityApplyChance(ability, synergyAbilityPowerIncrease).toFixed(2));
+        this.unitProperties.abilities_descriptions[index] = ability
+            .getDesc()
+            .join("\n")
+            .replace(/\{\}/g, chance.toString());
+    }
     private refreshBlindFuryDescription(): void {
         const abilityName = BLIND_FURY_ABILITY_NAME;
         const index = this.unitProperties.abilities.indexOf(abilityName);

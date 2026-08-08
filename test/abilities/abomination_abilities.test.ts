@@ -780,6 +780,42 @@ describe("Stun Aura", () => {
         expect(processStunAuraAbility(enemy, grid, unitsHolder, log, () => 0).stunned).toBe(false);
     });
 
+    // The card (and the debuff row on the seized enemy) must promise the number the field ACTUALLY
+    // rolls — stack-scaled power plus the owner's live luck — not the flat configured 25. In ranked the
+    // text a player reads is the one the server put in the snapshot, so this has to hold in common.
+    it("prints the live luck-included chance on the card, matching the roll", () => {
+        const luckyAbomination = createTestUnit({
+            name: "Abomination",
+            team: PBTypes.TeamVals.LOWER,
+            abilities: ["Stun Aura"],
+            auraEffects: ["Stun"],
+            auraRanges: [2],
+            auraIsBuff: [false],
+            stackPower: 5,
+            luck: 7,
+        });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER });
+        // Read the card and the roll at the SAME moment: adjustBaseStats settles the unit's live luck
+        // (the per-turn spread), and the promise on the card has to track it.
+        luckyAbomination.adjustBaseStats(true, 1, 0, 0, 0, 0, 0);
+        const rolled = calculateStunAuraApplyChance(luckyAbomination, enemy, 0);
+        const liveLuck = luckyAbomination.getLuck();
+        expect(rolled).toBeCloseTo(25 + liveLuck, 5); // 25 at full stack, plus the owner's live luck
+        expect(liveLuck).toBeGreaterThan(0);
+
+        const props = luckyAbomination.getUnitProperties();
+        const index = props.abilities.indexOf("Stun Aura");
+        const description = props.abilities_descriptions[index];
+        expect(description).toContain(`${Number(rolled.toFixed(2))}%`);
+        expect(description).not.toContain("25%"); // never the flat configured power once luck is in play
+        expect(description).not.toContain("{}");
+
+        // The aura's stored power — what the seized enemy's debuff row shows — agrees with the roll.
+        const auraEffect = luckyAbomination.getAuraEffects().find((a) => a.getName() === "Stun");
+        expect(auraEffect).toBeDefined();
+        expect(luckyAbomination.calculateAuraPower(auraEffect!, 0)).toBeCloseTo(rolled, 5);
+    });
+
     it("is carried by the real Abomination as a stack-powered range-2 aura card", () => {
         const props = HoCConfig.getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Abomination", "abomination_512", 1);
         const index = props.abilities.indexOf("Stun Aura");
