@@ -174,10 +174,10 @@
         },
         "Battle Mage": {
             "name": "Battle Mage",
-            "hp": 14,
+            "hp": 12,
             "steps": 3.3,
             "speed": 4.2,
-            "armor": 10,
+            "armor": 9,
             "attack_type": "MELEE_MAGIC",
             "attack": 12,
             "attack_damage_min": 2,

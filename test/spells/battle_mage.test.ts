@@ -232,14 +232,15 @@ describe("Battle Mage spell configuration", () => {
     });
 
     // The Battle Mage pays for its offensive book with the lowest armor of the level-2 casters. Its health
-    // returned from 26 -> 21 -> 19 -> 17 -> 14, so pin that balance value independently of the other casters.
-    it("is the softest-armoured level 2 caster with 14 health", () => {
+    // returned from 26 -> 21 -> 19 -> 17 -> 14 -> 12, so pin that balance value independently of the other
+    // casters.
+    it("is the softest-armoured level 2 caster with 12 health", () => {
         const creatures = creaturesJson as unknown as Record<string, Record<string, { hp: number; armor: number }>>;
         const healer = creatures.Life.Healer;
         const satyr = creatures.Nature.Satyr;
 
         expect(battleMage.armor).toBeLessThan(Math.min(healer.armor, satyr.armor));
-        expect(battleMage.hp).toBe(14);
+        expect(battleMage.hp).toBe(12);
     });
 });
 
