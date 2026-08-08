@@ -27,6 +27,12 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
         return unit.canFly();
     }
 
+    // Stun Aura reaches every enemy shape — walkers, flyers, shooters alike. The roll itself (and the
+    // target's status resist) decides whether the field actually seizes them at their turn start.
+    if (auraEffectProperties.power_type === AbilityPowerType.STUN_CHANCE) {
+        return true;
+    }
+
     if (
         auraEffectProperties.power_type === AbilityPowerType.UNTARGETABLE &&
         unit.hasAuraEffect("Disguise") &&

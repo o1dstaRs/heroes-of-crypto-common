@@ -925,7 +925,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["Dense Flesh", "Flesh Shield Aura"]
+            "abilities": ["Dense Flesh", "Flesh Shield Aura", "Stun Aura"]
         },
         "Ash Moth": {
             "name": "Ash Moth",

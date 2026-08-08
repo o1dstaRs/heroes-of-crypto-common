@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { processStunAuraAbility } from "../abilities/stun_aura_ability";
 import { getSpellConfig } from "../configuration/config_provider";
 import {
     MAX_HOLE_LAYERS,
@@ -449,6 +450,18 @@ export class TurnEngine {
         }
         this.fightProperties.startTurn(unit.getTeam(), this.runtime.clock.nowMillis());
         unit.refreshPreTurnState(this.sceneLog);
+
+        // Stun Aura (Abomination) fires the moment an enemy's turn starts inside the field — before the
+        // poison tick and before the skip check below, so a landed stun consumes exactly this activation.
+        const stunAura = processStunAuraAbility(unit, this.grid, this.unitsHolder, this.sceneLog, () =>
+            this.runtime.rng.int(0, 100),
+        );
+        if (stunAura.stunned) {
+            events.push({
+                type: "effects_applied",
+                applications: [{ unitId: unit.getId(), name: "Stun", kind: "effect", laps: stunAura.laps }],
+            });
+        }
 
         // Poison ticks at the very start of the unit's turn, before it acts (even if it is about to skip).
         const poisonEffect = unit.getEffect("Poison");

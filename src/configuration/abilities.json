@@ -1310,6 +1310,18 @@
         "aura_effect": "Flesh Shield",
         "can_be_cast": false
     },
+    "Stun Aura": {
+        "name": "Stun Aura",
+        "type": "DEBUFF_AURA",
+        "desc": ["Enemies that start their turn within 2 cells have a {}% chance to be stunned for 1 turn"],
+        "power": 25,
+        "power_type": "STUN_CHANCE",
+        "skip_reponse": false,
+        "stack_powered": true,
+        "effect": "Stun",
+        "aura_effect": "Stun",
+        "can_be_cast": false
+    },
     "Web Aura": {
         "name": "Web Aura",
         "type": "DEBUFF_AURA",

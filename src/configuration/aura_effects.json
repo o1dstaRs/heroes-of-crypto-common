@@ -96,6 +96,14 @@
         "is_buff": true,
         "power_type": "ABSORB_DAMAGE"
     },
+    "Stun": {
+        "name": "Stun",
+        "range": 2,
+        "desc": "Enemies starting their turn in this field can be stunned for a turn ({}% base chance, plus the Abomination's luck).",
+        "power": 25,
+        "is_buff": false,
+        "power_type": "STUN_CHANCE"
+    },
     "Web": {
         "name": "Web",
         "range": 2,

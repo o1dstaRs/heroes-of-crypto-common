@@ -52,7 +52,7 @@ const LEVEL4_UNITS = [
     {
         faction: "Chaos",
         name: "Abomination",
-        abilities: ["Dense Flesh", "Flesh Shield Aura"],
+        abilities: ["Dense Flesh", "Flesh Shield Aura", "Stun Aura"],
         configuredSteps: 4.2,
         effectiveSteps: 4.2,
     },

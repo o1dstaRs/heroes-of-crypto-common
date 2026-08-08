@@ -147,7 +147,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned for the pure-fractional steps call (getSteps no longer rounds, 2026-08-06): every
 // x.5-x.9-step unit reaches one straight cell less, so all seeded movement diverges. Two isolated runs
 // produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "b09772d98c83237a81614988e396c1f4e0289783f785b0ab94831f3f4966615a";
+// Re-pinned for the Abomination's new Stun Aura (range 2, chance 10 under a Squire stun): a fielded
+// Abomination now seizes enemies at their turn start, so every seeded fight it appears in resolves
+// differently. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "01e0d657fa26cba79541fed3509791bfb26da7e5ef609ca6d2a6cc5a3fdf1ee5";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

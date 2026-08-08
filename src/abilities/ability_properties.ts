@@ -96,6 +96,10 @@ export enum AbilityPowerType {
     // abilities, the same surface the Empower augment amplifies. Not stack-powered: the configured number is
     // what the ally gets, so the aura reads identically whatever the caster's stack size.
     ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE = 67,
+    // Stun Aura (Abomination): enemies that START their turn inside the field roll against being stunned.
+    // The roll uses the SOURCE's own calculateAbilityApplyChance (stack power + luck), exactly like the
+    // Squire's Stun ability — the aura's lower configured power is the whole difference between them.
+    STUN_CHANCE = 68,
 }
 
 export const AllAbilityPowerTypes = [
@@ -167,6 +171,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE,
     AbilityPowerType.VINE_THROW,
     AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE,
+    AbilityPowerType.STUN_CHANCE,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -241,6 +246,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     ADDITIONAL_SHOT_DISTANCE_PERCENTAGE: AbilityPowerType.ADDITIONAL_SHOT_DISTANCE_PERCENTAGE,
     VINE_THROW: AbilityPowerType.VINE_THROW,
     ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE: AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE,
+    STUN_CHANCE: AbilityPowerType.STUN_CHANCE,
 };
 
 export enum AbilityType {
