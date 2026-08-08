@@ -3473,8 +3473,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             baseAttackMultiplier = baseAttackMultiplier * (1 + sharpenedWeaponsAura.getPower() / 100);
         }
 
-        const blessingBuff = this.getBuff("Blessing");
-        if (blessingBuff || battleRoarBuff) {
+        // Blessing / Battle Roar force every roll to the maximum. Honour the applied_buffs DISPLAY list
+        // too, not only the buff OBJECT: the ranked client mirrors buff names but deliberately never
+        // rebuilds the buff objects (they would double-apply the authoritative stats), so getBuff() is
+        // empty there and a Blessed unit kept showing its base "min - max" range (the live "blessing
+        // still shows 2-3" report). The transform is idempotent and non-stacking, and on the server /
+        // sandbox the label stays in lockstep with the object, so this only corrects the display path.
+        const appliedBuffLabels = this.unitProperties.applied_buffs ?? [];
+        const blessed = !!this.getBuff("Blessing") || appliedBuffLabels.includes("Blessing");
+        const roared = !!battleRoarBuff || appliedBuffLabels.includes("Battle Roar");
+        if (blessed || roared) {
             this.unitProperties.attack_damage_min = this.unitProperties.attack_damage_max;
         } else {
             this.unitProperties.attack_damage_min = this.initialUnitProperties.attack_damage_min;

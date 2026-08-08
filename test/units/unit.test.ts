@@ -194,6 +194,33 @@ describe("Unit", () => {
             expect(unit.getDebuffs()).toEqual([]);
         });
 
+        it("forces min damage to max from a Blessing DISPLAY label alone (ranked mirror has no buff object)", () => {
+            // Ranked mirrors buff NAMES into applied_buffs but never rebuilds the buff OBJECTS, so
+            // getBuff("Blessing") is empty there. The blessed unit kept showing its base 2-3 range (the
+            // live report). adjustBaseStats must read the label list, not only the object.
+            const unit = createTestUnit({ damageMin: 2, damageMax: 3 });
+            expect(unit.getBuff("Blessing")).toBeUndefined();
+            (unit as unknown as { unitProperties: { applied_buffs: string[] } }).unitProperties.applied_buffs = [
+                "Blessing",
+            ];
+
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(unit.getAttackDamageMin()).toBe(unit.getAttackDamageMax());
+            expect(unit.getAttackDamageMin()).toBe(3);
+
+            // Battle Roar shares the same max-damage guarantee and the same display-only mirror.
+            (unit as unknown as { unitProperties: { applied_buffs: string[] } }).unitProperties.applied_buffs = [
+                "Battle Roar",
+            ];
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(unit.getAttackDamageMin()).toBe(3);
+
+            // No label, no object -> the base minimum is restored.
+            (unit as unknown as { unitProperties: { applied_buffs: string[] } }).unitProperties.applied_buffs = [];
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(unit.getAttackDamageMin()).toBe(2);
+        });
+
         it("refreshes regeneration and spell-cast state before turns", () => {
             const unit = createTestUnit({
                 abilities: ["Wild Regeneration"],
