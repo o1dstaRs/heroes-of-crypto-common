@@ -546,7 +546,7 @@
             "On a ranged attack, there is a {}% chance to apply any of the following debuffs to the target:",
             "Curse, Sadness, Quagmire, Weakening Beam, Weakness, Rangebane, or Cowardice. Multiple debuffs can be applied in a single shot"
         ],
-        "power": 25,
+        "power": 40,
         "power_type": "APPLY_RANDOM_DEBUFF",
         "skip_reponse": false,
         "stack_powered": true,

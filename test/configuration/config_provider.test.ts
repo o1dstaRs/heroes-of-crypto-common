@@ -147,7 +147,7 @@ describe("config_provider", () => {
         expect(creature.max_hp).toBe(600);
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(3.3);
-        expect(creature.base_armor).toBe(48);
+        expect(creature.base_armor).toBe(50);
         expect(creature.base_attack).toBe(22);
         expect(creature.exp).toBe(1000);
         expect(creature.amount_alive).toBe(1);
@@ -184,6 +184,13 @@ describe("config_provider", () => {
             if (factionName === "version" || !isRecord(spells)) {
                 continue;
             }
+
+            it("loads Spit Ball's increased stack-powered chance", () => {
+                const ability = getAbilityConfig("Spit Ball");
+
+                expect(ability.power).toBe(40);
+                expect(ability.stack_powered).toBe(true);
+            });
 
             for (const spellName of Object.keys(spells)) {
                 const spell = getSpellConfig(factionName, spellName, 3);

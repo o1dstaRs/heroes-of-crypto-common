@@ -198,7 +198,7 @@ describe("v0.8 search measurement alias", () => {
         // Re-pinned for the pure-fractional steps call (getSteps no longer rounds, 2026-08-06): every
         // x.5-x.9-step unit reaches one straight cell less, so all seeded movement diverges. Two isolated
         // runs reproduced this digest byte-identically.
-        expect(digest("v0.7")).toBe("8906733731777b4c9222321053063c9066ee2950f180f6132785362b2171a0d3");
+        expect(digest("v0.7")).toBe("e58b23f2c8c1bbb71ecd7f48c9f76f56f643a5ae45e77fe73845cd1ec0b482d1");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -213,7 +213,7 @@ describe("v0.8 search measurement alias", () => {
         // then again after Tsar Cannon's range, damage, attack, and armor buff. The v0.7 control above still
         // reproduces byte-identically.
         // Two isolated runs reproduced this digest.
-        expect(digest("v0.8")).toBe("c25c77fad1ec5121f03f86571e4cadcfc0ef00ace80c872646cdc9da7d1f04b8");
+        expect(digest("v0.8")).toBe("ff532debdc307cfdc0b811f166ea4ad35b7523ce4039e5c6d5139eef893ecfa1");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

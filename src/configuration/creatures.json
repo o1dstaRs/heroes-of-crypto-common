@@ -911,7 +911,7 @@
             "hp": 600,
             "steps": 4.2,
             "initiative": 3.3,
-            "armor": 48,
+            "armor": 50,
             "attack_type": "MELEE",
             "attack": 22,
             "attack_damage_min": 28,
