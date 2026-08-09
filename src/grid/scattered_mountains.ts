@@ -12,10 +12,14 @@
 import type { XY } from "../utils/math";
 
 /** How many single-cell mountains a scattered BLOCK_CENTER layout drops. */
-export const SCATTERED_MOUNTAIN_COUNT = 9;
+export const SCATTERED_MOUNTAIN_COUNT = 12;
 /** The neutral middle band the rocks land in: this many full-width rows, centred vertically. */
 export const SCATTERED_MOUNTAIN_BAND_ROWS = 4;
-/** Distinct rock art variants the client can draw (variant indices are 0..VARIANTS-1). */
+/**
+ * Distinct rock art variants the client can draw (variant indices are 0..VARIANTS-1). Fewer variants than
+ * COUNT, so the deal below hands out the full set first and only then repeats — at 12 slots from 8 variants
+ * exactly four stones repeat, spread by the shuffle rather than clustered.
+ */
 export const SCATTERED_MOUNTAIN_VARIANTS = 8;
 
 export interface ISeededScatteredMountain {
