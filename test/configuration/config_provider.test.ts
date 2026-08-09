@@ -100,6 +100,13 @@ describe("config_provider", () => {
         expect(creature.base_attack).toBe(21);
     });
 
+    it("loads Ogre Mage's improved damage range", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Ogre Mage", "ogre_mage_512", 1);
+
+        expect(creature.attack_damage_min).toBe(16);
+        expect(creature.attack_damage_max).toBe(20);
+    });
+
     it("loads Tsar Cannon's improved ranged profile", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Life", "Tsar Cannon", "tsar_cannon_512", 0, 500);
 
