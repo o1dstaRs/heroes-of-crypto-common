@@ -203,8 +203,7 @@ export class AttackHandler {
      * unit standing on the straight line between the attacker and the aimed cell. Returns that
      * unit's base cell so the splash "projects to it" instead of the throw passing through to the
      * empty cell behind. When the path is clear, the aimed cell is returned unchanged. Mirrors the
-     * legacy behaviour (scripts/legacy/test_heroes.ts Area Throw branch), where a unit on the
-     * trajectory intercepts the throw.
+     * original Area Throw behaviour, where a unit on the trajectory intercepts the throw.
      */
     public projectAreaThrowTargetCell(
         allUnits: ReadonlyMap<string, Unit>,
