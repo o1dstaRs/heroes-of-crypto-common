@@ -145,6 +145,58 @@ export function calculateSpellDamage(
     return 0;
 }
 
+/**
+ * An offensive spell's raw damage after the TARGET's own two defences: its element answers the spell first,
+ * then its magic resistance cuts what is left. Split out of the engine's per-victim step so the client's
+ * hover projection runs the identical arithmetic instead of a re-implementation that can drift.
+ */
+export function applyElementAndResistToSpellDamage(
+    rawDamage: number,
+    elementMultiplier: number,
+    targetMagicResist: number,
+): number {
+    if (elementMultiplier <= 0) {
+        return 0;
+    }
+    const scaled = elementMultiplier === 1 ? rawDamage : Math.floor(rawDamage * elementMultiplier);
+    return applyMagicResistToSpellDamage(scaled, targetMagicResist);
+}
+
+/**
+ * What ONE target actually takes from an offensive spell: the spell's own damage shape, then that target's
+ * element and magic resistance.
+ *
+ * This is the whole projection in one call, and it exists because the hover preview used to hard-code the
+ * UNIT_AMOUNT_STACK_POWER shape for every spell. That silently multiplied the Battle Mage's flat-per-caster
+ * book (Fire Strike, Meteorite) by its stack power — up to 5x the damage the cast would really deal — while
+ * the Magic Dragon's stack-powered book happened to read correctly. Dispatching here means a new spell in
+ * either shape is projected right without touching the client.
+ *
+ * Per TARGET by construction: an AOE must call this once per caught unit, because resistances and elements
+ * differ across the units under one blast even though the raw damage does not.
+ */
+export function offensiveSpellDamageAgainstTarget(
+    multiplierType: SpellMultiplierType,
+    spellPower: number,
+    casterAmountAlive: number,
+    casterStackPower: number,
+    casterMagicDamageBonusPercentage: number,
+    targetMagicResist: number,
+    elementMultiplier = 1,
+): number {
+    return applyElementAndResistToSpellDamage(
+        calculateSpellDamage(
+            multiplierType,
+            spellPower,
+            casterAmountAlive,
+            casterStackPower,
+            casterMagicDamageBonusPercentage,
+        ),
+        elementMultiplier,
+        targetMagicResist,
+    );
+}
+
 /** Whether a spell's multiplier is one of the OFFENSIVE shapes calculateSpellDamage can price. */
 export function isOffensiveSpellMultiplier(multiplierType: SpellMultiplierType): boolean {
     return (

@@ -42,7 +42,11 @@ import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { isSmokeableCell } from "../spells/smoke_clouds";
-import { applyMagicResistToSpellDamage, calculateSpellDamage, elementalSpellMultiplier } from "../spells/spell_damage";
+import {
+    applyElementAndResistToSpellDamage,
+    calculateSpellDamage,
+    elementalSpellMultiplier,
+} from "../spells/spell_damage";
 import { VINE_STRIDE_COST_MULTIPLIER, canVineTakeRoot, vinePathCells } from "../spells/vines";
 import {
     fireWallBurnDamage,
@@ -1917,11 +1921,9 @@ export class GameActionEngine {
             targetIsWaterElement: unit.hasAbilityActive("Water Element"),
             targetIsWindElement: unit.hasAbilityActive("Wind Element"),
         });
-        if (multiplier <= 0) {
-            return 0;
-        }
-        const scaled = multiplier === 1 ? rawDamage : Math.floor(rawDamage * multiplier);
-        return applyMagicResistToSpellDamage(scaled, unit.getMagicResist());
+        // Shared with the client's hover projection so the number a player is shown and the number this
+        // deals are produced by the same arithmetic, not two copies of it.
+        return applyElementAndResistToSpellDamage(rawDamage, multiplier, unit.getMagicResist());
     }
     private resolveSpellVictims(
         caster: Unit,
