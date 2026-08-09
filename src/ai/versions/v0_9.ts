@@ -304,6 +304,21 @@ export function selectV09RankedCandidate(
     return { index: 0, fallbackReason: guardedWinner ? "hard_guard" : "below_margin" };
 }
 
+/**
+ * A learned-policy abstention is not an engine fault. When every learned candidate is guarded out,
+ * v0.9 returns the exact legal v0.8 anchor action at candidate zero and records `no_safe_candidate`
+ * for analysis. Reserve circuit-breaker telemetry for a model/runtime path that could make an action
+ * invalid or otherwise requires operational intervention.
+ */
+export function v09FallbackRequiresCircuitBreaker(fallbackReason: V09DecisionFallbackReason | null): boolean {
+    return (
+        fallbackReason === "invalid_artifact" ||
+        fallbackReason === "missing_context" ||
+        fallbackReason === "runtime_error" ||
+        fallbackReason === "budget_exceeded"
+    );
+}
+
 function enumerateV09Candidates(
     unit: Unit,
     context: IDecisionContext,
@@ -376,12 +391,7 @@ export class StrategyV0_9 implements IAIStrategy {
                 margin,
                 elapsedMicros: Math.max(0, Math.round((monotonicNow() - startedAt) * 1000)),
                 fallbackReason,
-                circuitBreakerRecommended:
-                    fallbackReason === "invalid_artifact" ||
-                    fallbackReason === "missing_context" ||
-                    fallbackReason === "runtime_error" ||
-                    fallbackReason === "budget_exceeded" ||
-                    fallbackReason === "no_safe_candidate",
+                circuitBreakerRecommended: v09FallbackRequiresCircuitBreaker(fallbackReason),
             };
             try {
                 context.policyEventObserver({
@@ -451,7 +461,7 @@ export class StrategyV0_9 implements IAIStrategy {
                     margin,
                     elapsedMicros: Math.max(0, Math.round((monotonicNow() - startedAt) * 1000)),
                     fallbackReason,
-                    circuitBreakerRecommended: fallbackReason === "no_safe_candidate",
+                    circuitBreakerRecommended: v09FallbackRequiresCircuitBreaker(fallbackReason),
                 };
                 try {
                     context.policyEventObserver({

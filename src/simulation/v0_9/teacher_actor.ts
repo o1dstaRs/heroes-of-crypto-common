@@ -15,6 +15,7 @@ import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import type { IAIStrategy } from "../../ai";
+import type { IAIPolicyEvent } from "../../ai/ai_strategy";
 import { createV09OfflineResearchStrategy } from "../../ai/versions/v0_9";
 import { V08_A13_VALUE_LEAF, buildV08A13SearchEnvironment } from "../../ai/versions/v0_8_a13_profile";
 import type { IV09ModelArtifact } from "../../ai/versions/v0_9_model";
@@ -92,6 +93,54 @@ export function v09TeacherRejectedActionsMessage(
         `rejectedGreen=${rejectedGreen}, rejectedRed=${rejectedRed}, ` +
         `rejectedDetails=${JSON.stringify(result.rejectedDetails ?? [])}`
     );
+}
+
+type IV09TeacherStudentDecision = Extract<IAIPolicyEvent, { kind: "v0.9_decision" }>;
+
+export interface IV09TeacherStudentActivationFailure {
+    readonly team: number;
+    readonly unitId: string;
+    readonly creatureName: string;
+    readonly lap: number;
+    readonly reasons: readonly string[];
+    readonly fallbackReason: IV09TeacherStudentDecision["details"]["fallbackReason"];
+    readonly circuitBreakerRecommended: boolean;
+    readonly candidateCount: number;
+    readonly selectedCandidateIndex: number;
+}
+
+/** Keep DAgger activation checks strict while preserving the actionable policy telemetry on failure. */
+export function v09TeacherStudentActivationFailure(
+    event: IV09TeacherStudentDecision,
+    expected: { readonly studentTeams: readonly number[]; readonly modelId: string; readonly modelSha256: string },
+): IV09TeacherStudentActivationFailure | null {
+    const reasons: string[] = [];
+    if (!expected.studentTeams.includes(event.team)) reasons.push("unexpected_team");
+    if (event.details.artifactStatus !== "trained") reasons.push("artifact_not_trained");
+    if (event.details.modelId !== expected.modelId) reasons.push("model_id_mismatch");
+    if (event.details.modelSha256 !== expected.modelSha256) reasons.push("model_sha256_mismatch");
+    if (event.details.circuitBreakerRecommended) reasons.push("circuit_breaker_recommended");
+    if (
+        event.details.selectedCandidateIndex < 0 ||
+        event.details.selectedCandidateIndex >= event.details.candidateCount
+    ) {
+        reasons.push("selected_candidate_out_of_range");
+    }
+    if (!event.unitId.length) reasons.push("missing_unit_id");
+    if (!event.creatureName.length) reasons.push("missing_creature_name");
+    if (!Number.isSafeInteger(event.lap) || event.lap < 1) reasons.push("invalid_lap");
+    if (!reasons.length) return null;
+    return {
+        team: event.team,
+        unitId: event.unitId,
+        creatureName: event.creatureName,
+        lap: event.lap,
+        reasons,
+        fallbackReason: event.details.fallbackReason,
+        circuitBreakerRecommended: event.details.circuitBreakerRecommended,
+        candidateCount: event.details.candidateCount,
+        selectedCandidateIndex: event.details.selectedCandidateIndex,
+    };
 }
 
 function atomicJson(path: string, value: unknown): void {
@@ -462,7 +511,7 @@ export function runV09TeacherActor(args: IV09TeacherActorArgs): {
             );
             const observer = createV09TeacherObserver(recorder, common);
             let studentEvaluations = 0;
-            let studentActivationFailures = 0;
+            const studentActivationFailures: IV09TeacherStudentActivationFailure[] = [];
             const result = runMatch({
                 greenVersion: "v0.8",
                 redVersion: "v0.8",
@@ -477,30 +526,22 @@ export function runV09TeacherActor(args: IV09TeacherActorArgs): {
                           policyEventObserver: (event): void => {
                               if (event.kind !== "v0.9_decision") return;
                               studentEvaluations += 1;
-                              if (
-                                  !trajectory.studentTeams.includes(event.team) ||
-                                  event.details.artifactStatus !== "trained" ||
-                                  event.details.modelId !== student.artifact.modelId ||
-                                  event.details.modelSha256 !== student.modelSha256 ||
-                                  event.details.circuitBreakerRecommended ||
-                                  event.details.selectedCandidateIndex < 0 ||
-                                  event.details.selectedCandidateIndex >= event.details.candidateCount ||
-                                  event.unitId.length === 0 ||
-                                  event.creatureName.length === 0 ||
-                                  !Number.isSafeInteger(event.lap) ||
-                                  event.lap < 1
-                              ) {
-                                  studentActivationFailures += 1;
-                              }
+                              const failure = v09TeacherStudentActivationFailure(event, {
+                                  studentTeams: trajectory.studentTeams,
+                                  modelId: student.artifact.modelId,
+                                  modelSha256: student.modelSha256,
+                              });
+                              if (failure) studentActivationFailures.push(failure);
                           },
                       }
                     : {}),
                 ...trajectory.overrides,
             });
-            if (student && (studentEvaluations === 0 || studentActivationFailures !== 0)) {
+            if (student && (studentEvaluations === 0 || studentActivationFailures.length !== 0)) {
                 throw new Error(
                     `teacher game ${gameId} did not execute the offline student model ` +
-                        `(evaluations=${studentEvaluations}, activationFailures=${studentActivationFailures})`,
+                        `(evaluations=${studentEvaluations}, activationFailures=${studentActivationFailures.length}, ` +
+                        `telemetry=${JSON.stringify(studentActivationFailures.slice(0, 4))})`,
                 );
             }
             const rejectedActionsMessage = v09TeacherRejectedActionsMessage(gameId, result);
