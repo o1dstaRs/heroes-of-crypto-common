@@ -1179,6 +1179,10 @@ export class GameActionEngine {
                 (cell) => isCellWithinGrid(this.context.grid.getSettings(), cell),
                 caster.getBaseCell(),
                 target.getBaseCell(),
+                // Only Fire Strike arcs over the caster's own troops. Every other thrown spell is blocked by
+                // ANY body, and each re-checks that strictly in its own handler — scoping the transparency
+                // here keeps this gate from quietly becoming the more permissive of the two.
+                spell.getName() === "Fire Strike" ? (unitId) => this.isAllyOfCaster(caster, unitId) : undefined,
             );
         // Every unit-targeted spell must pass the same authoritative gate before dispatch. Most spells flow
         // through AttackHandler.handleMagicAttack, which rejects Hidden enemies and calls canCastSpell; the
@@ -1720,6 +1724,15 @@ export class GameActionEngine {
      * with the spellbook card and AI estimate. It is MAGICAL, so it ignores armor and only magic resistance
      * cuts it down. One cast = one charge.
      */
+    /**
+     * The caster's own side is transparent to a thrown fireball: only an ENEMY on the line intercepts it,
+     * the same rule Area Throw interception already follows. Without this, opening up interception would
+     * have handed players a way to burn their own front line by aiming past it.
+     */
+    private isAllyOfCaster(caster: Unit, unitId: string): boolean {
+        const unit = this.context.unitsHolder.getAllUnits().get(unitId);
+        return !!unit && unit.getTeam() === caster.getTeam();
+    }
     private fireStrikeCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
         const from = caster.getBaseCell();
         const to = target.getBaseCell();
@@ -1744,8 +1757,33 @@ export class GameActionEngine {
         ) {
             return this.reject("spell_not_available");
         }
-        if (!this.hasClearSpellLineOfSight(from, to)) {
+        // Like an archer's shot (owner 2026-08-09): a creature standing on the line INTERCEPTS the
+        // fireball and takes it instead of the aimed target, rather than the cast being refused. Only
+        // terrain still stops it outright — the fireball cannot fly through the mountain. The client's
+        // aim preview resolves the impact through this same helper, so the trajectory a player watches
+        // names the creature that actually burns.
+        const settings = this.context.grid.getSettings();
+        const impact = SpellHelper.resolveThrownSpellImpact(
+            spell.getName(),
+            this.context.grid,
+            (cell) => isCellWithinGrid(settings, cell),
+            from,
+            to,
+            (unitId) => this.isAllyOfCaster(caster, unitId),
+        );
+        if (impact.blockedByTerrain) {
             return this.reject("spell_not_available");
+        }
+        let victim = target;
+        if (impact.interceptedBy && impact.interceptedBy !== target.getId()) {
+            const intercepting = this.context.unitsHolder.getAllUnits().get(impact.interceptedBy);
+            if (!intercepting || intercepting.isDead()) {
+                return this.reject("spell_not_available");
+            }
+            victim = intercepting;
+            this.context.sceneLog.updateLog(
+                `${intercepting.getName()} intercepted ${spell.getName()} aimed at ${target.getName()}`,
+            );
         }
 
         const rawDamage = calculateSpellDamage(
@@ -1755,11 +1793,11 @@ export class GameActionEngine {
             caster.getStackPower(),
             caster.getMagicDamageBonusPercentage(),
         );
-        const victims = this.resolveSpellVictims(caster, spell, rawDamage, [target]);
+        const victims = this.resolveSpellVictims(caster, spell, rawDamage, [victim]);
         const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
-            `${caster.getName()} 🔥 ${target.getName()} (${spellDamageDealt(damaged, target.getId())})`,
+            `${caster.getName()} 🔥 ${victim.getName()} (${spellDamageDealt(damaged, victim.getId())})`,
         );
 
         const events: GameEvent[] = [
@@ -1767,8 +1805,10 @@ export class GameActionEngine {
                 type: "spell_cast",
                 casterId: caster.getId(),
                 spellName: spell.getName(),
-                targetId: target.getId(),
-                targetCell: to,
+                // The unit actually BURNED, which an interception makes different from the one aimed at.
+                // Clients animate the fireball to this id and print its damage, so it must be the victim.
+                targetId: victim.getId(),
+                targetCell: impact.cell,
                 unitIdsDied,
                 animations: [],
                 damaged,

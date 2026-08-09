@@ -58,7 +58,7 @@ import {
     canCastSpell,
     canMassCastSpell,
     isSpellUsableByCaster,
-    isTargetedSpellLineOfSightClear,
+    thrownSpellReachesAimedTarget,
 } from "../spells/spell_helper";
 import type { Spell } from "../spells/spell";
 import {
@@ -1060,12 +1060,17 @@ const canTargetOffensiveSpell = (caster: Unit, target: Unit, spell: Spell, conte
             target.canBeHealed(),
             undefined,
         ) === true &&
-        isTargetedSpellLineOfSightClear(
+        // Must LAND on this target, not merely be legal: a screening enemy intercepts Fire Strike onto itself.
+        // Fire Strike alone arcs over friendlies — any body blocks the other throws, as in the engine.
+        thrownSpellReachesAimedTarget(
             spell.getName(),
             context.grid,
             (cell) => isCellWithinGrid(settings, cell),
             caster.getBaseCell(),
             target.getBaseCell(),
+            spell.getName() === "Fire Strike"
+                ? (unitId) => context.unitsHolder.getAllUnits().get(unitId)?.getTeam() === caster.getTeam()
+                : undefined,
         )
     );
 };

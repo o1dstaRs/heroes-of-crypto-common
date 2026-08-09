@@ -58,6 +58,7 @@ const setupMageFight = (opts: {
     enemies?: { cell: { x: number; y: number }; maxHp?: number; magicResist?: number; amountAlive?: number }[];
     allyCell?: { x: number; y: number };
     blockerCell?: { x: number; y: number };
+    blockerTeam?: PBTypes.TeamVals;
 }) => {
     const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
     const fightProperties = FightStateManager.getInstance().getFightProperties();
@@ -101,13 +102,19 @@ const setupMageFight = (opts: {
         });
         placeUnit(context.grid, context.unitsHolder, ally, opts.allyCell);
     }
+    let blocker: Unit | undefined;
+    const blockerTeam = opts.blockerTeam ?? PBTypes.TeamVals.LOWER;
     if (opts.blockerCell) {
-        const blocker = createTestUnit({ name: "Blocker", team: PBTypes.TeamVals.LOWER, maxHp: 10_000, speed: 2 });
+        blocker = createTestUnit({ name: "Blocker", team: blockerTeam, maxHp: 10_000, speed: 2 });
         placeUnit(context.grid, context.unitsHolder, blocker, opts.blockerCell);
     }
 
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1 + (ally ? 1 : 0));
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, Math.max(1, enemies.length));
+    const blockerIsEnemy = !!blocker && blockerTeam === PBTypes.TeamVals.UPPER;
+    fightProperties.setTeamUnitsAlive(
+        PBTypes.TeamVals.LOWER,
+        1 + (ally ? 1 : 0) + (blocker && !blockerIsEnemy ? 1 : 0),
+    );
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, Math.max(1, enemies.length + (blockerIsEnemy ? 1 : 0)));
     fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
 
     const sceneLog = new SceneLogMock();
@@ -122,7 +129,7 @@ const setupMageFight = (opts: {
         getCurrentActiveUnitId: () => caster.getId(),
     });
 
-    return { ...context, fightProperties, caster, enemies, ally, engine, sceneLog };
+    return { ...context, fightProperties, caster, enemies, ally, blocker, engine, sceneLog };
 };
 
 // The Magic Dragon formula: creatures alive x stack power x the spell's damage multiplier. It lives in one
@@ -342,14 +349,19 @@ describe("action engine — Fire Strike", () => {
         ]);
     });
 
-    it("refuses the throw when a body blocks the line and keeps the scroll", () => {
+    // Owner 2026-08-09: a body in the way no longer refuses the throw. Fire Strike behaves like an archer's
+    // shot — it flies at the aimed enemy and burns whoever actually stands in the line. Friendlies are the
+    // exception: the mage arcs over their own troops rather than frying them.
+    it("is intercepted by an ENEMY body on the line, which takes the burn instead of the aimed target", () => {
         const setup = setupMageFight({
             casterAmountAlive: 38,
             casterStackPower: 5,
             enemies: [{ cell: { x: 6, y: 3 } }],
             blockerCell: { x: 5, y: 3 }, // squarely between (3,3) and (6,3)
+            blockerTeam: PBTypes.TeamVals.UPPER,
         });
-        const hpBefore = setup.enemies[0].getHp();
+        const aimedHpBefore = setup.enemies[0].getHp();
+        const blockerHpBefore = setup.blocker!.getHp();
 
         const result = setup.engine.apply({
             type: "cast_spell",
@@ -358,15 +370,43 @@ describe("action engine — Fire Strike", () => {
             targetId: setup.enemies[0].getId(),
         });
 
-        expect(result.completed).toBe(false);
-        expect(setup.enemies[0].getHp()).toBe(hpBefore);
+        expect(result.completed).toBe(true);
+        expect(setup.blocker!.getHp()).toBeLessThan(blockerHpBefore);
+        expect(setup.enemies[0].getHp()).toBe(aimedHpBefore); // the one it was aimed at is untouched
+        // The scroll is spent and the turn is over: this is a real cast, not a refusal.
         expect(
             setup.caster
                 .getSpells()
                 .find((s) => s.getName() === "Fire Strike")
                 ?.getAmount(),
-        ).toBe(3);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.caster.getId())).toBe(false);
+        ).toBe(2);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.caster.getId())).toBe(true);
+
+        const cast = result.events.find((event) => event.type === "spell_cast");
+        expect(cast && "targetId" in cast ? cast.targetId : undefined).toBe(setup.blocker!.getId());
+    });
+
+    it("arcs over a FRIENDLY body and still burns the aimed target", () => {
+        const setup = setupMageFight({
+            casterAmountAlive: 38,
+            casterStackPower: 5,
+            enemies: [{ cell: { x: 6, y: 3 } }],
+            blockerCell: { x: 5, y: 3 },
+            blockerTeam: PBTypes.TeamVals.LOWER,
+        });
+        const aimedHpBefore = setup.enemies[0].getHp();
+        const friendHpBefore = setup.blocker!.getHp();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Fire Strike",
+            targetId: setup.enemies[0].getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.blocker!.getHp()).toBe(friendHpBefore); // no friendly fire
+        expect(setup.enemies[0].getHp()).toBeLessThan(aimedHpBefore);
     });
 
     it("is magical: armor does nothing, magic resistance cuts it", () => {

@@ -196,7 +196,8 @@ describe("v0.8 damage-spell policy", () => {
     it("Battle Mage never proposes a depleted Meteorite or a blocked Fire Strike", () => {
         const combat = createCombatTestContext();
         const mage = makeNative(LOWER, "Life", "Battle Mage", 5);
-        const blocker = createTestUnit({ team: LOWER, name: "Line blocker", attackType: MELEE });
+        // An ENEMY screen — a friendly one is transparent, the mage arcs the throw over its own troops.
+        const blocker = createTestUnit({ team: UPPER, name: "Line blocker", attackType: MELEE });
         const target = enemy("Blocked target");
         placeCombatUnit(combat, mage, { x: 2, y: 2 });
         placeCombatUnit(combat, blocker, { x: 5, y: 2 });

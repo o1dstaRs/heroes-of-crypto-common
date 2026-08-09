@@ -56,8 +56,15 @@ describe("spell_helper", () => {
         expect(targetedSpellRequiresLineOfSight("Ring of Fire")).toBe(true);
         expect(targetedSpellRequiresLineOfSight("Lightning Strike")).toBe(false);
         expect(isTargetedSpellLineOfSightClear("Vine Throw", blockedGrid, withinGrid, from, to)).toBe(false);
-        expect(isTargetedSpellLineOfSightClear("Fire Strike", blockedGrid, withinGrid, from, to)).toBe(false);
         expect(isTargetedSpellLineOfSightClear("Ring of Fire", blockedGrid, withinGrid, from, to)).toBe(false);
+        // Fire Strike is the one thrown spell a creature no longer refuses (owner 2026-08-09): the engine
+        // intercepts it onto that body instead. Terrain is still a hard no.
+        expect(isTargetedSpellLineOfSightClear("Fire Strike", blockedGrid, withinGrid, from, to)).toBe(true);
+        const rockGrid = {
+            getOccupantUnitId: (cell: { x: number; y: number }): string | undefined =>
+                cell.x === 4 && cell.y === 2 ? "B" : undefined,
+        };
+        expect(isTargetedSpellLineOfSightClear("Fire Strike", rockGrid, withinGrid, from, to)).toBe(false);
         expect(isTargetedSpellLineOfSightClear("Lightning Strike", blockedGrid, withinGrid, from, to)).toBe(true);
         expect(
             isTargetedSpellLineOfSightClear("Vine Throw", { getOccupantUnitId: () => undefined }, withinGrid, from, to),

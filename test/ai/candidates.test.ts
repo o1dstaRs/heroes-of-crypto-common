@@ -2208,7 +2208,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const c = createCombatTestContext();
         const mage = makeReal(LOWER, "Life", "Battle Mage");
         mage.setStackPower(5);
-        const blocker = createTestUnit({ team: LOWER, name: "Fireball blocker", attackType: MELEE });
+        const blocker = createTestUnit({ team: UPPER, name: "Fireball blocker", attackType: MELEE });
         const blocked = createTestUnit({
             team: UPPER,
             name: "Blocked target",
@@ -2232,7 +2232,10 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const strikes = ofKind(enumerateCandidates(mage, context, endTurn(mage)).candidates, "spell").filter(
             (candidate) => candidate.spellName === "Fire Strike",
         );
+        // Not proposed at the unit BEHIND the screen: the engine would intercept the throw onto the screen, so
+        // scoring it against the far target would mis-attribute the damage. The screen itself is still offered.
         expect(strikes.some((candidate) => candidate.targetId === blocked.getId())).toBe(false);
+        expect(strikes.some((candidate) => candidate.targetId === blocker.getId())).toBe(true);
         const clearStrike = strikes.find((candidate) => candidate.targetId === clear.getId());
         expect(clearStrike).toBeDefined();
         expect(clearStrike!.features.expectedDamage).toBeGreaterThan(0);
@@ -2542,7 +2545,8 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const c = createCombatTestContext();
         const trent = makeReal(LOWER, "Nature", "Trent");
         trent.setStackPower(5);
-        const blocker = createTestUnit({ team: LOWER, name: "Blocker", attackType: MELEE });
+        // An ENEMY screen: friendly bodies are transparent to a throw, so a LOWER blocker would prove nothing.
+        const blocker = createTestUnit({ team: UPPER, name: "Blocker", attackType: MELEE });
         const blocked = createTestUnit({ team: UPPER, name: "Blocked target", attackType: MELEE });
         const clear = createTestUnit({ team: UPPER, name: "Clear target", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, trent, { x: 2, y: 2 });
@@ -2561,6 +2565,31 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const engine = startActionEngine(c, trent, context);
         expect(clearCast!.actions.map((action) => engine.apply(action).completed)).toEqual([true]);
         expect(context.fightProperties!.getVines().size()).toBeGreaterThan(0);
+    });
+
+    // The friend/foe asymmetry is easy to get wrong in the gate and invisible in play until the AI starts
+    // proposing throws the engine refuses (or refusing ones it would accept), so pin both spells at once.
+    it("blocks a throw on a FRIENDLY body only for the spells the engine blocks", () => {
+        const build = (casterFaction: string, casterName: string, spellName: string) => {
+            const c = createCombatTestContext();
+            const caster = makeReal(LOWER, casterFaction, casterName);
+            caster.setStackPower(5);
+            const friend = createTestUnit({ team: LOWER, name: "Friendly screen", attackType: MELEE });
+            const behind = createTestUnit({ team: UPPER, name: "Behind the screen", attackType: MELEE });
+            placeUnit(c.grid, c.unitsHolder, caster, { x: 2, y: 2 });
+            placeUnit(c.grid, c.unitsHolder, friend, { x: 5, y: 2 });
+            placeUnit(c.grid, c.unitsHolder, behind, { x: 8, y: 2 });
+            const proposed = ofKind(
+                enumerateCandidates(caster, ctxFor(c, true), endTurn(caster)).candidates,
+                "spell",
+            ).filter((candidate) => candidate.spellName === spellName);
+            return proposed.some((candidate) => candidate.targetId === behind.getId());
+        };
+
+        // Fire Strike arcs over its own troops, so the enemy behind them is still a live target...
+        expect(build("Life", "Battle Mage", "Fire Strike")).toBe(true);
+        // ...while a vine has to travel along the ground, and any body in the lane stops it.
+        expect(build("Nature", "Trent", "Vine Throw")).toBe(false);
     });
 
     it("dedupes candidates identical to the incumbent (no double-scored actions)", () => {

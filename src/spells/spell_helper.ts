@@ -210,6 +210,9 @@ export function firstSpellSightBlocker(
     // the cast. Every other thrown spell keeps the archer's rule where terrain blocks too. The vine simply
     // does not take root on a cell that cannot hold it (see canVineTakeRoot).
     blockedBy: "creatures" | "creatures-and-terrain" = "creatures-and-terrain",
+    // Bodies the throw passes straight over. Fire Strike uses it so a caster's OWN allies never eat the
+    // fireball — the same "first ENEMY on the line" rule Area Throw interception already follows.
+    isTransparentUnit?: (unitId: string) => boolean,
 ): ISpellSightBlocker | undefined {
     const pathCells = vinePathCells(from, to);
     if (!pathCells.length) {
@@ -244,7 +247,7 @@ export function firstSpellSightBlocker(
         if (creaturesOnly && (occupant === "B" || occupant === "H")) {
             continue;
         }
-        if (occupant !== casterUnitId && occupant !== targetUnitId) {
+        if (occupant !== casterUnitId && occupant !== targetUnitId && !isTransparentUnit?.(occupant)) {
             return { cell, occupantId: occupant };
         }
     }
@@ -272,11 +275,26 @@ export function isTargetedSpellLineOfSightClear(
     isWithinGrid: (cell: XY) => boolean,
     from: XY,
     to: XY,
+    isTransparentUnit?: (unitId: string) => boolean,
 ): boolean {
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return true;
     }
-    return firstTargetedSpellSightBlocker(spellName, grid, isWithinGrid, from, to) === undefined;
+    const blocker = firstTargetedSpellSightBlocker(spellName, grid, isWithinGrid, from, to, isTransparentUnit);
+    if (!blocker) {
+        return true;
+    }
+    // Fire Strike alone is no longer refused by a body in the way (owner 2026-08-09): like an archer's
+    // shot it is INTERCEPTED, and the engine burns whoever stepped into the line, so only terrain still
+    // refuses it. Deliberately NOT every thrown offensive spell: Ring of Fire has its own cast path that
+    // still resolves on the aimed target, so letting a blocked one through would fire it THROUGH the
+    // blocker. Vine Throw likewise keeps refusing — it snares one named enemy, and snaring a different
+    // creature instead would be a different spell.
+    if (spellName === "Fire Strike") {
+        return blocker.occupantId !== "B" && blocker.occupantId !== "H";
+    }
+
+    return false;
 }
 
 /**
@@ -290,6 +308,7 @@ export function firstTargetedSpellSightBlocker(
     isWithinGrid: (cell: XY) => boolean,
     from: XY,
     to: XY,
+    isTransparentUnit?: (unitId: string) => boolean,
 ): ISpellSightBlocker | undefined {
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return undefined;
@@ -300,7 +319,69 @@ export function firstTargetedSpellSightBlocker(
         from,
         to,
         spellName === "Vine Throw" ? "creatures" : "creatures-and-terrain",
+        isTransparentUnit,
     );
+}
+
+/** What a thrown spell actually hits: the aimed target, or the first body that gets in the way. */
+export interface IThrownSpellImpact {
+    /** The cell the spell resolves on. */
+    cell: XY;
+    /** The unit id standing there, when a THIRD body intercepted the throw (undefined = aimed target). */
+    interceptedBy?: string;
+    /** Terrain stopped it outright — the mountain or a narrowed hole, so nothing is hit. */
+    blockedByTerrain: boolean;
+}
+
+/**
+ * Where a thrown spell lands (owner 2026-08-09): like an archer's shot, the first CREATURE standing on
+ * the line takes the hit instead of the aimed target — the shot is intercepted, not refused. Terrain is
+ * still a wall: the mountain or a narrowed hole stops the throw outright and nothing is hit.
+ *
+ * Shared by the engine's cast and the client's aim preview so the trajectory a player sees names the
+ * creature the cast will actually burn.
+ */
+export function resolveThrownSpellImpact(
+    spellName: string,
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    from: XY,
+    to: XY,
+    isTransparentUnit?: (unitId: string) => boolean,
+): IThrownSpellImpact {
+    const blocker = firstTargetedSpellSightBlocker(spellName, grid, isWithinGrid, from, to, isTransparentUnit);
+    if (!blocker) {
+        return { cell: to, blockedByTerrain: false };
+    }
+    if (blocker.occupantId === "B" || blocker.occupantId === "H") {
+        return { cell: blocker.cell, blockedByTerrain: true };
+    }
+    return { cell: blocker.cell, interceptedBy: blocker.occupantId, blockedByTerrain: false };
+}
+
+/**
+ * Does a thrown spell actually LAND on the unit it was aimed at?
+ *
+ * This is the AI's gate, and it is deliberately stricter than the engine's legality check
+ * (isTargetedSpellLineOfSightClear). Since Fire Strike gained interception, an aimed cast that a screening
+ * enemy walks into is still LEGAL, but it burns the screen rather than the aimed target — so a candidate
+ * scored against the aimed target would be estimating damage on a unit that never gets hit. The AI therefore
+ * only proposes throws that reach their mark. It loses nothing: the interceptor is an enemy on the board too,
+ * so the same shot is enumerated as a direct throw at the interceptor, correctly scored.
+ */
+export function thrownSpellReachesAimedTarget(
+    spellName: string,
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    from: XY,
+    to: XY,
+    isTransparentUnit?: (unitId: string) => boolean,
+): boolean {
+    if (!targetedSpellRequiresLineOfSight(spellName)) {
+        return true;
+    }
+    const impact = resolveThrownSpellImpact(spellName, grid, isWithinGrid, from, to, isTransparentUnit);
+    return !impact.blockedByTerrain && !impact.interceptedBy;
 }
 
 export function canCastSummon(spell: Spell, gridMatrix: number[][], emptyGridCell?: XY): boolean {

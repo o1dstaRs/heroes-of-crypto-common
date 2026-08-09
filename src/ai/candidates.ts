@@ -32,7 +32,7 @@ import {
     canCastSpell,
     canCastSummon,
     canMassCastSpell,
-    isTargetedSpellLineOfSightClear,
+    thrownSpellReachesAimedTarget,
     isSpellUsableByCaster,
 } from "../spells/spell_helper";
 import type { Spell } from "../spells/spell";
@@ -2443,15 +2443,26 @@ class CandidateGenerator {
         }
         return { value, kill };
     }
-    /** A thrown spell needs the clear line the engine's cast re-checks — mirror it, never propose a refusal. */
+    /**
+     * A thrown spell must actually REACH the unit we are scoring. Terrain refuses it outright, and a screening
+     * body intercepts it (Fire Strike) or refuses it (Vine Throw, Ring of Fire) — either way the aimed target
+     * is not the one that gets hit, so proposing it would mis-attribute the damage.
+     *
+     * Only Fire Strike is arced over the caster's own troops, matching the engine; for the other throws a
+     * friendly body blocks the lane exactly as an enemy one does.
+     */
     private hasTargetedSpellLineOfSight(spell: Spell, target: Unit): boolean {
         const gs = this.context.grid.getSettings();
-        return isTargetedSpellLineOfSightClear(
+        const allUnits = this.context.unitsHolder.getAllUnits();
+        return thrownSpellReachesAimedTarget(
             spell.getName(),
             this.context.grid,
             (cell) => isCellWithinGrid(gs, cell),
             this.unit.getBaseCell(),
             target.getBaseCell(),
+            spell.getName() === "Fire Strike"
+                ? (unitId) => allUnits.get(unitId)?.getTeam() === this.unit.getTeam()
+                : undefined,
         );
     }
     /**
