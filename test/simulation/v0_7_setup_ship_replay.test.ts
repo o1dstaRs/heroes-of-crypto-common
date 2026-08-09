@@ -161,7 +161,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // that combat trace. Two isolated runs produced this byte-identical digest.
 // Re-pinned after Magic Dragon's minimum attack damage increased from 8 to 9. An isolated copy with only
 // that balance change reverted produced the previous digest, confirming it is the sole cause.
-const EXPECTED_REPLAY_SHA256 = "efbac52474cb034afb03e42cc6972e318c2ef0f3c1d9669f22e9ae39476f81aa";
+// Re-pinned for the 2026-08-09 balance batch: ranged damage and caster initiative tuning, Orc and Dryad
+// damage, Abomination armor 48 -> 50, and Spit Ball power 25 -> 40 all legitimately change seeded setup
+// valuation or downstream combat. The full suite and a focused rerun produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "d07218f0123605a0a7281eb9089870d3948ab8fe3739e492dd0dd940e8fca49e";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
