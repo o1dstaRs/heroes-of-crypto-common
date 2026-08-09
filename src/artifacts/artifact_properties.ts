@@ -132,8 +132,8 @@ export const ARTIFACT_POWER = {
     HELM_OF_FOCUS_RESIST_PERCENT: 35,
     AMULET_OF_RESOLVE_RESIST_PERCENT: 25,
     AEGIS_AREA_REDUCTION_PERCENT: 0,
-    GIANTS_MAUL_AOE_PERCENT: 35,
-    RIME_PROC_PERCENT: 30,
+    GIANTS_MAUL_AOE_PERCENT: 40,
+    RIME_PROC_PERCENT: 60,
     RIME_SLOW_LAPS: 3,
     HOLY_CROSS_HEAL_RES_PERCENT: 50,
     // Farsight Quiver extends an archer's BASIC shot range by this % (additive off base shot_distance; it

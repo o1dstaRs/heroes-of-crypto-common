@@ -2753,6 +2753,28 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         );
         this.unitProperties.applied_debuffs_powers.push(0);
     }
+    /**
+     * Overwrite the spellbook authoritatively from a ranked snapshot's exact entry list (each entry
+     * is one remaining cast, `${faction}:${name}`). The ranked client never runs the cast engine, so
+     * BOTH views of the book must be forced to the server truth: the Spell objects (they drive the
+     * spellbook cards and AI castability) AND the raw unitProperties.spells entry list (it drives the
+     * sidebar scroll count and every other properties reader — left stale, the count froze at the
+     * base value after every ranked cast). Sandbox never needs this: useSpell keeps both in lockstep.
+     */
+    public syncAuthoritativeSpellEntries(entries: string[]): void {
+        // In place, not a new array: getUnitProperties() hands out the live object and the HUD reads
+        // spells.length off whatever reference it already holds.
+        this.unitProperties.spells.length = 0;
+        this.unitProperties.spells.push(...entries);
+        const remainingByName = new Map<string, number>();
+        for (const entry of entries) {
+            const name = entry.substring(entry.indexOf(":") + 1);
+            remainingByName.set(name, (remainingByName.get(name) ?? 0) + 1);
+        }
+        for (const spell of this.spells) {
+            spell.setAmount(remainingByName.get(spell.getName()) ?? 0);
+        }
+    }
     public useSpell(spellName: string): void {
         for (const s of this.spells) {
             if (s.getName() === spellName) {
@@ -3872,6 +3894,42 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Miner scales with stack power, luck and Might synergy. Keep the shared/server-owned description
         // aligned with the amount processMinerAbility actually transfers, including sane decimal rounding.
         this.refreshMinerDescription(_synergyAbilityPowerIncrease);
+        // ARTIFACT Giant's Maul: while its buff is active, the non-magical AOE abilities deal +% damage, so
+        // their damage-% cards must show the BOOSTED figure the fight actually applies, not the base 100%.
+        this.refreshGiantsMaulAoeDescriptions();
+    }
+    /**
+     * The non-magical AOE damage abilities Giant's Maul boosts (the same set that reads its buff in the
+     * attack handler / AOE processors). Fire Breath and Chain Lightning are excluded — they are MAGICAL AOE
+     * and the Maul deliberately does not touch them; Chakram is excluded from THIS pass because its card
+     * carries no damage-% token to rewrite (its bounce damage is still boosted through the shared AOE tail).
+     */
+    private static readonly GIANTS_MAUL_AOE_DESCRIPTION_ABILITIES: readonly string[] = [
+        "Lightning Spin",
+        "Area Throw",
+        "Through Shot",
+        "Skewer Strike",
+        "Large Caliber",
+    ];
+    /** Re-render each Maul-boosted AOE ability's damage-% card at power x (1 + Maul%) while the buff is up. */
+    private refreshGiantsMaulAoeDescriptions(): void {
+        const maulBuff = this.getBuff("Giants Maul");
+        const factor = maulBuff ? 1 + maulBuff.getPower() / 100 : 1;
+        for (const abilityName of Unit.GIANTS_MAUL_AOE_DESCRIPTION_ABILITIES) {
+            const index = this.unitProperties.abilities.indexOf(abilityName);
+            if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
+                continue;
+            }
+            const ability = this.abilities.find((candidate) => candidate.getName() === abilityName);
+            if (!ability) {
+                continue;
+            }
+            const rescaled = Math.round(ability.getPower() * factor);
+            this.unitProperties.abilities_descriptions[index] = ability
+                .getDesc()
+                .join("\n")
+                .replace(/\{\}/g, rescaled.toString());
+        }
     }
     /**
      * Rewrite Blind Fury's description with the bonus it is CURRENTLY granting.
