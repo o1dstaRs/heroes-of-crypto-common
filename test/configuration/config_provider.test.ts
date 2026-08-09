@@ -106,7 +106,7 @@ describe("config_provider", () => {
         expect(creature.base_armor).toBe(32);
         expect(creature.base_attack).toBe(46);
         expect(creature.attack_damage_min).toBe(40);
-        expect(creature.attack_damage_max).toBe(52);
+        expect(creature.attack_damage_max).toBe(55);
         expect(creature.shot_distance).toBe(9.5);
     });
 
@@ -116,6 +116,14 @@ describe("config_provider", () => {
         expect(creature.base_attack).toBe(11);
         expect(creature.attack_damage_min).toBe(3);
         expect(creature.attack_damage_max).toBe(6);
+    });
+
+    it("loads Beholder's improved ranged attack profile", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Chaos", "Beholder", "beholder_512", 1);
+
+        expect(creature.base_attack).toBe(17);
+        expect(creature.attack_damage_min).toBe(9);
+        expect(creature.attack_damage_max).toBe(11);
     });
 
     it("derives creature amount from total experience when amount is not positive", () => {
