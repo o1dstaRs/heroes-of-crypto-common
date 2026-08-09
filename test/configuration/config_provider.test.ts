@@ -179,18 +179,18 @@ describe("config_provider", () => {
         }
     });
 
+    it("loads Spit Ball's increased stack-powered chance", () => {
+        const ability = getAbilityConfig("Spit Ball");
+
+        expect(ability.power).toBe(40);
+        expect(ability.stack_powered).toBe(true);
+    });
+
     it("loads every spell config", () => {
         for (const [factionName, spells] of objectEntries(spellsJson)) {
             if (factionName === "version" || !isRecord(spells)) {
                 continue;
             }
-
-            it("loads Spit Ball's increased stack-powered chance", () => {
-                const ability = getAbilityConfig("Spit Ball");
-
-                expect(ability.power).toBe(40);
-                expect(ability.stack_powered).toBe(true);
-            });
 
             for (const spellName of Object.keys(spells)) {
                 const spell = getSpellConfig(factionName, spellName, 3);
