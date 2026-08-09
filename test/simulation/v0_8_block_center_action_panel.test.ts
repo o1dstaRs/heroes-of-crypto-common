@@ -1051,6 +1051,8 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
                     greenAugments: setup.augments,
                     redAugments: setup.augments,
                     placementAugmentTiming: "setup-before-placement",
+                    // Observer invariance must not depend on host-speed watchdog timing.
+                    searchOfflineDeterministicWork: true,
                     decisionObserver: (observation) => {
                         const catalog = observation.context.decisionPathCatalog;
                         if (!catalog) {
