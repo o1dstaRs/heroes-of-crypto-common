@@ -110,6 +110,14 @@ describe("config_provider", () => {
         expect(creature.shot_distance).toBe(9.5);
     });
 
+    it("loads Dryad's improved attack profile", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Dryad", "dryad_512", 1);
+
+        expect(creature.base_attack).toBe(11);
+        expect(creature.attack_damage_min).toBe(3);
+        expect(creature.attack_damage_max).toBe(6);
+    });
+
     it("derives creature amount from total experience when amount is not positive", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Berserker", "berserker_512", 0, 1);
 
