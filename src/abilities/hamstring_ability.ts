@@ -23,8 +23,8 @@ import { FightStateManager } from "../fights/fight_state_manager";
 /**
  * Hamstring (Dryad): on a landed attack, a stack-powered chance to apply "Hamstrung" (-30% movement, like
  * Quagmire but stronger). The chance comes from the shared stack+luck formula (calculateAbilityApplyChance):
- * power/MAX_UNIT_STACK_POWER * stackPower + luck + synergy, i.e. 6/12/18/24/30 by stack tier (+ luck), a
- * default of 30% at full stack. Absorbable (Absorb Penalties), resistible by magic resist, and mirrored.
+ * power/MAX_UNIT_STACK_POWER * stackPower + luck + synergy, i.e. 8/16/24/32/40 by stack tier (+ luck), a
+ * default of 40% at full stack. Absorbable (Absorb Penalties), resistible by magic resist, and mirrored.
  */
 export function processHamstringAbility(
     fromUnit: Unit,

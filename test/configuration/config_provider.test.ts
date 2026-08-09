@@ -186,6 +186,13 @@ describe("config_provider", () => {
         expect(ability.stack_powered).toBe(true);
     });
 
+    it("loads Hamstring's increased stack-powered chance", () => {
+        const ability = getAbilityConfig("Hamstring");
+
+        expect(ability.power).toBe(40);
+        expect(ability.stack_powered).toBe(true);
+    });
+
     it("loads every spell config", () => {
         for (const [factionName, spells] of objectEntries(spellsJson)) {
             if (factionName === "version" || !isRecord(spells)) {
