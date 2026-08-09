@@ -3509,10 +3509,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const appliedBuffLabels = this.unitProperties.applied_buffs ?? [];
         const blessed = !!this.getBuff("Blessing") || appliedBuffLabels.includes("Blessing");
         const roared = !!battleRoarBuff || appliedBuffLabels.includes("Battle Roar");
+        // Curse is Blessing's mirror: every roll drops to the MINIMUM, so a 2-4 attacker reads 2-2. Same
+        // dual read of object + DISPLAY list, for the same reason (ranked mirrors debuff names but never
+        // rebuilds the objects). The two can never sit together — each names the other in conflicts_with
+        // — but check blessing first anyway so a stale label can only ever be generous, never silently
+        // zero a unit's spread.
+        const appliedDebuffLabels = this.unitProperties.applied_debuffs ?? [];
+        const cursed = !!this.getDebuff("Curse") || appliedDebuffLabels.includes("Curse");
+        // Restore BOTH ends from the base first: this pass is re-run every refresh, so a Curse that has
+        // expired must give the spread back. Before Curse only the min end was ever rewritten, so the max
+        // end had no restore path at all — collapsing it without this would be permanent.
+        this.unitProperties.attack_damage_min = this.initialUnitProperties.attack_damage_min;
+        this.unitProperties.attack_damage_max = this.initialUnitProperties.attack_damage_max;
         if (blessed || roared) {
             this.unitProperties.attack_damage_min = this.unitProperties.attack_damage_max;
-        } else {
-            this.unitProperties.attack_damage_min = this.initialUnitProperties.attack_damage_min;
+        } else if (cursed) {
+            this.unitProperties.attack_damage_max = this.unitProperties.attack_damage_min;
         }
 
         const riotBuff = this.getBuff("Riot");

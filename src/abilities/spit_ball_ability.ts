@@ -23,6 +23,7 @@ import * as EffectHelper from "../effects/effect_helper";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 const POSSIBLE_DEBUFFS_TO_FACTIONS = {
+    Curse: "Death",
     Sadness: "Death",
     Quagmire: "Death",
     "Weakening Beam": "Death",
