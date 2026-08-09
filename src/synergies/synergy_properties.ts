@@ -30,12 +30,12 @@ export const SynergyKeysToPower: { [key: string]: number[] } = {
     "Might:2:2": [8],
     "Might:1:3": [3],
     "Might:2:3": [12],
-    "Nature:1:1": [1],
-    "Nature:2:1": [10],
-    "Nature:1:2": [2],
-    "Nature:2:2": [20],
-    "Nature:1:3": [3],
-    "Nature:2:3": [30],
+    "Nature:1:1": [2],
+    "Nature:2:1": [15],
+    "Nature:1:2": [3],
+    "Nature:2:2": [30],
+    "Nature:1:3": [4],
+    "Nature:2:3": [50],
 };
 
 export enum LifeSynergy {
