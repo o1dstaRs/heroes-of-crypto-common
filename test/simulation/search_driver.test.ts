@@ -215,6 +215,16 @@ interface Harness {
     finished: () => boolean;
 }
 
+// Keep wait-specific fixtures independent of Nightmare's board-wide Time Denial, which intentionally removes Hourglass.
+const HOURGLASS_FIXTURE_ROSTER: readonly IArmyUnitSpec[] = [
+    { faction: "Chaos", creatureName: "Orc", level: 1, size: 1, amount: 50 },
+    { faction: "Nature", creatureName: "Leprechaun", level: 1, size: 1, amount: 50 },
+    { faction: "Nature", creatureName: "White Tiger", level: 2, size: 1, amount: 30 },
+    { faction: "Life", creatureName: "Battle Mage", level: 2, size: 1, amount: 30 },
+    { faction: "Nature", creatureName: "Unicorn", level: 3, size: 1, amount: 15 },
+    { faction: "Might", creatureName: "Thunderbird", level: 4, size: 2, amount: 8 },
+];
+
 /** Mid-fight harness mirroring battle_engine's loop with a deterministic clock (see lookahead.test.ts). */
 function buildBattle(
     seed: number,
@@ -3917,7 +3927,7 @@ describe("search driver — gating, hygiene, determinism", () => {
 
     it("keeps wait and defend challengers when SEARCH_ACTIVE_CHALLENGERS is default-off", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.6" });
-        const h = buildBattle(203, "v0.6");
+        const h = buildBattle(203, "v0.6", undefined, HOURGLASS_FIXTURE_ROSTER);
         const unit = h.activeUnit();
         expect(unit).toBeDefined();
         const incumbent: GameAction[] = [{ type: "end_turn", unitId: unit!.getId(), reason: "skip" }];
@@ -3932,7 +3942,7 @@ describe("search driver — gating, hygiene, determinism", () => {
 
     it("keeps v0.8 tactical-wait challengers but never introduces a generated Luck Shield", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s" });
-        const h = buildBattle(203, "v0.8s");
+        const h = buildBattle(203, "v0.8s", undefined, HOURGLASS_FIXTURE_ROSTER);
         const unit = h.activeUnit();
         expect(unit).toBeDefined();
         const incumbent: GameAction[] = [{ type: "end_turn", unitId: unit!.getId(), reason: "skip" }];
@@ -3947,7 +3957,7 @@ describe("search driver — gating, hygiene, determinism", () => {
 
     it("V08_AGGRESSIVE keeps waits scored while hard-prioritizing only idle, Luck Shield, and mountain", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8s,v0.8", V08_AGGRESSIVE: "1" });
-        const h = buildBattle(203, "v0.8s");
+        const h = buildBattle(203, "v0.8s", undefined, HOURGLASS_FIXTURE_ROSTER);
         const unit = h.activeUnit()!;
         const id = unit.getId();
         const calls: Array<{ kinds: string[]; prioritizeProductive: boolean; aggressiveWait: boolean }> = [];
@@ -5399,7 +5409,7 @@ describe("Q2 oracle — gate-1 act-vs-wait lap-rollout arbitration", () => {
             SEARCH_GATE: "0",
             Q2_DATASET: datasetPath,
         });
-        const h = buildBattle(2032, "v0.6");
+        const h = buildBattle(2032, "v0.6", undefined, HOURGLASS_FIXTURE_ROSTER);
         const { unit, incumbent } = findOraclePoint(h);
         const driver = h.makeDriver();
         driver.chooseDecision(unit, "v0.6", incumbent); // scored act point

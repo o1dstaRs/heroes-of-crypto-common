@@ -413,6 +413,23 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(ofKind(noFp.candidates, "wait").length).toBe(0);
     });
 
+    it("Nightmare's Time Denial suppresses wait candidates board-wide", () => {
+        const c = createCombatTestContext();
+        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, initiative: 1 });
+        const ally = createTestUnit({ team: LOWER, name: "A", attackType: MELEE });
+        const nightmare = makeReal(UPPER, "Chaos", "Nightmare");
+        placeUnit(c.grid, c.unitsHolder, unit, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, ally, { x: 5, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, nightmare, { x: 12, y: 12 });
+        const fp = FightStateManager.getInstance().getFightProperties();
+        fp.setTeamUnitsAlive(LOWER, 2);
+
+        expect(nightmare.hasAbilityActive("Time Denial")).toBe(true);
+        const candidates = enumerateCandidates(unit, ctxFor(c, true), endTurn(unit)).candidates;
+        expect(ofKind(candidates, "defend")).toHaveLength(1);
+        expect(ofKind(candidates, "wait")).toHaveLength(0);
+    });
+
     it("shots: aim alternatives per enemy, deduped by identical hit set; lone enemy -> exactly one shot", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
