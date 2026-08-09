@@ -10,8 +10,12 @@
  */
 import { describe, expect, it } from "bun:test";
 
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { Grid } from "../../src/grid/grid";
+import { isCellWithinGrid } from "../../src/grid/grid_math";
+import { GridSettings } from "../../src/grid/grid_settings";
 import { firstTargetedSpellSightBlocker } from "../../src/spells/spell_helper";
-import { canVineTakeRoot, isVineCrossableCell, type IVineGrid } from "../../src/spells/vines";
+import { canVineTakeRoot, isVineCrossableCell, vinePathCells, type IVineGrid } from "../../src/spells/vines";
 
 // isVineCrossableCell is the CONTRACT between the engine's vineThrowCast and the client's aim preview: the
 // preview highlights a lane only when every cell short of the target passes this, and the engine refuses the
@@ -94,5 +98,34 @@ describe("Vine Throw interception (creature-only)", () => {
             { x: 4, y: 0 },
         );
         expect(blocked?.occupantId).toBe("B");
+    });
+});
+
+// The rule against the REAL board rather than a hand-placed marker: a 16-wide BLOCK_CENTER grid puts
+// solid rock at (5,7)/(5,8) — a lane straight down x=5 crosses it. This is the exact "behind the
+// mountain" case the owner asked to open up, and the same code the ranked server runs.
+describe("Vine Throw over the centre mountain (real BLOCK_CENTER board)", () => {
+    const gs = new GridSettings(16, 1600, 0, 1600, 0, 0, 0);
+    const grid = new Grid(gs, PBTypes.GridVals.BLOCK_CENTER);
+    const from = { x: 5, y: 4 };
+    const to = { x: 5, y: 12 };
+    const within = (cell: { x: number; y: number }) => isCellWithinGrid(gs, cell);
+
+    it("has real rock in the lane", () => {
+        expect(grid.getOccupantUnitId({ x: 5, y: 7 })).toBe("B");
+        expect(grid.getOccupantUnitId({ x: 5, y: 8 })).toBe("B");
+    });
+
+    it("lets the vine arc over it while Fire Strike still stops on it", () => {
+        expect(firstTargetedSpellSightBlocker("Vine Throw", grid, within, from, to)).toBeUndefined();
+        expect(firstTargetedSpellSightBlocker("Fire Strike", grid, within, from, to)?.occupantId).toBe("B");
+    });
+
+    it("roots either side of the rock but never on it", () => {
+        const rooted = vinePathCells(from, to).filter((cell) => canVineTakeRoot(grid, within(cell), cell));
+        expect(rooted.length).toBeGreaterThan(0);
+        expect(rooted.some((cell) => cell.y === 7 || cell.y === 8)).toBe(false);
+        expect(rooted.some((cell) => cell.y < 7)).toBe(true);
+        expect(rooted.some((cell) => cell.y > 8)).toBe(true);
     });
 });
