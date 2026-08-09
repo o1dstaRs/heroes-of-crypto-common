@@ -133,6 +133,15 @@ describe("config_provider", () => {
         expect(creature.attack_damage_max).toBe(11);
     });
 
+    it("loads Nightmare's improved durability and damage range", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Chaos", "Nightmare", "nightmare_512", 1);
+
+        expect(creature.hp).toBe(65);
+        expect(creature.base_armor).toBe(21);
+        expect(creature.attack_damage_min).toBe(15);
+        expect(creature.attack_damage_max).toBe(20);
+    });
+
     it("loads the reduced caster initiatives without rounding away tenths", () => {
         const battleMage = getCreatureConfig(PBTypes.TeamVals.UPPER, "Life", "Battle Mage", "battle_mage_512", 1);
         const magicDragon = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Magic Dragon", "magic_dragon_512", 1);
