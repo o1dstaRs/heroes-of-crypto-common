@@ -150,7 +150,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned for the Abomination's new Stun Aura (range 2, chance 10 under a Squire stun): a fielded
 // Abomination now seizes enemies at their turn start, so every seeded fight it appears in resolves
 // differently. Two isolated runs produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "01e0d657fa26cba79541fed3509791bfb26da7e5ef609ca6d2a6cc5a3fdf1ee5";
+// Re-pinned after Wyvern's Venom Cloud doubled its poison share (15% -> 30%) and repeated-poison stack
+// contribution (35% -> 70%). The stronger damage legitimately changes any trace fielding the aura.
+const EXPECTED_REPLAY_SHA256 = "b63ecdb19ff9941fb7a20d421c7247e3e66a6ada67f027f6404a6f60c4ad5d90";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

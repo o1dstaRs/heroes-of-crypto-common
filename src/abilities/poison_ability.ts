@@ -19,12 +19,12 @@ const effectFactory = new EffectFactory();
 
 /**
  * Each poison landed on an ALREADY poisoned target adds a stack worth this share of that hit's own poison
- * value. So the second stack raises the tick by 35% of what it would have applied on its own, the third by
- * another 35%, and so on — linear, the same shape as Deep Wounds summing its cards' powers rather than one
+ * value. So the second stack raises the tick by 70% of what it would have applied on its own, the third by
+ * another 70%, and so on — linear, the same shape as Deep Wounds summing its cards' powers rather than one
  * overriding another. The stack count is not stored anywhere: the accumulated hp/turn IS the stack total,
  * which keeps this out of the effect serialization and the battle snapshot.
  */
-const POISON_STACK_SHARE = 0.35;
+const POISON_STACK_SHARE = 0.7;
 
 /**
  * The stacked tick stays a WHOLE number of hp: TurnEngine feeds it straight into applyDamage, which
