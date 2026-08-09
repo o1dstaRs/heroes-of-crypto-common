@@ -154,8 +154,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // contribution (35% -> 70%). The stronger damage legitimately changes any trace fielding the aura.
 // Re-pinned for the Abomination aura rework (2026-08-09): Flesh Shield reach 1 -> 2, and the Stun Aura
 // flipped from an enemy-turn-start field into a green ally buff that stuns on the ally's hit. Both change
-// combat outcomes in every seeded fight the Abomination screens. Two isolated runs produced this digest.
-const EXPECTED_REPLAY_SHA256 = "2e0823277e8327a050b23c8084b261cb9437ebfd4ffcdffb2b3f82497e1e13fa";
+// combat outcomes in every seeded fight the Abomination screens. Verified byte-identical x2 on a CLEAN
+// origin/main checkout (an earlier pin was contaminated by peer WIP left in the shared working tree).
+const EXPECTED_REPLAY_SHA256 = "1d35a5b341410ae51e3e3d08f21e9ad3f8cf6256b4930819389553bbcdf808dc";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
