@@ -24,7 +24,7 @@ describe("ranked Chaos MOVEMENT synergy folds into getSteps via the server refre
         const fp = FightStateManager.getInstance().getFightProperties();
 
         // Place a mover on the board (refresh skips off-grid units).
-        const mover = createTestUnit({ name: "Beholder", team: LOWER, attackType: RANGE, speed: 4, morale: 0 });
+        const mover = createTestUnit({ name: "Beholder", team: LOWER, attackType: RANGE, initiative: 4, morale: 0 });
         c.grid.occupyCell({ x: 6, y: 1 }, mover.getId(), LOWER, 1, false, false);
         mover.setPosition(6, 1);
         c.unitsHolder.addUnit(mover);

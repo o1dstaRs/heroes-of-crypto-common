@@ -65,7 +65,13 @@ const typeOf = (a: GameAction[], t: string): GameAction | undefined => a.find((x
 describe("v0.4 (3) flyer-mute-siege is DISABLED (it over-extended the flyer and lost games)", () => {
     it("does NOT dive a distant siege unit past a nearer enemy — engages normally instead", () => {
         const c = createCombatTestContext();
-        const flyer = createTestUnit({ team: LOWER, name: "Flyer", attackType: MELEE, movementType: FLY, speed: 8 });
+        const flyer = createTestUnit({
+            team: LOWER,
+            name: "Flyer",
+            attackType: MELEE,
+            movementType: FLY,
+            initiative: 8,
+        });
         const tsar = makeReal(UPPER, "Life", "Tsar Cannon");
         const frontMelee = createTestUnit({ team: UPPER, name: "Front", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, flyer, { x: 7, y: 7 });
@@ -84,7 +90,13 @@ describe("v0.4 (3) flyer-mute-siege is DISABLED (it over-extended the flyer and 
 
     it("ignores the siege rule when there is no siege unit (behaves as a normal flyer)", () => {
         const c = createCombatTestContext();
-        const flyer = createTestUnit({ team: LOWER, name: "Flyer", attackType: MELEE, movementType: FLY, speed: 6 });
+        const flyer = createTestUnit({
+            team: LOWER,
+            name: "Flyer",
+            attackType: MELEE,
+            movementType: FLY,
+            initiative: 6,
+        });
         const enemy = createTestUnit({ team: UPPER, name: "Brute", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, flyer, { x: 6, y: 6 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 6, y: 8 });
@@ -98,7 +110,13 @@ describe("v0.4 (2) ranged-superiority patience", () => {
     it("a shooter that out-guns the enemy and can't fire yet holds instead of advancing", () => {
         const c = createCombatTestContext();
         // Our shooter has ammo; the enemy is a lone melee far away (no enemy ranged -> we out-gun them).
-        const shooter = createTestUnit({ team: LOWER, name: "Archer", attackType: RANGE, rangeShots: 5, speed: 3 });
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Archer",
+            attackType: RANGE,
+            rangeShots: 5,
+            initiative: 3,
+        });
         const enemy = createTestUnit({ team: UPPER, name: "Brute", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 5, y: 3 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 5, y: 13 }); // far away, not in shot range
@@ -118,7 +136,7 @@ describe("v0.4 (2) ranged-superiority patience", () => {
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 30,
-            speed: 2,
+            initiative: 2,
         });
         const enemy = createTestUnit({ team: UPPER, name: "Brute", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 8, y: 8 });
@@ -240,7 +258,7 @@ describe("v0.4 (4) melee strikes relocate into a friendly buff aura", () => {
 
     it("never strikes from a less-aura-covered cell than v0.3", () => {
         const c = createCombatTestContext();
-        const attacker = createTestUnit({ team: LOWER, name: "Striker", attackType: MELEE, speed: 6 });
+        const attacker = createTestUnit({ team: LOWER, name: "Striker", attackType: MELEE, initiative: 6 });
         const emitter = createTestUnit({
             team: LOWER,
             name: "Bard",

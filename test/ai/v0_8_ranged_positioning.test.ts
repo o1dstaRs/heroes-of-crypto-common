@@ -78,7 +78,7 @@ function setupSupportedShot(
         team: LOWER,
         name: "Supported Archer",
         attackType: RANGE,
-        speed: 3,
+        initiative: 3,
         rangeShots: 8,
         shotDistance: 3,
         damageMin: 10,
@@ -88,7 +88,7 @@ function setupSupportedShot(
         team: UPPER,
         name: "Distant Target",
         attackType: rangedTarget ? RANGE : MELEE,
-        speed: 1,
+        initiative: 1,
         rangeShots: rangedTarget ? 2 : 0,
         damageMin: 1,
         damageMax: 1,
@@ -99,7 +99,7 @@ function setupSupportedShot(
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, target, { x: 10, y: 7 });
     if (withScreen) {
-        const screen = createTestUnit({ team: LOWER, name: "Frontline", attackType: MELEE, speed: 1 });
+        const screen = createTestUnit({ team: LOWER, name: "Frontline", attackType: MELEE, initiative: 1 });
         placeUnit(combat.grid, combat.unitsHolder, screen, { x: 6, y: offsetScreen ? 8 : 7 });
     }
     shooter.refreshPossibleAttackTypes(true);
@@ -119,7 +119,7 @@ function setupPinnedShooter(
         team: LOWER,
         name: handyman ? "Handyman Archer" : "Pinned Archer",
         attackType: RANGE,
-        speed: 3,
+        initiative: 3,
         rangeShots: 8,
         damageMin: 4,
         damageMax: 4,
@@ -129,10 +129,10 @@ function setupPinnedShooter(
         team: UPPER,
         name: "Pinner",
         attackType: MELEE,
-        speed: 1,
+        initiative: 1,
         maxHp: targetHp,
     });
-    const screen = createTestUnit({ team: LOWER, name: "Bodyguard", attackType: MELEE, speed: 1 });
+    const screen = createTestUnit({ team: LOWER, name: "Bodyguard", attackType: MELEE, initiative: 1 });
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 6, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, pinner, { x: 7, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, screen, { x: 5, y: 7 });
@@ -149,27 +149,27 @@ function setupPartiallyScreenedPinnedShooter(): {
         team: LOWER,
         name: "Partially screened archer",
         attackType: RANGE,
-        speed: 2,
+        initiative: 2,
         rangeShots: 8,
         damageMin: 4,
         damageMax: 4,
     });
-    const pinner = createTestUnit({ team: UPPER, name: "Current pinner", attackType: MELEE, speed: 1, maxHp: 3 });
+    const pinner = createTestUnit({ team: UPPER, name: "Current pinner", attackType: MELEE, initiative: 1, maxHp: 3 });
     const upperThreat = createTestUnit({
         team: UPPER,
         name: "Upper threat",
         attackType: MELEE,
-        speed: 10,
+        initiative: 10,
         maxHp: 100,
     });
     const lowerThreat = createTestUnit({
         team: UPPER,
         name: "Lower threat",
         attackType: MELEE,
-        speed: 10,
+        initiative: 10,
         maxHp: 100,
     });
-    const screen = createTestUnit({ team: LOWER, name: "Bodyguard", attackType: MELEE, speed: 1 });
+    const screen = createTestUnit({ team: LOWER, name: "Bodyguard", attackType: MELEE, initiative: 1 });
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 6, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, pinner, { x: 7, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, upperThreat, { x: 4, y: 10 });
@@ -189,7 +189,7 @@ function setupSupportedPrepinEgress(
         targetCell?: XY;
         threatRanged?: boolean;
         threatCell?: XY;
-        threatSpeed?: number;
+        threatInitiative?: number;
         shotDistance?: number;
     } = {},
 ): {
@@ -204,7 +204,7 @@ function setupSupportedPrepinEgress(
         team: LOWER,
         name: "Pre-pin Archer",
         attackType: RANGE,
-        speed: 1,
+        initiative: 1,
         rangeShots: 8,
         shotDistance: options.shotDistance ?? 16,
         damageMin: 10,
@@ -214,7 +214,7 @@ function setupSupportedPrepinEgress(
         team: UPPER,
         name: "Shot target",
         attackType: options.targetRanged ? RANGE : MELEE,
-        speed: 0,
+        initiative: 0,
         rangeShots: options.targetRanged ? 8 : 0,
         shotDistance: 16,
         amountAlive: 10,
@@ -224,7 +224,7 @@ function setupSupportedPrepinEgress(
         team: UPPER,
         name: "Pending charger",
         attackType: options.threatRanged ? RANGE : MELEE,
-        speed: options.threatSpeed ?? 2,
+        initiative: options.threatInitiative ?? 2,
         rangeShots: options.threatRanged ? 8 : 0,
         shotDistance: 16,
     });
@@ -232,13 +232,13 @@ function setupSupportedPrepinEgress(
         team: LOWER,
         name: "Frontline screen",
         attackType: options.guardRanged ? RANGE : MELEE,
-        speed: 1,
+        initiative: 1,
         rangeShots: options.guardRanged ? 1 : 0,
     });
     // The threat can reach the current cell by the optimistic one-activation distance bound, but not (0,0).
     // The melee ally at (1,1) is geometrically between that destination and the threat; the ranged wall proves
     // stable native class identity rather than merely accepting any occupied neighboring cell as support.
-    const wall = createTestUnit({ team: LOWER, name: "Corner wall", attackType: RANGE, speed: 1, rangeShots: 1 });
+    const wall = createTestUnit({ team: LOWER, name: "Corner wall", attackType: RANGE, initiative: 1, rangeShots: 1 });
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 0, y: 1 });
     placeUnit(combat.grid, combat.unitsHolder, target, options.targetCell ?? { x: 0, y: 10 });
     placeUnit(combat.grid, combat.unitsHolder, threat, options.threatCell ?? { x: 2, y: 5 });
@@ -272,7 +272,7 @@ function setupProactiveScreenedClose(
         team: LOWER,
         name: "Posture archer",
         attackType: RANGE,
-        speed: 1,
+        initiative: 1,
         rangeShots: 8,
         shotDistance: 5,
         damageMin: 10,
@@ -282,7 +282,7 @@ function setupProactiveScreenedClose(
         team: UPPER,
         name: "Posture target",
         attackType: RANGE,
-        speed: 0,
+        initiative: 0,
         rangeShots: 8,
         shotDistance: 16,
         damageMin: 1,
@@ -294,10 +294,10 @@ function setupProactiveScreenedClose(
         team: UPPER,
         name: "Screened future charger",
         attackType: MELEE,
-        speed: 2,
+        initiative: 2,
         maxHp: 100,
     });
-    const guard = createTestUnit({ team: LOWER, name: "Posture guard", attackType: MELEE, speed: 1 });
+    const guard = createTestUnit({ team: LOWER, name: "Posture guard", attackType: MELEE, initiative: 1 });
     const destination = { x: 5, y: 6 };
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 5, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, target, { x: 5, y: 1 });
@@ -317,7 +317,7 @@ function setupProactiveScreenedClose(
             team: UPPER,
             name: "Unscreened next-lap charger",
             attackType: MELEE,
-            speed: 2,
+            initiative: 2,
             maxHp: 100,
         });
         placeUnit(combat.grid, combat.unitsHolder, residualThreat, residualThreatCell);
@@ -363,7 +363,7 @@ function setupSupportedBandAdvance(
         guardRanged?: boolean;
         includeGuard?: boolean;
         shotDistance?: number;
-        shooterSpeed?: number;
+        shooterInitiative?: number;
         shooterAbilities?: string[];
         targetCanCounter?: boolean;
         targetRanged?: boolean;
@@ -386,7 +386,7 @@ function setupSupportedBandAdvance(
         team: LOWER,
         name: "Band archer",
         attackType: RANGE,
-        speed: options.shooterSpeed ?? 1,
+        initiative: options.shooterInitiative ?? 1,
         rangeShots: 8,
         shotDistance: options.shotDistance ?? 5,
         damageMin: 10,
@@ -398,7 +398,7 @@ function setupSupportedBandAdvance(
         team: UPPER,
         name: "Band target",
         attackType: targetRanged ? RANGE : MELEE,
-        speed: 0,
+        initiative: 0,
         rangeShots: targetRanged ? 8 : 0,
         shotDistance: 16,
         damageMin: 1,
@@ -417,7 +417,7 @@ function setupSupportedBandAdvance(
             team: LOWER,
             name: "Band guard",
             attackType: options.guardRanged ? RANGE : MELEE,
-            speed: 1,
+            initiative: 1,
             rangeShots: options.guardRanged ? 1 : 0,
         });
         // Offset from the firing ray, but strictly between the proposed destination and the target.
@@ -433,7 +433,7 @@ function setupSupportedBandAdvance(
             team: UPPER,
             name: "Acted hidden flanker",
             attackType: MELEE,
-            speed: 1,
+            initiative: 1,
             maxHp: 1,
         });
         placeUnit(combat.grid, combat.unitsHolder, threat, { x: 7, y: 7 });
@@ -450,7 +450,7 @@ function setupSupportedBandAdvance(
             team: UPPER,
             name: "Current hidden pinner",
             attackType: MELEE,
-            speed: 0,
+            initiative: 0,
         });
         placeUnit(combat.grid, combat.unitsHolder, pinner, { x: 6, y: 7 });
         pinner.applyBuff(
@@ -501,7 +501,7 @@ function setupScreenedCloserDuel(sameRoute = false): {
 } {
     const setup = setupSupportedBandAdvance({
         guardCell: { x: 1, y: 4 },
-        shooterSpeed: 3,
+        shooterInitiative: 3,
         shotDistance: 6.3,
         targetCell: { x: 5, y: 0 },
     });
@@ -2960,7 +2960,7 @@ describe("v0.8 protected ranged positioning", () => {
             team: UPPER,
             name: "Second pending charger",
             attackType: MELEE,
-            speed: 1,
+            initiative: 1,
         });
         placeUnit(context.grid, context.unitsHolder, secondThreat, { x: 0, y: 3 });
         secondThreat.refreshPossibleAttackTypes(true);
@@ -2978,7 +2978,7 @@ describe("v0.8 protected ranged positioning", () => {
             team: UPPER,
             name: "Second pending charger",
             attackType: MELEE,
-            speed: 0,
+            initiative: 0,
         });
         placeUnit(context.grid, context.unitsHolder, secondThreat, { x: 4, y: 1 });
         secondThreat.refreshPossibleAttackTypes(true);
@@ -3016,7 +3016,7 @@ describe("v0.8 protected ranged positioning", () => {
             team: UPPER,
             name: "Unscreened enemy archer",
             attackType: RANGE,
-            speed: 2,
+            initiative: 2,
             rangeShots: 8,
             shotDistance: 16,
         });
@@ -3036,7 +3036,7 @@ describe("v0.8 protected ranged positioning", () => {
             team: UPPER,
             name: "Unscreened enemy caster",
             attackType: MAGIC,
-            speed: 2,
+            initiative: 2,
         });
         placeUnit(context.grid, context.unitsHolder, unscreenedCaster, { x: 0, y: 3 });
         unscreenedCaster.refreshPossibleAttackTypes(false);
@@ -3227,7 +3227,7 @@ describe("v0.8 protected ranged positioning", () => {
         expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
 
         const threatened = setupSupportedShot(false);
-        const runner = createTestUnit({ team: UPPER, name: "Fast flanker", attackType: MELEE, speed: 8 });
+        const runner = createTestUnit({ team: UPPER, name: "Fast flanker", attackType: MELEE, initiative: 8 });
         placeUnit(threatened.context.grid, threatened.context.unitsHolder, runner, { x: 7, y: 8 });
         const held = new StrategyV0_8().decideTurn(threatened.shooter, threatened.context);
         expect(held.map((action) => action.type)).toEqual(["range_attack"]);
@@ -3579,7 +3579,7 @@ describe("v0.8 protected ranged positioning", () => {
             team: LOWER,
             name: "Quiver thief",
             attackType: MELEE,
-            speed: 3,
+            initiative: 3,
             damageMin: 4,
             damageMax: 4,
         });

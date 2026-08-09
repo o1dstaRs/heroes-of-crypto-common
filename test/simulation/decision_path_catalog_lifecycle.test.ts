@@ -48,7 +48,7 @@ describe("SearchDriver decision path catalog lifecycle", () => {
             team: PBTypes.TeamVals.LOWER,
             name: "Rollout Actor",
             attackType: PBTypes.AttackVals.MELEE,
-            speed: 4.2,
+            initiative: 4.2,
         });
         const enemy = createTestUnit({
             team: PBTypes.TeamVals.UPPER,

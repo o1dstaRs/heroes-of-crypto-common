@@ -82,7 +82,7 @@ const setupActionFight = (
         abilities: opts.lowerAbilities,
         rangeShots: opts.lowerRangeShots ?? 0,
         size: opts.lowerSize,
-        speed: 5,
+        initiative: 5,
         morale: 4,
         spells: opts.lowerSpells,
         stackPower: opts.lowerStackPower,
@@ -92,7 +92,7 @@ const setupActionFight = (
         name: "Upper",
         team: PBTypes.TeamVals.UPPER,
         attackType: opts.upperAttackType,
-        speed: 3,
+        initiative: 3,
         morale: 4,
         abilities: opts.upperAbilities,
         amountAlive: opts.upperAmountAlive,
@@ -108,7 +108,7 @@ const setupActionFight = (
     const lowerSupport = createTestUnit({
         name: "Lower Support",
         team: PBTypes.TeamVals.LOWER,
-        speed: 2,
+        initiative: 2,
         movementType: opts.supportMovementType,
     });
 

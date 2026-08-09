@@ -306,7 +306,7 @@ describe("Wyvern", () => {
 
         expect(between(wyvern.max_hp, valkyrie.max_hp, harpy.max_hp)).toBe(true);
         expect(between(wyvern.steps, valkyrie.steps, harpy.steps)).toBe(true);
-        expect(between(wyvern.speed, valkyrie.speed, harpy.speed)).toBe(true);
+        expect(between(wyvern.initiative, valkyrie.initiative, harpy.initiative)).toBe(true);
         expect(between(wyvern.base_armor, valkyrie.base_armor, harpy.base_armor)).toBe(true);
         expect(between(wyvern.base_attack, valkyrie.base_attack, harpy.base_attack)).toBe(true);
         // Exp is the deliberate exception: the rebalance took it to 33, UNDER both flyers, so a Wyvern stack

@@ -134,7 +134,7 @@ const ofKind = (cands: IEnumeratedCandidate[], kind: string): IEnumeratedCandida
 describe("candidates — the F4 enumerated candidate generator", () => {
     it("candidate 0 is ALWAYS the incumbent decision (anchor pattern), verbatim", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, speed: 2 });
+        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, initiative: 2 });
         const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 4, y: 4 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 4, y: 5 });
@@ -147,7 +147,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("melee: emits in-place strikes on EVERY adjacent enemy", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Brawler", attackType: MELEE, speed: 3, amountAlive: 5 });
+        const unit = createTestUnit({ team: LOWER, name: "Brawler", attackType: MELEE, initiative: 3, amountAlive: 5 });
         const adj1 = createTestUnit({ team: UPPER, name: "Adj1", attackType: MELEE, amountAlive: 3 });
         const adj2 = createTestUnit({ team: UPPER, name: "Adj2", attackType: MELEE, amountAlive: 3 });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
@@ -262,7 +262,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const c = createCombatTestContext();
         // Unengaged unit (aggro pathing constrains movement once adjacent to an enemy — that legality
         // is intentional and mirrors v0.5's enumeration).
-        const unit = createTestUnit({ team: LOWER, name: "Brawler", attackType: MELEE, speed: 4, amountAlive: 5 });
+        const unit = createTestUnit({ team: LOWER, name: "Brawler", attackType: MELEE, initiative: 4, amountAlive: 5 });
         const far = createTestUnit({ team: UPPER, name: "Far", attackType: MELEE, amountAlive: 3 });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, far, { x: 5, y: 8 }); // stand cells (4..6,7) reachable within 3 steps
@@ -293,14 +293,14 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("moves: every reachable destination; capped enumeration reports truncation", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Runner", attackType: MELEE, speed: 4 });
+        const unit = createTestUnit({ team: LOWER, name: "Runner", attackType: MELEE, initiative: 4 });
         const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 8 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 14 });
 
         const full = enumerateCandidates(unit, ctxFor(c), endTurn(unit));
         const fullMoves = ofKind(full.candidates, "move");
-        expect(fullMoves.length).toBeGreaterThan(10); // speed 4 in open field
+        expect(fullMoves.length).toBeGreaterThan(10); // initiative 4 in open field
         expect(full.truncated).toEqual([]);
 
         const capped = enumerateCandidates(unit, ctxFor(c), endTurn(unit), { maxMoveDestinations: 3 });
@@ -315,7 +315,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("opt-in capped moves retain one closing and one non-closing posture without changing the default", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Screen", attackType: MELEE, speed: 4 });
+        const unit = createTestUnit({ team: LOWER, name: "Screen", attackType: MELEE, initiative: 4 });
         const enemy = createTestUnit({ team: UPPER, name: "Approaching enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 8 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 14 });
@@ -348,7 +348,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("applies a hard move-role gate before selecting the nearest capped destination", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Role holder", attackType: MELEE, speed: 4 });
+        const unit = createTestUnit({ team: LOWER, name: "Role holder", attackType: MELEE, initiative: 4 });
         const enemy = createTestUnit({ team: UPPER, name: "Approaching enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 8 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 14 });
@@ -373,7 +373,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("does not expand an opt-in move cap when every reachable destination is closing", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Corner runner", attackType: MELEE, speed: 2 });
+        const unit = createTestUnit({ team: LOWER, name: "Corner runner", attackType: MELEE, initiative: 2 });
         const enemy = createTestUnit({ team: UPPER, name: "Far enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 0, y: 0 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 14, y: 14 });
@@ -388,7 +388,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("defend is always offered; wait (hourglass) only when the engine would accept it", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, speed: 1 });
+        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, initiative: 1 });
         const ally = createTestUnit({ team: LOWER, name: "A", attackType: MELEE });
         const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 3, y: 3 });
@@ -421,7 +421,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 30,
-            speed: 2,
+            initiative: 2,
             amountAlive: 5,
         });
         const lone = createTestUnit({ team: UPPER, name: "Lone", attackType: MELEE, amountAlive: 5 });
@@ -827,7 +827,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 3,
-            speed: 3,
+            initiative: 3,
             damageMin: 10,
             damageMax: 10,
             amountAlive: 5,
@@ -836,7 +836,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             team: UPPER,
             name: "Distant target",
             attackType: MELEE,
-            speed: 1,
+            initiative: 1,
             amountAlive: 20,
             maxHp: 20,
         });
@@ -922,7 +922,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 rangeShots: 5,
                 shotDistance: 30,
                 amountAlive: 5,
-                speed: 3,
+                initiative: 3,
                 stackPower: 100,
                 abilities: ["Large Caliber"],
             });
@@ -1021,7 +1021,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     });
 
     it("move-shots: terminal discovery opens a new BLOCK_CENTER line only when explicitly enabled", () => {
-        const fixture = (abilities: string[] = [], speed = 4) => {
+        const fixture = (abilities: string[] = [], initiative = 4) => {
             const c = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
             const shooter = createTestUnit({
                 team: LOWER,
@@ -1029,7 +1029,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 attackType: RANGE,
                 rangeShots: 8,
                 shotDistance: 3,
-                speed,
+                initiative,
                 damageMin: 10,
                 damageMax: 10,
                 amountAlive: 5,
@@ -1373,7 +1373,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 rangeShots: 5,
                 shotDistance: 30,
                 amountAlive: 5,
-                speed: 3,
+                initiative: 3,
                 stackPower: 5,
                 abilities: [special.ability],
             });
@@ -1461,7 +1461,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 3,
-            speed: 3,
+            initiative: 3,
             damageMin: 10,
             damageMax: 10,
             amountAlive: 5,
@@ -1470,7 +1470,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             team: UPPER,
             name: "a13 pressure target",
             attackType: MELEE,
-            speed: 1,
+            initiative: 1,
             amountAlive: 20,
             maxHp: 20,
         });
@@ -1550,12 +1550,12 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 30,
-            speed: 3,
+            initiative: 3,
             damageMin: 10,
             damageMax: 10,
             amountAlive: 5,
         });
-        const pinner = createTestUnit({ team: UPPER, name: "Destination pinner", attackType: MELEE, speed: 1 });
+        const pinner = createTestUnit({ team: UPPER, name: "Destination pinner", attackType: MELEE, initiative: 1 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
         placeUnit(c.grid, c.unitsHolder, pinner, { x: 6, y: 7 });
         shooter.refreshPossibleAttackTypes(true);
@@ -1594,7 +1594,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 3,
-            speed: 3,
+            initiative: 3,
             damageMin: 10,
             damageMax: 10,
             amountAlive: 5,
@@ -1603,7 +1603,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             team: UPPER,
             name: "Target",
             attackType: MELEE,
-            speed: 1,
+            initiative: 1,
             amountAlive: 20,
             maxHp: 20,
         });
@@ -1638,7 +1638,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 3,
-            speed: 3,
+            initiative: 3,
             size: PBTypes.UnitSizeVals.LARGE,
             damageMin: 10,
             damageMax: 10,
@@ -1648,7 +1648,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             team: UPPER,
             name: "Target",
             attackType: MELEE,
-            speed: 1,
+            initiative: 1,
             amountAlive: 20,
             maxHp: 20,
         });
@@ -1715,10 +1715,10 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 attackType: RANGE,
                 rangeShots: 5,
                 shotDistance: 3,
-                speed: 3,
+                initiative: 3,
                 abilities,
             });
-            const target = createTestUnit({ team: UPPER, name: "Target", attackType: MELEE, speed: 1 });
+            const target = createTestUnit({ team: UPPER, name: "Target", attackType: MELEE, initiative: 1 });
             placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
             placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 7 });
             if (pinned) {
@@ -2160,7 +2160,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Harpy: Castling targets exactly the SMALL enemies within movement range", () => {
         const c = createCombatTestContext();
-        const harpy = makeReal(LOWER, "Might", "Harpy"); // speed 7.6 flyer with Castling
+        const harpy = makeReal(LOWER, "Might", "Harpy"); // initiative 7.6 flyer with Castling
         harpy.setStackPower(5); // Castling requires stack power 4
         const near = createTestUnit({ team: UPPER, name: "Near", attackType: MELEE, amountAlive: 3 });
         const farAway = createTestUnit({ team: UPPER, name: "FarAway", attackType: MELEE, amountAlive: 3 });
@@ -2594,7 +2594,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("dedupes candidates identical to the incumbent (no double-scored actions)", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, speed: 2, amountAlive: 3 });
+        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, initiative: 2, amountAlive: 3 });
         const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE, amountAlive: 3 });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 5, y: 6 });
@@ -2616,7 +2616,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("is deterministic: two runs on the same board produce identical candidate sets", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, speed: 3, amountAlive: 4 });
+        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, initiative: 3, amountAlive: 4 });
         const e1 = createTestUnit({ team: UPPER, name: "E1", attackType: MELEE, amountAlive: 4 });
         const e2 = createTestUnit({ team: UPPER, name: "E2", attackType: MELEE, amountAlive: 4 });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 6, y: 6 });
@@ -2635,7 +2635,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         placeLarge(c, garg, { x: 3, y: 3 });
         movers.push(garg);
         for (let i = 0; i < 4; i += 1) {
-            const m = createTestUnit({ team: LOWER, name: `M${i}`, attackType: MELEE, speed: 4, amountAlive: 5 });
+            const m = createTestUnit({ team: LOWER, name: `M${i}`, attackType: MELEE, initiative: 4, amountAlive: 5 });
             placeUnit(c.grid, c.unitsHolder, m, { x: 5 + i * 2, y: 4 });
             movers.push(m);
         }
@@ -2643,7 +2643,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 13, y: 3 });
         movers.push(shooter);
         for (let i = 0; i < 6; i += 1) {
-            const e = createTestUnit({ team: UPPER, name: `E${i}`, attackType: MELEE, speed: 4, amountAlive: 5 });
+            const e = createTestUnit({ team: UPPER, name: `E${i}`, attackType: MELEE, initiative: 4, amountAlive: 5 });
             placeUnit(c.grid, c.unitsHolder, e, { x: 3 + i * 2, y: 9 });
         }
         const ctx = ctxFor(c);

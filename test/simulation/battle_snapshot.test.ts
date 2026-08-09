@@ -327,8 +327,8 @@ function dumpGrid(grid: Grid) {
 
 // Canonical dump of ALL mutable FightProperties fields (via a throwaway snapshot). Note: we do NOT
 // use FightProperties.serialize() as the oracle — it writes several fields as protobuf int32 and
-// throws on legitimate fractional mid-fight values (e.g. a creature speed of 7.6 in
-// highest_speed_this_turn), and it is lossy (omits synergies/augments/obstacleHitsLeft/etc). The
+// throws on legitimate fractional mid-fight values (e.g. a creature initiative of 7.6 in
+// highest_initiative_this_turn), and it is lossy (omits synergies/augments/obstacleHitsLeft/etc). The
 // normalized snapshot below is a strictly stronger, complete comparison.
 
 // ---------------------------------------------------------------------------

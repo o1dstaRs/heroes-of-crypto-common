@@ -36,7 +36,7 @@ describe("Unit", () => {
                 magicResist: 6,
                 morale: 3,
                 luck: 4,
-                speed: 8,
+                initiative: 8,
                 exp: 9,
                 movementType: PBTypes.MovementVals.FLY,
                 level: PBTypes.UnitLevelVals.SECOND,
@@ -55,7 +55,7 @@ describe("Unit", () => {
             expect(unit.getSteps()).toBe(3);
             expect(unit.getMorale()).toBe(3);
             expect(unit.getLuck()).toBe(4);
-            expect(unit.getSpeed()).toBe(8);
+            expect(unit.getInitiative()).toBe(8);
             expect(unit.getBaseArmor()).toBe(7);
             expect(unit.getRangeArmor()).toBe(7);
             expect(unit.getBaseAttack()).toBe(12);

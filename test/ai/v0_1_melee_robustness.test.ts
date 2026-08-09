@@ -179,7 +179,7 @@ describe("v0.1 melee robustness", () => {
             team: LOWER,
             attackType: MELEE,
             size: PBTypes.UnitSizeVals.LARGE,
-            speed: 7,
+            initiative: 7,
             abilities: ["AI Driven"],
         });
         placeLarge(combat, boar, { x: 7, y: 13 });
@@ -480,7 +480,7 @@ describe("v0.1 melee robustness", () => {
             attackType: MELEE,
             amountAlive: 4,
             maxHp: 100,
-            speed: 4,
+            initiative: 4,
         });
         const target = createTestUnit({ name: "Primary target", team: UPPER, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
@@ -619,7 +619,7 @@ describe("v0.1 melee robustness", () => {
             attackType: MELEE,
             amountAlive: 4,
             maxHp: 100,
-            speed: 4,
+            initiative: 4,
         });
         const target = createTestUnit({
             name: "Adjacent after move",
@@ -666,7 +666,7 @@ describe("v0.1 melee robustness", () => {
             attackType: MELEE,
             amountAlive: 2,
             maxHp: 100,
-            speed: 4,
+            initiative: 4,
         });
         const target = createTestUnit({
             name: "Stronger after burn",
@@ -711,7 +711,7 @@ describe("v0.1 melee robustness", () => {
             shotDistance: 30,
             amountAlive: 1,
             maxHp: 10,
-            speed: 3,
+            initiative: 3,
         });
         const stronger = createTestUnit({
             name: "Stronger distant target",

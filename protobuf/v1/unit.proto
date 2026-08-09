@@ -15,7 +15,7 @@ message UnitData {
   double steps_mod = 8;
   int32 morale = 9;
   int32 luck = 10;
-  uint32 speed = 11;
+  uint32 initiative = 11;
   double armor_mod = 12;
   double base_armor = 13;
   AttackVals attack_type = 14;

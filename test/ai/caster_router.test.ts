@@ -199,7 +199,7 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
             name: "Enemy flyer",
             attackType: MELEE,
             movementType: FLY,
-            speed: 8,
+            initiative: 8,
             damageMax: 100,
             amountAlive: 100,
         });
@@ -219,14 +219,14 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
         const alliedFlyer = createTestUnit({
             team: LOWER,
             movementType: FLY,
-            speed: 10,
+            initiative: 10,
             damageMax: 20,
             amountAlive: 20,
         });
         const enemyFlyer = createTestUnit({
             team: UPPER,
             movementType: FLY,
-            speed: 2,
+            initiative: 2,
             damageMax: 1,
             amountAlive: 1,
         });
@@ -246,7 +246,7 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
         const enemyFlyer = createTestUnit({
             team: UPPER,
             movementType: FLY,
-            speed: 2,
+            initiative: 2,
             damageMax: 1,
             amountAlive: 1,
         });
@@ -315,7 +315,7 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
             team: UPPER,
             attackType: MELEE,
             movementType: FLY,
-            speed: 8,
+            initiative: 8,
             damageMax: 100,
             amountAlive: 100,
         });
@@ -345,7 +345,7 @@ describe("v0.7 baked caster salvage", () => {
             team: UPPER,
             attackType: MELEE,
             movementType: FLY,
-            speed: 8,
+            initiative: 8,
             damageMax: 100,
             amountAlive: 100,
         });
@@ -462,7 +462,7 @@ describe("v0.7 baked caster salvage", () => {
             team: UPPER,
             attackType: MELEE,
             movementType: FLY,
-            speed: 8,
+            initiative: 8,
             damageMax: 100,
             amountAlive: 100,
         });

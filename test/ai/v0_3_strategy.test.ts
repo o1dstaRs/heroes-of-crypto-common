@@ -89,7 +89,7 @@ describe("AI version registry — v0.8 is the shipped default", () => {
 
         // decideTurn delegates too: a boxed-in shooter produces the same kind of action under both.
         const c = createCombatTestContext();
-        const shooter = createTestUnit({ team: LOWER, name: "S", attackType: RANGE, rangeShots: 5, speed: 3 });
+        const shooter = createTestUnit({ team: LOWER, name: "S", attackType: RANGE, rangeShots: 5, initiative: 3 });
         const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 5, y: 6 });
@@ -207,9 +207,9 @@ describe("v0.3 decideTurn — cohesion keeps the army together", () => {
     it("redirects a detached melee straggler toward its allies instead of charging in alone", () => {
         const c = createCombatTestContext();
         // Two allies clustered on the left; one straggler far to the right (> STRAGGLER_DIST from centroid).
-        const ally1 = createTestUnit({ team: LOWER, name: "Ally1", attackType: MELEE, speed: 3 });
-        const ally2 = createTestUnit({ team: LOWER, name: "Ally2", attackType: MELEE, speed: 3 });
-        const straggler = createTestUnit({ team: LOWER, name: "Straggler", attackType: MELEE, speed: 3 });
+        const ally1 = createTestUnit({ team: LOWER, name: "Ally1", attackType: MELEE, initiative: 3 });
+        const ally2 = createTestUnit({ team: LOWER, name: "Ally2", attackType: MELEE, initiative: 3 });
+        const straggler = createTestUnit({ team: LOWER, name: "Straggler", attackType: MELEE, initiative: 3 });
         // A lone enemy far away on the right edge so the straggler has no strike available (pure move turn).
         const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, ally1, { x: 1, y: 1 });
@@ -229,9 +229,9 @@ describe("v0.3 decideTurn — cohesion keeps the army together", () => {
 
     it("leaves a unit already with the pack to v0.2's normal decision", () => {
         const c = createCombatTestContext();
-        const a1 = createTestUnit({ team: LOWER, name: "A1", attackType: MELEE, speed: 3 });
-        const a2 = createTestUnit({ team: LOWER, name: "A2", attackType: MELEE, speed: 3 });
-        const a3 = createTestUnit({ team: LOWER, name: "A3", attackType: MELEE, speed: 3 });
+        const a1 = createTestUnit({ team: LOWER, name: "A1", attackType: MELEE, initiative: 3 });
+        const a2 = createTestUnit({ team: LOWER, name: "A2", attackType: MELEE, initiative: 3 });
+        const a3 = createTestUnit({ team: LOWER, name: "A3", attackType: MELEE, initiative: 3 });
         const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, a1, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, a2, { x: 6, y: 5 });
@@ -256,7 +256,7 @@ describe("v0.3 decideRangedTurn — focus-fire scoring & Beholder bias", () => {
             attackType: RANGE,
             rangeShots: 10,
             shotDistance: 30,
-            speed: 2,
+            initiative: 2,
         });
         // Mixed enemy targets: a ranged shooter (weighted up by scoreShot) and a melee body.
         const enemyRanged = createTestUnit({ team: UPPER, name: "EArcher", attackType: RANGE, rangeShots: 5 });
@@ -279,7 +279,7 @@ describe("v0.3 decideRangedTurn — focus-fire scoring & Beholder bias", () => {
             attackType: RANGE,
             rangeShots: 10,
             shotDistance: 30,
-            speed: 2,
+            initiative: 2,
         });
         // One ranged enemy with shots (canThreatenThisTurn range branch) and one melee enemy near our line
         // (canThreatenThisTurn melee branch). Neither is pre-debuffed, so the Spit Ball bonus is non-zero.
@@ -297,7 +297,13 @@ describe("v0.3 decideRangedTurn — focus-fire scoring & Beholder bias", () => {
 describe("v0.3 decideTurn — boxed-in shooter prefers to preserve its shot", () => {
     it("does not throw and returns actions for a shooter hemmed in by enemies", () => {
         const c = createCombatTestContext();
-        const shooter = createTestUnit({ team: LOWER, name: "Shooter", attackType: RANGE, rangeShots: 5, speed: 3 });
+        const shooter = createTestUnit({
+            team: LOWER,
+            name: "Shooter",
+            attackType: RANGE,
+            rangeShots: 5,
+            initiative: 3,
+        });
         const ally = createTestUnit({ team: LOWER, name: "Screen", attackType: MELEE });
         const e1 = createTestUnit({ team: UPPER, name: "E1", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 5, y: 5 });

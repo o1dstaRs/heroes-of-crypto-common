@@ -38,7 +38,7 @@ function setupQueen(): QueenHarness {
         team: LOWER,
         attackType: MELEE,
         shotDistance: 0,
-        speed: 6.3,
+        initiative: 6.3,
         amountAlive: 5,
         maxHp: 180,
         stackPower: 5,

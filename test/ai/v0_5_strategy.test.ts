@@ -119,7 +119,7 @@ describe("v0.5 — reinforcement-learned strategy", () => {
 
     it("aims Lightning Spin at a Cowardice-legal primary without giving up the legal surround", () => {
         const combat = createCombatTestContext();
-        const spinner = createTestUnit({ team: LOWER, abilities: ["Lightning Spin"], maxHp: 10, speed: 3 });
+        const spinner = createTestUnit({ team: LOWER, abilities: ["Lightning Spin"], maxHp: 10, initiative: 3 });
         const blocked = createTestUnit({ team: UPPER, name: "Blocked", amountAlive: 2, maxHp: 10 });
         const primary = createTestUnit({ team: UPPER, name: "Primary", maxHp: 10 });
         const splash = createTestUnit({ team: UPPER, name: "Splash", maxHp: 10 });
@@ -141,7 +141,7 @@ describe("v0.5 — reinforcement-learned strategy", () => {
 
     it("aims Skewer through a Cowardice-legal primary while retaining its legal line splash", () => {
         const combat = createCombatTestContext();
-        const pikeman = createTestUnit({ team: LOWER, abilities: ["Skewer Strike"], maxHp: 10, speed: 3 });
+        const pikeman = createTestUnit({ team: LOWER, abilities: ["Skewer Strike"], maxHp: 10, initiative: 3 });
         const blocked = createTestUnit({ team: UPPER, name: "Blocked", amountAlive: 2, maxHp: 10 });
         const blockedSplash = createTestUnit({ team: UPPER, name: "Blocked Splash", amountAlive: 2, maxHp: 10 });
         const primary = createTestUnit({ team: UPPER, name: "Primary", maxHp: 10 });
@@ -171,7 +171,7 @@ describe("v0.5 — reinforcement-learned strategy", () => {
             abilities: ["Fire Breath"],
             movementType: PBTypes.MovementVals.FLY,
             size: PBTypes.UnitSizeVals.LARGE,
-            speed: 4,
+            initiative: 4,
         });
         const incumbentTarget = createTestUnit({ team: UPPER, name: "Incumbent Target" });
         const lavaTarget = createTestUnit({ team: UPPER, name: "Lava Target" });

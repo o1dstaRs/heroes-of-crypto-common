@@ -166,7 +166,7 @@ function mixedSupportedFixture(
         team: UPPER,
         attackType: PBTypes.AttackVals.MELEE,
         name: "Enemy Squire",
-        speed: 2,
+        initiative: 2,
     });
     const noMelee = createTestUnit({
         team: UPPER,
@@ -748,7 +748,7 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
             team: UPPER,
             attackType: PBTypes.AttackVals.MELEE,
             name: "Flanking threat",
-            speed: 2,
+            initiative: 2,
         });
         placeUnit(unscreened.grid, unscreened.unitsHolder, extraThreat, { x: 2, y: 10 });
         expectFailure(unscreened, "all_reachable_threats_screened", 6);
@@ -818,7 +818,7 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
             team: UPPER,
             attackType: PBTypes.AttackVals.MELEE,
             name: "Flanking threat",
-            speed: 2,
+            initiative: 2,
         });
         placeUnit(unscreened.grid, unscreened.unitsHolder, extraThreat, { x: 2, y: 10 });
         expect(

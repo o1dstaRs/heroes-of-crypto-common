@@ -59,7 +59,7 @@ export type LeagueAugmentKind = (typeof LEAGUE_AUGMENT_KINDS)[number];
 
 export type LeaguePlacementTemplate = "adaptive" | "tight";
 
-const EXTRA_CREATURE_FEATURES = ["canFly", "hp", "armor", "speed"] as const;
+const EXTRA_CREATURE_FEATURES = ["canFly", "hp", "armor", "initiative"] as const;
 const COMPOSITION_FEATURES = [
     "ownRanged",
     "ownFlyer",
@@ -303,7 +303,7 @@ export function scoreLeagueCreature(
         info?.canFly ? 1 : 0,
         info?.hp ?? 0,
         info?.armor ?? 0,
-        info?.speed ?? 0,
+        info?.initiative ?? 0,
     ];
     let score = 0;
     for (let i = 0; i < intrinsic.length; i += 1) {

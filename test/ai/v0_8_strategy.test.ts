@@ -66,7 +66,7 @@ const RANGE = PBTypes.AttackVals.RANGE;
 
 function setupMountainDecision(
     enemyCell: { x: number; y: number },
-    speed: number,
+    initiative: number,
 ): {
     unit: Unit;
     enemy: Unit;
@@ -75,7 +75,7 @@ function setupMountainDecision(
     const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(PBTypes.GridVals.BLOCK_CENTER);
-    const unit = createTestUnit({ team: LOWER, attackType: MELEE, speed, name: "Miner" });
+    const unit = createTestUnit({ team: LOWER, attackType: MELEE, initiative, name: "Miner" });
     const rangedAlly = createTestUnit({
         team: LOWER,
         attackType: RANGE,
@@ -116,7 +116,7 @@ function setupRangedPosture(options: {
 } {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    const unit = createTestUnit({ team: LOWER, attackType: MELEE, speed: 2, name: "Screen" });
+    const unit = createTestUnit({ team: LOWER, attackType: MELEE, initiative: 2, name: "Screen" });
     placeUnit(combat.grid, combat.unitsHolder, unit, { x: 5, y: 3 });
     for (let index = 0; index < options.ownShooters; index += 1) {
         const shooter = createTestUnit({

@@ -1,7 +1,7 @@
 {
     "schemaVersion": 1,
     "spec": "ranked-replay-tactics-v1",
-    "behaviorSha256": "c0f246a501d0089b7f407ce0a5ccefd4d8db37a2e815d5969fede96f7b00aa90",
+    "behaviorSha256": "8b8a74f41c4c6353df86a22976b50b81581d46684e70f19a9d577048955fc67b",
     "policy": {
         "baseSpec": "v07-nonfight-4eda84635fe7",
         "classifier": {
@@ -16,7 +16,7 @@
             "rapidChargeAbility": "Rapid Charge",
             "rapidChargeMinMelee": 2,
             "broadMobileAbility": "Sky Runner",
-            "broadMobileMinSpeed": 7,
+            "broadMobileMinInitiative": 7,
             "broadMobileMinMelee": 4,
             "healerName": "Healer",
             "durableCarryNames": ["Abomination", "Frenzied Boar", "Goblin Knight", "Angel"]

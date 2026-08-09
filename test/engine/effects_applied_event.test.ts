@@ -181,7 +181,7 @@ describe("effects_applied event", () => {
 
     it("a plain move emits no effects_applied — refresh/seeding noise never leaks in", () => {
         const { context, fightProperties, engine } = startFight();
-        const walker = createTestUnit({ name: "Walker", team: PBTypes.TeamVals.LOWER, speed: 4 });
+        const walker = createTestUnit({ name: "Walker", team: PBTypes.TeamVals.LOWER, initiative: 4 });
         const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER });
         placeUnit(context.grid, context.unitsHolder, walker, { x: 3, y: 3 });
         placeUnit(context.grid, context.unitsHolder, enemy, { x: 12, y: 12 });

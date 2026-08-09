@@ -12,7 +12,7 @@ message Fight {
     bool fight_started = 5;
     bool fight_finished = 6;
     TeamVals previous_turn_team = 7;
-    int32 highest_speed_this_turn = 8;
+    int32 highest_initiative_this_turn = 8;
     repeated string already_made_turn = 9;
     map<uint32, StringList> already_made_turn_by_team = 10;
     repeated string already_hourglass = 11;

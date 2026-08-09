@@ -186,7 +186,7 @@ function setupLevel4Guard(spec: Level4Spec, stolenQuiver = false): IBandHarness 
         team: LOWER,
         name: "Level-4 guarded archer",
         attackType: RANGE,
-        speed: 1,
+        initiative: 1,
         rangeShots: 8,
         shotDistance: 5,
         damageMin: 10,
@@ -196,7 +196,7 @@ function setupLevel4Guard(spec: Level4Spec, stolenQuiver = false): IBandHarness 
         team: UPPER,
         name: "Ranged band target",
         attackType: RANGE,
-        speed: 0,
+        initiative: 0,
         rangeShots: 8,
         shotDistance: 16,
         damageMin: 1,
@@ -250,13 +250,13 @@ function setupLevel4Target(
         team: LOWER,
         name: "Level-4 target archer",
         attackType: RANGE,
-        speed: 1,
+        initiative: 1,
         rangeShots: options.shooterShots ?? 8,
         shotDistance: destinationDistance,
         damageMin: 10,
         damageMax: 10,
     });
-    const guard = createTestUnit({ team: LOWER, name: "Target-horizon guard", attackType: MELEE, speed: 1 });
+    const guard = createTestUnit({ team: LOWER, name: "Target-horizon guard", attackType: MELEE, initiative: 1 });
     placeAtAnchor(combat, target, targetAnchor);
     placeAtAnchor(combat, shooter, { x: destination.x, y: destination.y + 1 });
     placeAtAnchor(combat, guard, { x: destination.x + 2, y: destination.y - 2 });

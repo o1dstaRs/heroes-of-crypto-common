@@ -31,9 +31,9 @@ function setupStartedFight(
         lowerAttackType?: PBTypes.AttackVals;
         lowerMorale?: number;
         lowerRangeShots?: number;
-        lowerSpeed?: number;
+        lowerInitiative?: number;
         upperMorale?: number;
-        upperSpeed?: number;
+        upperInitiative?: number;
     } = {},
 ) {
     const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
@@ -46,13 +46,13 @@ function setupStartedFight(
         team: PBTypes.TeamVals.LOWER,
         attackType: opts.lowerAttackType,
         rangeShots: opts.lowerRangeShots,
-        speed: opts.lowerSpeed ?? 5,
+        initiative: opts.lowerInitiative ?? 5,
         morale: opts.lowerMorale ?? 0,
     });
     const upper = createTestUnit({
         name: "Upper",
         team: PBTypes.TeamVals.UPPER,
-        speed: opts.upperSpeed ?? 3,
+        initiative: opts.upperInitiative ?? 3,
         morale: opts.upperMorale ?? 0,
     });
 
@@ -495,12 +495,12 @@ describe("TurnEngine", () => {
         const lowerFast = createTestUnit({
             name: "Lower Fast",
             team: PBTypes.TeamVals.LOWER,
-            speed: 9,
+            initiative: 9,
         });
         const upperFast = createTestUnit({
             name: "Upper Fast",
             team: PBTypes.TeamVals.UPPER,
-            speed: 8,
+            initiative: 8,
         });
         placeUnit(setup.grid, setup.unitsHolder, lowerFast, { x: 4, y: 3 });
         placeUnit(setup.grid, setup.unitsHolder, upperFast, { x: 10, y: 9 });
@@ -538,7 +538,7 @@ describe("TurnEngine", () => {
     });
 
     it("uses injected tie-break randoms for first-lap and active-lap queue prefetching", () => {
-        const firstLapSetup = setupStartedFight({ lowerSpeed: 5, upperSpeed: 5 });
+        const firstLapSetup = setupStartedFight({ lowerInitiative: 5, upperInitiative: 5 });
         const firstLapEngine = new TurnEngine({
             fightProperties: firstLapSetup.fightProperties,
             grid: firstLapSetup.grid,
@@ -554,7 +554,7 @@ describe("TurnEngine", () => {
             firstLapResult.nextUnit?.getId() ?? "",
         );
 
-        const activeLapSetup = setupStartedFight({ lowerSpeed: 5, upperSpeed: 5 });
+        const activeLapSetup = setupStartedFight({ lowerInitiative: 5, upperInitiative: 5 });
         activeLapSetup.fightProperties.markFirstTurn();
         activeLapSetup.fightProperties.flipLap();
         const activeLapEngine = new TurnEngine({

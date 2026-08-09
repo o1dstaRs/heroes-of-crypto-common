@@ -37,7 +37,7 @@ describe("Arachna Queen configuration", () => {
         expect(queen.steps).toBe(6.3);
         expect(spider.abilities).toEqual(["Infest"]);
         expect(spider.steps).toBe(6);
-        expect(spider.speed).toBe(5.1);
+        expect(spider.initiative).toBe(5.1);
         expect(spider.base_armor).toBe(20);
         expect(spider.magic_resist).toBe(10);
         expect(spider.size).toBe(PBTypes.UnitSizeVals.SMALL);
@@ -606,7 +606,7 @@ describe("Stolen Endless Quiver", () => {
             attack: 40,
             damageMin: 30,
             damageMax: 30,
-            speed: 5,
+            initiative: 5,
         });
         const farEnemy = createTestUnit({
             name: "Far Enemy",

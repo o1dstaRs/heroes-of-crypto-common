@@ -199,10 +199,10 @@ class TestStrategyV0_7 extends StrategyV0_7 {
 function board(attackType: number): { actor: Unit; context: IDecisionContext; shot: GameAction[] } {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    const actor = createTestUnit({ name: "Actor", team: LOWER, attackType, rangeShots: 5, speed: 4 });
-    const ally = createTestUnit({ name: "Ally", team: LOWER, speed: 2 });
-    const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, speed: 3, amountAlive: 10 });
-    const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, speed: 5, amountAlive: 10 });
+    const actor = createTestUnit({ name: "Actor", team: LOWER, attackType, rangeShots: 5, initiative: 4 });
+    const ally = createTestUnit({ name: "Ally", team: LOWER, initiative: 2 });
+    const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, initiative: 3, amountAlive: 10 });
+    const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, initiative: 5, amountAlive: 10 });
     placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, ally, { x: 5, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 3, y: 10 });

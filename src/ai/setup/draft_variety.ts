@@ -72,7 +72,7 @@ const creatureArchetypes = (creatureId: number): RankedDraftArchetype[] => {
     if (!info) return [];
     const archetypes: RankedDraftArchetype[] = [];
     if (info.ranged) archetypes.push("ranged");
-    if (info.canFly || info.speed >= 7) archetypes.push("mobile");
+    if (info.canFly || info.initiative >= 7) archetypes.push("mobile");
     if (info.mage || info.caster) archetypes.push("caster");
     if (info.melee && !info.ranged) archetypes.push("frontline");
     return archetypes;

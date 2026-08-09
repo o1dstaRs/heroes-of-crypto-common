@@ -69,7 +69,7 @@ const hasMobilePressure = (creatureId: number): boolean => {
     return (
         !!info &&
         (info.canFly ||
-            info.speed >= 7 ||
+            info.initiative >= 7 ||
             info.abilities.includes("Rapid Charge") ||
             info.abilities.includes("Sky Runner"))
     );

@@ -56,7 +56,7 @@ export class UnitProperties {
     public steps_mod: number;
     public morale: number;
     public luck: number;
-    public speed: number;
+    public initiative: number;
     public armor_mod: number;
     public base_armor: number;
     public range_armor: number;
@@ -189,7 +189,7 @@ export class UnitProperties {
         steps: number,
         morale: number,
         luck: number,
-        speed: number,
+        initiative: number,
         base_armor: number,
         attack_type: AttackType,
         base_attack: number,
@@ -244,7 +244,7 @@ export class UnitProperties {
         this.steps_mod = 0;
         this.morale = morale;
         this.luck = luck;
-        this.speed = speed;
+        this.initiative = initiative;
         this.armor_mod = 0;
         this.base_armor = base_armor;
         this.range_armor = base_armor;

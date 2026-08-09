@@ -1091,7 +1091,7 @@ class UnitRepr implements IUnitAIRepr {
         public id: string,
         public team: TeamType,
         public steps: number, // distance the unit can travel
-        public speed: number, // inititive
+        public initiative: number, // inititive
         public size: number,
         public isFlying: boolean,
         public isSmall: boolean,
@@ -1119,8 +1119,8 @@ class UnitRepr implements IUnitAIRepr {
         return this.steps;
     }
 
-    public getSpeed(): number {
-        return this.speed;
+    public getInitiative(): number {
+        return this.initiative;
     }
 
     public getSize(): number {

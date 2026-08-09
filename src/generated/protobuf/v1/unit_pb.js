@@ -94,7 +94,7 @@ steps: jspb.Message.getFloatingPointFieldWithDefault(msg, 7, 0.0),
 stepsMod: jspb.Message.getFloatingPointFieldWithDefault(msg, 8, 0.0),
 morale: jspb.Message.getFieldWithDefault(msg, 9, 0),
 luck: jspb.Message.getFieldWithDefault(msg, 10, 0),
-speed: jspb.Message.getFieldWithDefault(msg, 11, 0),
+initiative: jspb.Message.getFieldWithDefault(msg, 11, 0),
 armorMod: jspb.Message.getFloatingPointFieldWithDefault(msg, 12, 0.0),
 baseArmor: jspb.Message.getFloatingPointFieldWithDefault(msg, 13, 0.0),
 attackType: jspb.Message.getFieldWithDefault(msg, 14, 0),
@@ -198,7 +198,7 @@ proto.PBTypes.UnitData.deserializeBinaryFromReader = function(msg, reader) {
       break;
     case 11:
       var value = /** @type {number} */ (reader.readUint32());
-      msg.setSpeed(value);
+      msg.setInitiative(value);
       break;
     case 12:
       var value = /** @type {number} */ (reader.readDouble());
@@ -399,7 +399,7 @@ proto.PBTypes.UnitData.serializeBinaryToWriter = function(message, writer) {
       f
     );
   }
-  f = message.getSpeed();
+  f = message.getInitiative();
   if (f !== 0) {
     writer.writeUint32(
       11,
@@ -789,10 +789,10 @@ proto.PBTypes.UnitData.prototype.setLuck = function(value) {
 
 
 /**
- * optional uint32 speed = 11;
+ * optional uint32 initiative = 11;
  * @return {number}
  */
-proto.PBTypes.UnitData.prototype.getSpeed = function() {
+proto.PBTypes.UnitData.prototype.getInitiative = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 11, 0));
 };
 
@@ -801,7 +801,7 @@ proto.PBTypes.UnitData.prototype.getSpeed = function() {
  * @param {number} value
  * @return {!proto.PBTypes.UnitData} returns this
  */
-proto.PBTypes.UnitData.prototype.setSpeed = function(value) {
+proto.PBTypes.UnitData.prototype.setInitiative = function(value) {
   return jspb.Message.setProto3IntField(this, 11, value);
 };
 

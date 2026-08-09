@@ -66,11 +66,11 @@ function makeFixture(
     size: typeof SMALL | typeof LARGE,
     actorCell: XY,
     targetCell: XY,
-    speed = 3.3,
+    initiative = 3.3,
 ): IFixture {
     const combat = createCombatTestContext(gridType);
-    const actor = createTestUnit({ team: LOWER, name: "Layer Actor", attackType: MELEE, size, speed });
-    const target = createTestUnit({ team: UPPER, name: "Layer Target", attackType: MELEE, speed: 1 });
+    const actor = createTestUnit({ team: LOWER, name: "Layer Actor", attackType: MELEE, size, initiative });
+    const target = createTestUnit({ team: UPPER, name: "Layer Target", attackType: MELEE, initiative: 1 });
     placeUnit(combat.grid, combat.unitsHolder, actor, actorCell);
     placeUnit(combat.grid, combat.unitsHolder, target, targetCell);
     return { actor, combat, matrix: combat.grid.getMatrix(), target };
@@ -160,14 +160,14 @@ describe("guarded first melee layer in findTarget", () => {
                 size: SMALL,
                 from: { x: 5, y: 5 },
                 to: { x: 8, y: 5 },
-                speed: 4.2,
+                initiative: 4.2,
             },
             {
                 grid: PBTypes.GridVals.NORMAL,
                 size: LARGE,
                 from: { x: 4, y: 4 },
                 to: { x: 8, y: 4 },
-                speed: 4.2,
+                initiative: 4.2,
             },
             { grid: PBTypes.GridVals.NORMAL, size: SMALL, from: { x: 2, y: 2 }, to: { x: 12, y: 12 } },
             { grid: PBTypes.GridVals.NORMAL, size: LARGE, from: { x: 3, y: 3 }, to: { x: 12, y: 11 } },
@@ -185,14 +185,14 @@ describe("guarded first melee layer in findTarget", () => {
                 testCase.size,
                 testCase.from,
                 testCase.to,
-                "speed" in testCase ? testCase.speed : 2.2 + (index % 3),
+                "initiative" in testCase ? testCase.initiative : 2.2 + (index % 3),
             );
             const firstFixture = makeFixture(
                 testCase.grid,
                 testCase.size,
                 testCase.from,
                 testCase.to,
-                "speed" in testCase ? testCase.speed : 2.2 + (index % 3),
+                "initiative" in testCase ? testCase.initiative : 2.2 + (index % 3),
             );
             const eager = eagerCatalogSource(eagerFixture);
             const first = firstLayerCatalogSource(firstFixture);
@@ -224,7 +224,7 @@ describe("guarded first melee layer in findTarget", () => {
             expect(eagerMemory.map((id) => id === eagerFixture.target.getId())).toEqual(
                 firstMemory.map((id) => id === firstFixture.target.getId()),
             );
-            if ("speed" in testCase) {
+            if ("initiative" in testCase) {
                 expect(eagerMemory).toEqual([eagerFixture.target.getId()]);
                 expect(firstMemory).toEqual([firstFixture.target.getId()]);
             }

@@ -68,14 +68,14 @@ function rngTail(): number[] {
     return [getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000), getRandomInt(0, 1_000_000)];
 }
 
-function placeCanonicalPair(speed = 4.2): {
+function placeCanonicalPair(initiative = 4.2): {
     combat: CombatTestContext;
     unit: Unit;
     enemy: Unit;
     matrix: number[][];
 } {
     const combat = createCombatTestContext();
-    const unit = createTestUnit({ team: LOWER, name: "Path Actor", attackType: MELEE, speed });
+    const unit = createTestUnit({ team: LOWER, name: "Path Actor", attackType: MELEE, initiative });
     const enemy = createTestUnit({ team: UPPER, name: "Path Target", attackType: MELEE });
     placeUnit(combat.grid, combat.unitsHolder, unit, { x: 8, y: 8 });
     placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 11, y: 11 });
@@ -230,7 +230,7 @@ describe("decision-scoped path catalog", () => {
         }
 
         const combat = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Collision Actor", attackType: MELEE, speed: 20 });
+        const unit = createTestUnit({ team: LOWER, name: "Collision Actor", attackType: MELEE, initiative: 20 });
         placeUnit(combat.grid, combat.unitsHolder, unit, { x: 8, y: 8 });
         const occupancy = Array.from({ length: 16 }, () => Array<number>(17).fill(0));
         const aggression = combat.grid.getAggrMatrixByTeam(UPPER)!;
@@ -482,7 +482,7 @@ describe("decision-scoped path catalog", () => {
             team: LOWER,
             name: "Candidate Actor",
             attackType: MELEE,
-            speed: 4.2,
+            initiative: 4.2,
             amountAlive: 5,
         });
         const adjacent = createTestUnit({ team: UPPER, name: "Adjacent Target", attackType: MELEE, amountAlive: 3 });

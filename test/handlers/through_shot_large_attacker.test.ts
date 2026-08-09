@@ -58,7 +58,7 @@ describe("Through Shot from a large (2x2) attacker", () => {
             shotDistance: 16,
             size: PBTypes.UnitSizeVals.LARGE,
             abilities: ["Through Shot", "No Melee"],
-            speed: 5,
+            initiative: 5,
             morale: 4,
         });
         placeLargeUnit(grid, unitsHolder, attacker, { x: minX + 8 * step, y: 2 * step });

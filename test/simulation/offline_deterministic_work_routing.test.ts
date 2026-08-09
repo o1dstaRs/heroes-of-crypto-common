@@ -29,7 +29,7 @@ const runTournamentGame = (offlineDeterministicWork: boolean | undefined): Recor
         SEARCH_AUDIT: auditPath,
         SEARCH_HORIZON: "1",
         SEARCH_ROLLOUTS: "1",
-        // These effectively-zero bounds make the live-path assertion independent of host speed.
+        // These effectively-zero bounds make the live-path assertion independent of host initiative.
         SEARCH_DECISION_DEADLINE_MS: "0.000001",
         SEARCH_CIRCUIT_BREAKER_MS: "0.00001",
     };

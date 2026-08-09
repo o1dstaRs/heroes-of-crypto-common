@@ -72,7 +72,7 @@ function activatedMover(
     const unit = createTestUnit({
         team: LOWER,
         name: "Projected mover",
-        speed: 12,
+        initiative: 12,
         ...options,
     });
     const enemy = createTestUnit({ team: UPPER, name: "Projection witness" });

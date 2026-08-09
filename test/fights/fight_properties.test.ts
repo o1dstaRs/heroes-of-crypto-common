@@ -548,17 +548,17 @@ describe("FightProperties", () => {
     });
 
     describe("serialization and stack power", () => {
-        it("serializes a fractional highest speed and fractional lap times (proto int fields)", () => {
-            // Regression guard: speed buffs (augments/synergies) make the highest speed fractional
+        it("serializes a fractional highest initiative and fractional lap times (proto int fields)", () => {
+            // Regression guard: initiative buffs (augments/synergies) make the highest initiative fractional
             // (e.g. 11.4) and per-lap time totals accumulate fractional ms; protobuf's serializer
             // asserts on non-integer int fields, which used to throw here and silently drop the whole
             // serialized fight (e.g. the ranked journal's FIGHT_INITIALIZED replay checkpoint).
             const fightProperties = new FightProperties();
-            fightProperties.setHighestSpeedThisTurn(11.4);
+            fightProperties.setHighestInitiativeThisTurn(11.4);
             fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000.25);
 
             const restored = FightProperties.deserialize(fightProperties.serialize());
-            expect(restored.getHighestSpeedThisTurn()).toBe(11);
+            expect(restored.getHighestInitiativeThisTurn()).toBe(11);
         });
 
         it("roundtrips serialized fight state", () => {
@@ -569,7 +569,7 @@ describe("FightProperties", () => {
             fightProperties.startFight();
             fightProperties.finishFight();
             fightProperties.updatePreviousTurnTeam(PBTypes.TeamVals.UPPER);
-            fightProperties.setHighestSpeedThisTurn(7);
+            fightProperties.setHighestInitiativeThisTurn(7);
             fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 2);
             fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 3);
             fightProperties.startTurn(PBTypes.TeamVals.LOWER);
@@ -593,7 +593,7 @@ describe("FightProperties", () => {
             expect(restored.hasFightStarted()).toBe(true);
             expect(restored.hasFightFinished()).toBe(true);
             expect(restored.getPreviousTurnTeam()).toBe(PBTypes.TeamVals.UPPER);
-            expect(restored.getHighestSpeedThisTurn()).toBe(7);
+            expect(restored.getHighestInitiativeThisTurn()).toBe(7);
             expect(restored.getTeamUnitsAlive(PBTypes.TeamVals.LOWER)).toBe(2);
             expect(restored.getTeamUnitsAlive(PBTypes.TeamVals.UPPER)).toBe(3);
             expect(restored.getStepsMoraleMultiplier()).toBe(STEPS_MORALE_MULTIPLIER);

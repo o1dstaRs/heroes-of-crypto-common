@@ -90,8 +90,8 @@ describe("AI landing legality", () => {
 
     test("fallback can cross lava but chooses a legal far-side endpoint", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
-        const flyer = createTestUnit({ team: LOWER, movementType: FLY, speed: 6 });
-        const enemy = createTestUnit({ team: UPPER, speed: 1 });
+        const flyer = createTestUnit({ team: LOWER, movementType: FLY, initiative: 6 });
+        const enemy = createTestUnit({ team: UPPER, initiative: 1 });
         placeUnit(combat.grid, combat.unitsHolder, flyer, { x: 5, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 11, y: 7 });
 
@@ -114,8 +114,8 @@ describe("AI landing legality", () => {
 
     test("findTarget never emits an unlandable infinite-route endpoint", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
-        const flyer = createTestUnit({ team: LOWER, movementType: FLY, speed: 3 });
-        const enemy = createTestUnit({ team: UPPER, speed: 1 });
+        const flyer = createTestUnit({ team: LOWER, movementType: FLY, initiative: 3 });
+        const enemy = createTestUnit({ team: UPPER, initiative: 1 });
         placeUnit(combat.grid, combat.unitsHolder, flyer, { x: 5, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 11, y: 7 });
 

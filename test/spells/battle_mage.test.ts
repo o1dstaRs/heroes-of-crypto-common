@@ -72,7 +72,7 @@ const setupMageFight = (opts: {
         spells: opts.spells ?? ["Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Meteorite"],
         amountAlive: opts.casterAmountAlive,
         stackPower: opts.casterStackPower,
-        speed: 5,
+        initiative: 5,
         morale: 4,
     });
     placeUnit(context.grid, context.unitsHolder, caster, { x: 3, y: 3 });
@@ -85,7 +85,7 @@ const setupMageFight = (opts: {
             maxHp: spec.maxHp ?? 10_000, // survives by default, so a test reads damage rather than a death
             magicResist: spec.magicResist ?? 0,
             amountAlive: spec.amountAlive ?? 1,
-            speed: 3,
+            initiative: 3,
             morale: 4,
         });
         placeUnit(context.grid, context.unitsHolder, enemy, spec.cell);
@@ -98,14 +98,14 @@ const setupMageFight = (opts: {
             name: "Friend",
             team: PBTypes.TeamVals.LOWER,
             maxHp: 10_000,
-            speed: 2,
+            initiative: 2,
         });
         placeUnit(context.grid, context.unitsHolder, ally, opts.allyCell);
     }
     let blocker: Unit | undefined;
     const blockerTeam = opts.blockerTeam ?? PBTypes.TeamVals.LOWER;
     if (opts.blockerCell) {
-        blocker = createTestUnit({ name: "Blocker", team: blockerTeam, maxHp: 10_000, speed: 2 });
+        blocker = createTestUnit({ name: "Blocker", team: blockerTeam, maxHp: 10_000, initiative: 2 });
         placeUnit(context.grid, context.unitsHolder, blocker, opts.blockerCell);
     }
 

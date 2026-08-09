@@ -713,7 +713,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         const actor = createTestUnit({
             team: PBTypes.TeamVals.LOWER,
             name: "Cowardly mover",
-            speed: 1,
+            initiative: 1,
             amountAlive: 10,
             maxHp: 10,
             damageMin: 5,
@@ -860,7 +860,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
             amountAlive: 1,
             stackPower: 4,
-            speed: 1,
+            initiative: 1,
             spells: ["Nature:Ring of Fire"],
         });
         const aimTarget = createTestUnit({
@@ -947,7 +947,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             name: "Smoke caster",
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
             stackPower: 4,
-            speed: 1,
+            initiative: 1,
             spells: ["Chaos:Smoke"],
         });
         const ally = createTestUnit({
@@ -1209,7 +1209,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             team: PBTypes.TeamVals.LOWER,
             name: "Blocked Walker",
             attackType: PBTypes.AttackVals.MELEE,
-            speed: 1,
+            initiative: 1,
         });
         const target = createTestUnit({
             team: PBTypes.TeamVals.UPPER,
@@ -1289,7 +1289,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             team: PBTypes.TeamVals.LOWER,
             name: "Oscillating walker",
             attackType: PBTypes.AttackVals.MELEE,
-            speed: 1,
+            initiative: 1,
         });
         const target = createTestUnit({
             team: PBTypes.TeamVals.UPPER,

@@ -107,7 +107,7 @@ function meleeFixture(resurrection = false): {
         team: LOWER,
         name: resurrection ? "Charged Angel" : "Fragile brawler",
         attackType: MELEE,
-        speed: 4,
+        initiative: 4,
         amountAlive: 1,
         maxHp: 10,
         damageMin: 2,
@@ -146,7 +146,7 @@ function cowardlyMeleeFixture(): {
         team: LOWER,
         name: "Cowardly brawler",
         attackType: MELEE,
-        speed: 4,
+        initiative: 4,
         amountAlive: 10,
         maxHp: 10,
         damageMin: 2,
@@ -189,7 +189,7 @@ function moveShotFixture(): {
         team: LOWER,
         name: "Fragile archer",
         attackType: RANGE,
-        speed: 4,
+        initiative: 4,
         rangeShots: 5,
         shotDistance: 3,
         amountAlive: 1,
@@ -414,7 +414,7 @@ describe("AI post-move actor availability", () => {
                 team: LOWER,
                 name: "Protected fragile archer",
                 attackType: RANGE,
-                speed: 4,
+                initiative: 4,
                 rangeShots: 8,
                 shotDistance: 3,
                 amountAlive: 1,
@@ -426,11 +426,11 @@ describe("AI post-move actor availability", () => {
                 team: UPPER,
                 name: "Protected target",
                 attackType: MELEE,
-                speed: 1,
+                initiative: 1,
                 amountAlive: 10,
                 maxHp: 20,
             });
-            const guard = createTestUnit({ team: LOWER, name: "Frontline", attackType: MELEE, speed: 1 });
+            const guard = createTestUnit({ team: LOWER, name: "Frontline", attackType: MELEE, initiative: 1 });
             shooter.applyDamage(9, 0, new SceneLogMock());
             placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 7 });
             placeUnit(combat.grid, combat.unitsHolder, guard, { x: 6, y: 7 });

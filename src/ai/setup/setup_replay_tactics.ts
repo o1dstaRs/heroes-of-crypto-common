@@ -20,7 +20,11 @@ import { creatureInfo } from "./creature_score";
 
 export const RANKED_REPLAY_TACTICS_SETUP_SPEC = "ranked-replay-tactics-v1";
 export const RANKED_REPLAY_TACTICS_BASE_SPEC = "v07-nonfight-4eda84635fe7";
-export const RANKED_REPLAY_TACTICS_BEHAVIOR_SHA256 = "c0f246a501d0089b7f407ce0a5ccefd4d8db37a2e815d5969fede96f7b00aa90";
+// Re-blessed 2026-08-09 for the game-wide Speed -> Initiative rename. The digest covers the canonical JSON
+// of the behavior, so renaming the `broadMobileMinSpeed` KEY moved it even though the policy is byte-for-byte
+// the same decision: the same threshold (7) on the same stat, which merely goes by a different name now.
+// Previous approved digest: c0f246a501d0089b7f407ce0a5ccefd4d8db37a2e815d5969fede96f7b00aa90
+export const RANKED_REPLAY_TACTICS_BEHAVIOR_SHA256 = "8b8a74f41c4c6353df86a22976b50b81581d46684e70f19a9d577048955fc67b";
 export const RANKED_REPLAY_TACTICS_BUDGET = 7;
 export const REPLAY_RAPID_CHARGE_AUGMENT_PLAN = Object.freeze({
     placement: 1,
@@ -61,7 +65,7 @@ export interface IReplayTacticsClassifier {
     rapidChargeAbility: string;
     rapidChargeMinMelee: number;
     broadMobileAbility: string;
-    broadMobileMinSpeed: number;
+    broadMobileMinInitiative: number;
     broadMobileMinMelee: number;
     healerName: string;
     durableCarryNames: string[];
@@ -141,7 +145,7 @@ const parseClassifier = (value: unknown): IReplayTacticsClassifier => {
             "rapidChargeAbility",
             "rapidChargeMinMelee",
             "broadMobileAbility",
-            "broadMobileMinSpeed",
+            "broadMobileMinInitiative",
             "broadMobileMinMelee",
             "healerName",
             "durableCarryNames",
@@ -169,8 +173,8 @@ const parseClassifier = (value: unknown): IReplayTacticsClassifier => {
     if (typeof record.broadMobileAbility !== "string" || !record.broadMobileAbility) {
         throw new TypeError("replay tactics broadMobileAbility must be a non-empty string");
     }
-    if (typeof record.broadMobileMinSpeed !== "number" || !Number.isFinite(record.broadMobileMinSpeed)) {
-        throw new TypeError("replay tactics broadMobileMinSpeed must be a finite number");
+    if (typeof record.broadMobileMinInitiative !== "number" || !Number.isFinite(record.broadMobileMinInitiative)) {
+        throw new TypeError("replay tactics broadMobileMinInitiative must be a finite number");
     }
     if (!Number.isInteger(record.broadMobileMinMelee) || (record.broadMobileMinMelee as number) < 1) {
         throw new TypeError("replay tactics broadMobileMinMelee must be a positive integer");
@@ -184,7 +188,7 @@ const parseClassifier = (value: unknown): IReplayTacticsClassifier => {
         rapidChargeAbility: record.rapidChargeAbility,
         rapidChargeMinMelee: record.rapidChargeMinMelee as number,
         broadMobileAbility: record.broadMobileAbility,
-        broadMobileMinSpeed: record.broadMobileMinSpeed,
+        broadMobileMinInitiative: record.broadMobileMinInitiative,
         broadMobileMinMelee: record.broadMobileMinMelee as number,
         healerName: record.healerName,
         durableCarryNames: parseStringArray(record.durableCarryNames, "replay tactics durableCarryNames"),
@@ -243,7 +247,7 @@ const APPROVED_REPLAY_TACTICS_BEHAVIOR = deepFreeze<IReplayTacticsSetupBehavior>
         rapidChargeAbility: "Rapid Charge",
         rapidChargeMinMelee: 2,
         broadMobileAbility: "Sky Runner",
-        broadMobileMinSpeed: 7,
+        broadMobileMinInitiative: 7,
         broadMobileMinMelee: 4,
         healerName: "Healer",
         durableCarryNames: ["Abomination", "Frenzied Boar", "Goblin Knight", "Angel"],
@@ -308,7 +312,7 @@ export function replayTacticsArmyIdentity(
             info.melee &&
             (info.abilities.includes(behavior.classifier.rapidChargeAbility) ||
                 info.canFly ||
-                info.speed >= behavior.classifier.broadMobileMinSpeed ||
+                info.initiative >= behavior.classifier.broadMobileMinInitiative ||
                 info.abilities.includes(behavior.classifier.broadMobileAbility)),
     ).length;
     if (broadMobileMeleeCount >= behavior.classifier.broadMobileMinMelee) {

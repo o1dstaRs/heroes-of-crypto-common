@@ -17,7 +17,7 @@ export namespace PBTypes {
             fight_started?: boolean;
             fight_finished?: boolean;
             previous_turn_team?: dependency_1.PBTypes.TeamVals;
-            highest_speed_this_turn?: number;
+            highest_initiative_this_turn?: number;
             already_made_turn?: string[];
             already_made_turn_by_team?: Map<number, dependency_1.PBTypes.StringList>;
             already_hourglass?: string[];
@@ -58,8 +58,8 @@ export namespace PBTypes {
                 if ("previous_turn_team" in data && data.previous_turn_team != undefined) {
                     this.previous_turn_team = data.previous_turn_team;
                 }
-                if ("highest_speed_this_turn" in data && data.highest_speed_this_turn != undefined) {
-                    this.highest_speed_this_turn = data.highest_speed_this_turn;
+                if ("highest_initiative_this_turn" in data && data.highest_initiative_this_turn != undefined) {
+                    this.highest_initiative_this_turn = data.highest_initiative_this_turn;
                 }
                 if ("already_made_turn" in data && data.already_made_turn != undefined) {
                     this.already_made_turn = data.already_made_turn;
@@ -158,10 +158,10 @@ export namespace PBTypes {
         set previous_turn_team(value: dependency_1.PBTypes.TeamVals) {
             pb_1.Message.setField(this, 7, value);
         }
-        get highest_speed_this_turn() {
+        get highest_initiative_this_turn() {
             return pb_1.Message.getFieldWithDefault(this, 8, 0) as number;
         }
-        set highest_speed_this_turn(value: number) {
+        set highest_initiative_this_turn(value: number) {
             pb_1.Message.setField(this, 8, value);
         }
         get already_made_turn() {
@@ -262,7 +262,7 @@ export namespace PBTypes {
             fight_started?: boolean;
             fight_finished?: boolean;
             previous_turn_team?: dependency_1.PBTypes.TeamVals;
-            highest_speed_this_turn?: number;
+            highest_initiative_this_turn?: number;
             already_made_turn?: string[];
             already_made_turn_by_team?: {
                 [key: number]: ReturnType<typeof dependency_1.PBTypes.StringList.prototype.toObject>;
@@ -309,8 +309,8 @@ export namespace PBTypes {
             if (data.previous_turn_team != null) {
                 message.previous_turn_team = data.previous_turn_team;
             }
-            if (data.highest_speed_this_turn != null) {
-                message.highest_speed_this_turn = data.highest_speed_this_turn;
+            if (data.highest_initiative_this_turn != null) {
+                message.highest_initiative_this_turn = data.highest_initiative_this_turn;
             }
             if (data.already_made_turn != null) {
                 message.already_made_turn = data.already_made_turn;
@@ -368,7 +368,7 @@ export namespace PBTypes {
                 fight_started?: boolean;
                 fight_finished?: boolean;
                 previous_turn_team?: dependency_1.PBTypes.TeamVals;
-                highest_speed_this_turn?: number;
+                highest_initiative_this_turn?: number;
                 already_made_turn?: string[];
                 already_made_turn_by_team?: {
                     [key: number]: ReturnType<typeof dependency_1.PBTypes.StringList.prototype.toObject>;
@@ -414,8 +414,8 @@ export namespace PBTypes {
             if (this.previous_turn_team != null) {
                 data.previous_turn_team = this.previous_turn_team;
             }
-            if (this.highest_speed_this_turn != null) {
-                data.highest_speed_this_turn = this.highest_speed_this_turn;
+            if (this.highest_initiative_this_turn != null) {
+                data.highest_initiative_this_turn = this.highest_initiative_this_turn;
             }
             if (this.already_made_turn != null) {
                 data.already_made_turn = this.already_made_turn;
@@ -482,8 +482,8 @@ export namespace PBTypes {
                 writer.writeBool(6, this.fight_finished);
             if (this.previous_turn_team != dependency_1.PBTypes.TeamVals.NO_TEAM)
                 writer.writeEnum(7, this.previous_turn_team);
-            if (this.highest_speed_this_turn != 0)
-                writer.writeInt32(8, this.highest_speed_this_turn);
+            if (this.highest_initiative_this_turn != 0)
+                writer.writeInt32(8, this.highest_initiative_this_turn);
             if (this.already_made_turn.length)
                 writer.writeRepeatedString(9, this.already_made_turn);
             for (const [key, value] of this.already_made_turn_by_team) {
@@ -561,7 +561,7 @@ export namespace PBTypes {
                         message.previous_turn_team = reader.readEnum();
                         break;
                     case 8:
-                        message.highest_speed_this_turn = reader.readInt32();
+                        message.highest_initiative_this_turn = reader.readInt32();
                         break;
                     case 9:
                         pb_1.Message.addToRepeatedField(message, 9, reader.readString());

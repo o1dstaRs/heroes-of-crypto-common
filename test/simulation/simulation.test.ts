@@ -169,7 +169,7 @@ describe("AI v0.2 out-of-ammo handling", () => {
             team: PBTypes.TeamVals.LOWER,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
-            speed: 5,
+            initiative: 5,
             abilities: shooterAbilities,
         });
         const enemy = createTestUnit({

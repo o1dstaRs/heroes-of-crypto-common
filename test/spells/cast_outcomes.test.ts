@@ -43,7 +43,7 @@ const setupBlacksmith = (allyCells: { x: number; y: number }[]) => {
         amountAlive: 5,
         stackPower: 5,
         maxHp: 10_000,
-        speed: 5,
+        initiative: 5,
         morale: 4,
     });
     placeUnit(context.grid, context.unitsHolder, caster, { x: 1, y: 1 });
@@ -53,7 +53,7 @@ const setupBlacksmith = (allyCells: { x: number; y: number }[]) => {
             name: `Friend ${index}`,
             team: PBTypes.TeamVals.LOWER,
             maxHp: 10_000,
-            speed: 2,
+            initiative: 2,
             morale: 4,
         });
         placeUnit(context.grid, context.unitsHolder, ally, cell);

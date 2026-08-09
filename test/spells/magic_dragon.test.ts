@@ -31,7 +31,7 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 interface IRawCreature {
     hp: number;
     steps: number;
-    speed: number;
+    initiative: number;
     armor: number;
     attack: number;
     attack_damage_min: number;
@@ -106,7 +106,7 @@ const setupDragonFight = (opts: {
         abilities: ["Tome of Elements"],
         amountAlive: opts.casterAmountAlive,
         stackPower: opts.casterStackPower,
-        speed: 5,
+        initiative: 5,
         morale: 4,
     });
     placeUnit(context.grid, context.unitsHolder, caster, { x: 3, y: 3 });
@@ -125,7 +125,7 @@ const setupDragonFight = (opts: {
             // the two formula tests at the top of the Magic Reflection describe.
             stackPower: spec.stackPower ?? 1,
             size: spec.large ? PBTypes.UnitSizeVals.LARGE : PBTypes.UnitSizeVals.SMALL,
-            speed: 3,
+            initiative: 3,
             morale: 4,
         });
         placeUnit(context.grid, context.unitsHolder, enemy, spec.cell);
@@ -138,14 +138,14 @@ const setupDragonFight = (opts: {
             name: `Friend ${index}`,
             team: PBTypes.TeamVals.LOWER,
             maxHp: 10_000,
-            speed: 2,
+            initiative: 2,
         });
         placeUnit(context.grid, context.unitsHolder, ally, spec.cell);
         allies.push(ally);
     }
 
     if (opts.blockerCell) {
-        const blocker = createTestUnit({ name: "Blocker", team: PBTypes.TeamVals.LOWER, maxHp: 10_000, speed: 2 });
+        const blocker = createTestUnit({ name: "Blocker", team: PBTypes.TeamVals.LOWER, maxHp: 10_000, initiative: 2 });
         placeUnit(context.grid, context.unitsHolder, blocker, opts.blockerCell);
     }
 
@@ -188,7 +188,7 @@ describe("Magic Dragon creature configuration", () => {
         const midpoint = (key: keyof IRawCreature): number =>
             ((cannon[key] as number) + (gargantuan[key] as number)) / 2;
 
-        for (const key of ["steps", "speed", "attack_damage_max"] as const) {
+        for (const key of ["steps", "initiative", "attack_damage_max"] as const) {
             const ratio = dragon[key] / midpoint(key);
             expect(ratio).toBeGreaterThanOrEqual(0.85);
             expect(ratio).toBeLessThanOrEqual(0.9);

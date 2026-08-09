@@ -157,7 +157,7 @@ describe("v0.8 Nightmare roadblock role", () => {
             team: UPPER,
             name: "Approaching threat",
             attackType: MELEE,
-            speed: 6,
+            initiative: 6,
             damageMax: 20,
             amountAlive: 20,
         });

@@ -20,7 +20,7 @@ describe("turn recovery movement", () => {
         const flyer = createTestUnit({
             team: PBTypes.TeamVals.LOWER,
             movementType: PBTypes.MovementVals.FLY,
-            speed: 6,
+            initiative: 6,
         });
         const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
         placeUnit(combat.grid, combat.unitsHolder, flyer, { x: 5, y: 7 });

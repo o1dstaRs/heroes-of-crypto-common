@@ -38,7 +38,7 @@ const setupFight = (withAbomination: boolean) => {
         spells: ["Life:Fire Strike"],
         amountAlive: 38,
         stackPower: 5,
-        speed: 5,
+        initiative: 5,
         morale: 4,
     });
     placeUnit(context.grid, context.unitsHolder, caster, { x: 3, y: 3 });
@@ -48,7 +48,7 @@ const setupFight = (withAbomination: boolean) => {
         team: PBTypes.TeamVals.UPPER,
         maxHp: 10_000,
         armor: 20,
-        speed: 3,
+        initiative: 3,
         morale: 4,
     });
     placeUnit(context.grid, context.unitsHolder, victim, { x: 6, y: 3 });
@@ -63,7 +63,7 @@ const setupFight = (withAbomination: boolean) => {
             magicResist: 0,
             luck: 0,
             stackPower: 5,
-            speed: 3,
+            initiative: 3,
             morale: 4,
             abilities: ["Flesh Shield Aura"],
             auraEffects: ["Flesh Shield"],
@@ -127,7 +127,7 @@ const setupMeteoriteOverflow = (
         spells: ["Life:Meteorite"],
         amountAlive: casterAmountAlive,
         stackPower: 5,
-        speed: 5,
+        initiative: 5,
         morale: 4,
         abilities: casterAbilities,
     });
@@ -142,8 +142,8 @@ const setupMeteoriteOverflow = (
     }
 
     const victims = [
-        createTestUnit({ name: "Victim A", team: PBTypes.TeamVals.UPPER, maxHp: 10_000, speed: 3 }),
-        createTestUnit({ name: "Victim B", team: PBTypes.TeamVals.UPPER, maxHp: 10_000, speed: 3 }),
+        createTestUnit({ name: "Victim A", team: PBTypes.TeamVals.UPPER, maxHp: 10_000, initiative: 3 }),
+        createTestUnit({ name: "Victim B", team: PBTypes.TeamVals.UPPER, maxHp: 10_000, initiative: 3 }),
     ];
     placeUnit(context.grid, context.unitsHolder, victims[0], { x: 6, y: 3 });
     placeUnit(context.grid, context.unitsHolder, victims[1], { x: 6, y: 4 });
@@ -154,7 +154,7 @@ const setupMeteoriteOverflow = (
         maxHp: 500,
         magicResist: 0,
         stackPower: 5,
-        speed: 3,
+        initiative: 3,
         morale: 4,
         abilities: ["Flesh Shield Aura"],
         auraEffects: ["Flesh Shield"],

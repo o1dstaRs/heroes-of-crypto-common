@@ -78,7 +78,7 @@ describe("v0.7 melee-magic attack selection", () => {
             team: LOWER,
             attackType: MELEE_MAGIC,
             spells: ["System:Resurrection"],
-            speed: 2,
+            initiative: 2,
         });
         const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 4, y: 4 });

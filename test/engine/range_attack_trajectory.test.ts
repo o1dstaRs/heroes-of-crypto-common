@@ -65,7 +65,7 @@ const setupRangeFight = (opts: {
         damageMax: 30,
         rangeShots: 3,
         shotDistance: 16,
-        speed: 5,
+        initiative: 5,
         morale: 4,
     });
     placeUnit(grid, unitsHolder, attacker, opts.attackerCell);

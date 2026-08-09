@@ -64,7 +64,7 @@ export interface TestUnitOptions {
     attackRange?: number;
     shotDistance?: number;
     morale?: number;
-    speed?: number;
+    initiative?: number;
     movementType?: MovementType;
     size?: UnitSizeType;
     level?: UnitLevelType;
@@ -139,7 +139,7 @@ export function createTestUnit(options: TestUnitOptions = {}): Unit {
             3,
             options.morale ?? 0,
             options.luck ?? 0,
-            options.speed ?? 1,
+            options.initiative ?? 1,
             options.armor ?? 10,
             options.attackType ?? PBTypes.AttackVals.MELEE,
             options.attack ?? 10,

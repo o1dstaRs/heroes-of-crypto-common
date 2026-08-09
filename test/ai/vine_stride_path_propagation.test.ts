@@ -27,7 +27,7 @@ function vineStridePair() {
         team: LOWER,
         name: "Trent",
         attackType: PBTypes.AttackVals.MELEE,
-        speed: 3.3,
+        initiative: 3.3,
         abilities: ["In Its Own World"],
     });
     const enemy = createTestUnit({

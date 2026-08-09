@@ -48,7 +48,7 @@ const setupStrike = (casterCell: XY) => {
         name: "Mage",
         team: PBTypes.TeamVals.LOWER,
         spells: ["Life:Fire Strike"],
-        speed: 5,
+        initiative: 5,
         morale: 4,
     });
     const bigTarget = createTestUnit({
@@ -57,7 +57,7 @@ const setupStrike = (casterCell: XY) => {
         size: PBTypes.UnitSizeVals.LARGE,
         maxHp: 10_000,
         amountAlive: 1,
-        speed: 3,
+        initiative: 3,
         morale: 4,
     });
     place(context.grid, context.unitsHolder, caster, casterCell);
@@ -126,7 +126,7 @@ describe("Fire Strike interception", () => {
             name: "Mage",
             team: PBTypes.TeamVals.LOWER,
             spells: ["Life:Fire Strike"],
-            speed: 5,
+            initiative: 5,
             morale: 4,
         });
         const aimed = createTestUnit({
@@ -134,7 +134,7 @@ describe("Fire Strike interception", () => {
             team: PBTypes.TeamVals.UPPER,
             maxHp: 10_000,
             amountAlive: 1,
-            speed: 3,
+            initiative: 3,
         });
         place(context.grid, context.unitsHolder, caster, { x: 2, y: 8 });
         place(context.grid, context.unitsHolder, aimed, { x: 8, y: 8 });
@@ -145,7 +145,7 @@ describe("Fire Strike interception", () => {
                 team: PBTypes.TeamVals.UPPER,
                 maxHp: 10_000,
                 amountAlive: 1,
-                speed: 2,
+                initiative: 2,
             });
             place(context.grid, context.unitsHolder, screen, screenAt);
         }

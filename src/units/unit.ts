@@ -131,7 +131,7 @@ export interface IUnitPropertiesProvider {
 
     getLuck(): number;
 
-    getSpeed(): number;
+    getInitiative(): number;
 
     getFaction(): FactionType;
 
@@ -190,7 +190,7 @@ export interface IUnitAIRepr {
     getId(): string;
     getTeam(): TeamType;
     getSteps(): number;
-    getSpeed(): number;
+    getInitiative(): number;
     getSize(): number;
     canFly(): boolean;
     canTraverseLava(): boolean;
@@ -1168,8 +1168,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         return luck;
     }
-    public getSpeed(): number {
-        return this.unitProperties.speed;
+    public getInitiative(): number {
+        return this.unitProperties.initiative;
     }
     public getBaseArmor(): number {
         return this.unitProperties.base_armor;
@@ -1796,9 +1796,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 Number((this.unitProperties.steps + this.unitProperties.steps / spellProperties.power).toFixed(21)),
                 this.unitProperties.steps,
             );
-            this.unitProperties.speed = Math.max(
-                Number((this.unitProperties.speed + this.unitProperties.speed / spellProperties.power).toFixed(1)),
-                this.unitProperties.speed,
+            this.unitProperties.initiative = Math.max(
+                Number(
+                    (this.unitProperties.initiative + this.unitProperties.initiative / spellProperties.power).toFixed(
+                        1,
+                    ),
+                ),
+                this.unitProperties.initiative,
             );
             this.unitProperties.shot_distance = Math.max(
                 Number(
@@ -3314,10 +3318,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.range_shots_mod = 0;
         }
 
-        // SPEED
-        this.unitProperties.speed = madeOfFireBuff
-            ? this.initialUnitProperties.speed + this.initialUnitProperties.speed / madeOfFireBuff.getPower()
-            : this.initialUnitProperties.speed;
+        // INITIATIVE
+        this.unitProperties.initiative = madeOfFireBuff
+            ? this.initialUnitProperties.initiative + this.initialUnitProperties.initiative / madeOfFireBuff.getPower()
+            : this.initialUnitProperties.initiative;
 
         // STEPS
         this.unitProperties.steps_mod =

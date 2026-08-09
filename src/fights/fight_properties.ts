@@ -81,7 +81,7 @@ export class FightProperties {
     private fightStarted: boolean;
     private fightFinished: boolean;
     private previousTurnTeam: TeamType;
-    private highestSpeedThisTurn: number;
+    private highestInitiativeThisTurn: number;
     private alreadyMadeTurn: Set<string>;
     private alreadyMadeTurnByTeam: Map<TeamType, Set<string>>;
     private alreadyHourglass: Set<string>;
@@ -141,7 +141,7 @@ export class FightProperties {
         this.fightStarted = false;
         this.fightFinished = false;
         this.previousTurnTeam = PBTypes.TeamVals.NO_TEAM;
-        this.highestSpeedThisTurn = 0;
+        this.highestInitiativeThisTurn = 0;
         this.alreadyMadeTurn = new Set();
         this.alreadyMadeTurnByTeam = new Map();
         this.alreadyHourglass = new Set();
@@ -215,8 +215,8 @@ export class FightProperties {
     public getPreviousTurnTeam(): TeamType {
         return this.previousTurnTeam;
     }
-    public getHighestSpeedThisTurn(): number {
-        return this.highestSpeedThisTurn;
+    public getHighestInitiativeThisTurn(): number {
+        return this.highestInitiativeThisTurn;
     }
     public hasAlreadyMadeTurn(unitId: string): boolean {
         return this.alreadyMadeTurn.has(unitId);
@@ -403,8 +403,8 @@ export class FightProperties {
     public dequeueHourglassQueue(): string | undefined {
         return this.hourglassQueue.shift();
     }
-    public setHighestSpeedThisTurn(highestSpeedThisTurn: number): void {
-        this.highestSpeedThisTurn = highestSpeedThisTurn;
+    public setHighestInitiativeThisTurn(highestInitiativeThisTurn: number): void {
+        this.highestInitiativeThisTurn = highestInitiativeThisTurn;
     }
     public startTurn(teamType: TeamType, nowMillis: number = getTimeMillis()): void {
         let currentTotalTimePerTeam = this.currentLapTotalTimePerTeam.get(teamType);
@@ -1153,7 +1153,7 @@ export class FightProperties {
         fightProperties.fightStarted = fight.fight_started;
         fightProperties.fightFinished = fight.fight_finished;
         fightProperties.previousTurnTeam = fight.previous_turn_team;
-        fightProperties.highestSpeedThisTurn = fight.highest_speed_this_turn;
+        fightProperties.highestInitiativeThisTurn = fight.highest_initiative_this_turn;
         fightProperties.alreadyMadeTurn = new Set(fight.already_made_turn);
 
         // Deserialize alreadyMadeTurnByTeam
@@ -1229,10 +1229,10 @@ export class FightProperties {
             fight_started: this.fightStarted,
             fight_finished: this.fightFinished,
             previous_turn_team: this.previousTurnTeam,
-            // Round: proto int field, but unit speed buffs (augments/synergies) make the highest speed
+            // Round: proto int field, but unit initiative buffs (augments/synergies) make the highest initiative
             // fractional (e.g. 11.4) and serializeBinary asserts on non-integers — dropping the whole
             // serialized fight for any consumer (e.g. the ranked journal's FIGHT_INITIALIZED snapshot).
-            highest_speed_this_turn: Math.round(this.highestSpeedThisTurn),
+            highest_initiative_this_turn: Math.round(this.highestInitiativeThisTurn),
             already_made_turn: Array.from(this.alreadyMadeTurn),
             already_made_turn_by_team: new Map(
                 Array.from(this.alreadyMadeTurnByTeam).map(([key, value]) => [
@@ -1441,11 +1441,11 @@ export class FightProperties {
         // total morale based
         if (this.previousTurnTeam == PBTypes.TeamVals.NO_TEAM) {
             for (const u of unitsUpper) {
-                this.setHighestSpeedThisTurn(Math.max(this.highestSpeedThisTurn, u.getSpeed()));
+                this.setHighestInitiativeThisTurn(Math.max(this.highestInitiativeThisTurn, u.getInitiative()));
                 totalArmyMoraleUpper += u.getMorale();
             }
             for (const u of unitsLower) {
-                this.setHighestSpeedThisTurn(Math.max(this.highestSpeedThisTurn, u.getSpeed()));
+                this.setHighestInitiativeThisTurn(Math.max(this.highestInitiativeThisTurn, u.getInitiative()));
                 totalArmyMoraleLower += u.getMorale();
             }
 
@@ -1459,19 +1459,21 @@ export class FightProperties {
                 firstBatch = unitsLower;
                 secondBatch = unitsUpper;
             } else {
-                let lowerMaxSpeed = Number.MIN_SAFE_INTEGER;
+                let lowerMaxInitiative = Number.MIN_SAFE_INTEGER;
                 for (const u of unitsLower) {
-                    lowerMaxSpeed = u.getSpeed() > lowerMaxSpeed ? u.getSpeed() : lowerMaxSpeed;
+                    lowerMaxInitiative =
+                        u.getInitiative() > lowerMaxInitiative ? u.getInitiative() : lowerMaxInitiative;
                 }
-                let upperMaxSpeed = Number.MIN_SAFE_INTEGER;
+                let upperMaxInitiative = Number.MIN_SAFE_INTEGER;
                 for (const u of unitsUpper) {
-                    upperMaxSpeed = u.getSpeed() > upperMaxSpeed ? u.getSpeed() : upperMaxSpeed;
+                    upperMaxInitiative =
+                        u.getInitiative() > upperMaxInitiative ? u.getInitiative() : upperMaxInitiative;
                 }
 
-                if (lowerMaxSpeed > upperMaxSpeed) {
+                if (lowerMaxInitiative > upperMaxInitiative) {
                     firstBatch = unitsLower;
                     secondBatch = unitsUpper;
-                } else if (lowerMaxSpeed < upperMaxSpeed) {
+                } else if (lowerMaxInitiative < upperMaxInitiative) {
                     firstBatch = unitsUpper;
                     secondBatch = unitsLower;
                 } else {

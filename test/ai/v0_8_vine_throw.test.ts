@@ -96,7 +96,7 @@ describe("v0.8 Vine Throw policy", () => {
             team: UPPER,
             name: "Distant threat",
             attackType: MELEE,
-            speed: 6,
+            initiative: 6,
             damageMax: 20,
             amountAlive: 5,
             magicResist: 0,
@@ -127,7 +127,7 @@ describe("v0.8 Vine Throw policy", () => {
             team: UPPER,
             name: "Weak scout",
             attackType: MELEE,
-            speed: 1,
+            initiative: 1,
             damageMax: 1,
             amountAlive: 1,
         });
@@ -135,7 +135,7 @@ describe("v0.8 Vine Throw policy", () => {
             team: UPPER,
             name: "Fast threat",
             attackType: MELEE,
-            speed: 7,
+            initiative: 7,
             damageMax: 30,
             amountAlive: 10,
         });

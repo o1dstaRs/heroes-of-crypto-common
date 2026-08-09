@@ -383,7 +383,7 @@ describe("v0.8 search measurement alias", () => {
     it("keeps a non-dominant stronger-ranged screen waiting through lap 8 and forces an advance at lap 9", () => {
         const combat = createCombatTestContext();
         const fightProperties = FightStateManager.getInstance().getFightProperties();
-        const screen = createTestUnit({ team: LOWER, name: "Screen", attackType: MELEE, speed: 2 });
+        const screen = createTestUnit({ team: LOWER, name: "Screen", attackType: MELEE, initiative: 2 });
         const ownShooter = createTestUnit({
             team: LOWER,
             name: "Strong shooter",
@@ -511,7 +511,7 @@ describe("v0.8 search measurement alias", () => {
     it("closes on a sole surviving enemy summon in the lap-9 sprint", () => {
         const combat = createCombatTestContext();
         const fightProperties = FightStateManager.getInstance().getFightProperties();
-        const actor = createTestUnit({ team: LOWER, name: "Summon finisher", attackType: MELEE, speed: 2 });
+        const actor = createTestUnit({ team: LOWER, name: "Summon finisher", attackType: MELEE, initiative: 2 });
         const ownShooter = createTestUnit({
             team: LOWER,
             name: "Strong shooter",
@@ -576,7 +576,7 @@ describe("v0.8 search measurement alias", () => {
                 damageMax: ownDamage,
                 rangeShots: 1,
                 shotDistance: 1,
-                speed: 2,
+                initiative: 2,
             });
             const ownScreen = createTestUnit({ team: LOWER, name: "Own screen", attackType: MELEE });
             const enemyShooter = createTestUnit({

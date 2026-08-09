@@ -109,10 +109,10 @@ function buildBoard(
 ): Board {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    const actor = createTestUnit({ name: "Actor", team: LOWER, speed: 4, ...actorOptions });
-    const ally = createTestUnit({ name: "Ally", team: LOWER, speed: 2, ...allyOptions });
-    const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, speed: 3, amountAlive: enemyAmountAlive });
-    const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, speed: 5, amountAlive: enemyAmountAlive });
+    const actor = createTestUnit({ name: "Actor", team: LOWER, initiative: 4, ...actorOptions });
+    const ally = createTestUnit({ name: "Ally", team: LOWER, initiative: 2, ...allyOptions });
+    const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, initiative: 3, amountAlive: enemyAmountAlive });
+    const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, initiative: 5, amountAlive: enemyAmountAlive });
     placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, ally, { x: 5, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 3, y: 10 });
@@ -411,7 +411,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
 
     it("fails closed when malformed state produces a non-finite score", () => {
         const { actor, context, incumbent } = buildBoard(10);
-        Object.defineProperty(actor, "getSpeed", { value: () => Number.NaN });
+        Object.defineProperty(actor, "getInitiative", { value: () => Number.NaN });
 
         expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
     });
@@ -493,18 +493,18 @@ describe("v0.7 strategy — baked wait scorer", () => {
         const actor = createTestUnit({
             name: "Shooter",
             team: LOWER,
-            speed: 4,
+            initiative: 4,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 5,
         });
         const ally = createTestUnit({
             name: "Shooter Ally",
             team: LOWER,
-            speed: 2,
+            initiative: 2,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 5,
         });
-        const enemy = createTestUnit({ name: "Enemy", team: UPPER, speed: 3, amountAlive: 10 });
+        const enemy = createTestUnit({ name: "Enemy", team: UPPER, initiative: 3, amountAlive: 10 });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 5, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 3, y: 10 });

@@ -501,13 +501,17 @@ export class TurnEngine {
         const unitsUpper = this.getAliveTeamUnits(PBTypes.TeamVals.UPPER);
         const unitsLower = this.getAliveTeamUnits(PBTypes.TeamVals.LOWER);
         const allUnits = shuffleWithRng([...unitsUpper, ...unitsLower], this.runtime.rng).sort(
-            (a, b) => b.getSpeed() - a.getSpeed(),
+            (a, b) => b.getInitiative() - a.getInitiative(),
         );
 
         return {
             allUnits,
-            unitsUpper: shuffleWithRng(unitsUpper, this.runtime.rng).sort((a, b) => b.getSpeed() - a.getSpeed()),
-            unitsLower: shuffleWithRng(unitsLower, this.runtime.rng).sort((a, b) => b.getSpeed() - a.getSpeed()),
+            unitsUpper: shuffleWithRng(unitsUpper, this.runtime.rng).sort(
+                (a, b) => b.getInitiative() - a.getInitiative(),
+            ),
+            unitsLower: shuffleWithRng(unitsLower, this.runtime.rng).sort(
+                (a, b) => b.getInitiative() - a.getInitiative(),
+            ),
         };
     }
     private getAliveTeamUnits(team: TeamType): Unit[] {

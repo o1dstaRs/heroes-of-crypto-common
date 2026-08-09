@@ -130,7 +130,7 @@ function buildBlockFixture(options: {
     readonly size: UnitSizeType;
     readonly actorBase: XY;
     readonly enemyBase?: XY;
-    readonly speed?: number;
+    readonly initiative?: number;
     readonly leftIntact?: boolean;
     readonly rightIntact?: boolean;
     readonly rangedAlly?: boolean;
@@ -149,7 +149,7 @@ function buildBlockFixture(options: {
         damageMax: 10,
         amountAlive: 2,
         maxHp: 100,
-        speed: options.speed ?? 2,
+        initiative: options.initiative ?? 2,
         size: options.size,
     });
     const enemy = createTestUnit({
@@ -162,7 +162,7 @@ function buildBlockFixture(options: {
         damageMax: 1,
         amountAlive: 10,
         maxHp: 100,
-        speed: 1,
+        initiative: 1,
     });
     placeActor(combat, actor, options.actorBase);
     placeUnit(
@@ -181,7 +181,7 @@ function buildBlockFixture(options: {
             damageMax: 20,
             amountAlive: 10,
             shotDistance: 30,
-            speed: 1,
+            initiative: 1,
         });
         placeUnit(combat.grid, combat.unitsHolder, ally, options.team === LOWER ? { x: 1, y: 14 } : { x: 14, y: 1 });
     }
@@ -372,7 +372,7 @@ describe("v0.8 BLOCK_CENTER selection", () => {
                                 team,
                                 size: size === "small" ? SMALL : LARGE,
                                 actorBase: strikeStart(side, team, size, mode),
-                                speed: mode === "stationary" ? 1 : 8,
+                                initiative: mode === "stationary" ? 1 : 8,
                                 leftIntact: side === "left",
                                 rightIntact: side === "right",
                             });
@@ -420,7 +420,7 @@ describe("v0.8 BLOCK_CENTER selection", () => {
                 team: testCase.team,
                 size: testCase.size,
                 actorBase: testCase.base,
-                speed: 3,
+                initiative: 3,
                 leftIntact: testCase.left,
                 rightIntact: testCase.right,
             });
@@ -447,7 +447,7 @@ describe("v0.8 BLOCK_CENTER selection", () => {
                                 team,
                                 size: size === "small" ? SMALL : LARGE,
                                 actorBase: strikeStart(side, team, size, mode),
-                                speed: 2,
+                                initiative: 2,
                                 leftIntact: side === "left",
                                 rightIntact: side === "right",
                             });
@@ -498,7 +498,7 @@ describe("v0.8 BLOCK_CENTER selection", () => {
                             size: size === "small" ? SMALL : LARGE,
                             actorBase: mountainDestination(side, team, size),
                             enemyBase: directEnemyBase(side, team, size),
-                            speed: 1,
+                            initiative: 1,
                             rangedAlly: true,
                         });
                         const mine = mineCandidates(fixture)[0];
@@ -553,7 +553,7 @@ describe("v0.8 BLOCK_CENTER selection", () => {
                 size: SMALL,
                 actorBase: { x: 4, y: 7 },
                 enemyBase: { x: 3, y: 7 },
-                speed: 1,
+                initiative: 1,
                 rangedAlly: true,
                 lap: A13_URGENT_LAP,
             });

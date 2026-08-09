@@ -934,7 +934,7 @@ describe("v0.8 back-line protector intent", () => {
             attackType: MELEE_MAGIC,
             movementType: FLY,
             size: PBTypes.UnitSizeVals.LARGE,
-            speed: 3,
+            initiative: 3,
             auraEffects: ["Arrows Wingshield"],
             auraRanges: [2],
             auraIsBuff: [true],

@@ -60,7 +60,7 @@ function runThroughShotScenario(abilities: string[]): number {
         shotDistance: 16,
         size: PBTypes.UnitSizeVals.LARGE,
         abilities,
-        speed: 5,
+        initiative: 5,
         morale: 4,
     });
     placeLargeUnit(grid, unitsHolder, attacker, { x: minX + 8 * step, y: 2 * step });

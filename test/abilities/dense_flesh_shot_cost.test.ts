@@ -30,7 +30,7 @@ const setup = (attackerAbilities: string[], targetAbilities: string[]) => {
         damageMax: 20,
         rangeShots: 14,
         shotDistance: 20,
-        speed: 5,
+        initiative: 5,
         morale: 4,
         abilities: attackerAbilities,
     });

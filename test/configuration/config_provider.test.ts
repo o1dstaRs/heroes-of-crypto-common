@@ -122,7 +122,7 @@ describe("config_provider", () => {
         // The requested one-unit tank profile: a 1,000-XP stack is exactly one 600-HP creature.
         expect(creature.max_hp).toBe(600);
         expect(creature.steps).toBe(4.2);
-        expect(creature.speed).toBe(3.3);
+        expect(creature.initiative).toBe(3.3);
         expect(creature.base_armor).toBe(48);
         expect(creature.base_attack).toBe(22);
         expect(creature.exp).toBe(1000);

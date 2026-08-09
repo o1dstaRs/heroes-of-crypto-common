@@ -67,8 +67,8 @@ export const WAIT_FEATURE_NAMES: readonly string[] = [
     "enemyYetFrac", // enemy yet-to-act / enemy alive
     "posInLap", // alreadyMadeTurnSize / total living stacks — how deep into the lap we are
     "lapCapped", // min(lap, 8)/8 — raw lap number (lapNorm above is min(lap/10,1); this is finer early)
-    "initAdvMax", // norm(max own yet-to-act speed, max enemy yet-to-act speed) — who wins the next pick
-    "initAdvMean", // norm(mean own yet-to-act speed, mean enemy yet-to-act speed) — remaining-queue quality
+    "initAdvMax", // norm(max own yet-to-act initiative, max enemy yet-to-act initiative) — who wins the next pick
+    "initAdvMean", // norm(mean own yet-to-act initiative, mean enemy yet-to-act initiative) — remaining-queue quality
     "isMelee", // acting unit class flags (MELEE or MELEE_MAGIC)
     "isRanged", // RANGE
     "isCaster", // MAGIC or MELEE_MAGIC
@@ -228,10 +228,10 @@ export function extractWaitFeatures(
     let enemyAlive = 0;
     let ownYet = 0;
     let enemyYet = 0;
-    let ownYetSpeedSum = 0;
-    let enemyYetSpeedSum = 0;
-    let ownYetSpeedMax = 0;
-    let enemyYetSpeedMax = 0;
+    let ownYetInitiativeSum = 0;
+    let enemyYetInitiativeSum = 0;
+    let ownYetInitiativeMax = 0;
+    let enemyYetInitiativeMax = 0;
     for (const u of unitsHolder.getAllUnits().values()) {
         if (u.isDead()) {
             continue;
@@ -246,15 +246,15 @@ export function extractWaitFeatures(
         if (!yet) {
             continue;
         }
-        const speed = u.getSpeed();
+        const initiative = u.getInitiative();
         if (own) {
             ownYet += 1;
-            ownYetSpeedSum += speed;
-            ownYetSpeedMax = Math.max(ownYetSpeedMax, speed);
+            ownYetInitiativeSum += initiative;
+            ownYetInitiativeMax = Math.max(ownYetInitiativeMax, initiative);
         } else {
             enemyYet += 1;
-            enemyYetSpeedSum += speed;
-            enemyYetSpeedMax = Math.max(enemyYetSpeedMax, speed);
+            enemyYetInitiativeSum += initiative;
+            enemyYetInitiativeMax = Math.max(enemyYetInitiativeMax, initiative);
         }
     }
     const norm = (a: number, b: number): number => (a - b) / (a + b + 1);
@@ -276,8 +276,8 @@ export function extractWaitFeatures(
         enemyYetFrac,
         ownAlive + enemyAlive > 0 ? fightProperties.getAlreadyMadeTurnSize() / (ownAlive + enemyAlive) : 0,
         lapCapped,
-        norm(ownYetSpeedMax, enemyYetSpeedMax),
-        norm(ownYet ? ownYetSpeedSum / ownYet : 0, enemyYet ? enemyYetSpeedSum / enemyYet : 0),
+        norm(ownYetInitiativeMax, enemyYetInitiativeMax),
+        norm(ownYet ? ownYetInitiativeSum / ownYet : 0, enemyYet ? enemyYetInitiativeSum / enemyYet : 0),
         isMelee,
         isRanged,
         attackType === MAGIC || attackType === MELEE_MAGIC ? 1 : 0,

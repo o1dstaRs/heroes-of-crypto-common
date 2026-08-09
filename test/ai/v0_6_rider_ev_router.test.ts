@@ -483,7 +483,7 @@ describe("v0.6 melee rider EV router", () => {
             damageMin: 1,
             damageMax: 1,
             amountAlive: 5,
-            speed: 4,
+            initiative: 4,
             stackPower: 100,
             abilities: ["Stun"],
         });

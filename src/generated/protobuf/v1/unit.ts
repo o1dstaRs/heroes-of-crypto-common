@@ -20,7 +20,7 @@ export namespace PBTypes {
             steps_mod?: number;
             morale?: number;
             luck?: number;
-            speed?: number;
+            initiative?: number;
             armor_mod?: number;
             base_armor?: number;
             attack_type?: dependency_1.PBTypes.AttackVals;
@@ -80,8 +80,8 @@ export namespace PBTypes {
                 if ("luck" in data && data.luck != undefined) {
                     this.luck = data.luck;
                 }
-                if ("speed" in data && data.speed != undefined) {
-                    this.speed = data.speed;
+                if ("initiative" in data && data.initiative != undefined) {
+                    this.initiative = data.initiative;
                 }
                 if ("armor_mod" in data && data.armor_mod != undefined) {
                     this.armor_mod = data.armor_mod;
@@ -220,10 +220,10 @@ export namespace PBTypes {
         set luck(value: number) {
             pb_1.Message.setField(this, 10, value);
         }
-        get speed() {
+        get initiative() {
             return pb_1.Message.getFieldWithDefault(this, 11, 0) as number;
         }
-        set speed(value: number) {
+        set initiative(value: number) {
             pb_1.Message.setField(this, 11, value);
         }
         get armor_mod() {
@@ -387,7 +387,7 @@ export namespace PBTypes {
             steps_mod?: number;
             morale?: number;
             luck?: number;
-            speed?: number;
+            initiative?: number;
             armor_mod?: number;
             base_armor?: number;
             attack_type?: dependency_1.PBTypes.AttackVals;
@@ -445,8 +445,8 @@ export namespace PBTypes {
             if (data.luck != null) {
                 message.luck = data.luck;
             }
-            if (data.speed != null) {
-                message.speed = data.speed;
+            if (data.initiative != null) {
+                message.initiative = data.initiative;
             }
             if (data.armor_mod != null) {
                 message.armor_mod = data.armor_mod;
@@ -537,7 +537,7 @@ export namespace PBTypes {
                 steps_mod?: number;
                 morale?: number;
                 luck?: number;
-                speed?: number;
+                initiative?: number;
                 armor_mod?: number;
                 base_armor?: number;
                 attack_type?: dependency_1.PBTypes.AttackVals;
@@ -594,8 +594,8 @@ export namespace PBTypes {
             if (this.luck != null) {
                 data.luck = this.luck;
             }
-            if (this.speed != null) {
-                data.speed = this.speed;
+            if (this.initiative != null) {
+                data.initiative = this.initiative;
             }
             if (this.armor_mod != null) {
                 data.armor_mod = this.armor_mod;
@@ -698,8 +698,8 @@ export namespace PBTypes {
                 writer.writeInt32(9, this.morale);
             if (this.luck != 0)
                 writer.writeInt32(10, this.luck);
-            if (this.speed != 0)
-                writer.writeUint32(11, this.speed);
+            if (this.initiative != 0)
+                writer.writeUint32(11, this.initiative);
             if (this.armor_mod != 0)
                 writer.writeDouble(12, this.armor_mod);
             if (this.base_armor != 0)
@@ -790,7 +790,7 @@ export namespace PBTypes {
                         message.luck = reader.readInt32();
                         break;
                     case 11:
-                        message.speed = reader.readUint32();
+                        message.initiative = reader.readUint32();
                         break;
                     case 12:
                         message.armor_mod = reader.readDouble();

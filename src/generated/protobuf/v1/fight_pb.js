@@ -91,7 +91,7 @@ firstTurnMade: jspb.Message.getBooleanFieldWithDefault(msg, 4, false),
 fightStarted: jspb.Message.getBooleanFieldWithDefault(msg, 5, false),
 fightFinished: jspb.Message.getBooleanFieldWithDefault(msg, 6, false),
 previousTurnTeam: jspb.Message.getFieldWithDefault(msg, 7, 0),
-highestSpeedThisTurn: jspb.Message.getFieldWithDefault(msg, 8, 0),
+highestInitiativeThisTurn: jspb.Message.getFieldWithDefault(msg, 8, 0),
 alreadyMadeTurnList: (f = jspb.Message.getRepeatedField(msg, 9)) == null ? undefined : f,
 alreadyMadeTurnByTeamMap: (f = msg.getAlreadyMadeTurnByTeamMap()) ? f.toObject(includeInstance, proto.PBTypes.StringList.toObject) : [],
 alreadyHourglassList: (f = jspb.Message.getRepeatedField(msg, 11)) == null ? undefined : f,
@@ -172,7 +172,7 @@ proto.PBTypes.Fight.deserializeBinaryFromReader = function(msg, reader) {
       break;
     case 8:
       var value = /** @type {number} */ (reader.readInt32());
-      msg.setHighestSpeedThisTurn(value);
+      msg.setHighestInitiativeThisTurn(value);
       break;
     case 9:
       var value = /** @type {string} */ (reader.readString());
@@ -316,7 +316,7 @@ proto.PBTypes.Fight.serializeBinaryToWriter = function(message, writer) {
       f
     );
   }
-  f = message.getHighestSpeedThisTurn();
+  f = message.getHighestInitiativeThisTurn();
   if (f !== 0) {
     writer.writeInt32(
       8,
@@ -563,10 +563,10 @@ proto.PBTypes.Fight.prototype.setPreviousTurnTeam = function(value) {
 
 
 /**
- * optional int32 highest_speed_this_turn = 8;
+ * optional int32 highest_initiative_this_turn = 8;
  * @return {number}
  */
-proto.PBTypes.Fight.prototype.getHighestSpeedThisTurn = function() {
+proto.PBTypes.Fight.prototype.getHighestInitiativeThisTurn = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 8, 0));
 };
 
@@ -575,7 +575,7 @@ proto.PBTypes.Fight.prototype.getHighestSpeedThisTurn = function() {
  * @param {number} value
  * @return {!proto.PBTypes.Fight} returns this
  */
-proto.PBTypes.Fight.prototype.setHighestSpeedThisTurn = function(value) {
+proto.PBTypes.Fight.prototype.setHighestInitiativeThisTurn = function(value) {
   return jspb.Message.setProto3IntField(this, 8, value);
 };
 

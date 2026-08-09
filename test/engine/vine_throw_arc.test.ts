@@ -46,7 +46,7 @@ const setupThrow = (options: { screenAt?: XY; terrainAt?: { cell: XY; marker: st
         team: PBTypes.TeamVals.LOWER,
         spells: ["System:Vine Throw"],
         stackPower: 5,
-        speed: 5,
+        initiative: 5,
         morale: 4,
     });
     const target = createTestUnit({
@@ -55,7 +55,7 @@ const setupThrow = (options: { screenAt?: XY; terrainAt?: { cell: XY; marker: st
         maxHp: 1000,
         amountAlive: 1,
         magicResist: 0,
-        speed: 3,
+        initiative: 3,
         morale: 4,
     });
     place(context.grid, context.unitsHolder, trent, { x: 2, y: 8 });

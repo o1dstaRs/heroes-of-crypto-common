@@ -100,7 +100,7 @@ function buildRig(isSmall: boolean, startCell: XY, occupyFootprint: boolean): Ri
         team: LOWER,
         attackType: MELEE,
         name: isSmall ? "Knight" : "Ogre",
-        speed: 8,
+        initiative: 8,
         ...(isSmall ? {} : { size: LARGE }),
     });
     if (isSmall) {

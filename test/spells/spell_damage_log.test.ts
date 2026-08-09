@@ -48,7 +48,7 @@ const setup = (magicResist: number) => {
         spells: ["Nature:Lightning Strike", "Nature:Ring of Fire"],
         amountAlive: 20,
         stackPower: 5,
-        speed: 5,
+        initiative: 5,
         morale: 4,
     });
     placeUnit(context.grid, context.unitsHolder, caster, { x: 3, y: 3 });
@@ -58,7 +58,7 @@ const setup = (magicResist: number) => {
         team: PBTypes.TeamVals.UPPER,
         maxHp: 100_000,
         magicResist,
-        speed: 3,
+        initiative: 3,
         morale: 4,
     });
     placeUnit(context.grid, context.unitsHolder, victim, { x: 6, y: 3 });
@@ -71,7 +71,7 @@ const setup = (magicResist: number) => {
         team: PBTypes.TeamVals.UPPER,
         maxHp: 100_000,
         magicResist,
-        speed: 3,
+        initiative: 3,
         morale: 4,
     });
     placeUnit(context.grid, context.unitsHolder, ringVictim, { x: 6, y: 4 });

@@ -261,7 +261,7 @@ describe("Fire Wall through the action engine", () => {
         const caster = createTestUnit({
             name: "Nightmare",
             team: PBTypes.TeamVals.LOWER,
-            speed: 5,
+            initiative: 5,
             morale: 4,
             spells: opts.casterSpells ?? ["Chaos:Fire Wall"],
             // Fire Wall's minimal_caster_stack_power is 4.
@@ -270,7 +270,7 @@ describe("Fire Wall through the action engine", () => {
         const enemy = createTestUnit({
             name: "Upper",
             team: PBTypes.TeamVals.UPPER,
-            speed: 3,
+            initiative: 3,
             morale: 4,
             maxHp: opts.moverMaxHp ?? 20,
             amountAlive: 10,
