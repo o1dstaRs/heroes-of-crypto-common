@@ -725,7 +725,7 @@
             "armor": 9,
             "attack_type": "RANGE",
             "attack": 11,
-            "attack_damage_min": 1,
+            "attack_damage_min": 2,
             "attack_damage_max": 5,
             "attack_range": 1,
             "range_shots": 6,
