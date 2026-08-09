@@ -216,6 +216,22 @@ export interface IVineGrid {
  * Shared with the client's aim preview so a highlighted throw can never be one the engine then refuses —
  * the same contract `isSmokeableCell` holds for Smoke.
  */
+/**
+ * Whether a vine can take ROOT on a cell it flies over.
+ *
+ * Distinct from crossing (below): since the throw arcs over terrain, the lane can now include cells that
+ * cannot hold a vine at all — the centre mountain ("B"), a narrowed hole ("H"), anything off-board. A
+ * creature standing there is NOT an obstacle to rooting: the vine lands under it, exactly as it always has
+ * on the target's own cell. Lava and water keep taking vines as before.
+ */
+export function canVineTakeRoot(grid: IVineGrid, withinGrid: boolean, cell: XY): boolean {
+    if (!withinGrid) {
+        return false;
+    }
+    const occupant = grid.getOccupantUnitId(cell);
+    return occupant !== "B" && occupant !== "H";
+}
+
 export function isVineCrossableCell(grid: IVineGrid, withinGrid: boolean, cell: XY): boolean {
     if (!withinGrid) {
         return false;

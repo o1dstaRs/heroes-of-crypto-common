@@ -43,7 +43,7 @@ import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { isSmokeableCell } from "../spells/smoke_clouds";
 import { applyMagicResistToSpellDamage, calculateSpellDamage, elementalSpellMultiplier } from "../spells/spell_damage";
-import { VINE_STRIDE_COST_MULTIPLIER, isVineCrossableCell, vinePathCells } from "../spells/vines";
+import { VINE_STRIDE_COST_MULTIPLIER, canVineTakeRoot, vinePathCells } from "../spells/vines";
 import {
     fireWallBurnDamage,
     fireWallBurnPercentage,
@@ -1465,28 +1465,28 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
         const settings = this.context.grid.getSettings();
-        // Everything before the target's own cell must be clear. The target obviously occupies the last cell,
-        // and the caster's cell is already excluded by vinePathCells.
-        //
-        // Neither endpoint's own body counts as a blocker, for the reason spelled out in
-        // isSpellLineOfSightClear: a 2x2 creature is addressed by ONE base cell but stands on four, so the
-        // line to that base cell crosses its own remaining cells whenever the throw comes from the far side.
-        const casterUnitId = this.context.grid.getOccupantUnitId(from);
-        const targetUnitId = this.context.grid.getOccupantUnitId(to);
-        for (const cell of pathCells.slice(0, -1)) {
-            const occupant = this.context.grid.getOccupantUnitId(cell);
-            if (occupant && (occupant === casterUnitId || occupant === targetUnitId)) {
-                continue;
-            }
-            // Lava and water are ground the vine creeps over; a body or the mountain is not. Shared with the
-            // client's aim preview so a highlighted throw is never one this then refuses.
-            if (!isVineCrossableCell(this.context.grid, isCellWithinGrid(settings, cell), cell)) {
-                return this.reject("spell_not_available");
-            }
+        // Only a CREATURE standing in the lane can intercept the throw (owner 2026-08-08) — the arc clears
+        // terrain. The shared per-spell walk decides, so the client's aim preview and the AI's enumeration
+        // can never promise a throw this then refuses, and neither endpoint's own body counts (a 2x2
+        // creature stands on four cells but is addressed by one).
+        const blocker = SpellHelper.firstTargetedSpellSightBlocker(
+            spell.getName(),
+            this.context.grid,
+            (cell) => isCellWithinGrid(settings, cell),
+            from,
+            to,
+        );
+        if (blocker) {
+            return this.reject("spell_not_available");
         }
 
         const laps = spell.getLapsTotal();
-        this.context.fightProperties.getVines().addAll(pathCells, laps, caster.getTeam());
+        // The lane may now cross ground no vine can grip (the mountain, a narrowed hole): the throw still
+        // happens, the vine just does not take root there.
+        const rootedCells = pathCells.filter((cell) =>
+            canVineTakeRoot(this.context.grid, isCellWithinGrid(settings, cell), cell),
+        );
+        this.context.fightProperties.getVines().addAll(rootedCells, laps, caster.getTeam());
         // The snare is a DEBUFF, so magic armor gets its usual save against it — the same roll every other
         // cast debuff takes (see the magic-attack path). Note what the save does NOT cover: the vines are
         // already on the ground by this point and stay there. The throw physically happened and painted the
@@ -1524,7 +1524,7 @@ export class GameActionEngine {
                 type: "vine_placed",
                 casterId: caster.getId(),
                 targetId: target.getId(),
-                cells: pathCells,
+                cells: rootedCells,
                 lapsRemaining: laps,
                 // Ranked rebuilds its log from events, never from the text above, so the save has to ride
                 // along or a resisted snare reads there as a snare that landed.

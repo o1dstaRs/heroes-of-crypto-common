@@ -101,7 +101,8 @@
             "name": "Vine Throw",
             "level": 0,
             "desc": [
-                "Hurls a vine at an enemy in line of sight, leaving it across every cell on the way.",
+                "Hurls a vine over the battlefield at any enemy no creature is screening,",
+                "leaving it across every cell on the way that can hold it.",
                 "A non-flying creature pays 1 extra step to cross a vined cell.",
                 "The struck creature also loses 1.5 steps, unless its magic armor shrugs the snare off.",
                 "The vine lands on the cells either way.",

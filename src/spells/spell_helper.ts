@@ -205,6 +205,11 @@ export function firstSpellSightBlocker(
     isWithinGrid: (cell: XY) => boolean,
     from: XY,
     to: XY,
+    // Vine Throw alone is thrown in an ARC (owner 2026-08-08): only a creature standing in the way can
+    // intercept it, so terrain — the centre mountain, a narrowed hole, off-board cells — no longer refuses
+    // the cast. Every other thrown spell keeps the archer's rule where terrain blocks too. The vine simply
+    // does not take root on a cell that cannot hold it (see canVineTakeRoot).
+    blockedBy: "creatures" | "creatures-and-terrain" = "creatures-and-terrain",
 ): ISpellSightBlocker | undefined {
     const pathCells = vinePathCells(from, to);
     if (!pathCells.length) {
@@ -223,18 +228,23 @@ export function firstSpellSightBlocker(
     // nothing.
     const casterUnitId = grid.getOccupantUnitId(from);
     const targetUnitId = grid.getOccupantUnitId(to);
+    const creaturesOnly = blockedBy === "creatures";
     for (const cell of pathCells.slice(0, -1)) {
         if (!isWithinGrid(cell)) {
+            if (creaturesOnly) {
+                continue;
+            }
             return { cell, occupantId: "B" };
         }
         const occupant = grid.getOccupantUnitId(cell);
-        if (
-            occupant &&
-            occupant !== "L" &&
-            occupant !== "W" &&
-            occupant !== casterUnitId &&
-            occupant !== targetUnitId
-        ) {
+        if (!occupant || occupant === "L" || occupant === "W") {
+            continue;
+        }
+        // "B" (mountain) and "H" (narrowed hole) are TERRAIN markers, not creatures.
+        if (creaturesOnly && (occupant === "B" || occupant === "H")) {
+            continue;
+        }
+        if (occupant !== casterUnitId && occupant !== targetUnitId) {
             return { cell, occupantId: occupant };
         }
     }
@@ -263,7 +273,34 @@ export function isTargetedSpellLineOfSightClear(
     from: XY,
     to: XY,
 ): boolean {
-    return !targetedSpellRequiresLineOfSight(spellName) || isSpellLineOfSightClear(grid, isWithinGrid, from, to);
+    if (!targetedSpellRequiresLineOfSight(spellName)) {
+        return true;
+    }
+    return firstTargetedSpellSightBlocker(spellName, grid, isWithinGrid, from, to) === undefined;
+}
+
+/**
+ * The blocker for a specific spell, applying that spell's own interception rule — creature-only for the
+ * arcing Vine Throw, terrain-inclusive for every other thrown spell. One place decides, so the engine's
+ * cast, the AI's enumeration and the client's aim preview can never disagree about what stops a throw.
+ */
+export function firstTargetedSpellSightBlocker(
+    spellName: string,
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    from: XY,
+    to: XY,
+): ISpellSightBlocker | undefined {
+    if (!targetedSpellRequiresLineOfSight(spellName)) {
+        return undefined;
+    }
+    return firstSpellSightBlocker(
+        grid,
+        isWithinGrid,
+        from,
+        to,
+        spellName === "Vine Throw" ? "creatures" : "creatures-and-terrain",
+    );
 }
 
 export function canCastSummon(spell: Spell, gridMatrix: number[][], emptyGridCell?: XY): boolean {
