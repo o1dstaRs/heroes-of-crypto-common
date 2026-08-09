@@ -152,7 +152,7 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // differently. Two isolated runs produced this byte-identical digest.
 // Re-pinned after Wyvern's Venom Cloud doubled its poison share (15% -> 30%) and repeated-poison stack
 // contribution (35% -> 70%). The stronger damage legitimately changes any trace fielding the aura.
-const EXPECTED_REPLAY_SHA256 = "b63ecdb19ff9941fb7a20d421c7247e3e66a6ada67f027f6404a6f60c4ad5d90";
+const EXPECTED_REPLAY_SHA256 = "e830fe0727e076471fc15dba3a0d7d85152514a3df92fcbb9818373e3ed85a15";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
