@@ -156,7 +156,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // flipped from an enemy-turn-start field into a green ally buff that stuns on the ally's hit. Both change
 // combat outcomes in every seeded fight the Abomination screens. Verified byte-identical x2 on a CLEAN
 // origin/main checkout (an earlier pin was contaminated by peer WIP left in the shared working tree).
-const EXPECTED_REPLAY_SHA256 = "1d35a5b341410ae51e3e3d08f21e9ad3f8cf6256b4930819389553bbcdf808dc";
+// Re-pinned after Miner began applying its permanent armor transfer through the normal debuff funnel.
+// Seed 2147790257 fields Troglodyte, so the authoritative effect event and unit state intentionally move
+// that combat trace. Two isolated runs produced this byte-identical digest.
+const EXPECTED_REPLAY_SHA256 = "aad50811ab8e8ab8198165fc2e285041f82226aed70e0d4f4cc27d9579218ce9";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
