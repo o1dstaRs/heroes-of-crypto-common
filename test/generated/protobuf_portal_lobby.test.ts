@@ -12,6 +12,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { PBTypes as LobbyPB } from "../../src/generated/protobuf/v1/lobby";
+import { PortalMatchKind } from "../../src/generated/protobuf/v1/messages_reexports";
 import { PBTypes as PortalPB } from "../../src/generated/protobuf/v1/player_portal";
 import { PBTypes as TypesPB } from "../../src/generated/protobuf/v1/types";
 
@@ -69,6 +70,11 @@ const portalMatch = {
     player_abandoned: false,
     player_setup: playerSetup,
     opponent_setup: opponentSetup,
+    match_kind: PortalPB.PortalMatchKind.RANKED,
+    mmr_before: 794,
+    mmr_after: 812,
+    mmr_delta: 18,
+    gold_earned: 18,
 };
 const portalCombo = { creature_ids: [7, 8], games: 12, wins: 9 };
 const portalCreature = { creature_id: 5, games: 20, wins: 14 };
@@ -95,10 +101,31 @@ describe("generated player_portal protobuf messages", () => {
             PortalPB.PortalMatch.fromObject({ ...portalMatch, game_id: "game-draw", won: false, draw: true }),
             PortalPB.PortalMatch.deserializeBinary,
         );
+        const loss = PortalPB.PortalMatch.fromObject({
+            ...portalMatch,
+            game_id: "game-loss",
+            won: false,
+            mmr_before: 812,
+            mmr_after: 794,
+            mmr_delta: -18,
+            gold_earned: 0,
+        });
+        roundTrip(loss, PortalPB.PortalMatch.deserializeBinary);
         const match = PortalPB.PortalMatch.fromObject(portalMatch);
         expect(match.player_setup?.synergies).toEqual(["Life:1:2", "Might:2:1"]);
         expect(match.player_setup?.complete).toBe(true);
         expect(match.opponent_setup?.artifact_tier_2).toBe(5);
+        expect(match.match_kind).toBe(PortalPB.PortalMatchKind.RANKED);
+        expect(match.mmr_delta).toBe(18);
+        expect(match.gold_earned).toBe(18);
+        expect(PortalPB.PortalMatch.deserializeBinary(loss.serializeBinary()).mmr_delta).toBe(-18);
+        expect([
+            PortalPB.PortalMatchKind.UNKNOWN,
+            PortalPB.PortalMatchKind.RANKED,
+            PortalPB.PortalMatchKind.CALIBRATION,
+            PortalPB.PortalMatchKind.LOBBY,
+        ]).toEqual([0, 1, 2, 3]);
+        expect(PortalMatchKind.LOBBY).toBe(PortalPB.PortalMatchKind.LOBBY);
         expect(PortalPB.PortalMatchSetup.fromObject({ perk: 3 }).complete).toBe(false);
         roundTrip(PortalPB.PortalComboStat.fromObject(portalCombo), PortalPB.PortalComboStat.deserializeBinary);
         roundTrip(
@@ -106,6 +133,21 @@ describe("generated player_portal protobuf messages", () => {
             PortalPB.PortalCreatureStat.deserializeBinary,
         );
         roundTrip(PortalPB.PortalFactionStat.fromObject(portalFaction), PortalPB.PortalFactionStat.deserializeBinary);
+    });
+
+    it("keeps appended match metadata backward-compatible with legacy payloads", () => {
+        const legacy = PortalPB.PortalMatch.deserializeBinary(
+            PortalPB.PortalMatch.fromObject({ game_id: "legacy-game", won: true }).serializeBinary(),
+        );
+
+        expect(legacy.toObject()).toMatchObject({
+            game_id: "legacy-game",
+            match_kind: PortalPB.PortalMatchKind.UNKNOWN,
+            mmr_before: 0,
+            mmr_after: 0,
+            mmr_delta: 0,
+            gold_earned: 0,
+        });
     });
 
     it("round-trips a fully-populated ResponsePlayerPortal", () => {

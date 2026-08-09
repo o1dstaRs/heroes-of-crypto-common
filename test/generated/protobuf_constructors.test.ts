@@ -149,6 +149,11 @@ describe("generated message constructors (new X({...}))", () => {
             player_abandoned: true,
             player_setup: playerSetup,
             opponent_setup: opponentSetup,
+            match_kind: PortalPB.PortalMatchKind.CALIBRATION,
+            mmr_before: 902,
+            mmr_after: 890,
+            mmr_delta: -12,
+            gold_earned: 0,
         };
         roundTrip(
             new PortalPB.PortalUnitPerformance({ creature_id: 1, damage_dealt: 1400 }),

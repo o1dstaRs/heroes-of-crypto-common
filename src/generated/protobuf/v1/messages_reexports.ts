@@ -67,6 +67,8 @@ export type PerkRequest = InstanceType<typeof m_pick_phase_requests.PBTypes.Perk
 export type PerkRequestObject = ReturnType<InstanceType<typeof m_pick_phase_requests.PBTypes.PerkRequest>["toObject"]>;
 
 import * as m_player_portal from "./player_portal";
+export const PortalMatchKind = m_player_portal.PBTypes.PortalMatchKind;
+export type PortalMatchKind = m_player_portal.PBTypes.PortalMatchKind;
 export const PortalUnitPerformance = m_player_portal.PBTypes.PortalUnitPerformance;
 export type PortalUnitPerformance = InstanceType<typeof m_player_portal.PBTypes.PortalUnitPerformance>;
 export type PortalUnitPerformanceObject = ReturnType<InstanceType<typeof m_player_portal.PBTypes.PortalUnitPerformance>["toObject"]>;
@@ -113,4 +115,3 @@ import * as m_unit from "./unit";
 export const UnitData = m_unit.PBTypes.UnitData;
 export type UnitData = InstanceType<typeof m_unit.PBTypes.UnitData>;
 export type UnitDataObject = ReturnType<InstanceType<typeof m_unit.PBTypes.UnitData>["toObject"]>;
-

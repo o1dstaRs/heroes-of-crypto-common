@@ -25,6 +25,7 @@ goog.exportSymbol('proto.PBTypes.PortalComboStat', null, global);
 goog.exportSymbol('proto.PBTypes.PortalCreatureStat', null, global);
 goog.exportSymbol('proto.PBTypes.PortalFactionStat', null, global);
 goog.exportSymbol('proto.PBTypes.PortalMatch', null, global);
+goog.exportSymbol('proto.PBTypes.PortalMatchKind', null, global);
 goog.exportSymbol('proto.PBTypes.PortalMatchSetup', null, global);
 goog.exportSymbol('proto.PBTypes.PortalUnitPerformance', null, global);
 goog.exportSymbol('proto.PBTypes.ResponsePlayerPortal', null, global);
@@ -820,7 +821,12 @@ opponentTopUnitsList: jspb.Message.toObjectList(msg.getOpponentTopUnitsList(),
 draw: jspb.Message.getBooleanFieldWithDefault(msg, 16, false),
 playerAbandoned: jspb.Message.getBooleanFieldWithDefault(msg, 17, false),
 playerSetup: (f = msg.getPlayerSetup()) && proto.PBTypes.PortalMatchSetup.toObject(includeInstance, f),
-opponentSetup: (f = msg.getOpponentSetup()) && proto.PBTypes.PortalMatchSetup.toObject(includeInstance, f)
+opponentSetup: (f = msg.getOpponentSetup()) && proto.PBTypes.PortalMatchSetup.toObject(includeInstance, f),
+matchKind: jspb.Message.getFieldWithDefault(msg, 20, 0),
+mmrBefore: jspb.Message.getFieldWithDefault(msg, 21, 0),
+mmrAfter: jspb.Message.getFieldWithDefault(msg, 22, 0),
+mmrDelta: jspb.Message.getFieldWithDefault(msg, 23, 0),
+goldEarned: jspb.Message.getFieldWithDefault(msg, 24, 0)
   };
 
   if (includeInstance) {
@@ -940,6 +946,26 @@ proto.PBTypes.PortalMatch.deserializeBinaryFromReader = function(msg, reader) {
       var value = new proto.PBTypes.PortalMatchSetup;
       reader.readMessage(value,proto.PBTypes.PortalMatchSetup.deserializeBinaryFromReader);
       msg.setOpponentSetup(value);
+      break;
+    case 20:
+      var value = /** @type {!proto.PBTypes.PortalMatchKind} */ (reader.readEnum());
+      msg.setMatchKind(value);
+      break;
+    case 21:
+      var value = /** @type {number} */ (reader.readInt32());
+      msg.setMmrBefore(value);
+      break;
+    case 22:
+      var value = /** @type {number} */ (reader.readInt32());
+      msg.setMmrAfter(value);
+      break;
+    case 23:
+      var value = /** @type {number} */ (reader.readSint32());
+      msg.setMmrDelta(value);
+      break;
+    case 24:
+      var value = /** @type {number} */ (reader.readInt32());
+      msg.setGoldEarned(value);
       break;
     default:
       reader.skipField();
@@ -1105,6 +1131,41 @@ proto.PBTypes.PortalMatch.serializeBinaryToWriter = function(message, writer) {
       19,
       f,
       proto.PBTypes.PortalMatchSetup.serializeBinaryToWriter
+    );
+  }
+  f = message.getMatchKind();
+  if (f !== 0.0) {
+    writer.writeEnum(
+      20,
+      f
+    );
+  }
+  f = message.getMmrBefore();
+  if (f !== 0) {
+    writer.writeInt32(
+      21,
+      f
+    );
+  }
+  f = message.getMmrAfter();
+  if (f !== 0) {
+    writer.writeInt32(
+      22,
+      f
+    );
+  }
+  f = message.getMmrDelta();
+  if (f !== 0) {
+    writer.writeSint32(
+      23,
+      f
+    );
+  }
+  f = message.getGoldEarned();
+  if (f !== 0) {
+    writer.writeInt32(
+      24,
+      f
     );
   }
 };
@@ -1565,6 +1626,96 @@ proto.PBTypes.PortalMatch.prototype.clearOpponentSetup = function() {
  */
 proto.PBTypes.PortalMatch.prototype.hasOpponentSetup = function() {
   return jspb.Message.getField(this, 19) != null;
+};
+
+
+/**
+ * optional PortalMatchKind match_kind = 20;
+ * @return {!proto.PBTypes.PortalMatchKind}
+ */
+proto.PBTypes.PortalMatch.prototype.getMatchKind = function() {
+  return /** @type {!proto.PBTypes.PortalMatchKind} */ (jspb.Message.getFieldWithDefault(this, 20, 0));
+};
+
+
+/**
+ * @param {!proto.PBTypes.PortalMatchKind} value
+ * @return {!proto.PBTypes.PortalMatch} returns this
+ */
+proto.PBTypes.PortalMatch.prototype.setMatchKind = function(value) {
+  return jspb.Message.setProto3EnumField(this, 20, value);
+};
+
+
+/**
+ * optional int32 mmr_before = 21;
+ * @return {number}
+ */
+proto.PBTypes.PortalMatch.prototype.getMmrBefore = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 21, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.PBTypes.PortalMatch} returns this
+ */
+proto.PBTypes.PortalMatch.prototype.setMmrBefore = function(value) {
+  return jspb.Message.setProto3IntField(this, 21, value);
+};
+
+
+/**
+ * optional int32 mmr_after = 22;
+ * @return {number}
+ */
+proto.PBTypes.PortalMatch.prototype.getMmrAfter = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 22, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.PBTypes.PortalMatch} returns this
+ */
+proto.PBTypes.PortalMatch.prototype.setMmrAfter = function(value) {
+  return jspb.Message.setProto3IntField(this, 22, value);
+};
+
+
+/**
+ * optional sint32 mmr_delta = 23;
+ * @return {number}
+ */
+proto.PBTypes.PortalMatch.prototype.getMmrDelta = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 23, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.PBTypes.PortalMatch} returns this
+ */
+proto.PBTypes.PortalMatch.prototype.setMmrDelta = function(value) {
+  return jspb.Message.setProto3IntField(this, 23, value);
+};
+
+
+/**
+ * optional int32 gold_earned = 24;
+ * @return {number}
+ */
+proto.PBTypes.PortalMatch.prototype.getGoldEarned = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 24, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.PBTypes.PortalMatch} returns this
+ */
+proto.PBTypes.PortalMatch.prototype.setGoldEarned = function(value) {
+  return jspb.Message.setProto3IntField(this, 24, value);
 };
 
 
@@ -2694,5 +2845,15 @@ proto.PBTypes.ResponsePlayerPortal.prototype.clearFactionStatsList = function() 
   return this.setFactionStatsList([]);
 };
 
+
+/**
+ * @enum {number}
+ */
+proto.PBTypes.PortalMatchKind = {
+  UNKNOWN: 0,
+  RANKED: 1,
+  CALIBRATION: 2,
+  LOBBY: 3
+};
 
 goog.object.extend(exports, proto.PBTypes);

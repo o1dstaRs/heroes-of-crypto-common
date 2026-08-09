@@ -2,6 +2,14 @@ syntax = "proto3";
 
 package PBTypes;
 
+// How a finished player-vs-player match affected the requesting player's competitive standing.
+enum PortalMatchKind {
+    UNKNOWN = 0;
+    RANKED = 1;
+    CALIBRATION = 2;
+    LOBBY = 3;
+}
+
 // Per-creature combat output for one team in a finished match.
 message PortalUnitPerformance {
     int32 creature_id = 1;
@@ -49,6 +57,11 @@ message PortalMatch {
     bool player_abandoned = 17;
     PortalMatchSetup player_setup = 18;
     PortalMatchSetup opponent_setup = 19;
+    PortalMatchKind match_kind = 20;
+    int32 mmr_before = 21;
+    int32 mmr_after = 22;
+    sint32 mmr_delta = 23;
+    int32 gold_earned = 24;
 }
 
 // A creature combo (a sorted set of creature ids the viewer played together) with its record.

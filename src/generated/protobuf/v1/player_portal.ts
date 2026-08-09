@@ -6,6 +6,12 @@
  * git: https://github.com/thesayyn/protoc-gen-ts */
 import * as pb_1 from "google-protobuf";
 export namespace PBTypes {
+    export enum PortalMatchKind {
+        UNKNOWN = 0,
+        RANKED = 1,
+        CALIBRATION = 2,
+        LOBBY = 3
+    }
     export class PortalUnitPerformance extends pb_1.Message {
         #one_of_decls: number[][] = [];
         constructor(data?: any[] | {
@@ -415,6 +421,11 @@ export namespace PBTypes {
             player_abandoned?: boolean;
             player_setup?: PortalMatchSetup;
             opponent_setup?: PortalMatchSetup;
+            match_kind?: PortalMatchKind;
+            mmr_before?: number;
+            mmr_after?: number;
+            mmr_delta?: number;
+            gold_earned?: number;
         }) {
             super();
             pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [7, 8, 14, 15], this.#one_of_decls);
@@ -475,6 +486,21 @@ export namespace PBTypes {
                 }
                 if ("opponent_setup" in data && data.opponent_setup != undefined) {
                     this.opponent_setup = data.opponent_setup;
+                }
+                if ("match_kind" in data && data.match_kind != undefined) {
+                    this.match_kind = data.match_kind;
+                }
+                if ("mmr_before" in data && data.mmr_before != undefined) {
+                    this.mmr_before = data.mmr_before;
+                }
+                if ("mmr_after" in data && data.mmr_after != undefined) {
+                    this.mmr_after = data.mmr_after;
+                }
+                if ("mmr_delta" in data && data.mmr_delta != undefined) {
+                    this.mmr_delta = data.mmr_delta;
+                }
+                if ("gold_earned" in data && data.gold_earned != undefined) {
+                    this.gold_earned = data.gold_earned;
                 }
             }
         }
@@ -598,6 +624,36 @@ export namespace PBTypes {
         get has_opponent_setup() {
             return pb_1.Message.getField(this, 19) != null;
         }
+        get match_kind() {
+            return pb_1.Message.getFieldWithDefault(this, 20, PortalMatchKind.UNKNOWN) as PortalMatchKind;
+        }
+        set match_kind(value: PortalMatchKind) {
+            pb_1.Message.setField(this, 20, value);
+        }
+        get mmr_before() {
+            return pb_1.Message.getFieldWithDefault(this, 21, 0) as number;
+        }
+        set mmr_before(value: number) {
+            pb_1.Message.setField(this, 21, value);
+        }
+        get mmr_after() {
+            return pb_1.Message.getFieldWithDefault(this, 22, 0) as number;
+        }
+        set mmr_after(value: number) {
+            pb_1.Message.setField(this, 22, value);
+        }
+        get mmr_delta() {
+            return pb_1.Message.getFieldWithDefault(this, 23, 0) as number;
+        }
+        set mmr_delta(value: number) {
+            pb_1.Message.setField(this, 23, value);
+        }
+        get gold_earned() {
+            return pb_1.Message.getFieldWithDefault(this, 24, 0) as number;
+        }
+        set gold_earned(value: number) {
+            pb_1.Message.setField(this, 24, value);
+        }
         static fromObject(data: {
             game_id?: string;
             won?: boolean;
@@ -618,6 +674,11 @@ export namespace PBTypes {
             player_abandoned?: boolean;
             player_setup?: ReturnType<typeof PortalMatchSetup.prototype.toObject>;
             opponent_setup?: ReturnType<typeof PortalMatchSetup.prototype.toObject>;
+            match_kind?: PortalMatchKind;
+            mmr_before?: number;
+            mmr_after?: number;
+            mmr_delta?: number;
+            gold_earned?: number;
         }): PortalMatch {
             const message = new PortalMatch({});
             if (data.game_id != null) {
@@ -677,6 +738,21 @@ export namespace PBTypes {
             if (data.opponent_setup != null) {
                 message.opponent_setup = PortalMatchSetup.fromObject(data.opponent_setup);
             }
+            if (data.match_kind != null) {
+                message.match_kind = data.match_kind;
+            }
+            if (data.mmr_before != null) {
+                message.mmr_before = data.mmr_before;
+            }
+            if (data.mmr_after != null) {
+                message.mmr_after = data.mmr_after;
+            }
+            if (data.mmr_delta != null) {
+                message.mmr_delta = data.mmr_delta;
+            }
+            if (data.gold_earned != null) {
+                message.gold_earned = data.gold_earned;
+            }
             return message;
         }
         toObject() {
@@ -700,6 +776,11 @@ export namespace PBTypes {
                 player_abandoned?: boolean;
                 player_setup?: ReturnType<typeof PortalMatchSetup.prototype.toObject>;
                 opponent_setup?: ReturnType<typeof PortalMatchSetup.prototype.toObject>;
+                match_kind?: PortalMatchKind;
+                mmr_before?: number;
+                mmr_after?: number;
+                mmr_delta?: number;
+                gold_earned?: number;
             } = {};
             if (this.game_id != null) {
                 data.game_id = this.game_id;
@@ -758,6 +839,21 @@ export namespace PBTypes {
             if (this.opponent_setup != null) {
                 data.opponent_setup = this.opponent_setup.toObject();
             }
+            if (this.match_kind != null) {
+                data.match_kind = this.match_kind;
+            }
+            if (this.mmr_before != null) {
+                data.mmr_before = this.mmr_before;
+            }
+            if (this.mmr_after != null) {
+                data.mmr_after = this.mmr_after;
+            }
+            if (this.mmr_delta != null) {
+                data.mmr_delta = this.mmr_delta;
+            }
+            if (this.gold_earned != null) {
+                data.gold_earned = this.gold_earned;
+            }
             return data;
         }
         serialize(): Uint8Array;
@@ -802,6 +898,16 @@ export namespace PBTypes {
                 writer.writeMessage(18, this.player_setup, () => this.player_setup.serialize(writer));
             if (this.has_opponent_setup)
                 writer.writeMessage(19, this.opponent_setup, () => this.opponent_setup.serialize(writer));
+            if (this.match_kind != PortalMatchKind.UNKNOWN)
+                writer.writeEnum(20, this.match_kind);
+            if (this.mmr_before != 0)
+                writer.writeInt32(21, this.mmr_before);
+            if (this.mmr_after != 0)
+                writer.writeInt32(22, this.mmr_after);
+            if (this.mmr_delta != 0)
+                writer.writeSint32(23, this.mmr_delta);
+            if (this.gold_earned != 0)
+                writer.writeInt32(24, this.gold_earned);
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -867,6 +973,21 @@ export namespace PBTypes {
                         break;
                     case 19:
                         reader.readMessage(message.opponent_setup, () => message.opponent_setup = PortalMatchSetup.deserialize(reader));
+                        break;
+                    case 20:
+                        message.match_kind = reader.readEnum();
+                        break;
+                    case 21:
+                        message.mmr_before = reader.readInt32();
+                        break;
+                    case 22:
+                        message.mmr_after = reader.readInt32();
+                        break;
+                    case 23:
+                        message.mmr_delta = reader.readSint32();
+                        break;
+                    case 24:
+                        message.gold_earned = reader.readInt32();
                         break;
                     default: reader.skipField();
                 }
