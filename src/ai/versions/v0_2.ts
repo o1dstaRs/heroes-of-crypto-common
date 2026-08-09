@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { canWaitOnHourglass } from "../../engine/hourglass";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
@@ -469,14 +470,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
     /** Whether the engine will accept a hourglass (wait) for this unit this lap. */
     protected canHourglass(unit: Unit, context: IDecisionContext): boolean {
         const fp = context.fightProperties;
-        return (
-            !!fp &&
-            fp.hasUnactedTeammate(unit.getTeam(), unit.getId(), context.unitsHolder.getAllUnits()) &&
-            !unit.isOnHourglass() &&
-            !fp.hourglassIncludes(unit.getId()) &&
-            !fp.hasAlreadyHourglass(unit.getId()) &&
-            !fp.hasAlreadyMadeTurn(unit.getId())
-        );
+        return !!fp && canWaitOnHourglass(unit, fp, context.unitsHolder.getAllUnits());
     }
     /**
      * Would attacking `target` in melee provoke a counter-attack worth dodging? No if it already used
@@ -843,13 +837,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             return false;
         }
         // Respect the engine's hourglass rules so the proposal is never rejected (which would waste the turn).
-        return (
-            fp.hasUnactedTeammate(fromTeam, unit.getId(), unitsHolder.getAllUnits()) &&
-            !unit.isOnHourglass() &&
-            !fp.hourglassIncludes(unit.getId()) &&
-            !fp.hasAlreadyHourglass(unit.getId()) &&
-            !fp.hasAlreadyMadeTurn(unit.getId())
-        );
+        return canWaitOnHourglass(unit, fp, unitsHolder.getAllUnits());
     }
     /** Can the unit land a ranged shot right now (not boxed in / suppressed)? Falls back to ammo count. */
     protected canLandRange(unit: Unit, context: IDecisionContext): boolean {

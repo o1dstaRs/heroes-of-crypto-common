@@ -825,6 +825,18 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Time Denial": {
+        "name": "Time Denial",
+        "type": "CONTROL",
+        "desc": ["While this ability is active, no unit can use Hourglass to wait."],
+        "power": 0,
+        "power_type": "DISABLE_HOURGLASS",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Tome of Elements": {
         "name": "Tome of Elements",
         "type": "INFO",

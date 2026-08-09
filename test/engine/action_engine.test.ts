@@ -351,6 +351,33 @@ describe("GameActionEngine", () => {
         expect(setup.lower.getMorale()).toBe(before - MORALE_CHANGE_FOR_CLOCK);
     });
 
+    it("rejects Hourglass globally while a Time Denial holder is active", () => {
+        const setup = setupActionFight({ upperAbilities: ["Time Denial"] });
+
+        expect(setup.upper.hasAbilityActive("Time Denial")).toBe(true);
+        expect(setup.engine.apply({ type: "wait_turn", unitId: setup.lower.getId() })).toMatchObject({
+            completed: false,
+            rejectionReason: "hourglass_not_available",
+        });
+    });
+
+    it("lifts Time Denial when its holder is Broken and carries it with a thief", () => {
+        const brokenSource = setupActionFight({ upperAbilities: ["Time Denial"] });
+        brokenSource.upper.applyEffect(new EffectFactory().makeEffect("Break")!);
+        expect(brokenSource.upper.hasAbilityActive("Time Denial")).toBe(false);
+        expect(brokenSource.engine.apply({ type: "wait_turn", unitId: brokenSource.lower.getId() }).completed).toBe(true);
+
+        const stolenSource = setupActionFight({ upperAbilities: ["Time Denial"] });
+        expect(stolenSource.upper.disableAbilityAsStolen("Time Denial")).toBeDefined();
+        stolenSource.lower.grantStolenAbility("Time Denial");
+        expect(stolenSource.upper.hasAbilityActive("Time Denial")).toBe(false);
+        expect(stolenSource.lower.hasAbilityActive("Time Denial")).toBe(true);
+        expect(stolenSource.engine.apply({ type: "wait_turn", unitId: stolenSource.lower.getId() })).toMatchObject({
+            completed: false,
+            rejectionReason: "hourglass_not_available",
+        });
+    });
+
     it("rejects hourglass when the active unit is the only living unit on its team", () => {
         const setup = setupActionFight({ lowerUnitsAlive: 1 });
 

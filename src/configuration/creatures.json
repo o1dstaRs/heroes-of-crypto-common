@@ -988,7 +988,7 @@
             "size": 1,
             "level": 3,
             "spells": ["Chaos:Fire Wall", "Chaos:Empower"],
-            "abilities": ["Book of Nightmares"]
+            "abilities": ["Book of Nightmares", "Time Denial"]
         }
     },
     "Death": {

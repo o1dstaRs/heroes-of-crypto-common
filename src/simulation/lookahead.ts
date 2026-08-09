@@ -14,6 +14,7 @@ import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import type { GameAction } from "../engine/actions";
 import type { GameActionEngine } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
+import { canWaitOnHourglass } from "../engine/hourglass";
 import type { TurnEngine } from "../engine/turn_engine";
 import type { FightProperties } from "../fights/fight_properties";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -223,17 +224,7 @@ export class LookaheadDriver {
         return cands.slice(0, MAX_CANDIDATES);
     }
     private canHourglass(unit: Unit): boolean {
-        const fp = this.deps.fightProperties;
-        const team = unit.getTeam();
-        if (team !== LOWER && team !== UPPER) {
-            return false;
-        }
-        return (
-            fp.hasUnactedTeammate(team, unit.getId(), this.deps.unitsHolder.getAllUnits()) &&
-            !fp.hourglassIncludes(unit.getId()) &&
-            !fp.hasAlreadyMadeTurn(unit.getId()) &&
-            !fp.hasAlreadyHourglass(unit.getId())
-        );
+        return canWaitOnHourglass(unit, this.deps.fightProperties, this.deps.unitsHolder.getAllUnits());
     }
     /** Up to a few distinct melee (target, stand-cell) strikes not identical to the base pick. */
     private meleeAlternatives(unit: Unit, baseDecision: GameAction[]): ICandidate[] {

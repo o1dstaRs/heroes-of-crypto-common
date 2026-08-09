@@ -13,6 +13,7 @@ import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIE
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { withDualStrikeCharm } from "../abilities/ability_helper";
 import type { GameAction } from "../engine/actions";
+import { canWaitOnHourglass } from "../engine/hourglass";
 import { projectPostMoveActorAvailability } from "../engine/post_move_actor_availability";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import {
@@ -788,16 +789,8 @@ class CandidateGenerator {
     /** Hourglass — mirrors GameActionEngine.canWaitOnHourglass exactly. */
     private addWait(): void {
         const fp = this.context.fightProperties;
-        const team = this.unit.getTeam();
         const id = this.unit.getId();
-        if (
-            !fp ||
-            (team !== LOWER && team !== UPPER) ||
-            !fp.hasUnactedTeammate(team, id, this.context.unitsHolder.getAllUnits()) ||
-            fp.hourglassIncludes(id) ||
-            fp.hasAlreadyMadeTurn(id) ||
-            fp.hasAlreadyHourglass(id)
-        ) {
+        if (!fp || !canWaitOnHourglass(this.unit, fp, this.context.unitsHolder.getAllUnits())) {
             return;
         }
         this.push({

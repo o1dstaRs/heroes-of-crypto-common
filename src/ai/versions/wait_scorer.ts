@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { canWaitOnHourglass } from "../../engine/hourglass";
 import type { FightProperties } from "../../fights/fight_properties";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
@@ -42,8 +43,6 @@ import type { IDecisionContext } from "../ai_strategy";
  * anchor (drive `b` negative and lean on `incRuleWait`).
  */
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const MAGIC = PBTypes.AttackVals.MAGIC;
@@ -160,15 +159,7 @@ export function canWaitOnHourglassMirror(
     fightProperties: FightProperties,
     allUnits: ReadonlyMap<string, Unit>,
 ): boolean {
-    const team = unit.getTeam();
-    const id = unit.getId();
-    return (
-        (team === LOWER || team === UPPER) &&
-        fightProperties.hasUnactedTeammate(team, id, allUnits) &&
-        !fightProperties.hourglassIncludes(id) &&
-        !fightProperties.hasAlreadyMadeTurn(id) &&
-        !fightProperties.hasAlreadyHourglass(id)
-    );
+    return canWaitOnHourglass(unit, fightProperties, allUnits);
 }
 
 /**

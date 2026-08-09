@@ -67,6 +67,7 @@ import { getLapString, getRandomInt } from "../utils/lib";
 import type { XY } from "../utils/math";
 import type { GameAction } from "./actions";
 import { isHeadlessSimulationEvent, type GameEvent, type IGameAnimationEvent } from "./events";
+import { canWaitOnHourglass } from "./hourglass";
 import {
     enteredFireWallCells,
     isMovePathFootprintOnly,
@@ -2791,20 +2792,7 @@ export class GameActionEngine {
         return unit;
     }
     private canWaitOnHourglass(unit: Unit): boolean {
-        if (unit.getTeam() !== PBTypes.TeamVals.LOWER && unit.getTeam() !== PBTypes.TeamVals.UPPER) {
-            return false;
-        }
-
-        return (
-            this.context.fightProperties.hasUnactedTeammate(
-                unit.getTeam(),
-                unit.getId(),
-                this.context.unitsHolder.getAllUnits(),
-            ) &&
-            !this.context.fightProperties.hourglassIncludes(unit.getId()) &&
-            !this.context.fightProperties.hasAlreadyMadeTurn(unit.getId()) &&
-            !this.context.fightProperties.hasAlreadyHourglass(unit.getId())
-        );
+        return canWaitOnHourglass(unit, this.context.fightProperties, this.context.unitsHolder.getAllUnits());
     }
     private resolveKnownMoveRoute(
         unit: Unit,

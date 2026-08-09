@@ -45,6 +45,7 @@ export * from "./picks/pick_sim";
 export * from "./engine/actions";
 export * from "./engine/action_engine";
 export * from "./engine/events";
+export * from "./engine/hourglass";
 export * from "./engine/runtime";
 export * from "./engine/turn_engine";
 export * from "./handlers/move_handler";

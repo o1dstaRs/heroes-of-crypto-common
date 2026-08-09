@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { canWaitOnHourglass } from "../../engine/hourglass";
 import { projectPostMoveActorAvailability } from "../../engine/post_move_actor_availability";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
@@ -638,12 +639,7 @@ export class StrategyV0_1 implements IAIStrategy {
         }
         const fightProperties = context.fightProperties;
         const canHourglass =
-            !!fightProperties &&
-            fightProperties.hasUnactedTeammate(unit.getTeam(), unit.getId(), context.unitsHolder.getAllUnits()) &&
-            !unit.isOnHourglass() &&
-            !fightProperties.hourglassIncludes(unit.getId()) &&
-            !fightProperties.hasAlreadyHourglass(unit.getId()) &&
-            !fightProperties.hasAlreadyMadeTurn(unit.getId());
+            !!fightProperties && canWaitOnHourglass(unit, fightProperties, context.unitsHolder.getAllUnits());
         return canHourglass
             ? [{ type: "wait_turn", unitId: unit.getId() }]
             : [{ type: "defend_turn", unitId: unit.getId() }];

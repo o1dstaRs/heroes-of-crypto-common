@@ -100,6 +100,8 @@ export enum AbilityPowerType {
     // The roll uses the SOURCE's own calculateAbilityApplyChance (stack power + luck), exactly like the
     // Squire's Stun ability — the aura's lower configured power is the whole difference between them.
     STUN_CHANCE = 68,
+    // A live holder prevents either side from using Hourglass. The engine gate lives in engine/hourglass.ts.
+    DISABLE_HOURGLASS = 69,
 }
 
 export const AllAbilityPowerTypes = [
@@ -172,6 +174,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.VINE_THROW,
     AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE,
     AbilityPowerType.STUN_CHANCE,
+    AbilityPowerType.DISABLE_HOURGLASS,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -247,6 +250,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     VINE_THROW: AbilityPowerType.VINE_THROW,
     ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE: AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE,
     STUN_CHANCE: AbilityPowerType.STUN_CHANCE,
+    DISABLE_HOURGLASS: AbilityPowerType.DISABLE_HOURGLASS,
 };
 
 export enum AbilityType {
