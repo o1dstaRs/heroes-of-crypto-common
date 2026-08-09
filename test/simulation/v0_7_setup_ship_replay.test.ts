@@ -164,7 +164,9 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned for the 2026-08-09 balance batch: ranged damage and caster initiative tuning, Orc and Dryad
 // damage, Abomination armor 48 -> 50, and Spit Ball power 25 -> 40 all legitimately change seeded setup
 // valuation or downstream combat. The full suite and a focused rerun produced this byte-identical digest.
-const EXPECTED_REPLAY_SHA256 = "d07218f0123605a0a7281eb9089870d3948ab8fe3739e492dd0dd940e8fca49e";
+// Re-pinned after Ogre Mage's damage increased from 14-19 to 16-20. Stronger seeded exchanges move the
+// downstream combat trace while leaving the deterministic replay contract intact.
+const EXPECTED_REPLAY_SHA256 = "872d7028c6fadd591c4d0d0ac57a1df415ce5dc935697844b02d248c8b1fa3f3";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
