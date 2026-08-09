@@ -159,6 +159,7 @@ describe("generated player_portal protobuf messages", () => {
             current_streak: 4,
             best_win_streak: 11,
             last_login: 1700000,
+            gold: 321,
             recent_matches: [
                 portalMatch,
                 {
@@ -176,6 +177,15 @@ describe("generated player_portal protobuf messages", () => {
         roundTrip(portal, PortalPB.ResponsePlayerPortal.deserializeBinary);
         expect(portal.recent_matches.length).toBe(2);
         expect(portal.creature_stats[0].wins).toBe(14);
+        expect(portal.gold).toBe(321);
+    });
+
+    it("defaults the appended Gold balance for legacy portal payloads", () => {
+        const legacy = PortalPB.ResponsePlayerPortal.deserializeBinary(
+            PortalPB.ResponsePlayerPortal.fromObject({ username: "legacy-player" }).serializeBinary(),
+        );
+
+        expect(legacy.toObject()).toMatchObject({ username: "legacy-player", gold: 0 });
     });
 
     it("constructs ResponsePlayerPortal directly and round-trips", () => {
@@ -187,6 +197,7 @@ describe("generated player_portal protobuf messages", () => {
             current_streak: 1,
             best_win_streak: 1,
             last_login: 5,
+            gold: 12,
             recent_matches: [],
             combos: [],
             creature_stats: [],

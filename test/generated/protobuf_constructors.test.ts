@@ -182,6 +182,7 @@ describe("generated message constructors (new X({...}))", () => {
                 current_streak: 1,
                 best_win_streak: 1,
                 last_login: 9,
+                gold: 7,
                 recent_matches: [new PortalPB.PortalMatch(match)],
                 combos: [new PortalPB.PortalComboStat({ creature_ids: [1], games: 1, wins: 1 })],
                 creature_stats: [new PortalPB.PortalCreatureStat({ creature_id: 1, games: 1, wins: 1 })],

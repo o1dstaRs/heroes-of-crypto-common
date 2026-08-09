@@ -100,4 +100,6 @@ message ResponsePlayerPortal {
     repeated PortalComboStat combos = 9;
     repeated PortalCreatureStat creature_stats = 10;
     repeated PortalFactionStat faction_stats = 11;
+    // Current season-currency balance from the authoritative ranked profile.
+    int32 gold = 12;
 }

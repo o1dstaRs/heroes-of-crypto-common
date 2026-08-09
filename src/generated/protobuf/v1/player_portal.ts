@@ -1354,6 +1354,7 @@ export namespace PBTypes {
             combos?: PortalComboStat[];
             creature_stats?: PortalCreatureStat[];
             faction_stats?: PortalFactionStat[];
+            gold?: number;
         }) {
             super();
             pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [8, 9, 10, 11], this.#one_of_decls);
@@ -1390,6 +1391,9 @@ export namespace PBTypes {
                 }
                 if ("faction_stats" in data && data.faction_stats != undefined) {
                     this.faction_stats = data.faction_stats;
+                }
+                if ("gold" in data && data.gold != undefined) {
+                    this.gold = data.gold;
                 }
             }
         }
@@ -1459,6 +1463,12 @@ export namespace PBTypes {
         set faction_stats(value: PortalFactionStat[]) {
             pb_1.Message.setRepeatedWrapperField(this, 11, value);
         }
+        get gold() {
+            return pb_1.Message.getFieldWithDefault(this, 12, 0) as number;
+        }
+        set gold(value: number) {
+            pb_1.Message.setField(this, 12, value);
+        }
         static fromObject(data: {
             username?: string;
             wins?: number;
@@ -1471,6 +1481,7 @@ export namespace PBTypes {
             combos?: ReturnType<typeof PortalComboStat.prototype.toObject>[];
             creature_stats?: ReturnType<typeof PortalCreatureStat.prototype.toObject>[];
             faction_stats?: ReturnType<typeof PortalFactionStat.prototype.toObject>[];
+            gold?: number;
         }): ResponsePlayerPortal {
             const message = new ResponsePlayerPortal({});
             if (data.username != null) {
@@ -1506,6 +1517,9 @@ export namespace PBTypes {
             if (data.faction_stats != null) {
                 message.faction_stats = data.faction_stats.map(item => PortalFactionStat.fromObject(item));
             }
+            if (data.gold != null) {
+                message.gold = data.gold;
+            }
             return message;
         }
         toObject() {
@@ -1521,6 +1535,7 @@ export namespace PBTypes {
                 combos?: ReturnType<typeof PortalComboStat.prototype.toObject>[];
                 creature_stats?: ReturnType<typeof PortalCreatureStat.prototype.toObject>[];
                 faction_stats?: ReturnType<typeof PortalFactionStat.prototype.toObject>[];
+                gold?: number;
             } = {};
             if (this.username != null) {
                 data.username = this.username;
@@ -1555,6 +1570,9 @@ export namespace PBTypes {
             if (this.faction_stats != null) {
                 data.faction_stats = this.faction_stats.map((item: PortalFactionStat) => item.toObject());
             }
+            if (this.gold != null) {
+                data.gold = this.gold;
+            }
             return data;
         }
         serialize(): Uint8Array;
@@ -1583,6 +1601,8 @@ export namespace PBTypes {
                 writer.writeRepeatedMessage(10, this.creature_stats, (item: PortalCreatureStat) => item.serialize(writer));
             if (this.faction_stats.length)
                 writer.writeRepeatedMessage(11, this.faction_stats, (item: PortalFactionStat) => item.serialize(writer));
+            if (this.gold != 0)
+                writer.writeInt32(12, this.gold);
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -1624,6 +1644,9 @@ export namespace PBTypes {
                         break;
                     case 11:
                         reader.readMessage(message.faction_stats, () => pb_1.Message.addToRepeatedWrapperField(message, 11, PortalFactionStat.deserialize(reader), PortalFactionStat));
+                        break;
+                    case 12:
+                        message.gold = reader.readInt32();
                         break;
                     default: reader.skipField();
                 }

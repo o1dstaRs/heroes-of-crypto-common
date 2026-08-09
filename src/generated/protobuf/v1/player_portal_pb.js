@@ -2370,7 +2370,8 @@ combosList: jspb.Message.toObjectList(msg.getCombosList(),
 creatureStatsList: jspb.Message.toObjectList(msg.getCreatureStatsList(),
     proto.PBTypes.PortalCreatureStat.toObject, includeInstance),
 factionStatsList: jspb.Message.toObjectList(msg.getFactionStatsList(),
-    proto.PBTypes.PortalFactionStat.toObject, includeInstance)
+    proto.PBTypes.PortalFactionStat.toObject, includeInstance),
+gold: jspb.Message.getFieldWithDefault(msg, 12, 0)
   };
 
   if (includeInstance) {
@@ -2454,6 +2455,10 @@ proto.PBTypes.ResponsePlayerPortal.deserializeBinaryFromReader = function(msg, r
       var value = new proto.PBTypes.PortalFactionStat;
       reader.readMessage(value,proto.PBTypes.PortalFactionStat.deserializeBinaryFromReader);
       msg.addFactionStats(value);
+      break;
+    case 12:
+      var value = /** @type {number} */ (reader.readInt32());
+      msg.setGold(value);
       break;
     default:
       reader.skipField();
@@ -2563,6 +2568,13 @@ proto.PBTypes.ResponsePlayerPortal.serializeBinaryToWriter = function(message, w
       11,
       f,
       proto.PBTypes.PortalFactionStat.serializeBinaryToWriter
+    );
+  }
+  f = message.getGold();
+  if (f !== 0) {
+    writer.writeInt32(
+      12,
+      f
     );
   }
 };
@@ -2843,6 +2855,24 @@ proto.PBTypes.ResponsePlayerPortal.prototype.addFactionStats = function(opt_valu
  */
 proto.PBTypes.ResponsePlayerPortal.prototype.clearFactionStatsList = function() {
   return this.setFactionStatsList([]);
+};
+
+
+/**
+ * optional int32 gold = 12;
+ * @return {number}
+ */
+proto.PBTypes.ResponsePlayerPortal.prototype.getGold = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 12, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.PBTypes.ResponsePlayerPortal} returns this
+ */
+proto.PBTypes.ResponsePlayerPortal.prototype.setGold = function(value) {
+  return jspb.Message.setProto3IntField(this, 12, value);
 };
 
 
