@@ -126,6 +126,14 @@ describe("config_provider", () => {
         expect(creature.attack_damage_max).toBe(11);
     });
 
+    it("loads the reduced caster initiatives without rounding away tenths", () => {
+        const battleMage = getCreatureConfig(PBTypes.TeamVals.UPPER, "Life", "Battle Mage", "battle_mage_512", 1);
+        const magicDragon = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Magic Dragon", "magic_dragon_512", 1);
+
+        expect(battleMage.initiative).toBe(2.1);
+        expect(magicDragon.initiative).toBe(2.4);
+    });
+
     it("derives creature amount from total experience when amount is not positive", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Berserker", "berserker_512", 0, 1);
 
