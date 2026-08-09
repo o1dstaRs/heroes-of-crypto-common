@@ -441,9 +441,11 @@ describe("action engine — Ring of Fire", () => {
         expect(before[2] - setup.enemies[2].getHp()).toBe(0); // far away, clear of even the wider ring
     });
 
-    // Nothing to burn is a REJECTED cast, not a wasted scroll — the ring only exists around other creatures,
-    // so an isolated target would otherwise consume a charge for zero effect.
-    it("refuses the cast when the target has nobody standing around it", () => {
+    // Owner 2026-08-08: an empty ring is a VALID cast, not a refusal. A lone enemy in line of sight is a
+    // legal aim point — it is spared like every other target and the ring simply burns no one. The scroll is
+    // still spent and the turn ends. This was the "sometimes it will not cast, with nothing in the way"
+    // report: the invisible barrier was this neighbour requirement, now gone.
+    it("casts on a lone target, sparing it and burning no one, but still spends the charge", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -458,8 +460,43 @@ describe("action engine — Ring of Fire", () => {
             targetId: setup.enemies[0].getId(),
         });
 
+        expect(result.completed).toBe(true);
+        expect(setup.enemies[0].getHp()).toBe(hpBefore); // spared — nothing stood around it to burn
+        expect(
+            setup.caster
+                .getSpells()
+                .find((s) => s.getName() === "Ring of Fire")
+                ?.getAmount(),
+        ).toBe(1); // the charge is spent even though the ring caught no one
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.caster.getId())).toBe(true);
+    });
+
+    // The one enemy Ring of Fire cannot be pointed at: a fully magic-immune target (a Black Dragon at 100%
+    // resist). canCastSpell turns it away before the ring is ever laid — even though the ring would spare it
+    // anyway — so the spellbook never offers a cast the aim point renders pointless.
+    it("refuses a fully magic-immune target (100% resist), even with a neighbour that would have burned", () => {
+        const setup = setupDragonFight({
+            casterAmountAlive: 1,
+            casterStackPower: 5,
+            enemies: [{ cell: { x: 6, y: 3 }, magicResist: 100 }, { cell: { x: 7, y: 3 } }],
+        });
+        const before = setup.enemies.map((unit) => unit.getHp());
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Ring of Fire",
+            targetId: setup.enemies[0].getId(),
+        });
+
         expect(result.completed).toBe(false);
-        expect(setup.enemies[0].getHp()).toBe(hpBefore);
+        expect(setup.enemies[1].getHp()).toBe(before[1]); // no ring laid: the neighbour that would have burned is untouched
+        expect(
+            setup.caster
+                .getSpells()
+                .find((s) => s.getName() === "Ring of Fire")
+                ?.getAmount(),
+        ).toBe(2); // charge kept
     });
 
     it("is thrown, so a body squarely on the line refuses the cast and keeps the scroll", () => {

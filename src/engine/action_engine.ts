@@ -2052,8 +2052,10 @@ export class GameActionEngine {
      *
      * Reach is LINE OF SIGHT, the gate Fire Strike uses, because unlike Lightning Strike this one is thrown
      * rather than called down. Its explicit 25 multiplier prices the wider footprint below Lightning Strike's
-     * 30 without deriving one spell from the other. A ring that catches nobody is REJECTED rather than silently
-     * burning the charge.
+     * 30 without deriving one spell from the other. The cast is allowed on ANY enemy in line of sight (owner
+     * 2026-08-08): a lone target with nothing standing around it is spared like every other aim point and the
+     * ring simply burns no one — the dragon still spends the charge. The only aim point that is refused is a
+     * fully magic-immune one (a Black Dragon at 100% resist), and that gate lives in canCastSpell, not here.
      */
     private ringOfFireCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
         const from = caster.getBaseCell();
@@ -2091,9 +2093,10 @@ export class GameActionEngine {
         const caught = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
             (unit) => !unit.isDead() && unit.getId() !== caster.getId() && unit.getId() !== target.getId(),
         );
-        if (!caught.length) {
-            return this.reject("spell_not_available");
-        }
+        // An empty ring is NOT a refusal: the owner wants Ring of Fire castable at any enemy in sight, so a
+        // lone target simply spends the charge and burns no one. Refusing here was the "sometimes it will not
+        // cast — with no barrier in the way" report: the barrier was this neighbour requirement, invisible to
+        // the player. canCastSpell above already turns a fully magic-immune aim point (Black Dragon) away.
 
         const rawDamage = calculateSpellDamage(
             spell.getMultiplierType(),

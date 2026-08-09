@@ -2356,7 +2356,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(context.fightProperties!.getFireWalls().cells()).toEqual(expectedCells);
     });
 
-    it("Magic Dragon: Ring of Fire needs a ring victim, spares its aim, and respects thrown LOS", () => {
+    it("Magic Dragon: AI only proposes Ring of Fire with a ring victim, spares its aim, and respects thrown LOS", () => {
         const c = createCombatTestContext();
         const dragon = makeReal(LOWER, "Nature", "Magic Dragon");
         dragon.setStackPower(5);
@@ -2375,9 +2375,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             amountAlive: 10,
             maxHp: 1_000,
         });
-        // Ring of Fire spares the creature it is aimed at, so a cast at a lone target now legitimately
-        // catches nobody and the engine refuses it. Park a second body beside the clear target — it burns
-        // friend or foe — so the ring has something to hit and this still tests LINE OF SIGHT.
+        // The engine allows an empty ring, but the AI deliberately omits that zero-value charge spend.
+        // Park a second body beside the clear target — it burns friend or foe — so the ring has something
+        // to hit and this still tests LINE OF SIGHT.
         const isolated = createTestUnit({
             team: UPPER,
             name: "Isolated target",
