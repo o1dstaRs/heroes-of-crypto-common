@@ -14,6 +14,9 @@ import {
     placementOpponentVisibility,
     pickSynergiesForVariant,
     pickTier2ForVariant,
+    RANKED_A19_CASTER_EMPOWER_AUGMENTS,
+    RANKED_A19_CASTER_EMPOWER_SETUP_SPEC,
+    rankedA19CasterEmpowerEligible,
     resolveSetupPolicy,
     SETUP_COHORTS,
     setupAugmentsForPlan,
@@ -342,5 +345,52 @@ describe("v0.7 setup ship resolver", () => {
             expect(optimizerPolicy.pickAugments(7, roster)).toEqual(optimized.pickAugments(7, roster));
             expect(optimizerPolicy.pickSynergies(roster)).toEqual(optimized.pickSynergies(roster));
         }
+    });
+});
+
+describe("ranked A19 caster-empower replay candidate", () => {
+    const replayRoster = [
+        PBTypes.CreatureVals.TROGLODYTE,
+        PBTypes.CreatureVals.PEASANT,
+        PBTypes.CreatureVals.SATYR,
+        PBTypes.CreatureVals.WHITE_TIGER,
+        PBTypes.CreatureVals.NIGHTMARE,
+        PBTypes.CreatureVals.MAGIC_DRAGON,
+    ];
+
+    test("replays the full-spend caster setup while retaining the frozen fallback", () => {
+        const candidate = resolveSetupPolicy(RANKED_A19_CASTER_EMPOWER_SETUP_SPEC);
+        const fallback = resolveSetupPolicy(V07_NONFIGHT_SETUP_SPEC);
+
+        expect(candidate).toMatchObject({
+            mode: "optimized-v07",
+            spec: RANKED_A19_CASTER_EMPOWER_SETUP_SPEC,
+            journalVersion: RANKED_A19_CASTER_EMPOWER_SETUP_SPEC,
+            placementAugmentTiming: "setup-before-placement",
+        });
+        expect(rankedA19CasterEmpowerEligible(replayRoster)).toBe(true);
+        expect(candidate.pickAugments(7, replayRoster)).toEqual(RANKED_A19_CASTER_EMPOWER_AUGMENTS);
+        expect(candidate.pickAugments(6, replayRoster)).toEqual(fallback.pickAugments(6, replayRoster));
+    });
+
+    test("requires direct spell damage plus a true magic amplifier and preserves control/support rosters", () => {
+        const candidate = resolveSetupPolicy(RANKED_A19_CASTER_EMPOWER_SETUP_SPEC);
+        const fallback = resolveSetupPolicy(V07_NONFIGHT_SETUP_SPEC);
+        const supportOnly = [PBTypes.CreatureVals.SATYR, PBTypes.CreatureVals.HEALER, PBTypes.CreatureVals.PEASANT];
+
+        expect(rankedA19CasterEmpowerEligible(supportOnly)).toBe(false);
+        expect(
+            rankedA19CasterEmpowerEligible([PBTypes.CreatureVals.MAGIC_DRAGON, PBTypes.CreatureVals.MAGIC_DRAGON]),
+        ).toBe(false);
+        expect(rankedA19CasterEmpowerEligible([PBTypes.CreatureVals.MAGIC_DRAGON, PBTypes.CreatureVals.ASH_MOTH])).toBe(
+            false,
+        );
+        expect(
+            rankedA19CasterEmpowerEligible([PBTypes.CreatureVals.MAGIC_DRAGON, PBTypes.CreatureVals.NIGHTMARE]),
+        ).toBe(true);
+        expect(rankedA19CasterEmpowerEligible([PBTypes.CreatureVals.BATTLE_MAGE, PBTypes.CreatureVals.SATYR])).toBe(
+            true,
+        );
+        expect(candidate.pickAugments(7, supportOnly)).toEqual(fallback.pickAugments(7, supportOnly));
     });
 });

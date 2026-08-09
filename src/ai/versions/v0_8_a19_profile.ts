@@ -26,8 +26,10 @@ export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SOURCE = "src/simu
 export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SHA256 =
     "9c1d70f719c8f6db786a0d00b04a40e4bfa9b90b22c0f22d1ae4374905faf134" as const;
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simulation/battle_engine.ts" as const;
+// Re-pinned after the simulation setup surface gained the explicit Empower augment used by A19
+// candidate evaluation. Production routing is unchanged; the ledger hashes the complete source file.
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "17099c0c82f7cb35eb05ab6d32ca7cf70ff105dfa8031ff27724ab17a5ba4b85" as const;
+    "f54161c9519a1491dab652ebcdef1973b5bd69edfe3d7b314f966c436e439c9e" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
     "b099d6aed15430b79abf9caccf272c48fc9563b292df8fcf453ce556d38fe7cf" as const;

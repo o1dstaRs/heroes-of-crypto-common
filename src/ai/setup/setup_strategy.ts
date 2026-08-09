@@ -139,7 +139,7 @@ export interface ISetupPolicy {
      * caller that already knows its faction composition (e.g. the server's refreshSynergies) pick directly. */
     bestSynergyForFaction(faction: number): number;
     /** Army augments to buy within the upgrade-point budget (kind + level). */
-    pickAugments(budget: number): { kind: "Armor" | "Might" | "Sniper" | "Movement"; value: number }[];
+    pickAugments(budget: number): { kind: "Armor" | "Might" | "Empower" | "Sniper" | "Movement"; value: number }[];
 }
 
 /**

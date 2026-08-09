@@ -19,7 +19,8 @@ import {
     LEAGUE_GENOME_DIM,
     LEAGUE_GENOME_LAYOUT,
     LEAGUE_SCHEMA_VERSION,
-    scoreLeagueCreature,
+    isRankedSpellRangedDraftPolicy,
+    scoreLeagueGenomeCreature,
     type ILeagueGenome,
     type ILeagueGenomeOptions,
 } from "../../simulation/league_genome";
@@ -113,6 +114,7 @@ const genomeFromParsedJson = (parsed: unknown, id: string, options: ILeagueGenom
             schemaVersion?: unknown;
             draftInteractionPrior?: unknown;
             draftVarietyPolicy?: unknown;
+            draftSpellRangedPolicy?: unknown;
             weights?: unknown;
         };
         if (value.schemaVersion !== undefined && value.schemaVersion !== LEAGUE_SCHEMA_VERSION) {
@@ -130,6 +132,12 @@ const genomeFromParsedJson = (parsed: unknown, id: string, options: ILeagueGenom
         if (value.draftVarietyPolicy !== undefined && !isRankedDraftVarietyPolicy(value.draftVarietyPolicy)) {
             throw new TypeError(`Unsupported ranked draft variety policy ${String(value.draftVarietyPolicy)}`);
         }
+        if (
+            value.draftSpellRangedPolicy !== undefined &&
+            !isRankedSpellRangedDraftPolicy(value.draftSpellRangedPolicy)
+        ) {
+            throw new TypeError(`Unsupported ranked spell-ranged draft policy ${String(value.draftSpellRangedPolicy)}`);
+        }
         if (Array.isArray(value.weights)) {
             return genomeFromParsedJson(value.weights, typeof value.id === "string" ? value.id : id, {
                 ...options,
@@ -139,6 +147,7 @@ const genomeFromParsedJson = (parsed: unknown, id: string, options: ILeagueGenom
                 ...(value.draftVarietyPolicy
                     ? { draftVarietyPolicy: value.draftVarietyPolicy as RankedDraftVarietyPolicyId }
                     : {}),
+                ...(value.draftSpellRangedPolicy ? { draftSpellRangedPolicy: value.draftSpellRangedPolicy } : {}),
             });
         }
     }
@@ -218,6 +227,7 @@ export function projectDraftGenomeForShipping(genome: ILeagueGenome): ILeagueGen
     const validated = createLeagueGenome(genome.id, genome.weights, !!genome.omniscientDraft, {
         ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
         ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
+        ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
     });
     if (validated.omniscientDraft) {
         throw new TypeError("A deployable draft genome cannot use omniscientDraft");
@@ -228,6 +238,7 @@ export function projectDraftGenomeForShipping(genome: ILeagueGenome): ILeagueGen
     return createLeagueGenome(validated.id, weights, false, {
         ...(validated.draftInteractionPrior ? { draftInteractionPrior: validated.draftInteractionPrior } : {}),
         ...(validated.draftVarietyPolicy ? { draftVarietyPolicy: validated.draftVarietyPolicy } : {}),
+        ...(validated.draftSpellRangedPolicy ? { draftSpellRangedPolicy: validated.draftSpellRangedPolicy } : {}),
     });
 }
 
@@ -236,7 +247,7 @@ export function projectDraftGenomeForShipping(genome: ILeagueGenome): ILeagueGen
  * score for bundle creature terms and legal-creature argmax; live auto-bans remain random.
  */
 export function draftGenomeCreatureScore(genome: ILeagueGenome, creatureId: number): number {
-    return scoreLeagueCreature(creatureId, [], [], genome.weights);
+    return scoreLeagueGenomeCreature(creatureId, [], [], genome);
 }
 
 /**
@@ -265,6 +276,7 @@ export function pickDraftGenomeCreature(
             knownOpponentCreatureIds,
             ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
             ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
+            ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
         },
     );
 }

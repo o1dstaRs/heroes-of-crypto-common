@@ -16,6 +16,14 @@ import {
     DRAFT_ANCHOR_W,
     DEFAULT_DRAFT_W,
     eligibleBacklineProtectorChoices,
+    isRankedSpellRangedDraftPolicy,
+    rankedSpellRangedCoPlayAffinity,
+    type RankedSpellRangedDraftPolicyId,
+} from "../ai/setup/creature_score";
+export {
+    RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
+    isRankedSpellRangedDraftPolicy,
+    type RankedSpellRangedDraftPolicyId,
 } from "../ai/setup/creature_score";
 import {
     applyRankedDraftInteractionOverlay,
@@ -169,12 +177,15 @@ export interface ILeagueGenome {
     draftInteractionPrior?: RankedDraftInteractionPriorId;
     /** Optional, score-bounded public-context variety selector. Omitted retains the historical argmax. */
     draftVarietyPolicy?: RankedDraftVarietyPolicyId;
+    /** Optional caster-DPS feature interpretation. Omitted retains the historical projectile-only semantics. */
+    draftSpellRangedPolicy?: RankedSpellRangedDraftPolicyId;
 }
 
 export interface ILeagueGenomeOptions {
     backlineProtectorDraftSafety?: boolean;
     draftInteractionPrior?: RankedDraftInteractionPriorId;
     draftVarietyPolicy?: RankedDraftVarietyPolicyId;
+    draftSpellRangedPolicy?: RankedSpellRangedDraftPolicyId;
 }
 
 export interface ILeagueAugment {
@@ -215,6 +226,12 @@ export function createLeagueGenome(
     if (options.draftVarietyPolicy !== undefined && !isRankedDraftVarietyPolicy(options.draftVarietyPolicy)) {
         throw new TypeError(`Unsupported ranked draft variety policy ${String(options.draftVarietyPolicy)}`);
     }
+    if (
+        options.draftSpellRangedPolicy !== undefined &&
+        !isRankedSpellRangedDraftPolicy(options.draftSpellRangedPolicy)
+    ) {
+        throw new TypeError(`Unsupported ranked spell-ranged draft policy ${String(options.draftSpellRangedPolicy)}`);
+    }
     return {
         schemaVersion: LEAGUE_SCHEMA_VERSION,
         id,
@@ -223,6 +240,7 @@ export function createLeagueGenome(
         ...(options.backlineProtectorDraftSafety ? { backlineProtectorDraftSafety: true } : {}),
         ...(options.draftInteractionPrior ? { draftInteractionPrior: options.draftInteractionPrior } : {}),
         ...(options.draftVarietyPolicy ? { draftVarietyPolicy: options.draftVarietyPolicy } : {}),
+        ...(options.draftSpellRangedPolicy ? { draftSpellRangedPolicy: options.draftSpellRangedPolicy } : {}),
     };
 }
 
@@ -300,6 +318,15 @@ export function scoreLeagueCreature(
     return score;
 }
 
+export function scoreLeagueGenomeCreature(
+    creatureId: number,
+    ownCreatures: readonly number[],
+    opponentCreatures: readonly number[],
+    genome: ILeagueGenome,
+): number {
+    return scoreLeagueCreature(creatureId, ownCreatures, opponentCreatures, genome.weights);
+}
+
 export function pickLeaguePerk(genome: ILeagueGenome, freezePerk: boolean = true): Perk {
     assertLeagueWeights(genome.weights);
     if (freezePerk) {
@@ -322,23 +349,33 @@ export function pickLeagueBundle(state: IPickSimState, team: PickTeam, genome: I
     const view = getPickTeamView(state, team);
     const own = teamState(state, team).creatures;
     const opponent = leagueOpponentCreatures(state, team, !!genome.omniscientDraft);
-    if (isRankedDraftInteractionPrior(genome.draftInteractionPrior)) {
+    const interactionPrior = isRankedDraftInteractionPrior(genome.draftInteractionPrior);
+    const spellRanged = isRankedSpellRangedDraftPolicy(genome.draftSpellRangedPolicy);
+    if (interactionPrior || spellRanged) {
         const baseScores = view.bundles.map(([level1, level2, artifact]) => {
             const bundleOwn = [...own, level1, level2];
             return (
-                scoreLeagueCreature(level1, bundleOwn, opponent, genome.weights) +
-                scoreLeagueCreature(level2, bundleOwn, opponent, genome.weights) +
+                scoreLeagueGenomeCreature(level1, bundleOwn, opponent, genome) +
+                scoreLeagueGenomeCreature(level2, bundleOwn, opponent, genome) +
                 artifactHeadWeight(genome.weights, LEAGUE_GENOME_LAYOUT.tier1, artifact)
             );
         });
         const scores = applyRankedDraftInteractionOverlay(
             baseScores,
-            view.bundles.map(([level1, level2]) =>
-                rankedDraftBundleInteractionAffinity([level1, level2], {
-                    ownCreatureIds: own,
-                    knownOpponentCreatureIds: opponent,
-                }),
-            ),
+            view.bundles.map(([level1, level2]) => {
+                const interactionAffinity = interactionPrior
+                    ? rankedDraftBundleInteractionAffinity([level1, level2], {
+                          ownCreatureIds: own,
+                          knownOpponentCreatureIds: opponent,
+                      })
+                    : 0;
+                const spellAffinity = spellRanged
+                    ? (rankedSpellRangedCoPlayAffinity(level1, [level2, ...own]) +
+                          rankedSpellRangedCoPlayAffinity(level2, [level1, ...own])) /
+                      2
+                    : 0;
+                return interactionAffinity + spellAffinity;
+            }),
         );
         let bestIndex: 0 | 1 = 0;
         let bestScore = -Infinity;
@@ -356,8 +393,8 @@ export function pickLeagueBundle(state: IPickSimState, team: PickTeam, genome: I
         const [level1, level2, artifact] = bundle;
         const bundleOwn = [...own, level1, level2];
         const score =
-            scoreLeagueCreature(level1, bundleOwn, opponent, genome.weights) +
-            scoreLeagueCreature(level2, bundleOwn, opponent, genome.weights) +
+            scoreLeagueGenomeCreature(level1, bundleOwn, opponent, genome) +
+            scoreLeagueGenomeCreature(level2, bundleOwn, opponent, genome) +
             artifactHeadWeight(genome.weights, LEAGUE_GENOME_LAYOUT.tier1, artifact);
         if (score > bestScore) {
             bestScore = score;
@@ -376,18 +413,24 @@ export function pickLeagueCreature(state: IPickSimState, team: PickTeam, genome:
     const choices = genome.backlineProtectorDraftSafety
         ? eligibleBacklineProtectorChoices(visibleChoices, own, opponent)
         : visibleChoices;
-    const baseScores = choices.map((creatureId) => scoreLeagueCreature(creatureId, own, opponent, genome.weights));
-    const scores = isRankedDraftInteractionPrior(genome.draftInteractionPrior)
-        ? applyRankedDraftInteractionOverlay(
-              baseScores,
-              choices.map((creatureId) =>
-                  rankedDraftInteractionAffinity(creatureId, {
-                      ownCreatureIds: own,
-                      knownOpponentCreatureIds: opponent,
-                  }),
-              ),
-          )
-        : baseScores;
+    const baseScores = choices.map((creatureId) => scoreLeagueGenomeCreature(creatureId, own, opponent, genome));
+    const interactionPrior = isRankedDraftInteractionPrior(genome.draftInteractionPrior);
+    const spellRanged = isRankedSpellRangedDraftPolicy(genome.draftSpellRangedPolicy);
+    const scores =
+        interactionPrior || spellRanged
+            ? applyRankedDraftInteractionOverlay(
+                  baseScores,
+                  choices.map(
+                      (creatureId) =>
+                          (interactionPrior
+                              ? rankedDraftInteractionAffinity(creatureId, {
+                                    ownCreatureIds: own,
+                                    knownOpponentCreatureIds: opponent,
+                                })
+                              : 0) + (spellRanged ? rankedSpellRangedCoPlayAffinity(creatureId, own) : 0),
+                  ),
+              )
+            : baseScores;
     if (isRankedDraftVarietyPolicy(genome.draftVarietyPolicy)) {
         return (
             pickRankedDraftVarietyCreature(choices, scores, {

@@ -584,6 +584,21 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
         interactions,
     };
     const heroStyle = background ? ` style="--hero-image:url('${background}')"` : "";
+    const sectionNavigationHtml = [
+        { id: "overview", label: "Overview" },
+        { id: "rankings", label: "Rankings" },
+        { id: "patterns", label: "Patterns" },
+        ...(interactions ? [{ id: "interactions", label: "Co-play" }] : []),
+        { id: "full-rankings", label: "Full table" },
+        { id: "method", label: "Method" },
+    ]
+        .map(
+            (item, index) =>
+                `<a class="report-jump${index === 0 ? " active" : ""}" href="#${item.id}" data-report-jump="${item.id}"${
+                    index === 0 ? ' aria-current="true"' : ""
+                }>${item.label}</a>`,
+        )
+        .join("");
 
     return `<!doctype html>
 <html lang="en">
@@ -602,10 +617,90 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
 @media(max-width:720px){.shell{width:min(100% - 24px,1260px)}.hero-inner{padding:34px 0 52px}.brand{margin-bottom:24px}.hero-stats{grid-template-columns:repeat(2,1fr)}.notice{grid-template-columns:1fr}.notice-mark{display:none}.filter-row{align-items:stretch}.cohort-tabs{flex-basis:100%;flex-wrap:nowrap;overflow-x:auto;padding-bottom:5px;scrollbar-color:var(--gold) transparent;scrollbar-width:thin}.map-picker{flex:1 1 auto;margin-left:0}.map-filter{flex:1}.filter-coverage{min-width:105px}.leaders{grid-template-columns:repeat(2,1fr)}.forest-row{grid-template-columns:minmax(110px,150px) minmax(100px,1fr) 54px}.interaction-grid{grid-template-columns:1fr}.interaction-card.wide{grid-column:auto}.table-tools{grid-template-columns:1fr}.details-grid{grid-template-columns:1fr}.section-head{display:block}.section-head p{margin-top:7px}.footer{display:block}.footer span{display:block;margin-top:5px}}
 @media(max-width:460px){.leaders{grid-template-columns:1fr}.leader-art{height:150px}.forest-row{grid-template-columns:112px minmax(90px,1fr) 49px;gap:6px}.forest-label{grid-template-columns:27px minmax(0,1fr);gap:6px}.forest-label img{width:27px;height:27px}.forest-name{font-size:.67rem}.chart-card,.analysis-card{padding:13px}}
 @media print{.sticky-filter,.table-tools{position:static;display:none}.hero{min-height:0}.hero-inner{padding:24px 0}.hero::before{opacity:.16}.report-main{padding-bottom:0}.chart-card,.analysis-card,.table-card,.details-card,.leader{break-inside:avoid;box-shadow:none}.shell{width:100%}.ranking-table th{position:static}}
+:root{--bg:#070504;--bg2:#110b07;--panel:#160e08;--panel2:#21150c;--panel3:#302014;--ink:#efe4cc;--white:#f8edd8;--muted:rgba(239,228,204,.69);--muted2:rgba(239,228,204,.5);--line:rgba(112,75,42,.46);--line2:rgba(220,177,88,.52);--gold:#dcb158;--gold2:#efd49a;--green:#46d160;--red:#ff5a3f;--shadow:0 22px 70px rgba(0,0,0,.48);--radius:14px}
+html{scrollbar-color:rgba(220,177,88,.72) #0a0603;scrollbar-gutter:stable;scrollbar-width:thin}
+html::-webkit-scrollbar{width:14px;height:14px}
+html::-webkit-scrollbar-track{border-left:1px solid rgba(205,160,120,.16);background:#0a0603}
+html::-webkit-scrollbar-thumb{border:4px solid #0a0603;border-radius:999px;background:linear-gradient(180deg,#f1cf84,#a86f2c);box-shadow:inset 0 0 0 1px rgba(255,244,214,.28)}
+html::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#ffe2a1,#c28538)}
+html::-webkit-scrollbar-corner{background:#0a0603}
+body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,0,.11),transparent 29%),radial-gradient(circle at 88% 34%,rgba(205,160,120,.055),transparent 28%),linear-gradient(180deg,#070504 0%,#110b07 43%,#070504 100%);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.012em}
+::selection{background:rgba(220,177,88,.28);color:#fff}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.shell{width:min(1720px,calc(100vw - 64px))}
+.hero{min-height:430px;border-bottom-color:rgba(205,160,120,.38);background:radial-gradient(circle at 76% 14%,rgba(220,177,88,.17),transparent 35%),radial-gradient(circle at 25% 0%,rgba(255,90,63,.09),transparent 32%),#0b0704}
+.hero::before{background-image:linear-gradient(90deg,rgba(7,5,4,.98) 0%,rgba(7,5,4,.8) 44%,rgba(7,5,4,.34)),linear-gradient(180deg,transparent 42%,#070504),var(--hero-image);opacity:.76}
+.hero-inner{gap:56px;padding:76px 0 82px}
+.brand{margin-bottom:38px;color:var(--gold);font-size:.72rem;letter-spacing:.18em}
+.brand img{width:60px;height:60px}
+.eyebrow{color:var(--gold);letter-spacing:.16em}
+.hero h1,.section-head h2{font-family:Georgia,"Times New Roman",serif;font-weight:700;letter-spacing:.035em;text-shadow:0 .08em .13em rgba(0,0,0,.74),0 -.02em 0 rgba(255,229,177,.13)}
+.hero h1{max-width:980px;color:var(--gold2);font-size:clamp(3rem,5.2vw,6.15rem);line-height:.98}
+.subtitle{max-width:820px;color:rgba(239,228,204,.72);font-size:clamp(1rem,1.35vw,1.22rem)}
+.hero-stats{width:min(430px,100%);gap:12px}
+.hero-stat{border-color:rgba(205,160,120,.46);border-radius:10px;background:linear-gradient(145deg,rgba(48,32,20,.82),rgba(11,7,4,.82));box-shadow:inset 0 1px rgba(255,232,189,.08),0 18px 42px rgba(0,0,0,.22)}
+.hero-stat strong{color:var(--gold2);font-family:Georgia,"Times New Roman",serif;font-size:1.8rem}
+.hero-stat span{color:rgba(239,228,204,.58)}
+.report-main{padding:36px 0 92px}
+.notice{border-color:rgba(205,160,120,.36);border-left-color:var(--gold);border-radius:10px;background:linear-gradient(90deg,rgba(220,177,88,.13),rgba(22,14,8,.92) 58%);box-shadow:0 16px 36px rgba(0,0,0,.17)}
+.sticky-filter{top:12px;margin:0 0 42px;padding:13px 15px 14px;border:1px solid rgba(205,160,120,.44);border-radius:12px;background:linear-gradient(145deg,rgba(33,21,12,.96),rgba(12,7,4,.95));box-shadow:0 18px 44px rgba(0,0,0,.38),inset 0 1px rgba(255,231,185,.08)}
+.command-deck{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;padding-bottom:12px}
+.command-deck-label{display:flex;align-items:center;gap:10px;color:var(--muted2);font-size:.67rem;font-weight:850;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+.command-deck-label a{padding:5px 8px;border:1px solid rgba(205,160,120,.34);border-radius:999px;color:var(--gold);font-size:.64rem;letter-spacing:.08em;text-decoration:none;transition:border-color .16s ease,background .16s ease,color .16s ease}
+.command-deck-label a:hover{border-color:rgba(220,177,88,.7);background:rgba(220,177,88,.12);color:var(--gold2)}
+.report-jumps{display:flex;gap:7px;min-width:0;overflow-x:auto;padding:2px 2px 5px;scrollbar-color:rgba(220,177,88,.44) transparent;scrollbar-width:thin}
+.report-jumps::-webkit-scrollbar{height:6px}
+.report-jumps::-webkit-scrollbar-thumb{border-radius:999px;background:rgba(220,177,88,.46)}
+.report-jump{flex:0 0 auto;padding:8px 12px;border:1px solid rgba(205,160,120,.24);border-radius:999px;background:rgba(8,5,3,.48);color:var(--muted);font-size:.71rem;font-weight:800;letter-spacing:.04em;text-decoration:none;transition:transform .16s ease,border-color .16s ease,background .16s ease,color .16s ease}
+.report-jump:hover{border-color:rgba(220,177,88,.62);background:rgba(220,177,88,.1);color:var(--gold2);transform:translateY(-1px)}
+.report-jump.active,.report-jump[aria-current="true"]{border-color:rgba(220,177,88,.78);background:linear-gradient(145deg,rgba(220,177,88,.24),rgba(127,78,30,.15));color:var(--gold2);box-shadow:inset 0 1px rgba(255,236,194,.13)}
+.filter-row{padding-top:12px;border-top:1px solid rgba(205,160,120,.24)}
+.cohort-tab{border-color:rgba(205,160,120,.34);background:rgba(8,5,3,.62);color:var(--muted);transition:border-color .16s ease,background .16s ease,color .16s ease}
+.cohort-tab:hover{border-color:rgba(220,177,88,.66);color:var(--gold2)}
+.cohort-tab.active{border-color:rgba(220,177,88,.76);background:rgba(220,177,88,.14);color:var(--gold2)}
+.map-filter,.search,.type-filter,.counter-select{border-color:rgba(205,160,120,.38);background:#0e0905;color:var(--ink);box-shadow:inset 0 1px rgba(255,232,189,.05)}
+.map-filter:focus,.search:focus,.type-filter:focus,.counter-select:focus{border-color:rgba(220,177,88,.8);box-shadow:0 0 0 3px rgba(220,177,88,.12)}
+.filter-coverage strong{color:var(--gold2)}
+.report-main section{position:relative;scroll-margin-top:188px}
+.section-head{margin:54px 0 18px;padding-bottom:15px;border-bottom:1px solid rgba(205,160,120,.24)}
+.section-head h2{color:var(--gold2);font-size:clamp(1.9rem,2.9vw,2.7rem)}
+.section-head p{max-width:740px;color:var(--muted);font-size:.9rem}
+.leaders{grid-template-columns:repeat(5,minmax(0,1fr));gap:17px}
+.leader{border-color:rgba(205,160,120,.38);border-radius:12px;background:linear-gradient(155deg,rgba(255,235,196,.075),transparent 37%),linear-gradient(155deg,rgba(47,30,18,.98),rgba(15,9,5,.98));box-shadow:0 20px 45px rgba(0,0,0,.3),inset 0 1px rgba(255,231,185,.09);transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+.leader::before{position:absolute;z-index:2;top:0;right:18px;left:18px;height:1px;background:linear-gradient(90deg,transparent,rgba(239,212,154,.75),transparent);content:""}
+.leader:hover{border-color:rgba(220,177,88,.72);box-shadow:0 26px 58px rgba(0,0,0,.44),0 0 0 1px rgba(220,177,88,.08);transform:translateY(-5px)}
+.leader-art{height:clamp(220px,16.5vw,312px);background:radial-gradient(circle at 50% 42%,rgba(220,177,88,.19),transparent 48%),radial-gradient(circle at 50% 92%,rgba(255,90,63,.12),transparent 45%),#0b0704}
+.leader-art::after{inset:42% 0 0;background:linear-gradient(transparent,rgba(15,9,5,.98))}
+.leader-art img{padding:12px;filter:drop-shadow(0 20px 22px rgba(0,0,0,.58));transform:scale(1.1);transition:transform .28s ease}
+.leader:hover .leader-art img{transform:scale(1.17)}
+.leader-copy{margin-top:-53px;padding:0 19px 20px}
+.leader-type{color:var(--gold);font-size:.64rem;letter-spacing:.13em}
+.leader h3{min-height:2.35em;color:var(--white);font-size:1.12rem}
+.leader-rate{color:var(--gold2);font-family:Georgia,"Times New Roman",serif;font-size:1.92rem}
+.leader-meta{color:var(--muted2);font-size:.72rem}
+.chart-card,.analysis-card,.table-card,.details-card,.interaction-card{border-color:rgba(205,160,120,.32);border-radius:12px;background:linear-gradient(145deg,rgba(255,235,196,.038),transparent 37%),linear-gradient(145deg,rgba(35,22,13,.98),rgba(17,10,6,.98));box-shadow:0 17px 42px rgba(0,0,0,.25),inset 0 1px rgba(255,231,185,.06)}
+.chart-card,.analysis-card,.interaction-card{padding:21px}
+.chart-title h3,.analysis-card h3,.interaction-card h3,.details-card h3{color:var(--gold2);font-family:Georgia,"Times New Roman",serif;font-size:1.2rem;letter-spacing:.025em}
+.forest{gap:12px}
+.forest-row{grid-template-columns:minmax(190px,250px) minmax(160px,1fr) 74px;gap:13px}
+.forest-label{grid-template-columns:48px minmax(0,1fr);gap:11px}
+.forest-label img{width:48px;height:48px;border:1px solid rgba(205,160,120,.28);border-radius:9px;background:#0a0603}
+.forest-name{font-size:.82rem}.forest-sample{font-size:.67rem}.forest-track{height:25px;background:linear-gradient(90deg,rgba(255,90,63,.12),rgba(255,255,255,.035) 50%,rgba(70,209,96,.12));box-shadow:inset 0 0 0 1px rgba(205,160,120,.16)}.forest-ci{top:10px}.forest-dot{top:6px;width:13px;height:13px;background:var(--gold2)}.forest-rate{color:var(--gold2);font-size:.84rem}
+.scatter-grid{stroke:rgba(239,228,204,.09)}.scatter-axis{stroke:rgba(205,160,120,.45)}.scatter-label{fill:rgba(239,228,204,.56)}.scatter-dot{stroke:#130b06;stroke-width:2}
+.heatmap-wrap,.table-wrap{scrollbar-color:rgba(220,177,88,.55) transparent;scrollbar-width:thin}.heatmap-wrap::-webkit-scrollbar,.table-wrap::-webkit-scrollbar{width:10px;height:10px}.heatmap-wrap::-webkit-scrollbar-thumb,.table-wrap::-webkit-scrollbar-thumb{border:2px solid #160e08;border-radius:999px;background:rgba(220,177,88,.58)}
+.table-tools{border-bottom-color:rgba(205,160,120,.24);background:rgba(8,5,3,.28)}.ranking-table th{background:#21150c}.ranking-table th button{color:var(--gold)}.ranking-table td{border-bottom-color:rgba(205,160,120,.14);color:var(--muted)}.ranking-table tr:hover td{background:rgba(220,177,88,.055)}.table-entry{gap:12px}.table-entry img{width:46px;height:46px;border:1px solid rgba(205,160,120,.25);border-radius:9px;background:#0a0603}.type-chip{border-color:rgba(205,160,120,.32);color:var(--muted2)}.rate-cell{color:var(--gold2)!important}
+.interaction-row{padding:12px 0;border-bottom-color:rgba(205,160,120,.16)}.interaction-name{color:var(--white);font-size:.84rem}.interaction-meta,.interaction-ci{color:var(--muted2)}.interaction-lift{color:var(--gold2);font-size:.88rem}
+.provenance-row{border-bottom-color:rgba(205,160,120,.16)}.cohort-note{border-left-color:rgba(220,177,88,.72);background:rgba(220,177,88,.055)}.footer{border-top-color:rgba(205,160,120,.28);color:var(--muted2)}
+@media(max-width:1420px){.leaders{grid-template-columns:repeat(4,minmax(0,1fr))}.leader-art{height:clamp(210px,19vw,292px)}}
+@media(max-width:1040px){.shell{width:min(100% - 40px,1320px)}.hero-inner{gap:30px}.leaders{grid-template-columns:repeat(3,minmax(0,1fr))}.forest-row{grid-template-columns:minmax(160px,205px) minmax(130px,1fr) 66px}}
+@media(max-width:720px){.shell{width:min(100% - 24px,1320px)}.hero{min-height:0}.hero-inner{padding:46px 0 58px}.hero h1{font-size:clamp(2.5rem,12vw,4.4rem)}.command-deck{grid-template-columns:1fr}.command-deck-label{justify-content:space-between}.sticky-filter{top:6px;margin-bottom:30px;padding:11px}.filter-row{padding-top:10px}.leaders{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.leader-art{height:clamp(188px,38vw,248px)}.leader-copy{padding:0 14px 16px}.forest-row{grid-template-columns:minmax(128px,160px) minmax(100px,1fr) 54px}.forest-label{grid-template-columns:36px minmax(0,1fr);gap:8px}.forest-label img{width:36px;height:36px}.section-head{margin-top:42px}.report-main section{scroll-margin-top:214px}}
+@media(max-width:460px){.leaders{grid-template-columns:1fr}.leader-art{height:235px}.forest-row{grid-template-columns:112px minmax(90px,1fr) 49px}.forest-label{grid-template-columns:29px minmax(0,1fr)}.forest-label img{width:29px;height:29px}.hero-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.leader,.leader-art img,.report-jump{transition:none}.leader:hover,.report-jump:hover{transform:none}}
+@media print{.sticky-filter{display:none}.report-main section{scroll-margin-top:0}}
 </style>
 </head>
 <body>
-<header class="hero"${heroStyle}>
+<header id="report-top" class="hero"${heroStyle}>
   <div class="shell hero-inner">
     <div>
       <div class="brand"><img src="${logo}" alt=""><span>Heroes of Crypto · Simulation intelligence</span></div>
@@ -642,19 +737,22 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
             }</p></div></aside>`
           : ""
   }
-  <div class="sticky-filter"><div class="filter-row"><nav class="cohort-tabs" id="cohort-tabs" aria-label="Filter report by cohort"></nav><label class="map-picker" for="map-filter"><span>Map</span><select class="map-filter" id="map-filter" aria-label="Filter report by map"></select></label><div class="filter-coverage" id="filter-coverage" aria-live="polite"></div></div></div>
+  <div class="sticky-filter" aria-label="Report controls">
+    <div class="command-deck"><div class="command-deck-label"><span>Report navigator</span><a href="#report-top">Top</a></div><nav class="report-jumps" aria-label="Jump to report section">${sectionNavigationHtml}</nav></div>
+    <div class="filter-row"><nav class="cohort-tabs" id="cohort-tabs" aria-label="Filter report by cohort"></nav><label class="map-picker" for="map-filter"><span>Map</span><select class="map-filter" id="map-filter" aria-label="Filter report by map"></select></label><div class="filter-coverage" id="filter-coverage" aria-live="polite"></div></div>
+  </div>
 
-  <section aria-labelledby="leaders-title">
+  <section id="overview" data-report-section aria-labelledby="leaders-title">
     <div class="section-head"><div><p class="eyebrow">At a glance</p><h2 id="leaders-title">Category leaders</h2></div><p>Highest observed draw-aware score rate in the selected cohort and map set. Treat close results as a tier rather than a proven unique winner: confidence intervals can overlap, synergy rows inherit roster composition, and the augment-plan view compares 96 candidates.</p></div>
     <div class="leaders" id="leaders"></div>
   </section>
 
-  <section aria-labelledby="rankings-title">
+  <section id="rankings" data-report-section aria-labelledby="rankings-title">
     <div class="section-head"><div><p class="eyebrow">Comparative performance</p><h2 id="rankings-title">Score-rate forest plots</h2></div><p>The selected cohort and map set apply to every chart. Unit and synergy panels include every supported entry and activation level; the gold rule marks 50%, and whiskers show reported 95% intervals.</p></div>
     <div class="chart-grid" id="forest-grid"></div>
   </section>
 
-  <section aria-labelledby="patterns-title">
+  <section id="patterns" data-report-section aria-labelledby="patterns-title">
     <div class="section-head"><div><p class="eyebrow">Selection patterns</p><h2 id="patterns-title">Context behind the leaderboard</h2></div><p>Pick frequency can expose policy preference; cohort matrices show where aggregate score rates hide composition-specific reversals.</p></div>
     <div class="analysis-grid">
       <article class="analysis-card" id="scatter-card"><h3>Pick rate vs score rate</h3><p>Each point is one ranked item with both metrics available.</p><div id="scatter"></div></article>
@@ -664,7 +762,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
 
   ${
       interactions
-          ? `<section aria-labelledby="interactions-title">
+          ? `<section id="interactions" data-report-section aria-labelledby="interactions-title">
     <div class="section-head"><div><p class="eyebrow">Roster interaction</p><h2 id="interactions-title">Unit co-play and counters</h2></div><p>Each lift is held-out performance above an additive model fitted separately for every cohort and live map, controlling unit main effects plus setup choices. Results are pooled across all included cohorts and live maps; the cohort/map filters above do not apply. Rankings are exploratory, uncorrected for multiple comparisons, and show adjusted associations rather than randomized causal effects.</p></div>
     <div class="interaction-grid" id="unit-interactions">
       <article class="interaction-card"><h3>2-unit co-play</h3><p id="ally-pair-note"></p><div class="interaction-list" id="ally-pairs"></div></article>
@@ -675,7 +773,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
           : ""
   }
 
-  <section aria-labelledby="table-title">
+  <section id="full-rankings" data-report-section aria-labelledby="table-title">
     <div class="section-head"><div><p class="eyebrow">Audit the numbers</p><h2 id="table-title">Full rankings</h2></div><p>Search any unit, synergy, or item within the selected cohort and map, restrict by category, and sort on every reported metric.</p></div>
     <div class="table-card">
       <div class="table-tools"><input class="search" id="table-search" type="search" placeholder="Search name, key, cohort…" aria-label="Search rankings"><select class="type-filter" id="type-filter" aria-label="Filter ranking category"><option value="all">All categories</option></select><span class="table-total" id="table-total"></span></div>
@@ -683,7 +781,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
     </div>
   </section>
 
-  <section aria-labelledby="method-title">
+  <section id="method" data-report-section aria-labelledby="method-title">
     <div class="section-head"><div><p class="eyebrow">Reproducibility</p><h2 id="method-title">Method and provenance</h2></div><p>Keep these identifiers with screenshots or exported conclusions so the result remains traceable.</p></div>
     <div class="details-grid">
       <article class="details-card"><h3>Run provenance</h3><dl class="provenance">${provenanceHtml}</dl></article>
@@ -752,7 +850,8 @@ function td(text,className){return node("td",className||"",text)}
 function renderTable(){var body=document.getElementById("ranking-body");var values=tableRows();body.replaceChildren();values.forEach(function(row){var line=node("tr");line.append(td(row.categoryLabel));var entry=td("");var wrap=node("div","table-entry");var img=node("img");img.src=image(row);img.alt="";var copy=node("div");copy.append(node("strong","",row.name));copy.append(node("span","type-chip",row.key));wrap.append(img,copy);entry.append(wrap);line.append(entry);line.append(td(cohortLabel(row.cohort)));line.append(td(mapLabel(row.map),mapIsNonLive(row.map)?"negative":""));line.append(td(sample(row)));line.append(td(finite(row.wins)?numberFormat.format(row.wins):"—"));line.append(td(finite(row.losses)?numberFormat.format(row.losses):"—"));line.append(td(finite(row.draws)?numberFormat.format(row.draws):"—"));line.append(td(rate(row.scoreRate),"rate-cell"));line.append(td(rate(row.winRate)));line.append(td(finite(row.ciLow)&&finite(row.ciHigh)?rate(row.ciLow)+" – "+rate(row.ciHigh):"—"));line.append(td(rate(row.pickRate)));line.append(td(lift(row.liftPp),tone(row.liftPp)));body.append(line)});if(!values.length){var line=node("tr");var empty=td("No ranking rows match the selected cohort, map, and table filters.","empty");empty.colSpan=13;line.append(empty);body.append(line)}document.getElementById("table-total").textContent=numberFormat.format(values.length)+" rows"}
 function bindTable(){var search=document.getElementById("table-search");search.addEventListener("input",function(){state.query=search.value.trim();renderTable()});var select=document.getElementById("type-filter");select.addEventListener("change",function(){state.type=select.value;renderTable()});document.querySelectorAll("[data-sort]").forEach(function(button){button.addEventListener("click",function(){var key=button.getAttribute("data-sort");if(state.sort===key)state.direction*=-1;else{state.sort=key;state.direction=key==="name"||key==="categoryLabel"||key==="cohort"||key==="map"?1:-1}renderTable()})})}
 function renderAll(){renderTabs();renderCoverage();renderLeaders();renderForests();renderScatter();renderHeatmap();renderTable()}
-renderTypeFilter();renderMapFilter();bindTable();renderInteractions();renderAll();
+function initReportNavigation(){var links=Array.from(document.querySelectorAll("[data-report-jump]"));var sections=Array.from(document.querySelectorAll("[data-report-section]"));if(!links.length||!sections.length||!("IntersectionObserver" in window))return;var setActive=function(id){links.forEach(function(link){var active=link.getAttribute("data-report-jump")===id;link.classList.toggle("active",active);if(active)link.setAttribute("aria-current","true");else link.removeAttribute("aria-current")})};var observer=new IntersectionObserver(function(entries){var visible=entries.filter(function(entry){return entry.isIntersecting}).sort(function(left,right){return left.boundingClientRect.top-right.boundingClientRect.top})[0];if(visible)setActive(visible.target.id)},{rootMargin:"-28% 0px -62% 0px",threshold:0});sections.forEach(function(section){observer.observe(section)})}
+renderTypeFilter();renderMapFilter();bindTable();renderInteractions();renderAll();initReportNavigation();
 })();
 </script>
 </body>

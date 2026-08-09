@@ -22,18 +22,15 @@ import {
     projectDraftGenomeForShipping,
     RANKED_VERSATILE_DRAFT_SPEC,
 } from "../ai/setup/draft_ship";
+import { RANKED_A19_DRAFT_CANDIDATE, RANKED_A19_DRAFT_CANDIDATE_ID } from "../ai/setup/ranked_a19_draft_candidate";
 import { pickCoherentDraftBundle } from "../ai/setup/draft_coherence";
 import { isRankedDraftInteractionPrior, RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../ai/setup/draft_interaction_prior";
 import { isRankedDraftVarietyPolicy, RANKED_DRAFT_VARIETY_POLICY_ID } from "../ai/setup/draft_variety";
-import {
-    conditionalArtifactT2,
-    conditionalAugments,
-    conditionalSynergies,
-    parseConditionalRules,
-} from "../ai/setup/setup_conditional";
+import { resolveSetupPolicy, type IResolvedSetupPolicy } from "../ai/setup/setup_ship";
 import { creatureInfo } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { TIER1_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
+import { buildV08A19SearchEnvironment } from "../ai/versions/v0_8_a19_profile";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { getUpgradePoints } from "../perks/perk_properties";
 import {
@@ -63,6 +60,8 @@ import {
     createMeleeLeagueGenome,
     LEAGUE_ANCHOR_GENOME,
     LEAGUE_GENOME_LAYOUT,
+    RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
+    isRankedSpellRangedDraftPolicy,
     type ILeagueGenome,
 } from "./league_genome";
 
@@ -80,7 +79,6 @@ for (const faction of Object.values(CREATURES)) {
 
 const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
-const RULES = parseConditionalRules("all");
 const CURRENT_INCUMBENT_ID = "ranked-round1-incumbent";
 const HEURISTIC_ID = "untrained-heuristic";
 const DEFAULT_ID = "shipped-default-draft";
@@ -93,6 +91,9 @@ export const RANKED_DRAFT_INTRINSIC_DIM = LEAGUE_GENOME_LAYOUT.draftIntrinsic.le
 export const RANKED_DRAFT_CURRENT_INCUMBENT_ID = CURRENT_INCUMBENT_ID;
 export const RANKED_DRAFT_INTERACTION_PRIOR_CANDIDATE_ID = "ranked-interactions-a19-ranked-draft-10008-v1";
 export const RANKED_DRAFT_VERSATILE_CANDIDATE_ID = RANKED_VERSATILE_DRAFT_SPEC;
+export const RANKED_DRAFT_A19_CALIBRATED_CANDIDATE_ID = RANKED_A19_DRAFT_CANDIDATE_ID;
+export const RANKED_DRAFT_A19_CASTER_REPLAY_CANDIDATE_ID = "ranked-a19-caster-replay-v1";
+export const RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC = "all";
 export const RANKED_DRAFT_LIVE_MAP_TYPES = [
     PBTypes.GridVals.NORMAL,
     PBTypes.GridVals.LAVA_CENTER,
@@ -100,6 +101,7 @@ export const RANKED_DRAFT_LIVE_MAP_TYPES = [
 ] as const;
 
 export type RankedDraftCohort = "ranged" | "mage" | "melee_magic" | "aura_heavy";
+export type RankedDraftFightProfileId = "v0.7" | "a19";
 
 export const RANKED_DRAFT_COHORT_DEFINITIONS: Readonly<Record<RankedDraftCohort, string>> = {
     ranged: "candidate roster contains at least one RANGE creature",
@@ -203,10 +205,13 @@ export interface IRankedDraftEvaluationReport {
         gamesPerOpponent: number;
         baseSeed: number;
         concurrency: number;
-        fightVersion: "v0.7";
+        fightProfile: RankedDraftFightProfileId;
+        fightVersion: "v0.7" | "v0.8";
         maxLaps: number;
         mapTypes: number[];
         setupRules: "all";
+        candidateSetupPolicySpec: string;
+        opponentSetupPolicySpec: string;
         draftDimensions: { offset: number; length: number };
         clusterSize: 4;
         seedAllocation: "indexed-bijective-v1";
@@ -239,6 +244,9 @@ export interface IRankedDraftEvaluationOptions {
     concurrency?: number;
     mapTypes?: readonly number[];
     maxLaps?: number;
+    fightProfile?: RankedDraftFightProfileId;
+    candidateSetupPolicySpec?: string;
+    opponentSetupPolicySpec?: string;
 }
 
 interface INormalizedOptions {
@@ -247,6 +255,9 @@ interface INormalizedOptions {
     concurrency: number;
     mapTypes: number[];
     maxLaps: number;
+    fightProfile: RankedDraftFightProfileId;
+    candidateSetupPolicySpec: string;
+    opponentSetupPolicySpec: string;
 }
 
 interface IRankedDraftGameDependencies {
@@ -321,6 +332,7 @@ export function normalizeRankedDraftGenome(genome: ILeagueGenome, id: string = g
     return createLeagueGenome(id, projected.weights, false, {
         ...(projected.draftInteractionPrior ? { draftInteractionPrior: projected.draftInteractionPrior } : {}),
         ...(projected.draftVarietyPolicy ? { draftVarietyPolicy: projected.draftVarietyPolicy } : {}),
+        ...(projected.draftSpellRangedPolicy ? { draftSpellRangedPolicy: projected.draftSpellRangedPolicy } : {}),
     });
 }
 
@@ -342,6 +354,17 @@ export function rankedDraftVersatileCandidate(): ILeagueGenome {
     return createLeagueGenome(RANKED_DRAFT_VERSATILE_CANDIDATE_ID, incumbent.weights, false, {
         draftInteractionPrior: RANKED_DRAFT_INTERACTION_PRIOR_ID,
         draftVarietyPolicy: RANKED_DRAFT_VARIETY_POLICY_ID,
+    });
+}
+
+export function rankedDraftA19CalibratedCandidate(): ILeagueGenome {
+    return normalizeRankedDraftGenome(RANKED_A19_DRAFT_CANDIDATE, RANKED_DRAFT_A19_CALIBRATED_CANDIDATE_ID);
+}
+
+export function rankedDraftA19CasterReplayCandidate(): ILeagueGenome {
+    const incumbent = rankedDraftCurrentIncumbent();
+    return createLeagueGenome(RANKED_DRAFT_A19_CASTER_REPLAY_CANDIDATE_ID, incumbent.weights, false, {
+        draftSpellRangedPolicy: RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
     });
 }
 
@@ -374,6 +397,7 @@ export function loadRankedDraftPool(specifier?: string, cwd: string = process.cw
             prior?: unknown;
             draftInteractionPrior?: unknown;
             draftVarietyPolicy?: unknown;
+            draftSpellRangedPolicy?: unknown;
         };
         const id = typeof value.id === "string" && value.id.trim() ? value.id : `opponent-${index}`;
         if (!Array.isArray(value.weights)) throw new TypeError(`Ranked draft pool entry ${id} omitted weights`);
@@ -383,11 +407,18 @@ export function loadRankedDraftPool(specifier?: string, cwd: string = process.cw
         if (value.draftVarietyPolicy !== undefined && !isRankedDraftVarietyPolicy(value.draftVarietyPolicy)) {
             throw new TypeError(`Ranked draft pool entry ${id} has an unsupported variety policy`);
         }
+        if (
+            value.draftSpellRangedPolicy !== undefined &&
+            !isRankedSpellRangedDraftPolicy(value.draftSpellRangedPolicy)
+        ) {
+            throw new TypeError(`Ranked draft pool entry ${id} has an unsupported spell-ranged policy`);
+        }
         return {
             ...normalizeRankedDraftGenome(
                 createLeagueGenome(id, value.weights as number[], false, {
                     ...(value.draftInteractionPrior ? { draftInteractionPrior: value.draftInteractionPrior } : {}),
                     ...(value.draftVarietyPolicy ? { draftVarietyPolicy: value.draftVarietyPolicy } : {}),
+                    ...(value.draftSpellRangedPolicy ? { draftSpellRangedPolicy: value.draftSpellRangedPolicy } : {}),
                 }),
                 id,
             ),
@@ -422,12 +453,25 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
     }
     const maxLaps = options.maxLaps ?? 60;
     if (!Number.isInteger(maxLaps) || maxLaps < 1) throw new RangeError("maxLaps must be positive");
+    const fightProfile = options.fightProfile ?? "v0.7";
+    if (fightProfile !== "v0.7" && fightProfile !== "a19") {
+        throw new RangeError('fightProfile must be "v0.7" or "a19"');
+    }
+    const candidateSetupPolicySpec = resolveSetupPolicy(
+        options.candidateSetupPolicySpec ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC,
+    ).spec;
+    const opponentSetupPolicySpec = resolveSetupPolicy(
+        options.opponentSetupPolicySpec ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC,
+    ).spec;
     return {
         gamesPerOpponent: options.gamesPerOpponent,
         baseSeed: options.baseSeed >>> 0,
         concurrency: Math.min(concurrency, total),
         mapTypes,
         maxLaps,
+        fightProfile,
+        candidateSetupPolicySpec,
+        opponentSetupPolicySpec,
     };
 }
 
@@ -517,13 +561,21 @@ function applyAccepted(state: IPickSimState, action: PickAction, rng: PickRandom
  * intrinsic draft head. Tier-2 is selected at live phase sequence 8, when each team has five creatures;
  * recomputing it after the level-4 pick would leak future roster information into the setup policy.
  */
+export interface IRankedDraftSetupPolicySpecs {
+    lower?: string;
+    upper?: string;
+}
+
 export function resolveRankedDraftPick(
     seed: number,
     lowerInput: ILeagueGenome,
     upperInput: ILeagueGenome,
+    setupPolicySpecs: IRankedDraftSetupPolicySpecs = {},
 ): IPickSimState {
     const lowerGenome = normalizeRankedDraftGenome(lowerInput);
     const upperGenome = normalizeRankedDraftGenome(upperInput);
+    const lowerSetupPolicy = resolveSetupPolicy(setupPolicySpecs.lower ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC);
+    const upperSetupPolicy = resolveSetupPolicy(setupPolicySpecs.upper ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC);
     const rng = randomInt(seed);
     let state = createPickSimState(rng);
     const teamState = (team: PickTeam): IPickTeamState => (team === LOWER ? state.lower : state.upper);
@@ -537,11 +589,21 @@ export function resolveRankedDraftPick(
         state.lower.bundles,
         (creatureId) => draftGenomeCreatureScore(lowerGenome, creatureId),
         (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+        {
+            ...(lowerGenome.draftSpellRangedPolicy
+                ? { draftSpellRangedPolicy: lowerGenome.draftSpellRangedPolicy }
+                : {}),
+        },
     );
     const upperBundle = pickCoherentDraftBundle(
         state.upper.bundles,
         (creatureId) => draftGenomeCreatureScore(upperGenome, creatureId),
         (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+        {
+            ...(upperGenome.draftSpellRangedPolicy
+                ? { draftSpellRangedPolicy: upperGenome.draftSpellRangedPolicy }
+                : {}),
+        },
     );
     state = applyAccepted(state, { type: "select_bundle", team: LOWER, bundleIndex: lowerBundle }, rng);
     state = applyAccepted(state, { type: "select_bundle", team: UPPER, bundleIndex: upperBundle }, rng);
@@ -553,8 +615,8 @@ export function resolveRankedDraftPick(
         if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
             const lower = teamState(LOWER);
             const upper = teamState(UPPER);
-            const lowerArtifact = conditionalArtifactT2(lower.tier2Offers, lower.creatures, RULES);
-            const upperArtifact = conditionalArtifactT2(upper.tier2Offers, upper.creatures, RULES);
+            const lowerArtifact = lowerSetupPolicy.pickArtifactT2(lower.tier2Offers, lower.creatures);
+            const upperArtifact = upperSetupPolicy.pickArtifactT2(upper.tier2Offers, upper.creatures);
             state = applyAccepted(state, { type: "select_tier2", team: LOWER, artifactId: lowerArtifact }, rng);
             state = applyAccepted(state, { type: "select_tier2", team: UPPER, artifactId: upperArtifact }, rng);
             continue;
@@ -599,7 +661,11 @@ function rankedDraftRoster(creatureIds: readonly number[]): IArmyUnitSpec[] {
     });
 }
 
-function materializeArmy(team: IPickTeamState, opponentReveals: readonly number[]): IRankedDraftArmy {
+function materializeArmy(
+    team: IPickTeamState,
+    opponentReveals: readonly number[],
+    setupPolicy: IResolvedSetupPolicy,
+): IRankedDraftArmy {
     if (team.tier1Artifact === undefined) throw new Error("Complete ranked draft omitted Tier-1 artifact");
     if (team.tier2Artifact === undefined) throw new Error("Complete ranked draft omitted Tier-2 artifact");
     const budget = getUpgradePoints(team.perk);
@@ -608,8 +674,8 @@ function materializeArmy(team: IPickTeamState, opponentReveals: readonly number[
         revealedOpponentCreatures: [...opponentReveals],
         roster: rankedDraftRoster(team.creatures),
         perk: team.perk,
-        augments: conditionalAugments(budget, team.creatures, RULES),
-        synergies: conditionalSynergies(team.creatures),
+        augments: setupPolicy.pickAugments(budget, team.creatures),
+        synergies: setupPolicy.pickSynergies(team.creatures),
         tier1Artifact: team.tier1Artifact,
         tier2Artifact: team.tier2Artifact,
     };
@@ -642,10 +708,11 @@ function matchConfig(
     seed: number,
     gridType: number,
     maxLaps: number,
+    fightProfile: RankedDraftFightProfileId,
 ): IMatchConfig {
     return {
-        greenVersion: "v0.7",
-        redVersion: "v0.7",
+        greenVersion: fightProfile === "a19" ? "v0.8" : "v0.7",
+        redVersion: fightProfile === "a19" ? "v0.8" : "v0.7",
         roster: green.roster,
         redRoster: red.roster,
         seed,
@@ -697,16 +764,27 @@ export function playRankedDraftGame(
     const candidatePickedLower = pickAssignment === 0;
     const lowerGenome = candidatePickedLower ? candidate : opponent;
     const upperGenome = candidatePickedLower ? opponent : candidate;
-    const pick = resolveRankedDraftPick(pickSeed, lowerGenome, upperGenome);
-    const lower = materializeArmy(pick.lower, getKnownOpponentCreatures(pick, LOWER));
-    const upper = materializeArmy(pick.upper, getKnownOpponentCreatures(pick, UPPER));
+    const lowerSetupPolicySpec = candidatePickedLower
+        ? options.candidateSetupPolicySpec
+        : options.opponentSetupPolicySpec;
+    const upperSetupPolicySpec = candidatePickedLower
+        ? options.opponentSetupPolicySpec
+        : options.candidateSetupPolicySpec;
+    const lowerSetupPolicy = resolveSetupPolicy(lowerSetupPolicySpec);
+    const upperSetupPolicy = resolveSetupPolicy(upperSetupPolicySpec);
+    const pick = resolveRankedDraftPick(pickSeed, lowerGenome, upperGenome, {
+        lower: lowerSetupPolicy.spec,
+        upper: upperSetupPolicy.spec,
+    });
+    const lower = materializeArmy(pick.lower, getKnownOpponentCreatures(pick, LOWER), lowerSetupPolicy);
+    const upper = materializeArmy(pick.upper, getKnownOpponentCreatures(pick, UPPER), upperSetupPolicy);
     const green = battleMirror ? upper : lower;
     const red = battleMirror ? lower : upper;
     const candidateIsGreen = battleMirror ? !candidatePickedLower : candidatePickedLower;
     const candidateArmy = candidatePickedLower ? lower : upper;
     const gridType = options.mapTypes[(offerBoard + seedLaneIndex) % options.mapTypes.length];
     const result = (dependencies.matchRunner ?? DEFAULT_DEPENDENCIES.matchRunner)(
-        matchConfig(green, red, battleSeed, gridType, options.maxLaps),
+        matchConfig(green, red, battleSeed, gridType, options.maxLaps, options.fightProfile),
     );
     const candidateSide: Side = candidateIsGreen ? "green" : "red";
     const candidateResult = result.winner === "draw" ? "draw" : result.winner === candidateSide ? "win" : "loss";
@@ -757,7 +835,10 @@ export function inspectRankedDraftBoard(
     const assignments = ([true, false] as const).map((candidatePickedLower) => {
         const lowerGenome = candidatePickedLower ? candidate : opponent;
         const upperGenome = candidatePickedLower ? opponent : candidate;
-        const pick = resolveRankedDraftPick(pickSeed, lowerGenome, upperGenome);
+        const pick = resolveRankedDraftPick(pickSeed, lowerGenome, upperGenome, {
+            lower: candidatePickedLower ? options.candidateSetupPolicySpec : options.opponentSetupPolicySpec,
+            upper: candidatePickedLower ? options.opponentSetupPolicySpec : options.candidateSetupPolicySpec,
+        });
         const candidateTeam = candidatePickedLower ? pick.lower : pick.upper;
         return {
             candidatePickedLower,
@@ -982,10 +1063,13 @@ export function summarizeRankedDraftRecords(
             gamesPerOpponent: options.gamesPerOpponent,
             baseSeed: options.baseSeed,
             concurrency: options.concurrency,
-            fightVersion: "v0.7",
+            fightProfile: options.fightProfile,
+            fightVersion: options.fightProfile === "a19" ? "v0.8" : "v0.7",
             maxLaps: options.maxLaps,
             mapTypes: options.mapTypes,
             setupRules: "all",
+            candidateSetupPolicySpec: options.candidateSetupPolicySpec,
+            opponentSetupPolicySpec: options.opponentSetupPolicySpec,
             draftDimensions: { offset: RANKED_DRAFT_INTRINSIC_OFFSET, length: RANKED_DRAFT_INTRINSIC_DIM },
             clusterSize: 4,
             seedAllocation: "indexed-bijective-v1",
@@ -1025,7 +1109,10 @@ interface IWorkerData {
 type WorkerMessage = { type: "ready" } | { type: "result"; record: IRankedDraftGameRecord };
 
 /** Remove ambient experiment overrides before workers import fight-policy modules. */
-export function sanitizedRankedDraftEnvironment(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+export function sanitizedRankedDraftEnvironment(
+    source: NodeJS.ProcessEnv = process.env,
+    fightProfile: RankedDraftFightProfileId = "v0.7",
+): NodeJS.ProcessEnv {
     const environment = { ...source };
     const explicitMeasurementKeys = new Set(["VALUE_DATA", "FORCE_CREATURES", "LIVETWIN", "SIM_NO_ACTIONS"]);
     for (const key of Object.keys(environment)) {
@@ -1033,7 +1120,11 @@ export function sanitizedRankedDraftEnvironment(source: NodeJS.ProcessEnv = proc
             delete environment[key];
         }
     }
-    return environment;
+    const profileEnvironment = fightProfile === "a19" ? buildV08A19SearchEnvironment() : {};
+    return {
+        ...environment,
+        ...Object.fromEntries(Object.entries(profileEnvironment).filter(([, value]) => value !== undefined)),
+    };
 }
 
 export function evaluateRankedDraftTasks(
@@ -1090,7 +1181,7 @@ export function evaluateRankedDraftTasks(
             worker.postMessage({ type: "game", task: tasks[dispatched++] });
         };
         const environment = {
-            ...sanitizedRankedDraftEnvironment(),
+            ...sanitizedRankedDraftEnvironment(process.env, options.fightProfile),
             LIVETWIN: "1",
         };
         for (let index = 0; index < Math.min(options.concurrency, tasks.length); index += 1) {
@@ -1156,7 +1247,19 @@ interface ICliOptions extends IRankedDraftEvaluationOptions {
 
 function parseCli(argv: readonly string[]): ICliOptions {
     const values = new Map<string, string>();
-    const allowed = new Set(["candidate", "candidate-json", "pool", "games", "seed", "concurrency", "maps", "output"]);
+    const allowed = new Set([
+        "candidate",
+        "candidate-json",
+        "pool",
+        "games",
+        "seed",
+        "concurrency",
+        "maps",
+        "fight-profile",
+        "candidate-setup",
+        "opponent-setup",
+        "output",
+    ]);
     for (let index = 0; index < argv.length; index += 1) {
         const argument = argv[index];
         if (!argument.startsWith("--")) throw new Error(`Unexpected positional argument ${argument}`);
@@ -1177,6 +1280,11 @@ function parseCli(argv: readonly string[]): ICliOptions {
         baseSeed: Number(values.get("seed") ?? 1),
         concurrency: Number(values.get("concurrency") ?? Math.max(1, availableParallelism() - 2)),
         mapTypes: (values.get("maps") ?? RANKED_DRAFT_LIVE_MAP_TYPES.join(",")).split(",").map(Number),
+        ...(values.get("fight-profile")
+            ? { fightProfile: values.get("fight-profile") as RankedDraftFightProfileId }
+            : {}),
+        ...(values.get("candidate-setup") ? { candidateSetupPolicySpec: values.get("candidate-setup") } : {}),
+        ...(values.get("opponent-setup") ? { opponentSetupPolicySpec: values.get("opponent-setup") } : {}),
         ...(values.get("output") ? { outputPath: resolve(values.get("output")!) } : {}),
     };
 }

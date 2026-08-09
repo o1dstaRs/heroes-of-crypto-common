@@ -9,11 +9,16 @@
 import { describe, expect, it } from "bun:test";
 
 import { conditionalArtifactT2, parseConditionalRules } from "../../src/ai/setup/setup_conditional";
+import { RANKED_A19_CASTER_EMPOWER_SETUP_SPEC, V07_NONFIGHT_SETUP_SPEC } from "../../src/ai/setup/setup_ship";
 import { creatureInfo } from "../../src/ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../../src/ai/setup/setup_v0";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { IMatchConfig, IMatchResult } from "../../src/simulation/battle_engine";
-import { LEAGUE_ANCHOR_GENOME, LEAGUE_GENOME_LAYOUT } from "../../src/simulation/league_genome";
+import {
+    LEAGUE_ANCHOR_GENOME,
+    LEAGUE_GENOME_LAYOUT,
+    RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
+} from "../../src/simulation/league_genome";
 import { RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../../src/ai/setup/draft_interaction_prior";
 import { RANKED_DRAFT_VARIETY_POLICY_ID } from "../../src/ai/setup/draft_variety";
 import {
@@ -24,6 +29,7 @@ import {
     rankedDraftBehaviorTraceSha256,
     RANKED_DRAFT_COHORT_DEFINITIONS,
     rankedDraftCurrentIncumbent,
+    rankedDraftA19CasterReplayCandidate,
     rankedDraftInteractionPriorCandidate,
     rankedDraftVersatileCandidate,
     evaluateRankedDraftTasks,
@@ -116,16 +122,20 @@ describe("exact ranked draft evaluator", () => {
 
     it("preserves opt-in interaction and variety metadata through ranked normalization", () => {
         const incumbent = rankedDraftCurrentIncumbent();
+        const casterReplayCandidate = rankedDraftA19CasterReplayCandidate();
         const interactionCandidate = rankedDraftInteractionPriorCandidate();
         const versatileCandidate = rankedDraftVersatileCandidate();
         const interactionNormalized = normalizeRankedDraftGenome(interactionCandidate);
         const versatileNormalized = normalizeRankedDraftGenome(versatileCandidate);
+        const casterReplayNormalized = normalizeRankedDraftGenome(casterReplayCandidate);
         expect(interactionCandidate.weights).toEqual(incumbent.weights);
         expect(interactionNormalized.draftInteractionPrior).toBe(RANKED_DRAFT_INTERACTION_PRIOR_ID);
         expect(interactionNormalized.weights).toEqual(incumbent.weights);
         expect(versatileNormalized.draftInteractionPrior).toBe(RANKED_DRAFT_INTERACTION_PRIOR_ID);
         expect(versatileNormalized.draftVarietyPolicy).toBe(RANKED_DRAFT_VARIETY_POLICY_ID);
         expect(versatileNormalized.weights).toEqual(incumbent.weights);
+        expect(casterReplayNormalized.draftSpellRangedPolicy).toBe(RANKED_SPELL_RANGED_DRAFT_POLICY_ID);
+        expect(casterReplayNormalized.weights).toEqual(incumbent.weights);
         expect(incumbent.draftInteractionPrior).toBeUndefined();
         expect(incumbent.draftVarietyPolicy).toBeUndefined();
     });
@@ -207,6 +217,36 @@ describe("exact ranked draft evaluator", () => {
         expect(configs[1].redRoster).toEqual(configs[0].roster);
         expect(configs[3].roster).toEqual(thirdRedRoster);
         expect(configs[3].redRoster).toEqual(configs[2].roster);
+    });
+
+    it("routes the caster setup candidate through only eligible ranked rosters", () => {
+        const candidate = rankedDraftA19CasterReplayCandidate();
+        const opponent = { ...rankedDraftCurrentIncumbent(), id: "caster-setup-control" };
+        const configs: IMatchConfig[] = [];
+        const options = {
+            // Board 847 is a deterministic Magic Dragon + Satyr candidate roster. Pin the real draft fixture
+            // rather than assuming a small random panel contains one of these intentionally rare combinations.
+            gamesPerOpponent: 3_392,
+            baseSeed: 91_150_000,
+            mapTypes: [PBTypes.GridVals.NORMAL],
+            candidateSetupPolicySpec: RANKED_A19_CASTER_EMPOWER_SETUP_SPEC,
+            opponentSetupPolicySpec: V07_NONFIGHT_SETUP_SPEC,
+        };
+        const record = playRankedDraftGame(candidate, opponent, options, 847 * 4, 0, {
+            matchRunner: (config) => {
+                configs.push(structuredClone(config));
+                return fakeMatch("green", config);
+            },
+        });
+
+        expect(record.pickSeat).toBe("candidate-lower");
+        expect(configs).toHaveLength(1);
+        expect(configs.some((config) => config.greenAugments?.some((augment) => augment.kind === "Empower"))).toBe(
+            true,
+        );
+        expect(configs.every((config) => config.redAugments?.every((augment) => augment.kind !== "Empower"))).toBe(
+            true,
+        );
     });
 
     it("validates clustered record integrity and keeps self-play exactly symmetric", () => {

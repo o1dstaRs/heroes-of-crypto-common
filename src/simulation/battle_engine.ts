@@ -388,7 +388,7 @@ export interface IMatchConfig {
 }
 
 export interface ISetupAugment {
-    kind: "Placement" | "Armor" | "Might" | "Sniper" | "Movement";
+    kind: "Placement" | "Armor" | "Might" | "Empower" | "Sniper" | "Movement";
     value: number;
 }
 

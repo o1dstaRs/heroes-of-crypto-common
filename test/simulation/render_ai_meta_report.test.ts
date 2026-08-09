@@ -120,6 +120,20 @@ describe("render_ai_meta_report", () => {
         expect(html).not.toContain('<link rel="stylesheet"');
     });
 
+    test("adds portal-style navigation, large-screen art, and themed scrollbars", () => {
+        const html = renderAiMetaReport({ rankings: { units: [] } });
+
+        expect(html).toContain('id="report-top"');
+        expect(html).toContain('data-report-jump="overview"');
+        expect(html).toContain('data-report-jump="full-rankings"');
+        expect(html).toContain('id="full-rankings" data-report-section');
+        expect(html).toContain('class="command-deck-label"');
+        expect(html).toContain("html::-webkit-scrollbar-thumb");
+        expect(html).toContain("scrollbar-color:rgba(220,177,88,.72) #0a0603");
+        expect(html).toContain(".leader-art{height:clamp(220px,16.5vw,312px)");
+        expect(html).toContain("function initReportNavigation()");
+    });
+
     test("filters orthogonal cohort and map rankings with live maps as the default", () => {
         const liveUnits = Array.from({ length: 18 }, (_, index) => ({
             key: `live-unit-${index + 1}`,

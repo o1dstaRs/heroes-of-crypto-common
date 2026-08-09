@@ -10,10 +10,18 @@
  */
 
 import CREATURES_JSON from "../../configuration/creatures.json";
+import { AbilityPowerType } from "../../abilities/ability_properties";
 import { getAbilityConfig, getSpellConfig } from "../../configuration/config_provider";
 import { CreatureFactions, CreatureLevels } from "../../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import { isOffensiveSpellMultiplier } from "../../spells/spell_damage";
 import { SpellPowerType } from "../../spells/spell_properties";
+
+export const RANKED_SPELL_RANGED_DRAFT_POLICY_ID = "ranked-spell-ranged-v1" as const;
+export type RankedSpellRangedDraftPolicyId = typeof RANKED_SPELL_RANGED_DRAFT_POLICY_ID;
+
+export const isRankedSpellRangedDraftPolicy = (value: unknown): value is RankedSpellRangedDraftPolicyId =>
+    value === RANKED_SPELL_RANGED_DRAFT_POLICY_ID;
 
 /**
  * Draft-time creature evaluation shared by the setup AI (server draft) and the sim. A creature is
@@ -35,6 +43,8 @@ export interface ICreatureInfo {
     caster: boolean;
     /** Owns at least one configured native spellbook entry; excludes direct-cast abilities. */
     nativeSpellbook: boolean;
+    /** Owns a direct-damage spell that can reach an enemy or board area without a native ranged attack. */
+    rangedSpellDamage: boolean;
     maxDamage: number;
     shots: number;
     distance: number;
@@ -53,6 +63,8 @@ export interface ICreatureInfo {
     abilityCount: number;
     /** Has at least one positive-power, non-healing buff that this unit can actively cast. */
     castsAmplifiableBuff: boolean;
+    /** Buffs allied magic damage through Nightmare's Empower or an ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE aura. */
+    magicDamageAmplifier: boolean;
 }
 
 const CreatureJsonShape = CREATURES_JSON as unknown as Record<
@@ -96,6 +108,40 @@ const isAmplifiableSpellbookEntry = (entry: string): boolean => {
     const separator = entry.indexOf(":");
     if (separator < 0) return false;
     return isAmplifiableBuffSpell(entry.slice(0, separator), entry.slice(separator + 1));
+};
+
+const isRangedDamageSpellbookEntry = (entry: string): boolean => {
+    const separator = entry.indexOf(":");
+    if (separator < 0) return false;
+    try {
+        const spell = getSpellConfig(entry.slice(0, separator), entry.slice(separator + 1));
+        // This is the same contract used by the engine and tactical AI before they call calculateSpellDamage.
+        // Target shape alone is not damage: Ash Moth's Smoke and Misfortune both target at range, but neither
+        // is an offensive magic hit and neither should make an army look like a mage battery.
+        return !spell.is_buff && isOffensiveSpellMultiplier(spell.multiplier_type);
+    } catch {
+        return false;
+    }
+};
+
+const isMagicDamageAmplifyingSpellbookEntry = (entry: string): boolean => {
+    const separator = entry.indexOf(":");
+    if (separator < 0) return false;
+    try {
+        const spell = getSpellConfig(entry.slice(0, separator), entry.slice(separator + 1));
+        // Unit.getMagicDamageBonusPercentage reads this exact active buff alongside the team's Empower augment.
+        return spell.is_buff && spell.name === "Empower";
+    } catch {
+        return false;
+    }
+};
+
+const isMagicDamageAmplifyingAbility = (name: string): boolean => {
+    try {
+        return getAbilityConfig(name).power_type === AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE;
+    } catch {
+        return false;
+    }
 };
 
 const isAmplifiableCastableAbility = (name: string): boolean => {
@@ -147,6 +193,7 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 mage: cfg.attack_type === "MAGIC",
                 caster: spellList.length > 0 || abilityList.some(isCastableAbility),
                 nativeSpellbook: spellList.length > 0,
+                rangedSpellDamage: spellList.some(isRangedDamageSpellbookEntry),
                 maxDamage: cfg.attack_damage_max ?? 0,
                 shots: cfg.range_shots ?? 0,
                 distance: cfg.shot_distance ?? 0,
@@ -161,6 +208,9 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 abilityCount: abilityList.filter((a) => !a.includes("Aura")).length,
                 castsAmplifiableBuff:
                     spellList.some(isAmplifiableSpellbookEntry) || abilityList.some(isAmplifiableCastableAbility),
+                magicDamageAmplifier:
+                    spellList.some(isMagicDamageAmplifyingSpellbookEntry) ||
+                    abilityList.some(isMagicDamageAmplifyingAbility),
             });
         }
     }
@@ -176,6 +226,22 @@ const creatureIndex = (): Map<number, ICreatureInfo> => {
 };
 
 export const creatureInfo = (creatureId: number): ICreatureInfo | undefined => creatureIndex().get(creatureId);
+
+export const isRangedDamageCreature = (creatureId: number): boolean => {
+    const info = creatureIndex().get(creatureId);
+    return !!info && (info.ranged || info.rangedSpellDamage);
+};
+
+export const rankedSpellRangedCoPlayAffinity = (creatureId: number, ownCreatureIds: readonly number[]): number => {
+    const candidate = creatureIndex().get(creatureId);
+    if (!candidate) return 0;
+    const own = [...new Set(ownCreatureIds)].map((ownCreatureId) => creatureIndex().get(ownCreatureId));
+    const hasOffensiveSpellcaster = own.some((info) => info?.rangedSpellDamage);
+    const hasMagicDamageAmplifier = own.some((info) => info?.magicDamageAmplifier);
+    if (candidate.rangedSpellDamage && hasMagicDamageAmplifier) return 0.18;
+    if (candidate.magicDamageAmplifier && hasOffensiveSpellcaster) return 0.18;
+    return 0;
+};
 
 /** The two level-4 stacks whose tactical value is specifically tied to screening a fragile back line. */
 export const isBacklineProtectorCreature = (creatureId: number): boolean => {

@@ -129,7 +129,7 @@ export interface IAugmentPlan {
 }
 
 export interface ISetupAugmentChoice {
-    kind: "Placement" | "Armor" | "Might" | "Sniper" | "Movement";
+    kind: "Placement" | "Armor" | "Might" | "Empower" | "Sniper" | "Movement";
     value: number;
 }
 
@@ -189,6 +189,22 @@ export function setupAugmentsForPlan(plan: Readonly<IAugmentPlan>): ISetupAugmen
     if (plan.sniper > 0) augments.push({ kind: "Sniper", value: plan.sniper });
     if (plan.movement > 0) augments.push({ kind: "Movement", value: plan.movement });
     return augments;
+}
+
+export const RANKED_A19_CASTER_EMPOWER_SETUP_SPEC = "ranked-a19-caster-empower-v1";
+
+export const RANKED_A19_CASTER_EMPOWER_AUGMENTS: readonly ISetupAugmentChoice[] = Object.freeze([
+    Object.freeze({ kind: "Placement", value: 1 }),
+    Object.freeze({ kind: "Armor", value: 3 }),
+    Object.freeze({ kind: "Empower", value: 3 }),
+]);
+
+export function rankedA19CasterEmpowerEligible(ownCreatureIds: readonly number[]): boolean {
+    const own = [...new Set(ownCreatureIds)].map(creatureInfo).filter((info) => info !== undefined);
+    // A direct magic carry plus a real magic amplifier is the replay-proven core: Magic Dragon with
+    // Nightmare's Empower and/or Satyr's Sylvan Focus. Do not spend the team augment merely because a
+    // roster contains two generic spellbooks or a control caster such as Ash Moth.
+    return own.some((info) => info.rangedSpellDamage) && own.some((info) => info.magicDamageAmplifier);
 }
 
 const CONDITIONAL_ALL = parseConditionalRules("all");
@@ -714,6 +730,23 @@ export function compileReplayTacticsSetupPolicy(): IResolvedSetupPolicy {
     });
 }
 
+export function compileRankedA19CasterEmpowerSetupPolicy(): IResolvedSetupPolicy {
+    const base = compileNonFightSetupPolicy(V07_NONFIGHT_SETUP_ARTIFACT.policy, V07_NONFIGHT_SETUP_SPEC);
+    return Object.freeze({
+        ...base,
+        spec: RANKED_A19_CASTER_EMPOWER_SETUP_SPEC,
+        journalVersion: RANKED_A19_CASTER_EMPOWER_SETUP_SPEC,
+        pickAugments: (
+            budget: number,
+            ownCreatureIds: readonly number[],
+            context?: Readonly<IPlacementSetupDecisionContext>,
+        ): ISetupAugmentChoice[] =>
+            budget === SETUP_OPTIMIZED_BUDGET && rankedA19CasterEmpowerEligible(ownCreatureIds)
+                ? [...RANKED_A19_CASTER_EMPOWER_AUGMENTS]
+                : base.pickAugments(budget, ownCreatureIds, context),
+    });
+}
+
 const conditionalPolicy = (rules: ReadonlySet<ConditionalSetupRule>): IResolvedSetupPolicy => {
     const ruleSnapshot = new Set(rules);
     const enabled = CONDITIONAL_SETUP_RULES.filter((rule) => ruleSnapshot.has(rule));
@@ -758,6 +791,9 @@ export function resolveSetupPolicy(spec: string | undefined): IResolvedSetupPoli
     if (normalized === RANKED_REPLAY_TACTICS_SETUP_SPEC) {
         return compileReplayTacticsSetupPolicy();
     }
+    if (normalized === RANKED_A19_CASTER_EMPOWER_SETUP_SPEC) {
+        return compileRankedA19CasterEmpowerSetupPolicy();
+    }
     if (normalized === V07_NONFIGHT_SETUP_SPEC) {
         return compileNonFightSetupPolicy(V07_NONFIGHT_SETUP_ARTIFACT.policy, V07_NONFIGHT_SETUP_SPEC);
     }
@@ -773,7 +809,7 @@ export function resolveSetupPolicy(spec: string | undefined): IResolvedSetupPoli
     const rules = conditionalRulesForSpec(normalized);
     if (rules) return conditionalPolicy(rules);
     throw new Error(
-        `Invalid setup policy spec ${JSON.stringify(spec)}; expected ${RANKED_REPLAY_TACTICS_SETUP_SPEC}, ${V07_NONFIGHT_SETUP_SPEC}, ${V07_PUBLIC_ROSTER_SETUP_SPEC}, ${V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC}, ${CONDITIONAL_SETUP_V1_SPEC}, ${SETUP_V0_SPEC}, or conditional rule names`,
+        `Invalid setup policy spec ${JSON.stringify(spec)}; expected ${RANKED_A19_CASTER_EMPOWER_SETUP_SPEC}, ${RANKED_REPLAY_TACTICS_SETUP_SPEC}, ${V07_NONFIGHT_SETUP_SPEC}, ${V07_PUBLIC_ROSTER_SETUP_SPEC}, ${V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC}, ${CONDITIONAL_SETUP_V1_SPEC}, ${SETUP_V0_SPEC}, or conditional rule names`,
     );
 }
 

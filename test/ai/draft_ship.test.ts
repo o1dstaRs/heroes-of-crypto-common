@@ -38,6 +38,8 @@ import {
     DRAFT_FEATURE_DIM,
     applyCreatureRoleFitMultiplier,
     creatureRoleFitMultiplier,
+    isRangedDamageCreature,
+    rankedSpellRangedCoPlayAffinity,
     scoreCreatureWeighted,
 } from "../../src/ai/setup/creature_score";
 import leagueRound1CandidateGenome from "../../src/ai/setup/draft_genomes/league_round1_br_57de5a2d_candidate.json";
@@ -49,6 +51,7 @@ import {
     LEAGUE_ANCHOR_GENOME,
     LEAGUE_GENOME_DIM,
     LEAGUE_GENOME_LAYOUT,
+    RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
 } from "../../src/simulation/league_genome";
 import { leagueGenomeFingerprint } from "../../src/simulation/optimizer/league_cycle_core";
 import { fingerprintRankedDraftArtifact } from "../../src/simulation/optimizer/ranked_draft_cem_core";
@@ -72,6 +75,40 @@ describe("draft ship genome", () => {
         expect(draftGenomeCreatureScore(genome, creatureId)).toBe(scoreCreatureWeighted(creatureId, DRAFT_ANCHOR_W));
         expect(() => embedIntrinsicDraftWeights(new Array(DRAFT_FEATURE_DIM - 1).fill(0))).toThrow(RangeError);
         expect(() => embedIntrinsicDraftWeights([...DRAFT_ANCHOR_W.slice(0, -1), Number.NaN])).toThrow(TypeError);
+    });
+
+    it("recognizes offensive spellcasters as a co-play asset without reclassifying support casters", () => {
+        const magicDragon = PBTypes.CreatureVals.MAGIC_DRAGON;
+        const battleMage = PBTypes.CreatureVals.BATTLE_MAGE;
+        const nightmare = PBTypes.CreatureVals.NIGHTMARE;
+        const satyr = PBTypes.CreatureVals.SATYR;
+        const arbalester = PBTypes.CreatureVals.ARBALESTER;
+        const ashMoth = PBTypes.CreatureVals.ASH_MOTH;
+        const control = createLeagueGenome("control", LEAGUE_ANCHOR_GENOME);
+        const candidate = createLeagueGenome("spell-ranged", LEAGUE_ANCHOR_GENOME, false, {
+            draftSpellRangedPolicy: RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
+        });
+
+        for (const creatureId of [magicDragon, battleMage, arbalester]) {
+            expect(isRangedDamageCreature(creatureId)).toBe(true);
+        }
+        for (const creatureId of [nightmare, satyr, ashMoth]) {
+            expect(isRangedDamageCreature(creatureId)).toBe(false);
+        }
+        for (const creatureId of [magicDragon, battleMage, nightmare]) {
+            expect(draftGenomeCreatureScore(candidate, creatureId)).toBe(draftGenomeCreatureScore(control, creatureId));
+        }
+        expect(draftGenomeCreatureScore(candidate, satyr)).toBe(draftGenomeCreatureScore(control, satyr));
+        expect(draftGenomeCreatureScore(candidate, arbalester)).toBe(draftGenomeCreatureScore(control, arbalester));
+        expect(rankedSpellRangedCoPlayAffinity(magicDragon, [nightmare])).toBeGreaterThan(0);
+        expect(rankedSpellRangedCoPlayAffinity(magicDragon, [satyr])).toBeGreaterThan(0);
+        expect(rankedSpellRangedCoPlayAffinity(nightmare, [magicDragon])).toBeGreaterThan(0);
+        expect(rankedSpellRangedCoPlayAffinity(satyr, [magicDragon])).toBeGreaterThan(0);
+        expect(rankedSpellRangedCoPlayAffinity(magicDragon, [ashMoth])).toBe(0);
+        expect(rankedSpellRangedCoPlayAffinity(magicDragon, [PBTypes.CreatureVals.PEASANT])).toBe(0);
+        expect(projectDraftGenomeForShipping(candidate).draftSpellRangedPolicy).toBe(
+            RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
+        );
     });
 
     it("applies own-roster protector eligibility before the immutable genome argmax", () => {

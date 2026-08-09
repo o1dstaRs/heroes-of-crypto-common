@@ -189,6 +189,27 @@ describe("battle_engine setup seeding", () => {
         }
     });
 
+    test("accepts a seven-point placement, armor, and Empower setup", () => {
+        const buffsByTeam = collectFirstUnitBuffs({
+            greenPerk: Perk.SEE_NONE,
+            redPerk: Perk.SEE_NONE,
+            greenAugments: [
+                { kind: "Placement", value: 1 },
+                { kind: "Armor", value: 3 },
+                { kind: "Empower", value: 3 },
+            ],
+            redAugments: [
+                { kind: "Placement", value: 1 },
+                { kind: "Armor", value: 3 },
+                { kind: "Empower", value: 3 },
+            ],
+        });
+        for (const [, buffs] of buffsByTeam) {
+            expect(buffs).toContain("Armor Augment");
+            expect(buffs).toContain("Empower Augment");
+        }
+    });
+
     test("artifacts alone still apply (no-augment path unchanged)", () => {
         const buffsByTeam = collectFirstUnitBuffs({
             greenArtifactT2: Tier2Artifact.TITAN_PLATE,

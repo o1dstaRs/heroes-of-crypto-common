@@ -10,7 +10,13 @@
  */
 
 import { Tier1Artifact } from "../../artifacts/artifact_properties";
-import { backlineProtectionBeneficiaryCount, creatureInfo } from "./creature_score";
+import {
+    backlineProtectionBeneficiaryCount,
+    creatureInfo,
+    isRankedSpellRangedDraftPolicy,
+    rankedSpellRangedCoPlayAffinity,
+    type RankedSpellRangedDraftPolicyId,
+} from "./creature_score";
 import {
     isRankedDraftInteractionPrior,
     rankedDraftInteractionAffinity,
@@ -36,6 +42,8 @@ export interface IDraftCoherenceContext {
     draftInteractionPrior?: RankedDraftInteractionPriorId;
     /** Candidate-only close-offer selector; omitted preserves the existing coherence policy exactly. */
     draftVarietyPolicy?: RankedDraftVarietyPolicyId;
+    /** Candidate-only offensive-spell co-play selector; omitted preserves the existing coherence policy exactly. */
+    draftSpellRangedPolicy?: RankedSpellRangedDraftPolicyId;
 }
 
 /** Keep replay-derived build fit influential without making it lexicographically stronger than the genome. */
@@ -101,6 +109,9 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
     if (info.name === "Abomination" && backlineProtectionBeneficiaryCount(context.ownCreatureIds) >= 2) {
         affinity += 0.4;
     }
+    if (isRankedSpellRangedDraftPolicy(context.draftSpellRangedPolicy)) {
+        affinity += rankedSpellRangedCoPlayAffinity(creatureId, context.ownCreatureIds);
+    }
     // The second unit activates a faction synergy; later matches retain a smaller continuity preference.
     if (info.faction && ownFaction > 0) affinity += ownFaction === 1 ? 0.12 : 0.07;
 
@@ -164,7 +175,10 @@ export function pickCoherentDraftCreature(
 }
 
 /** Build-plan fit available at bundle time, before later creature offers have resolved. */
-export function draftBundleCoherenceAffinity([level1, level2, artifactId]: DraftBundle): number {
+export function draftBundleCoherenceAffinity(
+    [level1, level2, artifactId]: DraftBundle,
+    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy"> = {},
+): number {
     const creatures = [level1, level2] as const;
     const planSeed =
         artifactId === Tier1Artifact.HUNTERS_LONGBOW ||
@@ -178,6 +192,7 @@ export function draftBundleCoherenceAffinity([level1, level2, artifactId]: Draft
             draftCreatureCoherenceAffinity(creatureId, {
                 ownCreatureIds: [creatures[index === 0 ? 1 : 0]],
                 tier1ArtifactId: artifactId,
+                ...options,
             }),
         0,
     );
@@ -188,11 +203,12 @@ export function pickCoherentDraftBundle(
     bundles: readonly DraftBundle[],
     creatureScore: (creatureId: number) => number,
     artifactScore: (artifactId: number) => number,
+    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy"> = {},
 ): number {
     if (!bundles.length) return 0;
     const baseScores = bundles.map(
         ([level1, level2, artifactId]) => creatureScore(level1) + creatureScore(level2) + artifactScore(artifactId),
     );
-    const affinities = bundles.map(draftBundleCoherenceAffinity);
+    const affinities = bundles.map((bundle) => draftBundleCoherenceAffinity(bundle, options));
     return bestScoreIndex(applyDraftCoherenceOverlay(baseScores, affinities));
 }
