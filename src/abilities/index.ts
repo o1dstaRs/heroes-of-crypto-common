@@ -35,5 +35,6 @@ export * from "./shatter_armor_ability";
 export * from "./skewer_strike_ability";
 export * from "./spit_ball_ability";
 export * from "./stun_ability";
+export * from "./stun_aura_ability";
 export * from "./terrifying_gaze_ability";
 export * from "./through_shot_ability";

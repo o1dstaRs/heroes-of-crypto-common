@@ -90,7 +90,7 @@
     },
     "Flesh Shield": {
         "name": "Flesh Shield",
-        "range": 1,
+        "range": 2,
         "desc": "{}% of the attack damage dealt to this unit is absorbed by the aura's owner, recalculated against the owner's defense.",
         "power": 90,
         "is_buff": true,
@@ -99,9 +99,9 @@
     "Stun": {
         "name": "Stun",
         "range": 2,
-        "desc": "Enemies starting their turn in this field can be stunned for a turn ({}% base chance, plus the Abomination's luck).",
+        "desc": "Allies within range gain a {}% chance to stun the enemy they hit for a turn (base chance scaled by the Abomination's power and luck).",
         "power": 25,
-        "is_buff": false,
+        "is_buff": true,
         "power_type": "STUN_CHANCE"
     },
     "Web": {

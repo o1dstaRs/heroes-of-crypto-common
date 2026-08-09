@@ -1885,9 +1885,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return auraEffect.getPower();
         }
 
-        // Stun Aura is stack-powered and rolled against the OWNER's luck (calculateStunAuraApplyChance),
-        // so the stored power must be that same live chance — otherwise the card and the debuff row on the
-        // seized enemy would promise the flat configured 25 while the field rolls something else.
+        // Stun Aura is stack-powered and scaled by the Abomination's (this owner's) luck, so the stored
+        // power IS the live stun chance the aura grants. The ally buff carries it straight to the on-hit
+        // roll (processStunAuraOnHit), and it is what the card + the buff row on the ally show — otherwise
+        // they would promise the flat configured 25 while the roll uses something else.
         if (auraEffect.getPowerType() === AbilityPowerType.STUN_CHANCE) {
             return Math.min(
                 100,

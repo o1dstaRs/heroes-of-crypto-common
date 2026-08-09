@@ -203,7 +203,8 @@ describe("Abomination runtime role contract", () => {
             const { protector, ward, enemy, context } = board(wardName);
             const intent = buildV08BacklineProtectorIntent(protector, context);
             expect(intent?.ward, `${version} ward selection`).toBe(ward);
-            expect(v08BacklineProtectorCoverageRange(protector, context)).toBe(1);
+            // Flesh Shield aura reaches 2 cells (balance change 2026-08-08).
+            expect(v08BacklineProtectorCoverageRange(protector, context)).toBe(2);
 
             const decision = createStrategy().decideTurn(protector, context);
             expect(preservesV08BacklineProtectorIntent(intent!, protector, context, decision), version).toBe(true);

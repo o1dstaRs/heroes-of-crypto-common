@@ -9,142 +9,67 @@
  * -----------------------------------------------------------------------------
  */
 
-import { AbilityType } from "./ability_properties";
-import { FightStateManager } from "../fights/fight_state_manager";
-import { Grid } from "../grid/grid";
+import { EffectFactory } from "../effects/effect_factory";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
-import { UnitsHolder } from "../units/units_holder";
 import * as HoCLib from "../utils/lib";
 
 export const STUN_AURA_ABILITY_NAME = "Stun Aura";
-/** The debuff the aura refresh lands on everyone standing in the field (see UnitsHolder aura pass). */
-export const STUN_AURA_DEBUFF_NAME = "Stun Aura";
+/** The BUFF the aura lands on every ally standing in the field (see the UnitsHolder aura pass). */
+export const STUN_AURA_BUFF_NAME = "Stun Aura";
+
+const effectFactory = new EffectFactory();
 
 /**
- * The unit projecting the Stun Aura onto `targetUnit`, or undefined when the field has no live owner.
+ * Stun Aura (Abomination), 2 cells: every ally standing in the field, when it lands a hit, gets a chance
+ * to Stun the enemy it hit for a turn. Mirrors the Venom Cloud Aura buff-on-hit pattern.
  *
- * The aura debuff carries its source cell in the applied spell's two properties (UnitsHolder stamps it
- * during the aura refresh), exactly like the Flesh Shield aura — so the owner is resolved from the grid
- * rather than by re-scanning neighbours, and a field whose owner died or moved away resolves to nothing.
+ * The chance is the aura's configured base power scaled by the ABOMINATION's stack power plus its luck.
+ * That whole live chance is computed by calculateAuraPower (STUN_CHANCE) at aura-application time and
+ * stored ON the buff the ally carries, so the roll here reads it straight off the buff — no need to
+ * resolve the distant owner. It is then cut by the target's status resist and amplified against
+ * Mechanisms, exactly like the Squire's Stun on-hit.
  */
-export function findStunAuraOwner(targetUnit: Unit, grid: Grid, unitsHolder: UnitsHolder): Unit | undefined {
-    const auraDebuff = targetUnit.getDebuff(STUN_AURA_DEBUFF_NAME);
-    if (!auraDebuff) {
-        return undefined;
-    }
-
-    const x = auraDebuff.getFirstSpellProperty();
-    const y = auraDebuff.getSecondSpellProperty();
-    if (x === undefined || y === undefined) {
-        return undefined;
-    }
-
-    const ownerId = grid.getOccupantUnitId({ x, y });
-    if (!ownerId || ownerId === targetUnit.getId()) {
-        return undefined;
-    }
-
-    const owner = unitsHolder.getAllUnits().get(ownerId);
-    if (
-        !owner ||
-        owner.isDead() ||
-        owner.getTeam() === targetUnit.getTeam() ||
-        !owner.hasAbilityActive(STUN_AURA_ABILITY_NAME)
-    ) {
-        return undefined;
-    }
-
-    return owner;
-}
-
-/**
- * Engine-identical marginal chance that the field seizes `targetUnit` at its turn start.
- *
- * Deliberately the Squire's own Stun formula (calculateStunApplyChance): the owner's stack-scaled ability
- * power plus its luck, amplified against Mechanisms, and cut by the target's status resist. The ONLY
- * difference is the configured power — 25 against the Squire's 35 — so the field is a flat 10 points
- * weaker than a Squire's stun at the same stack and luck.
- */
-export function calculateStunAuraApplyChance(
-    auraOwner: Unit,
+export function processStunAuraOnHit(
+    attackerUnit: Unit,
     targetUnit: Unit,
-    additionalAbilityPower: number,
-): number {
-    const auraAbility = auraOwner.getAbility(STUN_AURA_ABILITY_NAME);
-    if (!auraAbility) {
-        return 0;
+    currentActiveUnit: Unit,
+    sceneLog: ISceneLog,
+    rollPercent: () => number = () => HoCLib.getRandomInt(0, 100),
+): void {
+    if (targetUnit.isDead()) {
+        return;
+    }
+
+    const stunAuraBuff = attackerUnit.getBuff(STUN_AURA_BUFF_NAME);
+    if (!stunAuraBuff) {
+        return;
+    }
+
+    const stunEffect = effectFactory.makeEffect("Stun");
+    if (!stunEffect) {
+        return;
+    }
+    if (targetUnit.hasEffectActive(stunEffect.getName())) {
+        return;
     }
 
     const amplifier = targetUnit.hasAbilityActive("Mechanism") ? 1.5 : 1;
-    return Math.max(
+    const chance = Math.max(
         0,
-        Math.min(
-            100,
-            auraOwner.calculateAbilityApplyChance(auraAbility, additionalAbilityPower) *
-                amplifier *
-                (1 - targetUnit.getStatusResist() / 100),
-        ),
-    );
-}
-
-/** A landed field stun, for the caller to turn into its own engine event. */
-export interface IStunAuraResult {
-    stunned: boolean;
-    laps: number;
-}
-
-/**
- * Roll the Stun Aura against a unit whose turn is starting. Applies the same Stun effect the Squire's
- * ability applies, so everything downstream — the skip, the icon, status resist, dispels — behaves
- * identically. A unit already stunned (or immune) is left alone.
- */
-export function processStunAuraAbility(
-    targetUnit: Unit,
-    grid: Grid,
-    unitsHolder: UnitsHolder,
-    sceneLog: ISceneLog,
-    rollPercent: () => number = () => HoCLib.getRandomInt(0, 100),
-): IStunAuraResult {
-    const result: IStunAuraResult = { stunned: false, laps: 0 };
-    if (targetUnit.isDead()) {
-        return result;
-    }
-
-    const owner = findStunAuraOwner(targetUnit, grid, unitsHolder);
-    if (!owner) {
-        return result;
-    }
-
-    const auraAbility = owner.getAbility(STUN_AURA_ABILITY_NAME);
-    const stunEffect = auraAbility?.getEffect();
-    if (!auraAbility || !stunEffect || auraAbility.getType() !== AbilityType.DEBUFF_AURA) {
-        return result;
-    }
-    if (targetUnit.hasEffectActive(stunEffect.getName())) {
-        return result;
-    }
-
-    const chance = calculateStunAuraApplyChance(
-        owner,
-        targetUnit,
-        FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(owner.getTeam()),
+        Math.min(100, stunAuraBuff.getPower() * amplifier * (1 - targetUnit.getStatusResist() / 100)),
     );
     if (rollPercent() >= chance) {
-        return result;
+        return;
     }
 
-    // The stun lands on the unit whose turn is STARTING, so it costs that whole activation — the same
-    // shape the Stun ability gets when it catches the currently active unit.
-    stunEffect.extend();
-    if (!targetUnit.applyEffect(stunEffect)) {
-        return result;
+    // Catching the CURRENTLY active unit costs it this whole activation — the same shape the Squire's Stun
+    // gets when it lands on the active attacker (stun_ability.processStunAbility).
+    if (targetUnit.getId() === currentActiveUnit.getId()) {
+        stunEffect.extend();
     }
 
-    result.stunned = true;
-    result.laps = stunEffect.getLaps();
-    sceneLog.updateLog(
-        `${targetUnit.getName()} was seized by ${owner.getName()}'s Stun Aura for ${HoCLib.getLapString(result.laps)}`,
-    );
-    return result;
+    if (targetUnit.applyEffect(stunEffect)) {
+        sceneLog.updateLog(`${targetUnit.getName()} got stunned for ${HoCLib.getLapString(stunEffect.getLaps())}`);
+    }
 }

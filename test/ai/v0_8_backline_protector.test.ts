@@ -1075,7 +1075,7 @@ describe("v0.8 back-line protector placement", () => {
             attackType: MELEE,
             size: PBTypes.UnitSizeVals.LARGE,
             auraEffects: ["Flesh Shield"],
-            auraRanges: [1],
+            auraRanges: [2],
             auraIsBuff: [true],
         });
         const primary = createTestUnit({
@@ -1124,7 +1124,8 @@ describe("v0.8 back-line protector placement", () => {
             ward,
             cells: placementFootprint(ward, result!.get(ward.getId())!),
         }));
-        const covered = wardCells.filter(({ cells }) => placementDistance(protectorCells, cells) <= 1);
+        // Flesh Shield reaches 2 cells (balance change 2026-08-08), so coverage is measured at range 2.
+        const covered = wardCells.filter(({ cells }) => placementDistance(protectorCells, cells) <= 2);
 
         expect(covered.map(({ ward }) => ward)).toContain(primary);
         expect(covered.length).toBeGreaterThanOrEqual(2);

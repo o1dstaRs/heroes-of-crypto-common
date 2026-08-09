@@ -152,7 +152,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // differently. Two isolated runs produced this byte-identical digest.
 // Re-pinned after Wyvern's Venom Cloud doubled its poison share (15% -> 30%) and repeated-poison stack
 // contribution (35% -> 70%). The stronger damage legitimately changes any trace fielding the aura.
-const EXPECTED_REPLAY_SHA256 = "e830fe0727e076471fc15dba3a0d7d85152514a3df92fcbb9818373e3ed85a15";
+// Re-pinned for the Abomination aura rework (2026-08-09): Flesh Shield reach 1 -> 2, and the Stun Aura
+// flipped from an enemy-turn-start field into a green ally buff that stuns on the ally's hit. Both change
+// combat outcomes in every seeded fight the Abomination screens. Two isolated runs produced this digest.
+const EXPECTED_REPLAY_SHA256 = "2e0823277e8327a050b23c8084b261cb9437ebfd4ffcdffb2b3f82497e1e13fa";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

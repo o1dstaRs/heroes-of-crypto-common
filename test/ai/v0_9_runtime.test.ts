@@ -370,10 +370,13 @@ describe("v0.9 fixed-point runtime", () => {
             pathHelper: new PathHelper(testGridSettings),
             attackHandler: combat.attackHandler,
         };
+        // (8,3) is Chebyshev-distance 3 from the ward at (5,5): a genuine screen abandonment now that
+        // Flesh Shield reaches 2 cells (balance change 2026-08-08). At the old range-1 screen this was
+        // (7,3); pushed out one cell so the charge still breaks coverage under the wider aura.
         const protectorCharge: IEnumeratedCandidate = {
             kind: "move",
-            actions: [{ type: "move_unit", unitId: protector.getId(), path: [{ x: 7, y: 3 }] }],
-            targetCell: { x: 7, y: 3 },
+            actions: [{ type: "move_unit", unitId: protector.getId(), path: [{ x: 8, y: 3 }] }],
+            targetCell: { x: 8, y: 3 },
             features,
         };
         const wardCharge: IEnumeratedCandidate = {

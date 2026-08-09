@@ -13,12 +13,7 @@ import { describe, expect, it } from "bun:test";
 
 import { processRangeAOEAbility } from "../../src/abilities/aoe_range_ability";
 import { processFleshShieldAura } from "../../src/abilities/flesh_shield_aura_ability";
-import { calculateStunApplyChance } from "../../src/abilities/stun_ability";
-import {
-    calculateStunAuraApplyChance,
-    findStunAuraOwner,
-    processStunAuraAbility,
-} from "../../src/abilities/stun_aura_ability";
+import { processStunAuraOnHit } from "../../src/abilities/stun_aura_ability";
 import * as HoCConfig from "../../src/configuration/config_provider";
 import { processLightningSpinAbility } from "../../src/abilities/lightning_spin_ability";
 import { processThroughShotAbility } from "../../src/abilities/through_shot_ability";
@@ -689,10 +684,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
     });
 });
 
-describe("Stun Aura", () => {
-    const stunAuraPower = () => HoCConfig.getAbilityConfig("Stun Aura").power;
-    const squireStunPower = () => HoCConfig.getAbilityConfig("Stun").power;
-
+describe("Stun Aura (ally buff, stun-on-hit)", () => {
     const fieldContext = () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const abomination = createTestUnit({
@@ -701,7 +693,7 @@ describe("Stun Aura", () => {
             abilities: ["Stun Aura"],
             auraEffects: ["Stun"],
             auraRanges: [2],
-            auraIsBuff: [false],
+            auraIsBuff: [true],
             stackPower: 5,
         });
         const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, amountAlive: 5 });
@@ -713,92 +705,78 @@ describe("Stun Aura", () => {
         return { grid, unitsHolder, abomination, enemy, ally };
     };
 
-    it("is a range-2 enemy field that lands on enemies only", () => {
-        const { grid, unitsHolder, abomination, enemy, ally } = fieldContext();
+    it("is a range-2 BUFF that lands on allies only, never enemies", () => {
+        const { abomination, enemy, ally } = fieldContext();
         expect(HoCConfig.getAuraEffectConfig("Stun")?.range).toBe(2);
-        expect(enemy.hasDebuffActive("Stun Aura")).toBe(true);
-        expect(ally.hasDebuffActive("Stun Aura")).toBe(false);
-        expect(findStunAuraOwner(enemy, grid, unitsHolder)?.getId()).toBe(abomination.getId());
-
-        // Three cells away is outside the field entirely.
-        const distantEnemy = createTestUnit({ name: "Distant", team: PBTypes.TeamVals.UPPER });
-        placeUnit(grid, unitsHolder, distantEnemy, { x: 7, y: 4 });
-        unitsHolder.refreshAuraEffectsForAllUnits();
-        expect(distantEnemy.hasDebuffActive("Stun Aura")).toBe(false);
+        expect(HoCConfig.getAuraEffectConfig("Stun")?.is_buff).toBe(true);
+        // The buff sits on the ally standing in the field; the enemy never carries it.
+        expect(ally.hasBuffActive("Stun Aura")).toBe(true);
+        expect(enemy.hasBuffActive("Stun Aura")).toBe(false);
+        expect(enemy.hasDebuffActive("Stun Aura")).toBe(false);
+        // The Abomination projects its own aura ability, but the chance rides the allies' buff.
+        expect(abomination.hasAbilityActive("Stun Aura")).toBe(true);
+        expect(ally.getBuff("Stun Aura")?.getPower() ?? 0).toBeGreaterThan(0);
     });
 
-    // The owner's brief: exactly 10 points weaker than a Squire's stun at the same stack and luck.
-    it("rolls the Squire's stun formula ten points lower", () => {
-        const { grid, unitsHolder, abomination, enemy } = fieldContext();
-        expect(squireStunPower() - stunAuraPower()).toBe(10);
-
-        const squire = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LOWER, abilities: ["Stun"] });
-        squire.setStackPower(abomination.getStackPower());
-        const squireChance = calculateStunApplyChance(squire, enemy, 0);
-        const auraChance = calculateStunAuraApplyChance(abomination, enemy, 0);
-        expect(squireChance - auraChance).toBeCloseTo(10, 5);
-        // ...and luck rides along the same way it does for the Squire: a lucky owner rolls higher by
-        // exactly its luck, which is why the aura is "a Squire stun minus ten, plus luck".
-        const luckyAbomination = createTestUnit({
-            name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
-            abilities: ["Stun Aura"],
-            stackPower: abomination.getStackPower(),
-            luck: 7,
-        });
-        expect(calculateStunAuraApplyChance(luckyAbomination, enemy, 0)).toBeCloseTo(auraChance + 7, 5);
-        expect(findStunAuraOwner(enemy, grid, unitsHolder)).toBeDefined();
-    });
-
-    it("seizes a rolling enemy at turn start and lets a lucky one through", () => {
-        const { grid, unitsHolder, enemy } = fieldContext();
+    it("a buffed ally stuns the enemy it hits when the roll lands, and never double-stuns", () => {
+        const { enemy, ally } = fieldContext();
         const log = new SceneLogMock();
 
-        // A roll under the chance stuns; the effect is the same Stun the Squire applies, so it skips.
-        const seized = processStunAuraAbility(enemy, grid, unitsHolder, log, () => 0);
-        expect(seized.stunned).toBe(true);
+        // Roll under the buff's chance: the struck enemy is stunned with the same Stun the Squire applies.
+        processStunAuraOnHit(ally, enemy, ally, log, () => 0);
         expect(enemy.hasEffectActive("Stun")).toBe(true);
         expect(enemy.isSkippingThisTurn()).toBe(true);
 
-        // Already stunned: the field does not re-roll or extend a second time.
-        expect(processStunAuraAbility(enemy, grid, unitsHolder, log, () => 0).stunned).toBe(false);
-
-        const luckyEnemy = createTestUnit({ name: "Lucky", team: PBTypes.TeamVals.UPPER });
-        placeUnit(grid, unitsHolder, luckyEnemy, { x: 5, y: 5 });
-        unitsHolder.refreshAuraEffectsForAllUnits();
-        expect(processStunAuraAbility(luckyEnemy, grid, unitsHolder, log, () => 100).stunned).toBe(false);
-        expect(luckyEnemy.hasEffectActive("Stun")).toBe(false);
+        // Already stunned: no re-roll, no second application.
+        const lapsBefore = enemy.getEffect("Stun")?.getLaps();
+        processStunAuraOnHit(ally, enemy, ally, log, () => 0);
+        expect(enemy.getEffect("Stun")?.getLaps()).toBe(lapsBefore);
     });
 
-    it("never fires without a live field: no aura, or an owner that is gone", () => {
-        const { grid, unitsHolder, abomination, enemy, ally } = fieldContext();
+    it("a high roll leaves the enemy unstunned", () => {
+        const { enemy, ally } = fieldContext();
+        processStunAuraOnHit(ally, enemy, ally, new SceneLogMock(), () => 100);
+        expect(enemy.hasEffectActive("Stun")).toBe(false);
+    });
+
+    it("never fires for an ally outside the field, or against a dead target", () => {
+        const { grid, unitsHolder, enemy, ally } = fieldContext();
         const log = new SceneLogMock();
-        expect(processStunAuraAbility(ally, grid, unitsHolder, log, () => 0).stunned).toBe(false);
 
-        unitsHolder.deleteUnitById(abomination.getId());
-        expect(findStunAuraOwner(enemy, grid, unitsHolder)).toBeUndefined();
-        expect(processStunAuraAbility(enemy, grid, unitsHolder, log, () => 0).stunned).toBe(false);
+        // An ally four cells away never received the buff.
+        const distantAlly = createTestUnit({ name: "Distant", team: PBTypes.TeamVals.LOWER, amountAlive: 5 });
+        placeUnit(grid, unitsHolder, distantAlly, { x: 4, y: 8 });
+        unitsHolder.refreshAuraEffectsForAllUnits();
+        expect(distantAlly.hasBuffActive("Stun Aura")).toBe(false);
+        processStunAuraOnHit(distantAlly, enemy, distantAlly, log, () => 0);
+        expect(enemy.hasEffectActive("Stun")).toBe(false);
+
+        // A dead target is left alone even for a buffed attacker.
+        const deadEnemy = createTestUnit({ name: "Corpse", team: PBTypes.TeamVals.UPPER, amountAlive: 0 });
+        expect(deadEnemy.isDead()).toBe(true);
+        processStunAuraOnHit(ally, deadEnemy, ally, log, () => 0);
+        expect(deadEnemy.hasEffectActive("Stun")).toBe(false);
     });
 
-    // The card (and the debuff row on the seized enemy) must promise the number the field ACTUALLY
-    // rolls — stack-scaled power plus the owner's live luck — not the flat configured 25. In ranked the
+    // The card AND the buff row on the ally must promise the number the aura ACTUALLY rolls — the
+    // stack-scaled base power plus the Abomination's live luck — not the flat configured 25. In ranked the
     // text a player reads is the one the server put in the snapshot, so this has to hold in common.
-    it("prints the live luck-included chance on the card, matching the roll", () => {
+    it("prints the live luck-included chance on the card, matching the buff the ally carries", () => {
+        const { ally, abomination } = fieldContext();
         const luckyAbomination = createTestUnit({
             name: "Abomination",
             team: PBTypes.TeamVals.LOWER,
             abilities: ["Stun Aura"],
             auraEffects: ["Stun"],
             auraRanges: [2],
-            auraIsBuff: [false],
+            auraIsBuff: [true],
             stackPower: 5,
             luck: 7,
         });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER });
-        // Read the card and the roll at the SAME moment: adjustBaseStats settles the unit's live luck
-        // (the per-turn spread), and the promise on the card has to track it.
         luckyAbomination.adjustBaseStats(true, 1, 0, 0, 0, 0, 0);
-        const rolled = calculateStunAuraApplyChance(luckyAbomination, enemy, 0);
+        const auraEffect = luckyAbomination.getAuraEffects().find((a) => a.getName() === "Stun");
+        expect(auraEffect).toBeDefined();
+        const rolled = luckyAbomination.calculateAuraPower(auraEffect!, 0);
         const liveLuck = luckyAbomination.getLuck();
         expect(rolled).toBeCloseTo(25 + liveLuck, 5); // 25 at full stack, plus the owner's live luck
         expect(liveLuck).toBeGreaterThan(0);
@@ -810,20 +788,19 @@ describe("Stun Aura", () => {
         expect(description).not.toContain("25%"); // never the flat configured power once luck is in play
         expect(description).not.toContain("{}");
 
-        // The aura's stored power — what the seized enemy's debuff row shows — agrees with the roll.
-        const auraEffect = luckyAbomination.getAuraEffects().find((a) => a.getName() === "Stun");
-        expect(auraEffect).toBeDefined();
-        expect(luckyAbomination.calculateAuraPower(auraEffect!, 0)).toBeCloseTo(rolled, 5);
+        // The base (no-luck) Abomination's ally buff agrees with its own stored aura power.
+        const baseAura = abomination.getAuraEffects().find((a) => a.getName() === "Stun");
+        expect(ally.getBuff("Stun Aura")?.getPower()).toBeCloseTo(abomination.calculateAuraPower(baseAura!, 0), 5);
     });
 
-    it("is carried by the real Abomination as a stack-powered range-2 aura card", () => {
+    it("is carried by the real Abomination as a stack-powered range-2 BUFF aura card", () => {
         const props = HoCConfig.getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Abomination", "abomination_512", 1);
         const index = props.abilities.indexOf("Stun Aura");
         expect(index).toBeGreaterThanOrEqual(0);
         expect(props.abilities_stack_powered[index]).toBe(true);
         expect(props.abilities_auras[index]).toBe(true);
         expect(props.aura_ranges[index]).toBe(2);
-        expect(props.aura_is_buff[index]).toBe(false);
+        expect(props.aura_is_buff[index]).toBe(true);
         expect(props.abilities_descriptions[index]).not.toContain("{}");
     });
 });

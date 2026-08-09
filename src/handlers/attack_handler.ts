@@ -1278,6 +1278,7 @@ export class AttackHandler {
                     rangedFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
                 );
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
                 // Area Throw / Large Caliber already resolved Gaze for every struck unit in the AOE
@@ -1360,6 +1361,7 @@ export class AttackHandler {
                     // (mirrors the melee response path's isResponseMissed gate). A counter absorbed by
                     // the victim's Water Shield lands none either.
                     AllAbilities.processStunAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
+                    AllAbilities.processStunAuraOnHit(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processFreezeAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processRimeCharmAbility(targetUnit, rangeResponseUnit, this.sceneLog);
                     AllAbilities.processPetrifyingGazeAbility(
@@ -1524,6 +1526,7 @@ export class AttackHandler {
         if (!secondShotResult.aoeRangeAttackLanded) {
             if (!targetUnit.isDead() && secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
@@ -2154,6 +2157,7 @@ export class AttackHandler {
                             fireShieldFromAttackerResult.moraleDecreaseForTheUnitTeam,
                         );
                         AllAbilities.processStunAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
+                        AllAbilities.processStunAuraOnHit(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processFreezeAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
                         AllAbilities.processPetrifyingGazeAbility(
@@ -2282,6 +2286,7 @@ export class AttackHandler {
                 );
                 AllAbilities.processMinerAbility(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
@@ -2462,6 +2467,7 @@ export class AttackHandler {
                 );
                 AllAbilities.processMinerAbility(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
