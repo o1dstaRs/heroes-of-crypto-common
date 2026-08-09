@@ -41,7 +41,7 @@ import { processSpitBallAbility } from "../../src/abilities/spit_ball_ability";
 import { processStunAbility } from "../../src/abilities/stun_ability";
 import { processThroughShotAbility } from "../../src/abilities/through_shot_ability";
 import { ARTIFACT_POWER } from "../../src/artifacts/artifact_properties";
-import { LUCK_MAX_VALUE_TOTAL } from "../../src/constants";
+import { LUCK_MAX_VALUE_TOTAL, NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { ISecondaryDamage } from "../../src/scene/animations";
@@ -806,6 +806,55 @@ describe("ability processors", () => {
         expect(attacker.getBaseAttack()).toBeLessThan(10);
         expect(processRapidChargeAbility(miner, 3)).toBeGreaterThan(1);
         expect(processRapidChargeAbility(defender, 3)).toBe(1);
+    });
+
+    it("formats Miner cleanly and accumulates the armor actually transferred as a permanent debuff", () => {
+        createCombatTestContext();
+        const miner = createTestUnit({
+            name: "Miner",
+            team: PBTypes.TeamVals.UPPER,
+            abilities: ["Miner"],
+            stackPower: 3,
+            armor: 10,
+        });
+        const defender = createTestUnit({
+            name: "Defender",
+            team: PBTypes.TeamVals.LOWER,
+            armor: 2,
+        });
+        const sceneLog = new SceneLogMock();
+
+        miner.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(miner.getUnitProperties().abilities_descriptions).toEqual([
+            "On hit, permanently transfers 0.6 base armor from the target to this unit.\n" +
+                "A target cannot be reduced below 1 base armor.",
+        ]);
+
+        processMinerAbility(miner, defender, sceneLog);
+        expect(defender.getDebuff("Miner")?.getPower()).toBe(0.6);
+        expect(defender.getUnitProperties().applied_debuffs).toEqual(["Miner"]);
+        expect(defender.getUnitProperties().applied_debuffs_laps).toEqual([NUMBER_OF_LAPS_TOTAL]);
+        expect(defender.getUnitProperties().applied_debuffs_descriptions).toEqual([
+            "Base armor permanently reduced by {}.;0.6;",
+        ]);
+
+        // Only 0.4 armor remains above the floor, so the second hit transfers 0.4 (not the requested 0.6).
+        processMinerAbility(miner, defender, sceneLog);
+        expect(defender.getDebuff("Miner")?.getPower()).toBe(1);
+        expect(defender.getUnitProperties().applied_debuffs).toEqual(["Miner"]);
+        expect(defender.getUnitProperties().applied_debuffs_descriptions).toEqual([
+            "Base armor permanently reduced by {}.;1;",
+        ]);
+
+        // At the floor, further hits neither create armor nor duplicate/replace the existing sidebar row.
+        const before = defender.getUnitProperties().applied_debuffs_descriptions[0];
+        processMinerAbility(miner, defender, sceneLog);
+        expect(defender.getUnitProperties().applied_debuffs_descriptions).toEqual([before]);
+
+        miner.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        defender.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(miner.getBaseArmor()).toBe(11);
+        expect(defender.getBaseArmor()).toBe(1);
     });
 
     it("applies mind-control skip effects and respects mind resistance", () => {

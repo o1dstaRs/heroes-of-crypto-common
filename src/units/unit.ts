@@ -603,6 +603,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
+        if (ability.getName() === "Miner") {
+            return this.getMinerDescription(ability, 0);
+        }
         if (ability.getName() === "Chain Lightning") {
             const percentage = Number((this.calculateAbilityMultiplier(ability, 0) * 100).toFixed(2));
             const description = ability.getDesc().join("\n");
@@ -1687,11 +1690,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.initialUnitProperties.morale = newMorale;
     }
-    public decreaseBaseArmor(armorAmount: number): void {
+    public decreaseBaseArmor(armorAmount: number): number {
+        if (armorAmount <= 0) {
+            return 0;
+        }
+
+        const oldBaseArmor = this.initialUnitProperties.base_armor;
         this.initialUnitProperties.base_armor = Math.max(
             1,
             Number((this.initialUnitProperties.base_armor - armorAmount).toFixed(2)),
         );
+
+        return Number((oldBaseArmor - this.initialUnitProperties.base_armor).toFixed(2));
     }
     public increaseBaseArmor(armorAmount: number): void {
         this.initialUnitProperties.base_armor = Number(
@@ -3847,6 +3857,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.refreshStunAuraDescription(_synergyAbilityPowerIncrease);
         // Chakram's maximum TOTAL victims follows the live stack tier, which can change after casualties.
         this.refreshChakramDescription();
+        // Miner scales with stack power, luck and Might synergy. Keep the shared/server-owned description
+        // aligned with the amount processMinerAbility actually transfers, including sane decimal rounding.
+        this.refreshMinerDescription(_synergyAbilityPowerIncrease);
     }
     /**
      * Rewrite Blind Fury's description with the bonus it is CURRENTLY granting.
@@ -3871,6 +3884,24 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             .getDesc()
             .join("\n")
             .replace(/\{\}/g, chance.toString());
+    }
+    private getMinerDescription(ability: Ability, synergyAbilityPowerIncrease: number): string {
+        const amount = Number(this.calculateAbilityCount(ability, synergyAbilityPowerIncrease).toFixed(2));
+        return ability.getDesc().join("\n").replace(/\{\}/g, amount.toString());
+    }
+    private refreshMinerDescription(synergyAbilityPowerIncrease: number): void {
+        const index = this.unitProperties.abilities.indexOf("Miner");
+        if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
+            return;
+        }
+        const ability = this.abilities.find((candidate) => candidate.getName() === "Miner");
+        if (!ability) {
+            return;
+        }
+        this.unitProperties.abilities_descriptions[index] = this.getMinerDescription(
+            ability,
+            synergyAbilityPowerIncrease,
+        );
     }
     private refreshBlindFuryDescription(): void {
         const abilityName = BLIND_FURY_ABILITY_NAME;

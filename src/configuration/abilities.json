@@ -1043,7 +1043,10 @@
     "Miner": {
         "name": "Miner",
         "type": "ATTACK",
-        "desc": ["Permanently steals {} base armor from the enemy on hit"],
+        "desc": [
+            "On hit, permanently transfers {} base armor from the target to this unit.",
+            "A target cannot be reduced below 1 base armor."
+        ],
         "power": 1,
         "power_type": "STEAL_ARMOR_ON_HIT",
         "skip_reponse": false,
