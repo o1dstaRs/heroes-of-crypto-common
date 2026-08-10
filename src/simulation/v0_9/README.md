@@ -15,6 +15,10 @@ artifact or promotes v0.9 automatically.
   every learner launch pins the UUID rather than a numeric device index.
 - The campaign uses its own Python 3.12 virtual environment with PyTorch `2.11.0+cu130` and NumPy
   `2.2.6`.
+- WSL exposes a host-global load average that can remain elevated while the visible training environment is idle.
+  On WSL only, `--allow-wsl-load-average-override` replaces the initial load-average admission check with a
+  sealed instantaneous CPU-utilization sample. Conflicting training processes, GPU compute processes, memory,
+  affinity, and every between-candidate availability check remain mandatory.
 - Every initialization must name at least one reserved v0.8 output path with `--protect-v08-root`; repeat the
   option for every v0.8 root that must be protected. A v0.9 output may not equal, contain, or be contained
   by any protected root.
@@ -66,7 +70,8 @@ bun src/simulation/v0_9/actor_lane_benchmark.ts \
   --repository "$(pwd)" \
   --source-receipt "$SOURCE_RECEIPT" \
   --gpu-uuid GPU-5126d018-ec86-be8b-1bf5-b5ac323d3350 \
-  --protect-v08-root "$V08_OUTPUT"
+  --protect-v08-root "$V08_OUTPUT" \
+  --allow-wsl-load-average-override
 
 # Only when the host exposes neither CPU temperature nor throttle telemetry:
 # add --allow-missing-thermal-telemetry to the preceding benchmark command.

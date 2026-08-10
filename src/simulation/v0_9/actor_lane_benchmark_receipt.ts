@@ -12,11 +12,12 @@
 import { V09_RTX5090_GPU_UUID } from "./campaign";
 import { fingerprintV09 } from "./protocol";
 
-export const V09_ACTOR_LANE_BENCHMARK_SCHEMA = "hoc.ai.v0_9_actor_lane_benchmark.v2" as const;
+export const V09_ACTOR_LANE_BENCHMARK_SCHEMA = "hoc.ai.v0_9_actor_lane_benchmark.v3" as const;
 export const V09_AUDITED_ACTOR_LANE_COUNTS = [20, 22, 23, 24] as const;
 export type V09AuditedActorLaneCount = (typeof V09_AUDITED_ACTOR_LANE_COUNTS)[number];
 export type V09ActorLaneBenchmarkMode = "production" | "test_fixture";
 export type V09ActorLaneThermalTelemetry = "observed" | "unavailable_user_override";
+export type V09ActorLaneIdleLoadTelemetry = "load_average" | "unavailable_wsl_override";
 
 export const V09_ACTOR_LANE_SELECTION_POLICY = Object.freeze({
     requiredPlatform: "linux",
@@ -27,6 +28,7 @@ export const V09_ACTOR_LANE_SELECTION_POLICY = Object.freeze({
     minimumProductionPanelGames: 96,
     minimumProductionRepetitions: 2,
     minimumFreeMemoryBytes: 16 * 1024 * 1024 * 1024,
+    maximumInitialCpuUtilization: 0.1,
     maximumCoefficientOfVariation: 0.05,
     minimumThroughputGainRatio: 0.03,
     maximumTemperatureC: 90,
@@ -59,6 +61,7 @@ export interface IV09ActorLaneBenchmarkIdleEvidence {
     checkedAt: string;
     loadOne: number;
     maximumLoadOne: number;
+    instantaneousCpuUtilization: number;
     freeMemoryBytes: number;
     conflictingProcesses: string[];
     gpuComputePids: number[];
@@ -108,6 +111,7 @@ export interface IV09ActorLaneSelection {
 export interface IV09ActorLaneBenchmarkInput {
     mode: V09ActorLaneBenchmarkMode;
     thermalTelemetry: V09ActorLaneThermalTelemetry;
+    idleLoadTelemetry: V09ActorLaneIdleLoadTelemetry;
     source: IV09ActorLaneBenchmarkSource;
     host: IV09ActorLaneBenchmarkHost;
     idle: IV09ActorLaneBenchmarkIdleEvidence;
@@ -211,6 +215,14 @@ function assertIdle(idle: IV09ActorLaneBenchmarkIdleEvidence): void {
     requireTimestamp(idle.checkedAt, "idle.checkedAt");
     requireFinite(idle.loadOne, "idle.loadOne", 0);
     requireFinite(idle.maximumLoadOne, "idle.maximumLoadOne", 0);
+    const instantaneousCpuUtilization = requireFinite(
+        idle.instantaneousCpuUtilization,
+        "idle.instantaneousCpuUtilization",
+        0,
+    );
+    if (instantaneousCpuUtilization > 1) {
+        throw new Error("idle.instantaneousCpuUtilization must be within [0,1]");
+    }
     requireInteger(idle.freeMemoryBytes, "idle.freeMemoryBytes");
     if (
         !Array.isArray(idle.conflictingProcesses) ||
@@ -267,6 +279,9 @@ function assertBenchmarkInput(input: IV09ActorLaneBenchmarkInput): void {
     }
     if (input.thermalTelemetry !== "observed" && input.thermalTelemetry !== "unavailable_user_override") {
         throw new Error("benchmark thermal telemetry mode is unsupported");
+    }
+    if (input.idleLoadTelemetry !== "load_average" && input.idleLoadTelemetry !== "unavailable_wsl_override") {
+        throw new Error("benchmark idle-load telemetry mode is unsupported");
     }
     assertSource(input.source);
     assertHost(input.host);
@@ -358,10 +373,17 @@ function deriveSelection(input: IV09ActorLaneBenchmarkInput): {
         ) {
             throw new Error("production benchmark panel is too small");
         }
+        const loadAverageIdle =
+            input.idleLoadTelemetry === "load_average" && input.idle.loadOne <= input.idle.maximumLoadOne;
+        const wslInstantaneousIdle =
+            input.idleLoadTelemetry === "unavailable_wsl_override" &&
+            /microsoft.*wsl/i.test(input.host.release) &&
+            input.idle.loadOne > input.idle.maximumLoadOne &&
+            input.idle.instantaneousCpuUtilization <= V09_ACTOR_LANE_SELECTION_POLICY.maximumInitialCpuUtilization;
         if (
             input.idle.conflictingProcesses.length ||
             input.idle.gpuComputePids.length ||
-            input.idle.loadOne > input.idle.maximumLoadOne ||
+            (!loadAverageIdle && !wslInstantaneousIdle) ||
             input.idle.freeMemoryBytes < V09_ACTOR_LANE_SELECTION_POLICY.minimumFreeMemoryBytes
         ) {
             throw new Error("production benchmark did not begin on an idle host");
@@ -409,6 +431,9 @@ function deriveSelection(input: IV09ActorLaneBenchmarkInput): {
                 `${V09_ACTOR_LANE_SELECTION_POLICY.minimumThroughputGainRatio * 100}%` +
                 (input.thermalTelemetry === "unavailable_user_override"
                     ? "; CPU thermal telemetry was unavailable and explicitly user-overridden"
+                    : "") +
+                (input.idleLoadTelemetry === "unavailable_wsl_override"
+                    ? "; WSL load-average admission was unavailable and instantaneous CPU idleness was explicitly user-overridden"
                     : ""),
         },
     };
@@ -435,6 +460,7 @@ export function validateV09ActorLaneBenchmarkReceipt(value: unknown): IV09ActorL
     const input: IV09ActorLaneBenchmarkInput = {
         mode: receipt.mode,
         thermalTelemetry: receipt.thermalTelemetry,
+        idleLoadTelemetry: receipt.idleLoadTelemetry,
         source: receipt.source,
         host: receipt.host,
         idle: receipt.idle,

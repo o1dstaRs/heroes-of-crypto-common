@@ -84,6 +84,7 @@ function inputFromPlan(options: {
     return {
         mode: options.mode,
         thermalTelemetry: "observed",
+        idleLoadTelemetry: "load_average",
         source: {
             receiptSha256: SHA_B,
             sourceCommit: GIT_COMMIT,
@@ -95,6 +96,7 @@ function inputFromPlan(options: {
             checkedAt: "2026-07-29T12:00:00.000Z",
             loadOne: 0.25,
             maximumLoadOne: 2.4,
+            instantaneousCpuUtilization: 0.01,
             freeMemoryBytes: 32 * 1024 * 1024 * 1024,
             conflictingProcesses: [],
             gpuComputePids: [],
@@ -246,6 +248,26 @@ describe("v0.9 actor lane benchmark", () => {
         expect(() => sealV09ActorLaneBenchmarkReceipt(inconsistentOverride)).toThrow("override is only valid");
     });
 
+    it("permits an explicit WSL load-average override only with measured instantaneous idleness", () => {
+        const overridden = productionInput();
+        overridden.idleLoadTelemetry = "unavailable_wsl_override";
+        overridden.host.release = "6.6.87.2-microsoft-standard-WSL2";
+        overridden.idle.loadOne = 4.5;
+        overridden.idle.instantaneousCpuUtilization = 0.01;
+        const receipt = sealV09ActorLaneBenchmarkReceipt(overridden);
+        expect(receipt.eligibleForCampaign).toBe(true);
+        expect(receipt.idleLoadTelemetry).toBe("unavailable_wsl_override");
+        expect(receipt.selection.rationale).toContain("instantaneous CPU idleness was explicitly user-overridden");
+
+        const busy = structuredClone(overridden);
+        busy.idle.instantaneousCpuUtilization = V09_ACTOR_LANE_SELECTION_POLICY.maximumInitialCpuUtilization + 0.01;
+        expect(() => sealV09ActorLaneBenchmarkReceipt(busy)).toThrow("did not begin on an idle host");
+
+        const nonWsl = structuredClone(overridden);
+        nonWsl.host.release = "6.8.0-generic";
+        expect(() => sealV09ActorLaneBenchmarkReceipt(nonWsl)).toThrow("did not begin on an idle host");
+    });
+
     it("keeps tiny fixture receipts ineligible for campaign initialization", () => {
         const input = inputFromPlan({
             mode: "test_fixture",
@@ -295,6 +317,7 @@ describe("v0.9 actor lane benchmark", () => {
         const base: IV09ActorLaneBenchmarkReceiptBase = {
             mode: input.mode,
             thermalTelemetry: input.thermalTelemetry,
+            idleLoadTelemetry: input.idleLoadTelemetry,
             source: input.source,
             host: input.host,
             idle: input.idle,
