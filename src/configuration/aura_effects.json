@@ -148,7 +148,7 @@
         "name": "Warding Mane",
         "range": 2,
         "desc": "Affected allies gain {}% resistance to all magical attacks and debuffs.",
-        "power": 25,
+        "power": 30,
         "is_buff": true,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE"
     },

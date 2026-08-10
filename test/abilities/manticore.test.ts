@@ -109,10 +109,10 @@ describe("Manticore", () => {
             nearAlly.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
             farAlly.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
 
-            // Full stack at the card's power of 25 projects the top of the 5/10/15/20/25 ladder.
-            expect(nearAlly.getAppliedAuraEffect("Warding Mane Aura")?.getPower()).toBe(25);
-            // Independent rolls, as everywhere else: 1 - (1 - 0.08)(1 - 0.25) = 31%.
-            expect(nearAlly.getMagicResist()).toBeCloseTo(31, 1);
+            // Full stack at the card's power of 30 projects the top of the 6/12/18/24/30 ladder.
+            expect(nearAlly.getAppliedAuraEffect("Warding Mane Aura")?.getPower()).toBe(30);
+            // Independent rolls, as everywhere else: 1 - (1 - 0.08)(1 - 0.30) = 35.6%.
+            expect(nearAlly.getMagicResist()).toBeCloseTo(35.6, 1);
             expect(farAlly.getAppliedAuraEffect("Warding Mane Aura")).toBeUndefined();
             expect(farAlly.getMagicResist()).toBe(8);
         });
@@ -153,14 +153,14 @@ describe("Manticore", () => {
 
         it("raises a config-built ally's magic resist on the sandbox's own refresh path", () => {
             expect(magicResistBesideManticore("Chaos", "Troll", false).magicResist).toBe(5);
-            // Re-pinned with Warding Mane's power 20 -> 25 (the 5/10/15/20/25 ladder). The config-built
-            // Manticore's own luck shifts the projection a point off the round number, hence 24 rather
-            // than 25: 1 - (1 - 0.05)(1 - 0.24) = 27.8%.
-            expect(magicResistBesideManticore("Chaos", "Troll", true).magicResist).toBeCloseTo(27.8, 1);
+            // Warding Mane's full-stack power is 30 (the 6/12/18/24/30 ladder). The config-built
+            // Manticore's own luck shifts the projection a point off the round number, hence 29 rather
+            // than 30: 1 - (1 - 0.05)(1 - 0.29) = 32.55%.
+            expect(magicResistBesideManticore("Chaos", "Troll", true).magicResist).toBeCloseTo(32.55, 1);
             // A zero-resist ally gets the aura's own value and nothing more.
             expect(magicResistBesideManticore("Life", "Peasant", false).magicResist).toBe(0);
-            // …and it is the same 24 the Troll line above is derived from, which is what makes the two agree.
-            expect(magicResistBesideManticore("Life", "Peasant", true).magicResist).toBeCloseTo(24, 0);
+            // …and it is the same 29 the Troll line above is derived from, which is what makes the two agree.
+            expect(magicResistBesideManticore("Life", "Peasant", true).magicResist).toBeCloseTo(29, 0);
         });
 
         it("is a BUFF aura, so an enemy standing in range gets nothing", () => {

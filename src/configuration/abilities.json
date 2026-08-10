@@ -1382,7 +1382,7 @@
         "name": "Warding Mane Aura",
         "type": "BUFF_AURA",
         "desc": ["Allies within 2 cells gain {}% resistance to all magical attacks and debuffs"],
-        "power": 25,
+        "power": 30,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": true,
