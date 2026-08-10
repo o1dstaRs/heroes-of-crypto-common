@@ -708,8 +708,14 @@ export class GameActionEngine {
         );
         const destroyedScatteredCells: XY[] = [];
         const doubleShot = attacker.getAbility("Double Shot") ?? attacker.getAbility("Crafted Double Shot");
+        // "Ranged attacks ignore structures" (Large Caliber, Area Throw) outranks the Double Shot stone rule.
+        // Gargantuan carries BOTH, and without this the stone branch ran first and spent its two projectiles
+        // on tombstones, so a Cemetery lane with two stones left the declared creature untouched — the
+        // ability read as doing nothing at all. Cyclops never showed it: Large Caliber comes without Double
+        // Shot, so it always took the ignore-structures path below.
+        const ignoresStructures = attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw");
         const doubleShotObstacleIntersections =
-            this.context.grid.hasScatteredMountains() && doubleShot
+            this.context.grid.hasScatteredMountains() && doubleShot && !ignoresStructures
                 ? this.context.attackHandler.getObstacleIntersections(attacker.getPosition(), toPosition).slice(0, 2)
                 : [];
         const interceptedForDoubleShot = doubleShotObstacleIntersections.length > 0;
@@ -750,10 +756,7 @@ export class GameActionEngine {
                 attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
             );
         }
-        if (
-            this.context.grid.hasScatteredMountains() &&
-            (attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"))
-        ) {
+        if (this.context.grid.hasScatteredMountains() && ignoresStructures) {
             destroyedScatteredCells.push(
                 ...this.context.grid.clearScatteredMountainsInCells(evalResult.affectedCells.flat()),
             );

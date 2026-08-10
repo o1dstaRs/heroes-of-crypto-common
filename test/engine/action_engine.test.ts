@@ -1074,6 +1074,45 @@ describe("GameActionEngine", () => {
         expect(result.events.filter((event) => event.type === "unit_attacked")).toHaveLength(1);
     });
 
+    // Gargantuan carries Double Shot AND Area Throw. "Ranged attacks ignore structures" has to WIN: before
+    // this, the Double Shot stone rule ran first and spent both projectiles on tombstones, so a Cemetery lane
+    // holding two stones left the declared creature completely untouched — the ability read as doing nothing.
+    // Cyclops never showed it, because Large Caliber comes without Double Shot.
+    it("lets an ignore-structures shooter fire THROUGH scattered stones instead of spending Double Shot on them", () => {
+        for (const ignoring of ["Area Throw", "Large Caliber"]) {
+            const setup = setupActionFight({
+                gridType: PBTypes.GridVals.BLOCK_CENTER,
+                lowerAttackType: PBTypes.AttackVals.RANGE,
+                lowerAbilities: ["Double Shot", ignoring],
+                lowerRangeShots: 3,
+                lowerCell: { x: 3, y: 3 },
+                supportCell: { x: 3, y: 4 },
+                upperCell: { x: 11, y: 3 },
+            });
+            // TWO stones in the lane: the exact shape that used to eat both projectiles and end the turn.
+            setup.grid.setScatteredMountains([
+                { x: 6, y: 3 },
+                { x: 8, y: 3 },
+            ]);
+            setup.lower.refreshPossibleAttackTypes(true);
+            const hpBefore = setup.upper.getCumulativeHp();
+
+            const result = setup.engine.apply({
+                type: "range_attack",
+                attackerId: setup.lower.getId(),
+                targetId: setup.upper.getId(),
+            });
+
+            expect(result.completed).toBe(true);
+            // The creature is hit — that is the whole point of the ability.
+            expect({ ability: ignoring, hit: setup.upper.getCumulativeHp() < hpBefore }).toEqual({
+                ability: ignoring,
+                hit: true,
+            });
+            expect(result.events.filter((event) => event.type === "unit_attacked").length).toBeGreaterThan(0);
+        }
+    });
+
     it("shows direct obstacle targeting the same trajectory rule: Double Shot destroys the blocker then the aimed stone", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
