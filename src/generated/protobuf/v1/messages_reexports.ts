@@ -16,6 +16,9 @@ import * as m_fight from "./fight";
 export const Fight = m_fight.PBTypes.Fight;
 export type Fight = InstanceType<typeof m_fight.PBTypes.Fight>;
 export type FightObject = ReturnType<InstanceType<typeof m_fight.PBTypes.Fight>["toObject"]>;
+export const SmokeCell = m_fight.PBTypes.SmokeCell;
+export type SmokeCell = InstanceType<typeof m_fight.PBTypes.SmokeCell>;
+export type SmokeCellObject = ReturnType<InstanceType<typeof m_fight.PBTypes.SmokeCell>["toObject"]>;
 
 import * as m_game_public from "./game_public";
 export const GamePublic = m_game_public.PBTypes.GamePublic;
@@ -115,3 +118,4 @@ import * as m_unit from "./unit";
 export const UnitData = m_unit.PBTypes.UnitData;
 export type UnitData = InstanceType<typeof m_unit.PBTypes.UnitData>;
 export type UnitDataObject = ReturnType<InstanceType<typeof m_unit.PBTypes.UnitData>["toObject"]>;
+

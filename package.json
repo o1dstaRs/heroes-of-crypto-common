@@ -77,5 +77,8 @@
     },
     "publishConfig": {
         "access": "public"
-    }
+    },
+    "trustedDependencies": [
+        "protoc-gen-js"
+    ]
 }

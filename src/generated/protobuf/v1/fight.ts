@@ -33,9 +33,11 @@ export namespace PBTypes {
             steps_morale_multiplier?: number;
             has_additional_time_requested_per_team?: Map<number, boolean>;
             smoke_clouds?: SmokeCell[];
+            vine_cells?: SmokeCell[];
+            fire_wall_cells?: SmokeCell[];
         }) {
             super();
-            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [9, 11, 12, 14, 15, 16, 20, 23], this.#one_of_decls);
+            pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [9, 11, 12, 14, 15, 16, 20, 23, 24, 25], this.#one_of_decls);
             if (!Array.isArray(data) && typeof data == "object") {
                 if ("id" in data && data.id != undefined) {
                     this.id = data.id;
@@ -105,6 +107,12 @@ export namespace PBTypes {
                 }
                 if ("smoke_clouds" in data && data.smoke_clouds != undefined) {
                     this.smoke_clouds = data.smoke_clouds;
+                }
+                if ("vine_cells" in data && data.vine_cells != undefined) {
+                    this.vine_cells = data.vine_cells;
+                }
+                if ("fire_wall_cells" in data && data.fire_wall_cells != undefined) {
+                    this.fire_wall_cells = data.fire_wall_cells;
                 }
             }
             if (!this.already_made_turn_by_team)
@@ -254,6 +262,18 @@ export namespace PBTypes {
         set smoke_clouds(value: SmokeCell[]) {
             pb_1.Message.setRepeatedWrapperField(this, 23, value);
         }
+        get vine_cells() {
+            return pb_1.Message.getRepeatedWrapperField(this, SmokeCell, 24) as SmokeCell[];
+        }
+        set vine_cells(value: SmokeCell[]) {
+            pb_1.Message.setRepeatedWrapperField(this, 24, value);
+        }
+        get fire_wall_cells() {
+            return pb_1.Message.getRepeatedWrapperField(this, SmokeCell, 25) as SmokeCell[];
+        }
+        set fire_wall_cells(value: SmokeCell[]) {
+            pb_1.Message.setRepeatedWrapperField(this, 25, value);
+        }
         static fromObject(data: {
             id?: Uint8Array;
             current_lap?: number;
@@ -286,6 +306,8 @@ export namespace PBTypes {
                 [key: number]: boolean;
             };
             smoke_clouds?: ReturnType<typeof SmokeCell.prototype.toObject>[];
+            vine_cells?: ReturnType<typeof SmokeCell.prototype.toObject>[];
+            fire_wall_cells?: ReturnType<typeof SmokeCell.prototype.toObject>[];
         }): Fight {
             const message = new Fight({});
             if (data.id != null) {
@@ -355,7 +377,13 @@ export namespace PBTypes {
                 message.has_additional_time_requested_per_team = new Map(Object.entries(data.has_additional_time_requested_per_team).map(([key, value]) => [Number(key), value]));
             }
             if (data.smoke_clouds != null) {
-                message.smoke_clouds = data.smoke_clouds.map((item) => SmokeCell.fromObject(item));
+                message.smoke_clouds = data.smoke_clouds.map(item => SmokeCell.fromObject(item));
+            }
+            if (data.vine_cells != null) {
+                message.vine_cells = data.vine_cells.map(item => SmokeCell.fromObject(item));
+            }
+            if (data.fire_wall_cells != null) {
+                message.fire_wall_cells = data.fire_wall_cells.map(item => SmokeCell.fromObject(item));
             }
             return message;
         }
@@ -392,6 +420,8 @@ export namespace PBTypes {
                     [key: number]: boolean;
                 };
                 smoke_clouds?: ReturnType<typeof SmokeCell.prototype.toObject>[];
+                vine_cells?: ReturnType<typeof SmokeCell.prototype.toObject>[];
+                fire_wall_cells?: ReturnType<typeof SmokeCell.prototype.toObject>[];
             } = {};
             if (this.id != null) {
                 data.id = this.id;
@@ -460,7 +490,13 @@ export namespace PBTypes {
                 data.has_additional_time_requested_per_team = (Object.fromEntries)(this.has_additional_time_requested_per_team);
             }
             if (this.smoke_clouds != null) {
-                data.smoke_clouds = this.smoke_clouds.map((item) => item.toObject());
+                data.smoke_clouds = this.smoke_clouds.map((item: SmokeCell) => item.toObject());
+            }
+            if (this.vine_cells != null) {
+                data.vine_cells = this.vine_cells.map((item: SmokeCell) => item.toObject());
+            }
+            if (this.fire_wall_cells != null) {
+                data.fire_wall_cells = this.fire_wall_cells.map((item: SmokeCell) => item.toObject());
             }
             return data;
         }
@@ -529,7 +565,11 @@ export namespace PBTypes {
                 });
             }
             if (this.smoke_clouds.length)
-                writer.writeRepeatedMessage(23, this.smoke_clouds, (item) => item.serialize(writer));
+                writer.writeRepeatedMessage(23, this.smoke_clouds, (item: SmokeCell) => item.serialize(writer));
+            if (this.vine_cells.length)
+                writer.writeRepeatedMessage(24, this.vine_cells, (item: SmokeCell) => item.serialize(writer));
+            if (this.fire_wall_cells.length)
+                writer.writeRepeatedMessage(25, this.fire_wall_cells, (item: SmokeCell) => item.serialize(writer));
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -610,7 +650,13 @@ export namespace PBTypes {
                         reader.readMessage(message, () => pb_1.Map.deserializeBinary(message.has_additional_time_requested_per_team as any, reader, reader.readUint32, reader.readBool));
                         break;
                     case 23:
-                        reader.readMessage(message, () => pb_1.Message.addToRepeatedWrapperField(message, 23, SmokeCell.deserialize(reader), SmokeCell));
+                        reader.readMessage(message.smoke_clouds, () => pb_1.Message.addToRepeatedWrapperField(message, 23, SmokeCell.deserialize(reader), SmokeCell));
+                        break;
+                    case 24:
+                        reader.readMessage(message.vine_cells, () => pb_1.Message.addToRepeatedWrapperField(message, 24, SmokeCell.deserialize(reader), SmokeCell));
+                        break;
+                    case 25:
+                        reader.readMessage(message.fire_wall_cells, () => pb_1.Message.addToRepeatedWrapperField(message, 25, SmokeCell.deserialize(reader), SmokeCell));
                         break;
                     default: reader.skipField();
                 }

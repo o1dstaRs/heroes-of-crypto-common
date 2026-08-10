@@ -10,6 +10,17 @@ LOCAL_DIR="$(pwd)"  # Workspace root (game/heroes-of-crypto-common)
 PROTOC_BIN="${PROTOC_BIN:-protoc}"
 PROTOC_GEN_TS_PATH="${LOCAL_DIR}/node_modules/.bin/protoc-gen-ts"
 
+# Ensure the protoc-gen-js NATIVE plugin is present. protoc's --js_out execs
+# node_modules/protoc-gen-js/bin/protoc-gen-js, but that binary is fetched by the
+# package's postinstall (post-install.js), which bun skips on fresh installs unless
+# the package is trusted. Self-heal by running the fetch on demand so `build:proto`
+# works from any checkout regardless of how node_modules was populated.
+PROTOC_GEN_JS_DIR="${LOCAL_DIR}/node_modules/protoc-gen-js"
+if [ ! -s "${PROTOC_GEN_JS_DIR}/bin/protoc-gen-js" ]; then
+  echo "protoc-gen-js native binary missing — fetching it via post-install…"
+  ( cd "${PROTOC_GEN_JS_DIR}" && node post-install.js )
+fi
+
 TREE="protobuf/v1"
 SRC_DIR="${LOCAL_DIR}/protobuf/v1"
 OUT_DIR="${LOCAL_DIR}/src/generated"

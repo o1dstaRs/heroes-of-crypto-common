@@ -384,7 +384,8 @@ augmentMight: jspb.Message.getFieldWithDefault(msg, 6, 0),
 augmentSniper: jspb.Message.getFieldWithDefault(msg, 7, 0),
 augmentMovement: jspb.Message.getFieldWithDefault(msg, 8, 0),
 synergiesList: (f = jspb.Message.getRepeatedField(msg, 9)) == null ? undefined : f,
-complete: jspb.Message.getBooleanFieldWithDefault(msg, 10, false)
+complete: jspb.Message.getBooleanFieldWithDefault(msg, 10, false),
+augmentEmpower: jspb.Message.getFieldWithDefault(msg, 11, 0)
   };
 
   if (includeInstance) {
@@ -460,6 +461,10 @@ proto.PBTypes.PortalMatchSetup.deserializeBinaryFromReader = function(msg, reade
     case 10:
       var value = /** @type {boolean} */ (reader.readBool());
       msg.setComplete(value);
+      break;
+    case 11:
+      var value = /** @type {number} */ (reader.readInt32());
+      msg.setAugmentEmpower(value);
       break;
     default:
       reader.skipField();
@@ -557,6 +562,13 @@ proto.PBTypes.PortalMatchSetup.serializeBinaryToWriter = function(message, write
   if (f) {
     writer.writeBool(
       10,
+      f
+    );
+  }
+  f = message.getAugmentEmpower();
+  if (f !== 0) {
+    writer.writeInt32(
+      11,
       f
     );
   }
@@ -759,6 +771,24 @@ proto.PBTypes.PortalMatchSetup.prototype.getComplete = function() {
  */
 proto.PBTypes.PortalMatchSetup.prototype.setComplete = function(value) {
   return jspb.Message.setProto3BooleanField(this, 10, value);
+};
+
+
+/**
+ * optional int32 augment_empower = 11;
+ * @return {number}
+ */
+proto.PBTypes.PortalMatchSetup.prototype.getAugmentEmpower = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 11, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.PBTypes.PortalMatchSetup} returns this
+ */
+proto.PBTypes.PortalMatchSetup.prototype.setAugmentEmpower = function(value) {
+  return jspb.Message.setProto3IntField(this, 11, value);
 };
 
 
