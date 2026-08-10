@@ -1079,12 +1079,19 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 }
             }
             if (synergies?.length) {
-                const countByFaction = new Map<number, number>();
+                // Synergies count DISTINCT drafted creatures, not stacks: a creature split into several
+                // placement stacks (all sharing its name) counts once toward its faction. Dedupe by name.
+                const distinctByFaction = new Map<number, Set<string>>();
                 for (const u of units) {
                     const f = u.getFaction();
-                    countByFaction.set(f, (countByFaction.get(f) ?? 0) + 1);
+                    let names = distinctByFaction.get(f);
+                    if (!names) {
+                        names = new Set<string>();
+                        distinctByFaction.set(f, names);
+                    }
+                    names.add(u.getName());
                 }
-                const cnt = (f: number): number => countByFaction.get(f) ?? 0;
+                const cnt = (f: number): number => distinctByFaction.get(f)?.size ?? 0;
                 // Establish per-faction counts (drives possible synergies + effective levels), then select the
                 // chosen synergy for each fielded faction. The effective level is composition-derived exactly
                 // as setSynergyUnitsPerFactions computes it, so updateSynergyPerTeam validates against the same
