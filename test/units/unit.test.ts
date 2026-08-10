@@ -807,6 +807,36 @@ describe("Unit", () => {
             expect(noMelee.selectAttackType(PBTypes.AttackVals.MELEE)).toBe(false);
         });
 
+        it("makes Through Shot and Area Throw stack-independent (a lone Gargantuan / Tsar Cannon lands the full percentage)", () => {
+            // stack_powered:false -> the configured 100% is delivered whole from a single card, modified only
+            // by luck, never diluted by stack size. At a full stack it already matched; this lifts small stacks.
+            for (const abilityName of ["Through Shot", "Area Throw"]) {
+                const unit = createTestUnit({ luck: 0, abilities: [abilityName] });
+                const ability = unit.getAbility(abilityName)!;
+                expect(ability.isStackPowered()).toBe(false);
+
+                unit.setStackPower(1); // a single unit
+                const lone = unit.calculateAbilityMultiplier(ability, 0);
+                unit.setStackPower(100); // clamps to the full stack
+                const full = unit.calculateAbilityMultiplier(ability, 0);
+
+                expect(lone).toBeCloseTo(1, 5); // 100% -> coefficient 1.0, luck 0
+                expect(lone).toBeCloseTo(full, 5); // identical regardless of stack size
+            }
+
+            // Contrast: a stack_powered TOTAL_DAMAGE_PERCENTAGE ability (Large Caliber) still dilutes -- one
+            // card deals a fraction of the full-stack coefficient. Guards against flipping the wrong lever.
+            const lcUnit = createTestUnit({ luck: 0, abilities: ["Large Caliber"] });
+            const largeCaliber = lcUnit.getAbility("Large Caliber")!;
+            expect(largeCaliber.isStackPowered()).toBe(true);
+            lcUnit.setStackPower(100);
+            const maxStack = lcUnit.getStackPower();
+            const lcFull = lcUnit.calculateAbilityMultiplier(largeCaliber, 0);
+            lcUnit.setStackPower(1);
+            const lcLone = lcUnit.calculateAbilityMultiplier(largeCaliber, 0);
+            expect(lcLone).toBeCloseTo(lcFull / maxStack, 5);
+        });
+
         it("finds melee attack targets for mobile and immobilized units", () => {
             const attacker = createTestUnit();
             const enemy = createTestUnit({ team: PBTypes.TeamVals.LOWER });

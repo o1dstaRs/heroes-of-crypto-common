@@ -710,19 +710,21 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             return { estimated, applied: hpBefore - target.getCumulativeHp() };
         };
 
-        // Base deterministic damage is 50. Stack-power 1 scales Through Shot to 20%, then the target's
-        // 25% physical-AOE resistance floors 10 -> 7. Maul 50% is applied before resistance: 10 -> 15 -> 11.
-        expect(run()).toEqual({ estimated: 7, applied: 7 });
-        expect(run({ giantsMaulPower: 50 })).toEqual({ estimated: 11, applied: 11 });
-        // Crafted Double Shot is also stack-scaled: the second line volley is 20% of the first, so it adds
-        // only 1 after resistance (not another full 7). Dual Strike Charm raises that second impact to 2.
-        expect(run({ secondShot: "Crafted Double Shot" })).toEqual({ estimated: 8, applied: 8 });
+        // Base deterministic damage is 50. Through Shot is now stack-INDEPENDENT, so a stack-power-1 shooter
+        // keeps the full 100% (previously diluted to 20%); the target's 25% physical-AOE resistance floors
+        // 50 -> 37. Giant's Maul 50% applies before resistance: 50 -> 75 -> 56. In every case the AI's
+        // estimate must equal the engine's applied damage.
+        expect(run()).toEqual({ estimated: 37, applied: 37 });
+        expect(run({ giantsMaulPower: 50 })).toEqual({ estimated: 56, applied: 56 });
+        // Crafted Double Shot's SECOND line volley is still stack-scaled (20% of the first at stack 1), so it
+        // adds 7 after resistance (37 -> 44). Dual Strike Charm raises that second impact, taking it to 48.
+        expect(run({ secondShot: "Crafted Double Shot" })).toEqual({ estimated: 44, applied: 44 });
         expect(
             run({
                 secondShot: "Crafted Double Shot",
                 dualStrikeCharmPower: 50,
             }),
-        ).toEqual({ estimated: 9, applied: 9 });
+        ).toEqual({ estimated: 48, applied: 48 });
     });
 
     it("shots: Cowardice rejects the stronger resolved primary, leaves a legal lower-HP target, and does not enrich the invalid incumbent", () => {

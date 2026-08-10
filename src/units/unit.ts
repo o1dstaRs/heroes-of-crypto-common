@@ -2155,14 +2155,25 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 combinedPower = 1;
             }
 
-            calculatedCoeff *= (combinedPower / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower();
+            // stack_powered abilities dilute their percentage across the stack — a partial stack throws a
+            // weaker shot. A non-stack-powered ability (Through Shot, Area Throw) delivers its full percentage
+            // from a single unit: even one Gargantuan / Tsar Cannon lands the default effect (+luck), the stack
+            // size no longer scales it. At a full stack the two branches are identical, so this only lifts
+            // small stacks.
+            if (ability.isStackPowered()) {
+                calculatedCoeff *= (combinedPower / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower();
+            } else {
+                calculatedCoeff *= combinedPower / 100;
+            }
         } else if (
             ability.getPowerType() === AbilityPowerType.ADDITIONAL_DAMAGE_PERCENTAGE ||
             ability.getPowerType() === AbilityPowerType.ADDITIONAL_MELEE_DAMAGE_PERCENTAGE ||
             ability.getPowerType() === AbilityPowerType.ADDITIONAL_RANGE_ARMOR_PERCENTAGE
         ) {
             calculatedCoeff +=
-                (ability.getPower() / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                (ability.isStackPowered()
+                    ? (ability.getPower() / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower()
+                    : ability.getPower() / 100) +
                 (this.getLuck() + synergyAbilityPowerIncrease) / 100 +
                 (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0) / 100;
         }

@@ -365,7 +365,9 @@ describe("GameActionEngine", () => {
         const brokenSource = setupActionFight({ upperAbilities: ["Time Denial"] });
         brokenSource.upper.applyEffect(new EffectFactory().makeEffect("Break")!);
         expect(brokenSource.upper.hasAbilityActive("Time Denial")).toBe(false);
-        expect(brokenSource.engine.apply({ type: "wait_turn", unitId: brokenSource.lower.getId() }).completed).toBe(true);
+        expect(brokenSource.engine.apply({ type: "wait_turn", unitId: brokenSource.lower.getId() }).completed).toBe(
+            true,
+        );
 
         const stolenSource = setupActionFight({ upperAbilities: ["Time Denial"] });
         expect(stolenSource.upper.disableAbilityAsStolen("Time Denial")).toBeDefined();
@@ -1603,6 +1605,11 @@ describe("GameActionEngine", () => {
             lowerRangeShots: 3,
             supportCell: { x: 2, y: 3 },
             upperCell: { x: 7, y: 7 },
+            // Area Throw is stack-independent (full 100% from a single stack), so give the target enough bulk
+            // to survive BOTH volleys — otherwise the first shot kills it and the second has nothing to splash,
+            // which is not what this test is guarding (a recorded entry per shot).
+            upperAmountAlive: 100,
+            upperMaxHp: 100,
         });
         setup.lower.refreshPossibleAttackTypes(true);
 
