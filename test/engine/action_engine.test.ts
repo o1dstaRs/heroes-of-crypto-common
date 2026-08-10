@@ -1078,21 +1078,28 @@ describe("GameActionEngine", () => {
     // this, the Double Shot stone rule ran first and spent both projectiles on tombstones, so a Cemetery lane
     // holding two stones left the declared creature completely untouched — the ability read as doing nothing.
     // Cyclops never showed it, because Large Caliber comes without Double Shot.
-    it("lets an ignore-structures shooter fire THROUGH scattered stones instead of spending Double Shot on them", () => {
-        for (const ignoring of ["Area Throw", "Large Caliber"]) {
+    //
+    // Damage is pinned (attack + flat min/max) for the same reason the Large Caliber test above pins it: an
+    // unpinned roll can land on nothing and turn "did the shot arrive" into a coin flip.
+    for (const ignoring of ["Area Throw", "Large Caliber"]) {
+        it(`fires THROUGH scattered stones with Double Shot + ${ignoring} instead of spending projectiles on them`, () => {
             const setup = setupActionFight({
                 gridType: PBTypes.GridVals.BLOCK_CENTER,
                 lowerAttackType: PBTypes.AttackVals.RANGE,
+                lowerAttack: 20,
                 lowerAbilities: ["Double Shot", ignoring],
+                lowerDamageMin: 10,
+                lowerDamageMax: 10,
                 lowerRangeShots: 3,
-                lowerCell: { x: 3, y: 3 },
-                supportCell: { x: 3, y: 4 },
-                upperCell: { x: 11, y: 3 },
+                lowerCell: { x: 3, y: 7 },
+                supportCell: { x: 3, y: 6 },
+                upperCell: { x: 8, y: 7 },
             });
-            // TWO stones in the lane: the exact shape that used to eat both projectiles and end the turn.
+            // TWO stones strictly between shooter and target: the exact shape that used to eat both
+            // projectiles and end the turn with zero unit_attacked events.
             setup.grid.setScatteredMountains([
-                { x: 6, y: 3 },
-                { x: 8, y: 3 },
+                { x: 5, y: 7 },
+                { x: 7, y: 7 },
             ]);
             setup.lower.refreshPossibleAttackTypes(true);
             const hpBefore = setup.upper.getCumulativeHp();
@@ -1104,14 +1111,11 @@ describe("GameActionEngine", () => {
             });
 
             expect(result.completed).toBe(true);
-            // The creature is hit — that is the whole point of the ability.
-            expect({ ability: ignoring, hit: setup.upper.getCumulativeHp() < hpBefore }).toEqual({
-                ability: ignoring,
-                hit: true,
-            });
+            expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
+            // The old behaviour produced obstacle hits and NO unit_attacked at all.
             expect(result.events.filter((event) => event.type === "unit_attacked").length).toBeGreaterThan(0);
-        }
-    });
+        });
+    }
 
     it("shows direct obstacle targeting the same trajectory rule: Double Shot destroys the blocker then the aimed stone", () => {
         const setup = setupActionFight({
