@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { GridSettings } from "../../src/grid/grid_settings";
 import type { IMovePath } from "../../src/grid/path_definitions";
+import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PathHelper } from "../../src/grid/path_helper";
 import { ObstacleType } from "../../src/obstacles/obstacle_type";
 import { getRandomInt, setDeterministicRandomSource } from "../../src/utils/lib";
@@ -231,6 +232,20 @@ const serializeMovePath = (movePath: IMovePath): SerializedMoveResult => ({
 });
 
 const cloneMatrix = (matrix: number[][]): number[][] => matrix.map((row) => row.slice());
+
+/**
+ * Build the fight-state singleton BEFORE any case is measured.
+ *
+ * getMovePath calls FightStateManager.getInstance(), and the first call in a process CONSTRUCTS it — which
+ * runs `new FightProperties()` and draws once from whatever random source is installed (getRandomGridType).
+ * That draw is charged to whichever case happens to run first, shifting its rngTail by one getRandomInt and
+ * making this file pass or fail depending on whether some earlier test file already warmed the singleton.
+ * It did: the file passed in the full suite and failed on its own, which is exactly backwards.
+ *
+ * Touching it here, before any deterministic source is installed, spends that draw on the production crypto
+ * path where nothing is counting.
+ */
+FightStateManager.getInstance();
 
 const executeMoveCase = (helper: PathHelper, moveCase: MoveCase): MoveExecution => {
     const currentCell = { ...moveCase.currentCell };

@@ -64,20 +64,76 @@ function legacyPixelTrace(gridSettings: GridSettings, start: XY, end: XY): GridR
     return intersections;
 }
 
+/**
+ * The oracle walk again, but comparing as it goes instead of materialising the expected trace.
+ *
+ * The exhaustive case below runs this ~1M times, and building an array of {cell, position} tuples per ray —
+ * two allocations per PIXEL stepped, plus a linear `includes` over the visited keys — cost more than the
+ * function under test by a wide margin. Same walk, same `(x << 4) | y` key (so identical collision
+ * behaviour for off-board cells), one scratch object, and a Set lookup.
+ *
+ * Returns false on the first divergence; the caller rebuilds the full expected trace only to print a diff.
+ */
+const oracleScratch = { x: 0, y: 0 };
+function legacyTraceMatches(
+    gridSettings: GridSettings,
+    start: XY,
+    end: XY,
+    actual: GridRayCellIntersection[],
+): boolean {
+    const seen = new Set<number>();
+    let matched = 0;
+    let x0 = Math.round(start.x);
+    let y0 = Math.round(start.y);
+    const x1 = Math.round(end.x);
+    const y1 = Math.round(end.y);
+    const deltaX = Math.abs(x1 - x0);
+    const deltaY = Math.abs(y1 - y0);
+    const directionX = x0 < x1 ? 1 : -1;
+    const directionY = y0 < y1 ? 1 : -1;
+    let error = deltaX - deltaY;
+
+    for (;;) {
+        oracleScratch.x = x0;
+        oracleScratch.y = y0;
+        const cell = getCellForPosition(gridSettings, oracleScratch);
+        const cellKey = (cell.x << 4) | cell.y;
+        if (!seen.has(cellKey)) {
+            seen.add(cellKey);
+            const entry = actual[matched];
+            if (
+                entry === undefined ||
+                entry[0].x !== cell.x ||
+                entry[0].y !== cell.y ||
+                entry[1].x !== x0 ||
+                entry[1].y !== y0
+            ) {
+                return false;
+            }
+            matched += 1;
+        }
+        if (x0 === x1 && y0 === y1) {
+            break;
+        }
+        const doubledError = 2 * error;
+        if (doubledError > -deltaY) {
+            error -= deltaY;
+            x0 += directionX;
+        }
+        if (doubledError < deltaX) {
+            error += deltaX;
+            y0 += directionY;
+        }
+    }
+
+    return matched === actual.length;
+}
+
 function assertLegacyEquivalent(start: XY, end: XY, gridSettings = GS): void {
-    const expected = legacyPixelTrace(gridSettings, start, end);
     const actual = traceGridRayCells(gridSettings, start, end);
-    if (
-        actual.length !== expected.length ||
-        actual.some(
-            ([cell, position], index) =>
-                cell.x !== expected[index][0].x ||
-                cell.y !== expected[index][0].y ||
-                position.x !== expected[index][1].x ||
-                position.y !== expected[index][1].y,
-        )
-    ) {
-        expect(actual).toEqual(expected);
+    if (!legacyTraceMatches(gridSettings, start, end, actual)) {
+        // Only now is the array oracle worth building — it gives the assertion a readable diff.
+        expect(actual).toEqual(legacyPixelTrace(gridSettings, start, end));
     }
 }
 
