@@ -62,6 +62,8 @@ message PortalMatch {
     int32 mmr_after = 22;
     sint32 mmr_delta = 23;
     int32 gold_earned = 24;
+    // Persistent id for linking to the opponent's public player profile.
+    string opponent_player_id = 25;
 }
 
 // A creature combo (a sorted set of creature ids the viewer played together) with its record.

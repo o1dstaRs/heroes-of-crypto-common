@@ -154,6 +154,7 @@ describe("generated message constructors (new X({...}))", () => {
             mmr_after: 890,
             mmr_delta: -12,
             gold_earned: 0,
+            opponent_player_id: "22222222-2222-4222-8222-222222222222",
         };
         roundTrip(
             new PortalPB.PortalUnitPerformance({ creature_id: 1, damage_dealt: 1400 }),

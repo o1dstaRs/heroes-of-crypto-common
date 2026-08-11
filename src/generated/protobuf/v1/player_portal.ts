@@ -426,6 +426,7 @@ export namespace PBTypes {
             mmr_after?: number;
             mmr_delta?: number;
             gold_earned?: number;
+            opponent_player_id?: string;
         }) {
             super();
             pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [7, 8, 14, 15], this.#one_of_decls);
@@ -501,6 +502,9 @@ export namespace PBTypes {
                 }
                 if ("gold_earned" in data && data.gold_earned != undefined) {
                     this.gold_earned = data.gold_earned;
+                }
+                if ("opponent_player_id" in data && data.opponent_player_id != undefined) {
+                    this.opponent_player_id = data.opponent_player_id;
                 }
             }
         }
@@ -654,6 +658,12 @@ export namespace PBTypes {
         set gold_earned(value: number) {
             pb_1.Message.setField(this, 24, value);
         }
+        get opponent_player_id() {
+            return pb_1.Message.getFieldWithDefault(this, 25, "") as string;
+        }
+        set opponent_player_id(value: string) {
+            pb_1.Message.setField(this, 25, value);
+        }
         static fromObject(data: {
             game_id?: string;
             won?: boolean;
@@ -679,6 +689,7 @@ export namespace PBTypes {
             mmr_after?: number;
             mmr_delta?: number;
             gold_earned?: number;
+            opponent_player_id?: string;
         }): PortalMatch {
             const message = new PortalMatch({});
             if (data.game_id != null) {
@@ -753,6 +764,9 @@ export namespace PBTypes {
             if (data.gold_earned != null) {
                 message.gold_earned = data.gold_earned;
             }
+            if (data.opponent_player_id != null) {
+                message.opponent_player_id = data.opponent_player_id;
+            }
             return message;
         }
         toObject() {
@@ -781,6 +795,7 @@ export namespace PBTypes {
                 mmr_after?: number;
                 mmr_delta?: number;
                 gold_earned?: number;
+                opponent_player_id?: string;
             } = {};
             if (this.game_id != null) {
                 data.game_id = this.game_id;
@@ -854,6 +869,9 @@ export namespace PBTypes {
             if (this.gold_earned != null) {
                 data.gold_earned = this.gold_earned;
             }
+            if (this.opponent_player_id != null) {
+                data.opponent_player_id = this.opponent_player_id;
+            }
             return data;
         }
         serialize(): Uint8Array;
@@ -908,6 +926,8 @@ export namespace PBTypes {
                 writer.writeSint32(23, this.mmr_delta);
             if (this.gold_earned != 0)
                 writer.writeInt32(24, this.gold_earned);
+            if (this.opponent_player_id.length)
+                writer.writeString(25, this.opponent_player_id);
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -988,6 +1008,9 @@ export namespace PBTypes {
                         break;
                     case 24:
                         message.gold_earned = reader.readInt32();
+                        break;
+                    case 25:
+                        message.opponent_player_id = reader.readString();
                         break;
                     default: reader.skipField();
                 }

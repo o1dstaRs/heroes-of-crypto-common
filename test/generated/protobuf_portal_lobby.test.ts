@@ -75,6 +75,7 @@ const portalMatch = {
     mmr_after: 812,
     mmr_delta: 18,
     gold_earned: 18,
+    opponent_player_id: "22222222-2222-4222-8222-222222222222",
 };
 const portalCombo = { creature_ids: [7, 8], games: 12, wins: 9 };
 const portalCreature = { creature_id: 5, games: 20, wins: 14 };
@@ -118,6 +119,7 @@ describe("generated player_portal protobuf messages", () => {
         expect(match.match_kind).toBe(PortalPB.PortalMatchKind.RANKED);
         expect(match.mmr_delta).toBe(18);
         expect(match.gold_earned).toBe(18);
+        expect(match.opponent_player_id).toBe("22222222-2222-4222-8222-222222222222");
         expect(PortalPB.PortalMatch.deserializeBinary(loss.serializeBinary()).mmr_delta).toBe(-18);
         expect([
             PortalPB.PortalMatchKind.UNKNOWN,
@@ -147,6 +149,7 @@ describe("generated player_portal protobuf messages", () => {
             mmr_after: 0,
             mmr_delta: 0,
             gold_earned: 0,
+            opponent_player_id: "",
         });
     });
 
