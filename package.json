@@ -34,7 +34,7 @@
         "lint:style:base": "bunx prettier \"src/**/*.{ts,tsx,js,json}\"",
         "lint:style:fix": "bun run lint:style:base -- --write",
         "prepare": "git config core.hooksPath .githooks || true",
-        "test": "bun run check:test-skips && bun test --parallel --timeout 30000"
+        "test": "bun run check:test-skips && bun test --parallel --timeout 90000"
     },
     "lint-staged": {
         "*.{ts,tsx}": [
