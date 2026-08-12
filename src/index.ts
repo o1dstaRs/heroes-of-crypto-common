@@ -82,6 +82,8 @@ export {
     isMindlessAiUnit,
     MINDLESS_AI_ABILITY,
     MINDLESS_AI_VERSION,
+    pickRankedAIPerk,
+    RANKED_AI_PERK_CHOICES,
     enumerateCandidates,
     getEnemiesCellsWithinMovementRange,
     AI_VERSIONS,
@@ -127,6 +129,7 @@ export {
 export type {
     IAIPolicyEvent,
     IAIStrategy,
+    IRankedAIPerkChoiceContext,
     IRankedAIProfile,
     IRankedAISetupPolicy,
     IDecisionContext,
