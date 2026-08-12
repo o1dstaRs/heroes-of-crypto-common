@@ -99,7 +99,7 @@
     "Stun": {
         "name": "Stun",
         "range": 2,
-        "desc": "Allies within range gain a {}% chance to stun the enemy they hit for a turn (base chance scaled by the Abomination's power and luck).",
+        "desc": "This unit gains a separate {}% chance to stun the enemy it hits for a turn (scaled by the Abomination's power and luck).",
         "power": 25,
         "is_buff": true,
         "power_type": "STUN_CHANCE"

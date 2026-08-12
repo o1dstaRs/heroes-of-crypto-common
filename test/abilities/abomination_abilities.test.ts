@@ -793,6 +793,29 @@ describe("Stun Aura (ally buff, stun-on-hit)", () => {
         expect(ally.getBuff("Stun Aura")?.getPower()).toBeCloseTo(abomination.calculateAuraPower(baseAura!, 0), 5);
     });
 
+    it("caps the displayed chance at the same 100% maximum as the projected aura", () => {
+        const abomination = createTestUnit({
+            name: "Abomination",
+            team: PBTypes.TeamVals.LOWER,
+            abilities: ["Stun Aura"],
+            auraEffects: ["Stun"],
+            auraRanges: [2],
+            auraIsBuff: [true],
+            stackPower: 5,
+            luck: 10,
+        });
+        abomination.adjustBaseStats(true, 1, 80, 0, 0, 0, 10);
+
+        const auraEffect = abomination.getAuraEffects().find((a) => a.getName() === "Stun");
+        expect(auraEffect).toBeDefined();
+        expect(abomination.calculateAuraPower(auraEffect!, 80)).toBe(100);
+
+        const props = abomination.getUnitProperties();
+        const index = props.abilities.indexOf("Stun Aura");
+        expect(props.abilities_descriptions[index]).toContain("separate 100% chance");
+        expect(props.abilities_descriptions[index]).not.toContain("115%");
+    });
+
     it("is carried by the real Abomination as a stack-powered range-2 BUFF aura card", () => {
         const props = HoCConfig.getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Abomination", "abomination_512", 1);
         const index = props.abilities.indexOf("Stun Aura");

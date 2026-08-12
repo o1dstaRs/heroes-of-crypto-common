@@ -1328,7 +1328,7 @@
     "Stun Aura": {
         "name": "Stun Aura",
         "type": "BUFF_AURA",
-        "desc": ["Allies within 2 cells have a {}% chance to stun the enemy they hit for 1 turn"],
+        "desc": ["Allies within 2 cells have a separate {}% chance to stun the enemy they hit for 1 turn"],
         "power": 25,
         "power_type": "STUN_CHANCE",
         "skip_reponse": false,

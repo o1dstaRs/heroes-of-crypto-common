@@ -3964,7 +3964,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (!ability) {
             return;
         }
-        const chance = Number(this.calculateAbilityApplyChance(ability, synergyAbilityPowerIncrease).toFixed(2));
+        const auraEffect = ability.getAuraEffect();
+        if (!auraEffect) {
+            return;
+        }
+        // Use the aura calculation itself, rather than the similar-looking generic ability calculation.
+        // Combat stores this exact value on allies' Stun Aura buffs; it also owns the 0..100 clamp and avoids
+        // pulling in modifiers (such as Made of Fire) that do not affect aura projection.
+        const chance = Number(this.calculateAuraPower(auraEffect, synergyAbilityPowerIncrease).toFixed(2));
         this.unitProperties.abilities_descriptions[index] = ability
             .getDesc()
             .join("\n")
