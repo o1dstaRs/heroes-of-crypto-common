@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { getAuraCellKeys, getAuraCellKeysView } from "../../src/effects/effect_helper";
+import { getAuraCellKeyMembershipView, getAuraCellKeys, getAuraCellKeysView } from "../../src/effects/effect_helper";
 import { getCellsAroundCell } from "../../src/grid/grid_math";
 import { GridSettings } from "../../src/grid/grid_settings";
 import type { XY } from "../../src/utils/math";
@@ -123,6 +123,19 @@ describe("aura geometry compatibility oracle", () => {
         expect(firstView).toEqual(legacyGetAuraCellKeys(testGridSettings, source, 3));
         expect(mutableResult).toEqual(firstView);
         expect(mutableResult).not.toBe(firstView);
+    });
+
+    it("shares an exact membership view for each cached geometry", () => {
+        const source = { x: 5, y: 6 };
+        const expected = legacyGetAuraCellKeys(testGridSettings, source, 3);
+        const first = getAuraCellKeyMembershipView(testGridSettings, source, 3);
+        const second = getAuraCellKeyMembershipView(testGridSettings, source, 3);
+
+        expect(first).toBe(second);
+        expect(Object.isFrozen(first)).toBe(true);
+        for (let key = -16; key < 272; key++) {
+            expect(first.has(key)).toBe(expected.includes(key));
+        }
     });
 
     it("separates cache entries by grid identity, source cell, and range", () => {

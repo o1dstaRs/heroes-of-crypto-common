@@ -1,3 +1,5 @@
+import { Worker } from "node:worker_threads";
+
 import { describe, expect, test } from "bun:test";
 
 import type { ITurnExecutionObservation } from "../../src/simulation/battle_engine";
@@ -5,12 +7,12 @@ import {
     auditV08Level4Turn,
     forceLevel4CoverageUnit,
     planV08Level4CoverageGame,
-    runV08Level4CoverageGame,
     V08_LEVEL4_CONTROL_UNIT,
     V08_LEVEL4_COVERAGE_LANES,
     V08_LEVEL4_COVERAGE_UNITS,
     type IV08Level4ActionAudit,
     type IV08Level4CoverageOptions,
+    type IV08Level4CoverageRecord,
 } from "../../src/simulation/v0_8_l4_coverage";
 import { buildRoster, makeRng } from "../../src/simulation/army";
 
@@ -20,6 +22,45 @@ const OPTIONS: IV08Level4CoverageOptions = {
     pairsPerLane: 1,
     baseSeed: 1234,
 };
+
+const EXACT_FAILURE_OPTIONS: IV08Level4CoverageOptions = {
+    candidateVersion: "v0.8",
+    opponentVersion: "v0.7",
+    pairsPerLane: 16,
+    baseSeed: 2026072601,
+};
+
+type Level4CoverageWorkerMessage = { type: "ready" } | { type: "result"; record: IV08Level4CoverageRecord };
+
+const runLevel4CoverageRegression = (game: number): Promise<IV08Level4CoverageRecord> =>
+    new Promise((resolvePromise, rejectPromise) => {
+        // FightStateManager is a process singleton. Give each exact physical game an independent production
+        // worker so these rejection regressions run concurrently without sharing mutable battle state.
+        const worker = new Worker(new URL("../../src/simulation/v0_8_l4_coverage_worker.ts", import.meta.url), {
+            workerData: { options: EXACT_FAILURE_OPTIONS },
+        });
+        let settled = false;
+        const fail = (error: unknown): void => {
+            if (settled) return;
+            settled = true;
+            void worker.terminate();
+            rejectPromise(error instanceof Error ? error : new Error(String(error)));
+        };
+        worker.once("error", fail);
+        worker.on("exit", (code) => {
+            if (!settled) fail(new Error(`Level-4 coverage worker exited before returning game ${game}: ${code}`));
+        });
+        worker.on("message", (message: Level4CoverageWorkerMessage) => {
+            if (settled) return;
+            if (message.type === "ready") {
+                worker.postMessage({ type: "game", game });
+                return;
+            }
+            settled = true;
+            void worker.terminate();
+            resolvePromise(message.record);
+        });
+    });
 
 const emptyAudit = (): IV08Level4ActionAudit => ({
     appearances: 1,
@@ -106,32 +147,18 @@ describe("v0.8 forced level-4 coverage", () => {
         });
     });
 
-    test("keeps the exact A13 Level-4 Terrifying Gaze regressions rejection-free", () => {
-        const exactFailureOptions: IV08Level4CoverageOptions = {
-            candidateVersion: "v0.8",
-            opponentVersion: "v0.7",
-            pairsPerLane: 16,
-            baseSeed: 2026072601,
-        };
-
-        for (const game of [137, 156, 157]) {
-            const result = runV08Level4CoverageGame(exactFailureOptions, game);
+    test("keeps the exact A13 Level-4 Terrifying Gaze regressions rejection-free", async () => {
+        const results = await Promise.all([137, 156, 157].map(runLevel4CoverageRegression));
+        for (const result of results) {
             expect(result.rejectedCandidate).toBe(0);
         }
-    });
+    }, 30_000);
 
-    test("keeps the exact v0.7 Terrifying Gaze regressions rejection-free", () => {
-        const exactFailureOptions: IV08Level4CoverageOptions = {
-            candidateVersion: "v0.8",
-            opponentVersion: "v0.7",
-            pairsPerLane: 16,
-            baseSeed: 2026072601,
-        };
-
-        for (const game of [148, 219]) {
-            const result = runV08Level4CoverageGame(exactFailureOptions, game);
+    test("keeps the exact v0.7 Terrifying Gaze regressions rejection-free", async () => {
+        const results = await Promise.all([148, 219].map(runLevel4CoverageRegression));
+        for (const result of results) {
             expect(result.rejectedCandidate).toBe(0);
             expect(result.rejectedOpponent).toBe(0);
         }
-    });
+    }, 30_000);
 });

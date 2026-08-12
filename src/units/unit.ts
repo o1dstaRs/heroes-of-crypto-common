@@ -738,13 +738,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return false;
     }
     public getAbility(abilityName: string): Ability | undefined {
-        if (this.hasEffectActive("Break")) {
-            return undefined;
-        }
-
+        // Missing-ability probes dominate AI evaluation. Establish absence before consulting Break: Break can
+        // mute an ability that exists, but it cannot change an absent lookup's undefined/false/zero result.
         for (const a of this.abilities) {
             if (abilityName === a.getName()) {
-                return a;
+                return this.hasEffectActive("Break") ? undefined : a;
             }
         }
 
@@ -1063,13 +1061,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return false;
     }
     public hasAbilityActive(abilityName: string): boolean {
-        if (this.hasEffectActive("Break")) {
-            return false;
-        }
-
         for (const ab of this.abilities) {
             if (ab.getName() === abilityName) {
-                return true;
+                return !this.hasEffectActive("Break");
             }
         }
 
@@ -1109,13 +1103,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return undefined;
     }
     public getAbilityPower(abilityName: string): number {
-        if (this.hasEffectActive("Break")) {
-            return 0;
-        }
-
         for (const ab of this.abilities) {
             if (ab.getName() === abilityName) {
-                return ab.getPower();
+                return this.hasEffectActive("Break") ? 0 : ab.getPower();
             }
         }
 
@@ -2909,6 +2899,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ? this.unitProperties.base_attack
             : undefined;
 
+        // Stat refresh probes the same compact buff list dozens of times. Index it once for this refresh,
+        // preserving getBuff's first-match behavior for defensive compatibility with malformed duplicate rows.
+        // The index is deliberately local: buff mutation, battle rollback, and authoritative reconstruction cannot
+        // make it stale, and the AppliedSpell objects themselves remain the exact live instances.
+        const statBuffs: Record<string, AppliedSpell | undefined> = {};
+        for (const buff of this.buffs) {
+            const name = buff.getName();
+            if (statBuffs[name] === undefined) {
+                statBuffs[name] = buff;
+            }
+        }
+
         // target
         if (!this.hasEffectActive("Aggr")) {
             this.resetTarget();
@@ -2919,7 +2921,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // HP
-        const madeOfFireBuff = this.getBuff("Made of Fire");
+        const madeOfFireBuff = statBuffs["Made of Fire"];
         const baseStatsDiff = calculateBuffsDebuffsEffect(this.getBuffs(), this.getDebuffs());
         const hasUnyieldingPower = this.hasAbilityActive("Unyielding Power");
 
@@ -2941,7 +2943,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
             // ARTIFACTS: Pendant of Vitality adds % HP here. Tome of Amplification is intentionally absent from
             // base-stat recomputation: it applies only at the unit-cast buff boundary (spells/castable_buff.ts).
-            const pendantOfVitalityBuff = this.getBuff("Pendant of Vitality");
+            const pendantOfVitalityBuff = statBuffs["Pendant of Vitality"];
             if (pendantOfVitalityBuff) {
                 this.unitProperties.max_hp += roundUnitStat(
                     (this.unitProperties.max_hp / 100) * pendantOfVitalityBuff.getPower(),
@@ -2977,9 +2979,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 // rolls, synergy or artifact luck. See the Sadness block below for the morale equivalent.
                 const luckBuffed =
                     baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER ||
-                    this.hasBuffActive("Luck Aura") ||
-                    this.hasBuffActive("Clover of Fortune") ||
-                    this.hasBuffActive("Fortune");
+                    !!statBuffs["Luck Aura"] ||
+                    !!statBuffs["Clover of Fortune"] ||
+                    !!statBuffs.Fortune;
                 this.unitProperties.luck = luckBuffed ? 0 : -LUCK_MAX_VALUE_TOTAL;
                 this.unitProperties.luck_mod = 0;
             } else if (baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER) {
@@ -3004,11 +3006,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
                 // ARTIFACTS: Cursed Ward (+luck) and Clover of Fortune (+luck).
                 let artifactLuck = 0;
-                const cursedWardLuckBuff = this.getBuff("Cursed Ward");
+                const cursedWardLuckBuff = statBuffs["Cursed Ward"];
                 if (cursedWardLuckBuff) {
                     artifactLuck += cursedWardLuckBuff.getPower();
                 }
-                const cloverOfFortuneBuff = this.getBuff("Clover of Fortune");
+                const cloverOfFortuneBuff = statBuffs["Clover of Fortune"];
                 if (cloverOfFortuneBuff) {
                     artifactLuck += cloverOfFortuneBuff.getPower();
                 }
@@ -3038,11 +3040,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
             // ARTIFACTS: Cursed Ward (-morale) and Crown of Command (+morale). Crown's first stored
             // property carries morale; its AppliedSpell power carries movement and its second property armor.
-            const cursedWardMoraleBuff = this.getBuff("Cursed Ward");
+            const cursedWardMoraleBuff = statBuffs["Cursed Ward"];
             if (cursedWardMoraleBuff) {
                 this.unitProperties.morale -= parseInt(this.getBuffProperties("Cursed Ward")[1] || "0", 10);
             }
-            const crownOfCommandMoraleBuff = this.getBuff("Crown of Command");
+            const crownOfCommandMoraleBuff = statBuffs["Crown of Command"];
             if (crownOfCommandMoraleBuff) {
                 this.unitProperties.morale += parseInt(this.getBuffProperties("Crown of Command")[0] || "0", 10);
             }
@@ -3052,14 +3054,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         } else {
             let lockedMorale = false;
             if (this.hasDebuffActive("Sadness")) {
-                if (this.hasBuffActive("Courage")) {
+                if (statBuffs.Courage) {
                     this.unitProperties.morale = 0;
                     lockedMorale = true;
                 } else {
                     this.unitProperties.morale = -MORALE_MAX_VALUE_TOTAL;
                 }
             }
-            if (this.hasBuffActive("Courage")) {
+            if (statBuffs.Courage) {
                 if (this.hasDebuffActive("Sadness")) {
                     this.unitProperties.morale = 0;
                     lockedMorale = true;
@@ -3100,11 +3102,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (pegasusMightAura) {
             this.unitProperties.base_armor += pegasusMightAura.getPower();
         }
-        const windFlowBuff = this.getBuff("Wind Flow");
+        const windFlowBuff = statBuffs["Wind Flow"];
         if (windFlowBuff) {
             this.unitProperties.base_armor += windFlowBuff.getPower();
         }
-        const armorAugmentBuff = this.getBuff("Armor Augment");
+        const armorAugmentBuff = statBuffs["Armor Augment"];
         if (armorAugmentBuff) {
             this.unitProperties.base_armor += roundUnitStat(
                 (this.unitProperties.base_armor / 100) * armorAugmentBuff.getPower(),
@@ -3117,28 +3119,28 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Titan Plate: +% defense as an ADDITIONAL stat (armor_mod), not folded into base_armor — so it never
         // compounds with the armor multiplier or other % defense buffs, and (feeding armor_mod) it guards melee
         // AND ranged. Capture 15% of base here (pre-multiplier); apply into armor_mod at the Veteran Helm block.
-        const titanPlateBuff = this.getBuff("Titan Plate");
+        const titanPlateBuff = statBuffs["Titan Plate"];
         const titanPlateArmorBonus = titanPlateBuff
             ? roundUnitStat((this.unitProperties.base_armor / 100) * titanPlateBuff.getPower(), 2)
             : 0;
-        const ironPlateBuff = this.getBuff("Iron Plate");
+        const ironPlateBuff = statBuffs["Iron Plate"];
         if (ironPlateBuff) {
             this.unitProperties.base_armor += ironPlateBuff.getPower();
         }
         // ARTIFACT Winged Boots: flat armour for flyers, alongside the movement it grants below. Only
         // flying units ever carry the buff (applyArtifacts gates it), so its presence is sufficient here.
         // The armour is the SECOND stored value — the power is the steps, which the movement hook reads.
-        const wingedBootsArmorBuff = this.getBuff("Winged Boots");
+        const wingedBootsArmorBuff = statBuffs["Winged Boots"];
         if (wingedBootsArmorBuff) {
             this.unitProperties.base_armor += parseInt(this.getBuffProperties("Winged Boots")[1] || "0", 10);
         }
         // Crown of Command carries armor in its second stored property (movement remains the buff power and
         // morale the first property), so all three values survive authoritative ranked snapshots.
-        const crownOfCommandArmorBuff = this.getBuff("Crown of Command");
+        const crownOfCommandArmorBuff = statBuffs["Crown of Command"];
         if (crownOfCommandArmorBuff) {
             this.unitProperties.base_armor += parseInt(this.getBuffProperties("Crown of Command")[1] || "0", 10);
         }
-        const berserkersBondArmorBuff = this.getBuff("Berserkers Bond");
+        const berserkersBondArmorBuff = statBuffs["Berserkers Bond"];
         if (berserkersBondArmorBuff) {
             this.unitProperties.base_armor = Math.max(
                 1,
@@ -3184,7 +3186,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (this.getMovementType() === PBTypes.MovementVals.FLY && synergyFlyArmorIncrease > 0) {
             armorModMultiplier = synergyFlyArmorIncrease / 100;
         }
-        const spiritualArmorBuff = this.getBuff("Spiritual Armor");
+        const spiritualArmorBuff = statBuffs["Spiritual Armor"];
         if (spiritualArmorBuff) {
             armorModMultiplier = (spiritualArmorBuff.getPower() / 100) * (1 + armorModMultiplier);
         }
@@ -3202,7 +3204,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // armor_mod feeds BOTH getArmor and getRangeArmor it now protects vs melee AND ranged — the "+defense
         // (all)" it was always described as (folding into base_armor only guarded melee). Additive off base, so
         // it never compounds with other % defense buffs.
-        const veteranHelmArmorBuff = this.getBuff("Veteran Helm");
+        const veteranHelmArmorBuff = statBuffs["Veteran Helm"];
         if (veteranHelmArmorBuff) {
             this.unitProperties.armor_mod += roundUnitStat(
                 (this.unitProperties.base_armor / 100) * veteranHelmArmorBuff.getPower(),
@@ -3216,7 +3218,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.armor_mod = roundUnitStat(this.unitProperties.armor_mod + titanPlateArmorBonus, 2);
         }
 
-        const angelicHostBuff = this.getBuff("Angelic Host");
+        const angelicHostBuff = statBuffs["Angelic Host"];
         if (angelicHostBuff) {
             this.unitProperties.armor_mod = roundUnitStat(
                 this.unitProperties.armor_mod + angelicHostBuff.getPower(),
@@ -3260,7 +3262,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // so a percentage gave a level 1 unit 21% of nothing and a level 2 unit barely one point. Applied to
         // the base here, BEFORE the independent ability rolls below, so Magic Shield / Wardguard / Warding
         // Mane still compose on top of the raised figure.
-        const armorAugmentMagicBuff = this.getBuff("Armor Augment");
+        const armorAugmentMagicBuff = statBuffs["Armor Augment"];
         if (armorAugmentMagicBuff) {
             this.unitProperties.magic_resist = roundUnitStat(
                 this.unitProperties.magic_resist + armorAugmentMagicBuff.getPower(),
@@ -3358,13 +3360,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.steps_mod += tieUpTheHorsesAuraEffect.getPower();
             }
         }
-        const movementAugmentBuff = this.getBuff("Movement Augment");
+        const movementAugmentBuff = statBuffs["Movement Augment"];
         if (movementAugmentBuff) {
             this.unitProperties.steps += movementAugmentBuff.getPower();
         }
         // ARTIFACTS: movement. Swift Boots (melee) and Winged Boots (flyers) are only applied to eligible
         // units in applyArtifacts, so buff presence is sufficient. Crown of Command grants +steps to all.
-        const swiftBootsBuff = this.getBuff("Swift Boots");
+        const swiftBootsBuff = statBuffs["Swift Boots"];
         if (swiftBootsBuff) {
             // Percent of base steps (power is a %), not a flat +1 — scales with the unit's own movement.
             this.unitProperties.steps += roundUnitStat(
@@ -3372,15 +3374,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 2,
             );
         }
-        const wingedBootsBuff = this.getBuff("Winged Boots");
+        const wingedBootsBuff = statBuffs["Winged Boots"];
         if (wingedBootsBuff) {
             this.unitProperties.steps += wingedBootsBuff.getPower();
         }
-        const crownOfCommandStepsBuff = this.getBuff("Crown of Command");
+        const crownOfCommandStepsBuff = statBuffs["Crown of Command"];
         if (crownOfCommandStepsBuff) {
             this.unitProperties.steps += crownOfCommandStepsBuff.getPower();
         }
-        const battleRoarBuff = this.getBuff("Battle Roar");
+        const battleRoarBuff = statBuffs["Battle Roar"];
         if (battleRoarBuff) {
             this.unitProperties.steps_mod += battleRoarBuff.getPower();
         }
@@ -3448,7 +3450,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.base_attack += pegasusMightAura.getPower();
         }
 
-        const mightAugmentBuff = this.getBuff("Might Augment");
+        const mightAugmentBuff = statBuffs["Might Augment"];
 
         if (this.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE && mightAugmentBuff) {
             this.unitProperties.base_attack += roundUnitStat(
@@ -3457,7 +3459,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
-        const sniperAugmentBuff = this.getBuff("Sniper Augment");
+        const sniperAugmentBuff = statBuffs["Sniper Augment"];
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && sniperAugmentBuff) {
             const buffProperties = this.getBuffProperties(sniperAugmentBuff.getName());
             if (buffProperties?.length === 2) {
@@ -3477,7 +3479,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // off the INITIAL shot_distance (not the Sniper-Augment-boosted value above), so it doesn't compound with
         // Sniper Augment. This pushes out the range-falloff threshold (attack_handler.getRangeAttackDivisor)
         // rather than removing falloff entirely (which is what it used to do).
-        const farsightQuiverBuff = this.getBuff("Farsight Quiver");
+        const farsightQuiverBuff = statBuffs["Farsight Quiver"];
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && farsightQuiverBuff) {
             this.unitProperties.shot_distance += roundUnitStat(
                 (this.initialUnitProperties.shot_distance / 100) * farsightQuiverBuff.getPower(),
@@ -3498,11 +3500,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // ARTIFACTS: attack. Flat bonuses first, then percentage bonuses off the running base_attack.
-        const keenBladeBuff = this.getBuff("Keen Blade");
+        const keenBladeBuff = statBuffs["Keen Blade"];
         if (keenBladeBuff) {
             this.unitProperties.base_attack += keenBladeBuff.getPower();
         }
-        const berserkersBondAttackBuff = this.getBuff("Berserkers Bond");
+        const berserkersBondAttackBuff = statBuffs["Berserkers Bond"];
         if (berserkersBondAttackBuff) {
             this.unitProperties.base_attack += berserkersBondAttackBuff.getPower();
         }
@@ -3510,17 +3512,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Warlord's Edge: +% attack as an ADDITIONAL stat (attack_mod), not folded into base_attack — so it never
         // compounds with the Sharpened Weapons aura multiplier and isn't amplified by base_attack-derived effects
         // (Riot/Weakness). Capture 15% of base here (pre-aura); apply into attack_mod after those overwrites below.
-        const warlordsEdgeBuff = this.getBuff("Warlords Edge");
+        const warlordsEdgeBuff = statBuffs["Warlords Edge"];
         const warlordsEdgeAttackBonus = warlordsEdgeBuff
             ? roundUnitStat((this.unitProperties.base_attack / 100) * warlordsEdgeBuff.getPower(), 2)
             : 0;
-        const huntersLongbowAttackBuff = this.getBuff("Hunters Longbow");
+        const huntersLongbowAttackBuff = statBuffs["Hunters Longbow"];
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && huntersLongbowAttackBuff) {
             // Flat additional attack (NOT a percent of base attack) for ranged units.
             const longbowAttackFlat = parseInt(this.getBuffProperties("Hunters Longbow")[0] || "0", 10);
             this.unitProperties.base_attack += longbowAttackFlat;
         }
-        const pendantOfVitalityAttackBuff = this.getBuff("Pendant of Vitality");
+        const pendantOfVitalityAttackBuff = statBuffs["Pendant of Vitality"];
         if (pendantOfVitalityAttackBuff) {
             // parseFloat (not parseInt) so a fractional penalty like 12.5% applies exactly rather than truncating to 12.
             const pendantAttackPenaltyPercent = parseFloat(this.getBuffProperties("Pendant of Vitality")[1] || "0");
@@ -3544,7 +3546,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // still shows 2-3" report). The transform is idempotent and non-stacking, and on the server /
         // sandbox the label stays in lockstep with the object, so this only corrects the display path.
         const appliedBuffLabels = this.unitProperties.applied_buffs ?? [];
-        const blessed = !!this.getBuff("Blessing") || appliedBuffLabels.includes("Blessing");
+        const blessed = !!statBuffs["Blessing"] || appliedBuffLabels.includes("Blessing");
         const roared = !!battleRoarBuff || appliedBuffLabels.includes("Battle Roar");
         // Curse is Blessing's mirror: every roll drops to the MINIMUM, so a 2-4 attacker reads 2-2. Same
         // dual read of object + DISPLAY list, for the same reason (ranked mirrors debuff names but never
@@ -3564,8 +3566,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.attack_damage_max = this.unitProperties.attack_damage_min;
         }
 
-        const riotBuff = this.getBuff("Riot");
-        const massRiotBuff = this.getBuff("Mass Riot");
+        const riotBuff = statBuffs["Riot"];
+        const massRiotBuff = statBuffs["Mass Riot"];
         if (riotBuff) {
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * riotBuff.getPower()) / 100;
         } else if (massRiotBuff) {

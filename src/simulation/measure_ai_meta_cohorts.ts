@@ -880,6 +880,8 @@ export interface IAiMetaWorkerPoolStats {
 export interface IAiMetaWorkerPoolOptions {
     recycleAfterPairs?: number;
     beforeWorkerStart?: () => void;
+    /** Alternate worker entry used by lifecycle tests; production always uses the real cohort worker. */
+    workerUrl?: URL;
 }
 
 export async function runAiMetaWorkerPool(
@@ -895,7 +897,7 @@ export async function runAiMetaWorkerPool(
     }
     const total = options.games / AI_META_GAMES_PER_MATCHUP;
     const poolSize = Math.max(1, Math.min(Math.floor(concurrency), total));
-    const workerUrl = new URL("./ai_meta_cohorts_worker.ts", import.meta.url);
+    const workerUrl = workerPoolOptions.workerUrl ?? new URL("./ai_meta_cohorts_worker.ts", import.meta.url);
     const workerEnvironment = sanitizedAiMetaEnvironment(process.env, fightProfile);
     return new Promise<IAiMetaWorkerPoolStats>((resolvePromise, rejectPromise) => {
         const workers = new Set<Worker>();

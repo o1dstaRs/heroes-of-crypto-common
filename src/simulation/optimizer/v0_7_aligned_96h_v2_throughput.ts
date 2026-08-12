@@ -452,7 +452,18 @@ function sha256(value: string | Buffer): string {
 
 function fingerprintSeedSet(seeds: readonly number[]): string {
     const hash = createHash("sha256");
-    seeds.forEach((seed) => hash.update(`${seed}\n`));
+    // Updating the native hash once per seed crosses the JS/native boundary more than a million
+    // times for the frozen source reservation. Chunking the exact same newline-delimited bytes
+    // retains the pinned digest while making cold manifest verification materially cheaper.
+    const chunkSize = 8_192;
+    for (let start = 0; start < seeds.length; start += chunkSize) {
+        hash.update(
+            seeds
+                .slice(start, start + chunkSize)
+                .map((seed) => `${seed}\n`)
+                .join(""),
+        );
+    }
     return hash.digest("hex");
 }
 
@@ -751,6 +762,7 @@ function diagnosticPlanFromSeeds(seeds: readonly number[]): IV07AlignedV2Injecte
 // The cached object is exactly diagnosticPlanFromSeeds' output (itself fingerprint-pinned), so
 // this cannot change any derived digest.
 const cachedLegacyDiagnosticPlans = new Map<string, IV07AlignedV2InjectedSeedPlan>();
+const cachedV08DiagnosticPlans = new Map<string, IV08AlignedV1InjectedSeedPlan>();
 
 function cachedLegacyDiagnosticPlan(sourceManifestBytes: Buffer): IV07AlignedV2InjectedSeedPlan {
     const key = sha256(sourceManifestBytes);
@@ -767,22 +779,27 @@ export function buildV07AlignedV2ThroughputDiagnosticPlan(sourceManifestBytes: B
 }
 
 export function buildV08AlignedV1ThroughputDiagnosticPlan(sourceManifestBytes: Buffer): IV08AlignedV1InjectedSeedPlan {
-    const legacy = cachedLegacyDiagnosticPlan(sourceManifestBytes);
-    const plan: IV08AlignedV1InjectedSeedPlan = {
-        schemaVersion: 1,
-        artifactKind: "v0_8_aligned_96h_v1_seed_plan",
-        versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
-        panelId: "v0.8-aligned-v1-throughput-diagnostic-6144",
-        purpose: legacy.purpose,
-        scenariosPerCell: legacy.scenariosPerCell,
-        denysetSha256: legacy.denysetSha256,
-        pairs: structuredClone(legacy.pairs),
-    };
-    validateV08AlignedV1SeedPlan(plan);
-    if (fingerprintV08AlignedV1SeedPlan(plan) !== V08_ALIGNED_V1_THROUGHPUT_DIAGNOSTIC_PLAN_SHA256) {
-        throw new Error("v0.8 throughput diagnostic plan drifted from its profile-bound content address");
+    const key = sha256(sourceManifestBytes);
+    let plan = cachedV08DiagnosticPlans.get(key);
+    if (!plan) {
+        const legacy = cachedLegacyDiagnosticPlan(sourceManifestBytes);
+        plan = {
+            schemaVersion: 1,
+            artifactKind: "v0_8_aligned_96h_v1_seed_plan",
+            versionProfile: cloneAligned96hVersionProfile(V08_ALIGNED_96H_V1_VERSION_PROFILE),
+            panelId: "v0.8-aligned-v1-throughput-diagnostic-6144",
+            purpose: legacy.purpose,
+            scenariosPerCell: legacy.scenariosPerCell,
+            denysetSha256: legacy.denysetSha256,
+            pairs: structuredClone(legacy.pairs),
+        };
+        validateV08AlignedV1SeedPlan(plan);
+        if (fingerprintV08AlignedV1SeedPlan(plan) !== V08_ALIGNED_V1_THROUGHPUT_DIAGNOSTIC_PLAN_SHA256) {
+            throw new Error("v0.8 throughput diagnostic plan drifted from its profile-bound content address");
+        }
+        cachedV08DiagnosticPlans.set(key, plan);
     }
-    return plan;
+    return structuredClone(plan);
 }
 
 export function buildV07AlignedV2ThroughputSeedReceipt(sourceManifestBytes: Buffer): {
@@ -875,11 +892,10 @@ export function validateV08AlignedV1ThroughputSeedReceipt(
     return value as unknown as IV08AlignedV1ThroughputSeedReceipt;
 }
 
-export function buildV07AlignedV2ThroughputBatchPlan(
+function buildV07AlignedV2ThroughputBatchPlanFromValidated(
     plan: IV07AlignedV2InjectedSeedPlan,
     batchIndex: number,
 ): IV07AlignedV2InjectedSeedPlan {
-    validateV07AlignedV2SeedPlan(plan);
     requireInteger(batchIndex, "batchIndex");
     if (
         plan.scenariosPerCell !== V07_ALIGNED_V2_THROUGHPUT_SCENARIOS_PER_CELL ||
@@ -904,11 +920,18 @@ export function buildV07AlignedV2ThroughputBatchPlan(
     return batch;
 }
 
-export function buildV08AlignedV1ThroughputBatchPlan(
+export function buildV07AlignedV2ThroughputBatchPlan(
+    plan: IV07AlignedV2InjectedSeedPlan,
+    batchIndex: number,
+): IV07AlignedV2InjectedSeedPlan {
+    validateV07AlignedV2SeedPlan(plan);
+    return buildV07AlignedV2ThroughputBatchPlanFromValidated(plan, batchIndex);
+}
+
+function buildV08AlignedV1ThroughputBatchPlanFromValidated(
     plan: IV08AlignedV1InjectedSeedPlan,
     batchIndex: number,
 ): IV08AlignedV1InjectedSeedPlan {
-    validateV08AlignedV1SeedPlan(plan);
     requireInteger(batchIndex, "batchIndex");
     if (
         plan.scenariosPerCell !== V07_ALIGNED_V2_THROUGHPUT_SCENARIOS_PER_CELL ||
@@ -932,6 +955,14 @@ export function buildV08AlignedV1ThroughputBatchPlan(
     };
     validateV08AlignedV1SeedPlan(batch);
     return batch;
+}
+
+export function buildV08AlignedV1ThroughputBatchPlan(
+    plan: IV08AlignedV1InjectedSeedPlan,
+    batchIndex: number,
+): IV08AlignedV1InjectedSeedPlan {
+    validateV08AlignedV1SeedPlan(plan);
+    return buildV08AlignedV1ThroughputBatchPlanFromValidated(plan, batchIndex);
 }
 
 function legacyGeometryPlan(plan: IV08AlignedV1InjectedSeedPlan): IV07AlignedV2InjectedSeedPlan {
@@ -1598,12 +1629,12 @@ function expectedBatchShards(
 
 function expectedV08BatchShards(
     request: IV08AlignedV1ThroughputRequest,
-    plan: IV08AlignedV1InjectedSeedPlan,
+    plan: IV07AlignedV2InjectedSeedPlan,
     binding: IV08AlignedV1CandidateBinding,
 ): IV07AlignedV2CheckpointShardSpec[] {
     return buildAligned96hCheckpointShardSpecs({
         runFingerprint: request.runFingerprint,
-        seedPlan: legacyGeometryPlan(plan),
+        seedPlan: plan,
         binding,
         maxScenarioPairsPerShard: request.geometry.maxScenarioPairsPerShard,
     });
@@ -1734,14 +1765,17 @@ function replayAlignedThroughputEvidence(
         );
         assertExactInventory(batchDirectory, ["batch.json", "plan.json", "shards"], `throughput batch ${batchIndex}`);
         const expectedPlan = v08
-            ? buildV08AlignedV1ThroughputBatchPlan(plan as IV08AlignedV1InjectedSeedPlan, batchIndex)
-            : buildV07AlignedV2ThroughputBatchPlan(plan as IV07AlignedV2InjectedSeedPlan, batchIndex);
+            ? buildV08AlignedV1ThroughputBatchPlanFromValidated(plan as IV08AlignedV1InjectedSeedPlan, batchIndex)
+            : buildV07AlignedV2ThroughputBatchPlanFromValidated(plan as IV07AlignedV2InjectedSeedPlan, batchIndex);
         const batchPlanRef = artifactRef(`batches/${batchDirectoryName(batchIndex)}/plan.json`, expectedPlan);
         const batchPlan = readArtifact(root, batchPlanRef, `throughput batch ${batchIndex} plan`) as
             IV07AlignedV2InjectedSeedPlan | IV08AlignedV1InjectedSeedPlan;
         if (canonicalV07AlignedV2Json(batchPlan) !== canonicalV07AlignedV2Json(expectedPlan)) {
             throw new Error(`throughput batch ${batchIndex} plan is not the balanced deterministic partition`);
         }
+        const executionPlan = v08
+            ? legacyGeometryPlan(batchPlan as IV08AlignedV1InjectedSeedPlan)
+            : (batchPlan as IV07AlignedV2InjectedSeedPlan);
         const parsedBatch = readArtifact(root, batchRef, `throughput batch ${batchIndex} manifest`);
         const batch = v08
             ? validateBatchManifest(
@@ -1755,7 +1789,7 @@ function replayAlignedThroughputEvidence(
         const shards = v08
             ? expectedV08BatchShards(
                   request as IV08AlignedV1ThroughputRequest,
-                  batchPlan as IV08AlignedV1InjectedSeedPlan,
+                  executionPlan,
                   binding as IV08AlignedV1CandidateBinding,
               )
             : expectedBatchShards(
@@ -1797,7 +1831,7 @@ function replayAlignedThroughputEvidence(
                   )(shardDirectory, {
                       shard,
                       binding: binding as IV08AlignedV1CandidateBinding,
-                      seedPlan: legacyGeometryPlan(batchPlan as IV08AlignedV1InjectedSeedPlan),
+                      seedPlan: structuredClone(executionPlan),
                       manifestSha256: ref.manifestSha256,
                   })
                 : (
@@ -1976,15 +2010,18 @@ async function runAlignedThroughputEvidence(
             ensureDirectory(batchDirectory);
             ensureDirectory(shardsDirectory);
             const batchPlan = v08
-                ? buildV08AlignedV1ThroughputBatchPlan(plan as IV08AlignedV1InjectedSeedPlan, batchIndex)
-                : buildV07AlignedV2ThroughputBatchPlan(plan as IV07AlignedV2InjectedSeedPlan, batchIndex);
+                ? buildV08AlignedV1ThroughputBatchPlanFromValidated(plan as IV08AlignedV1InjectedSeedPlan, batchIndex)
+                : buildV07AlignedV2ThroughputBatchPlanFromValidated(plan as IV07AlignedV2InjectedSeedPlan, batchIndex);
+            const executionPlan = v08
+                ? legacyGeometryPlan(batchPlan as IV08AlignedV1InjectedSeedPlan)
+                : (batchPlan as IV07AlignedV2InjectedSeedPlan);
             const batchPlanPath = `batches/${directoryName}/plan.json`;
             const batchPlanRef = artifactRef(batchPlanPath, batchPlan);
             writeCanonical(join(batchDirectory, "plan.json"), batchPlan);
             const shards = v08
                 ? expectedV08BatchShards(
                       request as IV08AlignedV1ThroughputRequest,
-                      batchPlan as IV08AlignedV1InjectedSeedPlan,
+                      executionPlan,
                       binding as IV08AlignedV1CandidateBinding,
                   )
                 : expectedBatchShards(
@@ -2003,12 +2040,10 @@ async function runAlignedThroughputEvidence(
             try {
                 persisted = await mapConcurrentSettled(shards, geometry.concurrentShards, async (shard) => {
                     const auditDirectory = join(auditRoot, `shard-${shard.shardIndex}-${randomUUID()}`);
-                    const executionPlan = v08
-                        ? legacyGeometryPlan(batchPlan as IV08AlignedV1InjectedSeedPlan)
-                        : (batchPlan as IV07AlignedV2InjectedSeedPlan);
+                    const shardExecutionPlan = v08 ? structuredClone(executionPlan) : executionPlan;
                     const evaluation = await evaluateV07AlignedV2Shard({
                         shard,
-                        seedPlan: executionPlan,
+                        seedPlan: shardExecutionPlan,
                         binding,
                         workers: geometry.workersPerShard,
                         auditDirectory,
@@ -2022,11 +2057,11 @@ async function runAlignedThroughputEvidence(
                             `v0.8 throughput live shard ${shard.shardIndex}`,
                         );
                     }
-                    const durable = persistV07AlignedV2ShardEvaluation(shardsDirectory, evaluation, executionPlan);
+                    const durable = persistV07AlignedV2ShardEvaluation(shardsDirectory, evaluation, shardExecutionPlan);
                     const loaded = loadV07AlignedV2PersistedShard(durable.directory, {
                         shard,
                         binding,
-                        seedPlan: executionPlan,
+                        seedPlan: shardExecutionPlan,
                         manifestSha256: durable.manifestSha256,
                     });
                     if (v08) {

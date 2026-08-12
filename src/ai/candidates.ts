@@ -45,10 +45,11 @@ import {
 import {
     FIRE_WALL_ORIENTATIONS,
     fireWallCells,
+    type FireWalls,
     isFireWallableCell,
     normalizeFireWallOrientation,
 } from "../spells/fire_walls";
-import { isSmokeableCell } from "../spells/smoke_clouds";
+import { isSmokeableCell, SmokeClouds } from "../spells/smoke_clouds";
 import { SpellTargetType } from "../spells/spell_properties";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
@@ -66,6 +67,16 @@ const UPPER = PBTypes.TeamVals.UPPER;
 
 const otherTeam = (team: number): number => (team === LOWER ? UPPER : LOWER);
 const isAdjacentCell = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
+const haveAdjacentCells = (left: readonly XY[], right: readonly XY[]): boolean => {
+    for (const leftCell of left) {
+        for (const rightCell of right) {
+            if (isAdjacentCell(leftCell, rightCell)) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
 const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbilityActive("Hidden");
 
 /**
@@ -179,34 +190,31 @@ export interface IRangeCandidateDamage {
     aimTargetDamage: number;
 }
 
-/**
- * Deterministic expected net damage for one authoritative ranged-ray evaluation. Candidate enumeration and
- * independent action qualification share this exact calculation so an engine-valid AOE with greater allied
- * splash is never mislabeled as productive merely because its primary enemy takes damage.
- */
-export function evaluateRangeCandidateDamage(
+interface IPreparedRangeCandidateDamage {
+    attack: number;
+    attackerAbilityPower: number;
+    attackerTeam: number;
+    enemyAbilityPower: number;
+    enemyTeam: number;
+    giantsMaulPower?: number;
+    isPhysicalAoe: boolean;
+    isThroughShot: boolean;
+    reducesBrokenAegis: boolean;
+    secondVolleyMultiplier: number;
+    sharedAbilityMultiplier: number;
+}
+
+/** Attacker-only terms shared by every aim considered during one immutable decision. */
+function prepareRangeCandidateDamage(
     unit: Unit,
     context: IDecisionContext,
-    evaluation: { affectedUnits: Array<Unit[]>; rangeAttackDivisors: number[] },
-    primaryTargetId: string | undefined,
     shots: number,
     isAOE: boolean,
-    aimTargetId = primaryTargetId,
-    attackerAmountAlive = unit.getAmountAlive(),
-): IRangeCandidateDamage {
-    let value = 0;
-    let kill: 0 | 1 = 0;
-    let enemyDamage = 0;
-    let friendlyFireDamage = 0;
-    let primaryTargetDamage = 0;
-    let aimTargetDamage = 0;
-    const counted = new Set<string>();
-    const fightProperties = context.fightProperties;
-    const attackerAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(unit.getTeam()) ?? 0;
-    // Through Shot owns the ranged attack outright when active; Large Caliber / Area Throw use the
-    // separate splash tail. Both are physical AOE for damage purposes, but only the latter applies
-    // Broken Aegis' incoming-damage reduction. Keep this order identical to the authoritative handlers:
-    // ability (and Paralysis), Giant's Maul, target-specific Aegis where applicable, then status resist.
+): IPreparedRangeCandidateDamage {
+    const attackerTeam = unit.getTeam();
+    const enemyTeam = otherTeam(attackerTeam);
+    const attackerAbilityPower = context.fightProperties?.getAdditionalAbilityPowerPerTeam(attackerTeam) ?? 0;
+    const enemyAbilityPower = context.fightProperties?.getAdditionalAbilityPowerPerTeam(enemyTeam) ?? 0;
     const throughShotAbility = unit.getAbility("Through Shot");
     const aoeAbility =
         !throughShotAbility && isAOE ? (unit.getAbility("Area Throw") ?? unit.getAbility("Large Caliber")) : undefined;
@@ -222,18 +230,80 @@ export function evaluateRangeCandidateDamage(
     const giantsMaul = isPhysicalAoe ? unit.getBuff("Giants Maul") : undefined;
     const doubleShotAbility =
         shots > 1 ? (unit.getAbility("Double Shot") ?? unit.getAbility("Crafted Double Shot")) : undefined;
-    // Large Caliber / Area Throw's authoritative AOE tail repeats the same full splash when Double Shot
-    // exists. Ordinary and Through shots scale their second volley by the Double/Crafted ability and
-    // Dual Strike Charm. Through then folds that into its own stack-powered line multiplier.
     const secondVolleyMultiplier = doubleShotAbility
         ? aoeAbility
             ? 1
             : withDualStrikeCharm(unit.calculateAbilityMultiplier(doubleShotAbility, attackerAbilityPower), unit)
         : 0;
+    return {
+        attack: unit.getAttack(),
+        attackerAbilityPower,
+        attackerTeam,
+        enemyAbilityPower,
+        enemyTeam,
+        giantsMaulPower: giantsMaul?.getPower(),
+        isPhysicalAoe,
+        isThroughShot: !!throughShotAbility,
+        reducesBrokenAegis: !!aoeAbility,
+        secondVolleyMultiplier,
+        sharedAbilityMultiplier,
+    };
+}
+
+/**
+ * Deterministic expected net damage for one authoritative ranged-ray evaluation. Candidate enumeration and
+ * independent action qualification share this exact calculation so an engine-valid AOE with greater allied
+ * splash is never mislabeled as productive merely because its primary enemy takes damage.
+ */
+export function evaluateRangeCandidateDamage(
+    unit: Unit,
+    context: IDecisionContext,
+    evaluation: { affectedUnits: Array<Unit[]>; rangeAttackDivisors: number[] },
+    primaryTargetId: string | undefined,
+    shots: number,
+    isAOE: boolean,
+    aimTargetId = primaryTargetId,
+    attackerAmountAlive = unit.getAmountAlive(),
+): IRangeCandidateDamage {
+    return evaluatePreparedRangeCandidateDamage(
+        unit,
+        context,
+        evaluation,
+        primaryTargetId,
+        attackerAmountAlive,
+        aimTargetId,
+        prepareRangeCandidateDamage(unit, context, shots, isAOE),
+    );
+}
+
+function evaluatePreparedRangeCandidateDamage(
+    unit: Unit,
+    context: IDecisionContext,
+    evaluation: { affectedUnits: Array<Unit[]>; rangeAttackDivisors: number[] },
+    primaryTargetId: string | undefined,
+    attackerAmountAlive: number,
+    aimTargetId: string | undefined,
+    prepared: IPreparedRangeCandidateDamage,
+): IRangeCandidateDamage {
+    let value = 0;
+    let kill: 0 | 1 = 0;
+    let enemyDamage = 0;
+    let friendlyFireDamage = 0;
+    let primaryTargetDamage = 0;
+    let aimTargetDamage = 0;
+    const counted = new Set<string>();
+    const fightProperties = context.fightProperties;
+    // Through Shot owns the ranged attack outright when active; Large Caliber / Area Throw use the
+    // separate splash tail. Both are physical AOE for damage purposes, but only the latter applies
+    // Broken Aegis' incoming-damage reduction. Keep this order identical to the authoritative handlers:
+    // ability (and Paralysis), Giant's Maul, target-specific Aegis where applicable, then status resist.
+    // Large Caliber / Area Throw's authoritative AOE tail repeats the same full splash when Double Shot
+    // exists. Ordinary and Through shots scale their second volley by the Double/Crafted ability and
+    // Dual Strike Charm. Through then folds that into its own stack-powered line multiplier.
     // Only Through Shot traverses and damages every ray group. Ordinary attacks and Large Caliber resolve
     // the first impact group; Large Caliber's group already contains its complete 3x3 splash. Counting later
     // screened groups manufactures damage the engine never applies.
-    const groupCount = throughShotAbility
+    const groupCount = prepared.isThroughShot
         ? evaluation.affectedUnits.length
         : Math.min(1, evaluation.affectedUnits.length);
     for (let i = 0; i < groupCount; i += 1) {
@@ -244,30 +314,30 @@ export function evaluateRangeCandidateDamage(
             }
             counted.add(target.getId());
             const minRaw = unit.calculateAttackDamageMin(
-                unit.getAttack(),
+                prepared.attack,
                 target,
                 true,
-                attackerAbilityPower,
+                prepared.attackerAbilityPower,
                 divisor,
                 1,
                 attackerAmountAlive,
             );
             const maxRaw = unit.calculateAttackDamageMax(
-                unit.getAttack(),
+                prepared.attack,
                 target,
                 true,
-                attackerAbilityPower,
+                prepared.attackerAbilityPower,
                 divisor,
                 1,
                 attackerAmountAlive,
             );
             const applyEngineVolleyModifiers = (rawDamage: number, volleyMultiplier = 1): number => {
-                let adjusted = Math.floor(rawDamage * sharedAbilityMultiplier * volleyMultiplier);
-                if (isPhysicalAoe) {
-                    if (giantsMaul) {
-                        adjusted = Math.floor(adjusted * (1 + giantsMaul.getPower() / 100));
+                let adjusted = Math.floor(rawDamage * prepared.sharedAbilityMultiplier * volleyMultiplier);
+                if (prepared.isPhysicalAoe) {
+                    if (prepared.giantsMaulPower !== undefined) {
+                        adjusted = Math.floor(adjusted * (1 + prepared.giantsMaulPower / 100));
                     }
-                    if (aoeAbility) {
+                    if (prepared.reducesBrokenAegis) {
                         const brokenAegis = target.getBuff("Broken Aegis");
                         if (brokenAegis) {
                             adjusted = Math.floor(adjusted * (1 - brokenAegis.getPower() / 100));
@@ -279,22 +349,32 @@ export function evaluateRangeCandidateDamage(
             };
             const firstMin = applyEngineVolleyModifiers(minRaw);
             const firstMax = applyEngineVolleyModifiers(maxRaw);
-            const secondMin = secondVolleyMultiplier ? applyEngineVolleyModifiers(minRaw, secondVolleyMultiplier) : 0;
-            const secondMax = secondVolleyMultiplier ? applyEngineVolleyModifiers(maxRaw, secondVolleyMultiplier) : 0;
+            const secondMin = prepared.secondVolleyMultiplier
+                ? applyEngineVolleyModifiers(minRaw, prepared.secondVolleyMultiplier)
+                : 0;
+            const secondMax = prepared.secondVolleyMultiplier
+                ? applyEngineVolleyModifiers(maxRaw, prepared.secondVolleyMultiplier)
+                : 0;
             const hp = target.getCumulativeHp();
             const firstConditionalDamage = (firstMin + firstMax) / 2;
             const secondConditionalDamage = (secondMin + secondMax) / 2;
-            const defenderAbilityPower = fightProperties?.getAdditionalAbilityPowerPerTeam(target.getTeam()) ?? 0;
+            const targetTeam = target.getTeam();
+            const defenderAbilityPower =
+                targetTeam === prepared.attackerTeam
+                    ? prepared.attackerAbilityPower
+                    : targetTeam === prepared.enemyTeam
+                      ? prepared.enemyAbilityPower
+                      : (fightProperties?.getAdditionalAbilityPowerPerTeam(targetTeam) ?? 0);
             const hitChance =
                 1 - Math.min(100, Math.max(0, unit.calculateMissChance(target, defenderAbilityPower))) / 100;
             const missChance = 1 - hitChance;
             const effective =
-                secondVolleyMultiplier > 0
+                prepared.secondVolleyMultiplier > 0
                     ? hitChance * missChance * Math.min(firstConditionalDamage, hp) +
                       missChance * hitChance * Math.min(secondConditionalDamage, hp) +
                       hitChance * hitChance * Math.min(firstConditionalDamage + secondConditionalDamage, hp)
                     : hitChance * Math.min(firstConditionalDamage, hp);
-            if (target.getTeam() === otherTeam(unit.getTeam())) {
+            if (targetTeam === prepared.enemyTeam) {
                 value += effective;
                 enemyDamage += effective;
                 if (primaryTargetId && target.getId() === primaryTargetId && effective >= hp) {
@@ -336,9 +416,10 @@ export function findBestLegalStationaryRangeAttack(
     hypotheticalSmokeCells?: readonly XY[],
 ): IBestLegalStationaryRangeAttack | undefined {
     const attackHandler = context.attackHandler;
+    const shooterId = shooter.getId();
     if (
         !attackHandler ||
-        !attackHandler.canLandRangeAttack(shooter, context.grid.getEnemyAggrMatrixByUnitId(shooter.getId())) ||
+        !attackHandler.canLandRangeAttack(shooter, context.grid.getEnemyAggrMatrixByUnitId(shooterId)) ||
         !(shooter.getAttackTypeSelection() === RANGE || shooter.getPossibleAttackTypes().includes(RANGE))
     ) {
         return undefined;
@@ -350,28 +431,40 @@ export function findBestLegalStationaryRangeAttack(
     const targets = context.unitsHolder.getAllAllies(enemyTeam).filter((target) => !target.isDead());
     const gridSettings = context.grid.getSettings();
     const matrix = context.matrix;
+    const shooterPosition = shooter.getPosition();
+    const attackerAmountAlive = shooter.getAmountAlive();
     const isThroughShot = shooter.hasAbilityActive("Through Shot");
     const isAOE = shooter.hasAbilityActive("Large Caliber") || shooter.hasAbilityActive("Area Throw");
     const shots = shooter.getAbility("Double Shot") || shooter.getAbility("Crafted Double Shot") ? 2 : 1;
+    const preparedDamage = prepareRangeCandidateDamage(shooter, context, shots, isAOE);
     const forcedTarget = allUnits.get(shooter.getTarget());
     const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
+    const hasCowardice = !isThroughShot && shooter.hasStatusApplied("Cowardice");
+    const shooterCumulativeHp = hasCowardice ? shooter.getCumulativeHp() : 0;
+    // Every edge probe for this shooter uses the same hypothetical cloud. Pack it once instead of rebuilding
+    // an identical Set inside AttackHandler for every visible target edge.
+    const hypotheticalSmokeKeys = hypotheticalSmokeCells?.length
+        ? new Set(hypotheticalSmokeCells.map((cell) => SmokeClouds.key(cell)))
+        : undefined;
     let best: IBestLegalStationaryRangeAttack | undefined;
 
     for (const aimTarget of targets) {
-        if (isHidden(aimTarget) || shooter.cannotAttackUnitId(aimTarget.getId())) continue;
+        const aimTargetId = aimTarget.getId();
+        if (isHidden(aimTarget) || shooter.cannotAttackUnitId(aimTargetId)) continue;
         for (const aimCell of aimTarget.getCells()) {
             for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
                 if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot)) continue;
-                const to = getRangeAttackSideCenter(gridSettings, aimCell, aimSide, shooter.getPosition());
+                const to = getRangeAttackSideCenter(gridSettings, aimCell, aimSide, shooterPosition);
                 const evaluation = attackHandler.evaluateRangeAttack(
                     allUnits,
                     shooter,
-                    shooter.getPosition(),
+                    shooterPosition,
                     to,
                     isThroughShot,
                     false,
                     isAOE,
                     hypotheticalSmokeCells,
+                    hypotheticalSmokeKeys,
                 );
                 const primaryTarget = evaluation.affectedUnits[0]?.[0];
                 if (
@@ -379,30 +472,33 @@ export function findBestLegalStationaryRangeAttack(
                     evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length ||
                     primaryTarget.isDead() ||
                     primaryTarget.getTeam() !== enemyTeam ||
-                    isHidden(primaryTarget) ||
-                    shooter.cannotAttackUnitId(primaryTarget.getId()) ||
-                    (forcedTargetId !== undefined && primaryTarget.getId() !== forcedTargetId) ||
-                    (!isThroughShot &&
-                        shooter.hasStatusApplied("Cowardice") &&
-                        shooter.getCumulativeHp() < primaryTarget.getCumulativeHp()) ||
-                    (!isThroughShot && !isAOE && primaryTarget.getId() !== aimTarget.getId())
+                    isHidden(primaryTarget)
                 ) {
                     continue;
                 }
-                const damage = evaluateRangeCandidateDamage(
+                const primaryTargetId = primaryTarget.getId();
+                if (
+                    shooter.cannotAttackUnitId(primaryTargetId) ||
+                    (forcedTargetId !== undefined && primaryTargetId !== forcedTargetId) ||
+                    (hasCowardice && shooterCumulativeHp < primaryTarget.getCumulativeHp()) ||
+                    (!isThroughShot && !isAOE && primaryTargetId !== aimTargetId)
+                ) {
+                    continue;
+                }
+                const damage = evaluatePreparedRangeCandidateDamage(
                     shooter,
                     context,
                     evaluation,
-                    primaryTarget.getId(),
-                    shots,
-                    isAOE,
-                    aimTarget.getId(),
+                    primaryTargetId,
+                    attackerAmountAlive,
+                    aimTargetId,
+                    preparedDamage,
                 ).value;
                 if (damage > 0 && (!best || damage > best.expectedDamage)) {
                     best = {
                         expectedDamage: damage,
-                        aimTargetId: aimTarget.getId(),
-                        primaryTargetId: primaryTarget.getId(),
+                        aimTargetId,
+                        primaryTargetId,
                         aimCell: { x: aimCell.x, y: aimCell.y },
                         aimSide,
                     };
@@ -621,6 +717,12 @@ class CandidateGenerator {
     private readonly seen = new Set<string>();
     private readonly shared: Pick<ICandidateFeatures, "enemiesNotYetActedFrac" | "alliesNotYetActedFrac" | "lap">;
     private movePathCache?: IReadonlyMovePath;
+    private incumbentSignature?: string;
+    private preparedRangeDamage?: {
+        shots: number;
+        isAOE: boolean;
+        value: IPreparedRangeCandidateDamage;
+    };
     public constructor(unit: Unit, context: IDecisionContext, options: IEnumerateOptions) {
         this.unit = unit;
         this.context = context;
@@ -715,34 +817,45 @@ class CandidateGenerator {
     /** Canonical identity of an action list (field-order independent), for dedupe vs the incumbent. */
     private signature(actions: GameAction[]): string {
         const cell = (c?: XY): string => (c ? `${c.x},${c.y}` : "-");
-        return actions
-            .map((a) => {
-                switch (a.type) {
-                    case "select_attack_type":
-                        return `sel:${a.attackType}`;
-                    case "move_unit":
-                        return `mv:${cell(a.path[a.path.length - 1])}`;
-                    case "melee_attack":
-                        return `ml:${a.targetId}@${cell(a.attackFrom)}`;
-                    case "range_attack":
-                        return `rg:${a.targetId}@${cell(a.aimCell)}/${a.aimSide ?? "-"}`;
-                    case "area_throw_attack":
-                        return `at:${cell(a.targetCell)}`;
-                    case "cast_spell": {
-                        // Fire Wall rotations at one anchor cover different cells and are therefore distinct
-                        // engine actions. Other spells ignore targetOrientation, so keep their historical
-                        // identity stable even if a malformed caller supplies one.
-                        const orientation =
-                            a.spellName === "Fire Wall" ? `/${normalizeFireWallOrientation(a.targetOrientation)}` : "";
-                        return `cs:${a.spellName}>${a.targetId ?? "-"}@${cell(a.targetCell)}${orientation}`;
-                    }
-                    case "obstacle_attack":
-                        return `mn:${cell(a.targetPosition)}@${cell(a.attackFrom)}`;
-                    default:
-                        return a.type;
+        let result = "";
+        for (const action of actions) {
+            let part: string;
+            switch (action.type) {
+                case "select_attack_type":
+                    part = `sel:${action.attackType}`;
+                    break;
+                case "move_unit":
+                    part = `mv:${cell(action.path[action.path.length - 1])}`;
+                    break;
+                case "melee_attack":
+                    part = `ml:${action.targetId}@${cell(action.attackFrom)}`;
+                    break;
+                case "range_attack":
+                    part = `rg:${action.targetId}@${cell(action.aimCell)}/${action.aimSide ?? "-"}`;
+                    break;
+                case "area_throw_attack":
+                    part = `at:${cell(action.targetCell)}`;
+                    break;
+                case "cast_spell": {
+                    // Fire Wall rotations at one anchor cover different cells and are therefore distinct
+                    // engine actions. Other spells ignore targetOrientation, so keep their historical
+                    // identity stable even if a malformed caller supplies one.
+                    const orientation =
+                        action.spellName === "Fire Wall"
+                            ? `/${normalizeFireWallOrientation(action.targetOrientation)}`
+                            : "";
+                    part = `cs:${action.spellName}>${action.targetId ?? "-"}@${cell(action.targetCell)}${orientation}`;
+                    break;
                 }
-            })
-            .join("|");
+                case "obstacle_attack":
+                    part = `mn:${cell(action.targetPosition)}@${cell(action.attackFrom)}`;
+                    break;
+                default:
+                    part = action.type;
+            }
+            result += result ? `|${part}` : part;
+        }
+        return result;
     }
     private push(cand: IEnumeratedCandidate): boolean {
         const sig = this.signature(cand.actions);
@@ -752,6 +865,9 @@ class CandidateGenerator {
         }
         this.seen.add(sig);
         this.candidates.push(cand);
+        if (this.candidates.length === 1) {
+            this.incumbentSignature = sig;
+        }
         return true;
     }
     /**
@@ -762,7 +878,7 @@ class CandidateGenerator {
      */
     private enrichIncumbentCandidate(cand: IEnumeratedCandidate, sig = this.signature(cand.actions)): void {
         const incumbent = this.candidates[0];
-        if (!incumbent || incumbent.kind !== "incumbent" || this.signature(incumbent.actions) !== sig) {
+        if (!incumbent || incumbent.kind !== "incumbent" || this.incumbentSignature !== sig) {
             return;
         }
         if (!this.options.enrichIncumbentMetadata) {
@@ -857,12 +973,23 @@ class CandidateGenerator {
             hasWaterCell: route.hasWaterCell,
         };
     }
-    private meleeCumulativeHpAfterMove(route: IReadonlyWeightedRoute): number | undefined {
+    private meleeCumulativeHpAfterMove(
+        route: IReadonlyWeightedRoute,
+        hasCowardice: boolean,
+        currentCumulativeHp: number,
+        fireWalls: FireWalls,
+    ): number | undefined {
+        // The projection can only remove a stack through Fire Wall damage. Without a wall it matters to melee
+        // legality solely when Cowardice needs the Made-of-Fire max-HP increase from a lava route. Avoid cloning
+        // every path into a temporary action for the overwhelmingly common wall-free, non-Cowardice decision.
+        if (!fireWalls.size() && (!hasCowardice || !route.hasLavaCell)) {
+            return this.unit.getAmountAlive() > 0 ? currentCumulativeHp : undefined;
+        }
         const action = this.moveAction(route);
         if (action.type !== "move_unit") {
-            return this.unit.getCumulativeHp();
+            return currentCumulativeHp;
         }
-        const projection = projectPostMoveActorAvailability(this.unit, decisionFireWalls(this.context), action);
+        const projection = projectPostMoveActorAvailability(this.unit, fireWalls, action);
         if (!projection.availableAfterMove) {
             return undefined;
         }
@@ -905,12 +1032,10 @@ class CandidateGenerator {
             // stable sort keeps enumeration order on ties -> deterministic.
             const dist = (cell: XY): number =>
                 this.enemies.length
-                    ? Math.min(
-                          ...this.enemies.map((e) => {
-                              const ec = e.getBaseCell();
-                              return Math.abs(cell.x - ec.x) + Math.abs(cell.y - ec.y);
-                          }),
-                      )
+                    ? this.enemies.reduce((best, enemy) => {
+                          const enemyCell = enemy.getBaseCell();
+                          return Math.min(best, Math.abs(cell.x - enemyCell.x) + Math.abs(cell.y - enemyCell.y));
+                      }, Number.POSITIVE_INFINITY)
                     : 0;
             const ranked = routes
                 .map((route, index) => ({ route, index, distance: dist(route.cell) }))
@@ -1008,7 +1133,15 @@ class CandidateGenerator {
         const base = this.unit.getBaseCell();
         const myCells = this.unit.getCells();
         const prefix = meleeAttackTypeSelectionPrefix(this.unit);
+        const hasCowardice = this.unit.hasStatusApplied("Cowardice");
+        const currentCumulativeHp = this.unit.getCumulativeHp();
+        const fireWalls = decisionFireWalls(this.context);
 
+        interface IMeleeTarget {
+            unit: Unit;
+            cells: XY[];
+            damage?: { effective: number; kill: 0 | 1 };
+        }
         interface IMeleePair {
             target: Unit;
             cell: XY;
@@ -1017,17 +1150,21 @@ class CandidateGenerator {
             kill: 0 | 1;
             sourceIndex: number;
         }
+        const targetViews: IMeleeTarget[] = targets.map((target) => ({ unit: target, cells: target.getCells() }));
         const pairs: IMeleePair[] = [];
-        const pair = (target: Unit, cell: XY, route?: IReadonlyWeightedRoute): IMeleePair => ({
-            target,
-            cell,
-            route,
-            ...this.meleeDamage(target),
-            sourceIndex: pairs.length,
-        });
+        const pair = (target: IMeleeTarget, cell: XY, route?: IReadonlyWeightedRoute): IMeleePair => {
+            target.damage ??= this.meleeDamage(target.unit);
+            return {
+                target: target.unit,
+                cell,
+                route,
+                ...target.damage,
+                sourceIndex: pairs.length,
+            };
+        };
         // In-place strikes: enemies already adjacent to the current footprint.
-        for (const e of targets) {
-            if (e.getCells().some((ec) => myCells.some((mc) => isAdjacentCell(mc, ec)))) {
+        for (const e of targetViews) {
+            if (haveAdjacentCells(e.cells, myCells)) {
                 pairs.push(pair(e, base));
             }
         }
@@ -1041,17 +1178,17 @@ class CandidateGenerator {
                 }
                 const moved = route.cell.x !== base.x || route.cell.y !== base.y;
                 const postMoveCumulativeHp = moved
-                    ? this.meleeCumulativeHpAfterMove(route)
-                    : this.unit.getCumulativeHp();
+                    ? this.meleeCumulativeHpAfterMove(route, hasCowardice, currentCumulativeHp, fireWalls)
+                    : currentCumulativeHp;
                 if (postMoveCumulativeHp === undefined) {
                     continue;
                 }
                 const fpCells = this.footprintForCell(route.cell);
-                for (const e of targets) {
-                    if (this.unit.hasStatusApplied("Cowardice") && postMoveCumulativeHp < e.getCumulativeHp()) {
+                for (const e of targetViews) {
+                    if (hasCowardice && postMoveCumulativeHp < e.unit.getCumulativeHp()) {
                         continue;
                     }
-                    if (fpCells.some((mc) => e.getCells().some((ec) => isAdjacentCell(mc, ec)))) {
+                    if (haveAdjacentCells(fpCells, e.cells)) {
                         pairs.push(pair(e, route.cell, route));
                     }
                 }
@@ -1526,15 +1663,25 @@ class CandidateGenerator {
         aimTargetId = primaryTargetId,
         attackerAmountAlive = this.unit.getAmountAlive(),
     ): IRangeCandidateDamage {
-        return evaluateRangeCandidateDamage(
+        if (
+            !this.preparedRangeDamage ||
+            this.preparedRangeDamage.shots !== shots ||
+            this.preparedRangeDamage.isAOE !== isAOE
+        ) {
+            this.preparedRangeDamage = {
+                shots,
+                isAOE,
+                value: prepareRangeCandidateDamage(this.unit, this.context, shots, isAOE),
+            };
+        }
+        return evaluatePreparedRangeCandidateDamage(
             this.unit,
             this.context,
             evaluation,
             primaryTargetId,
-            shots,
-            isAOE,
-            aimTargetId,
             attackerAmountAlive,
+            aimTargetId,
+            this.preparedRangeDamage.value,
         );
     }
     /** Target-local signals already used by v0.5's shot scorer, exposed without changing that scorer. */

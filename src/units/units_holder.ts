@@ -1043,15 +1043,15 @@ export class UnitsHolder {
         return true;
     }
     private appendAuraDefinition(target: AuraRefreshFingerprintValue[], properties: AuraEffectProperties): boolean {
-        const keys = Object.keys(properties).sort();
+        const keys = Object.keys(properties);
         if (
             keys.length !== 6 ||
-            keys[0] !== "desc" ||
-            keys[1] !== "is_buff" ||
-            keys[2] !== "name" ||
-            keys[3] !== "power" ||
-            keys[4] !== "power_type" ||
-            keys[5] !== "range" ||
+            !Object.prototype.propertyIsEnumerable.call(properties, "desc") ||
+            !Object.prototype.propertyIsEnumerable.call(properties, "is_buff") ||
+            !Object.prototype.propertyIsEnumerable.call(properties, "name") ||
+            !Object.prototype.propertyIsEnumerable.call(properties, "power") ||
+            !Object.prototype.propertyIsEnumerable.call(properties, "power_type") ||
+            !Object.prototype.propertyIsEnumerable.call(properties, "range") ||
             typeof properties.name !== "string" ||
             typeof properties.desc !== "string" ||
             typeof properties.range !== "number" ||
@@ -1241,6 +1241,7 @@ export class UnitsHolder {
         // installs a fresh post-refresh fingerprint after this method returns successfully.
         this.auraRefreshFingerprint = undefined;
         this.auraRefreshKnownEmpty = false;
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         // setup the initial empty maps
         this.teamsAuraEffects = new Map();
@@ -1257,49 +1258,46 @@ export class UnitsHolder {
             u.cleanAuraEffects();
 
             const unitAuraEffects = u.getAuraEffects();
+            if (!unitAuraEffects.length) {
+                continue;
+            }
+            const unitTeam = u.getTeam();
+            const oppositeTeam = u.getOppositeTeam();
+            const unitCells = u.getCells();
+            const baseCell = u.getBaseCell();
+            const additionalAbilityPower = fightProperties.getAdditionalAbilityPowerPerTeam(unitTeam);
+            const additionalAuraRange = fightProperties.getAdditionalAuraRangePerTeam(unitTeam);
             for (const uae of unitAuraEffects) {
-                for (const c of u.getCells()) {
-                    uae.toDefault();
-                    const unitAuraEffectProperties = uae.getProperties();
-                    if (unitAuraEffectProperties.power) {
-                        unitAuraEffectProperties.power = u.calculateAuraPower(
-                            uae,
-                            FightStateManager.getInstance()
-                                .getFightProperties()
-                                .getAdditionalAbilityPowerPerTeam(u.getTeam()),
-                        );
-                    }
+                // Aura power, range, recipient team, and source are identical for every cell in this unit's
+                // footprint. Compute them once instead of cloning and recalculating them for every occupied cell
+                // (four times for a large creature). AppliedAuraEffectProperties is refresh-local and read-only.
+                uae.toDefault();
+                const unitAuraEffectProperties = uae.getProperties();
+                if (unitAuraEffectProperties.power) {
+                    unitAuraEffectProperties.power = u.calculateAuraPower(uae, additionalAbilityPower);
+                }
 
-                    const auraRange =
-                        unitAuraEffectProperties.range +
-                        FightStateManager.getInstance().getFightProperties().getAdditionalAuraRangePerTeam(u.getTeam());
+                const auraRange = unitAuraEffectProperties.range + additionalAuraRange;
 
-                    if (auraRange < 0) {
-                        continue;
-                    }
+                if (auraRange < 0) {
+                    continue;
+                }
 
-                    const teamAuraEffects = this.teamsAuraEffects.get(
-                        unitAuraEffectProperties.is_buff ? u.getTeam() : u.getOppositeTeam(),
-                    );
+                const teamAuraEffects = this.teamsAuraEffects.get(
+                    unitAuraEffectProperties.is_buff ? unitTeam : oppositeTeam,
+                );
 
-                    if (!teamAuraEffects) {
-                        continue;
-                    }
+                if (!teamAuraEffects) {
+                    continue;
+                }
 
+                for (const c of unitCells) {
                     const affectedCellKeys = EffectHelper.getAuraCellKeysView(this.gridSettings, c, auraRange);
                     for (const ack of affectedCellKeys) {
-                        if (!teamAuraEffects.has(ack)) {
-                            teamAuraEffects.set(ack, []);
-                        }
-
-                        const teamAuraEffectsPerCell = teamAuraEffects.get(ack);
+                        let teamAuraEffectsPerCell = teamAuraEffects.get(ack);
                         if (!teamAuraEffectsPerCell) {
-                            continue;
-                        }
-
-                        const baseCell = u.getBaseCell();
-                        if (!baseCell) {
-                            continue;
+                            teamAuraEffectsPerCell = [];
+                            teamAuraEffects.set(ack, teamAuraEffectsPerCell);
                         }
 
                         teamAuraEffectsPerCell.push(
@@ -1317,13 +1315,10 @@ export class UnitsHolder {
                 const auraEffectsMap = new Map<string, AppliedAuraEffectProperties>();
                 for (const aae of appliedAuraEffects) {
                     const auraEffectProperties = aae.getAuraEffectProperties();
-                    if (!auraEffectsMap.has(auraEffectProperties.name)) {
+                    const existingAppliedAuraEffect = auraEffectsMap.get(auraEffectProperties.name);
+                    if (!existingAppliedAuraEffect) {
                         auraEffectsMap.set(auraEffectProperties.name, aae);
                     } else {
-                        const existingAppliedAuraEffect = auraEffectsMap.get(auraEffectProperties.name);
-                        if (!existingAppliedAuraEffect) {
-                            continue;
-                        }
                         const existingAuraEffectProperties = existingAppliedAuraEffect.getAuraEffectProperties();
 
                         if (auraEffectProperties.power > existingAuraEffectProperties.power) {

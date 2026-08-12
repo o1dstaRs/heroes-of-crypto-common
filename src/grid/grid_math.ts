@@ -138,46 +138,47 @@ export function getCellsAroundPosition(gridSettings: GridSettings, position: XY)
         return cells;
     }
 
-    const canGoLeft = position.x > gridSettings.getMinX();
-    const canGoRight = position.x < gridSettings.getMaxX();
-    const canGoDown = position.y > gridSettings.getMinY();
-    const canGoUp = position.y < gridSettings.getMaxY();
+    // This routine sits beneath both Unit.getCells and adjacent-cell evaluation, so avoid constructing four
+    // temporary world positions only to immediately map them back to cells. The scalar formulas below are the
+    // exact getCellForPosition transform and still return fresh caller-owned cell objects in legacy order.
+    const minX = gridSettings.getMinX();
+    const maxX = gridSettings.getMaxX();
+    const minY = gridSettings.getMinY();
+    const maxY = gridSettings.getMaxY();
+    const halfStep = gridSettings.getHalfStep();
+    const cellSize = gridSettings.getCellSize();
+    const canGoLeft = position.x > minX;
+    const canGoRight = position.x < maxX;
+    const canGoDown = position.y > minY;
+    const canGoUp = position.y < maxY;
+    const leftCellX = canGoLeft ? Math.floor((position.x - halfStep + maxX) / cellSize) : 0;
+    const rightCellX = canGoRight ? Math.floor((position.x + halfStep + maxX) / cellSize) : 0;
+    const downCellY = canGoDown ? Math.floor((position.y - halfStep) / cellSize) : 0;
+    const upCellY = canGoUp ? Math.floor((position.y + halfStep) / cellSize) : 0;
 
     if (canGoLeft && canGoUp) {
-        const c = getCellForPosition(gridSettings, {
-            x: position.x - gridSettings.getHalfStep(),
-            y: position.y + gridSettings.getHalfStep(),
+        cells.push({
+            x: leftCellX,
+            y: upCellY,
         });
-        if (c) {
-            cells.push(c);
-        }
     }
     if (canGoRight && canGoUp) {
-        const c = getCellForPosition(gridSettings, {
-            x: position.x + gridSettings.getHalfStep(),
-            y: position.y + gridSettings.getHalfStep(),
+        cells.push({
+            x: rightCellX,
+            y: upCellY,
         });
-        if (c) {
-            cells.push(c);
-        }
     }
     if (canGoDown && canGoLeft) {
-        const c = getCellForPosition(gridSettings, {
-            x: position.x - gridSettings.getHalfStep(),
-            y: position.y - gridSettings.getHalfStep(),
+        cells.push({
+            x: leftCellX,
+            y: downCellY,
         });
-        if (c) {
-            cells.push(c);
-        }
     }
     if (canGoDown && canGoRight) {
-        const c = getCellForPosition(gridSettings, {
-            x: position.x + gridSettings.getHalfStep(),
-            y: position.y - gridSettings.getHalfStep(),
+        cells.push({
+            x: rightCellX,
+            y: downCellY,
         });
-        if (c) {
-            cells.push(c);
-        }
     }
 
     return cells;

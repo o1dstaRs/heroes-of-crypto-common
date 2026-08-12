@@ -13,6 +13,7 @@ import { describe, expect, it } from "bun:test";
 
 import { ObstacleType } from "../../src/obstacles/obstacle_type";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { GridSettings } from "../../src/grid/grid_settings";
 import {
     adjustClosestPointSideCenterPoint,
     arePointsConnected,
@@ -95,6 +96,72 @@ describe("grid_math", () => {
             ]),
         ).toEqual({ x: -256, y: 768 });
         expect(getPositionForCells(testGridSettings, [])).toBeUndefined();
+    });
+
+    it("preserves exact around-position cells for seeded fractional, boundary, and malformed inputs", () => {
+        const legacyGetCellsAroundPosition = (
+            settings: GridSettings,
+            position: { x: number; y: number },
+        ): { x: number; y: number }[] => {
+            const cells: { x: number; y: number }[] = [];
+            const canGoLeft = position.x > settings.getMinX();
+            const canGoRight = position.x < settings.getMaxX();
+            const canGoDown = position.y > settings.getMinY();
+            const canGoUp = position.y < settings.getMaxY();
+            const pushCell = (x: number, y: number): void => {
+                cells.push(getCellForPosition(settings, { x, y }));
+            };
+            if (canGoLeft && canGoUp) {
+                pushCell(position.x - settings.getHalfStep(), position.y + settings.getHalfStep());
+            }
+            if (canGoRight && canGoUp) {
+                pushCell(position.x + settings.getHalfStep(), position.y + settings.getHalfStep());
+            }
+            if (canGoDown && canGoLeft) {
+                pushCell(position.x - settings.getHalfStep(), position.y - settings.getHalfStep());
+            }
+            if (canGoDown && canGoRight) {
+                pushCell(position.x + settings.getHalfStep(), position.y - settings.getHalfStep());
+            }
+            return cells;
+        };
+        let randomState = 0x7a11_ce55;
+        const random = (): number => {
+            randomState = (randomState + 0x6d2b79f5) >>> 0;
+            let value = randomState;
+            value = Math.imul(value ^ (value >>> 15), value | 1);
+            value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+            return ((value ^ (value >>> 14)) >>> 0) / 0x1_0000_0000;
+        };
+        const settingsCases = [
+            testGridSettings,
+            new GridSettings(7, 1_000, -50, 500, -500, 1, 1),
+            new GridSettings(17, 1_000, 10, 500, -500, 1, 1),
+            new GridSettings(16, 2_047, 0, 1_023.5, -1_023.5, 1, 1),
+            new GridSettings(31, 997, -300, 498.5, -498.5, 1, 1),
+        ];
+        for (const settings of settingsCases) {
+            const positions = [
+                { x: settings.getMinX(), y: settings.getMinY() },
+                { x: settings.getMaxX(), y: settings.getMaxY() },
+                { x: Number.NaN, y: 0 },
+                { x: 0, y: Number.POSITIVE_INFINITY },
+            ];
+            for (let index = 0; index < 2_000; index++) {
+                const xSpan = settings.getMaxX() - settings.getMinX();
+                const ySpan = settings.getMaxY() - settings.getMinY();
+                positions.push({
+                    x: settings.getMinX() - 512 + random() * (xSpan + 1_024),
+                    y: settings.getMinY() - 512 + random() * (ySpan + 1_024),
+                });
+            }
+
+            for (const position of positions) {
+                expect(getCellsAroundPosition(settings, position)).toEqual(
+                    legacyGetCellsAroundPosition(settings, position),
+                );
+            }
+        }
     });
 
     it("reconstructs a 2x2 footprint center from its baseCell (max corner)", () => {

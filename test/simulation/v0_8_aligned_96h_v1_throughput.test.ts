@@ -352,6 +352,12 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
             versionProfile: V08_ALIGNED_96H_V1_VERSION_PROFILE,
             planSha256: V08_ALIGNED_V1_THROUGHPUT_DIAGNOSTIC_PLAN_SHA256,
         });
+        const cachedClone = buildV08AlignedV1ThroughputSeedReceipt(sourceBytes);
+        const firstSeed = plan.pairs[0]!.seats.candidate_green.setupSeeds[0]!;
+        cachedClone.plan.pairs[0]!.seats.candidate_green.setupSeeds[0] = (firstSeed + 1) >>> 0;
+        const rebuiltFromCache = buildV08AlignedV1ThroughputSeedReceipt(sourceBytes);
+        expect(rebuiltFromCache.receipt).toEqual(receipt);
+        expect(rebuiltFromCache.plan.pairs[0]!.seats.candidate_green.setupSeeds[0]).toBe(firstSeed);
         expect(flattenV08AlignedV1SeedPlan(plan)).toHaveLength(V07_ALIGNED_V2_THROUGHPUT_GAMES);
         expect(request).toMatchObject({
             artifactKind: "v0_8_aligned_96h_v1_throughput_request",

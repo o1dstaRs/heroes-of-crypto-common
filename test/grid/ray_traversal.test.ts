@@ -203,39 +203,43 @@ describe("traceGridRayCells", () => {
             RangeAttackCellSide.UP,
         ];
         let cases = 0;
-        for (let attackerX = 0; attackerX < GS.getGridSize(); attackerX += 1) {
-            for (let attackerY = 0; attackerY < GS.getGridSize(); attackerY += 1) {
-                const start = cellCenter({ x: attackerX, y: attackerY });
-                for (let targetX = 0; targetX < GS.getGridSize(); targetX += 1) {
-                    for (let targetY = 0; targetY < GS.getGridSize(); targetY += 1) {
-                        const targetCell = { x: targetX, y: targetY };
-                        for (const side of sideValues) {
-                            const end = getRangeAttackSideCenter(GS, targetCell, side, start);
-                            assertLegacyEquivalent(start, end);
-                            assertLegacyEquivalent(start, projectLineToFieldEdge(GS, start.x, start.y, end.x, end.y));
-                            cases += 2;
-                        }
+        let uniqueRays = 0;
+        const assertAllTargetRays = (start: XY): void => {
+            // Adjacent target cells share the same physical edge, so their LEFT/RIGHT or UP/DOWN entries
+            // produce the exact same rounded ray. Keep enumerating every legal cell+side case (and retain the
+            // exact census below), but run the differential oracle once per distinct production input.
+            const checkedEndpoints = new Set<string>();
+            const assertUniqueRay = (end: XY): void => {
+                const key = `${Math.round(end.x)},${Math.round(end.y)}`;
+                if (checkedEndpoints.has(key)) return;
+                checkedEndpoints.add(key);
+                uniqueRays += 1;
+                assertLegacyEquivalent(start, end);
+            };
+            for (let targetX = 0; targetX < GS.getGridSize(); targetX += 1) {
+                for (let targetY = 0; targetY < GS.getGridSize(); targetY += 1) {
+                    const targetCell = { x: targetX, y: targetY };
+                    for (const side of sideValues) {
+                        const end = getRangeAttackSideCenter(GS, targetCell, side, start);
+                        assertUniqueRay(end);
+                        assertUniqueRay(projectLineToFieldEdge(GS, start.x, start.y, end.x, end.y));
+                        cases += 2;
                     }
                 }
+            }
+        };
+        for (let attackerX = 0; attackerX < GS.getGridSize(); attackerX += 1) {
+            for (let attackerY = 0; attackerY < GS.getGridSize(); attackerY += 1) {
+                assertAllTargetRays(cellCenter({ x: attackerX, y: attackerY }));
             }
         }
         for (let attackerX = 1; attackerX < GS.getGridSize(); attackerX += 1) {
             for (let attackerY = 1; attackerY < GS.getGridSize(); attackerY += 1) {
-                const start = cellCenter({ x: attackerX - 0.5, y: attackerY - 0.5 });
-                for (let targetX = 0; targetX < GS.getGridSize(); targetX += 1) {
-                    for (let targetY = 0; targetY < GS.getGridSize(); targetY += 1) {
-                        const targetCell = { x: targetX, y: targetY };
-                        for (const side of sideValues) {
-                            const end = getRangeAttackSideCenter(GS, targetCell, side, start);
-                            assertLegacyEquivalent(start, end);
-                            assertLegacyEquivalent(start, projectLineToFieldEdge(GS, start.x, start.y, end.x, end.y));
-                            cases += 2;
-                        }
-                    }
-                }
+                assertAllTargetRays(cellCenter({ x: attackerX - 0.5, y: attackerY - 0.5 }));
             }
         }
         expect(cases).toBe(985_088);
+        expect(uniqueRays).toBe(478_922);
     }, 60_000);
 
     it("preserves the legacy large-unit corner alias cell", () => {

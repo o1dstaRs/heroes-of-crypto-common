@@ -26,7 +26,7 @@ import { traceGridRayCells } from "../../src/grid/ray_traversal";
 import type { IRangeAttackEvaluation } from "../../src/handlers/attack_handler";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
-import { isSmokeableCell } from "../../src/spells/smoke_clouds";
+import { isSmokeableCell, SmokeClouds } from "../../src/spells/smoke_clouds";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import {
@@ -501,7 +501,19 @@ describe("hypothetical/live Smoke differential", () => {
                 shooter.hasAbilityActive("Large Caliber"),
                 hypothetical,
             );
+            const projectedWithPreparedKeys = combat.attackHandler.evaluateRangeAttack(
+                combat.unitsHolder.getAllUnits(),
+                shooter,
+                shooter.getPosition(),
+                aim,
+                shooter.hasAbilityActive("Through Shot"),
+                false,
+                shooter.hasAbilityActive("Large Caliber"),
+                hypothetical,
+                new Set(hypothetical.map((cell) => SmokeClouds.key(cell))),
+            );
             expect(clouds.size()).toBe(liveSizeBefore);
+            expect(evaluationView(projectedWithPreparedKeys)).toEqual(evaluationView(projected));
 
             for (const cell of hypothetical) clouds.add(cell);
             const live = combat.attackHandler.evaluateRangeAttack(

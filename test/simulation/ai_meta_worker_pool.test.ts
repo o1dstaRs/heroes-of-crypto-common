@@ -26,6 +26,10 @@ it("recycles long-lived AI-meta workers without losing pair records", async () =
                 workerStarts += 1;
             },
             recycleAfterPairs: 1,
+            // Pool scheduling/recycling is the behavior under test. The real AI-meta worker already runs a
+            // complete two-battle regression in ai_meta_cohorts.test.ts; repeating four full search battles
+            // here hid a millisecond-scale lifecycle check behind several seconds of unrelated simulation.
+            workerUrl: new URL("../fixtures/ai_meta_worker_pool_fixture.ts", import.meta.url),
         },
     );
 

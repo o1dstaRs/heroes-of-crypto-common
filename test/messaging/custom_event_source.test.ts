@@ -40,14 +40,21 @@ describe("CustomEventSource", () => {
             token: "Bearer token",
         });
         const listener = (event: Event) => listenerEvents.push(event);
+        let resolveMessages!: () => void;
+        const messagesReceived = new Promise<void>((resolve) => {
+            resolveMessages = resolve;
+        });
 
         source.onopen = () => {
             opened += 1;
         };
-        source.onmessage = (event) => messages.push(event);
+        source.onmessage = (event) => {
+            messages.push(event);
+            if (messages.length === 3) resolveMessages();
+        };
         source.addEventListener("topic", listener);
 
-        await wait(20);
+        await messagesReceived;
 
         source.removeEventListener("topic", listener);
         source.close();
@@ -86,15 +93,20 @@ describe("CustomEventSource", () => {
             reconnectDelay: 1,
             maxReconnectAttempts: 1,
         });
+        let resolveReconnected!: () => void;
+        const reconnected = new Promise<void>((resolve) => {
+            resolveReconnected = resolve;
+        });
 
         source.onreconnect = () => {
             reconnects += 1;
         };
+        source.onopen = resolveReconnected;
         source.onerror = (error) => {
             errors.push(error.message);
         };
 
-        await wait(30);
+        await reconnected;
 
         expect(fetchCount).toBe(2);
         expect(reconnects).toBe(1);
@@ -114,12 +126,17 @@ describe("CustomEventSource", () => {
             reconnectDelay: 1,
             maxReconnectAttempts: 1,
         });
+        let resolveExhausted!: () => void;
+        const exhausted = new Promise<void>((resolve) => {
+            resolveExhausted = resolve;
+        });
 
         source.onerror = (error) => {
             errors.push(error.message);
+            if (error.message === "Max reconnection attempts reached") resolveExhausted();
         };
 
-        await wait(30);
+        await exhausted;
 
         expect(errors).toContain("No internet connection");
         expect(errors).toContain("Max reconnection attempts reached");
@@ -141,8 +158,4 @@ function streamResponse(chunks: string[]): Response {
         }),
         { status: 200, statusText: "OK" },
     );
-}
-
-function wait(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -23,7 +23,7 @@ import type { AuraEffect } from "../effects/aura_effect";
 import { AbilityPowerType } from "../abilities/ability_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import type { GridSettings } from "../grid/grid_settings";
-import type { IReadonlyKnownPaths, IReadonlyWeightedRoute } from "../grid/path_definitions";
+import type { IReadonlyKnownPaths, IReadonlyMovePath, IReadonlyWeightedRoute } from "../grid/path_definitions";
 import { DecisionPathCatalog, type IDecisionPathSource } from "./decision_path_catalog";
 import { buildFirstMeleeTargetLayers, buildMeleeTargetLayers } from "./internal/melee_target_layers";
 
@@ -1348,7 +1348,9 @@ export function auraCoverageScore(
         if (range < 0) {
             continue;
         }
-        const cellKeys = new Set(EffectHelper.getAuraCellKeysView(gridSettings, fromCell, range));
+        // Geometry and membership are cached together. Candidate scoring revisits the same cell/range pairs many
+        // times during rollouts, so it pays the Set construction once instead of once per scoring call.
+        const cellKeys = EffectHelper.getAuraCellKeyMembershipView(gridSettings, fromCell, range);
         const targets = aura.getProperties().is_buff ? allies : enemies;
         for (const t of targets) {
             const bc = t.getBaseCell();
@@ -1473,6 +1475,7 @@ function doFindTarget(
         unit,
         matrix,
     );
+    const canDeferCanonicalMovePath = DecisionPathCatalog.canDeferCanonicalMovePath(pathHelper, grid, unit, matrix);
     // closest enemy unit
     let closestTarget: HoCMath.XY | undefined;
     let closestTargetDistance = Infinity;
@@ -1502,23 +1505,36 @@ function doFindTarget(
         unit.hasAbilityActive("In Its Own World"),
     );
 
-    const actualMovePath = pathHelper.getMovePath(
-        unitCell,
-        matrix,
-        unit.getSteps(),
-        grid.getAggrMatrixByTeam(
-            unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER,
-        ),
-        unit.canFly(),
-        unit.isSmallSize(),
-        unit.canTraverseLava(),
-        unit.hasAbilityActive("In Its Own World"),
-    );
+    let actualMovePath: IReadonlyMovePath | undefined;
+    const getActualMovePath = (): IReadonlyMovePath => {
+        if (actualMovePath === undefined) {
+            actualMovePath = pathHelper.getMovePath(
+                unitCell,
+                matrix,
+                unit.getSteps(),
+                grid.getAggrMatrixByTeam(
+                    unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER,
+                ),
+                unit.canFly(),
+                unit.isSmallSize(),
+                unit.canTraverseLava(),
+                unit.hasAbilityActive("In Its Own World"),
+            );
+        }
+        return actualMovePath;
+    };
+    // Preserve the public/custom-helper call and RNG contract exactly. A branded production catalog has already
+    // proved that native packed-board traversal cannot enter captureRoute's random tie branch, so its finite path
+    // may be deferred until an action actually consumes it. Rollout turns that find an immediately reachable
+    // attack from the 100-step discovery path avoid building a second path that would otherwise be discarded.
+    if (!canDeferCanonicalMovePath) {
+        getActualMovePath();
+    }
 
     let movePath = infiniteMovePath;
 
     if (debug) {
-        console.log("just for debug: " + actualMovePath.knownPaths.size + " " + infiniteMovePath.knownPaths.size);
+        console.log("just for debug: " + getActualMovePath().knownPaths.size + " " + infiniteMovePath.knownPaths.size);
         grid.print(unit.getId());
     }
 
@@ -1541,7 +1557,7 @@ function doFindTarget(
         if (debug) {
             console.log("Checking actual path");
         }
-        movePath = actualMovePath;
+        movePath = getActualMovePath();
         for (let y = 0; y < numRows; y++) {
             for (let x = 0; x < numCols; x++) {
                 const element = HoCMath.matrixElementOrDefault(matrix, x, y, 0);
@@ -1919,7 +1935,7 @@ function doFindTarget(
                 ? resultRoute?.route[resultRouteIndex]
                 : resultRoute?.route.at(-1),
             undefined,
-            actualMovePath.knownPaths,
+            getActualMovePath().knownPaths,
         );
     }
 
@@ -1981,7 +1997,7 @@ function doFindTarget(
         AIActionType.MOVE,
         toMoveTo,
         undefined,
-        usedInfinitPath ? actualMovePath.knownPaths : movePath.knownPaths,
+        usedInfinitPath ? getActualMovePath().knownPaths : movePath.knownPaths,
     );
 }
 

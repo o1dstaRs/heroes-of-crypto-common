@@ -131,9 +131,14 @@ describe("Unit", () => {
 
             expect(unit.hasAbilityActive("Dodge")).toBe(false);
             expect(unit.getAbility("Dodge")).toBeUndefined();
+            // An absent ability stays absent under Break as well. This pins the fast lookup path that first
+            // establishes absence, where consulting Break cannot change the answer.
+            expect(unit.hasAbilityActive("Missing Ability")).toBe(false);
+            expect(unit.getAbility("Missing Ability")).toBeUndefined();
             expect(unit.getAbilities()).toEqual([]);
             expect(unit.getAuraEffects()).toEqual([]);
             expect(unit.getAbilityPower("Dodge")).toBe(0);
+            expect(unit.getAbilityPower("Missing Ability")).toBe(0);
             expect(unit.getSpellsCount()).toBe(0);
 
             unit.deleteAllEffects();
@@ -327,6 +332,20 @@ describe("Unit", () => {
 
             expect(unit.getMaxHp()).toBe(125);
             expect(unit.getHp()).toBe(125);
+        });
+
+        it("keeps first-match buff semantics while indexing one stat refresh", () => {
+            const unit = createTestUnit({ attack: 100 });
+            const first = spell("System", "Might Augment");
+            const duplicate = spell("System", "Might Augment");
+            first.setPower(10);
+            duplicate.setPower(90);
+            unit.applyBuff(first);
+            unit.applyBuff(duplicate);
+
+            expect(unit.getBuff("Might Augment")?.getPower()).toBe(10);
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(unit.getBaseAttack()).toBe(110);
         });
 
         it("keeps a ranked snapshot's max HP verbatim — the pendant must not re-boost an already-boosted cap", () => {

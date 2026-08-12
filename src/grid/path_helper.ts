@@ -1318,11 +1318,11 @@ export class PathHelper {
         };
 
         const indexedNeighbors: XY[] | undefined = usesIndexedStepsRemaining ? [] : undefined;
-        while (queue.length) {
-            const curWeightedRoute = queue.shift();
-            if (!curWeightedRoute) {
-                break;
-            }
+        // FIFO traversal never removes or reorders queued entries. A read cursor preserves that order while
+        // avoiding Array.shift's repeated tail compaction on every visited board cell.
+        let queueIndex = 0;
+        while (queueIndex < queue.length) {
+            const curWeightedRoute = queue[queueIndex++];
 
             const cur = curWeightedRoute.cell;
 

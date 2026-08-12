@@ -63,6 +63,9 @@ const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
+// This regression intentionally runs three complete max-lap matches. Leave enough wall-clock headroom when
+// a parallel simulation campaign saturates the host; the match count and exact action-log checks stay intact.
+const FULL_MATCH_REGRESSION_TIMEOUT_MS = 10_000;
 
 function setupMountainDecision(
     enemyCell: { x: number; y: number },
@@ -860,21 +863,25 @@ describe("v0.8 candidate policy", () => {
         expect(prioritizeV08Decision(unit, context, directCombat)).toBe(directCombat);
     });
 
-    it("changes only the candidate seat and keeps the promoted profile mountain-free", () => {
-        const seed = 20260718;
-        const roster = buildRoster(makeRng(seed));
-        const config = { redVersion: "v0.6", roster, seed, maxLaps: 60 } as const;
-        const baseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
-        const candidate = runMatch({ ...structuredClone(config), greenVersion: "v0.8" });
-        const repeatedBaseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
+    it(
+        "changes only the candidate seat and keeps the promoted profile mountain-free",
+        () => {
+            const seed = 20260718;
+            const roster = buildRoster(makeRng(seed));
+            const config = { redVersion: "v0.6", roster, seed, maxLaps: 60 } as const;
+            const baseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
+            const candidate = runMatch({ ...structuredClone(config), greenVersion: "v0.8" });
+            const repeatedBaseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
 
-        expect(candidate.outcome.green.version).toBe("v0.8");
-        expect(repeatedBaseline).toEqual(baseline);
-        expect(candidate).not.toEqual(baseline);
-        expect(
-            candidate.actions
-                .filter((action) => action.side === "green")
-                .filter((action) => action.actionType === "obstacle_attack"),
-        ).toEqual([]);
-    });
+            expect(candidate.outcome.green.version).toBe("v0.8");
+            expect(repeatedBaseline).toEqual(baseline);
+            expect(candidate).not.toEqual(baseline);
+            expect(
+                candidate.actions
+                    .filter((action) => action.side === "green")
+                    .filter((action) => action.actionType === "obstacle_attack"),
+            ).toEqual([]);
+        },
+        FULL_MATCH_REGRESSION_TIMEOUT_MS,
+    );
 });

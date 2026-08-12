@@ -152,6 +152,7 @@ export class AttackHandler {
         isSelection = false,
         isAOEShot = false,
         hypotheticalSmokeCells?: readonly HoCMath.XY[],
+        preparedHypotheticalSmokeKeys?: ReadonlySet<number>,
     ): IRangeAttackEvaluation {
         // Through Shot keeps travelling past the aimed target to the edge of the field, so it can
         // hit every unit standing on that line - not just the ones up to the hovered target.
@@ -175,6 +176,7 @@ export class AttackHandler {
             isSelection,
             isAOEShot,
             hypotheticalSmokeCells,
+            preparedHypotheticalSmokeKeys,
         );
     }
     /** Ordered, de-duplicated obstacle cells crossed before the supplied aim point. */
@@ -2873,6 +2875,7 @@ export class AttackHandler {
         isSelection = false,
         isAOEShot = false,
         hypotheticalSmokeCells?: readonly HoCMath.XY[],
+        preparedHypotheticalSmokeKeys?: ReadonlySet<number>,
     ): IRangeAttackEvaluation {
         const affectedUnitIds: string[] = [];
         const affectedUnits: Array<Unit[]> = [];
@@ -2887,9 +2890,11 @@ export class AttackHandler {
         const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
         // AI planning can project a not-yet-cast cloud without touching FightProperties. Hypothetical cells
         // supplement (rather than replace) live smoke, so the same evaluator is truthful in later laps too.
-        const hypotheticalSmokeKeys = hypotheticalSmokeCells?.length
-            ? new Set(hypotheticalSmokeCells.map((cell) => SmokeClouds.key(cell)))
-            : undefined;
+        const hypotheticalSmokeKeys =
+            preparedHypotheticalSmokeKeys ??
+            (hypotheticalSmokeCells?.length
+                ? new Set(hypotheticalSmokeCells.map((cell) => SmokeClouds.key(cell)))
+                : undefined);
         let pathCrossedSmoke = false;
 
         for (const cellToPosition of cellsToPositions) {

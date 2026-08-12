@@ -22,10 +22,11 @@ import type { UnitsHolder } from "../../src/units/units_holder";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
+const numberBitsView = new DataView(new ArrayBuffer(8));
+
 function numberBits(value: number): string {
-    const view = new DataView(new ArrayBuffer(8));
-    view.setFloat64(0, value, false);
-    return view.getBigUint64(0, false).toString(16).padStart(16, "0");
+    numberBitsView.setFloat64(0, value, false);
+    return numberBitsView.getBigUint64(0, false).toString(16).padStart(16, "0");
 }
 
 function exactValue(value: unknown): unknown {
@@ -56,11 +57,7 @@ function exactValue(value: unknown): unknown {
     };
 }
 
-function semanticBattleState(
-    unitsHolder: UnitsHolder,
-    grid: ReturnType<typeof createCombatTestContext>["grid"],
-): unknown {
-    const snapshot = snapshotBattle(unitsHolder, grid, FightStateManager.getInstance().getFightProperties());
+function semanticBattleState(snapshot: ReturnType<typeof snapshotBattle>): unknown {
     const holder = { ...snapshot.holder };
     delete holder.auraRefreshFingerprint;
 
@@ -91,11 +88,11 @@ function compareWithForcedFullRefresh(
 
     const changed = unitsHolder.refreshAuraEffectsIfNeeded();
     const candidateAfter = snapshotBattle(unitsHolder, grid, fightProperties);
-    const candidateState = semanticBattleState(unitsHolder, grid);
+    const candidateState = semanticBattleState(candidateAfter);
 
     restoreBattle(before, unitsHolder, grid, fightProperties);
     unitsHolder.refreshAuraEffectsForAllUnits();
-    const oracleState = semanticBattleState(unitsHolder, grid);
+    const oracleState = semanticBattleState(snapshotBattle(unitsHolder, grid, fightProperties));
     expect(candidateState).toEqual(oracleState);
 
     restoreBattle(candidateAfter, unitsHolder, grid, fightProperties);
@@ -220,6 +217,18 @@ describe("aura refresh dirty invalidation", () => {
         expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
         expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
 
+        delete defaultProperties.experimental;
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(false);
+
+        // Object.keys only saw enumerable keys in the original exact-shape check. Keep failing closed when a
+        // required field exists but is hidden and an enumerable extra field takes its place in the key count.
+        Object.defineProperty(defaultProperties, "is_buff", { enumerable: false });
+        defaultProperties.experimental = 1;
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
+
+        Object.defineProperty(defaultProperties, "is_buff", { enumerable: true });
         delete defaultProperties.experimental;
         expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
         expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(false);

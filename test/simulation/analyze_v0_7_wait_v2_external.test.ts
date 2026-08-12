@@ -11,7 +11,7 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -30,9 +30,20 @@ import {
 } from "../../src/simulation/v0_7_wait_v2_powered";
 
 const temporaryRoots: string[] = [];
+let sharedExecutionRoot: string;
+let sharedExecutionRepo: { repo: string; commit: string };
+
+beforeAll(() => {
+    sharedExecutionRoot = mkdtempSync(join(tmpdir(), "wait-v2-external-execution-"));
+    sharedExecutionRepo = createExecutionRepo(sharedExecutionRoot);
+});
 
 afterEach(() => {
     for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+afterAll(() => {
+    rmSync(sharedExecutionRoot, { recursive: true, force: true });
 });
 
 function sha256(value: string): string {
@@ -203,7 +214,7 @@ interface IFixture {
 function createFixture(): IFixture {
     const root = mkdtempSync(join(tmpdir(), "wait-v2-external-"));
     temporaryRoots.push(root);
-    const { repo: executionRepo, commit } = createExecutionRepo(root);
+    const { repo: executionRepo, commit } = sharedExecutionRepo;
     const runDir = join(root, "run");
     mkdirSync(runDir, { recursive: true });
     const runner = "#!/bin/sh\nexit 0\n";
