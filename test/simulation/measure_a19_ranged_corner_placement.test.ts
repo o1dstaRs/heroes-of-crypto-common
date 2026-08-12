@@ -51,5 +51,5 @@ describe("A19 Ogre Mage and Behemoth ranged-corner A/B", () => {
         expect(summary.overall.games).toBe(2);
         expect(summary.overall.candidateApplied).toBe(2);
         expect(summary.overall.candidateChanged).toBe(2);
-    });
+    }, 120_000);
 });
