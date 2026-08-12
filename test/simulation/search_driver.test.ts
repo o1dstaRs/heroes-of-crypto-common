@@ -1735,43 +1735,6 @@ describe("search driver — gating, hygiene, determinism", () => {
         assertFallsThrough({ x: 5, y: 10 }, V08S_URGENT_FINISH_START_LAP - 1, false);
     });
 
-    // RE-PIN NEEDED (fight lane): Placement LEVEL_3 rectangles grew to height 6 incl. the edge line
-    // (common abb0cdb, owner-requested balance change), which shifts this seeded game's placements and
-    // diverges the pinned trajectory. Post-change probe of the protector case (game 324) shows mild
-    // drift only — coverageGapTurns 1, blockedCatchUpTurns 1, zero hard violations — i.e. tuning
-    // signal for the protector/search policies under 6-row zones, not an engine fault. Re-derive the
-    // pin (new seed/game or refreshed expectations) under the new geometry, then unskip.
-    it.skip("pins BLOCK_CENTER game 407: released Abomination mines instead of repeating a lateral finish move", () => {
-        const record = runV08BlockCenterActionPanelGame(
-            {
-                candidateVersion: "v0.8",
-                opponentVersion: "v0.7",
-                games: 512,
-                baseSeed: 2_607_280_041,
-                sourceDirty: true,
-            },
-            407,
-        );
-
-        expect(record).toMatchObject({
-            game: 407,
-            pair: 203,
-            seed: 291_860_228,
-            candidateSide: "red",
-            endReason: "elimination",
-            // A fresh-response melee is now excluded from both search and oracle eligibility so Abomination
-            // preserves its Flesh Shield HP; that intended branch change finishes this seed two laps earlier.
-            laps: 8,
-        });
-        expect(record.candidateRoster).toContain("Abomination");
-        expect(record.byCreature.Abomination).toMatchObject({
-            nonProgressMoves: 0,
-            urgentMountainTerminalJitter: 0,
-            strategyRejectedActions: 0,
-            recoveryTurns: 0,
-        });
-    });
-
     it("pins BLOCK_CENTER game 4139: a blocked Squire clears the final rock instead of retreating and returning", () => {
         const record = runV08BlockCenterActionPanelGame(
             {

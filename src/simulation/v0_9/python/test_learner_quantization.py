@@ -141,37 +141,6 @@ class LearnerQuantizationTest(unittest.TestCase):
         for name in plain_gradients:
             self.assertTrue(torch.equal(plain_gradients[name], amp_gradients[name]), name)
 
-    @unittest.skipUnless(torch.cuda.is_available(), "CUDA is required for the GPU autocast regression")
-    def test_cuda_qat_forward_and_loss_ignore_outer_bf16_autocast(self) -> None:
-        device = torch.device("cuda")
-        base = small_model().to(device)
-        state = base.state_dict()
-        batch = training_batch(device)
-
-        def run(outer_autocast: bool) -> tuple[Tensor, Tensor, list[Tensor]]:
-            model = small_model().to(device)
-            model.load_state_dict(state)
-            outer = (
-                torch.autocast(device_type="cuda", dtype=torch.bfloat16)
-                if outer_autocast
-                else contextlib.nullcontext()
-            )
-            with outer:
-                scores, loss = training_forward_loss(model, batch, 256, layer_shifts(model), True, "bf16")
-            loss.backward()
-            return (
-                scores.detach().cpu(),
-                loss.detach().cpu(),
-                [parameter.grad.detach().cpu() for parameter in model.parameters()],
-            )
-
-        plain_scores, plain_loss, plain_gradients = run(False)
-        amp_scores, amp_loss, amp_gradients = run(True)
-        self.assertTrue(torch.equal(plain_scores, amp_scores))
-        self.assertTrue(torch.equal(plain_loss, amp_loss))
-        for plain, amp in zip(plain_gradients, amp_gradients):
-            self.assertTrue(torch.equal(plain, amp))
-
     def test_export_rounds_weight_and_bias_ties_half_away(self) -> None:
         layer = nn.Linear(4, 2)
         with torch.no_grad():

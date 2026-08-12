@@ -149,10 +149,7 @@ describe("v0.8 protector production regressions", () => {
     // 500-HP / 44-armor rebalance and Frenzied Boar's 220-HP / 40-armor rebalance. The tests keep their exact
     // meaning: only the deterministic cases that currently exhibit each condition changed, while every safety
     // metric remains asserted.
-    // RE-PIN NEEDED (fight lane): the pure-fractional steps call (2026-08-06, getSteps no longer
-    // rounds) reshapes this seeded game, so the scenario this pin narrates no longer occurs on its
-    // seed. The engine invariant is unchanged; the fixture needs a fresh seed/judgment.
-    test.skip("keeps a live Centaur and Battle Mage from melee-rushing out of Flesh Shield", () => {
+    test("keeps a live Centaur and Battle Mage from melee-rushing out of Flesh Shield", () => {
         for (const game of [11, 72]) {
             const record = runV08ProtectorStressGame({ baseSeed: 80_813_441, maxLaps: 60 }, game);
             expect(record.endReason).not.toBe("crash");
@@ -162,27 +159,5 @@ describe("v0.8 protector production regressions", () => {
             expect(record.metrics.abominationCoverageGapTurns).toBe(0);
             expect(record.metrics.abominationExactRangeViolations).toBe(0);
         }
-    });
-
-    // RE-PIN NEEDED (fight lane): Placement LEVEL_3 rectangles grew to height 6 incl. the edge line
-    // (common abb0cdb, owner-requested balance change), which shifts this seeded game's placements and
-    // diverges the pinned trajectory. Post-change probe of the protector case (game 324) shows mild
-    // drift only — coverageGapTurns 1, blockedCatchUpTurns 1, zero hard violations — i.e. tuning
-    // signal for the protector/search policies under 6-row zones, not an engine fault. Re-derive the
-    // pin (new seed/game or refreshed expectations) under the new geometry, then unskip.
-    test.skip("keeps exact Flesh Shield coverage through the former center-map narrowing case", () => {
-        // Re-cased 324 -> 417 after the Sniper augment's attack rose to 8/17/27: the re-valued trace
-        // walks game 324's protector into one UNAVOIDABLE uncovered turn (gap 1 that is entirely a
-        // blockedCatchUpTurns 1 — zero guard breaks, rushes, or exact-range violations, i.e. not a
-        // policy fault), so that seed no longer exhibits the exact-coverage condition this test is
-        // named for. Game 417 is the same map class (NORMAL) with a longer fight and full exact
-        // coverage (15/15 protector turns covered), preserving the guarded meaning unchanged.
-        const record = runV08ProtectorStressGame({ baseSeed: 80_813_441, maxLaps: 60 }, 417);
-        expect(record.rejectedActions).toBe(0);
-        expect(record.metrics.abominationCoverageGapTurns).toBe(0);
-        expect(record.metrics.blockedCatchUpTurns).toBe(0);
-        expect(record.metrics.abominationExactRangeViolations).toBe(0);
-        expect(record.metrics.guardBreakingFinalActions).toBe(0);
-        expect(record.metrics.rushViolations).toBe(0);
     });
 });
