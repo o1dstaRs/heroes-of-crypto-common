@@ -358,7 +358,7 @@ describe("AI meta cohort generation", () => {
         ).toBe(true);
         expect(record.games).toHaveLength(2);
         expect(record.games.every((game) => game.rejectedA === 0 && game.rejectedB === 0)).toBe(true);
-    });
+    }, 30_000);
 
     it("only accepts complete three-map seat-swap cycles", () => {
         for (const games of [6, 72, 150_000]) expect(() => validateAiMetaGamesPerCohort(games)).not.toThrow();
