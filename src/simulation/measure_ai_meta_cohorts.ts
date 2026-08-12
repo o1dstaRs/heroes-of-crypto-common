@@ -9,8 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { createHash } from "node:crypto";
-import { createWriteStream, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import { arch, availableParallelism, cpus, platform, release, totalmem } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -65,6 +64,7 @@ import {
     type IAiMetaUnitInteractionAnalysis,
 } from "./ai_meta_unit_interactions";
 import { creaturesByLevel, DEFAULT_ROSTER_COMPOSITION } from "./army";
+import { fingerprintSourceTree } from "./source_tree_fingerprint";
 
 interface ICountedOutcome {
     score: number;
@@ -1010,19 +1010,7 @@ const git = (args: string[]): string => {
 };
 
 function sourceFingerprint(): string {
-    const hash = createHash("sha256");
-    const visit = (directory: string): string[] =>
-        readdirSync(resolve(process.cwd(), directory), { withFileTypes: true })
-            .sort((left, right) => left.name.localeCompare(right.name))
-            .flatMap((entry) => {
-                const path = join(directory, entry.name);
-                return entry.isDirectory() ? visit(path) : entry.isFile() ? [path] : [];
-            });
-    for (const path of [...visit("src"), "package.json"]) {
-        hash.update(path);
-        hash.update(readFileSync(resolve(process.cwd(), path)));
-    }
-    return hash.digest("hex");
+    return fingerprintSourceTree(process.cwd(), ["src"], ["package.json"]);
 }
 
 export interface IAiMetaSourceIdentity {

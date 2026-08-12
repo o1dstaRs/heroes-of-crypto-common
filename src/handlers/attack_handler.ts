@@ -48,6 +48,46 @@ export interface IRangeAttackEvaluation {
 }
 
 /**
+ * Immutable trajectory/interception geometry for repeatedly evaluating one unchanged ranged shot.
+ *
+ * The object deliberately exposes only the resolved geometry. Smoke-prefix indexes and uncapped base
+ * divisors live in module-private metadata, so callers cannot accidentally invalidate a prepared ray. This
+ * API intentionally does not hash mutable Unit/Grid state: it is valid only inside a synchronous, mutation-
+ * free planning scope. Live Smoke is the one supported mutable overlay and is re-read by
+ * evaluatePreparedRangeAttack.
+ *
+ * @internal
+ */
+export interface IPreparedRangeAttackEvaluation {
+    readonly affectedUnits: ReadonlyArray<ReadonlyArray<Unit>>;
+    readonly affectedCells: ReadonlyArray<ReadonlyArray<Readonly<HoCMath.XY>>>;
+    readonly attackObstacle?: Readonly<{
+        position: Readonly<HoCMath.XY>;
+        size: number;
+        distance: number;
+    }>;
+}
+
+interface IPreparedRangeAttackMetadata {
+    readonly owner: AttackHandler;
+    readonly rayCells: ReadonlyArray<Readonly<HoCMath.XY>>;
+    readonly firstRayIndexBySmokeKey: ReadonlyMap<number, number>;
+    readonly hitRayIndices: readonly number[];
+    readonly baseRangeAttackDivisors: readonly number[];
+    readonly liveSmokeClouds: SmokeClouds;
+    readonly liveSmokeRevision: number;
+    readonly liveSmokeByHit: readonly boolean[];
+}
+
+interface IRangeAttackPreparationCapture {
+    readonly hitRayIndices: number[];
+    readonly baseRangeAttackDivisors: number[];
+    readonly liveSmokeByHit: boolean[];
+}
+
+const preparedRangeAttackMetadata = new WeakMap<IPreparedRangeAttackEvaluation, IPreparedRangeAttackMetadata>();
+
+/**
  * Multiplier on a Resurrection cast's hit-point budget (the caster's cumulative max hp). 1.5 = the raise is
  * 50% stronger than the Angel stack's own health, so a single Angel is worth casting with. Applied before
  * Holy Cross, which scales the already-boosted budget like it does healing.
@@ -178,6 +218,161 @@ export class AttackHandler {
             hypotheticalSmokeCells,
             preparedHypotheticalSmokeKeys,
         );
+    }
+    /**
+     * Resolve an unchanged shot's ray, unit groups, terrain interception and base falloff once. This is useful
+     * for pure look-ahead overlays such as comparing many hypothetical Smoke placements. Normal one-off combat
+     * should continue to call evaluateRangeAttack.
+     *
+     * @internal
+     */
+    public prepareRangeAttack(
+        allUnits: ReadonlyMap<string, Unit>,
+        fromUnit: Unit,
+        fromPosition: HoCMath.XY,
+        toPosition: HoCMath.XY,
+        isThroughShot = false,
+        isSelection = false,
+        isAOEShot = false,
+    ): IPreparedRangeAttackEvaluation {
+        const lineEndPosition = isThroughShot
+            ? GridMath.projectLineToFieldEdge(
+                  this.gridSettings,
+                  fromPosition.x,
+                  fromPosition.y,
+                  toPosition.x,
+                  toPosition.y,
+              )
+            : toPosition;
+        const cellsToPositions = traceGridRayCells(this.gridSettings, fromPosition, lineEndPosition);
+        const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
+        const liveSmokeRevision = smokeClouds.getRevision();
+        const capture: IRangeAttackPreparationCapture = {
+            hitRayIndices: [],
+            baseRangeAttackDivisors: [],
+            liveSmokeByHit: [],
+        };
+        const evaluation = this.getAffectedUnitsAndObstacles(
+            allUnits,
+            cellsToPositions,
+            fromUnit,
+            fromPosition,
+            isThroughShot,
+            isSelection,
+            isAOEShot,
+            undefined,
+            undefined,
+            capture,
+        );
+        const affectedUnits = Object.freeze(
+            evaluation.affectedUnits.map((group) => Object.freeze([...group]) as readonly Unit[]),
+        );
+        const affectedCells = Object.freeze(
+            evaluation.affectedCells.map((group) =>
+                Object.freeze(group.map((cell) => Object.freeze({ x: cell.x, y: cell.y }))),
+            ),
+        );
+        const attackObstacle = evaluation.attackObstacle
+            ? Object.freeze({
+                  position: Object.freeze({
+                      x: evaluation.attackObstacle.position.x,
+                      y: evaluation.attackObstacle.position.y,
+                  }),
+                  size: evaluation.attackObstacle.size,
+                  distance: evaluation.attackObstacle.distance,
+              })
+            : undefined;
+        const prepared = Object.freeze({ affectedUnits, affectedCells, attackObstacle });
+        const rayCells = Object.freeze(cellsToPositions.map(([cell]) => Object.freeze({ x: cell.x, y: cell.y })));
+        const firstRayIndexBySmokeKey = new Map<number, number>();
+        for (let index = 0; index < rayCells.length; index += 1) {
+            const key = SmokeClouds.key(rayCells[index]);
+            if (!firstRayIndexBySmokeKey.has(key)) {
+                firstRayIndexBySmokeKey.set(key, index);
+            }
+        }
+        preparedRangeAttackMetadata.set(prepared, {
+            owner: this,
+            rayCells,
+            firstRayIndexBySmokeKey,
+            hitRayIndices: Object.freeze(capture.hitRayIndices),
+            baseRangeAttackDivisors: Object.freeze(capture.baseRangeAttackDivisors),
+            liveSmokeClouds: smokeClouds,
+            liveSmokeRevision,
+            liveSmokeByHit: Object.freeze(capture.liveSmokeByHit),
+        });
+        return prepared;
+    }
+    /**
+     * Apply current live Smoke plus an optional hypothetical footprint to prepared immutable geometry. Each
+     * call returns caller-owned arrays, matching evaluateRangeAttack's mutation/ownership contract.
+     *
+     * @internal
+     */
+    public evaluatePreparedRangeAttack(
+        prepared: IPreparedRangeAttackEvaluation,
+        hypotheticalSmokeCells?: readonly HoCMath.XY[],
+        preparedHypotheticalSmokeKeys?: ReadonlySet<number>,
+    ): IRangeAttackEvaluation {
+        const metadata = preparedRangeAttackMetadata.get(prepared);
+        if (!metadata || metadata.owner !== this) {
+            throw new TypeError("Prepared range attack was not created by this AttackHandler instance");
+        }
+        const hypotheticalSmokeKeys =
+            preparedHypotheticalSmokeKeys ??
+            (hypotheticalSmokeCells?.length
+                ? new Set(hypotheticalSmokeCells.map((cell) => SmokeClouds.key(cell)))
+                : undefined);
+        const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
+        let liveSmokeByHit = metadata.liveSmokeByHit;
+        if (smokeClouds !== metadata.liveSmokeClouds || smokeClouds.getRevision() !== metadata.liveSmokeRevision) {
+            const recomputed: boolean[] = [];
+            let pathCrossedSmoke = false;
+            let nextHit = 0;
+            for (
+                let rayIndex = 0;
+                rayIndex < metadata.rayCells.length && nextHit < metadata.hitRayIndices.length;
+                rayIndex += 1
+            ) {
+                if (!pathCrossedSmoke && smokeClouds.has(metadata.rayCells[rayIndex])) {
+                    pathCrossedSmoke = true;
+                }
+                while (metadata.hitRayIndices[nextHit] === rayIndex) {
+                    recomputed.push(pathCrossedSmoke);
+                    nextHit += 1;
+                }
+            }
+            liveSmokeByHit = recomputed;
+        }
+        const rangeAttackDivisors = metadata.baseRangeAttackDivisors.map((baseDivisor, hitIndex) => {
+            let pathCrossedSmoke = liveSmokeByHit[hitIndex] ?? false;
+            if (!pathCrossedSmoke && hypotheticalSmokeKeys?.size) {
+                const hitRayIndex = metadata.hitRayIndices[hitIndex];
+                for (const smokeKey of hypotheticalSmokeKeys) {
+                    const smokeRayIndex = metadata.firstRayIndexBySmokeKey.get(smokeKey);
+                    if (smokeRayIndex !== undefined && smokeRayIndex <= hitRayIndex) {
+                        pathCrossedSmoke = true;
+                        break;
+                    }
+                }
+            }
+            return pathCrossedSmoke ? Math.min(8, baseDivisor * 2) : baseDivisor;
+        });
+        return {
+            rangeAttackDivisors,
+            affectedUnits: prepared.affectedUnits.map((group) => [...group]),
+            affectedCells: prepared.affectedCells.map((group) => group.map((cell) => ({ x: cell.x, y: cell.y }))),
+            attackObstacle: prepared.attackObstacle
+                ? {
+                      position: {
+                          x: prepared.attackObstacle.position.x,
+                          y: prepared.attackObstacle.position.y,
+                      },
+                      size: prepared.attackObstacle.size,
+                      distance: prepared.attackObstacle.distance,
+                  }
+                : undefined,
+        };
     }
     /** Ordered, de-duplicated obstacle cells crossed before the supplied aim point. */
     public getObstacleIntersections(fromPosition: HoCMath.XY, toPosition: HoCMath.XY): IAttackObstacle[] {
@@ -2876,6 +3071,7 @@ export class AttackHandler {
         isAOEShot = false,
         hypotheticalSmokeCells?: readonly HoCMath.XY[],
         preparedHypotheticalSmokeKeys?: ReadonlySet<number>,
+        preparationCapture?: IRangeAttackPreparationCapture,
     ): IRangeAttackEvaluation {
         const affectedUnitIds: string[] = [];
         const affectedUnits: Array<Unit[]> = [];
@@ -2897,7 +3093,8 @@ export class AttackHandler {
                 : undefined);
         let pathCrossedSmoke = false;
 
-        for (const cellToPosition of cellsToPositions) {
+        for (let rayIndex = 0; rayIndex < cellsToPositions.length; rayIndex += 1) {
+            const cellToPosition = cellsToPositions[rayIndex];
             const cell = cellToPosition[0];
             const position = cellToPosition[1];
 
@@ -2993,6 +3190,11 @@ export class AttackHandler {
             // Smoke halves damage by doubling the range-falloff divisor (capped at 8, same ceiling as
             // getRangeAttackDivisor). pathCrossedSmoke is sticky for the rest of this ray.
             let divisor = this.getRangeAttackDivisor(attackerUnit, position, attackerPosition);
+            if (preparationCapture) {
+                preparationCapture.hitRayIndices.push(rayIndex);
+                preparationCapture.baseRangeAttackDivisors.push(divisor);
+                preparationCapture.liveSmokeByHit.push(pathCrossedSmoke);
+            }
             if (pathCrossedSmoke) {
                 divisor = Math.min(8, divisor * 2);
             }

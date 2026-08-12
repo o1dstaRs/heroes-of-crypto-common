@@ -72,6 +72,46 @@ import { FireWalls } from "../spells/fire_walls";
 
 type RandomIntFn = (min: number, max: number) => number;
 
+interface IParsedSynergyKey {
+    faction: FactionType;
+    specificSynergy: SpecificSynergy;
+    level: number;
+}
+
+// Production synergy keys come from this immutable configuration table. Parse those 24 keys once at module
+// load instead of splitting the same four per-team strings throughout every battle stat refresh. Raw legacy or
+// authoritative keys that are not in the table retain the permissive historical parseInt behavior below.
+const PARSED_CANONICAL_SYNERGY_KEYS: ReadonlyMap<string, IParsedSynergyKey> = new Map(
+    Object.keys(SynergyKeysToPower).map((key) => {
+        const [factionName, specificSynergy, level] = key.split(":");
+        return [
+            key,
+            {
+                faction: ToFactionType[factionName],
+                specificSynergy: parseInt(specificSynergy) as SpecificSynergy,
+                level: parseInt(level),
+            },
+        ];
+    }),
+);
+
+const parseLegacySynergyKey = (synergy: string): IParsedSynergyKey | undefined => {
+    const factionSeparator = synergy.indexOf(":");
+    if (factionSeparator < 0) {
+        return undefined;
+    }
+    const levelSeparator = synergy.indexOf(":", factionSeparator + 1);
+    // This is the allocation-free equivalent of the historical `split(":").length === 3` shape guard.
+    if (levelSeparator < 0 || synergy.indexOf(":", levelSeparator + 1) >= 0) {
+        return undefined;
+    }
+    return {
+        faction: ToFactionType[synergy.slice(0, factionSeparator) as keyof typeof ToFactionType],
+        specificSynergy: parseInt(synergy.slice(factionSeparator + 1, levelSeparator)) as SpecificSynergy,
+        level: parseInt(synergy.slice(levelSeparator + 1)),
+    };
+};
+
 export class FightProperties {
     private id: string;
     private currentLap: number;
@@ -1356,21 +1396,18 @@ export class FightProperties {
         }
 
         for (const synergy of synergies) {
-            const synergySplitArr = synergy.split(":");
-            if (synergySplitArr.length !== 3) {
+            const parsed = PARSED_CANONICAL_SYNERGY_KEYS.get(synergy) ?? parseLegacySynergyKey(synergy);
+            if (!parsed) {
                 continue;
             }
 
-            const factionPart = ToFactionType[synergySplitArr[0] as keyof typeof ToFactionType];
-            if (factionPart !== faction) {
+            if (parsed.faction !== faction) {
                 continue;
             }
 
-            const specificSynergyPart = parseInt(synergySplitArr[1]) as SpecificSynergy;
-            if (specificSynergy === specificSynergyPart) {
-                const synergyLevelPart = parseInt(synergySplitArr[2]);
-                if (synergyLevelPart && synergyLevelPart <= MAX_SYNERGY_LEVEL) {
-                    return synergyLevelPart;
+            if (specificSynergy === parsed.specificSynergy) {
+                if (parsed.level && parsed.level <= MAX_SYNERGY_LEVEL) {
+                    return parsed.level;
                 }
             }
         }

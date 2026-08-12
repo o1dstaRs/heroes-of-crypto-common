@@ -175,6 +175,14 @@ describe("Unit", () => {
             expect(unit.hasBuffActive("Blessing")).toBe(true);
             expect(unit.hasDebuffActive("Weakness")).toBe(true);
             expect(unit.getBuffProperties("Blessing")).toEqual(["7", "9"]);
+            const unitState = unit as unknown as {
+                unitProperties: { applied_buffs: string[]; applied_buffs_descriptions: string[] };
+            };
+            const blessingIndex = unitState.unitProperties.applied_buffs.indexOf("Blessing");
+            const blessingDescription = unitState.unitProperties.applied_buffs_descriptions[blessingIndex];
+            unitState.unitProperties.applied_buffs_descriptions[blessingIndex] = `${blessingDescription};extra`;
+            expect(unit.getBuffProperties("Blessing")).toEqual(["", ""]);
+            unitState.unitProperties.applied_buffs_descriptions[blessingIndex] = blessingDescription;
             expect(unit.getAppliedAuraEffect("Pegasus Might Aura")?.getPower()).toBe(5);
             expect(unit.hasBuffActive("Pegasus Might Aura")).toBe(true);
             expect(unit.hasDebuffActive("Range Null Field Aura")).toBe(true);

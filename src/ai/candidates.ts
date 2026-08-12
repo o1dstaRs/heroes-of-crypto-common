@@ -28,7 +28,7 @@ import {
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../grid/grid_math";
-import type { AttackHandler } from "../handlers/attack_handler";
+import { AttackHandler, type IPreparedRangeAttackEvaluation } from "../handlers/attack_handler";
 import {
     canCastSpell,
     canCastSummon,
@@ -403,6 +403,172 @@ export interface IBestLegalStationaryRangeAttack {
     aimSide: RangeAttackCellSide;
 }
 
+interface IStationaryRangeAttackProbe {
+    readonly aimTargetId: string;
+    readonly aimCell: XY;
+    readonly aimSide: RangeAttackCellSide;
+    readonly prepared: IPreparedRangeAttackEvaluation;
+}
+
+interface IStationaryRangeAttackSearch {
+    readonly shooter: Unit;
+    readonly context: IDecisionContext;
+    readonly attackHandler: AttackHandler;
+    readonly enemyTeam: number;
+    readonly attackerAmountAlive: number;
+    readonly isThroughShot: boolean;
+    readonly isAOE: boolean;
+    readonly forcedTargetId?: string;
+    readonly hasCowardice: boolean;
+    readonly shooterCumulativeHp: number;
+    readonly preparedDamage: IPreparedRangeCandidateDamage;
+    readonly probes: readonly IStationaryRangeAttackProbe[];
+}
+
+function canUseNativePreparedRangeAttack(attackHandler: AttackHandler): boolean {
+    // A wrapped/spied/custom evaluator may deliberately expose calls or alter geometry. Falling back keeps its
+    // observable contract; the immutable fast path is reserved for the unmodified authoritative handler.
+    return (
+        Object.getPrototypeOf(attackHandler) === AttackHandler.prototype &&
+        attackHandler.canLandRangeAttack === AttackHandler.prototype.canLandRangeAttack &&
+        attackHandler.canBeAttackedByMelee === AttackHandler.prototype.canBeAttackedByMelee &&
+        attackHandler.getRangeAttackDivisor === AttackHandler.prototype.getRangeAttackDivisor &&
+        attackHandler.evaluateRangeAttack === AttackHandler.prototype.evaluateRangeAttack &&
+        attackHandler.prepareRangeAttack === AttackHandler.prototype.prepareRangeAttack &&
+        attackHandler.evaluatePreparedRangeAttack === AttackHandler.prototype.evaluatePreparedRangeAttack
+    );
+}
+
+function prepareStationaryRangeAttackSearch(
+    shooter: Unit,
+    context: IDecisionContext,
+): IStationaryRangeAttackSearch | undefined {
+    const attackHandler = context.attackHandler;
+    const shooterId = shooter.getId();
+    if (
+        !attackHandler ||
+        !attackHandler.canLandRangeAttack(shooter, context.grid.getEnemyAggrMatrixByUnitId(shooterId)) ||
+        !(shooter.getAttackTypeSelection() === RANGE || shooter.getPossibleAttackTypes().includes(RANGE))
+    ) {
+        return undefined;
+    }
+
+    const allUnits = context.unitsHolder.getAllUnits();
+    const shooterTeam = shooter.getTeam();
+    const enemyTeam = otherTeam(shooterTeam);
+    const targets = context.unitsHolder.getAllAllies(enemyTeam).filter((target) => !target.isDead());
+    const gridSettings = context.grid.getSettings();
+    const matrix = context.matrix;
+    const shooterPosition = shooter.getPosition();
+    const attackerAmountAlive = shooter.getAmountAlive();
+    const isThroughShot = shooter.hasAbilityActive("Through Shot");
+    const isAOE = shooter.hasAbilityActive("Large Caliber") || shooter.hasAbilityActive("Area Throw");
+    const shots = shooter.getAbility("Double Shot") || shooter.getAbility("Crafted Double Shot") ? 2 : 1;
+    const preparedDamage = prepareRangeCandidateDamage(shooter, context, shots, isAOE);
+    const forcedTarget = allUnits.get(shooter.getTarget());
+    const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
+    const hasCowardice = !isThroughShot && shooter.hasStatusApplied("Cowardice");
+    const shooterCumulativeHp = hasCowardice ? shooter.getCumulativeHp() : 0;
+    const probes: IStationaryRangeAttackProbe[] = [];
+
+    for (const aimTarget of targets) {
+        const aimTargetId = aimTarget.getId();
+        if (isHidden(aimTarget) || shooter.cannotAttackUnitId(aimTargetId)) continue;
+        for (const aimCell of aimTarget.getCells()) {
+            for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
+                if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot)) continue;
+                const toPosition = getRangeAttackSideCenter(gridSettings, aimCell, aimSide, shooterPosition);
+                probes.push({
+                    aimTargetId,
+                    aimCell,
+                    aimSide,
+                    prepared: attackHandler.prepareRangeAttack(
+                        allUnits,
+                        shooter,
+                        shooterPosition,
+                        toPosition,
+                        isThroughShot,
+                        false,
+                        isAOE,
+                    ),
+                });
+            }
+        }
+    }
+
+    return {
+        shooter,
+        context,
+        attackHandler,
+        enemyTeam,
+        attackerAmountAlive,
+        isThroughShot,
+        isAOE,
+        forcedTargetId,
+        hasCowardice,
+        shooterCumulativeHp,
+        preparedDamage,
+        probes,
+    };
+}
+
+function findBestPreparedStationaryRangeAttack(
+    search: IStationaryRangeAttackSearch | undefined,
+    hypotheticalSmokeCells?: readonly XY[],
+): IBestLegalStationaryRangeAttack | undefined {
+    if (!search) return undefined;
+    const hypotheticalSmokeKeys = hypotheticalSmokeCells?.length
+        ? new Set(hypotheticalSmokeCells.map((cell) => SmokeClouds.key(cell)))
+        : undefined;
+    let best: IBestLegalStationaryRangeAttack | undefined;
+
+    for (const probe of search.probes) {
+        const evaluation = search.attackHandler.evaluatePreparedRangeAttack(
+            probe.prepared,
+            hypotheticalSmokeCells,
+            hypotheticalSmokeKeys,
+        );
+        const primaryTarget = evaluation.affectedUnits[0]?.[0];
+        if (
+            !primaryTarget ||
+            evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length ||
+            primaryTarget.isDead() ||
+            primaryTarget.getTeam() !== search.enemyTeam ||
+            isHidden(primaryTarget)
+        ) {
+            continue;
+        }
+        const primaryTargetId = primaryTarget.getId();
+        if (
+            search.shooter.cannotAttackUnitId(primaryTargetId) ||
+            (search.forcedTargetId !== undefined && primaryTargetId !== search.forcedTargetId) ||
+            (search.hasCowardice && search.shooterCumulativeHp < primaryTarget.getCumulativeHp()) ||
+            (!search.isThroughShot && !search.isAOE && primaryTargetId !== probe.aimTargetId)
+        ) {
+            continue;
+        }
+        const damage = evaluatePreparedRangeCandidateDamage(
+            search.shooter,
+            search.context,
+            evaluation,
+            primaryTargetId,
+            search.attackerAmountAlive,
+            probe.aimTargetId,
+            search.preparedDamage,
+        ).value;
+        if (damage > 0 && (!best || damage > best.expectedDamage)) {
+            best = {
+                expectedDamage: damage,
+                aimTargetId: probe.aimTargetId,
+                primaryTargetId,
+                aimCell: { x: probe.aimCell.x, y: probe.aimCell.y },
+                aimSide: probe.aimSide,
+            };
+        }
+    }
+    return best;
+}
+
 /**
  * The strongest productive stationary ranged action available to one shooter under an optional not-yet-cast
  * Smoke footprint. This deliberately walks the same target-cell/visible-side space as addShots, then delegates
@@ -441,8 +607,6 @@ export function findBestLegalStationaryRangeAttack(
     const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
     const hasCowardice = !isThroughShot && shooter.hasStatusApplied("Cowardice");
     const shooterCumulativeHp = hasCowardice ? shooter.getCumulativeHp() : 0;
-    // Every edge probe for this shooter uses the same hypothetical cloud. Pack it once instead of rebuilding
-    // an identical Set inside AttackHandler for every visible target edge.
     const hypotheticalSmokeKeys = hypotheticalSmokeCells?.length
         ? new Set(hypotheticalSmokeCells.map((cell) => SmokeClouds.key(cell)))
         : undefined;
@@ -2363,18 +2527,31 @@ class CandidateGenerator {
 
         const alliedRangers = allies.filter((ally) => ally.isRangeCapable() && ally.getRangeShots() > 0);
         const baselineDamage = new Map<string, number>();
+        const stationarySearches = new Map<string, IStationaryRangeAttackSearch | undefined>();
+        const usePreparedGeometry = Boolean(
+            this.context.attackHandler && canUseNativePreparedRangeAttack(this.context.attackHandler),
+        );
         for (const shooter of [...enemyRangers, ...alliedRangers]) {
-            baselineDamage.set(
-                shooter.getId(),
-                findBestLegalStationaryRangeAttack(shooter, this.context)?.expectedDamage ?? 0,
-            );
+            if (usePreparedGeometry) {
+                const search = prepareStationaryRangeAttackSearch(shooter, this.context);
+                stationarySearches.set(shooter.getId(), search);
+                baselineDamage.set(shooter.getId(), findBestPreparedStationaryRangeAttack(search)?.expectedDamage ?? 0);
+            } else {
+                baselineDamage.set(
+                    shooter.getId(),
+                    findBestLegalStationaryRangeAttack(shooter, this.context)?.expectedDamage ?? 0,
+                );
+            }
         }
         const preventedDamage = (shooters: readonly Unit[], cells: readonly XY[]): number => {
             let total = 0;
             for (const shooter of shooters) {
                 const before = baselineDamage.get(shooter.getId()) ?? 0;
                 if (before <= 0) continue;
-                const after = findBestLegalStationaryRangeAttack(shooter, this.context, cells)?.expectedDamage ?? 0;
+                const after = usePreparedGeometry
+                    ? (findBestPreparedStationaryRangeAttack(stationarySearches.get(shooter.getId()), cells)
+                          ?.expectedDamage ?? 0)
+                    : (findBestLegalStationaryRangeAttack(shooter, this.context, cells)?.expectedDamage ?? 0);
                 total += Math.max(0, before - after);
             }
             return total;

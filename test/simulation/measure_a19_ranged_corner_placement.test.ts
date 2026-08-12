@@ -26,8 +26,11 @@ describe("A19 Ogre Mage and Behemoth ranged-corner A/B", () => {
         }
     });
 
-    test("crosses candidate and incumbent with real A19 search", () => {
-        const cluster = evaluateV08A19RangedCornerPlacementCluster("ground-control", 0, 819_024_611, 20);
+    test("assembles and summarizes the complete two-seat candidate/control shape", () => {
+        // The two file-level shards below own the four full max-lap-20 fights. A zero-lap cluster still runs
+        // the identical setup/placement path and covers the production cluster assembler and summarizer
+        // without serializing a second copy of those fights in this file.
+        const cluster = evaluateV08A19RangedCornerPlacementCluster("ground-control", 0, 819_024_611, 0);
         expect(cluster.games.map((game) => game.id)).toEqual(
             V08_A19_RANGED_CORNER_PLACEMENT_AB_SCHEDULE.map((schedule) => schedule.id),
         );
@@ -51,5 +54,5 @@ describe("A19 Ogre Mage and Behemoth ranged-corner A/B", () => {
         expect(summary.overall.games).toBe(2);
         expect(summary.overall.candidateApplied).toBe(2);
         expect(summary.overall.candidateChanged).toBe(2);
-    }, 120_000);
+    });
 });

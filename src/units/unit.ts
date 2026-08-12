@@ -2652,10 +2652,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 continue;
             }
             const description = this.unitProperties.applied_buffs_descriptions[i];
-            const splitDescription = description.split(";");
-            if (splitDescription.length === 3) {
-                buffProperties[0] = splitDescription[1];
-                buffProperties[1] = splitDescription[2];
+            const firstSeparator = description.indexOf(";");
+            const secondSeparator = description.indexOf(";", firstSeparator + 1);
+            // Preserve the exact three-field wire contract without allocating a split array in every stat refresh.
+            if (firstSeparator >= 0 && secondSeparator >= 0 && description.indexOf(";", secondSeparator + 1) < 0) {
+                buffProperties[0] = description.slice(firstSeparator + 1, secondSeparator);
+                buffProperties[1] = description.slice(secondSeparator + 1);
                 break;
             }
         }
