@@ -399,6 +399,13 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!isCharge || !this.canHourglass(unit, context)) {
             return decision;
         }
+        // A multi-stack AOE line is a transient board opportunity: after hourglassing, either target can move
+        // and the line/cluster disappears. v0.4 deliberately repositions Skewer, Fire Breath, Chain Lightning
+        // and Lightning Spin units to create these hits, so do not let this generic charge policy erase that
+        // higher-value tactical decision. This notably preserves Pikeman's move+Skewer through two stacks.
+        if (this.meleeAoeHitCount(unit, context, decision) >= 2) {
+            return decision;
+        }
         // BUFF-WAIT: if the charge would trade into an enemy carrying a STRONG, SOON-EXPIRING temporary buff
         // (Riot / Mass Riot / Armor / Behemoth-style), it's often better to HOLD and let the buff drop first than
         // to attack into inflated stats. Wait when the target has such a buff (power >= threshold, expiring within
@@ -423,6 +430,74 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return decision;
         }
         return [{ type: "wait_turn", unitId: unit.getId() }];
+    }
+    /** Number of enemy stacks hit by the selected melee AOE, mirroring v0.4's targeting geometry. */
+    private meleeAoeHitCount(unit: Unit, context: IDecisionContext, decision: GameAction[]): number {
+        const strike = decision.find((a) => a.type === "melee_attack");
+        if (!strike || strike.type !== "melee_attack") {
+            return 0;
+        }
+        const { grid, unitsHolder } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((enemy) => !enemy.isDead());
+        const stand = strike.attackFrom ?? unit.getBaseCell();
+
+        if (unit.hasAbilityActive("Lightning Spin")) {
+            const footprint = this.footprintForCell(unit, stand, context);
+            return enemies.filter((enemy) =>
+                enemy.getCells().some((enemyCell) => footprint.some((cell) => isAdjacentCell(cell, enemyCell))),
+            ).length;
+        }
+
+        const target = unitsHolder.getAllUnits().get(strike.targetId);
+        if (!target || target.isDead() || target.getTeam() !== enemyTeam) {
+            return 0;
+        }
+        if (unit.hasAbilityActive("Fire Breath") || unit.hasAbilityActive("Skewer Strike")) {
+            const targetCell = target.getBaseCell();
+            const dx = Math.sign(targetCell.x - stand.x);
+            const dy = Math.sign(targetCell.y - stand.y);
+            const depth = unit.hasAbilityActive("Fire Breath") && !unit.isSmallSize() ? 2 : 1;
+            const hitIds = new Set<string>([target.getId()]);
+            for (let distance = 1; distance <= depth; distance += 1) {
+                const occupantId = grid.getOccupantUnitId({
+                    x: targetCell.x + dx * distance,
+                    y: targetCell.y + dy * distance,
+                });
+                const occupant = occupantId ? unitsHolder.getAllUnits().get(occupantId) : undefined;
+                if (occupant && !occupant.isDead() && occupant.getTeam() === enemyTeam) {
+                    hitIds.add(occupant.getId());
+                }
+            }
+            return hitIds.size;
+        }
+
+        if (unit.hasAbilityActive("Chain Lightning")) {
+            const chainable = enemies.filter(
+                (enemy) => !enemy.hasAbilityActive("Wind Element") && enemy.getMagicResist() < 100,
+            );
+            const hitIds = new Set<string>([target.getId()]);
+            let frontier: Unit[] = [target];
+            for (let layer = 0; layer < 4 && frontier.length; layer += 1) {
+                const next: Unit[] = [];
+                for (const current of frontier) {
+                    for (const enemy of chainable) {
+                        if (
+                            !hitIds.has(enemy.getId()) &&
+                            enemy
+                                .getCells()
+                                .some((enemyCell) => current.getCells().some((cell) => isAdjacentCell(cell, enemyCell)))
+                        ) {
+                            hitIds.add(enemy.getId());
+                            next.push(enemy);
+                        }
+                    }
+                }
+                frontier = next;
+            }
+            return hitIds.size;
+        }
+        return 1;
     }
     /**
      * Learned center-mountain mining (BLOCK_CENTER maps). v0.4 already breaks the block via a fixed
