@@ -6,7 +6,11 @@ import { V07_NONFIGHT_SETUP_ARTIFACT, type INonFightCandidatePolicy } from "../.
 import { evaluateSetupPair } from "../../src/simulation/optimizer/v0_7_setup_overnight";
 
 const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
-const EXPECTED_REPLAY_SHA256 = "872d7028c6fadd591c4d0d0ac57a1df415ce5dc935697844b02d248c8b1fa3f3";
+// Re-pinned 2026-08-13 after 4f772bc ("preserve multi-target melee opportunities"): that fix changes which
+// melee target the AI takes, so every seeded trace containing such a choice diverges from that point on.
+// The change is deliberate, so the digest follows it. Two isolated runs reproduced this value byte-identically.
+// Previous approved digest: 872d7028c6fadd591c4d0d0ac57a1df415ce5dc935697844b02d248c8b1fa3f3
+const EXPECTED_REPLAY_SHA256 = "331591f5d47475e7a821d4a21f226ac94304d789381e59f2fe0ef038f2b93874";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
