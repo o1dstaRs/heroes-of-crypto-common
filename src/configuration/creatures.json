@@ -217,7 +217,7 @@
         "Griffin": {
             "name": "Griffin",
             "hp": 72,
-            "steps": 5.5,
+            "steps": 4.5,
             "initiative": 8,
             "armor": 23,
             "attack_type": "MELEE",
@@ -1248,10 +1248,10 @@
         },
         "Ogre Mage": {
             "name": "Ogre Mage",
-            "hp": 58,
+            "hp": 60,
             "steps": 4,
             "initiative": 5,
-            "armor": 19,
+            "armor": 20,
             "attack_type": "MELEE_MAGIC",
             "attack": 24,
             "attack_damage_min": 16,
