@@ -15,7 +15,7 @@ import { MAX_UNITS_PER_TEAM } from "../constants";
 import { SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import type { XY } from "../utils/math";
 
-export type TacticalSplitRole = "aura" | "support" | "bait";
+export type TacticalSplitRole = "aura" | "support" | "shield" | "cover" | "bait";
 
 /** Detached, fair-information description used by the pre-fight split planner. */
 export interface ITacticalSplitUnit {
@@ -30,6 +30,8 @@ export interface ITacticalSplitUnit {
     readonly hpPerCreature: number;
     readonly auraUtilityCount: number;
     readonly supportSpellCount: number;
+    readonly waterShieldUtilityCount: number;
+    readonly rangedCoverCount: number;
 }
 
 export interface ITacticalSplitPlan {
@@ -67,7 +69,7 @@ export interface ITacticalSplitUnitSource {
     getAttackType(): number;
     getSteps(): number;
     getMaxHp(): number;
-    getAbilities(): readonly { getAuraEffectName(): string | undefined }[];
+    getAbilities(): readonly { getAuraEffectName(): string | undefined; getName(): string }[];
     getSpells(): readonly {
         isRemaining(): boolean;
         isBuff(): boolean;
@@ -93,6 +95,12 @@ const compareUtility = (left: ITacticalSplitUnit, right: ITacticalSplitUnit): nu
 
 const compareSupport = (left: ITacticalSplitUnit, right: ITacticalSplitUnit): number =>
     right.supportSpellCount - left.supportSpellCount || compareStable(left, right);
+
+const compareShield = (left: ITacticalSplitUnit, right: ITacticalSplitUnit): number =>
+    right.waterShieldUtilityCount - left.waterShieldUtilityCount || compareStable(left, right);
+
+const compareCover = (left: ITacticalSplitUnit, right: ITacticalSplitUnit): number =>
+    right.rangedCoverCount - left.rangedCoverCount || compareStable(left, right);
 
 /**
  * Plan one-model utility stacks without mutating the army. The duplicate-identity guard is deliberate:
@@ -134,23 +142,37 @@ export function planTacticalStackSplits(
         slots -= 1;
     };
 
-    // Reserve one slot for a dedicated support caster, then use every other genuinely-extra slot for utility
-    // bodies. The best aura source may be peeled repeatedly (the replay-backed Leprechaun full-stack + four
-    // singles formation); each child creates another independent coverage zone. A carrier whose spellbook is
-    // itself support utility is limited to one child so this policy does not multiply support casts by accident.
+    const auraSources = eligible.filter((candidate) => candidate.auraUtilityCount > 0).sort(compareUtility);
     const support = eligible
         .filter((candidate) => candidate.supportSpellCount > 0 && candidate.auraUtilityCount === 0)
         .sort(compareSupport)[0];
-    const reservedSupportSlots = support && slots > 1 ? 1 : 0;
-    for (const unit of eligible.filter((candidate) => candidate.auraUtilityCount > 0).sort(compareUtility)) {
+    const shield = eligible
+        .filter((candidate) => candidate.waterShieldUtilityCount > 0 && candidate.auraUtilityCount === 0)
+        .sort(compareShield)[0];
+    const cover = eligible
+        .filter((candidate) => candidate.rangedCoverCount > 0 && candidate.auraUtilityCount === 0)
+        .sort(compareCover)[0];
+    const reservedUtility: Array<{ unit: ITacticalSplitUnit; role: TacticalSplitRole }> = [];
+    for (const [unit, role] of [
+        [support, "support"],
+        [shield, "shield"],
+        [cover, "cover"],
+    ] as const) {
+        if (unit && !reservedUtility.some((candidate) => candidate.unit.id === unit.id)) {
+            reservedUtility.push({ unit, role });
+        }
+    }
+    const reservedUtilitySlots = Math.min(reservedUtility.length, Math.max(0, slots - Number(auraSources.length > 0)));
+    for (const unit of auraSources) {
         const maximumChildren = unit.supportSpellCount > 0 ? 1 : unit.amount - 1;
-        for (let child = 0; child < maximumChildren && slots > reservedSupportSlots; child += 1) {
+        for (let child = 0; child < maximumChildren && slots > reservedUtilitySlots; child += 1) {
             take(unit, "aura");
         }
     }
 
-    // One extra support activation is useful; fragmenting every caster would throw away too much stack power.
-    if (support) take(support, "support");
+    for (const { unit, role } of reservedUtility) {
+        if (!splitSources.has(unit.id)) take(unit, role);
+    }
 
     // If room remains, peel at most two cheap/mobile native melee bodies from the single best bait source.
     // This preserves the replay's Fairy full+1+1 pull formation without turning every ordinary melee stack
@@ -192,6 +214,8 @@ export function tacticalSplitUnitFromUnit(unit: ITacticalSplitUnitSource): ITact
                     spell.getPowerType() === SpellPowerType.RESURRECT ||
                     supportTargets.has(spell.getSpellTargetType())),
         ).length;
+    const attackType = unit.getAttackType();
+    const abilities = unit.getAbilities();
     return {
         id: unit.getId(),
         identity: `${unit.getName()}:${unit.getLevel()}`,
@@ -199,11 +223,13 @@ export function tacticalSplitUnitFromUnit(unit: ITacticalSplitUnitSource): ITact
         level: unit.getLevel(),
         small: unit.isSmallSize(),
         summoned: unit.isSummoned(),
-        attackType: unit.getAttackType(),
+        attackType,
         steps: unit.getSteps(),
         hpPerCreature: unit.getMaxHp(),
-        auraUtilityCount: unit.getAbilities().filter((ability) => ability.getAuraEffectName() !== undefined).length,
+        auraUtilityCount: abilities.filter((ability) => ability.getAuraEffectName() !== undefined).length,
         supportSpellCount,
+        waterShieldUtilityCount: abilities.filter((ability) => ability.getName() === "Water Shield").length,
+        rangedCoverCount: Number(attackType === PBTypes.AttackVals.RANGE || attackType === PBTypes.AttackVals.MAGIC),
     };
 }
 
@@ -220,9 +246,8 @@ const footprintFor = (unit: ITacticalSplitPlacementUnit, base: XY): XY[] =>
 const chebyshev = (left: XY, right: XY): number => Math.max(Math.abs(left.x - right.x), Math.abs(left.y - right.y));
 
 /**
- * Overlay one isolated decoy on a normal strategy layout. Every full stack keeps its exact incumbent cell;
- * only the first split stack moves. On BLOCK_CENTER, aura/support decoys line up with the central corridor so
- * they pull/clear that lane; elsewhere the decoy takes the most isolated forward corner that legally fits.
+ * Overlay split-stack placement on a normal strategy layout. Every full stack keeps its exact incumbent cell;
+ * the first non-cover split becomes the isolated forward decoy and cover splits use protected rear corners.
  */
 export function applyTacticalSplitPlacement(
     incumbent: ReadonlyMap<string, XY>,
@@ -230,45 +255,75 @@ export function applyTacticalSplitPlacement(
     context: ITacticalSplitPlacementContext,
 ): Map<string, XY> {
     const result = new Map([...incumbent].map(([id, cell]) => [id, { x: cell.x, y: cell.y }]));
+    if (!context.legalCellHashes.size) return result;
+
+    const candidatesFor = (excludedId: string): { candidates: XY[]; alliedBases: XY[] } => {
+        const occupied = new Set<number>();
+        const alliedBases: XY[] = [];
+        for (const unit of units) {
+            if (unit.id === excludedId) continue;
+            const base = result.get(unit.id);
+            if (!base) continue;
+            alliedBases.push(base);
+            for (const cell of footprintFor(unit, base)) occupied.add(cellKey(cell));
+        }
+        return {
+            candidates: [...context.legalCellHashes]
+                .map((hash) => ({ x: hash >> 4, y: hash & 0xf }))
+                .filter((cell) => !occupied.has(cellKey(cell))),
+            alliedBases,
+        };
+    };
+    const centerX = 7.5;
+    const isolationFor = (cell: XY, alliedBases: readonly XY[]): number =>
+        alliedBases.length ? Math.min(...alliedBases.map((base) => chebyshev(cell, base))) : 16;
     const decoy = context.splitStacks[0];
     const decoyUnit = decoy ? units.find((unit) => unit.id === decoy.unitId) : undefined;
-    if (!decoy || !decoyUnit?.small || !context.legalCellHashes.size) return result;
-
-    const occupied = new Set<number>();
-    const alliedBases: XY[] = [];
-    for (const unit of units) {
-        if (unit.id === decoy.unitId) continue;
-        const base = result.get(unit.id);
-        if (!base) continue;
-        alliedBases.push(base);
-        for (const cell of footprintFor(unit, base)) occupied.add(cellKey(cell));
+    if (decoy && decoy.role !== "cover" && decoyUnit?.small) {
+        const { candidates, alliedBases } = candidatesFor(decoy.unitId);
+        const frontness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cell.y : 15 - cell.y);
+        const mountainUtility =
+            context.gridType === PBTypes.GridVals.BLOCK_CENTER &&
+            (decoy.role === "aura" || decoy.role === "support" || decoy.role === "shield");
+        candidates.sort((left, right) => {
+            const frontDelta = frontness(right) - frontness(left);
+            if (frontDelta) return frontDelta;
+            if (mountainUtility) {
+                const corridorDelta = Math.abs(left.x - centerX) - Math.abs(right.x - centerX);
+                if (corridorDelta) return corridorDelta;
+            }
+            const isolationDelta = isolationFor(right, alliedBases) - isolationFor(left, alliedBases);
+            if (isolationDelta) return isolationDelta;
+            const edgeDelta = Math.abs(right.x - centerX) - Math.abs(left.x - centerX);
+            if (edgeDelta) return edgeDelta;
+            return context.team === PBTypes.TeamVals.LOWER ? left.x - right.x : right.x - left.x;
+        });
+        if (candidates[0]) result.set(decoy.unitId, candidates[0]);
     }
 
-    const candidates = [...context.legalCellHashes]
-        .map((hash) => ({ x: hash >> 4, y: hash & 0xf }))
-        .filter((cell) => !occupied.has(cellKey(cell)));
-    if (!candidates.length) return result;
-
-    const frontness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cell.y : 15 - cell.y);
-    const centerX = 7.5;
-    const isolation = (cell: XY): number =>
-        alliedBases.length ? Math.min(...alliedBases.map((base) => chebyshev(cell, base))) : 16;
-    const mountainUtility =
-        context.gridType === PBTypes.GridVals.BLOCK_CENTER && (decoy.role === "aura" || decoy.role === "support");
-    candidates.sort((left, right) => {
-        const frontDelta = frontness(right) - frontness(left);
-        if (frontDelta) return frontDelta;
-        if (mountainUtility) {
-            const corridorDelta = Math.abs(left.x - centerX) - Math.abs(right.x - centerX);
-            if (corridorDelta) return corridorDelta;
+    let coverIndex = 0;
+    for (const cover of context.splitStacks.filter((split) => split.role === "cover")) {
+        const coverUnit = units.find((unit) => unit.id === cover.unitId);
+        if (!coverUnit?.small) continue;
+        const { candidates, alliedBases } = candidatesFor(cover.unitId);
+        const backness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? 15 - cell.y : cell.y);
+        const preferLeft = context.team === PBTypes.TeamVals.LOWER ? coverIndex % 2 === 0 : coverIndex % 2 !== 0;
+        const sideDistance = (cell: XY): number => (preferLeft ? cell.x : 15 - cell.x);
+        candidates.sort((left, right) => {
+            const backDelta = backness(right) - backness(left);
+            if (backDelta) return backDelta;
+            const edgeDelta = Math.abs(right.x - centerX) - Math.abs(left.x - centerX);
+            if (edgeDelta) return edgeDelta;
+            const sideDelta = sideDistance(left) - sideDistance(right);
+            if (sideDelta) return sideDelta;
+            const isolationDelta = isolationFor(right, alliedBases) - isolationFor(left, alliedBases);
+            if (isolationDelta) return isolationDelta;
+            return context.team === PBTypes.TeamVals.LOWER ? left.x - right.x : right.x - left.x;
+        });
+        if (candidates[0]) {
+            result.set(cover.unitId, candidates[0]);
+            coverIndex += 1;
         }
-        const isolationDelta = isolation(right) - isolation(left);
-        if (isolationDelta) return isolationDelta;
-        const edgeDelta = Math.abs(right.x - centerX) - Math.abs(left.x - centerX);
-        if (edgeDelta) return edgeDelta;
-        // Seat-mirrored stable tie break: LOWER pulls left, UPPER pulls right.
-        return context.team === PBTypes.TeamVals.LOWER ? left.x - right.x : right.x - left.x;
-    });
-    result.set(decoy.unitId, candidates[0]);
+    }
     return result;
 }

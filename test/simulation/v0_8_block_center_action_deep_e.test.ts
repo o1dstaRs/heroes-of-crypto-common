@@ -9,10 +9,6 @@
  * -----------------------------------------------------------------------------
  */
 
-import {
-    registerV08BlockCenterActionDeepRegressionCensus,
-    registerV08BlockCenterActionDeepRegressionShard,
-} from "./v0_8_block_center_action_deep_fixture";
+import { registerV08BlockCenterActionDeepRegressionShard } from "./v0_8_block_center_action_deep_fixture";
 
-registerV08BlockCenterActionDeepRegressionCensus();
-registerV08BlockCenterActionDeepRegressionShard(0);
+registerV08BlockCenterActionDeepRegressionShard(4);

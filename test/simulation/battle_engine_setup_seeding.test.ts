@@ -6,6 +6,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Perk } from "../../src/perks/perk_properties";
 import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { creaturesByLevel } from "../../src/simulation/army";
+import { NatureSynergy } from "../../src/synergies/synergy_properties";
 import {
     runMatch,
     seedAcceptedSetupForPlacement,
@@ -161,6 +162,64 @@ describe("battle_engine setup seeding", () => {
             expect(observed.every((entry) => entry.grid === gridType && entry.fightProperties === gridType)).toBe(true);
             expect(FightStateManager.getInstance().getFightProperties().getGridType()).toBe(gridType);
         }
+    });
+
+    test("uses the configured seeded synergy variant for combat and board capacity", () => {
+        const natureRoster = [
+            { faction: "Nature", creatureName: "Fairy", level: 1, size: 1, amount: 10 },
+            { faction: "Nature", creatureName: "Dryad", level: 1, size: 1, amount: 10 },
+        ];
+        const observed = new Map<number, { variant: number; placementSlots: number; flyArmor: number }>();
+        runMatch({
+            greenVersion: "v0.7",
+            redVersion: "v0.7",
+            roster: natureRoster,
+            redRoster: natureRoster.map((unit) => ({ ...unit })),
+            seed: 83030715,
+            gridType: PBTypes.GridVals.NORMAL,
+            maxLaps: 1,
+            synergyVariants: { Nature: NatureSynergy.INCREASE_BOARD_UNITS },
+            greenSynergies: [{ faction: PBTypes.FactionVals.NATURE, synergy: NatureSynergy.INCREASE_BOARD_UNITS }],
+            redSynergies: [{ faction: PBTypes.FactionVals.NATURE, synergy: NatureSynergy.INCREASE_BOARD_UNITS }],
+            decisionObserver: ({ unit, context }) => {
+                const team = unit.getTeam();
+                if (!observed.has(team)) {
+                    observed.set(team, {
+                        variant: context.fightProperties.getSynergyVariants().Nature,
+                        placementSlots: context.fightProperties.getNumberOfUnitsAvailableForPlacement(team),
+                        flyArmor: context.fightProperties.getAdditionalFlyArmorPerTeam(team),
+                    });
+                }
+            },
+        });
+
+        expect(observed.size).toBe(2);
+        for (const state of observed.values()) {
+            expect(state.variant).toBe(NatureSynergy.INCREASE_BOARD_UNITS);
+            expect(state.placementSlots).toBe(8);
+            expect(state.flyArmor).toBe(0);
+        }
+    });
+
+    test("rejects a setup choice that conflicts with the configured seeded variant", () => {
+        const natureRoster = [
+            { faction: "Nature", creatureName: "Fairy", level: 1, size: 1, amount: 10 },
+            { faction: "Nature", creatureName: "Dryad", level: 1, size: 1, amount: 10 },
+        ];
+        expect(() =>
+            runMatch({
+                greenVersion: "v0.7",
+                redVersion: "v0.7",
+                roster: natureRoster,
+                redRoster: natureRoster.map((unit) => ({ ...unit })),
+                seed: 83030716,
+                gridType: PBTypes.GridVals.NORMAL,
+                maxLaps: 1,
+                synergyVariants: { Nature: NatureSynergy.INCREASE_BOARD_UNITS },
+                greenSynergies: [{ faction: PBTypes.FactionVals.NATURE, synergy: NatureSynergy.PLUS_FLY_ARMOR }],
+                redSynergies: [{ faction: PBTypes.FactionVals.NATURE, synergy: NatureSynergy.INCREASE_BOARD_UNITS }],
+            }),
+        ).toThrow("does not match the configured Nature variant");
     });
 
     test("artifacts survive when augments are applied to the same team", () => {

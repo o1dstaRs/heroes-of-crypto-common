@@ -707,6 +707,41 @@ describe("v0.8 candidate policy", () => {
         expect(new StrategyV0_8().decideTurn(unit, context)).toEqual(defend);
     });
 
+    it("has Scavenger attack an adjacent enemy instead of defending while Backstab routes are constrained", () => {
+        const combat = createCombatTestContext();
+        const scavenger = createTestUnit({
+            team: LOWER,
+            attackType: MELEE,
+            luck: 10,
+            name: "Scavenger",
+            abilities: ["Backstab"],
+        });
+        const hyena = createTestUnit({ team: UPPER, attackType: MELEE, name: "Hyena" });
+        const fairy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Fairy" });
+        const crusader = createTestUnit({ team: UPPER, attackType: MELEE, name: "Crusader" });
+        placeUnit(combat.grid, combat.unitsHolder, scavenger, { x: 8, y: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, hyena, { x: 7, y: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, fairy, { x: 7, y: 11 });
+        placeUnit(combat.grid, combat.unitsHolder, crusader, { x: 9, y: 10 });
+        const context: IDecisionContext = {
+            grid: combat.grid,
+            matrix: combat.grid.getMatrix(),
+            unitsHolder: combat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: combat.attackHandler,
+            fightProperties: FightStateManager.getInstance().getFightProperties(),
+        };
+
+        const decision = new StrategyV0_8().decideTurn(scavenger, context);
+        const attack = decision.find(
+            (action): action is Extract<GameAction, { type: "melee_attack" }> => action.type === "melee_attack",
+        );
+
+        expect(decision.some((action) => action.type === "defend_turn")).toBe(false);
+        expect(attack?.attackerId).toBe(scavenger.getId());
+        expect([hyena.getId(), fairy.getId(), crusader.getId()]).toContain(attack?.targetId);
+    });
+
     it("holds one- and two-shooter melee screens only when their amount-aware ranged output is stronger", () => {
         for (const ownShooters of [1, 2] as const) {
             const strong = setupRangedPosture({ ownShooters, ownAmount: 5, enemyAmount: 1 });

@@ -548,7 +548,7 @@ export function materializeReplayAbSplits(
     return { roster: expanded, splitRoles };
 }
 
-/** Placement is worth buying only when every slot it opens becomes an independent aura/support activation. */
+/** Placement is worth buying only when every slot it opens becomes an independent tactical utility stack. */
 export function replayUtilitySplitGate(
     augments: readonly ISetupAugmentChoice[],
     splitRoles: readonly IRankedReplayAbSplitRole[],
@@ -557,7 +557,7 @@ export function replayUtilitySplitGate(
     return (
         placement > 0 &&
         splitRoles.length >= placement &&
-        splitRoles.slice(0, placement).every((split) => split.role === "aura" || split.role === "support")
+        splitRoles.slice(0, placement).every((split) => split.role !== "bait")
     );
 }
 

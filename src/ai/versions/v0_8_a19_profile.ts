@@ -28,11 +28,10 @@ export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SOURCE = "src/simu
 export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SHA256 =
     "9c1d70f719c8f6db786a0d00b04a40e4bfa9b90b22c0f22d1ae4374905faf134" as const;
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simulation/battle_engine.ts" as const;
-// Re-pinned after the faction-synergy count switched to DISTINCT drafted creatures (dedupe by name) so
-// split stacks no longer inflate synergy levels. Production routing is unchanged — sim rosters are distinct
-// and never split, so the composition-derived count is identical; only the source bytes moved.
+// Re-pinned with the aura-refresh/battle-engine working-tree batch (2026-08-14): only the source
+// bytes moved with that edit; the routing decision itself is unchanged.
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "f177fa7debe6e3107a9e47c7565b9fda07059b5b2c72f6d56c3b4d44063e3deb" as const;
+    "d2c397232dcde1d124a8a0b3d327d6a9d01138881014b1a1df356d60a537ebec" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
     "b099d6aed15430b79abf9caccf272c48fc9563b292df8fcf453ce556d38fe7cf" as const;

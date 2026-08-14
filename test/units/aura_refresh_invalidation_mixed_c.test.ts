@@ -9,10 +9,6 @@
  * -----------------------------------------------------------------------------
  */
 
-import {
-    registerV08BlockCenterActionDeepRegressionCensus,
-    registerV08BlockCenterActionDeepRegressionShard,
-} from "./v0_8_block_center_action_deep_fixture";
+import { registerAuraRefreshMixedEventTraceShard } from "./aura_refresh_invalidation_mixed_fixture";
 
-registerV08BlockCenterActionDeepRegressionCensus();
-registerV08BlockCenterActionDeepRegressionShard(0);
+registerAuraRefreshMixedEventTraceShard(2);

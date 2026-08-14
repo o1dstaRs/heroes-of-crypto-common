@@ -161,6 +161,15 @@ describe("ranked replay tactics full-pipeline A/B", () => {
                 ],
             ),
         ).toBe(false);
+        expect(
+            replayUtilitySplitGate(
+                [{ kind: "Placement", value: 2 }],
+                [
+                    { rosterIndex: 6, role: "shield" },
+                    { rosterIndex: 7, role: "cover" },
+                ],
+            ),
+        ).toBe(true);
         expect(replayUtilitySplitGate([{ kind: "Armor", value: 3 }], [{ rosterIndex: 6, role: "aura" }])).toBe(false);
     });
 

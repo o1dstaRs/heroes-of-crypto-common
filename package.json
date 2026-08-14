@@ -23,7 +23,7 @@
         "check:test-skips": "bun scripts/check_test_skips.ts",
         "copy-generated": "bunx cpy \"src/generated/**/*\" \"dist/generated\"",
         "copy-json": "bunx cpy \"src/**/*.json\" dist --parents",
-        "fmt": "bunx prettier \"src/**/*.ts\" --write",
+        "fmt": "bunx prettier \"src/**/*.ts\" --write --cache --cache-strategy content --cache-location node_modules/.cache/prettier/.prettier-cache",
         "lint": "bun run lint:es && bun run lint:package && bun run lint:style",
         "lint:es": "bunx eslint \"src/**/*.{ts,tsx}\" --ignore-pattern .prettierignore",
         "lint:es:fix": "bun run lint:es -- --fix",
@@ -31,10 +31,10 @@
         "lint:package": "bun run lint:package:fix -- --check",
         "lint:package:fix": "bunx sort-package-json package.json",
         "lint:style": "bun run lint:style:base -- --check",
-        "lint:style:base": "bunx prettier \"src/**/*.{ts,tsx,js,json}\"",
+        "lint:style:base": "bunx prettier \"src/**/*.{ts,tsx,js,json}\" --cache --cache-strategy content --cache-location node_modules/.cache/prettier/.prettier-cache",
         "lint:style:fix": "bun run lint:style:base -- --write",
         "prepare": "git config core.hooksPath .githooks || true",
-        "test": "bun run check:test-skips && bun test --parallel=2 --timeout 90000"
+        "test": "bun run check:test-skips && bun scripts/run_tests.ts"
     },
     "lint-staged": {
         "*.{ts,tsx}": [

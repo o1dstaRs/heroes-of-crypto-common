@@ -27,12 +27,9 @@ import { TIER1_ARTIFACT_WINRATE, TIER2_ARTIFACT_WINRATE } from "../ai/setup/setu
 import {
     augmentPlanId,
     enumerateFullBudgetAugmentPlans,
-    resolveSetupPolicy,
     setupAugmentsForPlan,
     setupCohort,
     setupRosterFeatures,
-    V07_NONFIGHT_BEHAVIOR_SHA256,
-    V07_NONFIGHT_SETUP_SPEC,
     type IAugmentPlan,
     type ISetupAugmentChoice,
     type SetupCohort,
@@ -54,7 +51,13 @@ import {
     type PickRandomInt,
     type PickTeam,
 } from "../picks/pick_sim";
-import { ChaosSynergy, LifeSynergy, MightSynergy, NatureSynergy } from "../synergies/synergy_properties";
+import {
+    ChaosSynergy,
+    LifeSynergy,
+    MightSynergy,
+    NatureSynergy,
+    synergyVariantsForSeed,
+} from "../synergies/synergy_properties";
 import {
     creaturesByLevel,
     DEFAULT_AMOUNT_BY_LEVEL,
@@ -78,13 +81,13 @@ import { creatureIdForName } from "./draft";
  */
 
 export const AI_META_SCHEMA_VERSION = 1;
-export const AI_META_POLICY = "contextual-oracle-v2-cast-buffs-80x20";
+export const AI_META_POLICY = "contextual-oracle-v3-live-synergy-splits-80x20";
 export const AI_META_EXPLORATION_RATE = 0.2;
 export const AI_META_FIGHT_VERSION = "v0.8";
 export const AI_META_FIGHT_PROFILE = "v0.8+a13";
 export const AI_META_RANKED_DRAFT_POLICY_SPEC = LEAGUE_ROUND1_DRAFT_SPEC;
-export const AI_META_SYNERGY_POLICY_SPEC = V07_NONFIGHT_SETUP_SPEC;
-export const AI_META_SYNERGY_POLICY_SHA256 = V07_NONFIGHT_BEHAVIOR_SHA256;
+export const AI_META_SYNERGY_POLICY_SPEC = "game-id-seeded-fnv1a-v1+tactical-split-placement-v1";
+export const AI_META_SYNERGY_POLICY_SHA256 = "a39de7362f2c1a0370e4bf3a1b1016c048b1698ad85ef74c2f662c694d591b8f";
 export const AI_META_SYNERGY_TRACKING = "exact-active-choice-level-v1";
 export const AI_META_GAMES_PER_MATCHUP = 2;
 export const AI_META_AUGMENT_BUDGET = 7;
@@ -188,7 +191,31 @@ export const AI_META_SYNERGY_DEFINITIONS: readonly IAiMetaSynergyDefinition[] = 
     },
 ] as const;
 
-const AI_META_SYNERGY_POLICY = resolveSetupPolicy(AI_META_SYNERGY_POLICY_SPEC);
+export function aiMetaSynergyVariantsForPair(
+    setupSeed: number,
+    combatSeed: number,
+): ReturnType<typeof synergyVariantsForSeed> {
+    return synergyVariantsForSeed(`ai-meta:${setupSeed}:${combatSeed}`);
+}
+
+export function aiMetaSynergiesForVariants(
+    creatureIds: readonly number[],
+    variants: ReturnType<typeof synergyVariantsForSeed>,
+): { faction: number; synergy: number }[] {
+    const counts = new Map<number, number>();
+    for (const creatureId of creatureIds) {
+        const faction = CreatureFactions[creatureId];
+        if (faction) {
+            counts.set(faction, (counts.get(faction) ?? 0) + 1);
+        }
+    }
+    return [
+        { faction: PBTypes.FactionVals.LIFE, synergy: variants.Life },
+        { faction: PBTypes.FactionVals.CHAOS, synergy: variants.Chaos },
+        { faction: PBTypes.FactionVals.MIGHT, synergy: variants.Might },
+        { faction: PBTypes.FactionVals.NATURE, synergy: variants.Nature },
+    ].filter(({ faction }) => (counts.get(faction) ?? 0) >= 2);
+}
 
 export function aiMetaSynergyDefinition(faction: number, synergy: number): IAiMetaSynergyDefinition | undefined {
     return AI_META_SYNERGY_DEFINITIONS.find(
@@ -794,6 +821,7 @@ export function chooseMetaArmy(
     opponentRoster: readonly IArmyUnitSpec[],
     map: AiMetaRecordedMap,
     seed: number,
+    synergyVariants = synergyVariantsForSeed(`ai-meta:${seed}`),
 ): IAiMetaArmy {
     const creatureIds = creatureIdsForRoster(roster);
     const features = armyFeatures(roster);
@@ -811,7 +839,7 @@ export function chooseMetaArmy(
         artifactT2,
         augment,
         perk: Perk.SEE_NONE,
-        synergies: AI_META_SYNERGY_POLICY.pickSynergies(creatureIds),
+        synergies: aiMetaSynergiesForVariants(creatureIds, synergyVariants),
     };
 }
 
@@ -822,6 +850,7 @@ export function prepareMetaPair(
 ): Omit<IAiMetaPairRecord, "games"> {
     const matchup = generateMetaMatchup(options, pair);
     const map = mapOverride ?? matchup.map;
+    const synergyVariants = aiMetaSynergyVariantsForPair(matchup.setupSeed, matchup.combatSeed);
     return {
         schemaVersion: AI_META_SCHEMA_VERSION,
         cohort: options.cohort,
@@ -835,6 +864,7 @@ export function prepareMetaPair(
             matchup.rosterB,
             map,
             hashSimulationParts(matchup.setupSeed, "a"),
+            synergyVariants,
         ),
         armyB: chooseMetaArmy(
             matchup.archetypeB,
@@ -842,6 +872,7 @@ export function prepareMetaPair(
             matchup.rosterA,
             map,
             hashSimulationParts(matchup.setupSeed, "b"),
+            synergyVariants,
         ),
     };
 }

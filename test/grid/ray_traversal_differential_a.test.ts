@@ -9,10 +9,6 @@
  * -----------------------------------------------------------------------------
  */
 
-import {
-    registerV08BlockCenterActionDeepRegressionCensus,
-    registerV08BlockCenterActionDeepRegressionShard,
-} from "./v0_8_block_center_action_deep_fixture";
+import { registerRayTraversalDifferentialShard } from "./ray_traversal_differential_fixture";
 
-registerV08BlockCenterActionDeepRegressionCensus();
-registerV08BlockCenterActionDeepRegressionShard(0);
+registerRayTraversalDifferentialShard(0);

@@ -9,10 +9,6 @@
  * -----------------------------------------------------------------------------
  */
 
-import {
-    registerV08BlockCenterActionDeepRegressionCensus,
-    registerV08BlockCenterActionDeepRegressionShard,
-} from "./v0_8_block_center_action_deep_fixture";
+import { registerV08Level4CoverageRegression } from "./v0_8_l4_coverage_regression_fixture";
 
-registerV08BlockCenterActionDeepRegressionCensus();
-registerV08BlockCenterActionDeepRegressionShard(0);
+registerV08Level4CoverageRegression(157);

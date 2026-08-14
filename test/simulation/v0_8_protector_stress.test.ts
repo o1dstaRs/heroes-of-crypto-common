@@ -1,5 +1,3 @@
-import { Worker } from "node:worker_threads";
-
 import { describe, expect, test } from "bun:test";
 
 import {
@@ -12,6 +10,10 @@ import {
     type IV08ProtectorStressOptions,
     type IV08ProtectorStressRecord,
 } from "../../src/simulation/v0_8_protector_stress";
+import {
+    V08_PROTECTOR_STRESS_REGRESSION_GAMES,
+    V08_PROTECTOR_STRESS_REGRESSION_SEEDS,
+} from "./v0_8_protector_stress_regression_fixture";
 
 const options: IV08ProtectorStressOptions = {
     games: V08_PROTECTOR_STRESS_MATRIX_GAMES,
@@ -19,50 +21,6 @@ const options: IV08ProtectorStressOptions = {
     concurrency: 4,
     maxLaps: 60,
 };
-
-type ProtectorStressWorkerMessage =
-    { type: "ready" } | { type: "result"; record: IV08ProtectorStressRecord } | { type: "fatal"; error?: string };
-
-const runProtectorStressRegression = (game: number): Promise<IV08ProtectorStressRecord> =>
-    new Promise((resolvePromise, rejectPromise) => {
-        // FightStateManager is a process singleton, so each physical game needs its own isolate for the two
-        // exact regressions below to run concurrently without sharing battle state.
-        const worker = new Worker(new URL("../../src/simulation/v0_8_protector_stress_worker.ts", import.meta.url), {
-            workerData: {
-                options: {
-                    games: 2,
-                    baseSeed: 80_813_441,
-                    concurrency: 2,
-                    maxLaps: 60,
-                } satisfies IV08ProtectorStressOptions,
-            },
-        });
-        let settled = false;
-        const fail = (error: unknown): void => {
-            if (settled) return;
-            settled = true;
-            void worker.terminate();
-            rejectPromise(error instanceof Error ? error : new Error(String(error)));
-        };
-        worker.once("error", fail);
-        worker.on("exit", (code) => {
-            if (!settled) fail(new Error(`Protector stress worker exited before returning game ${game}: ${code}`));
-        });
-        worker.on("message", (message: ProtectorStressWorkerMessage) => {
-            if (settled) return;
-            if (message.type === "ready") {
-                worker.postMessage({ type: "game", game });
-                return;
-            }
-            if (message.type === "fatal") {
-                fail(new Error(message.error ?? `Protector stress worker failed game ${game}`));
-                return;
-            }
-            settled = true;
-            void worker.terminate();
-            resolvePromise(message.record);
-        });
-    });
 
 describe("v0.8 protector stress mapping", () => {
     test("pairs identical scenarios and combat seeds across physical seats", () => {
@@ -194,15 +152,9 @@ describe("v0.8 protector production regressions", () => {
     // 500-HP / 44-armor rebalance and Frenzied Boar's 220-HP / 40-armor rebalance. The tests keep their exact
     // meaning: only the deterministic cases that currently exhibit each condition changed, while every safety
     // metric remains asserted.
-    test("keeps a live Centaur and Battle Mage from melee-rushing out of Flesh Shield", async () => {
-        const records = await Promise.all([11, 72].map(runProtectorStressRegression));
-        for (const record of records) {
-            expect(record.endReason).not.toBe("crash");
-            expect(record.rejectedActions).toBe(0);
-            expect(record.metrics.wardGuardBreakingFinalActions).toBe(0);
-            expect(record.metrics.wardRushViolations).toBe(0);
-            expect(record.metrics.abominationCoverageGapTurns).toBe(0);
-            expect(record.metrics.abominationExactRangeViolations).toBe(0);
-        }
-    }, 30_000);
+    test("partitions the exact Centaur and Battle Mage regressions into file isolates", () => {
+        expect(V08_PROTECTOR_STRESS_REGRESSION_GAMES).toEqual([11, 72]);
+        expect(V08_PROTECTOR_STRESS_REGRESSION_SEEDS).toEqual({ 11: 2_527_619_087, 72: 2_744_636_805 });
+        expect(new Set(V08_PROTECTOR_STRESS_REGRESSION_GAMES).size).toBe(2);
+    });
 });

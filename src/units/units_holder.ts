@@ -1244,12 +1244,19 @@ export class UnitsHolder {
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         // setup the initial empty maps
-        this.teamsAuraEffects = new Map();
-        for (let i = 0; i < (Object.keys(PBTypes.TeamVals).length - 2) >> 1; i++) {
-            this.teamsAuraEffects.set((i + 1) as TeamType, new Map());
-        }
+        const upperAuraEffects = new Map<number, AppliedAuraEffectProperties[]>();
+        const lowerAuraEffects = new Map<number, AppliedAuraEffectProperties[]>();
+        this.teamsAuraEffects = new Map([
+            [PBTypes.TeamVals.UPPER, upperAuraEffects],
+            [PBTypes.TeamVals.LOWER, lowerAuraEffects],
+        ]);
+        const upperAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
+        const lowerAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
 
-        // fill the maps with the aura effects, duplicate auras allowed
+        // Fill each cell with its strongest aura of each name as sources are visited. The companion indexes
+        // retain first-seen order while allowing a stronger later source to replace the value in-place. This
+        // produces the same final arrays as the old append-everything-then-squash pass without allocating and
+        // walking the duplicate AppliedAuraEffectProperties entries created by overlapping source footprints.
         for (const u of this.getAllUnitsIterator()) {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
                 continue;
@@ -1283,11 +1290,21 @@ export class UnitsHolder {
                     continue;
                 }
 
-                const teamAuraEffects = this.teamsAuraEffects.get(
-                    unitAuraEffectProperties.is_buff ? unitTeam : oppositeTeam,
-                );
+                const recipientTeam = unitAuraEffectProperties.is_buff ? unitTeam : oppositeTeam;
+                const teamAuraEffects =
+                    recipientTeam === PBTypes.TeamVals.UPPER
+                        ? upperAuraEffects
+                        : recipientTeam === PBTypes.TeamVals.LOWER
+                          ? lowerAuraEffects
+                          : undefined;
+                const teamAuraEffectIndexes =
+                    recipientTeam === PBTypes.TeamVals.UPPER
+                        ? upperAuraEffectIndexes
+                        : recipientTeam === PBTypes.TeamVals.LOWER
+                          ? lowerAuraEffectIndexes
+                          : undefined;
 
-                if (!teamAuraEffects) {
+                if (!teamAuraEffects || !teamAuraEffectIndexes) {
                     continue;
                 }
 
@@ -1300,35 +1317,30 @@ export class UnitsHolder {
                             teamAuraEffects.set(ack, teamAuraEffectsPerCell);
                         }
 
-                        teamAuraEffectsPerCell.push(
-                            new AppliedAuraEffectProperties(unitAuraEffectProperties, baseCell),
-                        );
-                    }
-                }
-            }
-        }
+                        let auraEffectIndexes = teamAuraEffectIndexes[ack];
+                        if (!auraEffectIndexes) {
+                            auraEffectIndexes = new Map();
+                            teamAuraEffectIndexes[ack] = auraEffectIndexes;
+                        }
 
-        // within the same team, squash aura effects where for the same auras, the one with bigger power will be applied
-        for (const [team, cells] of this.teamsAuraEffects) {
-            const newValue = new Map<number, AppliedAuraEffectProperties[]>();
-            for (const [cellKey, appliedAuraEffects] of cells) {
-                const auraEffectsMap = new Map<string, AppliedAuraEffectProperties>();
-                for (const aae of appliedAuraEffects) {
-                    const auraEffectProperties = aae.getAuraEffectProperties();
-                    const existingAppliedAuraEffect = auraEffectsMap.get(auraEffectProperties.name);
-                    if (!existingAppliedAuraEffect) {
-                        auraEffectsMap.set(auraEffectProperties.name, aae);
-                    } else {
-                        const existingAuraEffectProperties = existingAppliedAuraEffect.getAuraEffectProperties();
-
-                        if (auraEffectProperties.power > existingAuraEffectProperties.power) {
-                            auraEffectsMap.set(auraEffectProperties.name, aae);
+                        const existingIndex = auraEffectIndexes.get(unitAuraEffectProperties.name);
+                        if (existingIndex === undefined) {
+                            auraEffectIndexes.set(unitAuraEffectProperties.name, teamAuraEffectsPerCell.length);
+                            teamAuraEffectsPerCell.push(
+                                new AppliedAuraEffectProperties(unitAuraEffectProperties, baseCell),
+                            );
+                        } else if (
+                            unitAuraEffectProperties.power >
+                            teamAuraEffectsPerCell[existingIndex].getAuraEffectProperties().power
+                        ) {
+                            teamAuraEffectsPerCell[existingIndex] = new AppliedAuraEffectProperties(
+                                unitAuraEffectProperties,
+                                baseCell,
+                            );
                         }
                     }
                 }
-                newValue.set(cellKey, Array.from(auraEffectsMap.values()));
             }
-            this.teamsAuraEffects.set(team, newValue);
         }
 
         // apply aura effects to the units
@@ -1338,8 +1350,7 @@ export class UnitsHolder {
                 continue;
             }
 
-            let unitAuraNamesToApply: string[] = [];
-            let unitAppliedAuraEffectProperties: AppliedAuraEffectProperties[] = [];
+            const unitAuraNamesToApply: string[] = [];
             for (const c of u.getCells()) {
                 const cellKey = (c.x << 4) | c.y;
                 const appliedAuraEffects = teamAuraEffects.get(cellKey);
@@ -1351,35 +1362,34 @@ export class UnitsHolder {
                     const auraEffectProperties = aae.getAuraEffectProperties();
                     if (!unitAuraNamesToApply.includes(auraEffectProperties.name)) {
                         unitAuraNamesToApply.push(`${auraEffectProperties.name} Aura`);
-                        unitAppliedAuraEffectProperties.push(aae);
+                        this.applyAuraEffectToUnit(u, aae);
                     }
-                }
-            }
-
-            for (let i = 0; i < unitAppliedAuraEffectProperties.length; i++) {
-                const appliedAuraEffectProperties = unitAppliedAuraEffectProperties[i];
-                const auraEffectProperties = appliedAuraEffectProperties.getAuraEffectProperties();
-                if (EffectHelper.canApplyAuraEffect(u, auraEffectProperties)) {
-                    u.applyAuraEffect(
-                        `${auraEffectProperties.name} Aura`,
-                        auraEffectProperties.desc.replace(
-                            /\{\}/g,
-                            // A poison aura's applied % is the base plus the AFFECTED ally's own luck (added
-                            // at hit time in processPoisonAuraAbility), so fold that ally's luck into the
-                            // shown number here instead of a separate "(plus luck)" clause. Others keep base.
-                            (POISON_ON_HIT_AURA_EFFECT_NAMES.has(auraEffectProperties.name)
-                                ? Math.max(0, auraEffectProperties.power + u.getLuck())
-                                : auraEffectProperties.power
-                            ).toString(),
-                        ),
-                        auraEffectProperties.is_buff,
-                        Number(auraEffectProperties.power.toFixed(1)),
-                        appliedAuraEffectProperties.getSourceCellAsString(),
-                    );
                 }
             }
         }
         this.auraRefreshKnownEmpty = this.isAuraStateProvablyEmpty();
+    }
+    private applyAuraEffectToUnit(unit: Unit, appliedAuraEffectProperties: AppliedAuraEffectProperties): void {
+        const auraEffectProperties = appliedAuraEffectProperties.getAuraEffectProperties();
+        if (!EffectHelper.canApplyAuraEffect(unit, auraEffectProperties)) {
+            return;
+        }
+
+        unit.applyAuraEffect(
+            `${auraEffectProperties.name} Aura`,
+            auraEffectProperties.desc.replace(
+                /\{\}/g,
+                // A poison aura's applied % is the base plus the AFFECTED ally's own luck (added at hit time in
+                // processPoisonAuraAbility), so fold that ally's luck into the shown number here. Others keep base.
+                (POISON_ON_HIT_AURA_EFFECT_NAMES.has(auraEffectProperties.name)
+                    ? Math.max(0, auraEffectProperties.power + unit.getLuck())
+                    : auraEffectProperties.power
+                ).toString(),
+            ),
+            auraEffectProperties.is_buff,
+            Number(auraEffectProperties.power.toFixed(1)),
+            appliedAuraEffectProperties.getSourceCellAsString(),
+        );
     }
     public addUnit(unit: Unit): void {
         this.allUnits.set(unit.getId(), unit);

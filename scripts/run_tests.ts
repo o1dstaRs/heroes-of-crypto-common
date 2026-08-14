@@ -1,0 +1,44 @@
+/*
+ * -----------------------------------------------------------------------------
+ * This file is part of the common code of the Heroes of Crypto.
+ *
+ * Heroes of Crypto and Heroes of Crypto AI are registered trademarks.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ * -----------------------------------------------------------------------------
+ */
+
+import { availableParallelism } from "node:os";
+import { resolve } from "node:path";
+
+export const MAX_TEST_WORKERS = 12;
+
+export function testWorkerCount(availableWorkers: number): number {
+    if (!Number.isSafeInteger(availableWorkers) || availableWorkers < 1) {
+        throw new Error(`Available test workers must be a positive safe integer; got ${availableWorkers}`);
+    }
+    return Math.min(MAX_TEST_WORKERS, availableWorkers);
+}
+
+if (import.meta.main) {
+    const repositoryRoot = resolve(import.meta.dir, "..");
+    const workers = testWorkerCount(availableParallelism());
+    const result = Bun.spawnSync({
+        cmd: [
+            process.execPath,
+            "test",
+            `--parallel=${workers}`,
+            "--timeout",
+            "90000",
+            "--reporter=dots",
+            ...process.argv.slice(2),
+        ],
+        cwd: repositoryRoot,
+        env: { ...process.env },
+        stdin: "inherit",
+        stdout: "inherit",
+        stderr: "inherit",
+    });
+    process.exit(result.exitCode);
+}

@@ -12,7 +12,6 @@
 import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import { arch, availableParallelism, cpus, platform, release, totalmem } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
 import { Worker } from "node:worker_threads";
 import { createGzip, type Gzip } from "node:zlib";
 
@@ -64,6 +63,7 @@ import {
     type IAiMetaUnitInteractionAnalysis,
 } from "./ai_meta_unit_interactions";
 import { creaturesByLevel, DEFAULT_ROSTER_COMPOSITION } from "./army";
+import { captureGitSourceStatus } from "./git_source_status";
 import { fingerprintSourceTree } from "./source_tree_fingerprint";
 
 interface ICountedOutcome {
@@ -1001,14 +1001,6 @@ function finishGzip(gzip: Gzip, output: ReturnType<typeof createWriteStream>): P
     });
 }
 
-const git = (args: string[]): string => {
-    try {
-        return execFileSync("git", args, { encoding: "utf8" }).trim();
-    } catch {
-        return "unknown";
-    }
-};
-
 function sourceFingerprint(): string {
     return fingerprintSourceTree(process.cwd(), ["src"], ["package.json"]);
 }
@@ -1031,10 +1023,10 @@ export interface IAiMetaSourceIdentity {
 }
 
 export function captureAiMetaSourceIdentity(): IAiMetaSourceIdentity {
-    const status = git(["status", "--short"]);
+    const { commit, status } = captureGitSourceStatus();
     const processors = cpus();
     return {
-        commonCommit: git(["rev-parse", "HEAD"]),
+        commonCommit: commit,
         commonDirty: Boolean(status),
         commonStatus: status.split("\n").filter(Boolean),
         sourceSha256: sourceFingerprint(),
