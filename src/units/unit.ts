@@ -2913,8 +2913,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        // target
-        if (!this.hasEffectActive("Aggr")) {
+        // Aggr's forced target belongs to the status for exactly as long as that status is active.
+        // Sandbox owns a real Effect object; ranked deliberately owns only the authoritative display
+        // entry. Use the cross-mode predicate or every ranked refresh immediately clears the target that
+        // the snapshot just restored, leaving the client unable to explain or preview the forced attack.
+        if (!this.hasStatusApplied("Aggr")) {
             this.resetTarget();
         }
         // ...and its inverse: the fright wears off with the effect that caused it.

@@ -242,6 +242,12 @@ export function elementalSpellMultiplier(params: {
     if (element === SpellElement.AIR) {
         return targetIsWindElement ? 0 : 1;
     }
+    if (element === SpellElement.EARTH) {
+        // No creature is OF the earth (there is no Earth Element ability): stone answers to nothing
+        // and nothing burns harder under it. The branch exists so the day an Earth Element creature
+        // arrives, its immunity has exactly one place to live.
+        return 1;
+    }
     return 1;
 }
 

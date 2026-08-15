@@ -108,6 +108,20 @@ describe("authoritative stat mods", () => {
         }
     });
 
+    it("keeps an authoritative Aggr target while its display status is active and clears it when it expires", () => {
+        const unit = createTestUnit({ name: "Peasant", amountAlive: 5, maxHp: 100 });
+        const properties = unit.getUnitProperties();
+
+        unit.setTarget("provoker");
+        properties.applied_debuffs.push("Aggr");
+        adjust(unit);
+        expect(unit.getTarget()).toBe("provoker");
+
+        properties.applied_debuffs.splice(properties.applied_debuffs.indexOf("Aggr"), 1);
+        adjust(unit);
+        expect(unit.getTarget()).toBe("");
+    });
+
     // BASE stats drift too — Bitter Experience (+1 base armor per stack death), Made of Fire, Unyielding
     // Power all mutate base_armor/base_attack rather than the mods. A ranked client re-derives both bases
     // from its local creature config every pass, so the server-side gain was invisible: a Peasant with

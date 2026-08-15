@@ -75,6 +75,7 @@ export interface TestUnitOptions {
     auraRanges?: number[];
     auraIsBuff?: boolean[];
     summoned?: boolean;
+    target?: string;
 }
 
 export interface CombatTestContext {
@@ -181,7 +182,7 @@ export function createTestUnit(options: TestUnitOptions = {}): Unit {
             "",
             "",
             options.stackPower ?? 1,
-            "",
+            options.target ?? "",
         ),
         testGridSettings,
         options.team ?? PBTypes.TeamVals.UPPER,

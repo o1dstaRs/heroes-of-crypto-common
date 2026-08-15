@@ -280,7 +280,9 @@ describe("Tome of Elements spell configuration", () => {
         expect(getSpellConfig("Nature", "Whirlpool").element).toBe(SpellElement.WATER);
         expect(getSpellConfig("Nature", "Lightning Strike").element).toBe(SpellElement.AIR);
         expect(getSpellConfig("Nature", "Ring of Fire").element).toBe(SpellElement.FIRE);
-        expect(getSpellConfig("Nature", "Meteor Shower").element).toBe(SpellElement.FIRE);
+        // 2026-08-15: Meteor Shower moved FIRE -> EARTH, completing the one-spell-per-element tome
+        // (fire no longer shields Efreet/Black Dragon from it, water no longer burns harder under it).
+        expect(getSpellConfig("Nature", "Meteor Shower").element).toBe(SpellElement.EARTH);
         expect(getSpellConfig("Life", "Heal").element).toBe(SpellElement.NO_ELEMENT);
     });
 
@@ -552,7 +554,9 @@ describe("action engine — Meteor Shower", () => {
         expect(before[3] - setup.allies[0].getHp()).toBe(0); // allies are not caught
     });
 
-    it("cannot burn a Fire Element caught in the block, and burns a Water Element half again as hard", () => {
+    // 2026-08-15: Meteor Shower moved FIRE -> EARTH. Falling stone is nobody's element: the Fire
+    // Element immunity and the Water Element x1.5 vulnerability both belonged to its fire days.
+    it("as earth magic, hits Fire and Water Elements at the same flat number as anyone else", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -572,8 +576,8 @@ describe("action engine — Meteor Shower", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(before[0] - setup.enemies[0].getHp()).toBe(0); // it IS the fire
-        expect(before[1] - setup.enemies[1].getHp()).toBe(162); // 108 x 1.5
+        expect(before[0] - setup.enemies[0].getHp()).toBe(108); // stone is not fire — no immunity
+        expect(before[1] - setup.enemies[1].getHp()).toBe(108); // and water does not feed it
         expect(before[2] - setup.enemies[2].getHp()).toBe(108); // elementless, the plain number
     });
 

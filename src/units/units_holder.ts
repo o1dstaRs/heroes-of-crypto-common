@@ -741,6 +741,18 @@ export class UnitsHolder {
                 this.grid.cleanupAll(unitId, unitToDelete.getAttackRange(), unitToDelete.isSmallSize());
             }
 
+            // Aggr stores its source as an id on every affected unit. Most attack paths resolve that id
+            // through this holder and naturally release the lock once the source is gone, but targeted
+            // spell validation reads the raw id. Clear dangling references at the ownership boundary so
+            // every action surface agrees immediately after a real deletion (and after a missing-id heal).
+            for (const unit of this.allUnits.values()) {
+                if (unit.getTarget() === unitId) {
+                    // Do not use resetTarget(): a ranked/battle-snapshot hydrate may have captured this
+                    // mid-fight id in initialUnitProperties, which would merely restore the same dangling id.
+                    unit.setTarget("");
+                }
+            }
+
             FightStateManager.getInstance().getFightProperties().removeFromHourglassQueue(unitId);
             FightStateManager.getInstance().getFightProperties().removeFromMoraleMinusQueue(unitId);
             FightStateManager.getInstance().getFightProperties().removeFromMoralePlusQueue(unitId);

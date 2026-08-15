@@ -133,9 +133,10 @@ export enum SpellElement {
     FIRE = 1,
     WATER = 2,
     AIR = 3,
+    EARTH = 4,
 }
 
-export const AllSpellElements = [SpellElement.FIRE, SpellElement.WATER, SpellElement.AIR];
+export const AllSpellElements = [SpellElement.FIRE, SpellElement.WATER, SpellElement.AIR, SpellElement.EARTH];
 
 export type AllSpellElement = (typeof AllSpellElements)[number];
 
@@ -144,6 +145,7 @@ export const ToSpellElement: { [spellElementName: string]: SpellElement } = {
     FIRE: SpellElement.FIRE,
     WATER: SpellElement.WATER,
     AIR: SpellElement.AIR,
+    EARTH: SpellElement.EARTH,
 };
 
 export class SpellProperties {
