@@ -11,7 +11,7 @@
 
 import { LUCK_CHANGE_FOR_SHIELD, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
-import { withDualStrikeCharm } from "../abilities/ability_helper";
+import { getDoubleShotAbility, hasDoubleShotAbility, withDualStrikeCharm } from "../abilities/ability_helper";
 import type { GameAction } from "../engine/actions";
 import { canWaitOnHourglass } from "../engine/hourglass";
 import { projectPostMoveActorAvailability } from "../engine/post_move_actor_availability";
@@ -228,8 +228,7 @@ function prepareRangeCandidateDamage(
         sharedAbilityMultiplier *= (100 - paralysis.getPower()) / 100;
     }
     const giantsMaul = isPhysicalAoe ? unit.getBuff("Giants Maul") : undefined;
-    const doubleShotAbility =
-        shots > 1 ? (unit.getAbility("Double Shot") ?? unit.getAbility("Crafted Double Shot")) : undefined;
+    const doubleShotAbility = shots > 1 ? getDoubleShotAbility(unit) : undefined;
     const secondVolleyMultiplier = doubleShotAbility
         ? aoeAbility
             ? 1
@@ -463,7 +462,7 @@ function prepareStationaryRangeAttackSearch(
     const attackerAmountAlive = shooter.getAmountAlive();
     const isThroughShot = shooter.hasAbilityActive("Through Shot");
     const isAOE = shooter.hasAbilityActive("Large Caliber") || shooter.hasAbilityActive("Area Throw");
-    const shots = shooter.getAbility("Double Shot") || shooter.getAbility("Crafted Double Shot") ? 2 : 1;
+    const shots = hasDoubleShotAbility(shooter) ? 2 : 1;
     const preparedDamage = prepareRangeCandidateDamage(shooter, context, shots, isAOE);
     const forcedTarget = allUnits.get(shooter.getTarget());
     const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
@@ -601,7 +600,7 @@ export function findBestLegalStationaryRangeAttack(
     const attackerAmountAlive = shooter.getAmountAlive();
     const isThroughShot = shooter.hasAbilityActive("Through Shot");
     const isAOE = shooter.hasAbilityActive("Large Caliber") || shooter.hasAbilityActive("Area Throw");
-    const shots = shooter.getAbility("Double Shot") || shooter.getAbility("Crafted Double Shot") ? 2 : 1;
+    const shots = hasDoubleShotAbility(shooter) ? 2 : 1;
     const preparedDamage = prepareRangeCandidateDamage(shooter, context, shots, isAOE);
     const forcedTarget = allUnits.get(shooter.getTarget());
     const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
@@ -1892,7 +1891,7 @@ class CandidateGenerator {
         const isAreaThrow = this.unit.hasAbilityActive("Area Throw");
         const isAOE = isLargeCaliber || isAreaThrow;
         const isThroughShot = this.unit.hasAbilityActive("Through Shot");
-        const shots = this.unit.getAbility("Double Shot") || this.unit.getAbility("Crafted Double Shot") ? 2 : 1;
+        const shots = hasDoubleShotAbility(this.unit) ? 2 : 1;
         const prefix = this.rangePrefix();
         const forcedTarget = allUnits.get(this.unit.getTarget());
         const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
@@ -2308,7 +2307,7 @@ class CandidateGenerator {
         const gs = grid.getSettings();
         const allUnits = unitsHolder.getAllUnits();
         const prefix = this.rangePrefix();
-        const shots = this.unit.getAbility("Double Shot") || this.unit.getAbility("Crafted Double Shot") ? 2 : 1;
+        const shots = hasDoubleShotAbility(this.unit) ? 2 : 1;
         const forcedTarget = allUnits.get(this.unit.getTarget());
         const forcedTargetId = forcedTarget && !forcedTarget.isDead() ? forcedTarget.getId() : undefined;
 

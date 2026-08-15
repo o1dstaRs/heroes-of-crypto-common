@@ -48,6 +48,18 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Double Throw": {
+        "name": "Double Throw",
+        "type": "ADDITIONAL_ATTACK",
+        "desc": ["Hurls a second boulder for {}% of the calculated damage"],
+        "power": 100,
+        "power_type": "TOTAL_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Crafted Double Shot": {
         "name": "Crafted Double Shot",
         "type": "ADDITIONAL_ATTACK",

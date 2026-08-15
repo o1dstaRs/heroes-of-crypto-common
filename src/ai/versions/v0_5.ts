@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { hasDoubleShotAbility } from "../../abilities/ability_helper";
 import { AbilityPowerType } from "../../abilities/ability_properties";
 import type { GameAction } from "../../engine/actions";
 import {
@@ -1725,7 +1726,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // (double_shot_ability.ts). Model that so the scorer values the shot at its true ~2x output and,
         // crucially, so the kill bonus fires on a stack we can only wipe WITH both shots (single-shot damage
         // alone reads as "can't kill"). Applies to the friendly-fire cost too (the 2nd shot re-hits allies).
-        const shots = process.env.V05_DBLSHOT !== "off" && unit.hasAbilityActive("Double Shot") ? 2 : 1;
+        const shots = process.env.V05_DBLSHOT !== "off" && hasDoubleShotAbility(unit) ? 2 : 1;
         const counted = new Set<string>();
         for (let i = 0; i < evaluation.affectedUnits.length; i += 1) {
             const divisor = evaluation.rangeAttackDivisors[i] ?? 1;

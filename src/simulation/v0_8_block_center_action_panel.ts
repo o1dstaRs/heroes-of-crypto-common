@@ -10,6 +10,8 @@
  */
 
 import { execFileSync } from "node:child_process";
+
+import { hasDoubleShotAbility } from "../abilities/ability_helper";
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
@@ -874,7 +876,7 @@ function findIndependentRangeOption(
     const forcedTargetId = liveForcedTargetId(unit, context);
     const isThrough = unit.hasAbilityActive("Through Shot");
     const isArea = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
-    const shots = unit.getAbility("Double Shot") || unit.getAbility("Crafted Double Shot") ? 2 : 1;
+    const shots = hasDoubleShotAbility(unit) ? 2 : 1;
     const prefix: GameAction[] =
         unit.getAttackTypeSelection() === RANGE
             ? []
@@ -969,7 +971,7 @@ function findIndependentAreaThrowOption(
         unit.getAttackTypeSelection() === RANGE
             ? []
             : [{ type: "select_attack_type", unitId: unit.getId(), attackType: RANGE }];
-    const shots = unit.getAbility("Double Shot") || unit.getAbility("Crafted Double Shot") ? 2 : 1;
+    const shots = hasDoubleShotAbility(unit) ? 2 : 1;
     const forcedTargetId = liveForcedTargetId(unit, context);
     for (let x = 0; x < settings.getGridSize(); x += 1) {
         for (let y = 0; y < settings.getGridSize(); y += 1) {

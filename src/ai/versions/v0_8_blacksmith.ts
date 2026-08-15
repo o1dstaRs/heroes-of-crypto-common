@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { hasDoubleShotAbility } from "../../abilities/ability_helper";
 import { evaluateAffectedUnits } from "../../abilities/aoe_range_ability";
 import type { GameAction } from "../../engine/actions";
 import { isSpellUsableByCaster } from "../../spells/spell_helper";
@@ -89,7 +90,7 @@ export function v08BlacksmithCraftRecipientValue(unit: Unit): number {
     const output = perActivation * activations;
     const rangedCraft = unit.getRangeShots() > 0;
     const alreadyHasCraftDouble = rangedCraft
-        ? unit.hasAbilityActive("Double Shot") || unit.hasAbilityActive("Crafted Double Shot")
+        ? hasDoubleShotAbility(unit)
         : unit.hasAbilityActive("Double Punch") || unit.hasAbilityActive("Crafted Double Punch");
     // Craft's 40% double roll is a no-op when the matching native/crafted double is already active. Retain the
     // other 60% of the recipient's value: in particular, the independent Frozen outcome remains useful.

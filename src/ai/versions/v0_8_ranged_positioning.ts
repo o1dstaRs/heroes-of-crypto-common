@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { hasDoubleShotAbility } from "../../abilities/ability_helper";
 import { NUMBER_OF_LAPS_FIRST_ARMAGEDDON } from "../../constants";
 import type { GameAction } from "../../engine/actions";
 import { projectPostMoveActorAvailability } from "../../engine/post_move_actor_availability";
@@ -438,7 +439,7 @@ function supportedPrepinEgress(
         unit.hasAbilityActive("Through Shot") ||
         unit.hasAbilityActive("Large Caliber") ||
         unit.hasAbilityActive("Area Throw") ||
-        unit.hasAbilityActive("Double Shot") ||
+        hasDoubleShotAbility(unit) ||
         unit.hasDebuffActive("Range Null Field Aura") ||
         unit.hasStatusApplied("Rangebane") ||
         attackHandler.canBeAttackedByMelee(
@@ -711,7 +712,7 @@ function supportedBandAdvance(
         unit.hasAbilityActive("Through Shot") ||
         unit.hasAbilityActive("Large Caliber") ||
         unit.hasAbilityActive("Area Throw") ||
-        unit.hasAbilityActive("Double Shot") ||
+        hasDoubleShotAbility(unit) ||
         unit.hasDebuffActive("Range Null Field Aura") ||
         unit.hasStatusApplied("Rangebane") ||
         attackHandler.canBeAttackedByMelee(

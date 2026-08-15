@@ -650,7 +650,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["Double Shot", "Area Throw"]
+            "abilities": ["Double Throw", "Area Throw"]
         },
         "Arachna Queen": {
             "name": "Arachna Queen",

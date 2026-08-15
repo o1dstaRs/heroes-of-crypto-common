@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { hasDoubleShotAbility } from "../abilities/ability_helper";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { Grid } from "../grid/grid";
 import { ObstacleType } from "../obstacles/obstacle_type";
@@ -463,7 +464,7 @@ function findRangeAttackAction(
 
     const isAOEAttacker = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
     const isThroughShot = unit.hasAbilityActive("Through Shot");
-    const isDoubleShot = unit.hasAbilityActive("Double Shot");
+    const isDoubleShot = hasDoubleShotAbility(unit);
     const isSniper = unit.hasAbilityActive("Sniper");
     const shotDistance = unit.getRangeShotDistance();
     if (shotDistance <= 0 && !isSniper) {

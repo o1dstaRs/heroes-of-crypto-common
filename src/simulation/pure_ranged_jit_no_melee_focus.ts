@@ -84,7 +84,9 @@ export function pureRangedJitNoMeleeFocusActorEligible(
         !ownsPureRangedJitClassifyingAbility(actor, "Area Throw") &&
         // A Double Shot activation consumes two ammo while candidate damage describes both projectiles. Its
         // one-ammo tail therefore needs a separate damage model; exclude it from this deliberately narrow v1.
-        !ownsPureRangedJitClassifyingAbility(actor, "Double Shot")
+        // Gargantuan's Double Throw is the same two-ammo shape and is excluded on the same grounds.
+        !ownsPureRangedJitClassifyingAbility(actor, "Double Shot") &&
+        !ownsPureRangedJitClassifyingAbility(actor, "Double Throw")
     );
 }
 

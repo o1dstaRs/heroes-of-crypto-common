@@ -23,6 +23,7 @@ export interface ICraftResult {
     grantedAbility?: string;
 }
 
+import { DOUBLE_SHOT_ABILITY_NAMES } from "./double_shot_names";
 import { getCraftChances } from "./craft_chances";
 
 // Re-exported so existing importers keep working; the definitions live in craft_chances.ts, which has no
@@ -61,10 +62,13 @@ export function processCraftAbility(caster: Unit, allies: Unit[], sceneLog: ISce
             results.push({ unitId: ally.getId(), outcome: "nothing" });
         } else if (roll < stunChance + 80) {
             const granted = isRanged ? "Crafted Double Shot" : "Crafted Double Punch";
-            const existing = isRanged ? "Double Shot" : "Double Punch";
             // A unit that already gets this second attack can't gain a third (no triple attacks) — the
-            // craft simply does nothing rather than stacking another double.
-            if (ally.hasAbilityActive(existing) || ally.hasAbilityActive(granted)) {
+            // craft simply does nothing rather than stacking another double. On the ranged side that means
+            // the WHOLE family, so a Gargantuan already throwing twice is not handed a third boulder.
+            const alreadyStrikesTwice = isRanged
+                ? DOUBLE_SHOT_ABILITY_NAMES.some((abilityName) => ally.hasAbilityActive(abilityName))
+                : ally.hasAbilityActive("Double Punch") || ally.hasAbilityActive("Crafted Double Punch");
+            if (alreadyStrikesTwice) {
                 sceneLog.updateLog(`${ally.getName()}'s craft found nothing to improve`);
                 results.push({ unitId: ally.getId(), outcome: "nothing" });
             } else {

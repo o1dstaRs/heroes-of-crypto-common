@@ -11,11 +11,20 @@
 
 import CREATURES_JSON from "../../configuration/creatures.json";
 import { AbilityPowerType } from "../../abilities/ability_properties";
+import { DOUBLE_SHOT_ABILITY_NAMES } from "../../abilities/double_shot_names";
 import { getAbilityConfig, getSpellConfig } from "../../configuration/config_provider";
 import { CreatureFactions, CreatureLevels } from "../../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { isOffensiveSpellMultiplier } from "../../spells/spell_damage";
 import { SpellPowerType } from "../../spells/spell_properties";
+
+/**
+ * Whether a creature's printed kit lands a second ranged attack. Drafting reads the ability NAMES off the
+ * catalog rather than a live Unit, so it asks the shared roster directly — otherwise a new member of the
+ * family (Gargantuan's Double Throw) silently loses the second-shot weight the bot drafts on.
+ */
+const shootsTwice = (abilities: string): boolean =>
+    DOUBLE_SHOT_ABILITY_NAMES.some((abilityName) => abilities.includes(abilityName));
 
 export const RANKED_SPELL_RANGED_DRAFT_POLICY_ID = "ranked-spell-ranged-v1" as const;
 export type RankedSpellRangedDraftPolicyId = typeof RANKED_SPELL_RANGED_DRAFT_POLICY_ID;
@@ -364,7 +373,7 @@ export const scoreCreature = (creatureId: number): number => {
         c.maxDamage * (c.ranged ? 3 : 1.2) +
         c.shots * (c.ranged ? 5 : 0) +
         c.distance * (c.ranged ? 6 : 0) +
-        (c.abilities.includes("Double Shot") ? 50 : 0) +
+        (shootsTwice(c.abilities) ? 50 : 0) +
         (c.abilities.includes("Through Shot") ? 70 : 0) +
         (c.abilities.includes("Area Throw") ? 60 : 0) +
         (c.abilities.includes("Large Caliber") ? 45 : 0);
@@ -429,7 +438,7 @@ export const creatureFeatures = (creatureId: number): number[] => {
         r ? 0 : c.maxDamage,
         r ? c.shots : 0,
         r ? c.distance : 0,
-        c.abilities.includes("Double Shot") ? 1 : 0,
+        shootsTwice(c.abilities) ? 1 : 0,
         c.abilities.includes("Through Shot") ? 1 : 0,
         c.abilities.includes("Area Throw") ? 1 : 0,
         c.abilities.includes("Large Caliber") ? 1 : 0,

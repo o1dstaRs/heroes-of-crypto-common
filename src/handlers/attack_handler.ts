@@ -924,8 +924,7 @@ export class AttackHandler {
             // Cannon has no radius for — and this early return skips it entirely, so the crafted double shot
             // silently did nothing. Re-run the through shot here, scaling the volley by the Double Shot
             // multiplier: 100% for the base ability, stack-scaled 20/40/60/80/100% + luck for the crafted one.
-            const doubleShotAbility =
-                attackerUnit.getAbility("Double Shot") ?? attackerUnit.getAbility("Crafted Double Shot");
+            const doubleShotAbility = AbilityHelper.getDoubleShotAbility(attackerUnit);
             if (
                 !suppressDoubleShot &&
                 doubleShotAbility &&
@@ -2855,8 +2854,7 @@ export class AttackHandler {
             attackerUnit.getAttackTypeSelection() === PBTypes.AttackVals.RANGE &&
             this.canLandRangeAttack(attackerUnit, this.grid.getEnemyAggrMatrixByUnitId(attackerUnit.getId()))
         ) {
-            const doubleShotAbility =
-                attackerUnit.getAbility("Double Shot") ?? attackerUnit.getAbility("Crafted Double Shot");
+            const doubleShotAbility = AbilityHelper.getDoubleShotAbility(attackerUnit);
             const trajectoryTargets = this.grid.hasScatteredMountains()
                 ? this.getObstacleIntersections(attackerUnit.getPosition(), targetPosition).slice(
                       0,

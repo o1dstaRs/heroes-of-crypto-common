@@ -26,6 +26,7 @@ import {
     Tier1Artifact,
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
+import { DOUBLE_SHOT_ABILITY_NAMES } from "../abilities/double_shot_names";
 import { getSpellConfig, POISON_ON_HIT_AURA_EFFECT_NAMES } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effects/effect_properties";
@@ -557,8 +558,12 @@ export class UnitsHolder {
                 // Combat-time markers (checked by the relevant hook via unit.getBuff).
                 case Tier1Artifact.DUAL_STRIKE_CHARM:
                     // Only meaningful on units that actually get a second attack in the fight, so restrict the
-                    // marker buff to units with Double Punch (melee) or Double Shot (ranged).
-                    if (unit.hasAbilityActive("Double Punch") || unit.hasAbilityActive("Double Shot")) {
+                    // marker buff to units with Double Punch (melee) or one of the ranged second-shot
+                    // abilities — Double Shot and Gargantuan's full-power Double Throw alike.
+                    if (
+                        unit.hasAbilityActive("Double Punch") ||
+                        DOUBLE_SHOT_ABILITY_NAMES.some((abilityName) => unit.hasAbilityActive(abilityName))
+                    ) {
                         applyArtifactBuff("Dual Strike Charm", AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT);
                     }
                     break;

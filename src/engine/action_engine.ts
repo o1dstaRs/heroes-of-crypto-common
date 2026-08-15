@@ -15,6 +15,7 @@ import {
     MORALE_CHANGE_FOR_KILL,
     MORALE_CHANGE_FOR_SHIELD,
 } from "../constants";
+import * as AbilityHelper from "../abilities/ability_helper";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { processCraftAbility } from "../abilities/craft_ability";
 import * as EffectHelper from "../effects/effect_helper";
@@ -707,7 +708,7 @@ export class GameActionEngine {
             attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
         );
         const destroyedScatteredCells: XY[] = [];
-        const doubleShot = attacker.getAbility("Double Shot") ?? attacker.getAbility("Crafted Double Shot");
+        const doubleShot = AbilityHelper.getDoubleShotAbility(attacker);
         // "Ranged attacks ignore structures" (Large Caliber, Area Throw) outranks the Double Shot stone rule.
         // Gargantuan carries BOTH, and without this the stone branch ran first and spent its two projectiles
         // on tombstones, so a Cemetery lane with two stones left the declared creature untouched — the

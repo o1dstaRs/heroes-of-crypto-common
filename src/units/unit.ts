@@ -16,6 +16,7 @@ import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
 import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilities/absolving_arrow_ability";
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
+import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/double_shot_names";
 import { getCraftChances } from "../abilities/craft_ability";
 import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { empowerMultiplier } from "../augments/augment_properties";
@@ -3916,6 +3917,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Miner scales with stack power, luck and Might synergy. Keep the shared/server-owned description
         // aligned with the amount processMinerAbility actually transfers, including sane decimal rounding.
         this.refreshMinerDescription(_synergyAbilityPowerIncrease);
+        // The second-shot cards are a live percentage too: the ability's power plus the owner's CURRENT
+        // luck, and for the stack-powered members its current stack tier on top.
+        this.refreshDoubleShotDescriptions(_synergyAbilityPowerIncrease);
         // The non-magical AOE damage cards: the live percentage the fight applies — the owner's luck, Might
         // synergy and stack scaling through calculateAbilityMultiplier, then ARTIFACT Giant's Maul on top
         // while its buff is up. Runs LAST, so it is the figure every surface ends up showing.
@@ -3981,6 +3985,42 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * attack.
      */
     /** Rewrite the Stun Aura card with the chance the field is CURRENTLY rolling (luck included). */
+    /**
+     * Rewrite the second-shot cards with the percentage the volley will ACTUALLY land.
+     *
+     * calculateAbilityMultiplier folds in the owner's luck and Might synergy, and then either dilutes the
+     * power across the stack (Double Shot, Crafted Double Shot) or does not (Gargantuan's Double Throw,
+     * which is stack-independent and therefore reads a flat "100 + luck"). Without this the card printed
+     * the seeded figure — a Double Throw with 5 luck promises 105% and the card said 100%.
+     *
+     * Lives in common rather than only in the client's RenderableUnit for the reason spelled out on
+     * refreshBlindFuryDescription: a ranked player reads the description the SERVER put in the snapshot.
+     */
+    private refreshDoubleShotDescriptions(synergyAbilityPowerIncrease: number): void {
+        for (const abilityName of DOUBLE_SHOT_ABILITY_NAMES) {
+            const index = this.unitProperties.abilities.indexOf(abilityName);
+            if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
+                continue;
+            }
+            const ability = this.abilities.find((candidate) => candidate.getName() === abilityName);
+            if (!ability) {
+                continue;
+            }
+            // The Dual Strike Charm rides the same multiplier the damage path applies, so a charm-carrying
+            // unit's card shows the boosted number rather than going quiet about it. Folded inline rather
+            // than through ability_helper.withDualStrikeCharm: that module imports Unit, and importing it
+            // back here would close a cycle (which is also why the name list lives in a leaf module).
+            const charm = this.getBuff(DUAL_STRIKE_CHARM_BUFF);
+            const multiplier = this.calculateAbilityMultiplier(ability, synergyAbilityPowerIncrease);
+            const percentage = Number(
+                ((charm ? multiplier * (1 + charm.getPower() / 100) : multiplier) * 100).toFixed(2),
+            );
+            this.unitProperties.abilities_descriptions[index] = ability
+                .getDesc()
+                .join("\n")
+                .replace(/\{\}/g, percentage.toString());
+        }
+    }
     private refreshStunAuraDescription(synergyAbilityPowerIncrease: number): void {
         const index = this.unitProperties.abilities.indexOf("Stun Aura");
         if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {

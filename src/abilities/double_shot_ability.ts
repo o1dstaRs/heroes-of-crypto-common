@@ -22,7 +22,7 @@ import type { IDamageStatistic } from "../scene/scene_stats";
 import type { IVisibleDamage } from "../scene/animations";
 import { FightStateManager } from "../fights/fight_state_manager";
 
-import { withDualStrikeCharm } from "./ability_helper";
+import { getDoubleShotAbility, withDualStrikeCharm } from "./ability_helper";
 import { processRangeAOEAbility } from "./aoe_range_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
@@ -55,8 +55,10 @@ export function processDoubleShotAbility(
     isAOE: boolean,
 ): IDoubleShotResult {
     const animationData: IAnimationData[] = [];
-    // Crafted Double Shot (granted by the Blacksmith's Craft) behaves identically to Double Shot.
-    const doubleShotAbility = fromUnit.getAbility("Double Shot") ?? fromUnit.getAbility("Crafted Double Shot");
+    // Crafted Double Shot (granted by the Blacksmith's Craft) and Gargantuan's Double Throw run this exact
+    // path; what separates them is the ability's own stack_powered flag, which calculateAbilityMultiplier
+    // reads below — the throw is stack-independent, so both boulders land full damage plus luck.
+    const doubleShotAbility = getDoubleShotAbility(fromUnit);
     const unitIdsDied: string[] = [];
 
     let damageFromAttack = 0;
