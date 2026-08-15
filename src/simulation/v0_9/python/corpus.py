@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import glob
 import hashlib
 import json
@@ -57,8 +56,6 @@ TEACHER_SCHEDULE = {
     "maps": list(TEACHER_MAPS),
     "daggerPatterns": list(DAGGER_PATTERNS),
 }
-PARALLEL_VALIDATION_MIN_SHARDS = 64
-MAX_AUTOMATIC_VALIDATION_WORKERS = 24
 COMMON_KEYS = (
     "runFingerprint",
     "featureFingerprints",
@@ -72,9 +69,6 @@ COMMON_KEYS = (
     "seed",
     "gameId",
 )
-
-_validation_worker_campaign: dict[str, Any] | None = None
-_validation_worker_ledger: dict[str, Any] | None = None
 
 
 def canonical_json(value: Any) -> str:
@@ -391,77 +385,14 @@ def validate_shard(
     )
 
 
-def _initialize_validation_worker(campaign: dict[str, Any], ledger: dict[str, Any]) -> None:
-    global _validation_worker_campaign, _validation_worker_ledger
-    _validation_worker_campaign = campaign
-    _validation_worker_ledger = ledger
-
-
-def _validate_shard_worker(path: Path) -> ShardDescriptor:
-    if _validation_worker_campaign is None or _validation_worker_ledger is None:
-        raise RuntimeError("corpus validation worker was not initialized")
-    return validate_shard(path, _validation_worker_campaign, _validation_worker_ledger)
-
-
-def _available_cpu_count() -> int:
-    if hasattr(os, "sched_getaffinity"):
-        return max(1, len(os.sched_getaffinity(0)))
-    return max(1, os.cpu_count() or 1)
-
-
-def corpus_validation_workers(shards: int, requested: int | None = None) -> int:
-    if type(shards) is not int or shards < 1:
-        raise ValueError("corpus validation requires a positive shard count")
-    if requested is None:
-        configured = os.environ.get("V09_CORPUS_VALIDATION_WORKERS")
-        if configured is not None:
-            try:
-                requested = int(configured)
-            except ValueError as error:
-                raise ValueError("V09_CORPUS_VALIDATION_WORKERS must be a positive integer") from error
-        else:
-            # Reserve roughly one logical quarter for the supervisor, OS, and page-cache work. This maps the
-            # 48-thread Puffalo Xeon to its 24 physical cores and the 16-thread M4 Max to its 12 performance
-            # cores, while the cap prevents thousands of tiny shards from spawning an excessive process pool.
-            available = _available_cpu_count()
-            requested = min(MAX_AUTOMATIC_VALIDATION_WORKERS, max(1, (available * 3) // 4))
-    if type(requested) is not int or requested < 1:
-        raise ValueError("corpus validation workers must be a positive integer")
-    return min(shards, requested)
-
-
-def validate_shards(
-    paths: Sequence[Path],
-    campaign: dict[str, Any],
-    ledger: dict[str, Any],
-    workers: int | None = None,
-) -> list[ShardDescriptor]:
-    worker_count = corpus_validation_workers(len(paths), workers)
-    if worker_count == 1 or (workers is None and len(paths) < PARALLEL_VALIDATION_MIN_SHARDS):
-        return [validate_shard(path, campaign, ledger) for path in paths]
-
-    # `executor.map` returns results (and surfaces failures) in the immutable path order even though shard
-    # parsing happens concurrently. Each worker receives the large campaign/ledger once via the initializer;
-    # only compact Path tasks cross the queue afterward. The learner calls this before CUDA initialization, so
-    # Linux can safely use its lightweight default process start method; macOS uses spawn automatically.
-    chunksize = max(1, len(paths) // (worker_count * 16))
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=worker_count,
-        initializer=_initialize_validation_worker,
-        initargs=(campaign, ledger),
-    ) as executor:
-        return list(executor.map(_validate_shard_worker, paths, chunksize=chunksize))
-
-
 def validate_corpus(
     patterns: Sequence[str],
     campaign_manifest: Path,
     allow_partial: bool = False,
-    workers: int | None = None,
 ) -> tuple[dict[str, Any], list[Path], list[ShardDescriptor]]:
     campaign, ledger = validate_campaign_manifest(campaign_manifest)
     paths = expand_paths(patterns)
-    descriptors = validate_shards(paths, campaign, ledger, workers)
+    descriptors = [validate_shard(path, campaign, ledger) for path in paths]
     game_ids: set[str] = set()
     lanes: set[tuple[str, int]] = set()
     binding_by_purpose: dict[str, str] = {}
@@ -536,18 +467,8 @@ def main() -> None:
     parser.add_argument("--data", action="append", required=True)
     parser.add_argument("--allow-partial", action="store_true")
     parser.add_argument("--summary-only", action="store_true")
-    parser.add_argument(
-        "--workers",
-        type=int,
-        help="parallel shard validators (default: V09_CORPUS_VALIDATION_WORKERS or topology-derived)",
-    )
     args = parser.parse_args()
-    campaign, paths, descriptors = validate_corpus(
-        args.data,
-        args.campaign_manifest,
-        args.allow_partial,
-        args.workers,
-    )
+    campaign, paths, descriptors = validate_corpus(args.data, args.campaign_manifest, args.allow_partial)
     report = {
         "schema": "hoc.ai.v0_9_corpus_validation.v1",
         "runFingerprint": campaign["runFingerprint"],
