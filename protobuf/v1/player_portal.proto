@@ -64,6 +64,11 @@ message PortalMatch {
     int32 gold_earned = 24;
     // Persistent id for linking to the opponent's public player profile.
     string opponent_player_id = 25;
+    // The ranked settlement reason ("normal", "concede", "disconnect", "double_disconnect", "cancel"),
+    // empty when the match carries no ranked outcome. A CALIBRATION match with a non-"normal" reason
+    // did not advance the calibration counter (RankedOutcomeReason, ranked_math.ts) — only a fully
+    // played-out game does.
+    string outcome_reason = 26;
 }
 
 // A creature combo (a sorted set of creature ids the viewer played together) with its record.
