@@ -3916,9 +3916,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Miner scales with stack power, luck and Might synergy. Keep the shared/server-owned description
         // aligned with the amount processMinerAbility actually transfers, including sane decimal rounding.
         this.refreshMinerDescription(_synergyAbilityPowerIncrease);
-        // ARTIFACT Giant's Maul: while its buff is active, the non-magical AOE abilities deal +% damage, so
-        // their damage-% cards must show the BOOSTED figure the fight actually applies, not the base 100%.
-        this.refreshGiantsMaulAoeDescriptions();
+        // The non-magical AOE damage cards: the live percentage the fight applies — the owner's luck, Might
+        // synergy and stack scaling through calculateAbilityMultiplier, then ARTIFACT Giant's Maul on top
+        // while its buff is up. Runs LAST, so it is the figure every surface ends up showing.
+        this.refreshGiantsMaulAoeDescriptions(_synergyAbilityPowerIncrease);
     }
     /**
      * The non-magical AOE damage abilities Giant's Maul boosts (the same set that reads its buff in the
@@ -3933,8 +3934,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         "Skewer Strike",
         "Large Caliber",
     ];
-    /** Re-render each Maul-boosted AOE ability's damage-% card at power x (1 + Maul%) while the buff is up. */
-    private refreshGiantsMaulAoeDescriptions(): void {
+    /**
+     * Re-render each AOE ability's damage-% card with the percentage the fight ACTUALLY applies.
+     *
+     * This pass runs on every refresh, not only while Giant's Maul is up, and it is the LAST writer of
+     * these cards — the client's RenderableUnit chains up to this method after its own pass, and in ranked
+     * it is the only writer at all, because a player reads the description the server put in the snapshot.
+     * So whatever it prints is what every surface shows.
+     *
+     * It used to print the ability's BASE power times the Maul factor, which threw away everything
+     * calculateAbilityMultiplier folds in — the owner's luck above all, but also Might synergy, Made of
+     * Fire, and (for a stack-powered ability) the stack scaling. Gargantuan's Area Throw therefore read a
+     * flat "100%" no matter how lucky the stack was, while the shot itself landed 100% + luck. Take the
+     * engine's own coefficient and apply the Maul on top of it, exactly as processRangeAOEAbility does:
+     * ability multiplier first, then `damage * (1 + maul%)` at impact.
+     */
+    private refreshGiantsMaulAoeDescriptions(synergyAbilityPowerIncrease: number): void {
         const maulBuff = this.getBuff("Giants Maul");
         const factor = maulBuff ? 1 + maulBuff.getPower() / 100 : 1;
         for (const abilityName of Unit.GIANTS_MAUL_AOE_DESCRIPTION_ABILITIES) {
@@ -3946,7 +3961,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             if (!ability) {
                 continue;
             }
-            const rescaled = Math.round(ability.getPower() * factor);
+            // Two decimals, trailing zeros dropped: a stack-powered card lands on fractions (Large Caliber
+            // at stack 3 with 5 luck is 63), and rounding those to whole numbers hid the luck it just gained.
+            const rescaled = Number(
+                (this.calculateAbilityMultiplier(ability, synergyAbilityPowerIncrease) * 100 * factor).toFixed(2),
+            );
             this.unitProperties.abilities_descriptions[index] = ability
                 .getDesc()
                 .join("\n")
