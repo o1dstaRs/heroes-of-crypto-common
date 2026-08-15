@@ -27,6 +27,10 @@ describe("v0.8 a13 Vine Throw search coverage", () => {
                 redRoster: [{ faction: "Life", creatureName: "Peasant", level: 1, size: 1, amount: 100 }],
                 seed: 123,
                 maxLaps: 1,
+                // This asserts an EXACT shortlist of three. Under production deadline semantics a loaded
+                // host truncates enumeration and the shortlist comes back short, so let finite operation
+                // caps decide the search depth instead of the wall clock.
+                searchOfflineDeterministicWork: true,
                 searchScoredDecisionObserver: (decision) => {
                     if (decision.unit.getName() === "Trent") {
                         scored.push(decision.candidates);

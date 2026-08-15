@@ -65,7 +65,12 @@ const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 // This regression intentionally runs three complete max-lap matches. Leave enough wall-clock headroom when
 // a parallel simulation campaign saturates the host; the match count and exact action-log checks stay intact.
-const FULL_MATCH_REGRESSION_TIMEOUT_MS = 10_000;
+//
+// 10_000 was BELOW the package-wide 30s default (test/setup_timeout.ts), so this test opted itself out of
+// the very protection that default exists for: on GitHub's shared runners the three matches take 12–16s and
+// it timed out on nearly every push. Matches the "genuinely long simulations set their own higher explicit
+// timeout" convention instead — ~4x the slowest observed CI cost, with the assertions untouched.
+const FULL_MATCH_REGRESSION_TIMEOUT_MS = 60_000;
 
 function setupMountainDecision(
     enemyCell: { x: number; y: number },

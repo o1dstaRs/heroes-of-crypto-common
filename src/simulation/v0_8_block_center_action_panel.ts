@@ -164,6 +164,13 @@ export interface IV08BlockCenterActionPanelOptions {
     sourceCommit?: string;
     /** Set by the CLI from git status; a dirty source is recorded but can never pass qualification. */
     sourceDirty?: boolean;
+    /**
+     * Let finite search operation caps, rather than host timing, decide search behavior. Omitted/false keeps
+     * the production deadline semantics a real qualification pass must measure. Regression FIXTURES set it
+     * true: their recorded action logs are only reproducible when a slow shared runner cannot shorten the
+     * search and change which action the candidate picks.
+     */
+    searchOfflineDeterministicWork?: boolean;
 }
 
 export interface IV08BlockCenterActionPlan {
@@ -2141,6 +2148,7 @@ export function runV08BlockCenterActionPanelGame(
         seed: plan.seed,
         gridType: plan.mapType,
         maxLaps: options.maxLaps,
+        searchOfflineDeterministicWork: options.searchOfflineDeterministicWork === true,
         greenPerk: setup?.perk,
         redPerk: setup?.perk,
         greenAugments: setup?.augments,

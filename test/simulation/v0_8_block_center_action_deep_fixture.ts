@@ -23,6 +23,11 @@ const DEEP_PANEL_OPTIONS: IV08BlockCenterActionPanelOptions = {
     baseSeed: 2_607_280_041,
     sourceCommit: "a".repeat(40),
     sourceDirty: false,
+    // These games assert an EXACT action log. Under production deadline semantics a loaded shared runner
+    // shortens the search, the candidate picks a different action, and the engine rejects it —
+    // candidateEngineRejections went 0 -> 1 on CI while the same game passed locally. Finite operation
+    // caps make the replay host-independent; real qualification passes keep the live-bounded default.
+    searchOfflineDeterministicWork: true,
 };
 
 const DEEP_BLOCK_CENTER_REGRESSION_SHARDS = [
