@@ -938,6 +938,46 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
     });
 
+    it("a shot-at shooter counter-shoots, and a bouncing Chakram attacker does not suppress it", () => {
+        // A ranged attack is answered by a ranged victim. Zena's Chakram routes its bounces through the
+        // AOE tail, which is a different path from a plain shot, so pin that the PRIMARY victim still
+        // gets its counter-shot in both shapes — with and without extra enemies for the disc to bounce to.
+        const run = (abilities?: string[], bounceTargets = 0): number => {
+            const setup = setupActionFight({
+                lowerAttackType: PBTypes.AttackVals.RANGE,
+                lowerRangeShots: 3,
+                lowerAbilities: abilities,
+                lowerStackPower: 5,
+                supportCell: { x: 2, y: 3 },
+                upperAttackType: PBTypes.AttackVals.RANGE,
+                upperRangeShots: 3,
+                upperCell: { x: 7, y: 3 },
+            });
+            for (let i = 0; i < bounceTargets; i++) {
+                const extra = createTestUnit({
+                    name: `Bounce ${i}`,
+                    team: PBTypes.TeamVals.UPPER,
+                    maxHp: 10_000,
+                });
+                placeUnit(setup.grid, setup.unitsHolder, extra, { x: 8, y: 4 + i });
+            }
+            setup.lower.refreshPossibleAttackTypes(true);
+            setup.upper.refreshPossibleAttackTypes(true);
+            const hpBefore = setup.lower.getHp();
+            const result = setup.engine.apply({
+                type: "range_attack",
+                attackerId: setup.lower.getId(),
+                targetId: setup.upper.getId(),
+            });
+            expect(result.completed).toBe(true);
+            return hpBefore - setup.lower.getHp();
+        };
+        expect(run()).toBeGreaterThan(0);
+        expect(run(["Chakram"])).toBeGreaterThan(0);
+        expect(run(undefined, 2)).toBeGreaterThan(0);
+        expect(run(["Chakram"], 2)).toBeGreaterThan(0);
+    });
+
     it("rejects a range attack from a unit standing in a Range Null Field", () => {
         const setup = setupActionFight({
             lowerAttackType: PBTypes.AttackVals.RANGE,

@@ -1163,7 +1163,7 @@
             "desc": [
                 "Calls a meteor shower down on the battlefield, dealing {} damage.",
                 "Magical: it ignores armor, but magic resistance cuts it down.",
-                "Earth magic: no element withstands falling stone — and none feeds it."
+                "Earth magic: a Wind Element is struck half again as hard."
             ],
             "target": "FREE_CELL",
             "power": 21.6,
@@ -1375,12 +1375,13 @@
             "level": 1,
             "desc": [
                 "Sends a small fireball at an enemy in line of sight, dealing {} damage.",
-                "Magical: it ignores armor, but magic resistance cuts it down."
+                "Magical: it ignores armor, but magic resistance cuts it down.",
+                "Fire magic: a Fire Element is untouched, a Water Element burns half again as hard."
             ],
             "target": "ANY_ENEMY",
             "power": 6,
             "power_type": "COMMON",
-            "element": "",
+            "element": "FIRE",
             "multiplier_type": "UNIT_AMOUNT_DAMAGE",
             "laps": 1,
             "is_buff": false,
@@ -1396,12 +1397,13 @@
             "level": 2,
             "desc": [
                 "Calls a meteorite down on any 2x2 block of the battlefield.",
-                "Every enemy caught under it takes {} damage."
+                "Every enemy caught under it takes {} damage.",
+                "Earth magic: a Wind Element is struck half again as hard."
             ],
             "target": "FREE_CELL",
             "power": 4,
             "power_type": "COMMON",
-            "element": "",
+            "element": "EARTH",
             "multiplier_type": "UNIT_AMOUNT_DAMAGE",
             "laps": 1,
             "is_buff": false,

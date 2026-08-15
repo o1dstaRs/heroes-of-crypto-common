@@ -1924,6 +1924,7 @@ export class GameActionEngine {
             targetIsFireElement: unit.hasAbilityActive("Fire Element"),
             targetIsWaterElement: unit.hasAbilityActive("Water Element"),
             targetIsWindElement: unit.hasAbilityActive("Wind Element"),
+            targetIsEarthElement: unit.hasAbilityActive("Earth Element"),
         });
         // Shared with the client's hover projection so the number a player is shown and the number this
         // deals are produced by the same arithmetic, not two copies of it.

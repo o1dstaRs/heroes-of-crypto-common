@@ -500,6 +500,7 @@ export function canCastSpell(
             targetIsFireElement: targetUnit.hasAbilityActive("Fire Element"),
             targetIsWaterElement: targetUnit.hasAbilityActive("Water Element"),
             targetIsWindElement: targetUnit.hasAbilityActive("Wind Element"),
+            targetIsEarthElement: targetUnit.hasAbilityActive("Earth Element"),
         }) <= 0;
 
     const notAlreadyApplied = (): boolean => {

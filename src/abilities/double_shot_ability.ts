@@ -86,6 +86,17 @@ export function processDoubleShotAbility(
         };
     }
 
+    // The second arrow LEAVES THE BOW before we know whether it lands, exactly as the first one does
+    // (attack_handler pushes the primary shot's animation and only then rolls its miss). Rolling first
+    // and returning early meant a missed second volley drew nothing at all: the player saw one arrow for
+    // a two-shot attack and had only the combat log to tell them a second was ever fired — which read as
+    // "double shot sometimes doesn't fire", since it looked right whenever the roll happened to hit.
+    animationData.push({
+        fromPosition: fromUnit.getPosition(),
+        toPosition: hoverRangeAttackPosition,
+        affectedUnit: toUnit,
+    });
+
     const isSecondAttackMissed =
         HoCLib.getRandomInt(0, 100) <
         fromUnit.calculateMissChance(
@@ -106,12 +117,6 @@ export function processDoubleShotAbility(
             moraleDecreaseForTheUnitTeam,
         };
     }
-
-    animationData.push({
-        fromPosition: fromUnit.getPosition(),
-        toPosition: hoverRangeAttackPosition,
-        affectedUnit: toUnit,
-    });
     let aoeRangeAttackResult = processRangeAOEAbility(
         fromUnit,
         affectedUnits,
