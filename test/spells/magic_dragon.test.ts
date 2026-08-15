@@ -886,7 +886,7 @@ describe("Magic Reflection (passive)", () => {
         ]);
     });
 
-    it("keeps direct and rebound Flesh Shield absorption in separate event buckets", () => {
+    it("never routes spell damage — direct or rebounded — through a Flesh Shield owner", () => {
         alwaysRoll(0);
         const setup = setupDragonFight({
             casterAmountAlive: 1,
@@ -913,6 +913,7 @@ describe("Magic Reflection (passive)", () => {
         });
         placeUnit(setup.grid, setup.unitsHolder, abomination, { x: 4, y: 3 });
         setup.unitsHolder.refreshAuraEffectsForAllUnits();
+        const abominationHpBefore = abomination.getHp();
 
         const result = setup.engine.apply({
             type: "cast_spell",
@@ -924,41 +925,26 @@ describe("Magic Reflection (passive)", () => {
         expect(result.completed).toBe(true);
         const cast = result.events.find((event) => event.type === "spell_cast");
         const absorbed = cast?.type === "spell_cast" ? (cast.secondary ?? []) : [];
-        expect(absorbed).toEqual([
-            expect.objectContaining({
-                source: "flesh_shield",
-                unitId: abomination.getId(),
-                amount: 120,
-            }),
-            expect.objectContaining({
-                source: "flesh_shield",
-                unitId: abomination.getId(),
-                amount: 90,
-                rebounded: true,
-            }),
-        ]);
-        expect(absorbed.filter((entry) => entry.rebounded)).toHaveLength(1);
+        // The aura absorbs physical damage only: the burning ally beside it and the mirror's rebound onto the
+        // caster are both magical, so nothing is transferred and the owner stays untouched.
+        expect(absorbed.filter((entry) => entry.source === "flesh_shield")).toEqual([]);
+        expect(abomination.getHp()).toBe(abominationHpBefore);
     });
 
-    it("does not reward or demoralize its team when friendly Ring absorption kills the owner", () => {
+    it("does not reward or demoralize its team when the Ring burns a friendly stack to death", () => {
         alwaysRoll(99); // keep Magic Reflection out of this friendly-fire assertion
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
             enemies: [{ cell: { x: 5, y: 1 } }],
-            allies: [{ cell: { x: 5, y: 2 } }],
         });
-        const abomination = createTestUnit({
+        // Standing inside the ring next to the aimed enemy, this fragile friendly stack takes the full
+        // friendly-fire splash (120) and dies.
+        const victim = createTestUnit({
             name: "Abomination",
             team: PBTypes.TeamVals.LOWER,
             maxHp: 100,
-            luck: 10,
-            stackPower: 5,
             morale: 4,
-            abilities: ["Flesh Shield Aura"],
-            auraEffects: ["Flesh Shield"],
-            auraRanges: [1],
-            auraIsBuff: [true],
         });
         const witness = createTestUnit({
             name: "Abomination",
@@ -966,7 +952,7 @@ describe("Magic Reflection (passive)", () => {
             maxHp: 10_000,
             morale: 4,
         });
-        placeUnit(setup.grid, setup.unitsHolder, abomination, { x: 4, y: 3 });
+        placeUnit(setup.grid, setup.unitsHolder, victim, { x: 5, y: 2 });
         placeUnit(setup.grid, setup.unitsHolder, witness, { x: 8, y: 8 });
         setup.unitsHolder.refreshAuraEffectsForAllUnits();
         const casterMoraleBefore = setup.caster.getMorale();
@@ -980,7 +966,7 @@ describe("Magic Reflection (passive)", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(abomination.isDead()).toBe(true);
+        expect(victim.isDead()).toBe(true);
         expect(setup.caster.getMorale()).toBe(casterMoraleBefore);
         expect(witness.getMorale()).toBe(witnessMoraleBefore);
     });

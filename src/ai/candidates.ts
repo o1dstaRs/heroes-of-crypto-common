@@ -2780,6 +2780,7 @@ class CandidateGenerator {
             spell.getName() === "Fire Strike"
                 ? (unitId) => allUnits.get(unitId)?.getTeam() === this.unit.getTeam()
                 : undefined,
+            target.getCells(),
         );
     }
     /**

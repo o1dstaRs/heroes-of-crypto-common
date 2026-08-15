@@ -17,8 +17,11 @@ import {
     getClosestSideCenterDetailed,
     getPositionForCell,
     getRangeAttackSideCenter,
+    hasObservableRangeAttackEdge,
     isRangeAttackSideObservable,
+    observableRangeAttackEdges,
     RangeAttackCellSide,
+    resolveRangeAttackAimEdge,
 } from "../../src/grid/grid_math";
 import { testGridSettings } from "../helpers/combat";
 
@@ -227,5 +230,102 @@ describe("two-mountain BLOCK_CENTER map: visible edges stay selectable (occlusio
             expect(aim!.side).toBe(side);
             expect(aim!.cell).toEqual(target);
         }
+    });
+});
+
+describe("no visible edge means the shot is not allowed", () => {
+    const matrixWithNeighbours = (cell: { x: number; y: number }, neighbourValue: number): number[][] => {
+        const m = emptyMatrix();
+        setCell(m, cell.x, cell.y, LOWER);
+        setCell(m, cell.x - 1, cell.y, neighbourValue);
+        setCell(m, cell.x + 1, cell.y, neighbourValue);
+        setCell(m, cell.x, cell.y - 1, neighbourValue);
+        setCell(m, cell.x, cell.y + 1, neighbourValue);
+        return m;
+    };
+
+    it("reports no observable edge for a unit boxed in on all four sides by its own team", () => {
+        const target = { x: 8, y: 8 };
+        const m = matrixWithNeighbours(target, LOWER);
+        expect(hasObservableRangeAttackEdge(m, [target], UPPER)).toBe(false);
+        expect(observableRangeAttackEdges(m, [target], UPPER)).toEqual([]);
+        // ...and therefore offers nothing to aim at, rather than resolving to the target's centre.
+        expect(resolveRangeAttackAimEdge(m, GS, [target], cellCenter(1, 1), UPPER)).toBeUndefined();
+    });
+
+    it("still finds an edge when only one side is uncovered", () => {
+        const target = { x: 8, y: 8 };
+        const m = matrixWithNeighbours(target, LOWER);
+        setCell(m, target.x - 1, target.y, 0); // open the LEFT neighbour
+        expect(hasObservableRangeAttackEdge(m, [target], UPPER)).toBe(true);
+        const aim = resolveRangeAttackAimEdge(m, GS, [target], cellCenter(1, 8), UPPER);
+        expect(aim).toBeDefined();
+        expect(aim!.side).toBe(RangeAttackCellSide.LEFT);
+    });
+
+    it("Through Shot still sees an edge covered by bodies — only hard BLOCK hides one", () => {
+        const target = { x: 8, y: 8 };
+        const boxedByBodies = matrixWithNeighbours(target, LOWER);
+        // A plain shooter is refused; Tsar Cannon and friends pierce the screening bodies.
+        expect(hasObservableRangeAttackEdge(boxedByBodies, [target], UPPER, false)).toBe(false);
+        expect(hasObservableRangeAttackEdge(boxedByBodies, [target], UPPER, true)).toBe(true);
+
+        const boxedByRock = matrixWithNeighbours(target, ObstacleType.BLOCK);
+        expect(hasObservableRangeAttackEdge(boxedByRock, [target], UPPER, true)).toBe(false);
+    });
+
+    it("scans EVERY cell of a large target, so one walled-in corner does not hide the whole unit", () => {
+        // 2x2 target on (8,8),(9,8),(8,9),(9,9). Wall the (8,8) corner's own two outer sides only.
+        const cells = [
+            { x: 8, y: 8 },
+            { x: 9, y: 8 },
+            { x: 8, y: 9 },
+            { x: 9, y: 9 },
+        ];
+        const m = emptyMatrix();
+        for (const c of cells) {
+            setCell(m, c.x, c.y, LOWER);
+        }
+        setCell(m, 7, 8, ObstacleType.BLOCK);
+        setCell(m, 8, 7, ObstacleType.BLOCK);
+
+        expect(hasObservableRangeAttackEdge(m, [{ x: 8, y: 8 }], UPPER)).toBe(false);
+        // The whole footprint still presents open edges on the other cells.
+        expect(hasObservableRangeAttackEdge(m, cells, UPPER)).toBe(true);
+        expect(resolveRangeAttackAimEdge(m, GS, cells, cellCenter(1, 1), UPPER)).toBeDefined();
+    });
+
+    it("honors a legal requested aim and clamps an illegal one to the nearest observable edge", () => {
+        const target = { x: 8, y: 8 };
+        const m = emptyMatrix();
+        setCell(m, target.x, target.y, LOWER);
+        setCell(m, target.x - 1, target.y, LOWER); // LEFT is covered
+        const attackerPos = cellCenter(1, 8); // approaching from the left
+
+        const legal = resolveRangeAttackAimEdge(
+            m,
+            GS,
+            [target],
+            attackerPos,
+            UPPER,
+            false,
+            target,
+            RangeAttackCellSide.UP,
+        );
+        expect(legal!.side).toBe(RangeAttackCellSide.UP);
+
+        // LEFT is not observable, so the request is discarded rather than honoured.
+        const clamped = resolveRangeAttackAimEdge(
+            m,
+            GS,
+            [target],
+            attackerPos,
+            UPPER,
+            false,
+            target,
+            RangeAttackCellSide.LEFT,
+        );
+        expect(clamped).toBeDefined();
+        expect(clamped!.side).not.toBe(RangeAttackCellSide.LEFT);
     });
 });

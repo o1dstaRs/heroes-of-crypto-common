@@ -24,8 +24,6 @@ import type { IDamageStatistic } from "../scene/scene_stats";
 import type { ISecondaryDamage } from "../scene/animations";
 import * as SpellHelper from "../spells/spell_helper";
 
-import { processFleshShieldAura } from "./flesh_shield_aura_ability";
-
 interface ILayerImpact {
     cells: HoCMath.XY[];
     damage: number;
@@ -72,12 +70,9 @@ function attackEnemiesAndGetLayerImpact(
     multiplier: number,
     abilityMultiplier: number,
     alreadyAffectedIds: string[],
-    grid: Grid,
-    unitsHolder: UnitsHolder,
     sceneLog: ISceneLog,
     unitIdsDied: string[],
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
-    moraleDecreaseForTheUnitTeam: Record<string, number>,
     secondaryDamage?: ISecondaryDamage[],
 ): ILayerImpact[] {
     const fullLayerImpact: ILayerImpact[] = [];
@@ -101,7 +96,7 @@ function attackEnemiesAndGetLayerImpact(
             );
         }
 
-        let targetEnemyLightningDamage = Math.floor(
+        const targetEnemyLightningDamage = Math.floor(
             ((abilityMultiplier * multiplier) / 8) *
                 attackDamage *
                 (1 - enemyMagicResist / 100) *
@@ -111,32 +106,8 @@ function attackEnemiesAndGetLayerImpact(
         alreadyAffectedIds.push(e1.getId());
         let enemyMinusMorale = 0;
         if (targetEnemyLightningDamage && !e1.isDead()) {
-            const fleshShieldResult = processFleshShieldAura(
-                fromUnit,
-                e1,
-                targetEnemyLightningDamage,
-                false,
-                grid,
-                unitsHolder,
-                sceneLog,
-                damageStatisticHolder,
-                secondaryDamage,
-                "magic",
-            );
-            targetEnemyLightningDamage = fleshShieldResult.remainingDamage;
-            moraleIncrease += fleshShieldResult.increaseMorale;
-            for (const unitId of fleshShieldResult.unitIdsDied) {
-                if (!unitIdsDied.includes(unitId)) {
-                    unitIdsDied.push(unitId);
-                }
-            }
-            for (const [unitNameKey, moraleDecrease] of Object.entries(
-                fleshShieldResult.moraleDecreaseForTheUnitTeam,
-            )) {
-                moraleDecreaseForTheUnitTeam[unitNameKey] =
-                    (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
-            }
-
+            // ABILITY Flesh Shield Aura (Abomination) does NOT apply: the aura soaks physical damage only and
+            // every arc of Chain Lightning is magical, so a protected bounce target keeps the whole jolt.
             const e1AmountBefore = e1.getAmountAlive();
             const positionAtImpact = { ...e1.getPosition() };
             const damageDealt = e1.applyDamage(targetEnemyLightningDamage, 0 /* magic attack */, sceneLog);
@@ -223,33 +194,10 @@ export function processChainLightningAbility(
     let totalMagicDamageReflection = 0;
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
     let totalMoraleIncrease = 0;
-    let targetEnemyLightningDamage =
+    const targetEnemyLightningDamage =
         Math.floor(abilityMultiplier * attackDamage * (1 - targetMagicResist / 100)) * heavyArmorMultiplierTarget;
     if (targetEnemyLightningDamage && !targetUnit.isDead()) {
-        const fleshShieldResult = processFleshShieldAura(
-            fromUnit,
-            targetUnit,
-            targetEnemyLightningDamage,
-            false,
-            grid,
-            unitsHolder,
-            sceneLog,
-            damageStatisticHolder,
-            secondaryDamage,
-            "magic",
-        );
-        targetEnemyLightningDamage = fleshShieldResult.remainingDamage;
-        totalMoraleIncrease += fleshShieldResult.increaseMorale;
-        for (const unitId of fleshShieldResult.unitIdsDied) {
-            if (!unitIdsDied.includes(unitId)) {
-                unitIdsDied.push(unitId);
-            }
-        }
-        for (const [unitNameKey, moraleDecrease] of Object.entries(fleshShieldResult.moraleDecreaseForTheUnitTeam)) {
-            moraleDecreaseForTheUnitTeam[unitNameKey] =
-                (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
-        }
-
+        // Flesh Shield is physical-only, so this magical jolt is never redirected to a nearby Abomination.
         const targetAmountBefore = targetUnit.getAmountAlive();
         const targetPositionAtImpact = { ...targetUnit.getPosition() };
         const damageDealt = targetUnit.applyDamage(targetEnemyLightningDamage, 0 /* magic attack */, sceneLog);
@@ -306,12 +254,9 @@ export function processChainLightningAbility(
         7,
         abilityMultiplier,
         affectedEnemiesIds,
-        grid,
-        unitsHolder,
         sceneLog,
         unitIdsDied,
         damageStatisticHolder,
-        moraleDecreaseForTheUnitTeam,
         secondaryDamage,
     );
 
@@ -342,12 +287,9 @@ export function processChainLightningAbility(
             6,
             abilityMultiplier,
             affectedEnemiesIds,
-            grid,
-            unitsHolder,
             sceneLog,
             unitIdsDied,
             damageStatisticHolder,
-            moraleDecreaseForTheUnitTeam,
             secondaryDamage,
         );
 
@@ -377,12 +319,9 @@ export function processChainLightningAbility(
                 5,
                 abilityMultiplier,
                 affectedEnemiesIds,
-                grid,
-                unitsHolder,
                 sceneLog,
                 unitIdsDied,
                 damageStatisticHolder,
-                moraleDecreaseForTheUnitTeam,
                 secondaryDamage,
             );
 

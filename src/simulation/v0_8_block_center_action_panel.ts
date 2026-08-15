@@ -1071,6 +1071,7 @@ const canTargetOffensiveSpell = (caster: Unit, target: Unit, spell: Spell, conte
             spell.getName() === "Fire Strike"
                 ? (unitId) => context.unitsHolder.getAllUnits().get(unitId)?.getTeam() === caster.getTeam()
                 : undefined,
+            target.getCells(),
         )
     );
 };

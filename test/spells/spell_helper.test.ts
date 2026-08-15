@@ -641,3 +641,85 @@ function emptyMatrix(): number[][] {
         Array.from({ length: testGridSettings.getGridSize() }, () => 0),
     );
 }
+
+describe("Fire Strike needs a visible edge on its target", () => {
+    const withinGrid = (cell: { x: number; y: number }): boolean =>
+        cell.x >= 0 &&
+        cell.y >= 0 &&
+        cell.x < testGridSettings.getGridSize() &&
+        cell.y < testGridSettings.getGridSize();
+    const FROM = { x: 2, y: 8 };
+    const TARGET = { x: 8, y: 8 };
+    /** Grid where the four cells around TARGET are held by `cover` and everything else is empty. */
+    const boxedGrid = (cover: string) => ({
+        getOccupantUnitId: (cell: { x: number; y: number }): string | undefined => {
+            if (cell.x === TARGET.x && cell.y === TARGET.y) {
+                return "target";
+            }
+            const covered =
+                (cell.x === TARGET.x - 1 && cell.y === TARGET.y) ||
+                (cell.x === TARGET.x + 1 && cell.y === TARGET.y) ||
+                (cell.x === TARGET.x && cell.y === TARGET.y - 1) ||
+                (cell.x === TARGET.x && cell.y === TARGET.y + 1);
+            return covered ? cover : undefined;
+        },
+    });
+
+    it("refuses a target covered on all four sides by the caster's enemies", () => {
+        expect(isTargetedSpellLineOfSightClear("Fire Strike", boxedGrid("enemy"), withinGrid, FROM, TARGET)).toBe(
+            false,
+        );
+    });
+
+    it("still allows it when the cover is the caster's OWN troops, which it arcs over", () => {
+        const alliesAreTransparent = (unitId: string) => unitId === "ally";
+        expect(
+            isTargetedSpellLineOfSightClear(
+                "Fire Strike",
+                boxedGrid("ally"),
+                withinGrid,
+                FROM,
+                TARGET,
+                alliesAreTransparent,
+            ),
+        ).toBe(true);
+    });
+
+    it("treats lava and water as open sky rather than cover", () => {
+        for (const terrain of ["L", "W"]) {
+            expect(isTargetedSpellLineOfSightClear("Fire Strike", boxedGrid(terrain), withinGrid, FROM, TARGET)).toBe(
+                true,
+            );
+        }
+    });
+
+    it("scans the whole footprint, so a large target boxed in on one cell is still reachable", () => {
+        // TARGET's own four sides are covered, but the unit also stands on (9,8) whose sides are open.
+        const cells = [TARGET, { x: 9, y: 8 }];
+        expect(
+            isTargetedSpellLineOfSightClear(
+                "Fire Strike",
+                boxedGrid("enemy"),
+                withinGrid,
+                FROM,
+                TARGET,
+                undefined,
+                cells,
+            ),
+        ).toBe(true);
+    });
+
+    it("does not extend the gate to a target with an ally-covered edge and a rock on the lane", () => {
+        // Fire Strike arcs over the caster's troops, so ally cover leaves the edge visible — but the rock
+        // sitting on the lane still refuses the cast. Proves the edge gate ADDS a reason to refuse rather
+        // than replacing the existing line-walk one.
+        const alliesAreTransparent = (unitId: string) => unitId === "ally";
+        const rockOnLane = {
+            getOccupantUnitId: (cell: { x: number; y: number }): string | undefined =>
+                cell.x === 5 && cell.y === TARGET.y ? "B" : boxedGrid("ally").getOccupantUnitId(cell),
+        };
+        expect(
+            isTargetedSpellLineOfSightClear("Fire Strike", rockOnLane, withinGrid, FROM, TARGET, alliesAreTransparent),
+        ).toBe(false);
+    });
+});

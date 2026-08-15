@@ -17,7 +17,6 @@ import {
 } from "../constants";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { processCraftAbility } from "../abilities/craft_ability";
-import { processFleshShieldAura } from "../abilities/flesh_shield_aura_ability";
 import * as EffectHelper from "../effects/effect_helper";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { AttackType, FactionType, TeamType } from "../generated/protobuf/v1/types_gen";
@@ -27,13 +26,9 @@ import {
     getCellForPosition,
     getPositionForCell,
     getPositionForCells,
-    getRangeAttackSideCenter,
     isCellWithinGrid,
-    isRangeAttackSideObservable,
-    RANGE_ATTACK_CELL_SIDES,
-    RangeAttackCellSide,
+    resolveRangeAttackAimEdge,
 } from "../grid/grid_math";
-import { getDistance } from "../utils/math";
 import type { IWeightedRoute } from "../grid/path_definitions";
 import type { AttackHandler } from "../handlers/attack_handler";
 import type { IAnimationData, ISecondaryDamage, IVisibleDamage } from "../scene/animations";
@@ -694,8 +689,13 @@ export class GameActionEngine {
         // The shot travels from the attacker's center to the CENTER OF THE SELECTED VISIBLE EDGE of
         // the target, never to the target's center. The edge is reconstructed authoritatively here
         // from the client's bounded intent (aimCell + aimSide); malformed/occluded aim is clamped to
-        // a legal edge, so the server geometry can never be compromised.
+        // a legal edge, so the server geometry can never be compromised. No visible edge at all means
+        // the target is fully screened by its own side and there is nothing legal to aim at — reject
+        // rather than aim at its center.
         const toPosition = this.resolveRangeTargetPosition(attacker, target, action.aimCell, action.aimSide);
+        if (!toPosition) {
+            return this.reject("attack_not_available");
+        }
 
         let evalResult = this.context.attackHandler.evaluateRangeAttack(
             this.context.unitsHolder.getAllUnits(),
@@ -852,71 +852,25 @@ export class GameActionEngine {
      * If the unit is fully hidden (no observable side) it falls back to the target center — the
      * trajectory still hits whatever occluder stands in front first.
      */
-    private resolveRangeTargetPosition(attacker: Unit, target: Unit, aimCell?: XY, aimSide?: number): XY {
-        const gridMatrix = this.context.grid.getMatrix();
-        const fromTeam = attacker.getTeam();
-        const isThroughShot = attacker.hasAbilityActive("Through Shot");
-        const attackerPosition = attacker.getPosition();
-        const targetCells = target.getCells();
-
-        const cell =
-            (aimCell && targetCells.find((c) => c.x === aimCell.x && c.y === aimCell.y)) ||
-            this.closestCellToPosition(targetCells, attackerPosition);
-        if (!cell) {
-            return target.getPosition();
-        }
-
-        const observableSides = RANGE_ATTACK_CELL_SIDES.filter((side) =>
-            isRangeAttackSideObservable(gridMatrix, cell, side, fromTeam, isThroughShot),
-        );
-        if (!observableSides.length) {
-            return target.getPosition();
-        }
-
-        const side =
-            aimSide !== undefined && observableSides.includes(aimSide as RangeAttackCellSide)
-                ? (aimSide as RangeAttackCellSide)
-                : this.closestObservableSide(cell, observableSides, attackerPosition);
-
-        return getRangeAttackSideCenter(this.context.grid.getSettings(), cell, side, attackerPosition);
-    }
-    private closestCellToPosition(cells: XY[], position: XY): XY | undefined {
-        const gridSettings = this.context.grid.getSettings();
-        let best: XY | undefined;
-        let bestDistance = Number.MAX_VALUE;
-        for (const cell of cells) {
-            const cellPosition = getPositionForCell(
-                cell,
-                gridSettings.getMinX(),
-                gridSettings.getStep(),
-                gridSettings.getHalfStep(),
-            );
-            const distance = getDistance(position, cellPosition);
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                best = cell;
-            }
-        }
-        return best;
-    }
-    private closestObservableSide(
-        cell: XY,
-        sides: readonly RangeAttackCellSide[],
-        attackerPosition: XY,
-    ): RangeAttackCellSide {
-        const gridSettings = this.context.grid.getSettings();
-        let best = sides[0];
-        let bestDistance = Number.MAX_VALUE;
-        for (const side of sides) {
-            const point = getRangeAttackSideCenter(gridSettings, cell, side, attackerPosition);
-            const distance = getDistance(attackerPosition, point);
-            // Deterministic: strict less-than keeps the lower side index on ties.
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                best = side;
-            }
-        }
-        return best;
+    /**
+     * The visible-edge center this shot lands on, or undefined when the target presents NO visible edge.
+     *
+     * Undefined means the shot is ILLEGAL, not "aim somewhere else": a shot always flies to the center of a
+     * visible edge, so a unit boxed in on every side by its own allies and/or BLOCK obstacles has no legal
+     * aim point. This used to return target.getPosition() instead, which let a fully-screened unit be shot
+     * straight through the middle — the one case where the trajectory ignored the cover around it.
+     */
+    private resolveRangeTargetPosition(attacker: Unit, target: Unit, aimCell?: XY, aimSide?: number): XY | undefined {
+        return resolveRangeAttackAimEdge(
+            this.context.grid.getMatrix(),
+            this.context.grid.getSettings(),
+            target.getCells(),
+            attacker.getPosition(),
+            attacker.getTeam(),
+            attacker.hasAbilityActive("Through Shot"),
+            aimCell,
+            aimSide,
+        )?.position;
     }
     private obstacleAttack(action: Extract<GameAction, { type: "obstacle_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
@@ -1191,6 +1145,9 @@ export class GameActionEngine {
                 // ANY body, and each re-checks that strictly in its own handler — scoping the transparency
                 // here keeps this gate from quietly becoming the more permissive of the two.
                 spell.getName() === "Fire Strike" ? (unitId) => this.isAllyOfCaster(caster, unitId) : undefined,
+                // The whole footprint, so a large target boxed in on one corner is still reachable by the
+                // open edge of another of its cells.
+                target.getCells(),
             );
         // Every unit-targeted spell must pass the same authoritative gate before dispatch. Most spells flow
         // through AttackHandler.handleMagicAttack, which rejects Hidden enemies and calls canCastSpell; the
@@ -1576,7 +1533,6 @@ export class GameActionEngine {
             rebounded?: boolean;
             reboundedFromUnitId?: string;
         }[];
-        secondary: ISecondaryDamage[];
         unitIdsDied: string[];
         killed: Array<{ victim: Unit; killer: Unit }>;
     } {
@@ -1588,88 +1544,25 @@ export class GameActionEngine {
             rebounded?: boolean;
             reboundedFromUnitId?: string;
         }[] = [];
-        const secondary: ISecondaryDamage[] = [];
         const unitIdsDied: string[] = [];
         const killed: Array<{ victim: Unit; killer: Unit }> = [];
         const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         let casterPlusMorale = 0;
 
-        // A spell AOE is one simultaneous impact. Resolve directly-hit Flesh Shield owners before protected
-        // allies so the owner's own hit reserves its HP first; otherwise an allies-first cell order can spend
-        // all owner HP on transfers and make the owner's direct spell hit disappear. A later Magic Mirror
-        // rebound is not part of the original impact and keeps its causal position.
-        const impactOrder = [
-            ...victims.filter(({ unit, rebounded }) => !rebounded && unit.hasAbilityActive("Flesh Shield Aura")),
-            ...victims.filter(({ unit, rebounded }) => rebounded || !unit.hasAbilityActive("Flesh Shield Aura")),
-        ];
-        for (const { unit, damage, rebounded, reboundedFromUnitId } of impactOrder) {
+        // ABILITY Flesh Shield Aura (Abomination) does NOT apply here: the aura absorbs physical damage
+        // only, and every point a spell deals is magical. A protected ally eats a cast spell in full, so
+        // there is no owner-first impact ordering to arrange — victims resolve in their natural order.
+        for (const { unit, damage, rebounded, reboundedFromUnitId } of victims) {
             // Several Magic Mirrors can enqueue the caster more than once. Once an earlier rebound has killed
             // it, do not call Unit.applyDamage on the dead stack again: that method deliberately assumes a live
             // stack and a second call can otherwise mutate a zero-sized stack or report phantom damage.
             if (unit.isDead()) {
                 continue;
             }
-            // ABILITY Flesh Shield Aura (Abomination): a protected ally hands part of the hit to the
-            // Abomination standing beside it. Cast spell damage went straight to applyDamage and skipped
-            // this entirely, so the aura absorbed Fire Breath and Chain Lightning (whose ability modules
-            // call it themselves) but nothing the spellbook threw — Fire Strike and Meteorite passed
-            // through untouched. "magic" so the transfer is recalculated against magic resistance rather
-            // than armor, exactly as the other two magic call sites do.
-            const statisticHolder = this.context.attackHandler?.getDamageStatisticHolder();
-            let incomingDamage = damage;
-            if (statisticHolder) {
-                const fleshShieldResult = processFleshShieldAura(
-                    caster,
-                    unit,
-                    incomingDamage,
-                    false,
-                    this.context.grid,
-                    this.context.unitsHolder,
-                    this.context.sceneLog,
-                    statisticHolder,
-                    secondary,
-                    "magic",
-                    !rebounded,
-                    Boolean(rebounded),
-                );
-                incomingDamage = fleshShieldResult.remainingDamage;
-                const isHostileImpact = unit.getTeam() !== caster.getTeam();
-                if (!rebounded && isHostileImpact) {
-                    casterPlusMorale += fleshShieldResult.increaseMorale;
-                    for (const [teamKey, moraleDecrease] of Object.entries(
-                        fleshShieldResult.moraleDecreaseForTheUnitTeam,
-                    )) {
-                        moraleDecreaseForTheUnitTeam[teamKey] =
-                            (moraleDecreaseForTheUnitTeam[teamKey] ?? 0) + moraleDecrease;
-                    }
-                }
-                for (const unitId of fleshShieldResult.unitIdsDied) {
-                    if (!unitIdsDied.includes(unitId)) {
-                        unitIdsDied.push(unitId);
-                    }
-                    // Redirected damage is still an explicit kill by this spell. Preserve that attribution for
-                    // Infest, but never credit friendly Ring-of-Fire absorption or a self-damaging rebound.
-                    const absorbedVictim = this.context.unitsHolder.getAllUnits().get(unitId);
-                    if (
-                        !rebounded &&
-                        absorbedVictim?.isDead() &&
-                        absorbedVictim.getTeam() !== caster.getTeam() &&
-                        !killed.some(({ victim }) => victim.getId() === unitId)
-                    ) {
-                        killed.push({ victim: absorbedVictim, killer: caster });
-                    }
-                }
-            }
 
             const positionAtImpact = { ...unit.getPosition() };
             const amountAliveBefore = unit.getAmountAlive();
-            const damageDealt = unit.applyDamage(
-                incomingDamage,
-                0 /* magic attack */,
-                this.context.sceneLog,
-                false,
-                caster,
-            );
+            const damageDealt = unit.applyDamage(damage, 0 /* magic attack */, this.context.sceneLog, false, caster);
             const unitsDied = Math.max(0, amountAliveBefore - unit.getAmountAlive());
 
             damaged.push({
@@ -1722,7 +1615,7 @@ export class GameActionEngine {
             );
         }
 
-        return { damaged, secondary, unitIdsDied, killed };
+        return { damaged, unitIdsDied, killed };
     }
     /**
      * Fire Strike (Battle Mage / Basic Tome of Battle Magic): a small fireball thrown at a single enemy.
@@ -1802,7 +1695,7 @@ export class GameActionEngine {
             caster.getMagicDamageBonusPercentage(),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, [victim]);
-        const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
             `${caster.getName()} 🔥 ${victim.getName()} (${spellDamageDealt(damaged, victim.getId())})`,
@@ -1820,7 +1713,6 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: [],
                 damaged,
-                ...(secondary.length ? { secondary } : {}),
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
@@ -1873,7 +1765,7 @@ export class GameActionEngine {
             caster.getMagicDamageBonusPercentage(),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, enemies);
-        const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
             // Post-resistance total across everyone under the 2x2 — see the Lightning Strike log below.
@@ -1889,7 +1781,6 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: [],
                 damaged,
-                ...(secondary.length ? { secondary } : {}),
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
@@ -2017,7 +1908,7 @@ export class GameActionEngine {
             caster.getMagicDamageBonusPercentage(),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, [target]);
-        const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         // The number the victim ACTUALLY took, not the pre-resistance roll. Logging rawDamage printed the
         // same figure whatever the target's magic resistance was, which read as "mdef does nothing" even
@@ -2037,7 +1928,6 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: [],
                 damaged,
-                ...(secondary.length ? { secondary } : {}),
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
@@ -2113,7 +2003,7 @@ export class GameActionEngine {
             caster.getMagicDamageBonusPercentage(),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, caught);
-        const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
             // Post-resistance total across everyone caught — see the Lightning Strike log above. Each victim
@@ -2131,7 +2021,6 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: [],
                 damaged,
-                ...(secondary.length ? { secondary } : {}),
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
@@ -2189,7 +2078,7 @@ export class GameActionEngine {
             caster.getMagicDamageBonusPercentage(),
         );
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, enemies);
-        const { damaged, secondary, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
         this.context.sceneLog.updateLog(
             // Post-resistance total, as with Ring of Fire above.
@@ -2205,7 +2094,6 @@ export class GameActionEngine {
                 unitIdsDied,
                 animations: [],
                 damaged,
-                ...(secondary.length ? { secondary } : {}),
             },
         ];
         events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));

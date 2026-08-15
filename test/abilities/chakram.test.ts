@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
     CHAKRAM_HALF_DAMAGE_FACTOR,
+    chakramHopDistance,
     chakramMaxTargets,
     chakramSeparation,
     resolveChakramTrajectory,
@@ -220,5 +221,80 @@ describe("Zena's Chakram — separation chain", () => {
         const other = createTestUnit({ name: "Other", team: RED });
         placeUnit(context.grid, context.unitsHolder, other, { x: 6, y: 4 });
         expect(chakramSeparation(small, other)).toBe(2); // one empty column between them
+    });
+});
+
+/**
+ * One cell in between is one cell in between, whichever way it lies. A straight gap, a knight-style
+ * offset and a pure diagonal are the SAME reach for the disc — they differ only in how the eye reads
+ * them on the board.
+ */
+describe("Zena's Chakram — one cell in between reads the same in every direction", () => {
+    // Offsets from a unit, each leaving exactly one empty cell between the two footprints.
+    const ONE_CELL_BETWEEN: ReadonlyArray<readonly [string, number, number]> = [
+        ["straight", 2, 0],
+        ["knight-offset", 1, 2],
+        ["knight-offset mirrored", 2, 1],
+        ["pure diagonal", 2, 2],
+    ];
+
+    it("ranks every one-cell gap as the same hop distance", () => {
+        const origin = { x: 8, y: 8 };
+        for (const [label, dx, dy] of ONE_CELL_BETWEEN) {
+            const hop = chakramHopDistance(origin, { x: origin.x + dx, y: origin.y + dy });
+            expect(`${label}: ${hop}`).toBe(`${label}: 2`);
+        }
+    });
+
+    it("separates the same in every direction, so each keeps FULL bounce damage", () => {
+        for (const [label, dx, dy] of ONE_CELL_BETWEEN) {
+            const context = setup();
+            const primary = enemy(context, "Primary", { x: 8, y: 8 });
+            const neighbour = enemy(context, "Neighbour", { x: 8 + dx, y: 8 + dy });
+
+            expect(`${label}: ${chakramSeparation(primary, neighbour)}`).toBe(`${label}: 2`);
+
+            const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+            expect(`${label}: ${trajectory.hitUnits.map((u) => u.getName()).join(",")}`).toBe(`${label}: Neighbour`);
+            expect(`${label}: ${trajectory.damageFactorByUnitId[neighbour.getId()]}`).toBe(`${label}: 1`);
+        }
+    });
+
+    // The regression this guards: the hop tie-break used to be SQUARED EUCLIDEAN, which scores the same
+    // three gaps 4 / 5 / 8. With only one bounce left the disc always took the straight gap and the
+    // diagonal neighbour was passed over, even though both stand one cell away.
+    //
+    // Unit ids are generated, so a SINGLE trial cannot tell the two rules apart: under the old rule the
+    // straight unit always won, and it happened to hold the lower id about half the time. Repeating the
+    // scenario with fresh ids does separate them — under the fix the lower id wins EVERY time, under the
+    // old rule it wins only when geometry and id agree, so the run fails long before the last trial.
+    it("does not spend its last bounce on the straight gap in preference to the diagonal one", () => {
+        const TRIALS = 24;
+        const winners: string[] = [];
+
+        for (let trial = 0; trial < TRIALS; trial += 1) {
+            const context = setup(2); // stack power 2 -> primary + exactly ONE bounce
+            const primary = enemy(context, "Primary", { x: 8, y: 8 });
+            const straight = enemy(context, "Straight", { x: 10, y: 8 }); // squared-euclid 4
+            const diagonal = enemy(context, "Diagonal", { x: 10, y: 10 }); // squared-euclid 8
+
+            expect(chakramSeparation(primary, straight)).toBe(chakramSeparation(primary, diagonal));
+
+            const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+            expect(trajectory.hitUnits).toHaveLength(1);
+
+            const lowerId = [straight, diagonal].sort((a, b) => (a.getId() < b.getId() ? -1 : 1))[0];
+            winners.push(trajectory.hitUnits[0]?.getId() === lowerId.getId() ? "id" : "geometry");
+        }
+
+        // Every hop settled on identity, never on which way the gap happened to lie.
+        expect(winners.filter((w) => w === "geometry")).toEqual([]);
+    });
+
+    it("ranks a one-cell diagonal gap as nearer than a two-cell straight one", () => {
+        // Chebyshev keeps the ordering meaningful: equal gaps tie, but a genuinely closer unit still wins.
+        expect(chakramHopDistance({ x: 8, y: 8 }, { x: 10, y: 10 })).toBeLessThan(
+            chakramHopDistance({ x: 8, y: 8 }, { x: 11, y: 8 }),
+        );
     });
 });

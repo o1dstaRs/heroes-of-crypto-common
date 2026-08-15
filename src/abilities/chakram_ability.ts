@@ -61,6 +61,22 @@ export interface IChakramTrajectory {
     mountainCells: XY[];
 }
 
+/**
+ * How far the disc reckons one hop, base cell to base cell — Chebyshev, the same metric
+ * {@link chakramSeparation} uses. Every arrangement with ONE cell in between is one hop, whether that
+ * cell sits straight ahead, on the diagonal, or on a knight-style offset:
+ *
+ *   . . X      . . .      . . .
+ *   . . .      . X .      . . .
+ *   A . .      A . .      A . X
+ *
+ * All three read 2 here (one empty cell between), so none of them is "farther" than the others. Squared
+ * Euclidean would rank the same three 4 / 5 / 8 and quietly bias the flight toward the straight gap.
+ */
+export function chakramHopDistance(from: XY, to: XY): number {
+    return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+}
+
 /** Footprint-to-footprint Chebyshev distance: the number of empty cells between two units, plus one. */
 export function chakramSeparation(a: Unit, b: Unit): number {
     const aCells = a.isSmallSize() ? [a.getBaseCell()] : a.getCells();
@@ -153,8 +169,10 @@ function lineCells(from: XY, to: XY): XY[] {
  *    body (any team, or an obstacle) is a wall, not a bounce target.
  *  - Each victim is struck at most once per throw; the primary target never takes a second hit.
  *  - Total victims, INCLUDING the primary target, cannot exceed the attacker's stack power (1..5).
- *  - Nearest-first: smallest separation to the struck cluster wins; ties break by base-cell distance
- *    to the LAST unit hit, then by unit id — the flight is byte-identical everywhere it is computed.
+ *  - Nearest-first: smallest separation to the struck cluster wins; ties break by CHEBYSHEV base-cell
+ *    distance to the LAST unit hit (see {@link chakramHopDistance}), then by unit id — the flight is
+ *    byte-identical everywhere it is computed. Chebyshev throughout is what makes a straight, diagonal
+ *    and knight-offset gap of one cell rank as the same distance rather than three different ones.
  *  - Angel's "Arrows Wingshield Aura" owner is never struck and STOPS the whole flight when it is the
  *    next nearest bounce — the shield catches the disc.
  */
@@ -221,7 +239,7 @@ export function resolveChakramTrajectory(
             }
             const from = last.getBaseCell();
             const to = unit.getBaseCell();
-            const tieBreak = (to.x - from.x) * (to.x - from.x) + (to.y - from.y) * (to.y - from.y);
+            const tieBreak = chakramHopDistance(from, to);
             if (
                 separation < nextSeparation ||
                 (separation === nextSeparation && tieBreak < nextTieBreak) ||

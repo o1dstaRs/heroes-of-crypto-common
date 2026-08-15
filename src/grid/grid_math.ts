@@ -669,6 +669,103 @@ export interface IClosestSideCenter {
 }
 
 /**
+ * Every (cell, side) pair of `targetCells` a shot from `fromTeamType` can legally land on. A ranged shot
+ * always flies to the center of a VISIBLE EDGE — never to the target's geometric center — so a unit whose
+ * every edge is covered (boxed in by its own allies and/or BLOCK obstacles) offers no legal aim point and
+ * simply cannot be shot.
+ *
+ * Scans ALL of the target's cells on purpose: a 2x2 whose nearest corner is walled in may still present an
+ * open edge on a far cell, and that shot is legal. Checking only the closest cell would make such a unit
+ * unshootable.
+ */
+export function observableRangeAttackEdges(
+    gridMatrix: number[][],
+    targetCells: readonly XY[],
+    fromTeamType: TeamType,
+    isThroughShot = false,
+): Array<{ cell: XY; side: RangeAttackCellSide }> {
+    const edges: Array<{ cell: XY; side: RangeAttackCellSide }> = [];
+    for (const cell of targetCells) {
+        for (const side of RANGE_ATTACK_CELL_SIDES) {
+            if (isRangeAttackSideObservable(gridMatrix, cell, side, fromTeamType, isThroughShot)) {
+                edges.push({ cell, side });
+            }
+        }
+    }
+    return edges;
+}
+
+/** Whether any edge of `targetCells` is visible to `fromTeamType` — i.e. whether a ranged shot is possible. */
+export function hasObservableRangeAttackEdge(
+    gridMatrix: number[][],
+    targetCells: readonly XY[],
+    fromTeamType: TeamType,
+    isThroughShot = false,
+): boolean {
+    for (const cell of targetCells) {
+        for (const side of RANGE_ATTACK_CELL_SIDES) {
+            if (isRangeAttackSideObservable(gridMatrix, cell, side, fromTeamType, isThroughShot)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * The visible edge a shot resolves to, honoring the shooter's bounded intent (`aimCell` + `aimSide`) when
+ * that pair is still legal and clamping to the observable edge nearest the attacker otherwise. Returns
+ * undefined when the target presents NO visible edge, which callers must treat as "this shot is not
+ * allowed" rather than falling back to the target's center.
+ *
+ * Shared by the client preview and the authoritative engine so the two can never disagree about which
+ * shots exist.
+ */
+export function resolveRangeAttackAimEdge(
+    gridMatrix: number[][],
+    gridSettings: GridSettings,
+    targetCells: readonly XY[],
+    attackerPosition: XY,
+    fromTeamType: TeamType,
+    isThroughShot = false,
+    aimCell?: XY,
+    aimSide?: number,
+): IClosestSideCenter | undefined {
+    const edges = observableRangeAttackEdges(gridMatrix, targetCells, fromTeamType, isThroughShot);
+    if (!edges.length) {
+        return undefined;
+    }
+
+    const requested =
+        aimCell && aimSide !== undefined
+            ? edges.find((edge) => edge.cell.x === aimCell.x && edge.cell.y === aimCell.y && edge.side === aimSide)
+            : undefined;
+    if (requested) {
+        return {
+            position: getRangeAttackSideCenter(gridSettings, requested.cell, requested.side, attackerPosition),
+            cell: requested.cell,
+            side: requested.side,
+        };
+    }
+
+    // Clamp: nearest observable edge to the attacker. Deterministic — ties keep the lower side index, and
+    // cells are walked in the target's own stable order.
+    let best = edges[0];
+    let bestPosition = getRangeAttackSideCenter(gridSettings, best.cell, best.side, attackerPosition);
+    let bestDistance = getDistance(attackerPosition, bestPosition);
+    for (let i = 1; i < edges.length; i += 1) {
+        const position = getRangeAttackSideCenter(gridSettings, edges[i].cell, edges[i].side, attackerPosition);
+        const distance = getDistance(attackerPosition, position);
+        if (distance < bestDistance) {
+            best = edges[i];
+            bestPosition = position;
+            bestDistance = distance;
+        }
+    }
+    return { position: bestPosition, cell: best.cell, side: best.side };
+}
+
+/**
  * Resolve which visible edge of an enemy unit a ranged shot is aimed at, given the mouse position.
  * Deterministic (no shuffle): the player aims at a cell + the side of it nearest the cursor among the
  * up-to-two sides closest to the attacker. Returns the cell and side so the same choice can be sent

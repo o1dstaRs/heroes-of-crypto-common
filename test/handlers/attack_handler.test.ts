@@ -836,14 +836,17 @@ describe("AttackHandler", () => {
             ]);
         });
 
-        it("does not hit a primary Abomination again after Fire Breath absorption kills it", () => {
+        // Skewer Strike, not Fire Breath: the aura absorbs PHYSICAL damage only, so a magical sweep can
+        // never kill the Abomination this way. The invariant under test is the same — a primary target
+        // already killed by an earlier sweep's absorption must not be struck a second time.
+        it("does not hit a primary Abomination again after Skewer Strike absorption kills it", () => {
             const { grid, unitsHolder, attackHandler, damageStatisticHolder } = createCombatTestContext();
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
             const attacker = createTestUnit({
-                name: "Fire Breather",
+                name: "Skewerer",
                 team: PBTypes.TeamVals.UPPER,
                 attackType: PBTypes.AttackVals.MELEE,
-                abilities: ["Fire Breath"],
+                abilities: ["Skewer Strike"],
             });
             const abomination = createTestUnit({
                 name: "Abomination",
@@ -897,7 +900,7 @@ describe("AttackHandler", () => {
                         amount: 50,
                     }),
                     expect.objectContaining({
-                        source: "fire_breath",
+                        source: "skewer_strike",
                         unitId: protectedAlly.getId(),
                         amount: 50,
                     }),
@@ -906,7 +909,7 @@ describe("AttackHandler", () => {
             expect(damageStatisticHolder.get().reduce((total, entry) => total + entry.damage, 0)).toBe(100);
         });
 
-        it("does not apply a base response after response Fire Breath absorption kills the attacker", () => {
+        it("does not apply a base response after response Skewer Strike absorption kills the attacker", () => {
             const { grid, unitsHolder, attackHandler, damageStatisticHolder } = createCombatTestContext();
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
             const abomination = createTestUnit({
@@ -928,12 +931,12 @@ describe("AttackHandler", () => {
                 armor: 20,
             });
             const responder = createTestUnit({
-                name: "Responding Fire Breather",
+                name: "Responding Skewerer",
                 team: PBTypes.TeamVals.LOWER,
                 maxHp: 1000,
                 armor: 20,
                 attackType: PBTypes.AttackVals.MELEE,
-                abilities: ["Fire Breath"],
+                abilities: ["Skewer Strike"],
             });
             abomination.calculateMissChance = () => 0;
             abomination.calculateAttackDamage = () => 10;

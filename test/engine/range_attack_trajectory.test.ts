@@ -355,3 +355,67 @@ describe("range attack on the two-mountain BLOCK_CENTER map (all angles)", () =>
         expect(after.affectedUnits.flat()).toContain(setup.target);
     });
 });
+
+describe("a fully covered target cannot be shot at all", () => {
+    // Box the target in with four of ITS OWN allies. Every edge is then covered, so there is no
+    // visible-edge center to fly to — the engine must refuse rather than aim through the middle.
+    const boxedInSetup = () =>
+        setupRangeFight({
+            attackerCell: { x: 1, y: 8 },
+            targetCell: { x: 8, y: 8 },
+            extraEnemies: [
+                { x: 7, y: 8 },
+                { x: 9, y: 8 },
+                { x: 8, y: 7 },
+                { x: 8, y: 9 },
+            ],
+        });
+
+    it("rejects the shot instead of resolving it to the target's center", () => {
+        const setup = boxedInSetup();
+        const hpBefore = setup.target.getCumulativeHp();
+        const shotsBefore = setup.attacker.getRangeShots();
+
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.attacker.getId(),
+            targetId: setup.target.getId(),
+        });
+
+        expect(result.completed).toBe(false);
+        // Nothing was spent and nobody was hurt — the action never happened.
+        expect(setup.target.getCumulativeHp()).toBe(hpBefore);
+        expect(setup.attacker.getRangeShots()).toBe(shotsBefore);
+    });
+
+    it("rejects it even when the client insists on an explicit covered aim", () => {
+        const setup = boxedInSetup();
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.attacker.getId(),
+            targetId: setup.target.getId(),
+            aimCell: { x: 8, y: 8 },
+            aimSide: RangeAttackCellSide.LEFT,
+        });
+        expect(result.completed).toBe(false);
+    });
+
+    it("allows the shot again as soon as one screening ally steps aside", () => {
+        const setup = setupRangeFight({
+            attackerCell: { x: 1, y: 8 },
+            targetCell: { x: 8, y: 8 },
+            // The LEFT neighbour is left empty, so that edge stays visible.
+            extraEnemies: [
+                { x: 9, y: 8 },
+                { x: 8, y: 7 },
+                { x: 8, y: 9 },
+            ],
+        });
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.attacker.getId(),
+            targetId: setup.target.getId(),
+        });
+        expect(result.completed).toBe(true);
+    });
+});

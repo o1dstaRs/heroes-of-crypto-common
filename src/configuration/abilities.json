@@ -1313,9 +1313,9 @@
         "name": "Flesh Shield Aura",
         "type": "BUFF_AURA",
         "desc": [
-            "Absorbs {}% of the attack damage dealt to allies within range.",
-            "The absorbed damage is recalculated against the owner's defense",
-            "and dealt to the owner instead."
+            "Absorbs {}% of the physical damage dealt to allies within range.",
+            "The absorbed damage is recalculated against the owner's armor",
+            "and dealt to the owner instead. Magical damage is not absorbed."
         ],
         "power": 90,
         "power_type": "ABSORB_DAMAGE",

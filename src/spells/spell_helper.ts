@@ -166,6 +166,68 @@ export interface ISpellSightGrid {
 }
 
 /**
+ * Whether a thrown spell can see a given side of one of the target's cells — the spell-side twin of
+ * GridMath.isRangeAttackSideObservable, expressed in the occupant-id vocabulary this module already speaks.
+ *
+ * An edge is covered by a body the throw would hit before the target (so the spell lands there instead) or
+ * by hard terrain ("B" mountain, "H" narrowed hole). It is NOT covered by open ground, by lava/water — a
+ * projectile flies over both — or by a body the throw is transparent to, which for Fire Strike is the
+ * caster's own troops it arcs above.
+ */
+function isThrownSpellSideObservable(
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    cell: XY,
+    side: XY,
+    isTransparentUnit?: (unitId: string) => boolean,
+): boolean {
+    const neighbour = { x: cell.x + side.x, y: cell.y + side.y };
+    // Off-board is open sky, not cover: a unit on the board edge still presents that edge.
+    if (!isWithinGrid(neighbour)) {
+        return true;
+    }
+    const occupant = grid.getOccupantUnitId(neighbour);
+    if (!occupant || occupant === "L" || occupant === "W") {
+        return true;
+    }
+    if (occupant === "B" || occupant === "H") {
+        return false;
+    }
+    return isTransparentUnit?.(occupant) === true;
+}
+
+const THROWN_SPELL_SIDE_OFFSETS: readonly XY[] = [
+    { x: -1, y: 0 },
+    { x: 1, y: 0 },
+    { x: 0, y: -1 },
+    { x: 0, y: 1 },
+];
+
+/**
+ * Whether ANY edge of `targetCells` is visible to a thrown spell. A throw lands on the center of a visible
+ * edge, exactly as a ranged shot does, so a unit covered on every side offers nothing legal to aim at and
+ * cannot be targeted — rather than being hit through its middle.
+ *
+ * Scans every cell of the target: a 2x2 whose near corner is walled in may still present an open edge on a
+ * far cell, and that throw is legal.
+ */
+export function hasObservableThrownSpellEdge(
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    targetCells: readonly XY[],
+    isTransparentUnit?: (unitId: string) => boolean,
+): boolean {
+    for (const cell of targetCells) {
+        for (const side of THROWN_SPELL_SIDE_OFFSETS) {
+            if (isThrownSpellSideObservable(grid, isWithinGrid, cell, side, isTransparentUnit)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * Is the straight line from `from` to `to` clear enough for a THROWN spell to reach its target?
  *
  * The rule an archer's shot obeys: everything strictly BETWEEN the two cells must be clear. The target stands
@@ -276,9 +338,26 @@ export function isTargetedSpellLineOfSightClear(
     from: XY,
     to: XY,
     isTransparentUnit?: (unitId: string) => boolean,
+    // The target's WHOLE footprint, for the visible-edge gate below. Optional so existing cell-only callers
+    // still compile; they degrade to checking the base cell, which is exact for a 1x1 target.
+    targetCells?: readonly XY[],
 ): boolean {
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return true;
+    }
+    // Fire Strike lands on the center of a VISIBLE EDGE of its target, never on the target's middle, so a
+    // unit covered on every side has no legal aim point and the cast is refused outright (owner 2026-08-15
+    // — the same rule ranged shots obey). Checked before the line walk because it is a property of the
+    // TARGET, independent of which lane the throw takes.
+    //
+    // Fire Strike ONLY. Vine Throw snares one named enemy and Ring of Fire resolves on the aimed target
+    // through their own cast paths; neither is a shot at an edge, and gating them here would silently
+    // delete legal casts the engine still performs.
+    if (
+        spellName === "Fire Strike" &&
+        !hasObservableThrownSpellEdge(grid, isWithinGrid, targetCells ?? [to], isTransparentUnit)
+    ) {
+        return false;
     }
     const blocker = firstTargetedSpellSightBlocker(spellName, grid, isWithinGrid, from, to, isTransparentUnit);
     if (!blocker) {
@@ -376,9 +455,18 @@ export function thrownSpellReachesAimedTarget(
     from: XY,
     to: XY,
     isTransparentUnit?: (unitId: string) => boolean,
+    targetCells?: readonly XY[],
 ): boolean {
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return true;
+    }
+    // Same Fire-Strike-only visible-edge gate the engine applies, so the AI never scores a throw the cast
+    // would refuse. Scoped identically — see isTargetedSpellLineOfSightClear.
+    if (
+        spellName === "Fire Strike" &&
+        !hasObservableThrownSpellEdge(grid, isWithinGrid, targetCells ?? [to], isTransparentUnit)
+    ) {
+        return false;
     }
     const impact = resolveThrownSpellImpact(spellName, grid, isWithinGrid, from, to, isTransparentUnit);
     return !impact.blockedByTerrain && !impact.interceptedBy;

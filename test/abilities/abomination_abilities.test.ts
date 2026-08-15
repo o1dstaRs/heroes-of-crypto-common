@@ -199,28 +199,35 @@ describe("Flesh Shield aura (damage absorption)", () => {
         expect(abomination.getHp()).toBe(155);
     });
 
-    it("recalculates magical AOE absorption through the owner's magic resistance", () => {
-        const { grid, unitsHolder, damageStatisticHolder, abomination, ally, attacker } = setupAuraTrio({
-            abominationLuck: 10,
-            allyMagicResist: 0,
-            abominationMagicResist: 50,
-        });
-        const result = processFleshShieldAura(
-            attacker,
-            ally,
+    it("ignores magic resistance entirely — armor is the only defense in the transfer", () => {
+        // The aura is physical-only, so a magic-resistant owner soaks exactly as much as a bare one.
+        const resistant = setupAuraTrio({ allyMagicResist: 0, abominationMagicResist: 50 });
+        const bare = setupAuraTrio({ allyMagicResist: 0, abominationMagicResist: 0 });
+
+        const withResist = processFleshShieldAura(
+            resistant.attacker,
+            resistant.ally,
             100,
             false,
-            grid,
-            unitsHolder,
+            resistant.grid,
+            resistant.unitsHolder,
             new SceneLogMock(),
-            damageStatisticHolder,
-            undefined,
-            "magic",
+            resistant.damageStatisticHolder,
+        );
+        const withoutResist = processFleshShieldAura(
+            bare.attacker,
+            bare.ally,
+            100,
+            false,
+            bare.grid,
+            bare.unitsHolder,
+            new SceneLogMock(),
+            bare.damageStatisticHolder,
         );
 
-        expect(result.remainingDamage).toBe(0);
-        expect(result.absorbedDamage).toBe(50);
-        expect(abomination.getHp()).toBe(150);
+        expect(withResist.absorbedDamage).toBe(withoutResist.absorbedDamage);
+        expect(withResist.remainingDamage).toBe(withoutResist.remainingDamage);
+        expect(resistant.abomination.getHp()).toBe(bare.abomination.getHp());
     });
 
     it("does not absorb its own damage or trigger for units outside the aura", () => {
