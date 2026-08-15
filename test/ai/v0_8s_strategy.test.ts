@@ -206,7 +206,12 @@ describe("v0.8 search measurement alias", () => {
         // then again after Tsar Cannon's range, damage, attack, and armor buff. The v0.7 control above still
         // reproduces byte-identically.
         // Two isolated runs reproduced this digest.
-        expect(digest("v0.8")).toBe("ff532debdc307cfdc0b811f166ea4ad35b7523ce4039e5c6d5139eef893ecfa1");
+        // Re-pinned 2026-08-15 for the Deep-Wounds-applied-once engine fix (the attack handler and Double
+        // Punch each folded 1 + power/100 into the ability multiplier that calculateAttackDamage applied
+        // again, squaring the bonus) — v0.8's melee damage estimate mirrored that duplicate and now applies
+        // it once too, so its pricing and this trace both move. The v0.7 control hash above still reproduces
+        // byte-identically. Two isolated runs reproduced this digest.
+        expect(digest("v0.8")).toBe("efd5dc885a47552c7520ae1c628a922a3df79ec9dfc48e1a53805ea7d707b014");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

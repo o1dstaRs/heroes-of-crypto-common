@@ -33,6 +33,7 @@ import {
     MIN_ARMAGEDDON_DAMAGE_FIRST_WAVE,
     GUIDING_WINDS_MAX_PERCENT,
 } from "../constants";
+import { applyAttackDamageChain, projectShotCost, resolveAttackDamageChain } from "../damage/damage_projection";
 import { AuraEffect } from "../effects/aura_effect";
 import { Effect } from "../effects/effect";
 import { EffectFactory } from "../effects/effect_factory";
@@ -1217,19 +1218,29 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * Call this from EVERY path that consumes a volley so the two can never drift apart again.
      */
     public spendShotsAgainst(target?: Unit): number {
-        for (const ability of this.getAbilities()) {
-            if (ability.getPowerType() === AbilityPowerType.UNLIMITED_SUPPLIES) {
-                return 0;
-            }
-        }
-        const cost =
-            target?.hasAbilityActive("Dense Flesh") === true
-                ? Math.max(1, Math.floor(target.getAbility("Dense Flesh")?.getPower() ?? 1))
-                : 1;
+        const cost = projectShotCost(this, target);
         for (let i = 0; i < cost; i++) {
             this.decreaseNumberOfShots();
         }
         return cost;
+    }
+    /**
+     * How many arrows would REMAIN after firing `volleys` volleys at `target` — spendShotsAgainst's
+     * pure counterpart, so a preview can gate a follow-up volley (Double Shot's second arrow) on exactly
+     * the `getRangeShots() <= 0` bail calculateAttackDamage will hit. Nothing is spent here.
+     */
+    public projectRangeShotsAfterVolleys(target?: Unit, volleys = 1): number {
+        const cost = projectShotCost(this, target) * Math.max(0, volleys);
+        if (cost <= 0) {
+            return this.getRangeShots();
+        }
+        // range_shots_mod overrides the depleting counter (a stolen Endless Quiver never runs dry), and
+        // decreaseNumberOfShots only ever touches range_shots — so the mod survives any number of volleys.
+        if (this.unitProperties.range_shots_mod) {
+            return this.unitProperties.range_shots_mod;
+        }
+
+        return Math.max(0, Math.floor(this.unitProperties.range_shots) - cost);
     }
     public decreaseNumberOfShots(): void {
         this.unitProperties.range_shots -= 1;
@@ -2299,6 +2310,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         return 1;
     }
+    /**
+     * Resolve one attack: ROLL inside the band and spend the volley's arrows.
+     *
+     * The band, the multiplier chain (melee-poke penalty, ability multiplier, Deep Wounds, elemental
+     * affinity) and the single Math.floor all come from resolveAttackDamageChain/applyAttackDamageChain
+     * in damage/damage_projection — the SAME helpers every preview projects with. Anything that has to
+     * predict this number must go through projectAttackDamage rather than re-deriving the formula: the
+     * hover's hand-kept copy of it drifted 40 ways before this was shared.
+     */
     public calculateAttackDamage(
         enemyUnit: Unit,
         attackType: AttackType,
@@ -2307,24 +2327,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         abilityMultiplier = 1,
         decreaseNumberOfShots = true,
     ): number {
-        const min = this.calculateAttackDamageMin(
-            this.getAttack(),
-            enemyUnit,
-            attackType === PBTypes.AttackVals.RANGE,
+        const chain = resolveAttackDamageChain({
+            attacker: this,
+            target: enemyUnit,
+            attackType,
             synergyAbilityPowerIncrease,
             divisor,
-        );
-        const max = this.calculateAttackDamageMax(
-            this.getAttack(),
-            enemyUnit,
-            attackType === PBTypes.AttackVals.RANGE,
-            synergyAbilityPowerIncrease,
-            divisor,
-        );
-        const attackingByMelee =
-            attackType === PBTypes.AttackVals.MELEE || attackType === PBTypes.AttackVals.MELEE_MAGIC;
-        if (!attackingByMelee && attackType === PBTypes.AttackVals.RANGE) {
-            if (this.getRangeShots() <= 0) {
+            abilityMultiplier,
+        });
+
+        if (chain.spendsShot) {
+            if (chain.outOfShots) {
                 return 0;
             }
             if (decreaseNumberOfShots) {
@@ -2333,36 +2346,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        const attackTypeMultiplier =
-            attackingByMelee &&
-            this.unitProperties.attack_type === PBTypes.AttackVals.RANGE &&
-            !this.hasAbilityActive("Handyman")
-                ? 0.5
-                : 1;
-
-        // Deep Wounds damage bonus: if THIS attacker inflicts Deep Wounds and the target already carries the
-        // stacked "Deep Wounds" effect from a prior hit, this strike deals that % more damage. (calculate-
-        // ActiveDeepWoundsEffect encoded this but was never wired into damage — this is where it applies, so it
-        // works in ranked and sandbox alike since both run this same path.)
-        let deepWoundsMultiplier = 1;
-        const deepWoundsPower = enemyUnit.getEffect("Deep Wounds")?.getPower() ?? 0;
-        if (
-            deepWoundsPower > 0 &&
-            (this.getAbility("Deep Wounds Level 0") ||
-                this.getAbility("Deep Wounds Level 1") ||
-                this.getAbility("Deep Wounds Level 2") ||
-                this.getAbility("Deep Wounds Level 3"))
-        ) {
-            deepWoundsMultiplier = 1 + deepWoundsPower / 100;
-        }
-
-        return Math.floor(
-            getRandomInt(min, max) *
-                attackTypeMultiplier *
-                abilityMultiplier *
-                deepWoundsMultiplier *
-                this.getElementalDamageMultiplier(enemyUnit),
-        );
+        return applyAttackDamageChain(chain, getRandomInt(chain.rollMin, chain.rollMaxExclusive));
     }
     public canSkipResponse(): boolean {
         if (!this.hasAbilityActive("Break")) {

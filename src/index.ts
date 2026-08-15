@@ -64,6 +64,8 @@ export * from "./obstacles/obstacle_type";
 export * from "./units/unit_properties";
 export * from "./units/units_holder";
 export * from "./units/unit";
+export * from "./damage/damage_projection";
+export * from "./damage/ability_damage_projection";
 export * from "./scene/scene_log_interface";
 export * from "./scene/scene_stats";
 export * from "./scene/statistic_holder_interface";

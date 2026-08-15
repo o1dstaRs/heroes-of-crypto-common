@@ -12,7 +12,14 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // hp 58 -> 60 and armor 19 -> 20). Both are fielded across the seeded draws, so any trace holding
 // one diverges from that point on. Two isolated runs reproduced this value byte-identically.
 // Previous approved digest: 331591f5d47475e7a821d4a21f226ac94304d789381e59f2fe0ef038f2b93874
-const EXPECTED_REPLAY_SHA256 = "7a2f5efd2cc176321441766570bfe944976d7ca9d826a58f14a3c418ec08596f";
+// Re-pinned 2026-08-15 for two ENGINE damage fixes: Deep Wounds is applied once instead of twice (the
+// attack handler and Double Punch each folded 1 + power/100 into the ability multiplier that
+// calculateAttackDamage then applied again, so wounded stacks took (1 + p/100)^2), and Through Shot now
+// prices its pierce with the ATTACKER's team synergy instead of the defender's. Both change real damage, so
+// every seeded trace holding a Deep Wounds carrier or a Through Shot shooter diverges from that point on.
+// Two isolated runs reproduced this value byte-identically.
+// Previous approved digest: 7a2f5efd2cc176321441766570bfe944976d7ca9d826a58f14a3c418ec08596f
+const EXPECTED_REPLAY_SHA256 = "11d24bcbfe0ac4a3ed9656efb33889ba831679cbb0ae4a5e11271afe5eb8d1a9";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

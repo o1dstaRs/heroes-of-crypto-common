@@ -2007,10 +2007,10 @@ export class AttackHandler {
             }
         }
 
-        const deepWoundsTargetEffect = targetUnit.getEffect("Deep Wounds");
-        if (deepWoundsTargetEffect && AllAbilities.hasAnyDeepWoundsAbility(attackerUnit)) {
-            abilityMultiplier *= 1 + deepWoundsTargetEffect.getPower() / 100;
-        }
+        // NO Deep Wounds step here. Unit.calculateAttackDamage owns the amplification (its chain resolves
+        // `1 + targetPower/100` in damage/damage_projection), so folding it into abilityMultiplier as well
+        // squared it: at power 63 a hit landed for 132 instead of 82. One owner, one application, and the
+        // hover projects the very same chain.
 
         const isAttackMissed =
             HoCLib.getRandomInt(0, 100) <
@@ -2265,10 +2265,9 @@ export class AttackHandler {
                         abilityMultiplier *= (100 - paralysisTargetUnitEffect.getPower()) / 100;
                     }
 
-                    const deepWoundsAttackerEffect = attackerUnit.getEffect("Deep Wounds");
-                    if (deepWoundsAttackerEffect && AllAbilities.hasAnyDeepWoundsAbility(targetUnit)) {
-                        abilityMultiplier *= 1 + deepWoundsAttackerEffect.getPower() / 100;
-                    }
+                    // Deep Wounds is applied by Unit.calculateAttackDamage below (the responder is the
+                    // attacker of this hit, the original attacker its victim) — see the note on the
+                    // outgoing swing above. Folding it in here too would square it on the response as well.
 
                     let damageFromResponse =
                         AllAbilities.processLuckyStrikeAbility(

@@ -129,9 +129,13 @@ export function processThroughShotAbility(
                 attackerUnit.calculateAttackDamage(
                     targetUnit,
                     PBTypes.AttackVals.RANGE,
+                    // The ATTACKER's team power, like every other damage path. This argument reaches
+                    // getEnemyArmor -> calculateAbilityMultiplier(Piercing Spear), i.e. it scales the
+                    // SHOOTER's armor-ignore; handing it the defender's team dropped the shooter's own
+                    // Might synergy from its pierce (52 shown vs 39 dealt).
                     FightStateManager.getInstance()
                         .getFightProperties()
-                        .getAdditionalAbilityPowerPerTeam(targetUnit.getTeam()),
+                        .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),
                     hoverRangeAttackDivisor,
                     throughShotMultiplier,
                     false,
