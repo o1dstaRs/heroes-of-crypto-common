@@ -41,7 +41,6 @@ import { isSmokeableCell } from "../spells/smoke_clouds";
 import { projectSpellRebound, spellDamageAgainstUnit, spellRawDamage } from "../spells/spell_cast_projection";
 import { VINE_STRIDE_COST_MULTIPLIER, canVineTakeRoot, vinePathCells } from "../spells/vines";
 import {
-    fireWallBurnDamage,
     fireWallBurnPercentage,
     fireWallCells,
     isFireWallableCell,
@@ -61,7 +60,7 @@ import type { GameAction } from "./actions";
 import { isHeadlessSimulationEvent, type GameEvent, type IGameAnimationEvent } from "./events";
 import { canWaitOnHourglass } from "./hourglass";
 import {
-    enteredFireWallCells,
+    burnUnitOnFireWallCells,
     isMovePathFootprintOnly,
     moveCellsMatchAsSet,
     resolveMoveTargetCells,
@@ -559,38 +558,17 @@ export class GameActionEngine {
      * a smaller maximum health for the second to take its share of.
      */
     private applyFireWallBurn(unit: Unit, crossedCells: XY[]): GameEvent[] {
-        const fireWalls = this.context.fightProperties.getFireWalls();
-        if (!fireWalls.size() || !crossedCells.length) {
-            return [];
-        }
-        // De-duplicate: a large unit reports the same cell once per body part it lands on, and the wall
-        // charges per cell entered, not per body part standing in it.
-        const burning = enteredFireWallCells(fireWalls, crossedCells);
-        if (!burning.length) {
-            return [];
-        }
-
         const position = this.headlessEvents ? undefined : { ...unit.getPosition() };
-        const amountAliveBefore = unit.getAmountAlive();
-        let total = 0;
-        for (let i = 0; i < burning.length; i++) {
-            const damage = fireWallBurnDamage(unit.getCumulativeMaxHp(), fireWalls.burnPercentageAt(burning[i]));
-            if (damage <= 0) {
-                break;
-            }
-            total += unit.applyDamage(damage, 0, this.context.sceneLog);
-            if (unit.isDead()) {
-                break;
-            }
-        }
+        const { burning, total, unitsDied } = burnUnitOnFireWallCells(
+            unit,
+            crossedCells,
+            this.context.fightProperties.getFireWalls(),
+            this.context.sceneLog,
+        );
         if (total <= 0) {
             return [];
         }
 
-        const unitsDied = Math.max(0, amountAliveBefore - unit.getAmountAlive());
-        this.context.sceneLog.updateLog(
-            `${unit.getName()} was seared by the Fire Wall for ${total} damage crossing ${burning.length} of it`,
-        );
         const events: GameEvent[] = [];
         if (!this.headlessEvents) {
             events.push({

@@ -27,6 +27,7 @@ import { Spell } from "../spells/spell";
 import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { isHeadlessSimulationEvent, type GameEvent, type GameEventMode } from "./events";
+import { burnUnitOnFireWallCells } from "./post_move_actor_availability";
 import { createDefaultGameRuntime, type IGameRuntime, shuffleWithRng } from "./runtime";
 
 export interface ITurnEngineContext {
@@ -382,6 +383,50 @@ export class TurnEngine {
         for (const unitId of result.unitIdsDestroyed) {
             if (this.unitsHolder.deleteUnitById(unitId)) {
                 events.push({ type: "unit_destroyed", unitId, reason: "narrowing" });
+            }
+        }
+
+        // A unit SHOVED onto a Fire Wall burns exactly as one that walked there. The board closing in is
+        // still an arrival, and charging only for voluntary moves let a stack pushed into the flames stand
+        // in them untouched. Applied after the relocation events above so the burn reads as happening at
+        // the destination, and after the destroyed sweep so a unit already crushed by the narrowing is not
+        // resurrected to take fire damage.
+        //
+        // The unit is teleported rather than walked, so it has no route: its final footprint IS the set of
+        // cells entered, the same rule a footprint-only move already follows.
+        const fireWalls = this.fightProperties.getFireWalls();
+        if (fireWalls.size()) {
+            for (const unitId of result.unitIdToNewPosition.keys()) {
+                const unit = this.unitsHolder.getAllUnits().get(unitId);
+                if (!unit || unit.isDead()) {
+                    continue;
+                }
+                const position = this.headlessEvents ? undefined : { ...unit.getPosition() };
+                const { burning, total, unitsDied } = burnUnitOnFireWallCells(
+                    unit,
+                    unit.getCells(),
+                    fireWalls,
+                    this.sceneLog,
+                );
+                if (total <= 0) {
+                    continue;
+                }
+                if (!this.headlessEvents) {
+                    events.push({
+                        type: "fire_wall_burned",
+                        unitId,
+                        cells: burning,
+                        position: position!,
+                        amount: total,
+                        unitsDied,
+                    });
+                }
+                // Killed by the FIRE, not by the closing board: reported as an ordinary death and given the
+                // self-resurrection check the action engine's fire-wall path grants, rather than the
+                // no-questions crush the narrowing branch above applies.
+                if (unit.isDead() && this.unitsHolder.deleteUnitById(unitId, true)) {
+                    events.push({ type: "unit_destroyed", unitId, reason: "dead_cleanup" });
+                }
             }
         }
 

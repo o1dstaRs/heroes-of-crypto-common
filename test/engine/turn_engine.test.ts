@@ -573,3 +573,82 @@ describe("TurnEngine", () => {
         );
     });
 });
+
+describe("narrowing pushes a unit onto a Fire Wall", () => {
+    const buildEngine = (setup: ReturnType<typeof setupStartedFight>) =>
+        new TurnEngine({
+            fightProperties: setup.fightProperties,
+            grid: setup.grid,
+            unitsHolder: setup.unitsHolder,
+            moveHandler: setup.moveHandler,
+            sceneLog: setup.sceneLog,
+            runtime: createSequenceGameRuntime({ ints: queuedZeros(24), nowMillis: [1000] }),
+        });
+
+    it("burns a stack the closing board shoved into the flames", () => {
+        const setup = setupStartedFight();
+        const walls = setup.fightProperties.getFireWalls();
+        walls.clear();
+        // Light every cell the shoved unit ends up standing on.
+        walls.addAll(setup.upper.getCells());
+
+        const hpBefore = setup.upper.getCumulativeHp();
+        const events = (buildEngine(setup) as any).handleSystemMoveResult({
+            log: "",
+            unitIdToNewPosition: new Map([[setup.upper.getId(), setup.upper.getPosition()]]),
+            unitIdsDestroyed: [],
+        });
+
+        // The relocation is still reported...
+        expect(events).toContainEqual({
+            type: "unit_moved_by_system",
+            unitId: setup.upper.getId(),
+            position: setup.upper.getPosition(),
+            reason: "narrowing",
+        });
+        // ...and the wall now actually charges for the arrival, which it never used to.
+        const burn = events.find((e: { type: string }) => e.type === "fire_wall_burned");
+        expect(burn).toBeDefined();
+        expect(burn.unitId).toBe(setup.upper.getId());
+        expect(burn.amount).toBeGreaterThan(0);
+        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
+        walls.clear();
+    });
+
+    it("leaves a unit shoved onto clear ground untouched", () => {
+        const setup = setupStartedFight();
+        const walls = setup.fightProperties.getFireWalls();
+        walls.clear();
+        // A wall exists, but nowhere near where this unit landed.
+        walls.add({ x: 14, y: 14 });
+
+        const hpBefore = setup.upper.getCumulativeHp();
+        const events = (buildEngine(setup) as any).handleSystemMoveResult({
+            log: "",
+            unitIdToNewPosition: new Map([[setup.upper.getId(), setup.upper.getPosition()]]),
+            unitIdsDestroyed: [],
+        });
+
+        expect(events.some((e: { type: string }) => e.type === "fire_wall_burned")).toBe(false);
+        expect(setup.upper.getCumulativeHp()).toBe(hpBefore);
+        walls.clear();
+    });
+
+    it("does not burn a unit the narrowing already crushed", () => {
+        const setup = setupStartedFight();
+        const walls = setup.fightProperties.getFireWalls();
+        walls.clear();
+        walls.addAll(setup.upper.getCells());
+
+        const events = (buildEngine(setup) as any).handleSystemMoveResult({
+            log: "",
+            unitIdToNewPosition: new Map([[setup.upper.getId(), setup.upper.getPosition()]]),
+            unitIdsDestroyed: [setup.upper.getId()],
+        });
+
+        expect(events).toContainEqual({ type: "unit_destroyed", unitId: setup.upper.getId(), reason: "narrowing" });
+        // Already off the board — the flames must not resurrect it to take a hit.
+        expect(events.some((e: { type: string }) => e.type === "fire_wall_burned")).toBe(false);
+        walls.clear();
+    });
+});
