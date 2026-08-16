@@ -175,6 +175,11 @@ function lineCells(from: XY, to: XY): XY[] {
  *    and knight-offset gap of one cell rank as the same distance rather than three different ones.
  *  - Angel's "Arrows Wingshield Aura" owner is never struck and STOPS the whole flight when it is the
  *    next nearest bounce — the shield catches the disc.
+ *  - The flight is ONE CONTINUOUS PATH: eligibility for a hop is judged against the nearest member of the
+ *    whole struck cluster, but each hop is always DRAWN flying from wherever the disc currently is (the
+ *    unit it struck last), never snapping back to an earlier victim to launch from there. The disc never
+ *    reappears at a point on its own already-flown path — it only ever moves forward, and its final leg
+ *    (animated client-side) closes the loop back at Zena.
  */
 export function resolveChakramTrajectory(
     attackerUnit: Unit,
@@ -256,7 +261,12 @@ export function resolveChakramTrajectory(
             break;
         }
 
-        const fromCell = nextAnchor.getBaseCell();
+        // The disc is a single physical object with one current position: `last` (where the PREVIOUS hop
+        // actually landed), never `nextAnchor`. Eligibility and the damage factor are judged against the
+        // nearest member of the whole struck cluster (`nextAnchor` may be an earlier victim, not `last`),
+        // but the flight itself must still fly FROM where it currently is — otherwise the animation snaps
+        // back to an already-visited point before continuing, instead of tracing one continuous path.
+        const fromCell = last.getBaseCell();
         const toCell = next.getBaseCell();
         if (next.hasAbilityActive("Arrows Wingshield Aura")) {
             // The shield catches the disc: the hop flies (for the visual) but lands no hit, and the

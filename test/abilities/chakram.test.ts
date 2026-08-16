@@ -169,6 +169,27 @@ describe("Zena's Chakram — separation chain", () => {
         expect(trajectory.damageFactorByUnitId[further.getId()]).toBe(CHAKRAM_HALF_DAMAGE_FACTOR);
     });
 
+    it("flies one continuous path: each hop launches from where the disc actually landed, never an earlier victim", () => {
+        // Further's nearest-eligible ANCHOR is Primary (gap 2), not Nearer — Nearer sits gap 4 away, out of
+        // reach. So the hop that hits Further must still visually fly on from Nearer (the disc's true
+        // current position after hop 1), not snap back to reappear at Primary's already-passed point.
+        const context = setup();
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        const nearer = enemy(context, "Nearer", { x: 6, y: 8 }); // gap 1 from primary
+        const further = enemy(context, "Further", { x: 11, y: 8 }); // gap 2 from primary, gap 4 from nearer
+
+        const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+
+        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["Nearer", "Further"]);
+        expect(trajectory.steps).toHaveLength(2);
+        // Hop 1 launches from the primary target — where the initial throw just landed.
+        expect(trajectory.steps[0].fromCell).toEqual(primary.getBaseCell());
+        // Hop 2 must continue from Nearer (hop 1's landing spot), never snap back to Primary's cell.
+        expect(trajectory.steps[1].fromCell).toEqual(nearer.getBaseCell());
+        expect(trajectory.steps[1].fromCell).not.toEqual(primary.getBaseCell());
+        void further;
+    });
+
     it("never hits allies and never lets them relay the chain", () => {
         const context = setup();
         const primary = enemy(context, "Primary", { x: 8, y: 8 });
