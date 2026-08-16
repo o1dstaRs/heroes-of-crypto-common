@@ -10,6 +10,19 @@
  */
 
 import type { XY } from "../utils/math";
+import { elementalSpellMultiplier } from "./spell_damage";
+import { SpellElement } from "./spell_properties";
+
+/**
+ * What the wall needs to know about whoever walked into it — just its elements, so this module stays
+ * free of a Unit import cycle the way spell_damage.ts does.
+ */
+export interface IFireWallBurnTarget {
+    isFireElement?: boolean;
+    isWaterElement?: boolean;
+    isWindElement?: boolean;
+    isEarthElement?: boolean;
+}
 
 // Default lifetime of a freshly laid fire wall, in laps. Matches the Fire Wall spell's `laps: 3` config —
 // the spell is the only thing that lights walls today, so the two are intentionally coupled. If more sources
@@ -286,10 +299,28 @@ export function fireWallBurnPercentage(empowerPercentage = 0): number {
 export function fireWallBurnDamage(
     cumulativeMaxHp: number,
     burnPercentage: number = FIRE_WALL_BURN_PERCENTAGE,
+    target?: IFireWallBurnTarget,
 ): number {
     if (!Number.isFinite(cumulativeMaxHp) || cumulativeMaxHp <= 0) {
         return 0;
     }
+    // The wall burns, so it is fire — priced by the same element table every other fire source reads.
+    // A Fire Element creature walks through its own element untouched; a Water Element one takes half
+    // again as much. Without this the wall was elementally blank: fire seared a fire creature in full.
+    const elementMultiplier = target
+        ? elementalSpellMultiplier({
+              element: SpellElement.FIRE,
+              targetIsFireElement: !!target.isFireElement,
+              targetIsWaterElement: !!target.isWaterElement,
+              targetIsWindElement: !!target.isWindElement,
+              targetIsEarthElement: !!target.isEarthElement,
+          })
+        : 1;
+    if (elementMultiplier <= 0) {
+        return 0;
+    }
     const share = Number.isFinite(burnPercentage) && burnPercentage > 0 ? burnPercentage : FIRE_WALL_BURN_PERCENTAGE;
-    return Math.max(1, Math.floor((cumulativeMaxHp * share) / 100));
+    // The floor of 1 keeps a token sear on a huge stack, but only for a creature the fire can touch at
+    // all — an immune element is already gone above.
+    return Math.max(1, Math.floor(((cumulativeMaxHp * share) / 100) * elementMultiplier));
 }

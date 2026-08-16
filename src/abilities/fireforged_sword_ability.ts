@@ -66,6 +66,8 @@ export function processFireforgedSwordAbility(
         targetMagicResist: toUnit.getMagicResist(),
         targetIsFireElement: toUnit.hasAbilityActive("Fire Element"),
         targetIsWaterElement: toUnit.hasAbilityActive("Water Element"),
+        targetIsWindElement: toUnit.hasAbilityActive("Wind Element"),
+        targetIsEarthElement: toUnit.hasAbilityActive("Earth Element"),
     });
     if (burnDamage <= 0) {
         return NO_BURN;

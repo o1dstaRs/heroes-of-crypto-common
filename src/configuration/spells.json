@@ -1359,7 +1359,7 @@
             "target": "FREE_CELL",
             "power": 25,
             "power_type": "COMMON",
-            "element": "",
+            "element": "FIRE",
             "multiplier_type": "NO_MULTIPLIER",
             "laps": 3,
             "is_buff": false,

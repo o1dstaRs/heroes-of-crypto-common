@@ -327,17 +327,33 @@ export function fireforgedSwordDamage(params: {
     targetMagicResist: number;
     targetIsFireElement: boolean;
     targetIsWaterElement: boolean;
+    targetIsWindElement?: boolean;
+    targetIsEarthElement?: boolean;
 }): number {
-    const { damageDealt, swordPercentage, targetMagicResist, targetIsFireElement, targetIsWaterElement } = params;
-    if (targetIsFireElement || targetMagicResist >= 100) {
+    const { damageDealt, swordPercentage, targetMagicResist } = params;
+    if (targetMagicResist >= 100) {
         return 0;
     }
     if (!(damageDealt > 0) || !(swordPercentage > 0)) {
         return 0;
     }
 
-    const burn = (damageDealt * swordPercentage) / 100;
-    const scaled = targetIsWaterElement ? burn * FIREFORGED_SWORD_WATER_MULTIPLIER : burn;
+    // The burning edge IS fire, so it is priced by the one element table the rest of the game reads
+    // rather than by a private copy of the fire rule. That table is what decides a Fire Element target
+    // shrugs it off entirely and a Water Element one takes half again as much; when the table changes,
+    // the sword changes with it instead of quietly keeping the old pairing.
+    const elementMultiplier = elementalSpellMultiplier({
+        element: SpellElement.FIRE,
+        targetIsFireElement: params.targetIsFireElement,
+        targetIsWaterElement: params.targetIsWaterElement,
+        targetIsWindElement: !!params.targetIsWindElement,
+        targetIsEarthElement: !!params.targetIsEarthElement,
+    });
+    if (elementMultiplier <= 0) {
+        return 0;
+    }
 
-    return applyMagicResistToSpellDamage(Math.floor(scaled), targetMagicResist);
+    const burn = (damageDealt * swordPercentage) / 100;
+
+    return applyMagicResistToSpellDamage(Math.floor(burn * elementMultiplier), targetMagicResist);
 }
