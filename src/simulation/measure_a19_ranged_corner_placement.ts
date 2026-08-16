@@ -10,7 +10,7 @@ import {
     type IV08A19RangedCornerPlacementAudit,
 } from "../ai/versions/v0_8_a19_ranged_corner_placement";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { Perk } from "../perks/perk_properties";
+import { Doctrine } from "../doctrines/doctrine_properties";
 import {
     creaturesByLevel,
     hashSimulationParts,
@@ -24,7 +24,7 @@ export const V08_A19_RANGED_CORNER_PLACEMENT_AB_SCHEMA = "hoc.v0_8_a19_ranged_co
 export const V08_A19_RANGED_CORNER_PLACEMENT_AB_MAP = PBTypes.GridVals.NORMAL;
 export const V08_A19_RANGED_CORNER_PLACEMENT_AB_CLUSTER_SIZE = 4 as const;
 export const V08_A19_RANGED_CORNER_PLACEMENT_AB_SETUP = Object.freeze({
-    perk: Perk.SEE_NONE,
+    doctrine: Doctrine.SEE_NONE,
     placementAugmentTiming: "setup-before-placement" as const,
     augments: Object.freeze([Object.freeze({ kind: "Placement" as const, value: 2 })]),
 });
@@ -263,8 +263,8 @@ export function playV08A19RangedCornerPlacementGame(
         maxLaps,
         headlessEvents: true,
         searchOfflineDeterministicWork: true,
-        greenPerk: V08_A19_RANGED_CORNER_PLACEMENT_AB_SETUP.perk,
-        redPerk: V08_A19_RANGED_CORNER_PLACEMENT_AB_SETUP.perk,
+        greenDoctrine: V08_A19_RANGED_CORNER_PLACEMENT_AB_SETUP.doctrine,
+        redDoctrine: V08_A19_RANGED_CORNER_PLACEMENT_AB_SETUP.doctrine,
         greenAugments: setupAugments(),
         redAugments: setupAugments(),
         placementAugmentTiming: V08_A19_RANGED_CORNER_PLACEMENT_AB_SETUP.placementAugmentTiming,

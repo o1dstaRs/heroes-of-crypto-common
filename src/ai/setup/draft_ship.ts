@@ -220,7 +220,7 @@ export function parseDraftGenome(
 
 /**
  * Freeze a league artifact to the surface the ranked server consumes for draft decisions. Only the intrinsic
- * creature head survives; counter-draft, perk, artifact, augment and placement heads are reset to setup-v0.
+ * creature head survives; counter-draft, doctrine, artifact, augment and placement heads are reset to setup-v0.
  * This projection is also applied by the acceptance harness, preventing an unused head from earning a pass.
  */
 export function projectDraftGenomeForShipping(genome: ILeagueGenome): ILeagueGenome {

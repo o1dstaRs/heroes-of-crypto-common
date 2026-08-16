@@ -15,7 +15,7 @@ export * as GridConstants from "./grid/grid_constants";
 export * as GridMath from "./grid/grid_math";
 export * as Augment from "./augments/augment_properties";
 export * as Artifact from "./artifacts/artifact_properties";
-export * as Perk from "./perks/perk_properties";
+export * as Doctrine from "./doctrines/doctrine_properties";
 export * from "./abilities/ability";
 export * from "./scene/animations";
 export * as AbilityHelper from "./abilities/ability_helper";
@@ -85,8 +85,8 @@ export {
     isMindlessAiUnit,
     MINDLESS_AI_ABILITY,
     MINDLESS_AI_VERSION,
-    pickRankedAIPerk,
-    RANKED_AI_PERK_CHOICES,
+    pickRankedAIDoctrine,
+    RANKED_AI_DOCTRINE_CHOICES,
     enumerateCandidates,
     getEnemiesCellsWithinMovementRange,
     AI_VERSIONS,
@@ -132,7 +132,7 @@ export {
 export type {
     IAIPolicyEvent,
     IAIStrategy,
-    IRankedAIPerkChoiceContext,
+    IRankedAIDoctrineChoiceContext,
     IRankedAIProfile,
     IRankedAISetupPolicy,
     IDecisionContext,
@@ -147,7 +147,7 @@ export type {
     IV09ModelArtifact,
     IV09QualificationReceipt,
 } from "./ai";
-// Setup AI (draft/placement policy) — perk, bundle, creatures, artifacts, synergies, augments.
+// Setup AI (draft/placement policy) — doctrine, bundle, creatures, artifacts, synergies, augments.
 export { SETUP_POLICY_V0, SETUP_POLICY_V0_DRAFT_ROLLBACK, SetupPolicyV0 } from "./ai/setup/setup_v0";
 export type { ISetupPolicyV0Options } from "./ai/setup/setup_v0";
 export { createPlacementSetupDecisionContext, createTier2ArtifactDecisionContext } from "./ai/setup/setup_strategy";

@@ -55,8 +55,8 @@ export {
     RANKED_SETUP_POLICY_V0,
 } from "./ranked_profile";
 export type { IRankedAIProfile, IRankedAISetupPolicy } from "./ranked_profile";
-export { pickRankedAIPerk, RANKED_AI_PERK_CHOICES } from "./setup/perk_variety";
-export type { IRankedAIPerkChoiceContext } from "./setup/perk_variety";
+export { pickRankedAIDoctrine, RANKED_AI_DOCTRINE_CHOICES } from "./setup/doctrine_variety";
+export type { IRankedAIDoctrineChoiceContext } from "./setup/doctrine_variety";
 
 // Browser-safe identities and immutable configuration for the promoted v0.8+A19 composite and its a13
 // rollback. Node-only SearchDriver factories are exported separately from `src/simulation` so importing the

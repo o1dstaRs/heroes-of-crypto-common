@@ -29,7 +29,7 @@ const opponentTopUnit = { creature_id: 5, damage_dealt: 3700 };
 const playerSetup = {
     artifact_tier_1: 3,
     artifact_tier_2: 11,
-    perk: 2,
+    doctrine: 2,
     augment_placement: 1,
     augment_armor: 3,
     augment_might: 2,
@@ -41,7 +41,7 @@ const playerSetup = {
 const opponentSetup = {
     artifact_tier_1: 12,
     artifact_tier_2: 5,
-    perk: 3,
+    doctrine: 3,
     augment_placement: 0,
     augment_armor: 2,
     augment_might: 3,
@@ -128,7 +128,7 @@ describe("generated player_portal protobuf messages", () => {
             PortalPB.PortalMatchKind.LOBBY,
         ]).toEqual([0, 1, 2, 3]);
         expect(PortalMatchKind.LOBBY).toBe(PortalPB.PortalMatchKind.LOBBY);
-        expect(PortalPB.PortalMatchSetup.fromObject({ perk: 3 }).complete).toBe(false);
+        expect(PortalPB.PortalMatchSetup.fromObject({ doctrine: 3 }).complete).toBe(false);
         roundTrip(PortalPB.PortalComboStat.fromObject(portalCombo), PortalPB.PortalComboStat.deserializeBinary);
         roundTrip(
             PortalPB.PortalCreatureStat.fromObject(portalCreature),

@@ -65,9 +65,9 @@ export type ArtifactRequestObject = ReturnType<InstanceType<typeof m_pick_phase_
 export const RevealRequest = m_pick_phase_requests.PBTypes.RevealRequest;
 export type RevealRequest = InstanceType<typeof m_pick_phase_requests.PBTypes.RevealRequest>;
 export type RevealRequestObject = ReturnType<InstanceType<typeof m_pick_phase_requests.PBTypes.RevealRequest>["toObject"]>;
-export const PerkRequest = m_pick_phase_requests.PBTypes.PerkRequest;
-export type PerkRequest = InstanceType<typeof m_pick_phase_requests.PBTypes.PerkRequest>;
-export type PerkRequestObject = ReturnType<InstanceType<typeof m_pick_phase_requests.PBTypes.PerkRequest>["toObject"]>;
+export const DoctrineRequest = m_pick_phase_requests.PBTypes.DoctrineRequest;
+export type DoctrineRequest = InstanceType<typeof m_pick_phase_requests.PBTypes.DoctrineRequest>;
+export type DoctrineRequestObject = ReturnType<InstanceType<typeof m_pick_phase_requests.PBTypes.DoctrineRequest>["toObject"]>;
 
 import * as m_player_portal from "./player_portal";
 export const PortalMatchKind = m_player_portal.PBTypes.PortalMatchKind;

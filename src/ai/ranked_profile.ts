@@ -35,7 +35,7 @@ import { StrategyV0_9 } from "./versions/v0_9";
 export interface IRankedAISetupPolicy extends IResolvedSetupPolicy {
     /** Stable setup-policy identity for persisted seats, telemetry and future per-strength tuning. */
     readonly version: string;
-    pickPerk(): number;
+    pickDoctrine(): number;
     /** Optional pre-game ban. Undefined means there is no legal proposal to submit. */
     pickBan(bannableCreatureIds: readonly number[]): number | undefined;
     /** Index of a legal [level-1, level-2, Tier-1 artifact] starting bundle. */
@@ -95,7 +95,7 @@ const bestBan = (bannableCreatureIds: readonly number[]): number | undefined => 
 export const RANKED_SETUP_POLICY_V0: Readonly<IRankedAISetupPolicy> = Object.freeze({
     ...SETUP_POLICY_V0_RESOLVED,
     version: SETUP_POLICY_V0.version,
-    pickPerk: (): number => SETUP_POLICY_V0.pickPerk(),
+    pickDoctrine: (): number => SETUP_POLICY_V0.pickDoctrine(),
     pickBan: bestBan,
     pickBundle: (bundles: readonly (readonly [number, number, number])[]): number =>
         SETUP_POLICY_V0.pickBundle(bundles),

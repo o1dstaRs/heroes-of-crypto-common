@@ -883,8 +883,8 @@ export function playV07SelfplayPassiveAuditGame(
         seed: spec.seed,
         maxLaps: spec.maxLaps,
         gridType: PBTypes.GridVals.NORMAL,
-        greenPerk: setup.perk,
-        redPerk: setup.perk,
+        greenDoctrine: setup.doctrine,
+        redDoctrine: setup.doctrine,
         greenAugments: setup.augments,
         redAugments: setup.augments,
         decisionObserver: (observation) => {

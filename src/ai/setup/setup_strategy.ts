@@ -24,8 +24,8 @@ interface ISetupDecisionContextBase {
     readonly gridType?: GridType;
     /** Number of cells along one side of the square combat grid, when map topology is available. */
     readonly gridSize?: number;
-    /** This seat's selected perk, when the phase has one. Opponent perk information is intentionally absent. */
-    readonly ownPerk?: number;
+    /** This seat's selected doctrine, when the phase has one. Opponent doctrine information is intentionally absent. */
+    readonly ownDoctrine?: number;
     /** This seat's selected artifact ids in pick/tier order. Opponent artifacts are intentionally absent. */
     readonly ownArtifactIds?: readonly number[];
 }
@@ -56,7 +56,7 @@ export interface IPlacementSetupDecisionContext extends ISetupDecisionContextBas
 /**
  * Fair, phase-local information that a ranked setup policy may use in addition to its decision's explicit
  * arguments. The discriminants make it impossible to treat an earlier pick as a complete roster view. This
- * is deliberately data-only: never pass the live Grid/UnitsHolder or opponent placement, artifacts, perk,
+ * is deliberately data-only: never pass the live Grid/UnitsHolder or opponent placement, artifacts, doctrine,
  * augments, synergies, stack sizes, or positions through this boundary.
  */
 export type ISetupDecisionContext = ITier2ArtifactDecisionContext | IPlacementSetupDecisionContext;
@@ -79,7 +79,7 @@ const freezePublicSetupFields = (context: ISetupDecisionContextBase): Readonly<I
         ...(context.gridType !== undefined && context.gridSize !== undefined
             ? { gridType: context.gridType, gridSize: context.gridSize }
             : {}),
-        ...(context.ownPerk !== undefined ? { ownPerk: context.ownPerk } : {}),
+        ...(context.ownDoctrine !== undefined ? { ownDoctrine: context.ownDoctrine } : {}),
         ...(context.ownArtifactIds ? { ownArtifactIds: Object.freeze([...context.ownArtifactIds]) } : {}),
     });
 
@@ -115,8 +115,8 @@ export const createPlacementSetupDecisionContext = (
  */
 export interface ISetupPolicy {
     readonly version: string;
-    /** Doctrine/perk (Perk enum id). */
-    pickPerk(): number;
+    /** Doctrine/doctrine (Doctrine enum id). */
+    pickDoctrine(): number;
     /** Index (0-based) of the best starting bundle. Each bundle is [l1CreatureId, l2CreatureId, tier1ArtifactId]. */
     pickBundle(bundles: readonly (readonly [number, number, number])[]): number;
     /**
@@ -210,7 +210,7 @@ export const BEST_SYNERGY_BY_FACTION: Record<number, number> = {
 /**
  * Augment categories in spend priority (measured: Armor L3 68.6%, Might L3 66.7% are the top blind picks;
  * Sniper is ranged-conditional, Movement weak). The policy buys the highest affordable level of each in
- * this order until the perk's upgrade-point budget is exhausted. Movement caps at level 2 (no LEVEL_3).
+ * this order until the doctrine's upgrade-point budget is exhausted. Movement caps at level 2 (no LEVEL_3).
  */
 export const AUGMENT_PRIORITY: { kind: "Armor" | "Might" | "Sniper" | "Movement"; maxLevel: number }[] = [
     { kind: "Armor", maxLevel: 3 },

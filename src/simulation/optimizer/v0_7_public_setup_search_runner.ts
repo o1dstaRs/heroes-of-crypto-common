@@ -70,7 +70,7 @@ const SHIPPED_DRAFT = projectDraftGenomeForShipping(parseDraftGenome(LEAGUE_ROUN
 const SHIPPED_SETUP = compileNonFightSetupPolicy(V07_NONFIGHT_SETUP_ARTIFACT.policy, V07_NONFIGHT_SETUP_SPEC);
 const INFORMATION_BOUNDARY =
     "candidate sees own creature stack ids and deduplicated final public opponent creature ids only; " +
-    "no opponent positions, amounts, perk, artifacts, augments, synergies, or hidden state";
+    "no opponent positions, amounts, doctrine, artifacts, augments, synergies, or hidden state";
 const COMMON_REPOSITORY_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
 export interface IPublicSetupRecord extends IPublicSetupOutcomeRecord {
@@ -239,8 +239,8 @@ function playPublicSetupGame(
         seed: board.battleSeed,
         gridType: board.gridType,
         maxLaps,
-        greenPerk: greenArmy.perk,
-        redPerk: redArmy.perk,
+        greenDoctrine: greenArmy.doctrine,
+        redDoctrine: redArmy.doctrine,
         greenAugments: greenSetup.augments,
         redAugments: redSetup.augments,
         greenArtifactT1: greenArmy.tier1Artifact,

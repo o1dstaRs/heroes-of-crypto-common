@@ -222,7 +222,7 @@ export async function runDraftShipEval(options: IDraftShipOptions): Promise<IDra
         concurrency: options.concurrency,
         fightVersion: options.fightVersion,
         mapTypes: [PBTypes.GridVals.NORMAL],
-        freezePerk: true,
+        freezeDoctrine: true,
         aggregate: "worst-case",
     });
     return evaluateDraftShipGates(report, options.gates);

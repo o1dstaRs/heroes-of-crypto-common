@@ -168,7 +168,7 @@ describe("measure_picksim_oracle armies and games", () => {
         expect(army.roster[0].amount).toBeGreaterThan(army.roster[5].amount);
         expect(army.tier1Artifact).toBe(outcome.state.lower.tier1Artifact!);
         expect(army.tier2Artifact).toBe(outcome.state.lower.tier2Artifact!);
-        expect(army.perk).toBe(3); // SEE_NONE
+        expect(army.doctrine).toBe(3); // SEE_NONE
         expect(army.augments.length).toBeGreaterThan(0);
         expect(army.roleStacks.reduce((sum, count) => sum + count, 0)).toBe(6);
     });
@@ -191,7 +191,7 @@ describe("measure_picksim_oracle armies and games", () => {
         expect(even.armyB).not.toBe(odd.armyB);
         expect(configs[0].greenArtifactT1).toBeGreaterThanOrEqual(1);
         expect(configs[0].greenArtifactT2).toBeGreaterThanOrEqual(1);
-        expect(configs[0].greenPerk).toBe(3);
+        expect(configs[0].greenDoctrine).toBe(3);
         expect(configs[0].greenAugments!.length).toBeGreaterThan(0);
         expect(even.aIsLower).toBe(true);
         expect(odd.aIsLower).toBe(false);

@@ -313,11 +313,11 @@ export interface IMatchConfig {
     /** Army-wide Tier-2 artifact (Tier2Artifact enum id; 0/undefined = none). Same application path. */
     greenArtifactT2?: number;
     redArtifactT2?: number;
-    /** Perk (Perk enum id) per team — seeds the augment upgrade-point budget (getUpgradePoints). */
-    greenPerk?: number;
-    redPerk?: number;
+    /** Doctrine (Doctrine enum id) per team — seeds the augment upgrade-point budget (getUpgradePoints). */
+    greenDoctrine?: number;
+    redDoctrine?: number;
     /** Army augments per team ({kind,value}; kind = Placement/Armor/Might/Sniper/Movement, value = level).
-     * Applied as whole-army stat buffs via UnitsHolder.applyAugments, budget-checked against the perk. */
+     * Applied as whole-army stat buffs via UnitsHolder.applyAugments, budget-checked against the doctrine. */
     greenAugments?: ISetupAugment[];
     redAugments?: ISetupAugment[];
     /**
@@ -336,7 +336,7 @@ export interface IMatchConfig {
     /** Pre-fight split children, addressed by their index in each materialized roster. */
     greenTacticalSplitStacks?: readonly ITacticalSplitRosterStack[];
     redTacticalSplitStacks?: readonly ITacticalSplitRosterStack[];
-    /** Creature ids of RED stacks legitimately revealed to GREEN during the pick phase (collisions/perk
+    /** Creature ids of RED stacks legitimately revealed to GREEN during the pick phase (collisions/doctrine
      * reveals — pick_sim getKnownOpponentCreatures). Forwarded into GREEN's placement context; consumed
      * only by the env-gated reveal-conditioned placement (V07_PLACEMENT_REVEAL). Absent = today's behavior. */
     greenRevealedCreatures?: readonly number[];
@@ -403,12 +403,12 @@ export interface ISetupAugment {
 export function seedAcceptedSetupForPlacement(
     fightProperties: FightProperties,
     team: TeamType,
-    perk: number | undefined,
+    doctrine: number | undefined,
     augments: readonly ISetupAugment[] | undefined,
 ): void {
     fightProperties.setDefaultPlacementPerTeam(team, DefaultPlacementLevel1.THREE_BY_THREE);
-    if (perk) {
-        fightProperties.setPerkPerTeam(team, perk);
+    if (doctrine) {
+        fightProperties.setDoctrinePerTeam(team, doctrine);
     }
     for (const augment of augments ?? []) {
         fightProperties.setAugmentPerTeam(team, { type: augment.kind, value: augment.value } as AugmentType);
@@ -684,8 +684,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
 
     const setupBeforePlacement = config.placementAugmentTiming === "setup-before-placement";
     if (setupBeforePlacement) {
-        seedAcceptedSetupForPlacement(fightProperties, GREEN_TEAM, config.greenPerk, config.greenAugments);
-        seedAcceptedSetupForPlacement(fightProperties, RED_TEAM, config.redPerk, config.redAugments);
+        seedAcceptedSetupForPlacement(fightProperties, GREEN_TEAM, config.greenDoctrine, config.greenAugments);
+        seedAcceptedSetupForPlacement(fightProperties, RED_TEAM, config.redDoctrine, config.redAugments);
     }
     const greenZone = new RectanglePlacement(
         gridSettings,
@@ -1034,7 +1034,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         ),
     };
 
-    // --- army-wide setup (optional): perk budget, artifacts (both tiers), augments, synergies ---
+    // --- army-wide setup (optional): doctrine budget, artifacts (both tiers), augments, synergies ---
     // Mirror the live server: seed each team's chosen setup into fightProperties, then apply the buffs +
     // refreshStackPowerForAllUnits so adjustBaseStats folds everything in before combat. Combat runs through
     // the real handlers (which read the FightStateManager singleton this sim uses), so every mechanic behaves
@@ -1043,21 +1043,21 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const teamHasSetup = (
         t1?: number,
         t2?: number,
-        perk?: number,
+        doctrine?: number,
         augs?: ISetupAugment[],
         syn?: ISetupSynergy[],
-    ): boolean => !!(t1 || t2 || perk || augs?.length || syn?.length);
+    ): boolean => !!(t1 || t2 || doctrine || augs?.length || syn?.length);
     const greenSetup = teamHasSetup(
         config.greenArtifactT1,
         config.greenArtifactT2,
-        config.greenPerk,
+        config.greenDoctrine,
         config.greenAugments,
         config.greenSynergies,
     );
     const redSetup = teamHasSetup(
         config.redArtifactT1,
         config.redArtifactT2,
-        config.redPerk,
+        config.redDoctrine,
         config.redAugments,
         config.redSynergies,
     );
@@ -1065,14 +1065,14 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const applyTeamSetup = (
             team: TeamType,
             units: Unit[],
-            perk?: number,
+            doctrine?: number,
             t1?: number,
             t2?: number,
             augments?: ISetupAugment[],
             synergies?: ISetupSynergy[],
         ): void => {
-            if (perk) {
-                fightProperties.setPerkPerTeam(team, perk);
+            if (doctrine) {
+                fightProperties.setDoctrinePerTeam(team, doctrine);
             }
             if (t1 || t2 || augments?.length) {
                 // Init the per-team setup maps FIRST (canAugment/applyAugments read them). This must precede
@@ -1137,7 +1137,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         applyTeamSetup(
             GREEN_TEAM,
             greenUnits,
-            config.greenPerk,
+            config.greenDoctrine,
             config.greenArtifactT1,
             config.greenArtifactT2,
             config.greenAugments,
@@ -1146,7 +1146,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         applyTeamSetup(
             RED_TEAM,
             redUnits,
-            config.redPerk,
+            config.redDoctrine,
             config.redArtifactT1,
             config.redArtifactT2,
             config.redAugments,

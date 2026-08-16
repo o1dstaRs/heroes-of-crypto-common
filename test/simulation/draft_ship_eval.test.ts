@@ -48,7 +48,7 @@ const report = (heuristicLower: number, defaultLower: number): ILeagueEvaluation
         fightVersion: "v0.7",
         maxLaps: 60,
         mapTypes: [1],
-        freezePerk: true,
+        freezeDoctrine: true,
         aggregate: "worst-case",
         softminTemperature: 0.025,
         confidenceZ: 1.96,

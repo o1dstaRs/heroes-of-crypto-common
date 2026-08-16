@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { SETUP_POLICY_V0, SETUP_POLICY_V0_DRAFT_ROLLBACK } from "../../src/ai/setup/setup_v0";
 import { eligibleBacklineProtectorChoices, creatureInfo, scoreCreature } from "../../src/ai/setup/creature_score";
 import { CreatureFactions } from "../../src/generated/protobuf/v1/creature_gen";
-import { Perk } from "../../src/perks/perk_properties";
+import { Doctrine } from "../../src/doctrines/doctrine_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { LifeSynergy } from "../../src/synergies/synergy_properties";
@@ -11,8 +11,8 @@ import { LifeSynergy } from "../../src/synergies/synergy_properties";
 const policy = SETUP_POLICY_V0;
 
 describe("SetupPolicyV0", () => {
-    test("perk = SEE_NONE (max upgrade-point budget)", () => {
-        expect(policy.pickPerk()).toBe(Perk.SEE_NONE);
+    test("doctrine = SEE_NONE (max upgrade-point budget)", () => {
+        expect(policy.pickDoctrine()).toBe(Doctrine.SEE_NONE);
     });
 
     test("tier-2 artifact = highest measured win-rate from the offered set", () => {

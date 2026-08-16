@@ -16,7 +16,7 @@ import { Worker } from "node:worker_threads";
 import { parseArgs } from "node:util";
 
 import { creatureInfo, DEFAULT_DRAFT_W, DRAFT_ANCHOR_W, scoreCreatureWeighted } from "../ai/setup/creature_score";
-import { getUpgradePoints } from "../perks/perk_properties";
+import { getUpgradePoints } from "../doctrines/doctrine_properties";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { FightStateManager } from "../fights/fight_state_manager";
 import {
@@ -49,7 +49,7 @@ export const FROZEN_FIGHT_VERSION = "v0.6";
 export const HYBRID_ROLE_CYCLE: readonly HybridRole[] = ["melee", "melee", "ranged", "flyer"];
 
 export interface IArchetypeSetup {
-    perk: number;
+    doctrine: number;
     augments: ISetupAugment[];
 }
 
@@ -64,9 +64,9 @@ export interface IArchetypeDefinition {
 /** Sniper3 is pinned first; the remaining SEE_NONE budget follows the committed LiveTwin augment order. */
 function rangedMaxSetup(): IArchetypeSetup {
     const anchor = liveTwinSetup();
-    let remaining = getUpgradePoints(anchor.perk) - 3;
+    let remaining = getUpgradePoints(anchor.doctrine) - 3;
     if (remaining < 0) {
-        throw new Error("LiveTwin perk budget cannot fund the ranged_max Sniper3 pin");
+        throw new Error("LiveTwin doctrine budget cannot fund the ranged_max Sniper3 pin");
     }
     const augments: ISetupAugment[] = [{ kind: "Sniper", value: 3 }];
     for (const augment of anchor.augments) {
@@ -82,13 +82,13 @@ function rangedMaxSetup(): IArchetypeSetup {
             remaining -= value;
         }
     }
-    return { perk: anchor.perk, augments };
+    return { doctrine: anchor.doctrine, augments };
 }
 
 export function setupForArchetype(name: ArchetypeName): IArchetypeSetup {
     const setup = name === "ranged_max_sniper3" ? rangedMaxSetup() : liveTwinSetup();
     return {
-        perk: setup.perk,
+        doctrine: setup.doctrine,
         augments: setup.augments.map((augment) => ({ ...augment })),
     };
 }
@@ -435,8 +435,8 @@ export function playArchetypeGame(
         seed,
         gridType: PBTypes.GridVals.NORMAL,
         maxLaps: normalized.maxLaps,
-        greenPerk: greenSetup.perk,
-        redPerk: redSetup.perk,
+        greenDoctrine: greenSetup.doctrine,
+        redDoctrine: redSetup.doctrine,
         greenAugments: greenSetup.augments,
         redAugments: redSetup.augments,
     });
@@ -516,7 +516,7 @@ export interface IArchetypePayoffSummary {
     config: {
         amountMode: typeof LIVETWIN_PRESET.amountMode;
         grid: "NORMAL";
-        perk: number;
+        doctrine: number;
         baseAugments: ISetupAugment[];
         pairedSideSwap: true;
         commonOffersAcrossArchetypes: true;
@@ -655,7 +655,7 @@ function summarizeTallies(
         config: {
             amountMode: LIVETWIN_PRESET.amountMode,
             grid: "NORMAL",
-            perk: baseSetup.perk,
+            doctrine: baseSetup.doctrine,
             baseAugments: baseSetup.augments,
             pairedSideSwap: true,
             commonOffersAcrossArchetypes: true,
