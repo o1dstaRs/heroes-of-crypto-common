@@ -38,11 +38,7 @@ import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { isSmokeableCell } from "../spells/smoke_clouds";
-import {
-    applyElementAndResistToSpellDamage,
-    calculateSpellDamage,
-    elementalSpellMultiplier,
-} from "../spells/spell_damage";
+import { projectSpellRebound, spellDamageAgainstUnit, spellRawDamage } from "../spells/spell_cast_projection";
 import { VINE_STRIDE_COST_MULTIPLIER, canVineTakeRoot, vinePathCells } from "../spells/vines";
 import {
     fireWallBurnDamage,
@@ -1688,13 +1684,7 @@ export class GameActionEngine {
             );
         }
 
-        const rawDamage = calculateSpellDamage(
-            spell.getMultiplierType(),
-            spell.getPower(),
-            caster.getAmountAlive(),
-            caster.getStackPower(),
-            caster.getMagicDamageBonusPercentage(),
-        );
+        const rawDamage = spellRawDamage(spell, caster);
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, [victim]);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
@@ -1744,11 +1734,12 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
         const c = action.targetCell;
-        const cells: XY[] = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
-        // The WHOLE block has to be on the board, so the footprint the aim preview drew is the footprint that
-        // lands. Occupancy is deliberately NOT checked — a meteor is meant to come down on somebody's head.
+        // Footprint and fit both come from the shared helper the aim preview reads, so the block the player
+        // saw highlighted is the block that lands and a drop the preview labelled is a drop that happens.
+        // Occupancy is deliberately NOT checked — a meteor is meant to come down on somebody's head.
+        const cells = SpellHelper.cellTargetedSpellBlockCells(spell.getName(), c);
         const settings = this.context.grid.getSettings();
-        if (!cells.every((cell) => isCellWithinGrid(settings, cell))) {
+        if (!SpellHelper.cellTargetedSpellBlockFitsGrid(settings, spell.getName(), c)) {
             return this.reject("spell_not_available");
         }
 
@@ -1758,13 +1749,7 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const rawDamage = calculateSpellDamage(
-            spell.getMultiplierType(),
-            spell.getPower(),
-            caster.getAmountAlive(),
-            caster.getStackPower(),
-            caster.getMagicDamageBonusPercentage(),
-        );
+        const rawDamage = spellRawDamage(spell, caster);
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, enemies);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
@@ -1811,16 +1796,9 @@ export class GameActionEngine {
      * down to the fractional raw damage the old call site passed through untouched.
      */
     private elementalDamageAgainst(spell: Spell, rawDamage: number, unit: Unit): number {
-        const multiplier = elementalSpellMultiplier({
-            element: spell.getElement(),
-            targetIsFireElement: unit.hasAbilityActive("Fire Element"),
-            targetIsWaterElement: unit.hasAbilityActive("Water Element"),
-            targetIsWindElement: unit.hasAbilityActive("Wind Element"),
-            targetIsEarthElement: unit.hasAbilityActive("Earth Element"),
-        });
         // Shared with the client's hover projection so the number a player is shown and the number this
         // deals are produced by the same arithmetic, not two copies of it.
-        return applyElementAndResistToSpellDamage(rawDamage, multiplier, unit.getMagicResist());
+        return spellDamageAgainstUnit(spell, rawDamage, unit);
     }
     private resolveSpellVictims(
         caster: Unit,
@@ -1837,18 +1815,20 @@ export class GameActionEngine {
         for (const unit of targets) {
             const landedDamage = this.elementalDamageAgainst(spell, rawDamage, unit);
             victims.push({ unit, damage: landedDamage });
-            if (unit.getId() !== caster.getId() && SpellHelper.reboundsSpell(unit)) {
-                // A mirror returns what it REFLECTS, not the whole spell: the caster takes the mirror's own
-                // share (the percentage its card advertises) of the damage that actually landed on the
-                // holder. Reflecting 100% made a 75% card a lie and turned every dragon into a death trap.
-                const share = SpellHelper.getMagicMirrorAbilityShare(unit);
-                const reflected = Math.floor((landedDamage * share) / 100);
-                // The caster's own magic resistance cuts the rebound down, so this is what it actually takes —
-                // say so. The line used to name the rebound without a number, which left the player guessing
-                // what a Magic Mirror had just cost them.
-                // The caster's OWN element answers the rebound: a Fire Element that mirrored a Ring of Fire
-                // back at another Fire Element sends home a spell neither of them can be burned by.
-                const reboundDamage = this.elementalDamageAgainst(spell, reflected, caster);
+            // A mirror returns what it REFLECTS, not the whole spell: the caster takes the mirror's own share
+            // (the percentage its card advertises) of the damage that actually landed on the holder.
+            // Reflecting 100% made a 75% card a lie and turned every dragon into a death trap. The caster's
+            // OWN element and magic resistance then cut the rebound down, so what comes back is what the
+            // caster actually takes — projected by the same helper the client's aim preview draws over the
+            // caster, so aiming at a mirror warns about the return hit before it is taken.
+            const rebound =
+                unit.getId() !== caster.getId() && SpellHelper.reboundsSpell(unit)
+                    ? projectSpellRebound({ spell, caster, holder: unit, landedOnHolder: landedDamage })
+                    : undefined;
+            if (rebound) {
+                const { chancePercent: share, landed: reboundDamage } = rebound;
+                // The line used to name the rebound without a number, which left the player guessing what a
+                // Magic Mirror had just cost them.
                 this.context.sceneLog.updateLog(
                     `${unit.getName()} rebounded ${share}% of ${spell.getName()} back at ${caster.getName()} (${reboundDamage})`,
                 );
@@ -1901,13 +1881,7 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const rawDamage = calculateSpellDamage(
-            spell.getMultiplierType(),
-            spell.getPower(),
-            caster.getAmountAlive(),
-            caster.getStackPower(),
-            caster.getMagicDamageBonusPercentage(),
-        );
+        const rawDamage = spellRawDamage(spell, caster);
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, [target]);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
@@ -1996,13 +1970,7 @@ export class GameActionEngine {
         // cast — with no barrier in the way" report: the barrier was this neighbour requirement, invisible to
         // the player. canCastSpell above already turns a fully magic-immune aim point (Black Dragon) away.
 
-        const rawDamage = calculateSpellDamage(
-            spell.getMultiplierType(),
-            spell.getPower(),
-            caster.getAmountAlive(),
-            caster.getStackPower(),
-            caster.getMagicDamageBonusPercentage(),
-        );
+        const rawDamage = spellRawDamage(spell, caster);
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, caught);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
@@ -2052,16 +2020,11 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
         const c = action.targetCell;
-        const cells: XY[] = [];
-        for (let dx = -1; dx <= 1; dx++) {
-            for (let dy = -1; dy <= 1; dy++) {
-                cells.push({ x: c.x + dx, y: c.y + dy });
-            }
-        }
-        // The WHOLE block has to be on the board, so the footprint the aim preview drew is the footprint that
-        // lands. Occupancy is deliberately NOT checked — meteors are meant to come down on somebody's head.
+        // Footprint and fit both come from the shared helper the aim preview reads — see meteoriteCast. The
+        // 3x3 is CENTRED on the aimed cell, which is what makes it different from Meteorite's cornered 2x2.
+        const cells = SpellHelper.cellTargetedSpellBlockCells(spell.getName(), c);
         const settings = this.context.grid.getSettings();
-        if (!cells.every((cell) => isCellWithinGrid(settings, cell))) {
+        if (!SpellHelper.cellTargetedSpellBlockFitsGrid(settings, spell.getName(), c)) {
             return this.reject("spell_not_available");
         }
 
@@ -2071,13 +2034,7 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const rawDamage = calculateSpellDamage(
-            spell.getMultiplierType(),
-            spell.getPower(),
-            caster.getAmountAlive(),
-            caster.getStackPower(),
-            caster.getMagicDamageBonusPercentage(),
-        );
+        const rawDamage = spellRawDamage(spell, caster);
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, enemies);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());

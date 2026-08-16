@@ -278,6 +278,38 @@ export function elementalSpellMultiplier(params: {
 }
 
 /**
+ * The MOST `rawDamage` of a spell can become against any creature on the board, before magic resistance:
+ * half again as much for an elemental spell that meets the element it counters, and the bare figure for the
+ * rest of the book.
+ *
+ * The spellbook card needs this because it is read BEFORE a target is chosen, so the only honest thing it
+ * can print is the band — 0 (the element that shrugs the spell off, or a fully resistant target) up to this.
+ * Derived by probing {@link elementalSpellMultiplier} with each element in turn rather than by hard-coding
+ * the counter pairs, so the day the table changes the card changes with it.
+ */
+export function maximumElementalSpellDamage(rawDamage: number, element: SpellElement): number {
+    const elementFlags: Array<Partial<Parameters<typeof elementalSpellMultiplier>[0]>> = [
+        {},
+        { targetIsFireElement: true },
+        { targetIsWaterElement: true },
+        { targetIsWindElement: true },
+        { targetIsEarthElement: true },
+    ];
+
+    return elementFlags.reduce((most, flags) => {
+        const multiplier = elementalSpellMultiplier({
+            element,
+            targetIsFireElement: false,
+            targetIsWaterElement: false,
+            targetIsWindElement: false,
+            ...flags,
+        });
+
+        return Math.max(most, applyElementAndResistToSpellDamage(rawDamage, multiplier, 0));
+    }, 0);
+}
+
+/**
  * The FIRE damage a Fireforged Sword rider deals on top of the swing that carried it.
  *
  * The blade is enchanted, not sharpened: the bonus is magic damage riding on a physical hit, so unlike

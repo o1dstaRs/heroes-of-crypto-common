@@ -402,6 +402,34 @@ export function firstTargetedSpellSightBlocker(
     );
 }
 
+/**
+ * The block of cells a CELL-targeted spell covers when aimed at `origin`.
+ *
+ * Meteor Shower's 3x3 is CENTRED on the aimed cell — an odd-sided footprint pivots about the cursor, the way
+ * the Fire Wall's 3-cell line does. Everything else here is 2x2 (Meteorite, Smoke, Craft) and hangs off the
+ * aimed cell as its bottom-left corner, because an even-sided block has no centre cell to anchor on.
+ *
+ * The ONE place either footprint is derived: meteoriteCast / meteorShowerCast read their block out of this,
+ * and so does the client's aim outline and every damage label drawn inside it. A preview whose footprint
+ * differs from the cast's is worse than no preview at all.
+ */
+export function cellTargetedSpellBlockCells(spellName: string, origin: XY): XY[] {
+    const spread = spellName === "Meteor Shower" ? [-1, 0, 1] : [0, 1];
+    return spread.flatMap((dx) => spread.map((dy) => ({ x: origin.x + dx, y: origin.y + dy })));
+}
+
+/**
+ * Whether a called-down block aimed at `origin` actually LANDS: the WHOLE footprint has to be on the board.
+ *
+ * This is the gate meteoriteCast and meteorShowerCast apply before anything else happens, so a drop aimed at
+ * the board's edge is refused outright — no damage, no charge spent. The aim preview asks the same question
+ * through the same helper, because labelling damage on a cast the engine refuses is the loudest possible lie
+ * a hover can tell: it promised 152 and 4104 on drops that never landed.
+ */
+export function cellTargetedSpellBlockFitsGrid(gridSettings: GridSettings, spellName: string, origin: XY): boolean {
+    return cellTargetedSpellBlockCells(spellName, origin).every((cell) => isCellWithinGrid(gridSettings, cell));
+}
+
 /** What a thrown spell actually hits: the aimed target, or the first body that gets in the way. */
 export interface IThrownSpellImpact {
     /** The cell the spell resolves on. */
