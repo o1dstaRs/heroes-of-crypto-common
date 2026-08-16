@@ -415,6 +415,12 @@ export class UnitsHolder {
                 // (see applyDualArtifact); clear it too so nothing accumulates across recompute.
                 unit.deleteDebuff(buffName);
             }
+            // Artifacts can lend an ABILITY as well as a buff (the Wounding Charm's Deep Wounds card).
+            // Buffs above are cleared by name every recompute; the lent ability needs the same treatment
+            // or it outlives the artifact — swapping to another Tier 1 left the army permanently
+            // inflicting Deep Wounds while showing a different artifact's benefit. Only cards the
+            // artifact itself handed over are taken back, so natives survive the swap.
+            unit.revokeArtifactGrantedAbilities();
 
             if (!isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 continue;
@@ -574,7 +580,9 @@ export class UnitsHolder {
                     // stack it on top, since processDeepWoundsAbility sums the cards a unit holds. The buff
                     // itself is just the visible marker — nothing reads its power.
                     applyArtifactBuff("Wounding Charm", AP.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT);
-                    unit.grantAbility("Deep Wounds Level 1");
+                    // Granted through the artifact channel so the cleanup pass above can take it back
+                    // when the charm is swapped out. A native Level 1 (the Wolf) is left alone.
+                    unit.grantArtifactAbility("Deep Wounds Level 1");
                     break;
                 case Tier1Artifact.BROKEN_AEGIS:
                     // Upside (offensive break, resolved in getBreakChancePerTeam) vs downside (self-miss).

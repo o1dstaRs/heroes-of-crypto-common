@@ -460,6 +460,36 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
         }
     }
+    /**
+     * Grant an ability that belongs to the equipped ARTIFACT rather than to the creature, and remember
+     * that the artifact is the one lending it. A card the unit already owns is left alone and NOT
+     * recorded, so taking the artifact off can never strip a native ability.
+     */
+    public grantArtifactAbility(abilityName: string): void {
+        if (this.abilities.some((ability) => ability.getName() === abilityName)) {
+            return;
+        }
+        this.grantAbility(abilityName);
+        // grantAbility declines to restore a permanently stolen card; only record what actually landed.
+        if (!this.abilities.some((ability) => ability.getName() === abilityName)) {
+            return;
+        }
+        this.unitProperties.artifact_granted_abilities ??= [];
+        if (!this.unitProperties.artifact_granted_abilities.includes(abilityName)) {
+            this.unitProperties.artifact_granted_abilities.push(abilityName);
+        }
+    }
+    /** Take back every ability the equipped artifact lent this unit. Natives are untouched. */
+    public revokeArtifactGrantedAbilities(): void {
+        const granted = this.unitProperties.artifact_granted_abilities;
+        if (!granted?.length) {
+            return;
+        }
+        for (const abilityName of granted) {
+            this.deleteAbility(abilityName);
+        }
+        this.unitProperties.artifact_granted_abilities = [];
+    }
     public addAbility(ability: Ability): void {
         if (this.abilities.some((currentAbility) => currentAbility.getName() === ability.getName())) {
             return;
