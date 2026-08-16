@@ -152,42 +152,63 @@ describe("Zena's Chakram — separation chain", () => {
         expect(trajectory.damageFactorByUnitId[far.getId()]).toBe(CHAKRAM_HALF_DAMAGE_FACTOR);
     });
 
-    it("visits nearest-first and hits every reachable enemy exactly once", () => {
+    it("takes the nearest bounce first and hits each victim exactly once", () => {
         const context = setup();
         const primary = enemy(context, "Primary", { x: 8, y: 8 });
         // Both qualify from the primary; the 1-gap one must be taken before the 2-gap one.
         const nearer = enemy(context, "Nearer", { x: 6, y: 8 }); // gap 1
-        const further = enemy(context, "Further", { x: 11, y: 8 }); // gap 2
+        const onward = enemy(context, "Onward", { x: 4, y: 7 }); // gap 1 from Nearer — the chain continues
 
         const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
         const names = trajectory.hitUnits.map((u) => u.getName());
 
-        expect(names[0]).toBe("Nearer");
-        expect(names).toContain("Further");
+        expect(names).toEqual(["Nearer", "Onward"]);
         expect(new Set(names).size).toBe(names.length); // once at most, each
         expect(trajectory.damageFactorByUnitId[nearer.getId()]).toBe(1);
-        expect(trajectory.damageFactorByUnitId[further.getId()]).toBe(CHAKRAM_HALF_DAMAGE_FACTOR);
+        expect(trajectory.damageFactorByUnitId[onward.getId()]).toBe(1);
     });
 
-    it("flies one continuous path: each hop launches from where the disc actually landed, never an earlier victim", () => {
-        // Further's nearest-eligible ANCHOR is Primary (gap 2), not Nearer — Nearer sits gap 4 away, out of
-        // reach. So the hop that hits Further must still visually fly on from Nearer (the disc's true
-        // current position after hop 1), not snap back to reappear at Primary's already-passed point.
+    it("never doubles back across ground it has already flown", () => {
+        // The zigzag this kills: Left and Right both sit within reach of the PRIMARY, on opposite sides.
+        // Reckoning from the whole struck set, the disc used to fan out to Left and then cut back through
+        // the primary's cell to reach Right — re-appearing at a point it had already passed. The disc has
+        // ONE position: after Left it can only continue from Left, and Right is 5 cells away, so the
+        // flight ends there and comes home.
         const context = setup();
         const primary = enemy(context, "Primary", { x: 8, y: 8 });
-        const nearer = enemy(context, "Nearer", { x: 6, y: 8 }); // gap 1 from primary
-        const further = enemy(context, "Further", { x: 11, y: 8 }); // gap 2 from primary, gap 4 from nearer
+        const left = enemy(context, "Left", { x: 6, y: 8 }); // gap 1 from primary
+        const right = enemy(context, "Right", { x: 11, y: 8 }); // gap 2 from primary, but gap 4 from Left
 
         const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
 
-        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["Nearer", "Further"]);
-        expect(trajectory.steps).toHaveLength(2);
-        // Hop 1 launches from the primary target — where the initial throw just landed.
+        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["Left"]);
+        expect(right.getId() in trajectory.damageFactorByUnitId).toBe(false);
+        // One hop only, launched from the primary — the disc never flies back over its own path.
+        expect(trajectory.steps).toHaveLength(1);
         expect(trajectory.steps[0].fromCell).toEqual(primary.getBaseCell());
-        // Hop 2 must continue from Nearer (hop 1's landing spot), never snap back to Primary's cell.
-        expect(trajectory.steps[1].fromCell).toEqual(nearer.getBaseCell());
-        expect(trajectory.steps[1].fromCell).not.toEqual(primary.getBaseCell());
-        void further;
+        void left;
+    });
+
+    it("each hop launches from the previous victim, so the path is unbroken end to end", () => {
+        // A genuine chain: every link is in reach of the one before it, so the disc traces a single
+        // forward-only run. Each hop must start exactly where the previous hop landed.
+        const context = setup();
+        const primary = enemy(context, "Primary", { x: 8, y: 4 });
+        const first = enemy(context, "First", { x: 8, y: 6 });
+        const second = enemy(context, "Second", { x: 8, y: 8 });
+        const third = enemy(context, "Third", { x: 8, y: 10 });
+
+        const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+
+        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["First", "Second", "Third"]);
+        const launchedFrom = trajectory.steps.map((step) => step.fromCell);
+        expect(launchedFrom).toEqual([primary.getBaseCell(), first.getBaseCell(), second.getBaseCell()]);
+        // Every hop starts where the previous one ended: no gaps, no jumps back.
+        const landedOn = [primary, first, second, third].map((u) => u.getBaseCell());
+        trajectory.steps.forEach((step, index) => {
+            expect(step.fromCell).toEqual(landedOn[index]);
+            expect(step.circleCells.at(-1)).toEqual(landedOn[index + 1]);
+        });
     });
 
     it("never hits allies and never lets them relay the chain", () => {

@@ -157,10 +157,18 @@ function lineCells(from: XY, to: XY): XY[] {
  * Precompute the WHOLE chakram flight, deterministically, on the engine — the client only replays it,
  * and the hover preview calls the same function to show exactly who will be struck.
  *
- * The disc sweeps the SEPARATED CLUSTER around the shot's target, up to the attacker's stack-power target
- * limit. It repeatedly bounces to the nearest not-yet-hit enemy standing apart from ANY unit already struck —
- * 1 empty cell of separation keeps full bounce damage, 2 empty cells halves it — until nobody within reach
- * remains. Then it flies home to Zena (the return leg is the client's to animate; it deals no damage).
+ * The disc flies ONE CONTINUOUS PATH — a directed cycle, Zena -> primary target -> bounce -> bounce ->
+ * ... -> home to Zena (the return leg is the client's to animate; it deals no damage). It is a single
+ * physical object with one position at a time, so every hop is reckoned from WHERE IT CURRENTLY IS: it
+ * bounces to the nearest not-yet-hit enemy standing apart from the unit it struck LAST — 1 empty cell of
+ * separation keeps full bounce damage, 2 empty cells halves it — and stops the moment nothing is in reach
+ * of that spot. A chain that walks into a dead end simply ends there and the disc comes home.
+ *
+ * Reckoning from the last victim (rather than from anything already struck) is what keeps the flight a
+ * cycle instead of a zigzag: a unit that merely stands near an EARLIER victim is NOT eligible, because
+ * reaching it would fly the disc back across ground it has already covered — fanning out to one side of
+ * the target and then cutting back through it to the other. The disc never re-appears at a point on its
+ * own already-flown path; it only ever moves forward, then closes the loop at Zena.
  *
  * Rules:
  *  - ALLIES ARE NEVER HIT, and never relay the chain.
@@ -169,17 +177,12 @@ function lineCells(from: XY, to: XY): XY[] {
  *    body (any team, or an obstacle) is a wall, not a bounce target.
  *  - Each victim is struck at most once per throw; the primary target never takes a second hit.
  *  - Total victims, INCLUDING the primary target, cannot exceed the attacker's stack power (1..5).
- *  - Nearest-first: smallest separation to the struck cluster wins; ties break by CHEBYSHEV base-cell
- *    distance to the LAST unit hit (see {@link chakramHopDistance}), then by unit id — the flight is
- *    byte-identical everywhere it is computed. Chebyshev throughout is what makes a straight, diagonal
- *    and knight-offset gap of one cell rank as the same distance rather than three different ones.
+ *  - Nearest-first: smallest separation from the last victim wins; ties break by CHEBYSHEV base-cell
+ *    distance (see {@link chakramHopDistance}), then by unit id — the flight is byte-identical everywhere
+ *    it is computed. Chebyshev throughout is what makes a straight, diagonal and knight-offset gap of one
+ *    cell rank as the same distance rather than three different ones.
  *  - Angel's "Arrows Wingshield Aura" owner is never struck and STOPS the whole flight when it is the
  *    next nearest bounce — the shield catches the disc.
- *  - The flight is ONE CONTINUOUS PATH: eligibility for a hop is judged against the nearest member of the
- *    whole struck cluster, but each hop is always DRAWN flying from wherever the disc currently is (the
- *    unit it struck last), never snapping back to an earlier victim to launch from there. The disc never
- *    reappears at a point on its own already-flown path — it only ever moves forward, and its final leg
- *    (animated client-side) closes the loop back at Zena.
  */
 export function resolveChakramTrajectory(
     attackerUnit: Unit,
@@ -195,56 +198,38 @@ export function resolveChakramTrajectory(
     const steps: IChakramStep[] = [];
     const hitUnits: Unit[] = [];
     const damageFactorByUnitId: Record<string, number> = {};
-    // The primary target is already damaged by the shot itself — it anchors the cluster but is never re-hit.
-    const struck: Unit[] = [primaryTarget];
     const visited = new Set<string>([primaryTarget.getId()]);
 
+    // Where the disc physically IS. It starts on the primary target (already damaged by the throw itself,
+    // never re-hit) and every bounce is reckoned from here — see the one-continuous-path rule above.
     let last = primaryTarget;
     // The primary shot already consumes one slot, leaving at most 0..4 secondary victims.
     const maxBounces = chakramMaxTargets(attackerUnit.getStackPower()) - 1;
     for (let hop = 0; hop < maxBounces; hop += 1) {
         let next: Unit | undefined;
         let nextSeparation = Number.MAX_SAFE_INTEGER;
-        let nextAnchor: Unit | undefined;
         let nextTieBreak = Number.MAX_SAFE_INTEGER;
         for (const unit of unitsHolder.getAllUnits().values()) {
             if (visited.has(unit.getId()) || unit.isDead() || unit.getTeam() === attackerUnit.getTeam()) {
                 continue;
             }
-            // Anyone touching the struck cluster is part of the wall, never a bounce — checked FIRST so a
-            // blocked bridge below can never promote a shoulder-to-shoulder unit through a farther anchor.
-            let minSeparation = Number.MAX_SAFE_INTEGER;
-            for (const member of struck) {
-                minSeparation = Math.min(minSeparation, chakramSeparation(member, unit));
-            }
-            if (minSeparation - 1 < CHAKRAM_FULL_DAMAGE_GAP) {
+            // Reckoned from the disc's CURRENT position only. A unit that merely stands near an EARLIER
+            // victim is out of reach: honouring it would fly the disc back across ground it has already
+            // covered (fan out left, then cut back right through the primary), which is a zigzag, not a
+            // chakram's flight. Touching units (gap 0) are the wall the disc cannot curve through, and
+            // anything past 2 empty cells is simply too far.
+            const separation = chakramSeparation(last, unit);
+            const gap = separation - 1;
+            if (gap < CHAKRAM_FULL_DAMAGE_GAP || gap > CHAKRAM_HALF_DAMAGE_GAP) {
                 continue;
             }
-            // Nearest qualifying separation to ANYONE already struck whose separating cells are actually
-            // EMPTY; that unit anchors the hop's visual. Geometry alone is not enough: in a packed army a
-            // diagonal neighbour's neighbour measures two apart with a third body in between, and the disc
-            // cannot cut through a wall (the fight report that pinned this: a solid six-stack block still
-            // got three units chained).
-            let separation = Number.MAX_SAFE_INTEGER;
-            let anchor: Unit | undefined;
-            for (const member of struck) {
-                const memberSeparation = chakramSeparation(member, unit);
-                const memberGap = memberSeparation - 1;
-                if (memberGap < CHAKRAM_FULL_DAMAGE_GAP || memberGap > CHAKRAM_HALF_DAMAGE_GAP) {
-                    continue;
-                }
-                if (memberSeparation >= separation || !hasEmptyBridge(grid, member, unit, memberGap)) {
-                    continue;
-                }
-                separation = memberSeparation;
-                anchor = member;
-            }
-            if (!anchor) {
+            // Geometry alone is not enough: in a packed army a diagonal neighbour's neighbour measures two
+            // apart with a third body in between, and the disc cannot cut through a wall (the fight report
+            // that pinned this: a solid six-stack block still got three units chained).
+            if (!hasEmptyBridge(grid, last, unit, gap)) {
                 continue;
             }
-            const from = last.getBaseCell();
-            const to = unit.getBaseCell();
-            const tieBreak = chakramHopDistance(from, to);
+            const tieBreak = chakramHopDistance(last.getBaseCell(), unit.getBaseCell());
             if (
                 separation < nextSeparation ||
                 (separation === nextSeparation && tieBreak < nextTieBreak) ||
@@ -252,20 +237,14 @@ export function resolveChakramTrajectory(
             ) {
                 next = unit;
                 nextSeparation = separation;
-                nextAnchor = anchor;
                 nextTieBreak = tieBreak;
             }
         }
 
-        if (!next || !nextAnchor) {
+        if (!next) {
             break;
         }
 
-        // The disc is a single physical object with one current position: `last` (where the PREVIOUS hop
-        // actually landed), never `nextAnchor`. Eligibility and the damage factor are judged against the
-        // nearest member of the whole struck cluster (`nextAnchor` may be an earlier victim, not `last`),
-        // but the flight itself must still fly FROM where it currently is — otherwise the animation snaps
-        // back to an already-visited point before continuing, instead of tracing one continuous path.
         const fromCell = last.getBaseCell();
         const toCell = next.getBaseCell();
         if (next.hasAbilityActive("Arrows Wingshield Aura")) {
@@ -281,7 +260,6 @@ export function resolveChakramTrajectory(
         }
 
         visited.add(next.getId());
-        struck.push(next);
         hitUnits.push(next);
         damageFactorByUnitId[next.getId()] =
             nextSeparation - 1 === CHAKRAM_FULL_DAMAGE_GAP ? 1 : CHAKRAM_HALF_DAMAGE_FACTOR;
