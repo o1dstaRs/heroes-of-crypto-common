@@ -217,7 +217,7 @@
         "Griffin": {
             "name": "Griffin",
             "hp": 72,
-            "steps": 4.5,
+            "steps": 3.5,
             "initiative": 8,
             "armor": 23,
             "attack_type": "MELEE",

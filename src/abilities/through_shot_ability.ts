@@ -234,6 +234,14 @@ export function processThroughShotAbility(
                 );
             }
         }
+
+        // ABILITY Arrows Wingshield Aura (Angel): "the owner is immune to being shot through". The bolt
+        // reaches HIM — he is shot AT, and takes this hit — but it stops in his shield instead of
+        // carrying on down the lane, so whatever stands behind him is spared. Placed outside the
+        // hit/miss branches on purpose: his body blocks the lane whether or not the shot connected.
+        if (targetUnit.hasAbilityActive("Arrows Wingshield Aura")) {
+            break;
+        }
     }
 
     for (const unit of unitsDamaged) {
