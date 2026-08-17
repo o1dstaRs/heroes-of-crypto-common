@@ -6,10 +6,12 @@ import {
     chakramHopDistance,
     chakramMaxTargets,
     chakramSeparation,
+    resolveChakramFlightMisses,
     resolveChakramTrajectory,
 } from "../../src/abilities/chakram_ability";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
+import { setDeterministicRandomSource } from "../../src/utils/lib";
+import { createCombatTestContext, createTestUnit, createVisibleDamage, placeUnit } from "../helpers/combat";
 
 const GREEN = PBTypes.TeamVals.LOWER;
 const RED = PBTypes.TeamVals.UPPER;
@@ -52,6 +54,43 @@ describe("Zena's Chakram — separation chain", () => {
 
         expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["Reachable"]);
         expect(trajectory.damageFactorByUnitId[reachable.getId()]).toBe(1);
+    });
+
+    it("never bounces past a neighbour standing in the way — a shoulder-to-shoulder row", () => {
+        // A B C on one row. A and C measure two apart, which LOOKS like a 1-cell gap, but the cell
+        // between them is B. The disc used to curve around B through the empty cell beside it; a filled
+        // space is not a gap, whichever way you walk around it.
+        const context = setup(5);
+        const a = enemy(context, "A", { x: 5, y: 8 });
+        enemy(context, "B", { x: 6, y: 8 });
+        enemy(context, "C", { x: 7, y: 8 });
+
+        const trajectory = resolveChakramTrajectory(context.zena, a, context.unitsHolder, context.grid);
+
+        expect(trajectory.hitUnits).toEqual([]);
+    });
+
+    it("never bounces past a neighbour standing in the way — a diagonal stair", () => {
+        const context = setup(5);
+        const a = enemy(context, "A", { x: 5, y: 9 });
+        enemy(context, "B", { x: 6, y: 8 });
+        enemy(context, "C", { x: 7, y: 7 });
+
+        const trajectory = resolveChakramTrajectory(context.zena, a, context.unitsHolder, context.grid);
+
+        expect(trajectory.hitUnits).toEqual([]);
+    });
+
+    it("still bounces along a row once the middle body steps aside", () => {
+        // Same A and C, no B: now the cell between them really is open air.
+        const context = setup(5);
+        const a = enemy(context, "A", { x: 5, y: 8 });
+        const c = enemy(context, "C", { x: 7, y: 8 });
+
+        const trajectory = resolveChakramTrajectory(context.zena, a, context.unitsHolder, context.grid);
+
+        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["C"]);
+        expect(trajectory.damageFactorByUnitId[c.getId()]).toBe(1);
     });
 
     it("an ally's body blocks the gap exactly like an enemy's", () => {
@@ -151,6 +190,32 @@ describe("Zena's Chakram — separation chain", () => {
         expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["Near", "Far"]);
         expect(trajectory.damageFactorByUnitId[near.getId()]).toBe(1);
         expect(trajectory.damageFactorByUnitId[far.getId()]).toBe(CHAKRAM_HALF_DAMAGE_FACTOR);
+    });
+
+    it("stops after a half-damage bounce, however many enemies wait beyond it", () => {
+        const context = setup(5); // room for four bounces, so only the rule can end this flight
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        const wide = enemy(context, "Wide", { x: 11, y: 11 }); // gap 2 from the primary — the long stretch
+        enemy(context, "Beyond", { x: 13, y: 13 }); // gap 1 from Wide: a perfectly good onward bounce
+
+        const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+
+        // The disc spent itself crossing two empty cells: it strikes Wide at half and goes home.
+        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["Wide"]);
+        expect(trajectory.damageFactorByUnitId[wide.getId()]).toBe(CHAKRAM_HALF_DAMAGE_FACTOR);
+        expect(trajectory.steps).toHaveLength(1);
+    });
+
+    it("keeps relaying through 1-cell bounces, which cost it nothing", () => {
+        const context = setup(5);
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        enemy(context, "First", { x: 10, y: 10 }); // gap 1
+        enemy(context, "Second", { x: 12, y: 12 }); // gap 1 from First
+
+        const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+
+        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["First", "Second"]);
+        expect(Object.values(trajectory.damageFactorByUnitId)).toEqual([1, 1]);
     });
 
     it("takes the nearest bounce first and hits each victim exactly once", () => {
@@ -418,5 +483,147 @@ describe("Zena's Chakram — the flight sweeps clockwise", () => {
         const one = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
         const two = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
         expect(one.hitUnits.map((u) => u.getName())).toEqual(two.hitUnits.map((u) => u.getName()));
+    });
+});
+
+describe("Zena's Chakram — a dodge ends the flight", () => {
+    it("does not bounce at all when the throw itself is dodged", () => {
+        const context = setup();
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        enemy(context, "Bounce", { x: 10, y: 10 });
+        const planned = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+        expect(planned.hitUnits.map((u) => u.getName())).toEqual(["Bounce"]);
+
+        const outcome = resolveChakramFlightMisses(planned, primary, true, () => false);
+
+        // Nothing was struck, so there is nothing for the disc to ricochet off.
+        expect(outcome.trajectory.hitUnits).toEqual([]);
+        expect(outcome.trajectory.steps).toEqual([]);
+        // Only the primary is accounted for — the bounce was never even rolled for.
+        expect(outcome.missByUnitId).toEqual({ [primary.getId()]: true });
+    });
+
+    it("stops at the victim that dodges and never reaches the one behind it", () => {
+        const context = setup();
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        const first = enemy(context, "First", { x: 10, y: 10 });
+        const second = enemy(context, "Second", { x: 12, y: 12 });
+        const planned = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+        expect(planned.hitUnits.map((u) => u.getName())).toEqual(["First", "Second"]);
+
+        const rolledFor: string[] = [];
+        const outcome = resolveChakramFlightMisses(planned, primary, false, (victim) => {
+            rolledFor.push(victim.getName());
+            return victim.getId() === first.getId();
+        });
+
+        // The dodging victim keeps its own hop — the disc visibly flies at it and is dodged — and stays
+        // among the affected units so the client has something to pop MISS over.
+        expect(outcome.trajectory.hitUnits.map((u) => u.getName())).toEqual(["First"]);
+        expect(outcome.trajectory.steps).toHaveLength(1);
+        // The enemy behind is never rolled for, because the disc never got there.
+        expect(rolledFor).toEqual(["First"]);
+        expect(second.getId() in outcome.missByUnitId).toBe(false);
+    });
+
+    it("flies the whole planned flight when nothing dodges", () => {
+        const context = setup();
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        const first = enemy(context, "First", { x: 10, y: 10 });
+        const second = enemy(context, "Second", { x: 12, y: 12 });
+        const planned = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+
+        const outcome = resolveChakramFlightMisses(planned, primary, false, () => false);
+
+        expect(outcome.trajectory.hitUnits.map((u) => u.getName())).toEqual(["First", "Second"]);
+        expect(outcome.trajectory.steps).toHaveLength(planned.steps.length);
+        expect(outcome.trajectory.damageFactorByUnitId).toEqual(planned.damageFactorByUnitId);
+        // Every reached unit carries a verdict, so the damage tail never rolls a second time for any of them.
+        expect(outcome.missByUnitId).toEqual({
+            [primary.getId()]: false,
+            [first.getId()]: false,
+            [second.getId()]: false,
+        });
+    });
+});
+
+describe("Zena's Chakram — the engine stops the disc on a dodge", () => {
+    /** A throwing Zena plus the enemies her disc would chain through, in flight order. */
+    function engineSetup() {
+        const context = createCombatTestContext();
+        const zena = createTestUnit({
+            name: "Zena",
+            team: GREEN,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 8,
+            abilities: ["Chakram"],
+            stackPower: 5,
+            amountAlive: 1,
+        });
+        zena.calculateAttackDamage = () => 10;
+        placeUnit(context.grid, context.unitsHolder, zena, { x: 8, y: 2 });
+        const victims = (["Primary", "First", "Second"] as const).map((name, index) => {
+            const unit = createTestUnit({ name, team: RED, amountAlive: 3, maxHp: 100 });
+            placeUnit(context.grid, context.unitsHolder, unit, { x: 8 + index * 2, y: 8 + index * 2 });
+            return unit;
+        });
+        const [primary] = victims;
+        return { ...context, zena, primary, victims };
+    }
+
+    /** Throw the disc, dodged by exactly the named victims. */
+    function throwChakram(context: ReturnType<typeof engineSetup>, dodgedNames: string[]) {
+        context.zena.calculateMissChance = (enemyUnit) => (dodgedNames.includes(enemyUnit.getName()) ? 100 : 0);
+        const damageForAnimation = createVisibleDamage(context.primary);
+        // getRandomInt(0, 100) -> 0, so a unit misses exactly when its miss chance is above zero.
+        setDeterministicRandomSource(() => 0);
+        try {
+            const result = context.attackHandler.handleRangeAttack(
+                context.unitsHolder,
+                [1],
+                1,
+                damageForAnimation,
+                context.zena,
+                [[context.primary]],
+                undefined,
+                context.primary.getPosition(),
+            );
+            expect(result.completed).toBe(true);
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+        return { damageForAnimation, hurt: context.victims.filter((u) => u.getCumulativeHp() < 300) };
+    }
+
+    it("damages the whole chain when nothing dodges", () => {
+        const context = engineSetup();
+
+        const { hurt, damageForAnimation } = throwChakram(context, []);
+
+        expect(hurt.map((u) => u.getName())).toEqual(["Primary", "First", "Second"]);
+        expect(damageForAnimation.chakramArcs).toHaveLength(2);
+    });
+
+    it("never bounces off a primary that dodged the throw", () => {
+        const context = engineSetup();
+
+        const { hurt, damageForAnimation } = throwChakram(context, ["Primary"]);
+
+        expect(hurt).toEqual([]);
+        expect(damageForAnimation.chakramArcs ?? []).toEqual([]);
+    });
+
+    it("drops the rest of the chain once a bounce is dodged", () => {
+        const context = engineSetup();
+
+        const { hurt, damageForAnimation } = throwChakram(context, ["First"]);
+
+        // The disc reached First and was dodged, so Second was never in its path at all.
+        expect(hurt.map((u) => u.getName())).toEqual(["Primary"]);
+        // The dodged hop is still flown and still reported, so the client pops MISS over First.
+        expect(damageForAnimation.chakramArcs).toHaveLength(1);
+        expect(damageForAnimation.splash).toContainEqual(
+            expect.objectContaining({ unitId: context.victims[1].getId(), amount: 0, missed: true }),
+        );
     });
 });

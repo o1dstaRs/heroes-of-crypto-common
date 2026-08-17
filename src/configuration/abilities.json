@@ -707,7 +707,8 @@
         "type": "ATTACK",
         "desc": [
             "Maximum targets: {}. Ranged attacks hit the chosen enemy, then bounce to the nearest eligible enemies.",
-            "A 1-cell gap keeps full damage; a 2-cell gap halves it. Each enemy is hit once, and allies are never hit."
+            "A 1-cell gap keeps full damage; a 2-cell gap halves it and ends the flight there.",
+            "A dodged target also ends it. Each enemy is hit once, and allies are never hit."
         ],
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",

@@ -58,6 +58,10 @@ export function processRangeAOEAbility(
     // Per-victim scaling applied to the raw hit before artifacts/resistances — Zena's Chakram halves
     // the bounce onto a target two cells removed (see chakram_ability.damageFactorByUnitId).
     perUnitDamageFactors?: Record<string, number>,
+    // Zena's Chakram rolls its dodges up front, in flight order, because a dodge ENDS the flight
+    // (chakram_ability.resolveChakramFlightMisses). Those verdicts are reused here rather than rolled
+    // again: a second roll could hand a hit to a victim the disc already stopped short of.
+    preRolledMissByUnitId?: Readonly<Record<string, boolean>>,
 ): IAOERangeAttackResult {
     const unitIdsDied: string[] = [];
     const perUnitDamage: IAOERangeAttackResult["perUnitDamage"] = [];
@@ -102,13 +106,14 @@ export function processRangeAOEAbility(
             }
 
             const isAttackMissed =
+                preRolledMissByUnitId?.[unit.getId()] ??
                 HoCLib.getRandomInt(0, 100) <
-                attackerUnit.calculateMissChance(
-                    unit,
-                    FightStateManager.getInstance()
-                        .getFightProperties()
-                        .getAdditionalAbilityPowerPerTeam(unit.getTeam()),
-                );
+                    attackerUnit.calculateMissChance(
+                        unit,
+                        FightStateManager.getInstance()
+                            .getFightProperties()
+                            .getAdditionalAbilityPowerPerTeam(unit.getTeam()),
+                    );
             if (isAttackMissed) {
                 sceneLog.updateLog(
                     `${attackerUnit.getName()} misses 🏹 ${isAttack ? "on" : "resp on"} ${unit.getName()}`,

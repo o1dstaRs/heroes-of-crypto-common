@@ -1092,16 +1092,38 @@ export class AttackHandler {
         // ABILITY Chakram (Zena): the disc may hit up to the attacker's stack power in TOTAL. After the
         // primary, it bounces among enemies standing apart — 1 empty cell keeps full bounce damage and 2
         // halves it — nearest first, each enemy at most once, then it returns to Zena.
-        // resolveChakramTrajectory PRECOMPUTES the whole flight deterministically, so the client replay and
-        // red hover preview use the exact same capped victims.
+        // resolveChakramTrajectory PRECOMPUTES the geometry deterministically: the red hover preview shows
+        // this planned flight (a preview cannot know which way a dodge will fall), and the client replays
+        // whatever survives the dodge pass below, so the disc it flies is the disc that dealt the damage.
         // Victims JOIN affectedUnits, so they resolve through the very same AOE tail as Large Caliber /
         // Area Throw (Giant's Maul, status resistance, Flesh Shield ordering, per-unit numbers).
-        const chakramTrajectory = AllAbilities.resolveChakramTrajectory(
+        const plannedChakramFlight = AllAbilities.resolveChakramTrajectory(
             attackerUnit,
             targetUnit,
             unitsHolder,
             this.grid,
         );
+        // A dodge ENDS the throw: the disc never touched that victim, so it never left it either and the
+        // enemy behind is never reached. The rolls happen here, in flight order, because
+        // resolveChakramTrajectory has to stay pure geometry for the hover preview. The primary reuses
+        // the shot's own miss roll above instead of rolling a second time against the same pair — which
+        // also puts its damage and its on-hit riders on one verdict rather than two.
+        const chakramFlight = plannedChakramFlight.hitUnits.length
+            ? AllAbilities.resolveChakramFlightMisses(
+                  plannedChakramFlight,
+                  targetUnit,
+                  isAttackMissed,
+                  (victim) =>
+                      HoCLib.getRandomInt(0, 100) <
+                      attackerUnit.calculateMissChance(
+                          victim,
+                          FightStateManager.getInstance()
+                              .getFightProperties()
+                              .getAdditionalAbilityPowerPerTeam(victim.getTeam()),
+                      ),
+              )
+            : undefined;
+        const chakramTrajectory = chakramFlight?.trajectory ?? plannedChakramFlight;
         if (chakramTrajectory.hitUnits.length && affectedUnits) {
             for (const hitUnit of chakramTrajectory.hitUnits) {
                 if (!affectedUnits.some((unit) => unit.getId() === hitUnit.getId())) {
@@ -1141,6 +1163,7 @@ export class AttackHandler {
             true,
             (damageForAnimation.secondary ??= []),
             chakramTrajectory.damageFactorByUnitId,
+            chakramFlight?.missByUnitId,
         );
         let attackDamageApplied = true;
         if (aoeRangeAttackResult.landed) {
@@ -1222,12 +1245,30 @@ export class AttackHandler {
             // ABILITY Chakram (Zena) on the RESPONSE: a counter-throw behaves EXACTLY like the initiating one —
             // same stack-power total-target cap, separation chain, ally exclusion and Angel stop, with the
             // RESPONDER as the attacker and its shooter as the primary victim.
-            const responseChakramTrajectory = AllAbilities.resolveChakramTrajectory(
+            const plannedResponseChakramFlight = AllAbilities.resolveChakramTrajectory(
                 targetUnit,
                 rangeResponseUnit,
                 unitsHolder,
                 this.grid,
             );
+            // Dodges end the counter-throw exactly as they end the initiating one, and its primary
+            // likewise reuses the counter-shot's own miss roll rather than rolling again.
+            const responseChakramFlight = plannedResponseChakramFlight.hitUnits.length
+                ? AllAbilities.resolveChakramFlightMisses(
+                      plannedResponseChakramFlight,
+                      rangeResponseUnit,
+                      isResponseMissed,
+                      (victim) =>
+                          HoCLib.getRandomInt(0, 100) <
+                          targetUnit.calculateMissChance(
+                              victim,
+                              FightStateManager.getInstance()
+                                  .getFightProperties()
+                                  .getAdditionalAbilityPowerPerTeam(victim.getTeam()),
+                          ),
+                  )
+                : undefined;
+            const responseChakramTrajectory = responseChakramFlight?.trajectory ?? plannedResponseChakramFlight;
             if (responseChakramTrajectory.hitUnits.length) {
                 for (const hitUnit of responseChakramTrajectory.hitUnits) {
                     if (!rangeResponseUnits.some((unit) => unit.getId() === hitUnit.getId())) {
@@ -1269,6 +1310,7 @@ export class AttackHandler {
                 false,
                 (damageForAnimation.secondary ??= []),
                 responseChakramTrajectory.damageFactorByUnitId,
+                responseChakramFlight?.missByUnitId,
             );
             if (aoeRangeResponseResult.landed) {
                 damageFromResponse = AllAbilities.processLuckyStrikeAbility(

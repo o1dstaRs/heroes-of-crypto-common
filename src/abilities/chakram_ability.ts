@@ -18,8 +18,11 @@ import type { XY } from "../utils/math";
 /**
  * The chakram bounces only between units that stand APART: the disc needs open air to curve through.
  * Separation is measured between unit footprints (Chebyshev, so diagonals count the same as straights):
- * 1 empty cell between two units keeps FULL bounce damage, 2 empty cells HALVES it, touching units and
- * anything further apart are never bounced to.
+ * 1 empty cell between two units keeps FULL bounce damage, 2 empty cells HALVES it AND ends the flight
+ * there, and touching units or anything further apart are never bounced to.
+ *
+ * The wide bounce being terminal is what stops the disc from chaining an army at half price: it can
+ * reach far or it can reach often, never both.
  */
 export const CHAKRAM_FULL_DAMAGE_GAP = 1;
 export const CHAKRAM_HALF_DAMAGE_GAP = 2;
@@ -59,6 +62,73 @@ export interface IChakramTrajectory {
     damageFactorByUnitId: Record<string, number>;
     /** Legacy ricochet-era field — the separation chakram never touches mountains. Always empty. */
     mountainCells: XY[];
+}
+
+/** What the throw actually did, once the dodges along the flight are rolled. */
+export interface IChakramFlightOutcome {
+    /** The hops the disc really flew — everything past a dodge is never flown. */
+    trajectory: IChakramTrajectory;
+    /**
+     * Miss verdict for every unit the disc reached, the primary target included. The engine damages
+     * these through the shared range-AOE tail, which must REUSE these verdicts instead of rolling its
+     * own — a second roll would let the flight stop on one victim and damage the next anyway.
+     */
+    missByUnitId: Record<string, boolean>;
+}
+
+/**
+ * Cut the flight short at the first victim that dodges.
+ *
+ * A chakram is ONE disc on ONE continuous path, so a victim it never touched is a victim it never left:
+ * a dodge ends the throw where it happened and the disc drops and returns to Zena, instead of carrying
+ * on to the enemy behind. Dodging the throw itself stops it before the first bounce.
+ *
+ * The dodging victim KEEPS its hop — the disc visibly flies at it and is dodged — and stays among the
+ * affected units so the client can pop MISS over it. Only the hops beyond it are dropped.
+ *
+ * The roll is injected rather than taken here so {@link resolveChakramTrajectory} stays pure geometry:
+ * the red hover preview calls it too, and a preview must neither consume the fight's RNG nor pretend to
+ * know which way a dodge will land.
+ */
+export function resolveChakramFlightMisses(
+    trajectory: IChakramTrajectory,
+    primaryTarget: Unit,
+    primaryMissed: boolean,
+    rollMiss: (victim: Unit) => boolean,
+): IChakramFlightOutcome {
+    const missByUnitId: Record<string, boolean> = { [primaryTarget.getId()]: primaryMissed };
+    if (primaryMissed) {
+        return {
+            trajectory: { steps: [], hitUnits: [], damageFactorByUnitId: {}, mountainCells: [] },
+            missByUnitId,
+        };
+    }
+
+    const hitUnits: Unit[] = [];
+    const damageFactorByUnitId: Record<string, number> = {};
+    // Nothing dodges: the disc flies the whole planned flight, trailing Angel-shield hop included.
+    let flownSteps = trajectory.steps.length;
+    for (let hop = 0; hop < trajectory.hitUnits.length; hop += 1) {
+        const victim = trajectory.hitUnits[hop];
+        hitUnits.push(victim);
+        damageFactorByUnitId[victim.getId()] = trajectory.damageFactorByUnitId[victim.getId()];
+        const missed = rollMiss(victim);
+        missByUnitId[victim.getId()] = missed;
+        if (missed) {
+            flownSteps = hop + 1;
+            break;
+        }
+    }
+
+    return {
+        trajectory: {
+            steps: trajectory.steps.slice(0, flownSteps),
+            hitUnits,
+            damageFactorByUnitId,
+            mountainCells: [],
+        },
+        missByUnitId,
+    };
 }
 
 /**
@@ -122,11 +192,22 @@ const CHAKRAM_NEIGHBOR_OFFSETS: readonly XY[] = [
  * gap — a diagonal neighbour's neighbour measures two apart — but the cell in between holds a third
  * body, and the disc cannot cut through a wall: no empty bridge, no bounce. Anything standing there
  * blocks — enemy, ally, or an obstacle the grid tracks.
+ *
+ * Every link must also lie BETWEEN the two units — inside the box their footprints span — not beside
+ * them. Otherwise a shoulder-to-shoulder row A B C bounced A -> C by curving through the empty cell
+ * next to B, and a diagonal stair did the same: B fills the space between them, and a filled space is
+ * not a gap, whichever way you walk around it.
  */
 function hasEmptyBridge(grid: Grid, a: Unit, b: Unit, gap: number): boolean {
     const aCells = a.isSmallSize() ? [a.getBaseCell()] : a.getCells();
     const bCells = b.isSmallSize() ? [b.getBaseCell()] : b.getCells();
-    const isEmpty = (cell: XY): boolean => !grid.getOccupantUnitId(cell);
+    const spanned = [...aCells, ...bCells];
+    const minX = Math.min(...spanned.map((cell) => cell.x));
+    const maxX = Math.max(...spanned.map((cell) => cell.x));
+    const minY = Math.min(...spanned.map((cell) => cell.y));
+    const maxY = Math.max(...spanned.map((cell) => cell.y));
+    const isBetween = (cell: XY): boolean => cell.x >= minX && cell.x <= maxX && cell.y >= minY && cell.y <= maxY;
+    const isEmpty = (cell: XY): boolean => isBetween(cell) && !grid.getOccupantUnitId(cell);
     const touches = (cell: XY, cells: XY[]): boolean =>
         cells.some((c) => Math.max(Math.abs(c.x - cell.x), Math.abs(c.y - cell.y)) === 1);
 
@@ -176,8 +257,8 @@ function lineCells(from: XY, to: XY): XY[] {
  * ... -> home to Zena (the return leg is the client's to animate; it deals no damage). It is a single
  * physical object with one position at a time, so every hop is reckoned from WHERE IT CURRENTLY IS: it
  * bounces to the nearest not-yet-hit enemy standing apart from the unit it struck LAST — 1 empty cell of
- * separation keeps full bounce damage, 2 empty cells halves it — and stops the moment nothing is in reach
- * of that spot. A chain that walks into a dead end simply ends there and the disc comes home.
+ * separation keeps full bounce damage, 2 empty cells halves it AND is the last hop — and stops the moment
+ * nothing is in reach of that spot. A chain that walks into a dead end simply ends there and comes home.
  *
  * Reckoning from the last victim (rather than from anything already struck) is what keeps the flight a
  * cycle instead of a zigzag: a unit that merely stands near an EARLIER victim is NOT eligible, because
@@ -190,6 +271,9 @@ function lineCells(from: XY, to: XY): XY[] {
  *  - Touching units (no gap) and units more than 2 cells apart are never bounced to.
  *  - The separating cells must be EMPTY: a unit at the right distance whose gap is filled by another
  *    body (any team, or an obstacle) is a wall, not a bounce target.
+ *  - A 2-empty-cell (half damage) bounce ENDS the flight: the disc spends itself on that stretch, strikes
+ *    that victim and returns to Zena. Only 1-cell bounces relay onward, so a throw reaches far or reaches
+ *    often, never both.
  *  - Each victim is struck at most once per throw; the primary target never takes a second hit.
  *  - Total victims, INCLUDING the primary target, cannot exceed the attacker's stack power (1..5).
  *  - CLOCKWISE, not nearest-first: of the enemies in reach, the disc takes whichever it meets first
@@ -289,14 +373,20 @@ export function resolveChakramTrajectory(
 
         visited.add(next.getId());
         hitUnits.push(next);
-        damageFactorByUnitId[next.getId()] =
-            nextSeparation - 1 === CHAKRAM_FULL_DAMAGE_GAP ? 1 : CHAKRAM_HALF_DAMAGE_FACTOR;
+        const isWideBounce = nextSeparation - 1 !== CHAKRAM_FULL_DAMAGE_GAP;
+        damageFactorByUnitId[next.getId()] = isWideBounce ? CHAKRAM_HALF_DAMAGE_FACTOR : 1;
         steps.push({
             fromCell: { x: fromCell.x, y: fromCell.y },
             circleCells: lineCells(fromCell, toCell),
             hitUnitIds: [next.getId()],
             mountainCells: [],
         });
+        if (isWideBounce) {
+            // Crossing TWO empty cells is the stretch that already costs half the damage — the disc
+            // arrives spent. It strikes this victim and goes home: a wide bounce is always the last one,
+            // so a throw can reach far or reach often, never both.
+            break;
+        }
         // The disc leaves this victim travelling the way it arrived, so the next sweep turns from here.
         heading = chakramBearing(fromCell, toCell);
         last = next;
