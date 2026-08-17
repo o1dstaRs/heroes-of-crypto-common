@@ -30,6 +30,9 @@ import {
     getClosestVH,
     getCrossingPoints,
     getDistanceToFurthestCorner,
+    getFullDamageSquareHalfExtent,
+    getShotCellDistance,
+    getWholeCellShotDistance,
     getLargeUnitAttackCells,
     getPositionForCell,
     getPositionForCells,
@@ -224,6 +227,55 @@ describe("grid_math", () => {
         expect(reverseVh).toContainEqual({ x: testGridSettings.getMinX(), y: 384 });
         expect(adjustClosestPointSideCenterPoint({ x: 1, y: 1 }, { x: 2, y: 2 })).toEqual({ x: 0, y: 0 });
         expect(getDistanceToFurthestCorner({ x: 0, y: 0 }, testGridSettings)).toBeGreaterThan(0);
+    });
+
+    it("plays a fractional shot distance as a square of whole cells", () => {
+        // The unit card and the left sidebar keep the fractional stat; only the board floors it.
+        expect(getWholeCellShotDistance(6.5)).toBe(6);
+        expect(getWholeCellShotDistance(4)).toBe(4);
+        expect(getWholeCellShotDistance(0.9)).toBe(0);
+        expect(getWholeCellShotDistance(0)).toBe(0);
+        expect(getWholeCellShotDistance(Number.NaN)).toBe(0);
+
+        const center = (cell: { x: number; y: number }) =>
+            getPositionForCell(
+                cell,
+                testGridSettings.getMinX(),
+                testGridSettings.getStep(),
+                testGridSettings.getHalfStep(),
+            );
+        const smallAt = { x: 5, y: 5 };
+        const cellsAway = (cell: { x: number; y: number }) =>
+            getShotCellDistance(testGridSettings, center(smallAt), 1, center(cell));
+
+        expect(cellsAway(smallAt)).toBe(0);
+        expect(cellsAway({ x: 8, y: 5 })).toBe(3);
+        // King moves: the diagonal is exactly as far as the straight line, which is what turns the
+        // full-damage area from a circle into a square.
+        expect(cellsAway({ x: 8, y: 8 })).toBe(3);
+        expect(cellsAway({ x: 2, y: 8 })).toBe(3);
+        expect(cellsAway({ x: 8, y: 6 })).toBe(3);
+
+        // An aim point nudged onto a cell EDGE still measures as that cell.
+        const edge = getRangeAttackSideCenter(
+            testGridSettings,
+            { x: 8, y: 5 },
+            RangeAttackCellSide.LEFT,
+            center(smallAt),
+        );
+        expect(getShotCellDistance(testGridSettings, center(smallAt), 1, edge)).toBe(3);
+
+        // A 2x2 measures from its footprint: its own cells are 0 away, the next ring is 1.
+        const largeCenter = center({ x: 4.5, y: 4.5 });
+        expect(getShotCellDistance(testGridSettings, largeCenter, 2, center({ x: 5, y: 5 }))).toBe(0);
+        expect(getShotCellDistance(testGridSettings, largeCenter, 2, center({ x: 6, y: 6 }))).toBe(1);
+        expect(getShotCellDistance(testGridSettings, largeCenter, 2, center({ x: 3, y: 4 }))).toBe(1);
+
+        // The drawn square hugs whole cells: half a cell for a 1x1, a full cell for a 2x2.
+        const step = testGridSettings.getStep();
+        expect(getFullDamageSquareHalfExtent(6.5, 1, step)).toBe(6.5 * step);
+        expect(getFullDamageSquareHalfExtent(6.5, 2, step)).toBe(7 * step);
+        expect(getFullDamageSquareHalfExtent(0.5, 1, step)).toBe(0.5 * step);
     });
 
     it("finds random adjacent cells only within the grid", () => {

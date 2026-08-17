@@ -471,8 +471,12 @@ function findRangeAttackAction(
         return undefined;
     }
 
+    // Falloff bands are SQUARES of whole cells (see AttackHandler.getRangeAttackDivisor), so this scan
+    // measures in king moves off the floored stat too — otherwise the AI would price diagonal targets
+    // a band worse than the engine actually resolves them.
+    const shotBandCells = GridMath.getWholeCellShotDistance(shotDistance);
     // Range attacks cap the divisor at 8x (every additional shotDistance beyond the 3rd is wasted).
-    const maxRangeCells = isSniper ? Infinity : shotDistance * 4;
+    const maxRangeCells = isSniper ? Infinity : shotBandCells * 4;
 
     let bestTarget: HoCMath.XY | undefined;
     let bestScore = -1;
@@ -487,7 +491,7 @@ function findRangeAttackAction(
             }
 
             const targetCell = { x: x, y: y };
-            const distanceCells = HoCMath.getDistance(unitCell, targetCell);
+            const distanceCells = Math.max(Math.abs(targetCell.x - unitCell.x), Math.abs(targetCell.y - unitCell.y));
 
             if (!isSniper && distanceCells > maxRangeCells) {
                 continue;
@@ -523,10 +527,10 @@ function findRangeAttackAction(
             }
 
             let divisor = 1;
-            if (!isSniper && shotDistance > 0) {
+            if (!isSniper && shotBandCells > 0) {
                 let d = distanceCells;
-                while (d >= shotDistance) {
-                    d -= shotDistance;
+                while (d > shotBandCells) {
+                    d -= shotBandCells;
                     divisor *= 2;
                 }
                 if (divisor > 8) {

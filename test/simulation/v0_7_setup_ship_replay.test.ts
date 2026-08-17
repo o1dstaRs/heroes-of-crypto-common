@@ -19,7 +19,12 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // every seeded trace holding a Deep Wounds carrier or a Through Shot shooter diverges from that point on.
 // Two isolated runs reproduced this value byte-identically.
 // Previous approved digest: 7a2f5efd2cc176321441766570bfe944976d7ca9d826a58f14a3c418ec08596f
-const EXPECTED_REPLAY_SHA256 = "11d24bcbfe0ac4a3ed9656efb33889ba831679cbb0ae4a5e11271afe5eb8d1a9";
+// Re-pinned 2026-08-16 for the squared ranged falloff: the bands are now squares of WHOLE cells
+// (the fractional shot_distance stat is floored on the board) measured in king moves, and the band's
+// last cell keeps full strength, so every seeded trace holding a shooter diverges from its first shot.
+// Two isolated runs reproduced this value byte-identically.
+// Previous approved digest: 11d24bcbfe0ac4a3ed9656efb33889ba831679cbb0ae4a5e11271afe5eb8d1a9
+const EXPECTED_REPLAY_SHA256 = "2d3e9727f3c79de48196b3d48a35c7855dab172406739a942c9afdc2d69ec2ed";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

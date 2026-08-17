@@ -191,7 +191,11 @@ describe("v0.8 search measurement alias", () => {
         // Re-pinned for the pure-fractional steps call (getSteps no longer rounds, 2026-08-06): every
         // x.5-x.9-step unit reaches one straight cell less, so all seeded movement diverges. Two isolated
         // runs reproduced this digest byte-identically.
-        expect(digest("v0.7")).toBe("e58b23f2c8c1bbb71ecd7f48c9f76f56f643a5ae45e77fe73845cd1ec0b482d1");
+        // Re-pinned 2026-08-16 for the squared ranged falloff: falloff bands are squares of WHOLE cells
+        // (the fractional shot_distance stat is floored on the board) measured in king moves, and a band's
+        // last cell stays full strength, so every seeded trace diverges at its first shot. Two isolated
+        // runs reproduced this digest byte-identically.
+        expect(digest("v0.7")).toBe("fbfd4d723a7ad85811c4d360f1229556db6f051816450e33fb62febf9720ada6");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -211,7 +215,9 @@ describe("v0.8 search measurement alias", () => {
         // again, squaring the bonus) — v0.8's melee damage estimate mirrored that duplicate and now applies
         // it once too, so its pricing and this trace both move. The v0.7 control hash above still reproduces
         // byte-identically. Two isolated runs reproduced this digest.
-        expect(digest("v0.8")).toBe("efd5dc885a47552c7520ae1c628a922a3df79ec9dfc48e1a53805ea7d707b014");
+        // Re-pinned 2026-08-16 with the same squared-falloff change as the v0.7 control above; v0.8's own
+        // ranged pricing mirrors the engine bands, so its trace moves too. Two isolated runs reproduced it.
+        expect(digest("v0.8")).toBe("6eecf371ef5b3c9d712d7b6a2a1ad20e2908be44234e4f1911707cf4ff88d3c9");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

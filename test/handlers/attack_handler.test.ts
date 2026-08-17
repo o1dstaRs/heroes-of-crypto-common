@@ -53,36 +53,84 @@ describe("AttackHandler", () => {
             expect(damageStatisticHolder.has(3)).toBe(false);
         });
 
-        it("uses exact range-falloff boundaries and an optional attacker origin", () => {
+        it("floors the shot distance and halves damage per SQUARE band of whole cells", () => {
             const { attackHandler } = createCombatTestContext();
             const attacker = createTestUnit({
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
-                shotDistance: 2,
+                // Fractional on purpose: the unit card and the left sidebar keep showing 2.9, the board
+                // floors it to a 2-cell square.
+                shotDistance: 2.9,
             });
-            attacker.setPosition(0, 0);
-            const band = Math.ceil(attacker.getRangeShotDistance() * testGridSettings.getStep());
+            const center = (cell: { x: number; y: number }) =>
+                getPositionForCell(
+                    cell,
+                    testGridSettings.getMinX(),
+                    testGridSettings.getStep(),
+                    testGridSettings.getHalfStep(),
+                );
+            const origin = center({ x: 4, y: 4 });
+            attacker.setPosition(origin.x, origin.y);
+            const divisorAt = (x: number, y: number) => attackHandler.getRangeAttackDivisor(attacker, center({ x, y }));
 
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band - 1, y: 0 })).toBe(1);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band, y: 0 })).toBe(2);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 2 - 1, y: 0 })).toBe(2);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 2, y: 0 })).toBe(4);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 3 - 1, y: 0 })).toBe(4);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 3, y: 0 })).toBe(8);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 20, y: 0 })).toBe(8);
+            // Full 1/1 everywhere inside the 2-cell square, diagonal corners included — those corners are
+            // exactly what the old circular falloff cut off.
+            expect(divisorAt(6, 4)).toBe(1);
+            expect(divisorAt(6, 6)).toBe(1);
+            expect(divisorAt(2, 2)).toBe(1);
+            // The very next ring out halves, in every direction alike.
+            expect(divisorAt(7, 4)).toBe(2);
+            expect(divisorAt(7, 7)).toBe(2);
+            expect(divisorAt(4, 7)).toBe(2);
+            // Successive square bands: 3..4 cells -> 1/2, 5..6 -> 1/4, 7..8 -> 1/8, then capped.
+            expect(divisorAt(8, 4)).toBe(2);
+            expect(divisorAt(9, 4)).toBe(4);
+            expect(divisorAt(10, 10)).toBe(4);
+            expect(divisorAt(11, 4)).toBe(8);
+            expect(divisorAt(12, 12)).toBe(8);
+            expect(divisorAt(15, 15)).toBe(8);
 
+            // An explicit origin re-measures the same square from somewhere else on the board.
             expect(
-                attackHandler.getRangeAttackDivisor(attacker, { x: band * 3, y: 0 }, { x: band * 2 + 1, y: 0 }),
+                attackHandler.getRangeAttackDivisor(attacker, center({ x: 15, y: 15 }), center({ x: 14, y: 14 })),
             ).toBe(1);
 
             const sniper = createTestUnit({
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
-                shotDistance: 2,
+                shotDistance: 2.9,
                 abilities: ["Sniper"],
             });
-            sniper.setPosition(0, 0);
-            expect(attackHandler.getRangeAttackDivisor(sniper, { x: band * 20, y: 0 })).toBe(1);
+            sniper.setPosition(origin.x, origin.y);
+            expect(attackHandler.getRangeAttackDivisor(sniper, center({ x: 15, y: 15 }))).toBe(1);
+        });
+
+        it("measures a large attacker's square from its footprint, not from its center", () => {
+            const { attackHandler } = createCombatTestContext();
+            const attacker = createTestUnit({
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                shotDistance: 2,
+                size: 2,
+            });
+            const center = (cell: { x: number; y: number }) =>
+                getPositionForCell(
+                    cell,
+                    testGridSettings.getMinX(),
+                    testGridSettings.getStep(),
+                    testGridSettings.getHalfStep(),
+                );
+            // A 2x2 covering cells (4,4)..(5,5) sits on their shared intersection, so a raw
+            // center-to-center measurement would put every target half a cell too far.
+            const footprintCenter = center({ x: 4.5, y: 4.5 });
+            attacker.setPosition(footprintCenter.x, footprintCenter.y);
+
+            // Occupied cells are distance 0; the square then reaches two whole cells past the footprint.
+            expect(attackHandler.getRangeAttackDivisor(attacker, center({ x: 4, y: 4 }))).toBe(1);
+            expect(attackHandler.getRangeAttackDivisor(attacker, center({ x: 7, y: 7 }))).toBe(1);
+            expect(attackHandler.getRangeAttackDivisor(attacker, center({ x: 2, y: 2 }))).toBe(1);
+            expect(attackHandler.getRangeAttackDivisor(attacker, center({ x: 8, y: 8 }))).toBe(2);
+            expect(attackHandler.getRangeAttackDivisor(attacker, center({ x: 1, y: 4 }))).toBe(2);
         });
 
         it("evaluates hypothetical shots with the supplied origin's falloff", () => {

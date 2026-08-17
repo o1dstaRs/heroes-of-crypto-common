@@ -163,15 +163,26 @@ export class AttackHandler {
     ): number {
         let rangeAttackDivisor = 1;
 
-        // Range falloff: damage halves for every full shot-distance of range. Only the Sniper ability negates
-        // it entirely. Farsight Quiver no longer removes falloff — instead it extends the archer's basic
-        // shot_distance (adjustBaseStats), pushing this threshold out so full-damage range is larger.
+        // Range falloff: damage halves for every full shot-distance band of range. The bands are SQUARES of
+        // whole cells, not circles — the board floors the fractional shot_distance stat (which the unit card
+        // and the left sidebar keep showing unrounded) and measures in king moves, so a 6.5 archer deals a
+        // full 1/1 to every cell inside the 6-cell square around it, 1/2 out to 12 cells, and so on.
+        // Only the Sniper ability negates falloff entirely. Farsight Quiver no longer removes falloff —
+        // instead it extends the archer's basic shot_distance (adjustBaseStats), pushing these bands out.
         if (!attackerUnit.hasAbilityActive("Sniper")) {
-            const shotDistancePixels = Math.ceil(attackerUnit.getRangeShotDistance() * this.gridSettings.getStep());
-            let distance = HoCMath.getDistance(attackerPosition, attackPosition);
-            while (distance >= shotDistancePixels) {
-                distance -= shotDistancePixels;
-                rangeAttackDivisor *= 2;
+            const bandCells = GridMath.getWholeCellShotDistance(attackerUnit.getRangeShotDistance());
+            if (bandCells > 0) {
+                let cellsAway = GridMath.getShotCellDistance(
+                    this.gridSettings,
+                    attackerPosition,
+                    attackerUnit.getSize(),
+                    attackPosition,
+                );
+                // The band's LAST cell is still full strength — it is the edge of the square the player sees.
+                while (cellsAway > bandCells) {
+                    cellsAway -= bandCells;
+                    rangeAttackDivisor *= 2;
+                }
             }
         }
         if (rangeAttackDivisor < 1) {

@@ -2502,7 +2502,10 @@ describe("search driver — gating, hygiene, determinism", () => {
         setEnv({ ...pureRangedDeadlineEnvironment });
         const h = buildBattle(8_222_701, "v0.8", undefined, pureRangedDeadlineRoster());
         const medusa = greenUnitNamed(h, "Medusa");
-        medusa.setAmountAlive(34);
+        // Re-calibrated 34 -> 18 when ranged falloff bands became squares of whole cells: every shot in
+        // this seeded line gained a band, so the barrier stops needing every remaining activation at a
+        // much smaller stack. 18 is the largest stack that still sits on the boundary (19 has slack).
+        medusa.setAmountAlive(18);
         h.setActiveUnitId(medusa.getId());
         const driver = h.makeDriver();
         driver.onFightReady();
@@ -2552,7 +2555,8 @@ describe("search driver — gating, hygiene, determinism", () => {
         setEnv({ ...pureRangedDeadlineEnvironment });
         const h = buildBattle(8_222_701, "v0.8", undefined, pureRangedDeadlineRoster());
         const unit = greenUnitNamed(h, "Medusa");
-        unit.setAmountAlive(34);
+        // Same 34 -> 18 boundary re-calibration as the Endless Quiver redirect above.
+        unit.setAmountAlive(18);
         h.setActiveUnitId(unit.getId());
         const driver = h.makeDriver();
         driver.onFightReady();

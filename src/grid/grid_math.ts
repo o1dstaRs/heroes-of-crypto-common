@@ -565,6 +565,62 @@ export function getDistanceToFurthestCorner(position: XY, gridSettings: GridSett
 }
 
 /**
+ * The shot distance the BOARD works in: whole cells, floored. The unit STAT stays fractional (5.3,
+ * 6.5, 9.5) and is calculated and displayed exactly as before on the unit card and the left sidebar —
+ * only the in-game geometry rounds down, so "6.5" means a full-damage square six cells deep.
+ */
+export function getWholeCellShotDistance(shotDistance: number): number {
+    if (!Number.isFinite(shotDistance) || shotDistance <= 0) {
+        return 0;
+    }
+
+    return Math.floor(shotDistance);
+}
+
+/**
+ * Chebyshev ("king move") distance, in whole cells, from an attacker's FOOTPRINT to a target position.
+ * 0 means the target sits on the attacker's own cells, 1 means it is adjacent (diagonals included).
+ *
+ * This is what makes the ranged falloff bands SQUARES rather than circles: a diagonal cell is exactly
+ * as far as a straight one, so the full-damage area is the square the board draws.
+ *
+ * The target is snapped to its cell first, so an aim point nudged onto a cell EDGE (the side centers
+ * a real shot resolves to - see getRangeAttackSideCenter) measures the same as that cell's center.
+ * The attacker keeps its raw position because large units are centered on a grid intersection; their
+ * half-footprint is subtracted instead, which is what makes the square hug the unit's own cells.
+ */
+export function getShotCellDistance(
+    gridSettings: GridSettings,
+    attackerPosition: XY,
+    attackerSize: number,
+    targetPosition: XY,
+): number {
+    const step = gridSettings.getStep();
+    const targetCellPosition = getPositionForCell(
+        getCellForPosition(gridSettings, targetPosition),
+        gridSettings.getMinX(),
+        step,
+        gridSettings.getHalfStep(),
+    );
+    // Half the attacker's own footprint, in pixels: 0 for a 1x1 (centered on its cell), half a cell
+    // for a 2x2 (centered on the intersection of its four cells).
+    const halfFootprint = ((Math.max(1, attackerSize) - 1) / 2) * step;
+    const dx = Math.abs(targetCellPosition.x - attackerPosition.x) - halfFootprint;
+    const dy = Math.abs(targetCellPosition.y - attackerPosition.y) - halfFootprint;
+
+    return Math.max(0, Math.round(Math.max(dx, dy) / step));
+}
+
+/**
+ * Half-width, in pixels, of the square a shooter covers at full 1/1 damage - the area the board
+ * highlights. Whole cells out from the unit's own footprint, so the edge lands on a cell border
+ * instead of cutting through one.
+ */
+export function getFullDamageSquareHalfExtent(shotDistance: number, unitSize: number, step: number): number {
+    return (getWholeCellShotDistance(shotDistance) + Math.max(1, unitSize) / 2) * step;
+}
+
+/**
  * Sides of a grid cell a ranged shot can be aimed at. The numeric values are part of the ranked
  * wire protocol (range_attack carries the chosen side as an int) and are persisted in replays, so
  * they MUST stay stable. Order matches the legacy push order in getClosestSideCenter.

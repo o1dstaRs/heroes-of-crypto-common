@@ -1100,10 +1100,12 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             expect.objectContaining({
                 type: "move_unit",
                 unitId: live.shooter.getId(),
+                // Re-pinned when falloff bands became squares of whole cells: the wider band means one
+                // diagonal step already buys the same 1/2 shot the old two-step walk to (4, 9) did, so
+                // discovery settles on the cheaper move for the identical expectedDamage of 25.
                 path: [
                     { x: 4, y: 7 },
-                    { x: 4, y: 8 },
-                    { x: 4, y: 9 },
+                    { x: 3, y: 8 },
                 ],
             }),
             expect.objectContaining({
