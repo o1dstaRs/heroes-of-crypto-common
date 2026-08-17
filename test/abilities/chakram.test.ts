@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
     CHAKRAM_HALF_DAMAGE_FACTOR,
+    chakramClockwiseSweep,
     chakramHopDistance,
     chakramMaxTargets,
     chakramSeparation,
@@ -181,12 +182,18 @@ describe("Zena's Chakram — separation chain", () => {
 
         const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
 
-        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["Left"]);
-        expect(right.getId() in trajectory.damageFactorByUnitId).toBe(false);
-        // One hop only, launched from the primary — the disc never flies back over its own path.
+        // Zena throws north, so sweeping clockwise reaches Right (90 degrees round) before Left (270).
+        // Right is the FARTHER of the two — a half-damage 2-cell gap against Left's full-damage 1-cell
+        // gap — which is the clockwise rule doing its job: bearing picks the target, distance only says
+        // whether it is in reach at all and what the bounce is worth.
+        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["Right"]);
+        // Struck at HALF, because it is the 2-cell gap — and Left, the full-damage neighbour, is skipped.
+        expect(trajectory.damageFactorByUnitId[right.getId()]).toBe(CHAKRAM_HALF_DAMAGE_FACTOR);
+        expect(left.getId() in trajectory.damageFactorByUnitId).toBe(false);
+        // One hop either way: from Right, Left is 5 cells off and out of reach, so the disc comes home
+        // rather than flying back over the primary's cell.
         expect(trajectory.steps).toHaveLength(1);
         expect(trajectory.steps[0].fromCell).toEqual(primary.getBaseCell());
-        void left;
     });
 
     it("each hop launches from the previous victim, so the path is unbroken end to end", () => {
@@ -310,27 +317,28 @@ describe("Zena's Chakram — one cell in between reads the same in every directi
     // straight unit always won, and it happened to hold the lower id about half the time. Repeating the
     // scenario with fresh ids does separate them — under the fix the lower id wins EVERY time, under the
     // old rule it wins only when geometry and id agree, so the run fails long before the last trial.
-    it("does not spend its last bounce on the straight gap in preference to the diagonal one", () => {
+    it("chooses between two equal gaps by bearing, not by which one lies straight ahead", () => {
+        // Both stand one cell from the primary, so separation cannot choose. Zena throws north: the
+        // diagonal sits 45 degrees clockwise round, the straight one 90, so the diagonal is taken.
+        // Repeated because unit ids are generated — if identity were still deciding this, the run would
+        // disagree with itself long before the last trial.
         const TRIALS = 24;
-        const winners: string[] = [];
+        const winners = new Set<string>();
 
         for (let trial = 0; trial < TRIALS; trial += 1) {
             const context = setup(2); // stack power 2 -> primary + exactly ONE bounce
             const primary = enemy(context, "Primary", { x: 8, y: 8 });
-            const straight = enemy(context, "Straight", { x: 10, y: 8 }); // squared-euclid 4
-            const diagonal = enemy(context, "Diagonal", { x: 10, y: 10 }); // squared-euclid 8
+            const straight = enemy(context, "Straight", { x: 10, y: 8 });
+            const diagonal = enemy(context, "Diagonal", { x: 10, y: 10 });
 
             expect(chakramSeparation(primary, straight)).toBe(chakramSeparation(primary, diagonal));
 
             const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
             expect(trajectory.hitUnits).toHaveLength(1);
-
-            const lowerId = [straight, diagonal].sort((a, b) => (a.getId() < b.getId() ? -1 : 1))[0];
-            winners.push(trajectory.hitUnits[0]?.getId() === lowerId.getId() ? "id" : "geometry");
+            winners.add(trajectory.hitUnits[0]!.getName());
         }
 
-        // Every hop settled on identity, never on which way the gap happened to lie.
-        expect(winners.filter((w) => w === "geometry")).toEqual([]);
+        expect([...winners]).toEqual(["Diagonal"]);
     });
 
     it("ranks a one-cell diagonal gap as nearer than a two-cell straight one", () => {
@@ -338,5 +346,77 @@ describe("Zena's Chakram — one cell in between reads the same in every directi
         expect(chakramHopDistance({ x: 8, y: 8 }, { x: 10, y: 10 })).toBeLessThan(
             chakramHopDistance({ x: 8, y: 8 }, { x: 11, y: 8 }),
         );
+    });
+});
+
+/**
+ * The disc curves. Of the enemies in reach it takes whichever it meets first sweeping CLOCKWISE from the
+ * direction it is already travelling — not whichever happens to be nearest, and nothing is rolled.
+ */
+describe("Zena's Chakram — the flight sweeps clockwise", () => {
+    it("measures a clockwise turn from the heading, with straight ahead costing nothing", () => {
+        const EAST = 0;
+        const NORTH = Math.PI / 2;
+        const SOUTH = -Math.PI / 2;
+        const WEST = Math.PI;
+
+        // Travelling east: straight on is no turn, south is a quarter turn clockwise, north is three.
+        expect(chakramClockwiseSweep(EAST, EAST)).toBeCloseTo(0, 10);
+        expect(chakramClockwiseSweep(EAST, SOUTH)).toBeCloseTo(Math.PI / 2, 10);
+        expect(chakramClockwiseSweep(EAST, WEST)).toBeCloseTo(Math.PI, 10);
+        expect(chakramClockwiseSweep(EAST, NORTH)).toBeCloseTo((3 * Math.PI) / 2, 10);
+    });
+
+    it("always reports a turn in [0, 2pi), whichever way the angles wrap", () => {
+        for (const heading of [-Math.PI, -1, 0, 1, Math.PI, 3]) {
+            for (const bearing of [-Math.PI, -2, 0, 2, Math.PI, 3]) {
+                const sweep = chakramClockwiseSweep(heading, bearing);
+                expect(sweep >= 0 && sweep < 2 * Math.PI).toBe(true);
+            }
+        }
+    });
+
+    /**
+     * Zena throws NORTH. Two enemies sit one cell either side of the primary, both equally reachable and
+     * both exactly as near — so distance cannot choose between them and the old nearest-first rule fell
+     * through to unit id. Sweeping clockwise from a northward heading reaches EAST first.
+     */
+    it("takes the clockwise neighbour when two are equally close", () => {
+        const context = setup(2); // primary + exactly one bounce
+        const primary = enemy(context, "Primary", { x: 8, y: 8 }); // Zena is at (8,2): heading is north
+        const east = enemy(context, "East", { x: 10, y: 8 });
+        const west = enemy(context, "West", { x: 6, y: 8 });
+
+        expect(chakramSeparation(primary, east)).toBe(chakramSeparation(primary, west));
+
+        const trajectory = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+        expect(trajectory.hitUnits.map((u) => u.getName())).toEqual(["East"]);
+    });
+
+    it("keeps turning the same way across several bounces", () => {
+        const context = setup(5); // room for four bounces
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        // A ring around the primary, each two cells out so every one is a legal 1-gap bounce.
+        enemy(context, "East", { x: 10, y: 8 });
+        enemy(context, "South", { x: 8, y: 6 });
+        enemy(context, "West", { x: 6, y: 8 });
+
+        const flight = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+        const order = flight.hitUnits.map((u) => u.getName());
+
+        // Never the counter-clockwise neighbour before the clockwise one.
+        expect(order.indexOf("West")).toBeGreaterThan(order.indexOf("East"));
+    });
+
+    it("is still deterministic: two computations agree hop for hop", () => {
+        const context = setup(5);
+        const primary = enemy(context, "Primary", { x: 8, y: 8 });
+        enemy(context, "A", { x: 10, y: 8 });
+        enemy(context, "B", { x: 8, y: 6 });
+        enemy(context, "C", { x: 6, y: 8 });
+
+        const one = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+        const two = resolveChakramTrajectory(context.zena, primary, context.unitsHolder, context.grid);
+        expect(one.hitUnits.map((u) => u.getName())).toEqual(two.hitUnits.map((u) => u.getName()));
     });
 });

@@ -77,6 +77,21 @@ export function chakramHopDistance(from: XY, to: XY): number {
     return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
 }
 
+/** Direction from one cell to another, in radians. */
+const chakramBearing = (from: XY, to: XY): number => Math.atan2(to.y - from.y, to.x - from.x);
+
+/**
+ * How far CLOCKWISE you must turn from `heading` to be looking at `bearing`, in [0, 2π).
+ *
+ * The grid is y-UP — the LOWER team sits at low y and the UPPER team at high y — so atan2 grows
+ * counter-clockwise and turning clockwise means SUBTRACTING angle. Straight ahead is 0, so a target
+ * directly in the disc's path is taken before it sweeps anywhere.
+ */
+export const chakramClockwiseSweep = (heading: number, bearing: number): number => {
+    const turn = (heading - bearing) % (2 * Math.PI);
+    return turn < 0 ? turn + 2 * Math.PI : turn;
+};
+
 /** Footprint-to-footprint Chebyshev distance: the number of empty cells between two units, plus one. */
 export function chakramSeparation(a: Unit, b: Unit): number {
     const aCells = a.isSmallSize() ? [a.getBaseCell()] : a.getCells();
@@ -177,12 +192,16 @@ function lineCells(from: XY, to: XY): XY[] {
  *    body (any team, or an obstacle) is a wall, not a bounce target.
  *  - Each victim is struck at most once per throw; the primary target never takes a second hit.
  *  - Total victims, INCLUDING the primary target, cannot exceed the attacker's stack power (1..5).
- *  - Nearest-first: smallest separation from the last victim wins; ties break by CHEBYSHEV base-cell
- *    distance (see {@link chakramHopDistance}), then by unit id — the flight is byte-identical everywhere
- *    it is computed. Chebyshev throughout is what makes a straight, diagonal and knight-offset gap of one
- *    cell rank as the same distance rather than three different ones.
+ *  - CLOCKWISE, not nearest-first: of the enemies in reach, the disc takes whichever it meets first
+ *    sweeping clockwise from the direction it is already travelling. It leaves Zena's hand aimed at the
+ *    primary target, and every bounce sets the heading for the next, so the flight keeps turning the
+ *    same way instead of jumping to whatever happens to be closest. Nothing is rolled: the board's
+ *    geometry alone decides the order, and the flight is byte-identical everywhere it is computed.
+ *    Reach is still governed by separation (a 1- or 2-cell gap of open air); clockwise only decides
+ *    WHICH of the reachable enemies comes next. Two enemies on the exact same bearing break the tie by
+ *    the nearer one first, then by unit id.
  *  - Angel's "Arrows Wingshield Aura" owner is never struck and STOPS the whole flight when it is the
- *    next nearest bounce — the shield catches the disc.
+ *    next bounce clockwise — the shield catches the disc.
  */
 export function resolveChakramTrajectory(
     attackerUnit: Unit,
@@ -203,12 +222,15 @@ export function resolveChakramTrajectory(
     // Where the disc physically IS. It starts on the primary target (already damaged by the throw itself,
     // never re-hit) and every bounce is reckoned from here — see the one-continuous-path rule above.
     let last = primaryTarget;
+    // The direction the disc is travelling as it arrives. It leaves Zena's hand aimed at the primary
+    // target, and after that each bounce sets the heading for the next one.
+    let heading = chakramBearing(attackerUnit.getBaseCell(), primaryTarget.getBaseCell());
     // The primary shot already consumes one slot, leaving at most 0..4 secondary victims.
     const maxBounces = chakramMaxTargets(attackerUnit.getStackPower()) - 1;
     for (let hop = 0; hop < maxBounces; hop += 1) {
         let next: Unit | undefined;
         let nextSeparation = Number.MAX_SAFE_INTEGER;
-        let nextTieBreak = Number.MAX_SAFE_INTEGER;
+        let nextSweep = Number.POSITIVE_INFINITY;
         for (const unit of unitsHolder.getAllUnits().values()) {
             if (visited.has(unit.getId()) || unit.isDead() || unit.getTeam() === attackerUnit.getTeam()) {
                 continue;
@@ -229,15 +251,21 @@ export function resolveChakramTrajectory(
             if (!hasEmptyBridge(grid, last, unit, gap)) {
                 continue;
             }
-            const tieBreak = chakramHopDistance(last.getBaseCell(), unit.getBaseCell());
+            // CLOCKWISE, not nearest. The disc keeps turning the same way, so the flight reads as one
+            // curving sweep rather than a scatter of shortest hops — and which target comes next is
+            // decided by the board's geometry alone. Straight ahead sweeps 0, so a target already in the
+            // disc's path is taken before it turns at all.
+            const sweep = chakramClockwiseSweep(heading, chakramBearing(last.getBaseCell(), unit.getBaseCell()));
             if (
-                separation < nextSeparation ||
-                (separation === nextSeparation && tieBreak < nextTieBreak) ||
-                (separation === nextSeparation && tieBreak === nextTieBreak && next && unit.getId() < next.getId())
+                sweep < nextSweep ||
+                // Two enemies on the exact same bearing: the nearer one is in front, so it is struck
+                // first. Unit id settles the last theoretical tie so the flight stays byte-identical.
+                (sweep === nextSweep && separation < nextSeparation) ||
+                (sweep === nextSweep && separation === nextSeparation && next && unit.getId() < next.getId())
             ) {
                 next = unit;
                 nextSeparation = separation;
-                nextTieBreak = tieBreak;
+                nextSweep = sweep;
             }
         }
 
@@ -269,6 +297,8 @@ export function resolveChakramTrajectory(
             hitUnitIds: [next.getId()],
             mountainCells: [],
         });
+        // The disc leaves this victim travelling the way it arrived, so the next sweep turns from here.
+        heading = chakramBearing(fromCell, toCell);
         last = next;
     }
 
