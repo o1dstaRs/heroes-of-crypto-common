@@ -584,6 +584,18 @@ describe("spell_helper", () => {
         massMirrorTarget.applyBuff(massMirror);
         expect(getMagicMirrorPower(massMirrorTarget)).toBe(70);
 
+        // Ranked hydration carries active buffs in the authoritative parallel arrays without rebuilding
+        // AppliedSpell objects. The combat preview must read the same power instead of silently showing no
+        // return damage after every snapshot refresh.
+        const snapshotMirrorTarget = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const snapshotProperties = snapshotMirrorTarget.getUnitProperties();
+        snapshotProperties.applied_buffs.push("Magic Mirror");
+        snapshotProperties.applied_buffs_laps.push(2);
+        snapshotProperties.applied_buffs_descriptions.push("Reflects 30% magic damage");
+        snapshotProperties.applied_buffs_powers.push(30);
+        expect(snapshotMirrorTarget.getBuff("Magic Mirror")).toBeUndefined();
+        expect(getMagicMirrorPower(snapshotMirrorTarget)).toBe(30);
+
         const noMirrorTarget = createTestUnit({ team: PBTypes.TeamVals.LOWER });
 
         expect(getMagicMirrorPower(noMirrorTarget)).toBe(0);

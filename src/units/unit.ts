@@ -385,6 +385,33 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return undefined;
     }
+    /**
+     * Power of an active buff from either a live AppliedSpell or authoritative snapshot display state.
+     *
+     * Ranked clients hydrate the parallel applied_buffs arrays without rebuilding `this.buffs`, so a mechanic
+     * used by both engine and preview cannot rely on getBuff() alone. Reading only the power is safe: unlike
+     * stat derivation, it does not re-apply the buff or double-count authoritative modifiers.
+     */
+    public getBuffPower(buffName: string): number | undefined {
+        const live = this.getBuff(buffName);
+        if (live) {
+            return live.getPower();
+        }
+
+        const names = this.unitProperties.applied_buffs;
+        const laps = this.unitProperties.applied_buffs_laps;
+        const powers = this.unitProperties.applied_buffs_powers;
+        if (names.length !== laps.length || names.length !== powers.length) {
+            return undefined;
+        }
+        for (let i = names.length - 1; i >= 0; i--) {
+            if (names[i] === buffName && laps[i] > 0) {
+                return Number.isFinite(powers[i]) ? powers[i] : undefined;
+            }
+        }
+
+        return undefined;
+    }
     public getBuffs(): AppliedSpell[] {
         return this.buffs;
     }

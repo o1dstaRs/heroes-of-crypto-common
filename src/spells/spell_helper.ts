@@ -789,20 +789,20 @@ export function calculateBuffsDebuffsEffect(
 }
 
 /**
- * The reflected share, as a percentage: the buff's own power PLUS the holder's luck, clamped to 0..100.
- * Luck moves it the same way it moves every other percentage in the game, so a lucky unit mirrors more —
- * and the spell card shows this exact figure rather than the flat configured number (see
- * magicMirrorDescriptionPercent, which the client uses to fill the {} placeholders).
+ * The deterministic share of magical damage returned by Magic Mirror or Mass Magic Mirror.
+ *
+ * The buff's configured power is the whole answer: it is not stack-scaled and luck does not move it. When
+ * both historical buff records are present, the stronger one wins rather than reflecting the same hit twice.
  */
 export const getMagicMirrorPower = (targetUnit: Unit): number => {
     let mirrorPower = 0;
-    const magicMirrorBuff = targetUnit.getBuff("Magic Mirror");
-    const massMagicMirrorBuff = targetUnit.getBuff("Mass Magic Mirror");
-    if (magicMirrorBuff) {
-        mirrorPower = magicMirrorBuff.getPower();
+    const magicMirrorPower = targetUnit.getBuffPower("Magic Mirror");
+    const massMagicMirrorPower = targetUnit.getBuffPower("Mass Magic Mirror");
+    if (magicMirrorPower !== undefined) {
+        mirrorPower = magicMirrorPower;
     }
-    if (massMagicMirrorBuff) {
-        mirrorPower = Math.max(mirrorPower, massMagicMirrorBuff.getPower());
+    if (massMagicMirrorPower !== undefined) {
+        mirrorPower = Math.max(mirrorPower, massMagicMirrorPower);
     }
     // FLAT and stable: the Ogre Mage's Magic Mirror / Mass Magic Mirror reflect exactly their configured
     // percentage (30 / 25) — NOT stack-scaled and NOT moved by luck (unlike the Magic Dragon's ability). The
@@ -858,15 +858,31 @@ export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
 export const getMagicMirrorAbilityShare = (targetUnit: Unit): number => getMagicMirrorAbilityChance(targetUnit);
 
 /**
- * Whether an incoming spell rebounds off `targetUnit` — its effects whole, its damage cut to the mirror's own
- * share (getMagicMirrorAbilityShare) — landing on the caster IN ADDITION to landing on the holder, which is
- * hit in full either way. Only the passive ability rebounds a spell; the Magic Mirror buff keeps its own
- * partial behaviour.
+ * Whether the Magic Reflection passive rebounds an incoming spell. The Magic Mirror spell buffs return
+ * damage deterministically instead and are resolved by {@link rollMagicMirrorDamageShare}.
  */
 export const reboundsSpell = (targetUnit: Unit): boolean => {
     const chance = getMagicMirrorAbilityChance(targetUnit);
 
     return chance > 0 && getRandomInt(0, 100) < chance;
+};
+
+/**
+ * Resolve the percentage of landed magical damage this holder returns to the caster for one incoming spell.
+ *
+ * Magic Mirror and Mass Magic Mirror always return their configured share. Magic Reflection remains a proc:
+ * when it succeeds with a stronger share than the active spell buff, that stronger share wins for this hit.
+ * This preserves the existing non-stacking mirror rule and never consumes randomness when the passive could
+ * not improve the guaranteed result.
+ */
+export const rollMagicMirrorDamageShare = (targetUnit: Unit): number => {
+    const guaranteedShare = getMagicMirrorPower(targetUnit);
+    const passiveShare = getMagicMirrorAbilityShare(targetUnit);
+    if (passiveShare <= guaranteedShare) {
+        return guaranteedShare;
+    }
+
+    return getRandomInt(0, 100) < passiveShare ? passiveShare : guaranteedShare;
 };
 
 export const isMirrored = (targetUnit: Unit): boolean => {

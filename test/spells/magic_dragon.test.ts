@@ -22,6 +22,7 @@ import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { amountForCreatureExperienceBudget, STACK_EXPERIENCE_BUDGET } from "../../src/simulation/army";
 import { calculateStackPoweredSpellDamage, isThrownOffensiveSpell } from "../../src/spells/spell_damage";
+import { Spell } from "../../src/spells/spell";
 import { SpellElement, SpellMultiplierType, SpellTargetType } from "../../src/spells/spell_properties";
 import { getMagicMirrorAbilityChance } from "../../src/spells/spell_helper";
 import type { Unit } from "../../src/units/unit";
@@ -674,6 +675,47 @@ describe("action engine — Whirlpool", () => {
         expect(charges("Whirlpool")).toBe(1);
         expect(charges("Lightning Strike")).toBe(4);
     });
+});
+
+describe("Magic Mirror spell buffs", () => {
+    for (const [spellName, expectedRebound] of [
+        ["Magic Mirror", 45],
+        ["Mass Magic Mirror", 37],
+    ] as const) {
+        it(`${spellName} always returns its configured share of landed magical damage`, () => {
+            // A high roll proves this is the spell buff's guaranteed damage return, not the Magic Dragon
+            // passive's chance-based rebound. Lightning Strike lands for 150; the two buffs return 30% and
+            // 25% respectively, floored before the caster's own defences are applied.
+            alwaysRoll(99);
+            const setup = setupDragonFight({
+                casterAmountAlive: 1,
+                casterStackPower: 5,
+                enemies: [{ cell: { x: 6, y: 3 } }],
+            });
+            setup.enemies[0].applyBuff(new Spell({ spellProperties: getSpellConfig("Chaos", spellName), amount: 1 }));
+            const targetHpBefore = setup.enemies[0].getHp();
+            const casterHpBefore = setup.caster.getHp();
+
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.caster.getId(),
+                spellName: "Lightning Strike",
+                targetId: setup.enemies[0].getId(),
+            });
+
+            expect(result.completed).toBe(true);
+            expect(targetHpBefore - setup.enemies[0].getHp()).toBe(150);
+            expect(casterHpBefore - setup.caster.getHp()).toBe(expectedRebound);
+            const cast = result.events.find((event) => event.type === "spell_cast");
+            expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toEqual([
+                expect.objectContaining({
+                    unitId: setup.caster.getId(),
+                    amount: expectedRebound,
+                    reboundedFromUnitId: setup.enemies[0].getId(),
+                }),
+            ]);
+        });
+    }
 });
 
 describe("Magic Reflection (passive)", () => {

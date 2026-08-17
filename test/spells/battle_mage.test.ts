@@ -55,6 +55,8 @@ const chaosSpells = (spellsJson as unknown as Record<string, Record<string, { po
 const setupMageFight = (opts: {
     casterAmountAlive: number;
     casterStackPower: number;
+    casterMaxHp?: number;
+    casterMagicResist?: number;
     spells?: string[];
     enemies?: {
         cell: { x: number; y: number };
@@ -78,6 +80,8 @@ const setupMageFight = (opts: {
         attackType: PBTypes.AttackVals.MELEE_MAGIC,
         spells: opts.spells ?? ["Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Meteorite"],
         amountAlive: opts.casterAmountAlive,
+        maxHp: opts.casterMaxHp ?? 10,
+        magicResist: opts.casterMagicResist ?? 0,
         stackPower: opts.casterStackPower,
         initiative: 5,
         morale: 4,
@@ -260,6 +264,35 @@ describe("Battle Mage spell configuration", () => {
 });
 
 describe("action engine — Fire Strike", () => {
+    it("takes Magic Mirror's guaranteed share back from the Battle Mage", () => {
+        const setup = setupMageFight({
+            casterAmountAlive: 38,
+            casterStackPower: 5,
+            casterMaxHp: 10_000,
+            enemies: [{ cell: { x: 6, y: 3 } }],
+        });
+        setup.enemies[0].applyBuff(new Spell({ spellProperties: getSpellConfig("Chaos", "Magic Mirror"), amount: 1 }));
+        const casterHpBefore = setup.caster.getHp();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Fire Strike",
+            targetId: setup.enemies[0].getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(casterHpBefore - setup.caster.getHp()).toBe(68); // floor((38 * 6) * 30%)
+        const cast = result.events.find((event) => event.type === "spell_cast");
+        expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toEqual([
+            expect.objectContaining({
+                unitId: setup.caster.getId(),
+                amount: 68,
+                reboundedFromUnitId: setup.enemies[0].getId(),
+            }),
+        ]);
+    });
+
     it("burns the target for the formula damage, spends one of three scrolls and ends the turn", () => {
         const setup = setupMageFight({
             casterAmountAlive: 38,
@@ -494,6 +527,37 @@ describe("action engine — Fire Strike", () => {
 });
 
 describe("action engine — Meteorite", () => {
+    it("takes Mass Magic Mirror's guaranteed share back from the Battle Mage", () => {
+        const setup = setupMageFight({
+            casterAmountAlive: 38,
+            casterStackPower: 5,
+            casterMaxHp: 10_000,
+            enemies: [{ cell: { x: 6, y: 3 } }],
+        });
+        setup.enemies[0].applyBuff(
+            new Spell({ spellProperties: getSpellConfig("Chaos", "Mass Magic Mirror"), amount: 1 }),
+        );
+        const casterHpBefore = setup.caster.getHp();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Meteorite",
+            targetCell: { x: 6, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        expect(casterHpBefore - setup.caster.getHp()).toBe(38); // floor((38 * 4) * 25%)
+        const cast = result.events.find((event) => event.type === "spell_cast");
+        expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toEqual([
+            expect.objectContaining({
+                unitId: setup.caster.getId(),
+                amount: 38,
+                reboundedFromUnitId: setup.enemies[0].getId(),
+            }),
+        ]);
+    });
+
     // The 2x2 whose bottom-left is (6,3) covers (6,3) (7,3) (6,4) (7,4) — the same corner convention Craft
     // and Smoke use.
     const BLOCK_ANCHOR = { x: 6, y: 3 };

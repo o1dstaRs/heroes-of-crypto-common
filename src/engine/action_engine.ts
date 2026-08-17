@@ -1752,17 +1752,14 @@ export class GameActionEngine {
         return { completed: true, events };
     }
     /**
-     * Turn one raw (pre-resistance) damage number into the list of units that will actually take it, honouring
-     * the Magic Dragon's passive "Magic Mirror" on the way.
+     * Turn one raw (pre-resistance) spell-damage number into the units that actually take it, including each
+     * Magic Mirror return. The spell buffs return their configured share deterministically; Magic Reflection
+     * keeps its chance-based proc and uses that same advertised percentage as its returned share.
      *
-     * A rebound is an EXTRA hit, not a redirection: the spell still lands on the mirror-holder in full, and on
-     * a successful roll the caster takes the same damage again on top — cut down by the CASTER's own magic
-     * resistance rather than the holder's. This matches how the Magic Mirror BUFF already handles debuffs
-     * (attack_handler applies the debuff to the target and THEN mirrors a copy onto the attacker); the mirror
-     * punishes the caster, it does not protect the holder.
-     *
-     * Two rebounding targets in one splash therefore hit the caster twice. The caster is never asked to
-     * rebound a spell onto itself, so a mirror-carrying caster caught in its own blast cannot loop.
+     * A rebound is an EXTRA hit, not a redirection: the spell still lands on the holder in full, then the
+     * caster takes the resolved share, cut down by the CASTER's own element and magic resistance. Two mirrored
+     * targets in one splash therefore hit the caster twice. The caster is never asked to rebound a spell onto
+     * itself, so a mirror-carrying caster caught in its own blast cannot loop.
      */
     /**
      * What `rawDamage` of this spell actually does to `unit`: element first, magic resistance second.
@@ -1799,12 +1796,19 @@ export class GameActionEngine {
             // OWN element and magic resistance then cut the rebound down, so what comes back is what the
             // caster actually takes — projected by the same helper the client's aim preview draws over the
             // caster, so aiming at a mirror warns about the return hit before it is taken.
-            const rebound =
-                unit.getId() !== caster.getId() && SpellHelper.reboundsSpell(unit)
-                    ? projectSpellRebound({ spell, caster, holder: unit, landedOnHolder: landedDamage })
-                    : undefined;
+            const reflectionPercent =
+                landedDamage > 0 && unit.getId() !== caster.getId() ? SpellHelper.rollMagicMirrorDamageShare(unit) : 0;
+            const rebound = reflectionPercent
+                ? projectSpellRebound({
+                      spell,
+                      caster,
+                      holder: unit,
+                      landedOnHolder: landedDamage,
+                      reflectionPercent,
+                  })
+                : undefined;
             if (rebound) {
-                const { chancePercent: share, landed: reboundDamage } = rebound;
+                const { reflectionPercent: share, landed: reboundDamage } = rebound;
                 // The line used to name the rebound without a number, which left the player guessing what a
                 // Magic Mirror had just cost them.
                 this.context.sceneLog.updateLog(

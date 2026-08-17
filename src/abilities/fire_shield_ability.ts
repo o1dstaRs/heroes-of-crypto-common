@@ -17,6 +17,8 @@ import { UnitsHolder } from "../units/units_holder";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 import type { ISecondaryDamage } from "../scene/animations";
+import { applyMagicMirrorDamage } from "../spells/magic_mirror_damage";
+import { SpellElement } from "../spells/spell_properties";
 
 export interface IFireShieldResult {
     increaseMorale: number;
@@ -70,9 +72,10 @@ export function processFireShieldAbility(
         );
         const positionAtImpact = { ...toUnit.getPosition() };
         const amountAliveBefore = toUnit.getAmountAlive();
+        const damageDealt = toUnit.applyDamage(fireShieldDmg, 0 /* magic attack */, sceneLog, false, fromUnit);
         damageStatisticHolder.add({
             unitName: fromUnit.getName(),
-            damage: toUnit.applyDamage(fireShieldDmg, 0 /* magic attack */, sceneLog, false, fromUnit),
+            damage: damageDealt,
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });
@@ -84,6 +87,17 @@ export function processFireShieldAbility(
             unitsDied: Math.max(0, amountAliveBefore - toUnit.getAmountAlive()),
         });
         sceneLog.updateLog(`${toUnit.getName()} received (${fireShieldDmg}) from Fire Shield`);
+        const mirror = applyMagicMirrorDamage({
+            attacker: fromUnit,
+            holder: toUnit,
+            landedOnHolder: fireShieldDmg,
+            element: SpellElement.FIRE,
+            sceneLog,
+            secondaryDamage,
+        });
+        if (mirror?.unitDied && !unitIdsDied.includes(fromUnit.getId())) {
+            unitIdsDied.push(fromUnit.getId());
+        }
 
         if (toUnit.isDead() && !unitIdsDied.includes(toUnit.getId())) {
             sceneLog.updateLog(`${toUnit.getName()} died`);

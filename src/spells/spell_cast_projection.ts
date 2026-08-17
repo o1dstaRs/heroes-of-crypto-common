@@ -10,9 +10,10 @@
  */
 
 import type { Unit } from "../units/unit";
+import { projectMagicMirrorDamage, type IMagicMirrorDamageProjection } from "./magic_mirror_damage";
 import type { Spell } from "./spell";
 import { applyElementAndResistToSpellDamage, calculateSpellDamage, elementalSpellMultiplier } from "./spell_damage";
-import { getMagicMirrorAbilityShare } from "./spell_helper";
+import { getMagicMirrorAbilityShare, getMagicMirrorPower } from "./spell_helper";
 
 /**
  * THE single source of truth for "what will this spell actually do to that creature".
@@ -43,11 +44,8 @@ export interface ISpellDamageProjection {
     absorbedByWaterShield: boolean;
 }
 
-/** A rebound is the same projection, plus the odds of it happening at all. */
-export interface ISpellReboundProjection extends ISpellDamageProjection {
-    /** The mirror's share, which is BOTH the chance it rebounds and the percentage it sends back. */
-    chancePercent: number;
-}
+/** A rebound is the same projection, plus the share of the holder's landed damage it returns. */
+export type ISpellReboundProjection = IMagicMirrorDamageProjection;
 
 export interface ISpellDamageProjectionInput {
     spell: Spell;
@@ -136,12 +134,12 @@ export function projectSpellDamageAgainstUnit({
 }
 
 /**
- * What a Magic Reflection holder sends BACK at the caster, or undefined when it cannot rebound at all.
+ * What a Magic Mirror holder sends BACK at the caster, or undefined when it cannot reflect damage.
  *
  * A rebound is an EXTRA hit, not a redirection: the holder still takes the spell in full, and the caster then
  * takes the mirror's own share of what LANDED on the holder (pre-absorb — a shield that ate the hit does not
- * spare the caster), cut down by the caster's own element and magic resistance. The share is also the odds:
- * a 45% mirror rebounds 45% of the time, for 45% of the damage.
+ * spare the caster), cut down by the caster's own element and magic resistance. The spell buffs return their
+ * share every time; the Magic Reflection passive rolls separately before the engine calls this projection.
  *
  * The caster is never asked to rebound a spell onto itself, so a mirror-carrying caster caught in its own
  * blast cannot loop.
@@ -153,23 +151,24 @@ export function projectSpellRebound(input: {
     holder: Unit;
     /** Damage that landed on the holder, i.e. {@link ISpellDamageProjection.landed}. */
     landedOnHolder: number;
+    /** A share already resolved by the engine. Omit when projecting the strongest advertised mirror. */
+    reflectionPercent?: number;
 }): ISpellReboundProjection | undefined {
     const { spell, caster, holder, landedOnHolder } = input;
     if (holder.getId() === caster.getId()) {
         return undefined;
     }
-    const chancePercent = getMagicMirrorAbilityShare(holder);
-    if (chancePercent <= 0) {
+    const reflectionPercent =
+        input.reflectionPercent ?? Math.max(getMagicMirrorPower(holder), getMagicMirrorAbilityShare(holder));
+    if (reflectionPercent <= 0) {
         return undefined;
     }
 
-    return {
-        ...projectSpellDamageAgainstUnit({
-            spell,
-            caster,
-            target: caster,
-            rawDamage: Math.floor((landedOnHolder * chancePercent) / 100),
-        }),
-        chancePercent,
-    };
+    return projectMagicMirrorDamage({
+        attacker: caster,
+        holder,
+        landedOnHolder,
+        element: spell.getElement(),
+        reflectionPercent,
+    });
 }

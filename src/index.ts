@@ -53,6 +53,7 @@ export * from "./handlers/attack_handler";
 export * from "./spells/spell_properties";
 export * from "./spells/spell_damage";
 export * from "./spells/spell_cast_projection";
+export * from "./spells/magic_mirror_damage";
 export * from "./synergies/synergy_properties";
 export * from "./grid/path_definitions";
 export * from "./grid/path_helper";
