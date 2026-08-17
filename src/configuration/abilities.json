@@ -1221,7 +1221,9 @@
         "type": "ATTACK",
         "desc": [
             "On attack or reponse, deals {}/{}/{}/{}% of the damage",
-            "to the connected enemy (Wind). Depending on how far the enemy is from the target"
+            "to the connected enemy (Wind). Depending on how far the enemy is from the target.",
+            "Earth Elements take 50% more. A Wind Element earths the bolt: it takes nothing",
+            "and the chain stops there"
         ],
         "power": 80,
         "power_type": "MAGIC_DAMAGE",

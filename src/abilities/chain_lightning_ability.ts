@@ -22,7 +22,9 @@ import { UnitsHolder } from "../units/units_holder";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 import type { ISecondaryDamage } from "../scene/animations";
-import * as SpellHelper from "../spells/spell_helper";
+import { applyMagicMirrorDamage } from "../spells/magic_mirror_damage";
+import { elementalSpellMultiplier } from "../spells/spell_damage";
+import { SpellElement } from "../spells/spell_properties";
 
 interface ILayerImpact {
     cells: HoCMath.XY[];
@@ -30,7 +32,29 @@ interface ILayerImpact {
     moraleIncrease: number;
     enemyName: string;
     enemyMinusMorale: number;
-    magicDamageReflection: number;
+}
+
+/**
+ * Chain Lightning is WIND, so every arc is priced by the same element table an air spell uses:
+ * a Wind Element takes NOTHING, an Earth Element takes {@link ELEMENT_COUNTER_MULTIPLIER} (50% more),
+ * everyone else takes it straight.
+ *
+ * Deliberately keyed off the VICTIM's element and the ability's own element — never off who is
+ * swinging. A Chain Lightning stolen onto a body that is not Wind still burns Earth Elements,
+ * exactly as a stolen Chakram still flies.
+ */
+const chainElementMultiplier = (target: Unit): number =>
+    elementalSpellMultiplier({
+        element: SpellElement.AIR,
+        targetIsFireElement: target.hasAbilityActive("Fire Element"),
+        targetIsWaterElement: target.hasAbilityActive("Water Element"),
+        targetIsWindElement: target.hasAbilityActive("Wind Element"),
+        targetIsEarthElement: target.hasAbilityActive("Earth Element"),
+    });
+
+/** Set once a Wind Element earths the bolt, so the caller stops walking outward. */
+interface IChainHalt {
+    value: boolean;
 }
 
 function getEnemiesForCells(
@@ -73,14 +97,24 @@ function attackEnemiesAndGetLayerImpact(
     sceneLog: ISceneLog,
     unitIdsDied: string[],
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
+    halt: IChainHalt,
     secondaryDamage?: ISecondaryDamage[],
 ): ILayerImpact[] {
     const fullLayerImpact: ILayerImpact[] = [];
-    let magicDamageReflection = 0;
     for (const e1 of enemies) {
         let moraleIncrease = 0;
         const enemyMagicResist = e1.getMagicResist();
-        if (enemyMagicResist === 100 || e1.hasAbilityActive("Wind Element")) {
+        // A Wind Element is a SCREEN, not just an immune bystander: the bolt earths itself on the one
+        // creature made of the same stuff and travels no further, so everything behind it is spared.
+        // 100% magic resist is NOT the same thing — that shrugs its own arc off and lets the chain
+        // carry on past it.
+        const elementMultiplier = chainElementMultiplier(e1);
+        if (elementMultiplier <= 0) {
+            sceneLog.updateLog(`${e1.getName()} earthed the Chain Lightning`);
+            halt.value = true;
+            break;
+        }
+        if (enemyMagicResist === 100) {
             continue;
         }
 
@@ -99,6 +133,7 @@ function attackEnemiesAndGetLayerImpact(
         const targetEnemyLightningDamage = Math.floor(
             ((abilityMultiplier * multiplier) / 8) *
                 attackDamage *
+                elementMultiplier *
                 (1 - enemyMagicResist / 100) *
                 heavyArmorMultiplierEnemy,
         );
@@ -117,7 +152,6 @@ function attackEnemiesAndGetLayerImpact(
                 team: fromUnit.getTeam(),
                 lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
             });
-            magicDamageReflection += (SpellHelper.getMagicMirrorPower(e1) / 100) * targetEnemyLightningDamage;
             secondaryDamage?.push({
                 source: "chain_lightning",
                 unitId: e1.getId(),
@@ -129,6 +163,17 @@ function attackEnemiesAndGetLayerImpact(
                 `${e1.getName()} got hit ${targetEnemyLightningDamage} by Chain Lightning` +
                     HoCLib.killTag(e1AmountBefore - e1.getAmountAlive()),
             );
+            const mirror = applyMagicMirrorDamage({
+                attacker: fromUnit,
+                holder: e1,
+                landedOnHolder: targetEnemyLightningDamage,
+                element: SpellElement.AIR,
+                sceneLog,
+                secondaryDamage,
+            });
+            if (mirror?.unitDied && !unitIdsDied.includes(fromUnit.getId())) {
+                unitIdsDied.push(fromUnit.getId());
+            }
 
             if (e1.isDead() && !unitIdsDied.includes(e1.getId())) {
                 sceneLog.updateLog(`${e1.getName()} died`);
@@ -144,7 +189,6 @@ function attackEnemiesAndGetLayerImpact(
             moraleIncrease,
             enemyName: e1.getName(),
             enemyMinusMorale,
-            magicDamageReflection,
         });
     }
 
@@ -168,10 +212,19 @@ export function processChainLightningAbility(
     }
 
     const targetMagicResist = targetUnit.getMagicResist();
-    if (targetMagicResist === 100 || targetUnit.hasAbilityActive("Wind Element")) {
+    const targetElementMultiplier = chainElementMultiplier(targetUnit);
+    if (targetMagicResist === 100 || targetElementMultiplier <= 0) {
         sceneLog.updateLog(`${targetUnit.getName()} resisted from Chain Lightning`);
         return unitIdsDied;
     }
+
+    // The swing that fed us was ALREADY priced with the attacker's own elemental affinity against
+    // this primary target (Thunderbird is Wind, so an Earth primary came in pre-multiplied). Divide
+    // that back out and let every arc — the primary's included — be priced exactly once, below, by
+    // the ability's own element. Without this the primary took the bonus twice and, worse, every
+    // bounce inherited a base inflated by whoever happened to be standing at the front.
+    const wielderAffinity = fromUnit.getElementalDamageMultiplier(targetUnit) || 1;
+    const chainBaseDamage = attackDamage / wielderAffinity;
 
     const heavyArmorAbilityTarget = targetUnit.getAbility("Heavy Armor");
     let heavyArmorMultiplierTarget = 1;
@@ -191,11 +244,11 @@ export function processChainLightningAbility(
         chainLightningAbility,
         FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
     );
-    let totalMagicDamageReflection = 0;
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
     let totalMoraleIncrease = 0;
     const targetEnemyLightningDamage =
-        Math.floor(abilityMultiplier * attackDamage * (1 - targetMagicResist / 100)) * heavyArmorMultiplierTarget;
+        Math.floor(abilityMultiplier * chainBaseDamage * targetElementMultiplier * (1 - targetMagicResist / 100)) *
+        heavyArmorMultiplierTarget;
     if (targetEnemyLightningDamage && !targetUnit.isDead()) {
         // Flesh Shield is physical-only, so this magical jolt is never redirected to a nearby Abomination.
         const targetAmountBefore = targetUnit.getAmountAlive();
@@ -207,7 +260,6 @@ export function processChainLightningAbility(
             team: fromUnit.getTeam(),
             lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
         });
-        totalMagicDamageReflection += (SpellHelper.getMagicMirrorPower(targetUnit) / 100) * targetEnemyLightningDamage;
         secondaryDamage?.push({
             source: "chain_lightning",
             unitId: targetUnit.getId(),
@@ -219,6 +271,17 @@ export function processChainLightningAbility(
             `${targetUnit.getName()} got hit ${targetEnemyLightningDamage} by Chain Lightning` +
                 HoCLib.killTag(targetAmountBefore - targetUnit.getAmountAlive()),
         );
+        const mirror = applyMagicMirrorDamage({
+            attacker: fromUnit,
+            holder: targetUnit,
+            landedOnHolder: targetEnemyLightningDamage,
+            element: SpellElement.AIR,
+            sceneLog,
+            secondaryDamage,
+        });
+        if (mirror?.unitDied && !unitIdsDied.includes(fromUnit.getId())) {
+            unitIdsDied.push(fromUnit.getId());
+        }
     }
 
     if (targetUnit.isDead()) {
@@ -247,16 +310,20 @@ export function processChainLightningAbility(
         return unitIdsDied;
     }
 
+    // Once a Wind Element earths the bolt anywhere along the chain, the walk outward stops entirely —
+    // it screens every creature the chain had not reached yet, not merely itself.
+    const halt: IChainHalt = { value: false };
     const layer1Impact = attackEnemiesAndGetLayerImpact(
         fromUnit,
         enemiesLayer1,
-        attackDamage,
+        chainBaseDamage,
         7,
         abilityMultiplier,
         affectedEnemiesIds,
         sceneLog,
         unitIdsDied,
         damageStatisticHolder,
+        halt,
         secondaryDamage,
     );
 
@@ -270,26 +337,26 @@ export function processChainLightningAbility(
             affectedEnemiesIds,
         );
 
-        totalMagicDamageReflection += impact.magicDamageReflection;
-
         const unitNameKeyL1 = `${impact.enemyName}:${fromUnit.getOppositeTeam()}`;
         moraleDecreaseForTheUnitTeam[unitNameKeyL1] =
             (moraleDecreaseForTheUnitTeam[unitNameKeyL1] || 0) + impact.enemyMinusMorale;
 
-        if (!enemiesLayer2.length) {
+        // Units already struck still count for morale above; the halt only stops the chain SPREADING.
+        if (halt.value || !enemiesLayer2.length) {
             continue;
         }
 
         const layer2Impact = attackEnemiesAndGetLayerImpact(
             fromUnit,
             enemiesLayer2,
-            attackDamage,
+            chainBaseDamage,
             6,
             abilityMultiplier,
             affectedEnemiesIds,
             sceneLog,
             unitIdsDied,
             damageStatisticHolder,
+            halt,
             secondaryDamage,
         );
 
@@ -302,57 +369,36 @@ export function processChainLightningAbility(
                 unitsHolder,
                 affectedEnemiesIds,
             );
-            totalMagicDamageReflection += impact2.magicDamageReflection;
-
             const unitNameKeyL2 = `${impact2.enemyName}:${fromUnit.getOppositeTeam()}`;
             moraleDecreaseForTheUnitTeam[unitNameKeyL2] =
                 (moraleDecreaseForTheUnitTeam[unitNameKeyL2] || 0) + impact2.enemyMinusMorale;
 
-            if (!enemiesLayer2.length) {
+            // NB: the pre-existing guard here tested enemiesLayer2 rather than enemiesLayer3; left as
+            // found (an empty layer 3 simply yields no impacts) beyond adding the halt.
+            if (halt.value || !enemiesLayer2.length) {
                 continue;
             }
 
             const layer3Impact = attackEnemiesAndGetLayerImpact(
                 fromUnit,
                 enemiesLayer3,
-                attackDamage,
+                chainBaseDamage,
                 5,
                 abilityMultiplier,
                 affectedEnemiesIds,
                 sceneLog,
                 unitIdsDied,
                 damageStatisticHolder,
+                halt,
                 secondaryDamage,
             );
 
             for (const impact3 of layer3Impact) {
                 totalMoraleIncrease += impact3.moraleIncrease;
-                totalMagicDamageReflection += impact3.magicDamageReflection;
                 const unitNameKeyL3 = `${impact3.enemyName}:${fromUnit.getOppositeTeam()}`;
                 moraleDecreaseForTheUnitTeam[unitNameKeyL3] =
                     (moraleDecreaseForTheUnitTeam[unitNameKeyL3] || 0) + impact3.enemyMinusMorale;
             }
-        }
-    }
-
-    if (totalMagicDamageReflection && !fromUnit.hasAbilityActive("Wind Element")) {
-        const reflectPositionAtImpact = { ...fromUnit.getPosition() };
-        const reflectAmountBefore = fromUnit.getAmountAlive();
-        fromUnit.applyDamage(totalMagicDamageReflection, 0 /* magic attack */, sceneLog);
-        secondaryDamage?.push({
-            source: "magic_mirror",
-            unitId: fromUnit.getId(),
-            position: reflectPositionAtImpact,
-            amount: Math.floor(totalMagicDamageReflection),
-            unitsDied: Math.max(0, reflectAmountBefore - fromUnit.getAmountAlive()),
-        });
-        sceneLog.updateLog(`${fromUnit.getName()} got hit ${totalMagicDamageReflection} by Magic Mirror reflection`);
-        if (fromUnit.isDead()) {
-            sceneLog.updateLog(`${fromUnit.getName()} died`);
-            unitIdsDied.push(fromUnit.getId());
-            const unitFromKey = `${fromUnit.getName()}:${fromUnit.getOppositeTeam()}`;
-            moraleDecreaseForTheUnitTeam[unitFromKey] =
-                (moraleDecreaseForTheUnitTeam[unitFromKey] || 0) + HoCConstants.MORALE_CHANGE_FOR_KILL;
         }
     }
 
@@ -370,7 +416,7 @@ export function getChainLightningTargets(targetUnit: Unit, grid: Grid, unitsHold
     const affectedEnemiesIds: string[] = [targetUnit.getId()];
 
     // Initial target check
-    if (targetUnit.getMagicResist() === 100 || targetUnit.hasAbilityActive("Wind Element")) {
+    if (targetUnit.getMagicResist() === 100 || chainElementMultiplier(targetUnit) <= 0) {
         return affectedEnemies;
     }
     // Main target is usually already highlighted by hover, but we include it here for completeness if needed.
@@ -387,8 +433,11 @@ export function getChainLightningTargets(targetUnit: Unit, grid: Grid, unitsHold
         affectedEnemiesIds,
     );
 
+    // Mirrors the engine hop for hop, halt included — this is what the hover preview draws, and a
+    // preview that ignored the Wind screen would promise arcs the swing never delivers.
     for (const e1 of enemiesLayer1) {
-        if (e1.getMagicResist() === 100 || e1.hasAbilityActive("Wind Element")) continue;
+        if (chainElementMultiplier(e1) <= 0) break;
+        if (e1.getMagicResist() === 100) continue;
 
         affectedEnemies.push(e1);
         affectedEnemiesIds.push(e1.getId());
@@ -403,7 +452,8 @@ export function getChainLightningTargets(targetUnit: Unit, grid: Grid, unitsHold
         );
 
         for (const e2 of enemiesLayer2) {
-            if (e2.getMagicResist() === 100 || e2.hasAbilityActive("Wind Element")) continue;
+            if (chainElementMultiplier(e2) <= 0) break;
+            if (e2.getMagicResist() === 100) continue;
 
             affectedEnemies.push(e2);
             affectedEnemiesIds.push(e2.getId());
@@ -418,7 +468,8 @@ export function getChainLightningTargets(targetUnit: Unit, grid: Grid, unitsHold
             );
 
             for (const e3 of enemiesLayer3) {
-                if (e3.getMagicResist() === 100 || e3.hasAbilityActive("Wind Element")) continue;
+                if (chainElementMultiplier(e3) <= 0) break;
+                if (e3.getMagicResist() === 100) continue;
 
                 if (!affectedEnemiesIds.includes(e3.getId())) {
                     affectedEnemies.push(e3);
