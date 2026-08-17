@@ -494,7 +494,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": ["Vine Throw", "In Its Own World"]
+            "abilities": ["Earth Element", "Vine Throw", "In Its Own World"]
         },
         "Unicorn": {
             "name": "Unicorn",
@@ -650,7 +650,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["Double Throw", "Area Throw"]
+            "abilities": ["Earth Element", "Double Throw", "Area Throw"]
         },
         "Arachna Queen": {
             "name": "Arachna Queen",

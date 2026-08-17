@@ -16,6 +16,7 @@ import auraEffectsJson from "../../src/configuration/aura_effects.json";
 import creaturesJson from "../../src/configuration/creatures.json";
 import effectsJson from "../../src/configuration/effects.json";
 import spellsJson from "../../src/configuration/spells.json";
+import { AbilityPowerType } from "../../src/abilities/ability_properties";
 import {
     getAbilityConfig,
     getAuraEffectConfig,
@@ -193,6 +194,17 @@ describe("config_provider", () => {
             expect(typeof ability.stack_powered).toBe("boolean");
             expect(typeof ability.can_be_cast).toBe("boolean");
         }
+    });
+
+    it("makes Trent and Gargantuan Earth Elements", () => {
+        const earthElement = getAbilityConfig("Earth Element");
+        const trent = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Trent", "trent_512", 1);
+        const gargantuan = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Gargantuan", "gargantuan_512", 1);
+
+        expect(earthElement.power).toBe(50);
+        expect(earthElement.power_type).toBe(AbilityPowerType.MAGIC_VULNERABILITY_WIND);
+        expect(trent.abilities).toContain("Earth Element");
+        expect(gargantuan.abilities).toContain("Earth Element");
     });
 
     it("loads Spit Ball's increased stack-powered chance", () => {

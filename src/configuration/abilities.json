@@ -291,6 +291,18 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Earth Element": {
+        "name": "Earth Element",
+        "type": "DEFENCE",
+        "desc": ["Gives Earth immunity. Wind attacks deal {}% more damage"],
+        "power": 50,
+        "power_type": "MAGIC_VULNERABILITY_WIND",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Water Shield": {
         "name": "Water Shield",
         "type": "DEFENCE",

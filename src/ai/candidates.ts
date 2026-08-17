@@ -37,11 +37,8 @@ import {
     isSpellUsableByCaster,
 } from "../spells/spell_helper";
 import type { Spell } from "../spells/spell";
-import {
-    applyMagicResistToSpellDamage,
-    calculateSpellDamage,
-    isOffensiveSpellMultiplier,
-} from "../spells/spell_damage";
+import { spellDamageAgainstUnit, spellRawDamage } from "../spells/spell_cast_projection";
+import { isOffensiveSpellMultiplier } from "../spells/spell_damage";
 import {
     FIRE_WALL_ORIENTATIONS,
     fireWallCells,
@@ -2714,16 +2711,7 @@ class CandidateGenerator {
      * stack-powered Magic Dragon damage.
      */
     private offensiveSpellDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
-        const rawDamage = applyMagicResistToSpellDamage(
-            calculateSpellDamage(
-                spell.getMultiplierType(),
-                spell.getPower(),
-                this.unit.getAmountAlive(),
-                this.unit.getStackPower(),
-                this.unit.getMagicDamageBonusPercentage(),
-            ),
-            target.getMagicResist(),
-        );
+        const rawDamage = spellDamageAgainstUnit(spell, spellRawDamage(spell, this.unit), target);
         const targetHp = target.getCumulativeHp();
         return { value: Math.min(rawDamage, targetHp), kill: rawDamage >= targetHp ? 1 : 0 };
     }
@@ -2800,13 +2788,7 @@ class CandidateGenerator {
     private addMeteoriteCastCandidates(spell: Spell): void {
         const { grid, unitsHolder } = this.context;
         const gs = grid.getSettings();
-        const rawDamage = calculateSpellDamage(
-            spell.getMultiplierType(),
-            spell.getPower(),
-            this.unit.getAmountAlive(),
-            this.unit.getStackPower(),
-            this.unit.getMagicDamageBonusPercentage(),
-        );
+        const rawDamage = spellRawDamage(spell, this.unit);
         if (rawDamage <= 0) {
             return;
         }
@@ -2843,7 +2825,7 @@ class CandidateGenerator {
                             if (unit.getTeam() === this.unit.getTeam() || unit.isDead()) {
                                 continue;
                             }
-                            const dealt = applyMagicResistToSpellDamage(rawDamage, unit.getMagicResist());
+                            const dealt = spellDamageAgainstUnit(spell, rawDamage, unit);
                             const hp = unit.getCumulativeHp();
                             value += Math.min(dealt, hp);
                             if (dealt >= hp) {

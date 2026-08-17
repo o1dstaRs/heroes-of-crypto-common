@@ -2269,7 +2269,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const c = createCombatTestContext();
         const mage = makeReal(LOWER, "Life", "Battle Mage");
         mage.setStackPower(5);
-        const first = makeReal(UPPER, "Nature", "Gargantuan");
+        const first = makeReal(UPPER, "Chaos", "Hydra");
         const second = makeReal(UPPER, "Chaos", "Black Dragon");
         placeUnit(c.grid, c.unitsHolder, mage, { x: 2, y: 2 });
         // The 2x2 at (8,8) catches (9,8) of the first footprint and (8,9) of the second, while neither
@@ -2291,6 +2291,21 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(firstHpBefore - first.getCumulativeHp() + (secondHpBefore - second.getCumulativeHp())).toBe(
             meteorite!.features.expectedDamage,
         );
+    });
+
+    it("Battle Mage: Meteorite does not score an Earth Element target it cannot damage", () => {
+        const c = createCombatTestContext();
+        const mage = makeReal(LOWER, "Life", "Battle Mage");
+        mage.setStackPower(5);
+        const gargantuan = makeReal(UPPER, "Nature", "Gargantuan");
+        placeUnit(c.grid, c.unitsHolder, mage, { x: 2, y: 2 });
+        placeLarge(c, gargantuan, { x: 8, y: 8 });
+
+        const meteorites = ofKind(enumerateCandidates(mage, ctxFor(c, true), endTurn(mage)).candidates, "spell").filter(
+            (candidate) => candidate.spellName === "Meteorite",
+        );
+
+        expect(meteorites).toHaveLength(0);
     });
 
     it("Nightmare: Fire Wall emits an oriented FREE_CELL candidate accepted by the engine", () => {
@@ -2498,9 +2513,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const c = createCombatTestContext();
         const dragon = makeReal(LOWER, "Nature", "Magic Dragon");
         dragon.setStackPower(5);
-        const first = makeReal(UPPER, "Nature", "Gargantuan");
-        // Deliberately NOT a Black Dragon: it carries Fire Element, and Meteor Shower is a fire spell, so it
-        // would soak the whole shower and this geometry assertion would read as a footprint miss.
+        // Meteor Shower is Earth magic, so neither target may be an Earth Element: the test needs HP loss to
+        // prove that both non-base footprint cells were actually caught.
+        const first = makeReal(UPPER, "Chaos", "Black Dragon");
         const second = makeReal(UPPER, "Chaos", "Hydra");
         placeLarge(c, dragon, { x: 3, y: 3 });
         // The 3x3 centered at (8,8) catches non-base footprint cells of both large targets. Its centre is

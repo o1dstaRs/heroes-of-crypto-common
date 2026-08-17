@@ -8,12 +8,8 @@ import { SpellElement } from "../../src/spells/spell_properties";
  *
  * Two opposed pairs — fire against water, earth against wind — where each element cannot touch the
  * creature that IS it and deals half again as much to the one it counters, in BOTH directions. The
- * ability cards have always promised this from the defending side (MAGIC_VULNERABILITY_WATER / _FIRE /
- * _EARTH, each at power 50); for a long time only fire-against-water was actually wired up.
- *
- * Earth's own immunity and air's counter have no creature to land on yet — nothing in the roster carries
- * an "Earth Element" ability — but they are pinned here so the rule cannot quietly rot before the first
- * earth creature arrives.
+ * ability cards promise this from the defending side (the four MAGIC_VULNERABILITY_* types, each at power
+ * 50); for a long time only fire-against-water was actually wired up.
  */
 const against = (element: SpellElement, target: "fire" | "water" | "wind" | "earth" | "none"): number =>
     elementalSpellMultiplier({

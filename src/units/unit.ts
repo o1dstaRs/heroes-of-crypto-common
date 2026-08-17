@@ -2325,11 +2325,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         );
     }
     /**
-     * Water <-> Fire elemental affinity multiplier. The vulnerability lives on the DEFENDER's element ability
-     * (Fire Element / Water Element, power 50 = "takes 50% more from the opposing element"): a Fire-Element
-     * attacker vs a Water-Element target, and a Water-Element attacker vs a Fire-Element target, each deal
-     * +power% more. Feeding this into calculateAttackDamage covers normal melee/ranged attacks AND Fire Breath
-     * (whose per-target damage routes through calculateAttackDamage).
+     * Elemental affinity multiplier for the two opposed pairs: Fire <-> Water and Wind <-> Earth. The
+     * vulnerability lives on the DEFENDER's element ability (power 50 = "takes 50% more from the opposing
+     * element"). Feeding this into calculateAttackDamage covers normal melee/ranged attacks and abilities whose
+     * damage routes through them, such as Fire Breath.
      */
     public getElementalDamageMultiplier(enemyUnit: Unit): number {
         if (this.hasAbilityActive("Fire Element") && enemyUnit.hasAbilityActive("Water Element")) {
@@ -2337,6 +2336,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         if (this.hasAbilityActive("Water Element") && enemyUnit.hasAbilityActive("Fire Element")) {
             return 1 + (enemyUnit.getAbility("Fire Element")?.getPower() ?? 0) / 100;
+        }
+        if (this.hasAbilityActive("Wind Element") && enemyUnit.hasAbilityActive("Earth Element")) {
+            return 1 + (enemyUnit.getAbility("Earth Element")?.getPower() ?? 0) / 100;
+        }
+        if (this.hasAbilityActive("Earth Element") && enemyUnit.hasAbilityActive("Wind Element")) {
+            return 1 + (enemyUnit.getAbility("Wind Element")?.getPower() ?? 0) / 100;
         }
         return 1;
     }

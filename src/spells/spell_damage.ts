@@ -216,9 +216,9 @@ export const FIRE_AGAINST_WATER_MULTIPLIER = FIREFORGED_SWORD_WATER_MULTIPLIER;
  *
  * The elements sit in two opposed pairs — fire against water, earth against wind — and the ability cards
  * have always said so from the defending side: Fire Element reads "Water attacks deal 50% more damage",
- * Water Element reads the same of fire, and Wind Element reads "Earth attacks deal 50% more damage"
- * (MAGIC_VULNERABILITY_WATER / _FIRE / _EARTH, each at power 50). Only the fire-against-water half was
- * ever wired up, so the other three were promises the game did not keep.
+ * Water Element reads the same of fire, Wind Element reads "Earth attacks deal 50% more damage", and Earth
+ * Element reads the same of wind (the four MAGIC_VULNERABILITY_* types, each at power 50). Only the
+ * fire-against-water half was originally wired up, so the other three were promises the game did not keep.
  */
 export const ELEMENT_COUNTER_MULTIPLIER = 1.5;
 
@@ -233,9 +233,7 @@ export const ELEMENT_COUNTER_MULTIPLIER = 1.5;
  *   COUNTER   the elements sit in two opposed pairs — fire against water, earth against wind — and each
  *             deals ELEMENT_COUNTER_MULTIPLIER to the one it counters, in BOTH directions.
  *
- * Earth has no creature that IS it yet, so its immunity branch is inert; it is written anyway so the day
- * an Earth Element arrives, the rule has exactly one place to live. An elementless spell — most of the
- * book — is unaffected and returns 1.
+ * An elementless spell — most of the book — is unaffected and returns 1.
  *
  * Pure and Unit-free so the spellbook card, the hover preview, the engine and the tests all price an
  * elemental hit identically.
@@ -245,7 +243,7 @@ export function elementalSpellMultiplier(params: {
     targetIsFireElement: boolean;
     targetIsWaterElement: boolean;
     targetIsWindElement: boolean;
-    /** Optional: nothing in the roster carries an "Earth Element" ability yet. */
+    /** Optional for compatibility with older callers written before Earth Element joined the roster. */
     targetIsEarthElement?: boolean;
 }): number {
     const { element, targetIsFireElement, targetIsWaterElement, targetIsWindElement } = params;
