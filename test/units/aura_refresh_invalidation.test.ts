@@ -116,7 +116,7 @@ describe("aura refresh dirty invalidation", () => {
         const upperEmitter = createTestUnit({
             name: "Upper Emitter",
             team: PBTypes.TeamVals.UPPER,
-            auraEffects: ["Range Null Field", "Poison Cloud"],
+            auraEffects: ["Range Null Field", "Venom Cloud"],
         });
         const upperRanged = createTestUnit({
             name: "Upper Ranged",
@@ -173,11 +173,11 @@ describe("aura refresh dirty invalidation", () => {
 
         upperEmitter.applyDamage(1_000_000, 0, new SceneLogMock());
         compare(false);
-        expect(upperRanged.hasBuffActive("Poison Cloud Aura")).toBe(true);
+        expect(upperRanged.hasBuffActive("Venom Cloud Aura")).toBe(true);
 
         unitsHolder.deleteUnitById(upperEmitter.getId());
         compare(true);
-        expect(upperRanged.hasBuffActive("Poison Cloud Aura")).toBe(false);
+        expect(upperRanged.hasBuffActive("Venom Cloud Aura")).toBe(false);
 
         const offGridPosition = positionForCell({ x: 30, y: 30 });
         upperRanged.setPosition(offGridPosition.x, offGridPosition.y);

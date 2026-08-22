@@ -195,7 +195,7 @@ export function processThroughShotAbility(
                 false,
                 attackerUnit,
             );
-            // Poison Cloud Aura: an aura'd attacker poisons every unit the shot passes through.
+            // Poison aura: an aura'd attacker poisons every unit the shot passes through.
             processPoisonAuraAbility(attackerUnit, targetUnit, damageDealt, sceneLog);
             damageStatisticHolder.add({
                 unitName: attackerUnit.getName(),

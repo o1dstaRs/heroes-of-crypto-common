@@ -196,7 +196,7 @@ export function registerAuraRefreshMixedEventTraceShard(shardIndex: number): voi
                             stackPower: 4,
                             auraEffects: [
                                 "Range Null Field",
-                                "Poison Cloud",
+                                "Venom Cloud",
                                 "Web",
                                 "Arrows Wingshield",
                                 "Absorb Penalties",

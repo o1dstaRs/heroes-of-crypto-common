@@ -1974,7 +1974,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
-        // Poison Cloud is not stack-powered: the affected ally applies the flat base % (its own luck is
+        // A poison aura is not stack-powered: the affected ally applies the flat base % (its own luck is
         // added at hit time in processPoisonAuraAbility), so the stored aura power is just the base value.
         if (auraEffect.getPowerType() === AbilityPowerType.POISON_ON_HIT) {
             return auraEffect.getPower();

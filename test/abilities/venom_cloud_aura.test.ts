@@ -1,13 +1,13 @@
 /*
  * -----------------------------------------------------------------------------
  * The Wyvern's Venom Cloud Aura: the poison-on-hit passive, handed to allies standing
- * within TWO cells — the same reach as Poison Cloud (the Dryad's aura until it
- * traded poison for Guiding Winds; Poison Cloud stays declared but unassigned).
+ * within TWO cells. It is now the only declared poison aura — Poison Cloud, the Dryad's
+ * until it traded poison for Guiding Winds, was removed once nothing carried it.
  *
- * Regression guard: the on-hit poison used to be looked up by the literal buff name
- * "Poison Cloud Aura", so a second poison aura landed on the right allies, showed the
- * right tooltip and then poisoned nobody. The lookup now goes through the config-derived
- * POISON_ON_HIT set, which is what these tests pin.
+ * The regression that motivated the config-derived lookup (a literal "Poison Cloud Aura"
+ * buff name, so a second poison aura buffed the right allies and poisoned nobody) is
+ * guarded in poison_aura_config_driven.test.ts — with one aura declared, no fixture here
+ * can catch a hard-coded name.
  * -----------------------------------------------------------------------------
  */
 
@@ -65,16 +65,12 @@ describe("Venom Cloud Aura", () => {
         const aura = getAuraEffectConfig("Venom Cloud");
         expect(aura?.range).toBe(2);
         expect(aura?.is_buff).toBe(true);
-        // Poison Cloud remains declared but unassigned. The two no longer sit at a fixed ratio — Venom was
-        // cut to 20 while Poison Cloud kept its 15 — so pin both numbers outright rather than a relationship.
-        expect(aura?.range).toBe(getAuraEffectConfig("Poison Cloud")?.range);
         expect(AURA_POWER).toBe(20);
-        expect(getAbilityConfig("Poison Cloud Aura").power).toBe(15);
         expect(getAbilityConfig("Venom Cloud Aura").desc.join(" ")).toContain("+50% poison damage per stack");
         expect(getAbilityConfig("Venom Cloud Aura").stack_powered).toBe(false);
-        // Both poison auras must be discoverable from the config, or the on-hit path silently skips one.
-        expect([...POISON_ON_HIT_AURA_EFFECT_NAMES].sort()).toEqual(["Poison Cloud", "Venom Cloud"]);
-        expect([...POISON_ON_HIT_AURA_BUFF_NAMES].sort()).toEqual(["Poison Cloud Aura", "Venom Cloud Aura"]);
+        // The aura must be discoverable from the config, or the on-hit path silently skips it.
+        expect([...POISON_ON_HIT_AURA_EFFECT_NAMES]).toEqual(["Venom Cloud"]);
+        expect([...POISON_ON_HIT_AURA_BUFF_NAMES]).toEqual(["Venom Cloud Aura"]);
     });
 
     it("buffs allies up to two cells out but not one three cells away", () => {

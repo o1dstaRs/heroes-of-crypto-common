@@ -578,21 +578,6 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Poison Cloud Aura": {
-        "name": "Poison Cloud Aura",
-        "type": "BUFF_AURA",
-        "desc": [
-            "Allies within 2 cells apply {}% of their attack damage to the target as Poison",
-            "Poisoning an already poisoned enemy stacks: +50% poison damage per stack"
-        ],
-        "power": 15,
-        "power_type": "POISON_ON_HIT",
-        "skip_reponse": false,
-        "stack_powered": false,
-        "effect": null,
-        "aura_effect": "Poison Cloud",
-        "can_be_cast": false
-    },
     "Sylvan Focus Aura": {
         "name": "Sylvan Focus Aura",
         "type": "BUFF_AURA",

@@ -221,7 +221,7 @@ export function processRangeAOEAbility(
                     false,
                     attackerUnit,
                 );
-                // Poison Cloud Aura: an aura'd attacker poisons every unit its AOE hits, not just the primary.
+                // Poison aura: an aura'd attacker poisons every unit its AOE hits, not just the primary.
                 processPoisonAuraAbility(attackerUnit, unit, damageDealt, sceneLog);
                 const unitsKilled = Math.max(0, amountAliveBeforeDamage - unit.getAmountAlive());
                 perUnitDamage.push({
