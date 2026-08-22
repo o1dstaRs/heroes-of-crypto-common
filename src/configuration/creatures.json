@@ -908,10 +908,10 @@
         },
         "Abomination": {
             "name": "Abomination",
-            "hp": 600,
+            "hp": 550,
             "steps": 4.2,
             "initiative": 3.3,
-            "armor": 50,
+            "armor": 49,
             "attack_type": "MELEE",
             "attack": 22,
             "attack_damage_min": 28,

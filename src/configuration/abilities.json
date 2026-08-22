@@ -583,7 +583,7 @@
         "type": "BUFF_AURA",
         "desc": [
             "Allies within 2 cells apply {}% of their attack damage to the target as Poison",
-            "Poisoning an already poisoned enemy stacks: +70% poison damage per stack"
+            "Poisoning an already poisoned enemy stacks: +50% poison damage per stack"
         ],
         "power": 15,
         "power_type": "POISON_ON_HIT",
@@ -622,9 +622,9 @@
         "type": "BUFF_AURA",
         "desc": [
             "Allies within 2 cells apply {}% of their attack damage to the target as Poison",
-            "Poisoning an already poisoned enemy stacks: +70% poison damage per stack"
+            "Poisoning an already poisoned enemy stacks: +50% poison damage per stack"
         ],
-        "power": 30,
+        "power": 20,
         "power_type": "POISON_ON_HIT",
         "skip_reponse": false,
         "stack_powered": false,

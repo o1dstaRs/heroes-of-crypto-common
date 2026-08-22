@@ -19,12 +19,12 @@ const effectFactory = new EffectFactory();
 
 /**
  * Each poison landed on an ALREADY poisoned target adds a stack worth this share of that hit's own poison
- * value. So the second stack raises the tick by 70% of what it would have applied on its own, the third by
- * another 70%, and so on — linear, the same shape as Deep Wounds summing its cards' powers rather than one
+ * value. So the second stack raises the tick by 50% of what it would have applied on its own, the third by
+ * another 50%, and so on — linear, the same shape as Deep Wounds summing its cards' powers rather than one
  * overriding another. The stack count is not stored anywhere: the accumulated hp/turn IS the stack total,
  * which keeps this out of the effect serialization and the battle snapshot.
  */
-const POISON_STACK_SHARE = 0.7;
+const POISON_STACK_SHARE = 0.5;
 
 /**
  * The stacked tick stays a WHOLE number of hp: TurnEngine feeds it straight into applyDamage, which
@@ -41,7 +41,7 @@ const poisonStackIncrement = (poisonHp: number): number => Math.max(1, Math.roun
  * until the very end of the fight — its config laps === NUMBER_OF_LAPS_TOTAL, which are never decremented.
  * The first poison sets the tick outright. Every later one stacks: the tick grows by POISON_STACK_SHARE of
  * the incoming poison, and never drops below the strongest single poison the target has been dealt — so a
- * big hit landing on a weak stack still rebases the tick upwards instead of only adding its 35%.
+ * big hit landing on a weak stack still rebases the tick upwards instead of only adding its 50%.
  *
  * Targets that cannot be poisoned at all (Mechanism constructs, per canBePoisoned) drop the effect here, so
  * every route in — direct hits, Poison/Venom Cloud auras, AOE and line attacks — is covered by one guard.

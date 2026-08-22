@@ -61,15 +61,16 @@ const makeWyvern = () =>
 const makeAlly = (name: string) => createTestUnit({ name, team: PBTypes.TeamVals.LOWER, attack: 10 });
 
 describe("Venom Cloud Aura", () => {
-    it("is a 2-cell buff aura with doubled poison and stack damage", () => {
+    it("is a 2-cell buff aura with its own poison and stack damage", () => {
         const aura = getAuraEffectConfig("Venom Cloud");
         expect(aura?.range).toBe(2);
         expect(aura?.is_buff).toBe(true);
-        // Poison Cloud remains declared but unassigned; Wyvern's live aura has twice its base poison share.
+        // Poison Cloud remains declared but unassigned. The two no longer sit at a fixed ratio — Venom was
+        // cut to 20 while Poison Cloud kept its 15 — so pin both numbers outright rather than a relationship.
         expect(aura?.range).toBe(getAuraEffectConfig("Poison Cloud")?.range);
-        expect(AURA_POWER).toBe(30);
-        expect(AURA_POWER).toBe(getAbilityConfig("Poison Cloud Aura").power * 2);
-        expect(getAbilityConfig("Venom Cloud Aura").desc.join(" ")).toContain("+70% poison damage per stack");
+        expect(AURA_POWER).toBe(20);
+        expect(getAbilityConfig("Poison Cloud Aura").power).toBe(15);
+        expect(getAbilityConfig("Venom Cloud Aura").desc.join(" ")).toContain("+50% poison damage per stack");
         expect(getAbilityConfig("Venom Cloud Aura").stack_powered).toBe(false);
         // Both poison auras must be discoverable from the config, or the on-hit path silently skips one.
         expect([...POISON_ON_HIT_AURA_EFFECT_NAMES].sort()).toEqual(["Poison Cloud", "Venom Cloud"]);
@@ -111,12 +112,12 @@ describe("Venom Cloud Aura", () => {
         const { log, lines } = capturingSceneLog();
         processPoisonAuraAbility(ally, enemy, 100, log);
 
-        // 30% of a 100-damage hit at luck 0.
+        // 20% of a 100-damage hit at luck 0.
         expect(enemy.getEffect("Poison")?.getPower()).toBe(AURA_POWER);
         expect(lines.join("\n")).toContain("is poisoned");
     });
 
-    it("stacks +70% of each further poison onto an already poisoned target", () => {
+    it("stacks +50% of each further poison onto an already poisoned target", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const wyvern = makeWyvern();
         const ally = makeAlly("Ally");
@@ -129,15 +130,15 @@ describe("Venom Cloud Aura", () => {
         unitsHolder.refreshAuraEffectsForAllUnits();
         const { log, lines } = capturingSceneLog();
 
-        // First hit sets the tick outright: 30% of 100 damage.
+        // First hit sets the tick outright: 20% of 100 damage.
+        processPoisonAuraAbility(ally, enemy, 100, log);
+        expect(enemy.getEffect("Poison")?.getPower()).toBe(20);
+
+        // Each further poison adds 50% of its own value, rounded to whole hp — equal hits add a constant 10.
         processPoisonAuraAbility(ally, enemy, 100, log);
         expect(enemy.getEffect("Poison")?.getPower()).toBe(30);
-
-        // Each further poison adds 70% of its own value, rounded to whole hp — equal hits add a constant 21.
         processPoisonAuraAbility(ally, enemy, 100, log);
-        expect(enemy.getEffect("Poison")?.getPower()).toBe(51);
-        processPoisonAuraAbility(ally, enemy, 100, log);
-        expect(enemy.getEffect("Poison")?.getPower()).toBe(72);
+        expect(enemy.getEffect("Poison")?.getPower()).toBe(40);
 
         expect(lines.join("\n")).toContain("poison stacks up");
 
@@ -148,7 +149,7 @@ describe("Venom Cloud Aura", () => {
         const poisonIndex = properties.applied_effects.indexOf("Poison");
         expect(poisonIndex).toBeGreaterThanOrEqual(0);
         expect(properties.applied_effects_descriptions[poisonIndex]).toBe(
-            "Loses 72 hp at the start of each of its turns. Poison stacks: 3.",
+            "Loses 40 hp at the start of each of its turns. Poison stacks: 3.",
         );
         // Index-parallel to applied_effects — this is what the sidebar reads for the count badge.
         expect(properties.applied_effects_stacks[poisonIndex]).toBe(3);
@@ -168,13 +169,13 @@ describe("Venom Cloud Aura", () => {
         unitsHolder.refreshAuraEffectsForAllUnits();
         const { log } = capturingSceneLog();
 
-        processPoisonAuraAbility(weakAlly, enemy, 20, log); // 30% of 20 = 6
-        expect(enemy.getEffect("Poison")?.getPower()).toBe(6);
+        processPoisonAuraAbility(weakAlly, enemy, 20, log); // 20% of 20 = 4
+        expect(enemy.getEffect("Poison")?.getPower()).toBe(4);
 
-        // A 120-hp poison landing on a 6-hp stack would only reach 6 + 84 = 90 by the stack rule, but the
+        // An 80-hp poison landing on a 4-hp stack would only reach 4 + 40 = 44 by the stack rule, but the
         // target must always suffer at least the strongest single poison dealt.
-        processPoisonAuraAbility(weakAlly, enemy, 400, log); // 30% of 400 = 120
-        expect(enemy.getEffect("Poison")?.getPower()).toBe(120);
+        processPoisonAuraAbility(weakAlly, enemy, 400, log); // 20% of 400 = 80
+        expect(enemy.getEffect("Poison")?.getPower()).toBe(80);
     });
 
     it("leaves an ally outside the aura unpoisoning", () => {

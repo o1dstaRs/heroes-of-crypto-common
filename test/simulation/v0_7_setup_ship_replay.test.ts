@@ -24,7 +24,12 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // last cell keeps full strength, so every seeded trace holding a shooter diverges from its first shot.
 // Two isolated runs reproduced this value byte-identically.
 // Previous approved digest: 11d24bcbfe0ac4a3ed9656efb33889ba831679cbb0ae4a5e11271afe5eb8d1a9
-const EXPECTED_REPLAY_SHA256 = "2d3e9727f3c79de48196b3d48a35c7855dab172406739a942c9afdc2d69ec2ed";
+// Re-pinned 2026-08-22 for a poison + Abomination balance pass: Venom Cloud's on-hit share 30 -> 20,
+// the poison stack share 70% -> 50%, Abomination hp 600 -> 550 and armor 50 -> 49. Abomination is
+// fielded across the seeded draws and the Wyvern's aura prices real damage, so any trace holding
+// either diverges from that point on. Two isolated runs reproduced this value byte-identically.
+// Previous approved digest: 2d3e9727f3c79de48196b3d48a35c7855dab172406739a942c9afdc2d69ec2ed
+const EXPECTED_REPLAY_SHA256 = "5d5b7a69138fa716091e005b8850228e1118adbcc7264742a8a72b20bfa11a47";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

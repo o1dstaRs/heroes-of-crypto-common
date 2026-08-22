@@ -11,7 +11,7 @@
     "Poison Cloud": {
         "name": "Poison Cloud",
         "range": 2,
-        "desc": "Affected allies apply {}% of their attack damage to the target as Poison. Poisoning an already poisoned enemy stacks: +70% poison damage per stack.",
+        "desc": "Affected allies apply {}% of their attack damage to the target as Poison. Poisoning an already poisoned enemy stacks: +50% poison damage per stack.",
         "power": 15,
         "is_buff": true,
         "power_type": "POISON_ON_HIT"
@@ -139,8 +139,8 @@
     "Venom Cloud": {
         "name": "Venom Cloud",
         "range": 2,
-        "desc": "Affected allies apply {}% of their attack damage to the target as Poison. Poisoning an already poisoned enemy stacks: +70% poison damage per stack.",
-        "power": 30,
+        "desc": "Affected allies apply {}% of their attack damage to the target as Poison. Poisoning an already poisoned enemy stacks: +50% poison damage per stack.",
+        "power": 20,
         "is_buff": true,
         "power_type": "POISON_ON_HIT"
     },
