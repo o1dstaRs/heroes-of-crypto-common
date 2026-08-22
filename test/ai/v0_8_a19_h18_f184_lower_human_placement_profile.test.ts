@@ -600,11 +600,10 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             "tournament-entrant-a-router",
             "battle-engine-search-team-scope",
         ]);
-        // Promotion intentionally changed the registry/search router and the tournament's native control. Those
-        // current bytes are pinned by the production profile; retain these two entries here as immutable
-        // qualification provenance while continuing to verify the unchanged policy implementations.
+        // Promotion intentionally changed the registry/search router and the tournament's native control, and
+        // subsequent shipped policy work changed the generic search driver. Retain those historical entries as
+        // immutable qualification provenance while continuing to verify the unchanged policy implementations.
         const currentImplementationRoles = new Set([
-            "search-driver",
             "armageddon-endgame",
             "boar-battle-mage-flank-placement",
             "compact-placement",

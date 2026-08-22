@@ -40,6 +40,7 @@ import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
+    getPositionForCell,
     getRangeAttackSideCenter,
     isRangeAttackSideObservable,
     RANGE_ATTACK_CELL_SIDES,
@@ -672,6 +673,79 @@ describe("v0.8 candidate policy", () => {
         ];
         const repairedSequence = prioritizeV08ProductiveAction(unit, context, moveThenMine);
         expect(repairedSequence.map((action) => action.type)).toEqual(["move_unit"]);
+    });
+
+    it("attacks cemetery objects with melee and ranged units while keeping living-enemy attacks first", () => {
+        const meleeCombat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        meleeCombat.grid.setScatteredMountains([{ x: 5, y: 7 }]);
+        const meleeFight = FightStateManager.getInstance().getFightProperties();
+        meleeFight.setGridType(PBTypes.GridVals.BLOCK_CENTER);
+        const melee = createTestUnit({ team: LOWER, attackType: MELEE, initiative: 3, name: "Cemetery miner" });
+        const distantEnemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Distant enemy" });
+        placeUnit(meleeCombat.grid, meleeCombat.unitsHolder, melee, { x: 4, y: 7 });
+        placeUnit(meleeCombat.grid, meleeCombat.unitsHolder, distantEnemy, { x: 14, y: 14 });
+        const meleeContext: IDecisionContext = {
+            grid: meleeCombat.grid,
+            matrix: meleeCombat.grid.getMatrix(),
+            unitsHolder: meleeCombat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: meleeCombat.attackHandler,
+            fightProperties: meleeFight,
+        };
+
+        expect(new StrategyV0_8().decideTurn(melee, meleeContext)).toMatchObject([
+            { type: "obstacle_attack", attackFrom: { x: 4, y: 7 } },
+        ]);
+
+        const adjacentEnemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Adjacent enemy" });
+        placeUnit(meleeCombat.grid, meleeCombat.unitsHolder, adjacentEnemy, { x: 4, y: 6 });
+        const enemyFirst = new StrategyV0_8().decideTurn(melee, meleeContext);
+        expect(
+            enemyFirst.some((action) => action.type === "melee_attack" && action.targetId === adjacentEnemy.getId()),
+        ).toBe(true);
+
+        const rangedCombat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        rangedCombat.grid.setScatteredMountains([
+            { x: 10, y: 7 },
+            { x: 5, y: 7 },
+        ]);
+        const rangedFight = FightStateManager.getInstance().getFightProperties();
+        rangedFight.setGridType(PBTypes.GridVals.BLOCK_CENTER);
+        const ranged = createTestUnit({
+            team: LOWER,
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            initiative: 3,
+            name: "Cemetery archer",
+        });
+        const hiddenEnemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Hidden enemy" });
+        hiddenEnemy.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Hidden"), amount: 1 }));
+        placeUnit(rangedCombat.grid, rangedCombat.unitsHolder, ranged, { x: 2, y: 7 });
+        placeUnit(rangedCombat.grid, rangedCombat.unitsHolder, hiddenEnemy, { x: 14, y: 14 });
+        ranged.refreshPossibleAttackTypes(true);
+        const rangedContext: IDecisionContext = {
+            grid: rangedCombat.grid,
+            matrix: rangedCombat.grid.getMatrix(),
+            unitsHolder: rangedCombat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: rangedCombat.attackHandler,
+            fightProperties: rangedFight,
+        };
+        const rangedDecision = new StrategyV0_8().decideTurn(ranged, rangedContext);
+
+        expect(rangedDecision).toEqual([
+            {
+                type: "obstacle_attack",
+                attackerId: ranged.getId(),
+                targetPosition: getPositionForCell(
+                    { x: 5, y: 7 },
+                    testGridSettings.getMinX(),
+                    testGridSettings.getStep(),
+                    testGridSettings.getHalfStep(),
+                ),
+            },
+        ]);
     });
 
     it("replaces legacy BLOCK_CENTER mining with a reachable enemy attack before considering movement", () => {

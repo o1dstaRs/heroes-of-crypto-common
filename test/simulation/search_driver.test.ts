@@ -809,6 +809,39 @@ describe("search driver — gating, hygiene, determinism", () => {
         ]);
     });
 
+    it("preserves a cemetery-object strike instead of treating it as classic mountain mining", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "0",
+            SEARCH_INCLUDE_MOVES: "1",
+        });
+        const harness = buildBattle(91, "v0.8", undefined, undefined, false, PBTypes.GridVals.BLOCK_CENTER);
+        harness.grid.setScatteredMountains([{ x: 7, y: 7 }]);
+        const unit = harness.activeUnit()!;
+        const incumbent: GameAction[] = [
+            {
+                type: "obstacle_attack",
+                attackerId: unit.getId(),
+                targetPosition: getPositionForCell(
+                    { x: 7, y: 7 },
+                    harness.grid.getSettings().getMinX(),
+                    harness.grid.getSettings().getStep(),
+                    harness.grid.getSettings().getHalfStep(),
+                ),
+            },
+        ];
+        const driver = harness.makeDriver() as unknown as {
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+            search(): GameAction[];
+        };
+        driver.search = () => {
+            throw new Error("cemetery strike reached horizon search");
+        };
+
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).toBe(incumbent);
+    });
+
     it("A19 repairs a hard passive only with a nonregressive productive rollout", () => {
         setEnv({
             V07_SEARCH: "1",

@@ -101,7 +101,8 @@ const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbility
  *                      charge — exposed as an opportunity-cost feature), Valkyrie's Wind Flow
  *                      (ALL_FLYING mass), Harpy's Castling (ENEMY_WITHIN_MOVEMENT_RANGE), plus
  *                      heals/buffs/debuffs/summons
- *      mine          — one deterministic reachable melee strike against an intact BLOCK_CENTER mountain
+ *      mine          — one deterministic reachable strike against a BLOCK_CENTER obstacle (melee for classic
+ *                      mountains; melee or ranged for the one-hit objects in a scattered/cemetery layout)
  *      defend        — luck shield (always legal for the acting unit)
  *      wait          — hourglass, when the engine would accept it
  *    Mountain challengers are opt-in so versions predating v0.8 retain their exact candidate set.
@@ -1537,23 +1538,26 @@ class CandidateGenerator {
         const best = strikes[0];
         return best ? { attackFrom: best.attackFrom, targetCell: best.targetCell, route: best.route } : undefined;
     }
-    /** One deterministic, engine-legal melee strike against an intact BLOCK_CENTER mountain. */
+    /** One deterministic, engine-legal strike against an intact BLOCK_CENTER obstacle. */
     private addMountainAttack(): void {
         if (!this.options.includeMountainAttacks) {
             return;
         }
         const { attackHandler, fightProperties, grid, unitsHolder } = this.context;
+        const scattered = grid.hasScatteredMountains();
+        const standingScattered = scattered ? grid.getScatteredMountainsStanding() : [];
         if (
             !attackHandler ||
             !fightProperties ||
             grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
             fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
-            fightProperties.getObstacleHitsLeft() <= 0 ||
+            (scattered ? standingScattered.length <= 0 : fightProperties.getObstacleHitsLeft() <= 0) ||
             this.unit.isDead() ||
-            !this.unit.canMove() ||
-            this.unit.getAttackType() === RANGE ||
-            this.unit.getAttackTypeSelection() === RANGE ||
-            !this.canMelee()
+            (!scattered &&
+                (!this.unit.canMove() ||
+                    this.unit.getAttackType() === RANGE ||
+                    this.unit.getAttackTypeSelection() === RANGE ||
+                    !this.canMelee()))
         ) {
             return;
         }
@@ -1563,15 +1567,60 @@ class CandidateGenerator {
             return;
         }
 
+        const settings = grid.getSettings();
+        const targetPositionFor = (cell: XY): XY =>
+            getPositionForCell(cell, settings.getMinX(), settings.getStep(), settings.getHalfStep());
+
+        // Cemetery objects are individually targetable one-hit obstacles. A shooter with a legal ranged attack
+        // should clear the nearest standing object instead of treating the whole layout like the classic two-sided
+        // mountain. The authoritative handler traces the projectile and removes the first stone on that ray.
+        if (scattered && this.canShoot(attackHandler)) {
+            const base = this.unit.getBaseCell();
+            let targetCell = standingScattered[0];
+            let targetDistance = Number.POSITIVE_INFINITY;
+            for (const cell of standingScattered) {
+                const distance = Math.abs(cell.x - base.x) + Math.abs(cell.y - base.y);
+                if (distance < targetDistance) {
+                    targetCell = cell;
+                    targetDistance = distance;
+                }
+            }
+            if (!targetCell) {
+                return;
+            }
+            const actions: GameAction[] = [
+                ...this.rangePrefix(),
+                {
+                    type: "obstacle_attack",
+                    attackerId: this.unit.getId(),
+                    targetPosition: targetPositionFor(targetCell),
+                },
+            ];
+            this.push({
+                kind: "mine",
+                actions,
+                targetCell: { x: targetCell.x, y: targetCell.y },
+                standCell: { x: base.x, y: base.y },
+                features: this.features({ spendsRangeShot: 1 }),
+            });
+            return;
+        }
+
+        if (!this.unit.canMove() || this.unit.getAttackTypeSelection() === RANGE || !this.canMelee()) {
+            return;
+        }
+
         const mid = grid.getSettings().getGridSize() >> 1;
         const strike = this.mountainMeleeStrike(
-            grid
-                .getCenterCells(true)
-                .filter((cell) =>
-                    cell.x >= mid
-                        ? fightProperties.getObstacleHitsLeftRight() > 0
-                        : fightProperties.getObstacleHitsLeftLeft() > 0,
-                ),
+            scattered
+                ? standingScattered
+                : grid
+                      .getCenterCells(true)
+                      .filter((cell) =>
+                          cell.x >= mid
+                              ? fightProperties.getObstacleHitsLeftRight() > 0
+                              : fightProperties.getObstacleHitsLeftLeft() > 0,
+                      ),
         );
         if (!strike) {
             return;
@@ -1583,13 +1632,7 @@ class CandidateGenerator {
         if (!inPlace && !route?.route.length) {
             return;
         }
-        const settings = grid.getSettings();
-        const targetPosition = getPositionForCell(
-            strike.targetCell,
-            settings.getMinX(),
-            settings.getStep(),
-            settings.getHalfStep(),
-        );
+        const targetPosition = targetPositionFor(strike.targetCell);
         const actions: GameAction[] = [
             {
                 type: "obstacle_attack",
