@@ -2053,6 +2053,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public canBeHealed(): boolean {
         return !this.hasAbilityActive("Mechanism");
     }
+    // Mechanism constructs are machines: the Mechanism ability text promises immunity to poison, and there is
+    // nothing alive in them for a damage-over-time to corrode. Enforced at the applyPoisonEffect chokepoint.
+    public canBePoisoned(): boolean {
+        return !this.hasAbilityActive("Mechanism");
+    }
     // Total Deep Wounds a unit applies in one hit. The cards STACK — their base powers sum — but the flat
     // terms (luck, the team's synergy ability power) apply once to the UNIT, not once per card: a White Tiger
     // carrying the Wounding Charm's Level 1 on top of its native Level 2 adds its luck a single time. Floored

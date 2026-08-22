@@ -42,9 +42,12 @@ const poisonStackIncrement = (poisonHp: number): number => Math.max(1, Math.roun
  * The first poison sets the tick outright. Every later one stacks: the tick grows by POISON_STACK_SHARE of
  * the incoming poison, and never drops below the strongest single poison the target has been dealt — so a
  * big hit landing on a weak stack still rebases the tick upwards instead of only adding its 35%.
+ *
+ * Targets that cannot be poisoned at all (Mechanism constructs, per canBePoisoned) drop the effect here, so
+ * every route in — direct hits, Poison/Venom Cloud auras, AOE and line attacks — is covered by one guard.
  */
 export function applyPoisonEffect(targetUnit: Unit, poisonHp: number, sceneLog: ISceneLog): void {
-    if (targetUnit.isDead() || poisonHp <= 0) {
+    if (targetUnit.isDead() || poisonHp <= 0 || !targetUnit.canBePoisoned()) {
         return;
     }
 
