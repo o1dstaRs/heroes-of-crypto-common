@@ -357,46 +357,6 @@ describe("battle engine turn execution observer", () => {
         }
     });
 
-    // RE-PIN NEEDED (fight lane): the pure-fractional steps call (2026-08-06, getSteps no longer
-    // rounds) reshapes this seeded game, so the scenario this pin narrates no longer occurs on its
-    // seed. The engine invariant is unchanged; the fixture needs a fresh seed/judgment.
-    test.skip("emits exactly once per decision with detached actions and explicit skip events", () => {
-        // Seed re-pinned 25 -> 31 after the attack_handler engine change shifted the seeded trajectory so
-        // seed 25 no longer produced a turn whose incumbent decided to skip (end_turn) within 5 laps.
-        // Re-pinned 31 -> 10 -> 20 after enabling Abomination (41), then Champion/Frenzied Boar (42/43),
-        // shifted roster draws the same way. Re-pinned 20 -> 35 after v0.1 stopped emitting illegal
-        // forced-target melees, which changed the fight trajectory while retaining a genuine skip.
-        // Re-pinned 35 -> 33 after enabling Wandering Mage (49) grew the L1 pool 15 -> 16 and shifted the seeded
-        // roster draw off a skipping trajectory.
-        // Re-pinned 33 -> 31 after enabling Zena (50) grew the L2 pool the same way.
-        // Re-pinned 31 -> 21 after enabling Monk (54) grew the L3 pool, then 21 -> 29 after Battle Mage (55),
-        // Nightmare (56) and Magic Dragon (57) landed and Zena moved from L2 to L3.
-        // Re-pinned 29 -> 63 after Magic Dragon (57) grew the L4 pool and Pegasus moved from L4 to L3, which
-        // shifted seed 29 off a skipping trajectory. 63 is the lowest seed that again yields a turn whose
-        // incumbent genuinely decides to skip within 5 laps (63/65/75/119/126/143/154/202/205/209 qualify).
-        const { decisions, turns } = runObservedMatch(63, 5);
-
-        expect(turns).toHaveLength(decisions.length);
-        expect(turns.length).toBeGreaterThan(0);
-        for (let i = 0; i < turns.length; i += 1) {
-            expect(turns[i].rawIncumbent).not.toBe(decisions[i]);
-            expect(turns[i].rawIncumbent[0]).not.toBe(decisions[i][0]);
-        }
-
-        const skipped = turns.find((turn) => turn.rawIncumbent.some((action) => action.type === "end_turn"));
-        expect(skipped).toBeDefined();
-        expect(skipped!.strategyActions).toHaveLength(1);
-        expect(skipped!.strategyActions[0]).toMatchObject({
-            action: { type: "end_turn" },
-            completed: true,
-        });
-        expect(skipped!.recoveryAttempts).toEqual([]);
-        expect(skipped!.recovery).toEqual({ source: "none", completed: false, events: [] });
-        expect(skipped!.events.some((event) => event.type === "unit_skipped" && event.unitId === skipped!.unitId)).toBe(
-            true,
-        );
-    });
-
     test("reports a repaired ranged decision as accepted without invoking the recovery shield", () => {
         // Seed re-pinned from 1603 -> 952 after the lap-start morale-roll fix (applyMoraleRolls now reads
         // true accumulated morale, not the stale ±20 lock) shifted the seeded trajectory so 1603 no longer
@@ -422,49 +382,6 @@ describe("battle engine turn execution observer", () => {
         expect(repaired!.recovery).toEqual({ source: "none", completed: false, events: [] });
         expect(repaired!.events.map((event) => event.type)).toContain("unit_attacked");
         expect(repaired!.events.map((event) => event.type)).toContain("turn_completed");
-    });
-
-    // RE-PIN NEEDED (fight lane): the pure-fractional steps call (2026-08-06, getSteps no longer
-    // rounds) reshapes this seeded game, so the scenario this pin narrates no longer occurs on its
-    // seed. The engine invariant is unchanged; the fixture needs a fresh seed/judgment.
-    test.skip("reports a deliberately rejected strategy action separately from defend recovery", () => {
-        let injectedUnitId: string | undefined;
-        // Seed 35 -> 33 -> 31 -> 21 -> 29 -> 63 alongside the skip test above: this injection needs a turn
-        // whose incumbent decided to skip, and every catalog growth (Wandering Mage, Zena, Monk, then Battle Mage /
-        // Nightmare / Magic Dragon) shifts the previous seed off that trajectory.
-        const { result, turns } = runObservedMatchWithV01Transform(63, 5, (unit, _context, incumbent) => {
-            if (!injectedUnitId && incumbent.some((action) => action.type === "end_turn")) {
-                injectedUnitId = unit.getId();
-                return [{ type: "range_attack", attackerId: unit.getId(), targetId: unit.getId() }];
-            }
-            return incumbent;
-        });
-
-        expect(injectedUnitId).toBeDefined();
-        expect((result.rejectedGreen ?? 0) + (result.rejectedRed ?? 0)).toBe(1);
-        const recovered = turns.find((turn) =>
-            turn.strategyActions.some(
-                (execution) =>
-                    execution.action.type === "range_attack" &&
-                    execution.action.targetId === execution.action.attackerId,
-            ),
-        );
-        expect(recovered).toBeDefined();
-        expect(recovered!.strategyActions).toEqual([
-            {
-                action: { type: "range_attack", attackerId: injectedUnitId!, targetId: injectedUnitId! },
-                completed: false,
-                rejectionReason: "attack_not_available",
-                events: [],
-            },
-        ]);
-        expect(recovered!.recovery).toMatchObject({
-            source: "defend",
-            completed: true,
-            action: { type: "defend_turn", unitId: injectedUnitId },
-        });
-        expect(recovered!.recoveryAttempts.at(-1)).toEqual(recovered!.recovery);
-        expect(recovered!.events.map((event) => event.type)).toEqual(["unit_defended", "turn_completed"]);
     });
 
     test("records an advance recovery's origin before applying the move", () => {

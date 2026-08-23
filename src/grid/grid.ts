@@ -790,7 +790,6 @@ export class Grid {
             updateMatrixElementIfExists(aggrGrid, cell.y, cell.x, updBy);
         }
     }
-
     private updateAggrGrid(
         cell: XY,
         range: number,

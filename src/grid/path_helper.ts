@@ -1764,7 +1764,6 @@ export class PathHelper {
             isMadeOfFire,
         );
     }
-
     /** Pathfinding for fixed non-square footprints such as 2x1 creatures. The anchor is always top-right. */
     private getRectangularMovePath(
         currentCell: XY,
