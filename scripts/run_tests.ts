@@ -13,17 +13,22 @@ import { availableParallelism } from "node:os";
 import { resolve } from "node:path";
 
 export const MAX_TEST_WORKERS = 12;
+export const MAX_CI_TEST_WORKERS = 2;
 
-export function testWorkerCount(availableWorkers: number): number {
+export function testWorkerCount(availableWorkers: number, isCi = false): number {
     if (!Number.isSafeInteger(availableWorkers) || availableWorkers < 1) {
         throw new Error(`Available test workers must be a positive safe integer; got ${availableWorkers}`);
     }
-    return Math.min(MAX_TEST_WORKERS, availableWorkers);
+    // Several simulation files spawn their own Bun processes. Four-way file parallelism on GitHub's
+    // four-core runner therefore oversubscribes the machine and intermittently starves those children
+    // until their 30s/120s watchdogs fire. Two files at a time keeps those watchdogs meaningful while
+    // local development still uses every performance core up to the workstation cap.
+    return Math.min(isCi ? MAX_CI_TEST_WORKERS : MAX_TEST_WORKERS, availableWorkers);
 }
 
 if (import.meta.main) {
     const repositoryRoot = resolve(import.meta.dir, "..");
-    const workers = testWorkerCount(availableParallelism());
+    const workers = testWorkerCount(availableParallelism(), process.env.CI === "true");
     const result = Bun.spawnSync({
         cmd: [
             process.execPath,

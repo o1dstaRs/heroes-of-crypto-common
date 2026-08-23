@@ -11,7 +11,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { MAX_TEST_WORKERS, testWorkerCount } from "../../scripts/run_tests";
+import { MAX_CI_TEST_WORKERS, MAX_TEST_WORKERS, testWorkerCount } from "../../scripts/run_tests";
 
 describe("common test worker selection", () => {
     test("uses the host capacity up to the performance-core cap", () => {
@@ -19,6 +19,12 @@ describe("common test worker selection", () => {
         expect(testWorkerCount(4)).toBe(4);
         expect(testWorkerCount(MAX_TEST_WORKERS)).toBe(MAX_TEST_WORKERS);
         expect(testWorkerCount(16)).toBe(MAX_TEST_WORKERS);
+    });
+
+    test("leaves capacity for child-process simulations on CI", () => {
+        expect(testWorkerCount(1, true)).toBe(1);
+        expect(testWorkerCount(4, true)).toBe(MAX_CI_TEST_WORKERS);
+        expect(testWorkerCount(16, true)).toBe(MAX_CI_TEST_WORKERS);
     });
 
     test("rejects invalid host capacity instead of silently disabling tests", () => {
