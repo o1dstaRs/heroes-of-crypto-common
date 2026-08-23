@@ -20,7 +20,15 @@ import type { Unit } from "../units/unit";
 import type { UnitsHolder } from "../units/units_holder";
 import type { XY } from "../utils/math";
 
-const footprintCells = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
+const footprintCells = (unit: Unit, base: XY): XY[] =>
+    unit.isSmallSize()
+        ? [{ x: base.x, y: base.y }]
+        : [
+              { x: base.x, y: base.y },
+              { x: base.x - 1, y: base.y },
+              { x: base.x, y: base.y - 1 },
+              { x: base.x - 1, y: base.y - 1 },
+          ];
 
 /** A guaranteed-legal move toward the nearest enemy for recovering a rejected/no-op policy decision. */
 export function advanceTowardEnemyAction(
@@ -46,8 +54,6 @@ export function advanceTowardEnemyAction(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
-        unit.getFootprintWidth(),
-        unit.getFootprintHeight(),
     );
     if (!movePath.knownPaths.size) {
         return undefined;

@@ -212,13 +212,28 @@ export const FIREFORGED_SWORD_WATER_MULTIPLIER = 1.5;
 export const FIRE_AGAINST_WATER_MULTIPLIER = FIREFORGED_SWORD_WATER_MULTIPLIER;
 
 /**
+ * What an element deals to the one it COUNTERS: half again as much, in both directions of the pair.
+ *
+ * The elements sit in two opposed pairs — fire against water, earth against wind — and the ability cards
+ * have always said so from the defending side: Fire Element reads "Water attacks deal 50% more damage",
+ * Water Element reads the same of fire, Wind Element reads "Earth attacks deal 50% more damage", and Earth
+ * Element reads the same of wind (the four MAGIC_VULNERABILITY_* types, each at power 50). Only the
+ * fire-against-water half was originally wired up, so the other three were promises the game did not keep.
+ */
+export const ELEMENT_COUNTER_MULTIPLIER = 1.5;
+
+/**
  * How much of an elemental spell a target actually takes, before magic resistance.
  *
- * The rules are not new — they are the ones already written into the abilities: a Fire Element IS the fire
- * and cannot be burned (Fire Shield, Fire Breath, the Fireforged blade all say so), a Water Element takes
- * fire half again as hard, and a Wind Element lets lightning pass straight through (Chain Lightning skips
- * it outright). Water spells wash over a Water Element for the same reason fire cannot burn a Fire Element.
- * An elementless spell — anything not explicitly tagged in configuration — is unaffected and returns 1.
+ * Two rules, applied in order, and neither is new — both are already written into the ability cards:
+ *
+ *   IMMUNITY  a creature cannot be hurt by the element it IS. A Fire Element cannot be burned (Fire
+ *             Shield, Fire Breath and the Fireforged blade all say so), a Wind Element lets lightning
+ *             pass straight through (Chain Lightning skips it outright), and so on round the table.
+ *   COUNTER   the elements sit in two opposed pairs — fire against water, earth against wind — and each
+ *             deals ELEMENT_COUNTER_MULTIPLIER to the one it counters, in BOTH directions.
+ *
+ * An elementless spell — most of the book — is unaffected and returns 1.
  *
  * Pure and Unit-free so the spellbook card, the hover preview, the engine and the tests all price an
  * elemental hit identically.
@@ -228,10 +243,11 @@ export function elementalSpellMultiplier(params: {
     targetIsFireElement: boolean;
     targetIsWaterElement: boolean;
     targetIsWindElement: boolean;
-    /** Compatibility with callers that already report the fourth elemental flag. */
+    /** Optional for compatibility with older callers written before Earth Element joined the roster. */
     targetIsEarthElement?: boolean;
 }): number {
     const { element, targetIsFireElement, targetIsWaterElement, targetIsWindElement } = params;
+    const targetIsEarthElement = !!params.targetIsEarthElement;
     if (element === SpellElement.FIRE) {
         if (targetIsFireElement) {
             return 0;
@@ -239,15 +255,36 @@ export function elementalSpellMultiplier(params: {
         return targetIsWaterElement ? FIRE_AGAINST_WATER_MULTIPLIER : 1;
     }
     if (element === SpellElement.WATER) {
-        return targetIsWaterElement ? 0 : 1;
+        if (targetIsWaterElement) {
+            return 0;
+        }
+        return targetIsFireElement ? ELEMENT_COUNTER_MULTIPLIER : 1;
     }
     if (element === SpellElement.AIR) {
-        return targetIsWindElement ? 0 : 1;
+        if (targetIsWindElement) {
+            return 0;
+        }
+        return targetIsEarthElement ? ELEMENT_COUNTER_MULTIPLIER : 1;
+    }
+    if (element === SpellElement.EARTH) {
+        if (targetIsEarthElement) {
+            return 0;
+        }
+        return targetIsWindElement ? ELEMENT_COUNTER_MULTIPLIER : 1;
     }
     return 1;
 }
 
-/** Maximum pre-resist value an elemental spell can reach against any elemental target. */
+/**
+ * The MOST `rawDamage` of a spell can become against any creature on the board, before magic resistance:
+ * half again as much for an elemental spell that meets the element it counters, and the bare figure for the
+ * rest of the book.
+ *
+ * The spellbook card needs this because it is read BEFORE a target is chosen, so the only honest thing it
+ * can print is the band — 0 (the element that shrugs the spell off, or a fully resistant target) up to this.
+ * Derived by probing {@link elementalSpellMultiplier} with each element in turn rather than by hard-coding
+ * the counter pairs, so the day the table changes the card changes with it.
+ */
 export function maximumElementalSpellDamage(rawDamage: number, element: SpellElement): number {
     const elementFlags: Array<Partial<Parameters<typeof elementalSpellMultiplier>[0]>> = [
         {},
@@ -265,6 +302,7 @@ export function maximumElementalSpellDamage(rawDamage: number, element: SpellEle
             targetIsWindElement: false,
             ...flags,
         });
+
         return Math.max(most, applyElementAndResistToSpellDamage(rawDamage, multiplier, 0));
     }, 0);
 }
@@ -287,20 +325,33 @@ export function fireforgedSwordDamage(params: {
     targetMagicResist: number;
     targetIsFireElement: boolean;
     targetIsWaterElement: boolean;
-    /** Accepted for compatibility; the current fire/water rules remain authoritative. */
     targetIsWindElement?: boolean;
     targetIsEarthElement?: boolean;
 }): number {
-    const { damageDealt, swordPercentage, targetMagicResist, targetIsFireElement, targetIsWaterElement } = params;
-    if (targetIsFireElement || targetMagicResist >= 100) {
+    const { damageDealt, swordPercentage, targetMagicResist } = params;
+    if (targetMagicResist >= 100) {
         return 0;
     }
     if (!(damageDealt > 0) || !(swordPercentage > 0)) {
         return 0;
     }
 
-    const burn = (damageDealt * swordPercentage) / 100;
-    const scaled = targetIsWaterElement ? burn * FIREFORGED_SWORD_WATER_MULTIPLIER : burn;
+    // The burning edge IS fire, so it is priced by the one element table the rest of the game reads
+    // rather than by a private copy of the fire rule. That table is what decides a Fire Element target
+    // shrugs it off entirely and a Water Element one takes half again as much; when the table changes,
+    // the sword changes with it instead of quietly keeping the old pairing.
+    const elementMultiplier = elementalSpellMultiplier({
+        element: SpellElement.FIRE,
+        targetIsFireElement: params.targetIsFireElement,
+        targetIsWaterElement: params.targetIsWaterElement,
+        targetIsWindElement: !!params.targetIsWindElement,
+        targetIsEarthElement: !!params.targetIsEarthElement,
+    });
+    if (elementMultiplier <= 0) {
+        return 0;
+    }
 
-    return applyMagicResistToSpellDamage(Math.floor(scaled), targetMagicResist);
+    const burn = (damageDealt * swordPercentage) / 100;
+
+    return applyMagicResistToSpellDamage(Math.floor(burn * elementMultiplier), targetMagicResist);
 }

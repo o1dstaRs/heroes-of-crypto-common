@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { Perk, getUpgradePoints } from "../../perks/perk_properties";
+import { Doctrine, getUpgradePoints } from "../../doctrines/doctrine_properties";
 import { SetupPolicyV0 } from "./setup_v0";
 
 /**
@@ -17,12 +17,12 @@ import { SetupPolicyV0 } from "./setup_v0";
  * learned weight vector injected at runtime). The ANCHOR — an all-zero vector — reproduces SetupPolicyV0
  * exactly, so gen-1 of a CEM run never regresses below the shipped heuristic (incumbency, as v0.5 did).
  *
- * Two interacting decisions are learned (the ones a per-axis greedy can't jointly optimise): the perk
+ * Two interacting decisions are learned (the ones a per-axis greedy can't jointly optimise): the doctrine
  * (its upgrade-point budget) and how that budget is split across augment categories. Artifacts + synergies
  * stay on the measured-best greedy (independent choices — greedy is already optimal there).
  *
  * Weight layout (SETUP_WEIGHT_DIM = 7):
- *   [0..2] perk bias for [THREE_REVEALS, SEE_ALL, SEE_NONE] — added to each perk's budget score.
+ *   [0..2] doctrine bias for [THREE_REVEALS, SEE_ALL, SEE_NONE] — added to each doctrine's budget score.
  *   [3..6] augment-category value nudge for [Armor, Might, Sniper, Movement] — added to the measured base
  *          advantage; a category is bought (highest affordable level) while its nudged value clears a
  *          threshold, in descending value order, until the budget is spent.
@@ -48,12 +48,12 @@ const AUGMENT_MAX_LEVEL: Record<"Armor" | "Might" | "Sniper" | "Movement", numbe
 };
 const AUGMENT_VALUE_THRESHOLD = 10; // anchor: only Armor(+19)/Might(+15) clear it; Sniper(+7)/Movement don't.
 
-const PERKS: Perk[] = [Perk.THREE_REVEALS, Perk.SEE_ALL, Perk.SEE_NONE];
+const DOCTRINES: Doctrine[] = [Doctrine.THREE_REVEALS, Doctrine.SEE_ALL, Doctrine.SEE_NONE];
 
 /**
  * Baked setup vector — CEM self-play champion (agent-zinc node, 2026-07-05): decisive win rate 57.8% on a
  * held-out seed vs the all-zero heuristic anchor (+7.8pp), CEM_DIM=7 POP=12 GENS=12 GAMES=3000. Steers the
- * perk away from THREE_REVEALS ([0..2]) and lifts Sniper past the augment buy threshold ([3..6]). This is the
+ * doctrine away from THREE_REVEALS ([0..2]) and lifts Sniper past the augment buy threshold ([3..6]). This is the
  * DEFAULT when no V05_SETUP_WEIGHTS env is set — the anchor is now the trained policy, not the raw heuristic.
  * To recover the pre-training heuristic for an A/B, pass V05_SETUP_WEIGHTS='[0,0,0,0,0,0,0]'.
  */
@@ -84,15 +84,15 @@ export class SetupPolicyWeighted extends SetupPolicyV0 {
         super();
         this.w = weights.length >= SETUP_WEIGHT_DIM ? weights : [...weights, ...new Array(SETUP_WEIGHT_DIM).fill(0)];
     }
-    /** Perk maximising (upgrade-point budget + learned bias). Anchor → SEE_NONE (max budget). */
-    public override pickPerk(): number {
-        let best = PERKS[0];
+    /** Doctrine maximising (upgrade-point budget + learned bias). Anchor → SEE_NONE (max budget). */
+    public override pickDoctrine(): number {
+        let best = DOCTRINES[0];
         let bestScore = -Infinity;
-        PERKS.forEach((perk, i) => {
-            const score = getUpgradePoints(perk) + this.w[i];
+        DOCTRINES.forEach((doctrine, i) => {
+            const score = getUpgradePoints(doctrine) + this.w[i];
             if (score > bestScore) {
                 bestScore = score;
-                best = perk;
+                best = doctrine;
             }
         });
         return best;

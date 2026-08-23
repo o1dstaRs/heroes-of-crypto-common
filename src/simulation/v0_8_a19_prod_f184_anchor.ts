@@ -11,7 +11,7 @@
 
 import { augmentPlanId, setupAugmentsForPlan, type IAugmentPlan } from "../ai/setup/setup_ship";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { Perk } from "../perks/perk_properties";
+import { Doctrine } from "../doctrines/doctrine_properties";
 import { ChaosSynergy, LifeSynergy, MightSynergy, NatureSynergy } from "../synergies/synergy_properties";
 import { hashSimulationParts, type IArmyUnitSpec } from "./army";
 import { chooseMetaArmy, type IAiMetaArmy } from "./ai_meta_cohorts_core";
@@ -26,7 +26,7 @@ interface IRecordedArmySetup {
     readonly roster: readonly IArmyUnitSpec[];
     readonly artifactT1: number;
     readonly artifactT2: number;
-    readonly perk: Perk;
+    readonly doctrine: Doctrine;
     /** Recorded Empower augment; zero and therefore absent from the legacy simulation setup wire. */
     readonly empower: 0;
     readonly augmentPlan: Readonly<IAugmentPlan>;
@@ -45,7 +45,7 @@ const LOWER_SETUP: IRecordedArmySetup = Object.freeze({
     ]),
     artifactT1: 10,
     artifactT2: 4,
-    perk: Perk.SEE_NONE,
+    doctrine: Doctrine.SEE_NONE,
     empower: 0,
     augmentPlan: Object.freeze({ placement: 0, armor: 3, might: 3, sniper: 1, movement: 0 }),
     synergies: Object.freeze([
@@ -66,7 +66,7 @@ const UPPER_SETUP: IRecordedArmySetup = Object.freeze({
     ]),
     artifactT1: 8,
     artifactT2: 9,
-    perk: Perk.SEE_NONE,
+    doctrine: Doctrine.SEE_NONE,
     empower: 0,
     augmentPlan: Object.freeze({ placement: 0, armor: 3, might: 3, sniper: 0, movement: 1 }),
     synergies: Object.freeze([
@@ -117,7 +117,7 @@ export const V08_A19_PROD_F184_ANCHOR = Object.freeze({
 /**
  * SHA-256 of JSON.stringify(V08_A19_PROD_F184_ANCHOR), verified by the harness tests.
  *
- * Re-pinned for the perk -> perk rename: the anchor's VALUES are untouched (still Perk.SEE_NONE
+ * Re-pinned for the perk -> doctrine rename: the anchor's VALUES are untouched (still Doctrine.SEE_NONE
  * on both seats) — only the field name inside the object moved, which JSON.stringify includes in the
  * bytes it hashes. The recorded production setup itself is unchanged.
  */
@@ -148,7 +148,7 @@ const recordedArmy = (setup: IRecordedArmySetup, opponent: IRecordedArmySetup, s
             propensity: 1,
             contextualScore: 0,
         },
-        perk: setup.perk,
+        doctrine: setup.doctrine,
         synergies: setup.synergies.map(({ faction, synergy }) => ({ faction, synergy })),
     };
 };

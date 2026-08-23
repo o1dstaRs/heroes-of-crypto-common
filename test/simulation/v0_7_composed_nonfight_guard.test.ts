@@ -282,7 +282,7 @@ describe("ranked conditional dual-genome compatibility", () => {
         });
         expect(mixed.lower.creatureIds).not.toEqual(historical.lower.creatureIds);
         // Re-pinned after Blacksmith expanded the Life L1 catalog and shifted the seeded round-3 draft picks.
-        // Re-pinned again after Wandering Mage (Chaos L1) grew the L1 pool 15 -> 16, shifting the same draw.
+        // Re-pinned again after Ash Moth (Chaos L1) grew the L1 pool 15 -> 16, shifting the same draw.
         // Re-pinned again after Zena (50) grew the L2 pool, which swaps 36 for her in the same seeded draw.
         // Re-pinned again after Wyvern (51) and Trent (52) grew that pool 13 -> 15; Trent takes the slot
         // Zena held, in the same seeded draw.

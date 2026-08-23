@@ -494,8 +494,8 @@ describe("measure_mirror_cohorts", () => {
         expect(signature(configs[0].roster)).toEqual(signature(configs[0].redRoster!));
         expect(signature(configs[1].roster)).toEqual(signature(configs[0].roster));
         expect(configs[0].roster).not.toBe(configs[0].redRoster);
-        expect(configs[0].greenPerk).toBe(expectedSetup.perk);
-        expect(configs[0].redPerk).toBe(expectedSetup.perk);
+        expect(configs[0].greenDoctrine).toBe(expectedSetup.doctrine);
+        expect(configs[0].redDoctrine).toBe(expectedSetup.doctrine);
         expect(configs[0].greenAugments).toEqual(expectedSetup.augments);
         expect(configs[0].redAugments).toEqual(expectedSetup.augments);
     });

@@ -84,7 +84,15 @@ const LEARNED_VALUE: { b: number; w: number[] } | null = (() => {
 const otherTeam = (team: TeamType): TeamType => (team === LOWER ? UPPER : LOWER);
 const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbilityActive("Hidden");
 
-const footprintForBase = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
+const footprintForBase = (unit: Unit, base: XY): XY[] =>
+    unit.isSmallSize()
+        ? [{ x: base.x, y: base.y }]
+        : [
+              { x: base.x, y: base.y },
+              { x: base.x - 1, y: base.y },
+              { x: base.x, y: base.y - 1 },
+              { x: base.x - 1, y: base.y - 1 },
+          ];
 
 /** Everything the driver needs from the (closure-heavy) battle_engine loop it plugs into. */
 export interface ILookaheadDeps {
@@ -271,8 +279,6 @@ export class LookaheadDriver {
                 unit.isSmallSize(),
                 unit.canTraverseLava(),
                 unit.hasAbilityActive("In Its Own World"),
-                unit.getFootprintWidth(),
-                unit.getFootprintHeight(),
             );
             for (const e of enemies) {
                 if (usedTargets.has(e.getId())) {

@@ -40,7 +40,7 @@ describe("pick_helper", () => {
         const levelOne = creatureIdsForLevel(1);
         const levelFour = creatureIdsForLevel(4);
 
-        // L1 has a 16-creature pool (Mermaid + Dryad + Blacksmith, and now Wandering Mage) and both teams may
+        // L1 has a 16-creature pool (Mermaid + Dryad + Blacksmith, and now Ash Moth) and both teams may
         // pick 2 each (4 reserved): the 12th ban is the last legal one, so with 12 already banned a 13th
         // is refused (it would strand a pick). A sentinel-inflated bucket would wrongly allow it, so
         // this still pins the bucket size.

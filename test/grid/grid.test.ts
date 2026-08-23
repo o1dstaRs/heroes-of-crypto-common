@@ -3,23 +3,8 @@ import { Grid } from "../../src/grid/grid";
 import { GridSettings } from "../../src/grid/grid_settings";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { ObstacleType } from "../../src/obstacles/obstacle_type";
-import { getPositionForCells } from "../../src/grid/grid_math";
-import { createTestUnit, testGridSettings } from "../helpers/combat";
 
 describe("Grid Aggregation Matrix Tests", () => {
-    test("a 2x1 unit occupies exactly two horizontal cells", () => {
-        const unit = createTestUnit({ footprintWidth: 2, footprintHeight: 1 });
-        const position = getPositionForCells(testGridSettings, [
-            { x: 4, y: 5 },
-            { x: 5, y: 5 },
-        ]);
-        expect(position).toBeDefined();
-        unit.setPosition(position!.x, position!.y);
-        expect(unit.getCells()).toEqual([
-            { x: 5, y: 5 },
-            { x: 4, y: 5 },
-        ]);
-    });
     let grid: Grid;
     let gridSettings: GridSettings;
 

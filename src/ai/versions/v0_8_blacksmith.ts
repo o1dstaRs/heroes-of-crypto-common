@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { hasDoubleShotAbility } from "../../abilities/ability_helper";
 import { evaluateAffectedUnits } from "../../abilities/aoe_range_ability";
 import type { GameAction } from "../../engine/actions";
 import { isSpellUsableByCaster } from "../../spells/spell_helper";
@@ -54,7 +55,15 @@ const craftCells = (anchor: XY): XY[] => [
     { x: anchor.x + 1, y: anchor.y + 1 },
 ];
 
-const footprintForBase = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
+const footprintForBase = (unit: Unit, base: XY): XY[] =>
+    unit.isSmallSize()
+        ? [{ x: base.x, y: base.y }]
+        : [
+              { x: base.x, y: base.y },
+              { x: base.x - 1, y: base.y },
+              { x: base.x, y: base.y - 1 },
+              { x: base.x - 1, y: base.y - 1 },
+          ];
 
 const footprintDistance = (left: readonly XY[], right: readonly XY[]): number => {
     let closest = Infinity;
@@ -81,7 +90,7 @@ export function v08BlacksmithCraftRecipientValue(unit: Unit): number {
     const output = perActivation * activations;
     const rangedCraft = unit.getRangeShots() > 0;
     const alreadyHasCraftDouble = rangedCraft
-        ? unit.hasAbilityActive("Double Shot") || unit.hasAbilityActive("Crafted Double Shot")
+        ? hasDoubleShotAbility(unit)
         : unit.hasAbilityActive("Double Punch") || unit.hasAbilityActive("Crafted Double Punch");
     // Craft's 40% double roll is a no-op when the matching native/crafted double is already active. Retain the
     // other 60% of the recipient's value: in particular, the independent Frozen outcome remains useful.

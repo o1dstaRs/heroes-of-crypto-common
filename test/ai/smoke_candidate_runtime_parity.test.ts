@@ -26,7 +26,7 @@ import { traceGridRayCells } from "../../src/grid/ray_traversal";
 import type { IRangeAttackEvaluation } from "../../src/handlers/attack_handler";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
-import { isSmokeableCell } from "../../src/spells/smoke_clouds";
+import { isSmokeableCell, SmokeClouds } from "../../src/spells/smoke_clouds";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import {
@@ -44,7 +44,7 @@ const RANGE = PBTypes.AttackVals.RANGE;
 function nativeAshMoth(): Unit {
     const effectFactory = new EffectFactory();
     return Unit.createUnit(
-        getCreatureConfig(LOWER, "Chaos", "Wandering Mage", "", 50),
+        getCreatureConfig(LOWER, "Chaos", "Ash Moth", "", 50),
         testGridSettings,
         LOWER,
         PBTypes.UnitVals.CREATURE,
@@ -418,6 +418,250 @@ function evaluationView(evaluation: IRangeAttackEvaluation) {
 }
 
 describe("hypothetical/live Smoke differential", () => {
+    test("rejects foreign prepared objects instead of evaluating unbound geometry", () => {
+        const combat = createCombatTestContext();
+        expect(() =>
+            combat.attackHandler.evaluatePreparedRangeAttack({
+                affectedUnits: [],
+                affectedCells: [],
+            }),
+        ).toThrow("Prepared range attack was not created by this AttackHandler instance");
+
+        const shooter = createTestUnit({ team: UPPER, attackType: RANGE, rangeShots: 1 });
+        const target = createTestUnit({ team: LOWER });
+        placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 1 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 8, y: 8 });
+        const prepared = combat.attackHandler.prepareRangeAttack(
+            combat.unitsHolder.getAllUnits(),
+            shooter,
+            shooter.getPosition(),
+            target.getPosition(),
+        );
+        const other = createCombatTestContext().attackHandler;
+        expect(() => other.evaluatePreparedRangeAttack(prepared)).toThrow(
+            "Prepared range attack was not created by this AttackHandler instance",
+        );
+    });
+
+    test("recomputes sticky live Smoke exactly for multiple hit groups", () => {
+        const combat = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: UPPER,
+            name: "Prepared Through ranger",
+            attackType: RANGE,
+            rangeShots: 8,
+            abilities: ["Through Shot"],
+        });
+        const front = createTestUnit({ team: LOWER, name: "Prepared front" });
+        const rear = createTestUnit({ team: LOWER, name: "Prepared rear" });
+        placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, front, { x: 6, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, rear, { x: 11, y: 5 });
+        const aim = getRangeAttackSideCenter(
+            testGridSettings,
+            front.getBaseCell(),
+            RangeAttackCellSide.LEFT,
+            shooter.getPosition(),
+        );
+        const prepared = combat.attackHandler.prepareRangeAttack(
+            combat.unitsHolder.getAllUnits(),
+            shooter,
+            shooter.getPosition(),
+            aim,
+            true,
+        );
+        const smoke = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
+        smoke.add({ x: 8, y: 5 });
+
+        const projected = combat.attackHandler.evaluatePreparedRangeAttack(prepared);
+        const eager = combat.attackHandler.evaluateRangeAttack(
+            combat.unitsHolder.getAllUnits(),
+            shooter,
+            shooter.getPosition(),
+            aim,
+            true,
+        );
+
+        expect(projected.affectedUnits.map((group) => group[0]?.getId())).toEqual([front.getId(), rear.getId()]);
+        expect(projected.rangeAttackDivisors).toEqual([1, 2]);
+        expect(evaluationView(projected)).toEqual(evaluationView(eager));
+    });
+
+    test("applies revised live Smoke once to every unit in one prepared AOE hit group", () => {
+        const combat = createCombatTestContext();
+        const shooter = createTestUnit({
+            team: UPPER,
+            name: "Prepared caliber ranger",
+            attackType: RANGE,
+            rangeShots: 8,
+            abilities: ["Large Caliber"],
+        });
+        const primary = createTestUnit({ team: LOWER, name: "Prepared AOE primary" });
+        const adjacent = createTestUnit({ team: LOWER, name: "Prepared AOE adjacent" });
+        placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, primary, { x: 6, y: 5 });
+        placeUnit(combat.grid, combat.unitsHolder, adjacent, { x: 6, y: 6 });
+        const aim = getRangeAttackSideCenter(
+            testGridSettings,
+            primary.getBaseCell(),
+            RangeAttackCellSide.LEFT,
+            shooter.getPosition(),
+        );
+        const prepared = combat.attackHandler.prepareRangeAttack(
+            combat.unitsHolder.getAllUnits(),
+            shooter,
+            shooter.getPosition(),
+            aim,
+            false,
+            false,
+            true,
+        );
+        FightStateManager.getInstance().getFightProperties().getSmokeClouds().add({ x: 3, y: 5 });
+
+        const projected = combat.attackHandler.evaluatePreparedRangeAttack(prepared);
+        const eager = combat.attackHandler.evaluateRangeAttack(
+            combat.unitsHolder.getAllUnits(),
+            shooter,
+            shooter.getPosition(),
+            aim,
+            false,
+            false,
+            true,
+        );
+
+        expect(projected.affectedUnits).toHaveLength(1);
+        expect(projected.affectedUnits[0]).toEqual(expect.arrayContaining([primary, adjacent]));
+        expect(projected.rangeAttackDivisors).toEqual([2]);
+        expect(evaluationView(projected)).toEqual(evaluationView(eager));
+    });
+
+    test("prepared immutable rays match eager geometry across randomized terrain, interception, and Smoke revisions", () => {
+        let state = 0x91e1_0da5;
+        const next = (bound: number): number => {
+            state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+            return state % bound;
+        };
+        const gridTypes = [
+            PBTypes.GridVals.NORMAL,
+            PBTypes.GridVals.BLOCK_CENTER,
+            PBTypes.GridVals.LAVA_CENTER,
+            PBTypes.GridVals.WATER_CENTER,
+        ];
+
+        for (let iteration = 0; iteration < 256; iteration += 1) {
+            const combat = createCombatTestContext(gridTypes[iteration % gridTypes.length]!);
+            const shooter = createTestUnit({
+                team: UPPER,
+                name: `Prepared fuzz shooter ${iteration}`,
+                attackType: RANGE,
+                rangeShots: 8,
+                shotDistance: 1 + next(20),
+                abilities: iteration % 6 === 0 ? ["Through Shot"] : iteration % 6 === 1 ? ["Large Caliber"] : [],
+            });
+            const pickEmptyCell = (): XY => {
+                for (let attempt = 0; attempt < 512; attempt += 1) {
+                    const cell = { x: next(16), y: next(16) };
+                    if (!combat.grid.getOccupantUnitId(cell)) return cell;
+                }
+                throw new Error("prepared-ray fuzz could not find an empty cell");
+            };
+            placeUnit(combat.grid, combat.unitsHolder, shooter, pickEmptyCell());
+
+            const target = createTestUnit({ team: LOWER, name: `Prepared fuzz target ${iteration}` });
+            placeUnit(combat.grid, combat.unitsHolder, target, pickEmptyCell());
+            const extraCount = next(6);
+            for (let extra = 0; extra < extraCount; extra += 1) {
+                const unit = createTestUnit({
+                    team: next(3) === 0 ? UPPER : LOWER,
+                    name: `Prepared fuzz extra ${iteration}:${extra}`,
+                });
+                placeUnit(combat.grid, combat.unitsHolder, unit, pickEmptyCell());
+            }
+
+            const side = RANGE_ATTACK_CELL_SIDES[next(RANGE_ATTACK_CELL_SIDES.length)]!;
+            const aim = getRangeAttackSideCenter(testGridSettings, target.getBaseCell(), side, shooter.getPosition());
+            const isThroughShot = iteration % 4 === 0;
+            const isSelection = iteration % 7 === 0;
+            const isAOEShot = iteration % 5 === 0;
+            const clouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
+            for (let live = 0; live < next(5); live += 1) {
+                clouds.add({ x: next(18) - 1, y: next(18) - 1 });
+            }
+
+            const prepared = combat.attackHandler.prepareRangeAttack(
+                combat.unitsHolder.getAllUnits(),
+                shooter,
+                shooter.getPosition(),
+                aim,
+                isThroughShot,
+                isSelection,
+                isAOEShot,
+            );
+            expect(Object.isFrozen(prepared)).toBe(true);
+            expect(Object.isFrozen(prepared.affectedUnits)).toBe(true);
+            expect(Object.isFrozen(prepared.affectedCells)).toBe(true);
+
+            // Force evaluatePreparedRangeAttack's revision-aware path on half the corpus. Adding even an
+            // already-smoked key advances the revision, just like a real recast refreshing its lifetime.
+            if (iteration % 2 === 0) {
+                clouds.add({ x: next(18) - 1, y: next(18) - 1 });
+            }
+            if (iteration % 11 === 0) {
+                clouds.clear();
+                clouds.add({ x: next(18) - 1, y: next(18) - 1 });
+            }
+            const hypothetical = Array.from({ length: next(7) }, () => ({
+                x: next(20) - 2,
+                y: next(20) - 2,
+            }));
+            const eager = combat.attackHandler.evaluateRangeAttack(
+                combat.unitsHolder.getAllUnits(),
+                shooter,
+                shooter.getPosition(),
+                aim,
+                isThroughShot,
+                isSelection,
+                isAOEShot,
+                hypothetical,
+            );
+            const projected = combat.attackHandler.evaluatePreparedRangeAttack(prepared, hypothetical);
+            const projectedWithPreparedKeys = combat.attackHandler.evaluatePreparedRangeAttack(
+                prepared,
+                hypothetical,
+                new Set(hypothetical.map((cell) => SmokeClouds.key(cell))),
+            );
+            expect(evaluationView(projected)).toEqual(evaluationView(eager));
+            expect(evaluationView(projectedWithPreparedKeys)).toEqual(evaluationView(eager));
+
+            expect(projected.rangeAttackDivisors).not.toBe(projectedWithPreparedKeys.rangeAttackDivisors);
+            expect(projected.affectedUnits).not.toBe(projectedWithPreparedKeys.affectedUnits);
+            expect(projected.affectedCells).not.toBe(projectedWithPreparedKeys.affectedCells);
+            for (let group = 0; group < projected.affectedUnits.length; group += 1) {
+                expect(projected.affectedUnits[group]).not.toBe(projectedWithPreparedKeys.affectedUnits[group]);
+            }
+            for (let group = 0; group < projected.affectedCells.length; group += 1) {
+                expect(projected.affectedCells[group]).not.toBe(projectedWithPreparedKeys.affectedCells[group]);
+                for (let cell = 0; cell < projected.affectedCells[group].length; cell += 1) {
+                    expect(projected.affectedCells[group][cell]).not.toBe(
+                        projectedWithPreparedKeys.affectedCells[group][cell],
+                    );
+                }
+            }
+            if (projected.attackObstacle) {
+                expect(projected.attackObstacle).not.toBe(projectedWithPreparedKeys.attackObstacle);
+                expect(projected.attackObstacle.position).not.toBe(projectedWithPreparedKeys.attackObstacle?.position);
+            }
+
+            // Results remain caller-owned even though their source geometry is shared and frozen.
+            projected.rangeAttackDivisors.push(12345);
+            projected.affectedUnits.push([]);
+            projected.affectedCells.push([{ x: 12345, y: 12345 }]);
+            expect(evaluationView(combat.attackHandler.evaluatePreparedRangeAttack(prepared, hypothetical))).toEqual(
+                evaluationView(eager),
+            );
+        }
+    });
+
     test("matches live FightProperties across deterministic random edge rays without mutating it", () => {
         let state = 0x5a17_c0de;
         const next = (bound: number): number => {
@@ -501,7 +745,19 @@ describe("hypothetical/live Smoke differential", () => {
                 shooter.hasAbilityActive("Large Caliber"),
                 hypothetical,
             );
+            const projectedWithPreparedKeys = combat.attackHandler.evaluateRangeAttack(
+                combat.unitsHolder.getAllUnits(),
+                shooter,
+                shooter.getPosition(),
+                aim,
+                shooter.hasAbilityActive("Through Shot"),
+                false,
+                shooter.hasAbilityActive("Large Caliber"),
+                hypothetical,
+                new Set(hypothetical.map((cell) => SmokeClouds.key(cell))),
+            );
             expect(clouds.size()).toBe(liveSizeBefore);
+            expect(evaluationView(projectedWithPreparedKeys)).toEqual(evaluationView(projected));
 
             for (const cell of hypothetical) clouds.add(cell);
             const live = combat.attackHandler.evaluateRangeAttack(
@@ -519,6 +775,98 @@ describe("hypothetical/live Smoke differential", () => {
 });
 
 describe("Smoke candidate/runtime parity", () => {
+    test("matches the eager fallback across randomized multi-ranger candidate boards", () => {
+        let state = 0x50c0_a11e;
+        const next = (bound: number): number => {
+            state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+            return state % bound;
+        };
+        const gridTypes = [
+            PBTypes.GridVals.NORMAL,
+            PBTypes.GridVals.BLOCK_CENTER,
+            PBTypes.GridVals.LAVA_CENTER,
+            PBTypes.GridVals.WATER_CENTER,
+        ];
+        let eagerCalls = 0;
+
+        for (let iteration = 0; iteration < 32; iteration += 1) {
+            const combat = createCombatTestContext(gridTypes[iteration % gridTypes.length]!);
+            const caster = nativeAshMoth();
+            const pickEmptyCell = (): XY => {
+                for (let attempt = 0; attempt < 512; attempt += 1) {
+                    const cell = { x: next(16), y: next(16) };
+                    if (!combat.grid.getOccupantUnitId(cell)) return cell;
+                }
+                throw new Error("Smoke candidate fuzz could not find an empty cell");
+            };
+            placeUnit(combat.grid, combat.unitsHolder, caster, pickEmptyCell());
+
+            let lowerAlive = 1;
+            let upperAlive = 0;
+            const addRanger = (team: typeof LOWER | typeof UPPER, index: number): void => {
+                const ranger = createTestUnit({
+                    team,
+                    name: `Candidate fuzz ranger ${iteration}:${team}:${index}`,
+                    attackType: RANGE,
+                    rangeShots: 1 + next(12),
+                    damageMin: 1 + next(20),
+                    damageMax: 21 + next(20),
+                    shotDistance: 1 + next(16),
+                    abilities: index % 5 === 0 ? ["Through Shot"] : index % 5 === 1 ? ["Large Caliber"] : [],
+                });
+                placeUnit(combat.grid, combat.unitsHolder, ranger, pickEmptyCell());
+                if (team === LOWER) lowerAlive += 1;
+                else upperAlive += 1;
+            };
+            for (let index = 0; index < 1 + next(4); index += 1) addRanger(UPPER, index);
+            for (let index = 0; index < next(4); index += 1) addRanger(LOWER, index + 10);
+            for (let index = 0; index < next(4); index += 1) {
+                const team = next(2) === 0 ? LOWER : UPPER;
+                const blocker = createTestUnit({ team, name: `Candidate fuzz blocker ${iteration}:${index}` });
+                placeUnit(combat.grid, combat.unitsHolder, blocker, pickEmptyCell());
+                if (team === LOWER) lowerAlive += 1;
+                else upperAlive += 1;
+            }
+
+            const fightProperties = FightStateManager.getInstance().getFightProperties();
+            fightProperties.startFight();
+            fightProperties.setTeamUnitsAlive(LOWER, lowerAlive);
+            fightProperties.setTeamUnitsAlive(UPPER, upperAlive);
+            fightProperties.startTurn(LOWER, 1_000);
+            const context = decisionContext(combat);
+            const incumbent: GameAction[] = [{ type: "end_turn", unitId: caster.getId(), reason: "manual" }];
+            const candidates = () =>
+                enumerateCandidates(caster, context, incumbent).candidates.filter(
+                    (candidate) => candidate.kind === "spell" && candidate.spellName === "Smoke",
+                );
+
+            const preparedCandidates = candidates();
+            const originalEvaluate = combat.attackHandler.evaluateRangeAttack;
+            combat.attackHandler.evaluateRangeAttack = function (...args) {
+                eagerCalls += 1;
+                return originalEvaluate.apply(this, args);
+            };
+            expect(candidates()).toEqual(preparedCandidates);
+        }
+        expect(eagerCalls).toBeGreaterThan(0);
+    });
+
+    test("keeps wrapped/custom AttackHandler evaluation on the eager fallback with identical candidates", () => {
+        const harness = smokeHarness(PBTypes.GridVals.NORMAL);
+        const preparedCandidates = smokeCandidates(harness);
+        const originalEvaluate = harness.combat.attackHandler.evaluateRangeAttack;
+        let eagerCalls = 0;
+        harness.combat.attackHandler.evaluateRangeAttack = function (...args) {
+            eagerCalls += 1;
+            return originalEvaluate.apply(this, args);
+        };
+
+        const fallbackCandidates = smokeCandidates(harness);
+
+        expect(eagerCalls).toBeGreaterThan(0);
+        expect(fallbackCandidates).toEqual(preparedCandidates);
+    });
+
     test("stores exact enemy prevention minus friendly prevention after both sides retarget", () => {
         const combat = createCombatTestContext();
         const caster = nativeAshMoth();
@@ -605,7 +953,7 @@ describe("Smoke candidate/runtime parity", () => {
         ).toBe(chargesBefore - 1);
     });
 
-    test("never emits the legacy candidate that overlaps its own Wandering Mage caster", () => {
+    test("never emits the legacy candidate that overlaps its own Ash Moth caster", () => {
         const harness = smokeHarness(PBTypes.GridVals.NORMAL, { x: 2, y: 8 }, { x: 4, y: 8 });
         const casterOverlap = smokeCells({ x: 2, y: 8 });
 

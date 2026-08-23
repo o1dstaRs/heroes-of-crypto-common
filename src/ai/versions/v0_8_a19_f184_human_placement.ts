@@ -18,8 +18,10 @@ import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { creatureIdForName, creatureInfo } from "../setup/creature_score";
 
+// Re-pinned for the perk -> doctrine rename; same anchor bytes as V08_A19_PROD_F184_FIXTURE_SHA256,
+// whose values did not move — only the field name did.
 export const V08_A19_F184_HUMAN_PLACEMENT_FIXTURE_SHA256 =
-    "aa524842a6cfeaf96260a10be9dd52c8be36d92654d843af4f496ed192a8b87c" as const;
+    "6649cc5a3fe134f0289c1d6ffb8a056cf25e1a56d6c45f5a34f53354b1cdc0a1" as const;
 
 export const V08_A19_F184_HUMAN_PLACEMENT_POLICY = Object.freeze({
     schema: "hoc.v0_8_a19_f184_human_placement.v10" as const,
@@ -220,12 +222,17 @@ const idsEqual = (left: readonly number[], right: readonly number[]): boolean =>
 const openingIds = (opening: IOpeningRecipe): number[] =>
     sortedIds(opening.ownUnits.map(({ creatureId }) => creatureId));
 
-const footprintFor = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
+const footprintFor = (unit: Unit, base: XY): XY[] =>
+    unit.isSmallSize()
+        ? [base]
+        : [
+              { x: base.x, y: base.y },
+              { x: base.x - 1, y: base.y },
+              { x: base.x, y: base.y - 1 },
+              { x: base.x - 1, y: base.y - 1 },
+          ];
 
-const centerFor = (unit: Unit, base: XY): XY => ({
-    x: base.x - (unit.getFootprintWidth() - 1) / 2,
-    y: base.y - (unit.getFootprintHeight() - 1) / 2,
-});
+const centerFor = (unit: Unit, base: XY): XY => (unit.isSmallSize() ? base : { x: base.x - 0.5, y: base.y - 0.5 });
 
 const exactLegalZoneForTeam = (team: IPlacementContext["team"]): Set<number> => {
     const legal = new Set<number>();

@@ -16,12 +16,7 @@ import { getSpellConfig } from "../../src/configuration/config_provider";
 import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_KILL } from "../../src/constants";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import {
-    getPositionForCell,
-    getPositionForCells,
-    getRangeAttackSideCenter,
-    RangeAttackCellSide,
-} from "../../src/grid/grid_math";
+import { getPositionForCell } from "../../src/grid/grid_math";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { AttackTarget } from "../../src/handlers/attack_handler";
 import { Spell } from "../../src/spells/spell";
@@ -58,36 +53,84 @@ describe("AttackHandler", () => {
             expect(damageStatisticHolder.has(3)).toBe(false);
         });
 
-        it("uses exact range-falloff boundaries and an optional attacker origin", () => {
+        it("floors the shot distance and halves damage per SQUARE band of whole cells", () => {
             const { attackHandler } = createCombatTestContext();
             const attacker = createTestUnit({
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
-                shotDistance: 2,
+                // Fractional on purpose: the unit card and the left sidebar keep showing 2.9, the board
+                // floors it to a 2-cell square.
+                shotDistance: 2.9,
             });
-            attacker.setPosition(0, 0);
-            const band = Math.ceil(attacker.getRangeShotDistance() * testGridSettings.getStep());
+            const center = (cell: { x: number; y: number }) =>
+                getPositionForCell(
+                    cell,
+                    testGridSettings.getMinX(),
+                    testGridSettings.getStep(),
+                    testGridSettings.getHalfStep(),
+                );
+            const origin = center({ x: 4, y: 4 });
+            attacker.setPosition(origin.x, origin.y);
+            const divisorAt = (x: number, y: number) => attackHandler.getRangeAttackDivisor(attacker, center({ x, y }));
 
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band - 1, y: 0 })).toBe(1);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band, y: 0 })).toBe(2);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 2 - 1, y: 0 })).toBe(2);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 2, y: 0 })).toBe(4);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 3 - 1, y: 0 })).toBe(4);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 3, y: 0 })).toBe(8);
-            expect(attackHandler.getRangeAttackDivisor(attacker, { x: band * 20, y: 0 })).toBe(8);
+            // Full 1/1 everywhere inside the 2-cell square, diagonal corners included — those corners are
+            // exactly what the old circular falloff cut off.
+            expect(divisorAt(6, 4)).toBe(1);
+            expect(divisorAt(6, 6)).toBe(1);
+            expect(divisorAt(2, 2)).toBe(1);
+            // The very next ring out halves, in every direction alike.
+            expect(divisorAt(7, 4)).toBe(2);
+            expect(divisorAt(7, 7)).toBe(2);
+            expect(divisorAt(4, 7)).toBe(2);
+            // Successive square bands: 3..4 cells -> 1/2, 5..6 -> 1/4, 7..8 -> 1/8, then capped.
+            expect(divisorAt(8, 4)).toBe(2);
+            expect(divisorAt(9, 4)).toBe(4);
+            expect(divisorAt(10, 10)).toBe(4);
+            expect(divisorAt(11, 4)).toBe(8);
+            expect(divisorAt(12, 12)).toBe(8);
+            expect(divisorAt(15, 15)).toBe(8);
 
+            // An explicit origin re-measures the same square from somewhere else on the board.
             expect(
-                attackHandler.getRangeAttackDivisor(attacker, { x: band * 3, y: 0 }, { x: band * 2 + 1, y: 0 }),
+                attackHandler.getRangeAttackDivisor(attacker, center({ x: 15, y: 15 }), center({ x: 14, y: 14 })),
             ).toBe(1);
 
             const sniper = createTestUnit({
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
-                shotDistance: 2,
+                shotDistance: 2.9,
                 abilities: ["Sniper"],
             });
-            sniper.setPosition(0, 0);
-            expect(attackHandler.getRangeAttackDivisor(sniper, { x: band * 20, y: 0 })).toBe(1);
+            sniper.setPosition(origin.x, origin.y);
+            expect(attackHandler.getRangeAttackDivisor(sniper, center({ x: 15, y: 15 }))).toBe(1);
+        });
+
+        it("measures a large attacker's square from its footprint, not from its center", () => {
+            const { attackHandler } = createCombatTestContext();
+            const attacker = createTestUnit({
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                shotDistance: 2,
+                size: 2,
+            });
+            const center = (cell: { x: number; y: number }) =>
+                getPositionForCell(
+                    cell,
+                    testGridSettings.getMinX(),
+                    testGridSettings.getStep(),
+                    testGridSettings.getHalfStep(),
+                );
+            // A 2x2 covering cells (4,4)..(5,5) sits on their shared intersection, so a raw
+            // center-to-center measurement would put every target half a cell too far.
+            const footprintCenter = center({ x: 4.5, y: 4.5 });
+            attacker.setPosition(footprintCenter.x, footprintCenter.y);
+
+            // Occupied cells are distance 0; the square then reaches two whole cells past the footprint.
+            expect(attackHandler.getRangeAttackDivisor(attacker, center({ x: 4, y: 4 }))).toBe(1);
+            expect(attackHandler.getRangeAttackDivisor(attacker, center({ x: 7, y: 7 }))).toBe(1);
+            expect(attackHandler.getRangeAttackDivisor(attacker, center({ x: 2, y: 2 }))).toBe(1);
+            expect(attackHandler.getRangeAttackDivisor(attacker, center({ x: 8, y: 8 }))).toBe(2);
+            expect(attackHandler.getRangeAttackDivisor(attacker, center({ x: 1, y: 4 }))).toBe(2);
         });
 
         it("evaluates hypothetical shots with the supplied origin's falloff", () => {
@@ -158,86 +201,6 @@ describe("AttackHandler", () => {
             expect(evaluation.rangeAttackDivisors.length).toBeGreaterThan(0);
             expect(evaluation.affectedUnits.flat()).toContain(target);
             expect(evaluation.affectedCells.length).toBeGreaterThan(0);
-        });
-
-        it("does not pin a 2x1 shooter through a phantom second row", () => {
-            const { attackHandler } = createCombatTestContext();
-            const shooter = createTestUnit({
-                attackType: PBTypes.AttackVals.RANGE,
-                rangeShots: 3,
-                footprintWidth: 2,
-                footprintHeight: 1,
-            });
-            const position = getPositionForCells(testGridSettings, [
-                { x: 4, y: 5 },
-                { x: 5, y: 5 },
-            ])!;
-            shooter.setPosition(position.x, position.y);
-
-            const enemyAggression = Array.from({ length: testGridSettings.getGridSize() }, () =>
-                Array(testGridSettings.getGridSize()).fill(1),
-            );
-            enemyAggression[4][4] = 2;
-            enemyAggression[5][4] = 2;
-
-            expect(
-                attackHandler.canBeAttackedByMelee(
-                    shooter.getPosition(),
-                    shooter.isSmallSize(),
-                    enemyAggression,
-                    shooter.getFootprintWidth(),
-                    shooter.getFootprintHeight(),
-                ),
-            ).toBe(false);
-            expect(attackHandler.canLandRangeAttack(shooter, enemyAggression)).toBe(true);
-        });
-
-        it("lands shots from a 2x1 shooter on either cell of a 2x1 target", () => {
-            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
-            const shooter = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
-                attackType: PBTypes.AttackVals.RANGE,
-                rangeShots: 3,
-                footprintWidth: 2,
-                footprintHeight: 1,
-            });
-            const target = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
-                footprintWidth: 2,
-                footprintHeight: 1,
-            });
-            const shooterCells = [
-                { x: 2, y: 3 },
-                { x: 3, y: 3 },
-            ];
-            const targetCells = [
-                { x: 9, y: 7 },
-                { x: 10, y: 7 },
-            ];
-            const shooterPosition = getPositionForCells(testGridSettings, shooterCells)!;
-            const targetPosition = getPositionForCells(testGridSettings, targetCells)!;
-            shooter.setPosition(shooterPosition.x, shooterPosition.y);
-            target.setPosition(targetPosition.x, targetPosition.y);
-            grid.occupyCells(shooterCells, shooter.getId(), shooter.getTeam(), shooter.getAttackRange(), false, false);
-            grid.occupyCells(targetCells, target.getId(), target.getTeam(), target.getAttackRange(), false, false);
-            unitsHolder.addUnit(shooter);
-            unitsHolder.addUnit(target);
-
-            for (const targetCell of targetCells) {
-                const aim = getRangeAttackSideCenter(
-                    testGridSettings,
-                    targetCell,
-                    RangeAttackCellSide.DOWN,
-                    shooter.getPosition(),
-                );
-                const evaluation = attackHandler.evaluateRangeAttack(
-                    unitsHolder.getAllUnits(),
-                    shooter,
-                    shooter.getPosition(),
-                    aim,
-                );
-                expect(evaluation.affectedUnits.flat()).toContain(target);
-            }
         });
     });
 
@@ -921,14 +884,17 @@ describe("AttackHandler", () => {
             ]);
         });
 
-        it("does not hit a primary Abomination again after Fire Breath absorption kills it", () => {
+        // Skewer Strike, not Fire Breath: the aura absorbs PHYSICAL damage only, so a magical sweep can
+        // never kill the Abomination this way. The invariant under test is the same — a primary target
+        // already killed by an earlier sweep's absorption must not be struck a second time.
+        it("does not hit a primary Abomination again after Skewer Strike absorption kills it", () => {
             const { grid, unitsHolder, attackHandler, damageStatisticHolder } = createCombatTestContext();
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
             const attacker = createTestUnit({
-                name: "Fire Breather",
+                name: "Skewerer",
                 team: PBTypes.TeamVals.UPPER,
                 attackType: PBTypes.AttackVals.MELEE,
-                abilities: ["Fire Breath"],
+                abilities: ["Skewer Strike"],
             });
             const abomination = createTestUnit({
                 name: "Abomination",
@@ -982,7 +948,7 @@ describe("AttackHandler", () => {
                         amount: 50,
                     }),
                     expect.objectContaining({
-                        source: "fire_breath",
+                        source: "skewer_strike",
                         unitId: protectedAlly.getId(),
                         amount: 50,
                     }),
@@ -991,7 +957,7 @@ describe("AttackHandler", () => {
             expect(damageStatisticHolder.get().reduce((total, entry) => total + entry.damage, 0)).toBe(100);
         });
 
-        it("does not apply a base response after response Fire Breath absorption kills the attacker", () => {
+        it("does not apply a base response after response Skewer Strike absorption kills the attacker", () => {
             const { grid, unitsHolder, attackHandler, damageStatisticHolder } = createCombatTestContext();
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
             const abomination = createTestUnit({
@@ -1013,12 +979,12 @@ describe("AttackHandler", () => {
                 armor: 20,
             });
             const responder = createTestUnit({
-                name: "Responding Fire Breather",
+                name: "Responding Skewerer",
                 team: PBTypes.TeamVals.LOWER,
                 maxHp: 1000,
                 armor: 20,
                 attackType: PBTypes.AttackVals.MELEE,
-                abilities: ["Fire Breath"],
+                abilities: ["Skewer Strike"],
             });
             abomination.calculateMissChance = () => 0;
             abomination.calculateAttackDamage = () => 10;

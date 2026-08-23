@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { hasDoubleShotAbility } from "../abilities/ability_helper";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { Grid } from "../grid/grid";
 import { ObstacleType } from "../obstacles/obstacle_type";
@@ -23,7 +24,7 @@ import type { AuraEffect } from "../effects/aura_effect";
 import { AbilityPowerType } from "../abilities/ability_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import type { GridSettings } from "../grid/grid_settings";
-import type { IReadonlyKnownPaths, IReadonlyWeightedRoute } from "../grid/path_definitions";
+import type { IReadonlyKnownPaths, IReadonlyMovePath, IReadonlyWeightedRoute } from "../grid/path_definitions";
 import { DecisionPathCatalog, type IDecisionPathSource } from "./decision_path_catalog";
 import { buildFirstMeleeTargetLayers, buildMeleeTargetLayers } from "./internal/melee_target_layers";
 
@@ -463,15 +464,19 @@ function findRangeAttackAction(
 
     const isAOEAttacker = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
     const isThroughShot = unit.hasAbilityActive("Through Shot");
-    const isDoubleShot = unit.hasAbilityActive("Double Shot");
+    const isDoubleShot = hasDoubleShotAbility(unit);
     const isSniper = unit.hasAbilityActive("Sniper");
     const shotDistance = unit.getRangeShotDistance();
     if (shotDistance <= 0 && !isSniper) {
         return undefined;
     }
 
+    // Falloff bands are SQUARES of whole cells (see AttackHandler.getRangeAttackDivisor), so this scan
+    // measures in king moves off the floored stat too — otherwise the AI would price diagonal targets
+    // a band worse than the engine actually resolves them.
+    const shotBandCells = GridMath.getWholeCellShotDistance(shotDistance);
     // Range attacks cap the divisor at 8x (every additional shotDistance beyond the 3rd is wasted).
-    const maxRangeCells = isSniper ? Infinity : shotDistance * 4;
+    const maxRangeCells = isSniper ? Infinity : shotBandCells * 4;
 
     let bestTarget: HoCMath.XY | undefined;
     let bestScore = -1;
@@ -486,7 +491,7 @@ function findRangeAttackAction(
             }
 
             const targetCell = { x: x, y: y };
-            const distanceCells = HoCMath.getDistance(unitCell, targetCell);
+            const distanceCells = Math.max(Math.abs(targetCell.x - unitCell.x), Math.abs(targetCell.y - unitCell.y));
 
             if (!isSniper && distanceCells > maxRangeCells) {
                 continue;
@@ -522,10 +527,10 @@ function findRangeAttackAction(
             }
 
             let divisor = 1;
-            if (!isSniper && shotDistance > 0) {
+            if (!isSniper && shotBandCells > 0) {
                 let d = distanceCells;
-                while (d >= shotDistance) {
-                    d -= shotDistance;
+                while (d > shotBandCells) {
+                    d -= shotBandCells;
                     divisor *= 2;
                 }
                 if (divisor > 8) {
@@ -851,11 +856,13 @@ export function countMeleeThreatsToCell(cell: HoCMath.XY, matrix: number[][], en
  * the execution-time landing rule separately without restricting transit.
  */
 export function canUnitLandAt(unit: IUnitAIRepr, grid: Grid, baseCell: HoCMath.XY): boolean {
-    const cells: HoCMath.XY[] = [];
-    for (let dx = 0; dx < unit.getFootprintWidth(); dx++) {
-        for (let dy = 0; dy < unit.getFootprintHeight(); dy++) {
-            cells.push({ x: baseCell.x - dx, y: baseCell.y - dy });
-        }
+    const cells = [baseCell];
+    if (!unit.isSmallSize()) {
+        cells.push(
+            { x: baseCell.x, y: baseCell.y - 1 },
+            { x: baseCell.x - 1, y: baseCell.y },
+            { x: baseCell.x - 1, y: baseCell.y - 1 },
+        );
     }
     if (cells.some((cell) => !GridMath.isCellWithinGrid(grid.getSettings(), cell))) {
         return false;
@@ -1021,8 +1028,6 @@ export function findMountainMeleeStrike(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
-        unit.getFootprintWidth(),
-        unit.getFootprintHeight(),
     );
     const knownPaths = movePath.knownPaths;
 
@@ -1197,8 +1202,6 @@ function preferBackstabAttackCell(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
-        unit.getFootprintWidth(),
-        unit.getFootprintHeight(),
     ).knownPaths;
 
     // Among the cells adjacent to the target on the backstab side, pick the cheapest reachable one.
@@ -1350,7 +1353,9 @@ export function auraCoverageScore(
         if (range < 0) {
             continue;
         }
-        const cellKeys = new Set(EffectHelper.getAuraCellKeysView(gridSettings, fromCell, range));
+        // Geometry and membership are cached together. Candidate scoring revisits the same cell/range pairs many
+        // times during rollouts, so it pays the Set construction once instead of once per scoring call.
+        const cellKeys = EffectHelper.getAuraCellKeyMembershipView(gridSettings, fromCell, range);
         const targets = aura.getProperties().is_buff ? allies : enemies;
         for (const t of targets) {
             const bc = t.getBaseCell();
@@ -1475,6 +1480,7 @@ function doFindTarget(
         unit,
         matrix,
     );
+    const canDeferCanonicalMovePath = DecisionPathCatalog.canDeferCanonicalMovePath(pathHelper, grid, unit, matrix);
     // closest enemy unit
     let closestTarget: HoCMath.XY | undefined;
     let closestTargetDistance = Infinity;
@@ -1502,29 +1508,38 @@ function doFindTarget(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
-        unit.getFootprintWidth(),
-        unit.getFootprintHeight(),
     );
 
-    const actualMovePath = pathHelper.getMovePath(
-        unitCell,
-        matrix,
-        unit.getSteps(),
-        grid.getAggrMatrixByTeam(
-            unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER,
-        ),
-        unit.canFly(),
-        unit.isSmallSize(),
-        unit.canTraverseLava(),
-        unit.hasAbilityActive("In Its Own World"),
-        unit.getFootprintWidth(),
-        unit.getFootprintHeight(),
-    );
+    let actualMovePath: IReadonlyMovePath | undefined;
+    const getActualMovePath = (): IReadonlyMovePath => {
+        if (actualMovePath === undefined) {
+            actualMovePath = pathHelper.getMovePath(
+                unitCell,
+                matrix,
+                unit.getSteps(),
+                grid.getAggrMatrixByTeam(
+                    unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER,
+                ),
+                unit.canFly(),
+                unit.isSmallSize(),
+                unit.canTraverseLava(),
+                unit.hasAbilityActive("In Its Own World"),
+            );
+        }
+        return actualMovePath;
+    };
+    // Preserve the public/custom-helper call and RNG contract exactly. A branded production catalog has already
+    // proved that native packed-board traversal cannot enter captureRoute's random tie branch, so its finite path
+    // may be deferred until an action actually consumes it. Rollout turns that find an immediately reachable
+    // attack from the 100-step discovery path avoid building a second path that would otherwise be discarded.
+    if (!canDeferCanonicalMovePath) {
+        getActualMovePath();
+    }
 
     let movePath = infiniteMovePath;
 
     if (debug) {
-        console.log("just for debug: " + actualMovePath.knownPaths.size + " " + infiniteMovePath.knownPaths.size);
+        console.log("just for debug: " + getActualMovePath().knownPaths.size + " " + infiniteMovePath.knownPaths.size);
         grid.print(unit.getId());
     }
 
@@ -1547,7 +1562,7 @@ function doFindTarget(
         if (debug) {
             console.log("Checking actual path");
         }
-        movePath = actualMovePath;
+        movePath = getActualMovePath();
         for (let y = 0; y < numRows; y++) {
             for (let x = 0; x < numCols; x++) {
                 const element = HoCMath.matrixElementOrDefault(matrix, x, y, 0);
@@ -1925,7 +1940,7 @@ function doFindTarget(
                 ? resultRoute?.route[resultRouteIndex]
                 : resultRoute?.route.at(-1),
             undefined,
-            actualMovePath.knownPaths,
+            getActualMovePath().knownPaths,
         );
     }
 
@@ -1987,7 +2002,7 @@ function doFindTarget(
         AIActionType.MOVE,
         toMoveTo,
         undefined,
-        usedInfinitPath ? actualMovePath.knownPaths : movePath.knownPaths,
+        usedInfinitPath ? getActualMovePath().knownPaths : movePath.knownPaths,
     );
 }
 

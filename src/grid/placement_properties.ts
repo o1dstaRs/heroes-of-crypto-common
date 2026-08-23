@@ -16,7 +16,7 @@ export interface IPlacement {
     getSize(): number;
     isAllowed(v: XY): boolean;
     possibleCellHashes(): Set<number>;
-    possibleCellPositions(isSmallUnit?: boolean, footprintWidth?: number, footprintHeight?: number): XY[];
+    possibleCellPositions(isSmallUnit?: boolean): XY[];
 }
 
 export enum PlacementPositionType {

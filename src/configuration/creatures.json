@@ -190,7 +190,7 @@
             "exp": 20,
             "size": 1,
             "level": 2,
-            "spells": ["Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Fire Strike", "Nature:Meteorite"],
+            "spells": ["Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Meteorite"],
             "abilities": ["Basic Tome of Battle Magic"]
         },
         "Crusader": {
@@ -217,7 +217,7 @@
         "Griffin": {
             "name": "Griffin",
             "hp": 72,
-            "steps": 5.5,
+            "steps": 3.5,
             "initiative": 8,
             "armor": 23,
             "attack_type": "MELEE",
@@ -231,8 +231,6 @@
             "movement_type": "FLY",
             "exp": 118.5,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 3,
             "spells": [],
             "abilities": ["Range Null Field Aura", "Sky Runner", "Deep Wounds Level 2"]
@@ -382,8 +380,6 @@
             "movement_type": "WALK",
             "exp": 8.1,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 1,
             "spells": [],
             "abilities": ["Double Punch", "Deep Wounds Level 1"]
@@ -426,8 +422,6 @@
             "movement_type": "WALK",
             "exp": 40.5,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 2,
             "spells": [],
             "abilities": ["Disguise Aura", "Deep Wounds Level 2"]
@@ -500,7 +494,7 @@
             "size": 1,
             "level": 2,
             "spells": [],
-            "abilities": ["Vine Throw", "In Its Own World"]
+            "abilities": ["Earth Element", "Vine Throw", "In Its Own World"]
         },
         "Unicorn": {
             "name": "Unicorn",
@@ -519,8 +513,6 @@
             "movement_type": "WALK",
             "exp": 98,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 3,
             "spells": [],
             "abilities": ["One in the Field", "Blindness"]
@@ -542,8 +534,6 @@
             "movement_type": "FLY",
             "exp": 85,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 3,
             "spells": [],
             "abilities": ["Paralysis"]
@@ -552,7 +542,7 @@
             "name": "Pegasus",
             "hp": 58,
             "steps": 7.5,
-            "initiative": 7,
+            "initiative": 6.7,
             "armor": 19,
             "attack_type": "MELEE",
             "attack": 21,
@@ -565,8 +555,6 @@
             "movement_type": "FLY",
             "exp": 97,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 3,
             "spells": [],
             "abilities": ["Pegasus Might Aura", "Pegasus Light"]
@@ -637,8 +625,8 @@
                 "Nature:Lightning Strike",
                 "Nature:Lightning Strike",
                 "Nature:Lightning Strike",
-                "Chaos:Ring of Fire",
-                "Chaos:Ring of Fire",
+                "Nature:Ring of Fire",
+                "Nature:Ring of Fire",
                 "Nature:Meteor Shower"
             ],
             "abilities": ["Tome of Elements", "Magic Reflection"]
@@ -662,7 +650,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["Double Shot", "Area Throw"]
+            "abilities": ["Earth Element", "Double Throw", "Area Throw"]
         },
         "Arachna Queen": {
             "name": "Arachna Queen",
@@ -920,10 +908,10 @@
         },
         "Abomination": {
             "name": "Abomination",
-            "hp": 600,
+            "hp": 550,
             "steps": 4.2,
             "initiative": 3.3,
-            "armor": 50,
+            "armor": 49,
             "attack_type": "MELEE",
             "attack": 22,
             "attack_damage_min": 28,
@@ -939,8 +927,8 @@
             "spells": [],
             "abilities": ["Dense Flesh", "Flesh Shield Aura", "Stun Aura"]
         },
-        "Wandering Mage": {
-            "name": "Wandering Mage",
+        "Ash Moth": {
+            "name": "Ash Moth",
             "hp": 6,
             "steps": 7.5,
             "initiative": 5.6,
@@ -953,7 +941,7 @@
             "range_shots": 0,
             "shot_distance": 0,
             "magic_resist": 0,
-            "movement_type": "WALK",
+            "movement_type": "FLY",
             "exp": 6.1,
             "size": 1,
             "level": 1,
@@ -977,8 +965,6 @@
             "movement_type": "FLY",
             "exp": 38.4,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 2,
             "spells": [],
             "abilities": ["Warding Mane Aura", "Terrifying Gaze", "Deep Wounds Level 2"]
@@ -1000,8 +986,6 @@
             "movement_type": "WALK",
             "exp": 102,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 3,
             "spells": ["Chaos:Fire Wall", "Chaos:Empower"],
             "abilities": ["Book of Nightmares", "Time Denial"]
@@ -1153,8 +1137,6 @@
             "movement_type": "WALK",
             "exp": 13.8,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 1,
             "spells": [],
             "abilities": ["Handyman", "Piercing Spear", "Boost Health"]
@@ -1176,8 +1158,6 @@
             "movement_type": "WALK",
             "exp": 12.4,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 1,
             "spells": [],
             "abilities": ["Wolf Trail Aura", "Rapid Charge"]
@@ -1199,8 +1179,6 @@
             "movement_type": "WALK",
             "exp": 39.5,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 2,
             "spells": [],
             "abilities": ["Shatter Armor", "Rapid Charge"]
@@ -1243,8 +1221,6 @@
             "movement_type": "WALK",
             "exp": 39.6,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 2,
             "spells": [],
             "abilities": ["Penetrating Bite"]
@@ -1266,18 +1242,16 @@
             "movement_type": "FLY",
             "exp": 33,
             "size": 1,
-            "footprint_width": 2,
-            "footprint_height": 1,
             "level": 2,
             "spells": [],
             "abilities": ["Venom Cloud Aura", "Wardguard"]
         },
         "Ogre Mage": {
             "name": "Ogre Mage",
-            "hp": 58,
+            "hp": 60,
             "steps": 4,
             "initiative": 5,
-            "armor": 19,
+            "armor": 20,
             "attack_type": "MELEE_MAGIC",
             "attack": 24,
             "attack_damage_min": 16,

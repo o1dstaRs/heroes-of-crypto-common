@@ -13,7 +13,7 @@ import { getAbilitiesWithPosisionCoefficient } from "../abilities/ability_helper
 import { hasAnyDeepWoundsAbility } from "../abilities/deep_wounds_ability";
 import type { GameAction } from "../engine/actions";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getFootprintCellsForPosition, getPositionForCell } from "../grid/grid_math";
+import { getCellsAroundPosition, getPositionForCell } from "../grid/grid_math";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import type { IDecisionContext } from "./ai_strategy";
@@ -44,7 +44,10 @@ function standCells(unit: Unit, context: IDecisionContext, standCell: XY): XY[] 
     }
     const settings = context.grid.getSettings();
     const position = getPositionForCell(standCell, settings.getMinX(), settings.getStep(), settings.getHalfStep());
-    return getFootprintCellsForPosition(settings, position, unit.getFootprintWidth(), unit.getFootprintHeight());
+    return getCellsAroundPosition(settings, {
+        x: position.x - settings.getHalfStep(),
+        y: position.y - settings.getHalfStep(),
+    });
 }
 
 function chargeDistance(actions: readonly GameAction[]): number {
@@ -136,12 +139,13 @@ export function estimatePrimaryMeleeDamage(
         handlerMultiplier *= unit.calculateAbilityMultiplier(ability, attackerAbilityPower);
     }
 
+    // Deep Wounds is applied ONCE, by Unit.calculateAttackDamage — it is a term of the engine's product
+    // (roll * attackTypeMultiplier * abilityMultiplier * deepWoundsMultiplier * ...), not part of the
+    // multiplier AttackHandler supplies. It used to be folded into handlerMultiplier as well, mirroring a
+    // handler-side duplicate that squared the bonus; both the duplicate and this mirror are gone.
     const deepWoundsMultiplier = hasAnyDeepWoundsAbility(unit)
         ? 1 + (target.getEffect("Deep Wounds")?.getPower() ?? 0) / 100
         : 1;
-    // AttackHandler includes Deep Wounds in its supplied ability multiplier and Unit.calculateAttackDamage
-    // applies the same target-state multiplier again. Preserve that authoritative behavior here.
-    handlerMultiplier *= deepWoundsMultiplier;
 
     const luckyStrike = unit.getAbility("Lucky Strike");
     const luckyChance = luckyStrike

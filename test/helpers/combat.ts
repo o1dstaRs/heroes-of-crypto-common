@@ -67,8 +67,6 @@ export interface TestUnitOptions {
     initiative?: number;
     movementType?: MovementType;
     size?: UnitSizeType;
-    footprintWidth?: number;
-    footprintHeight?: number;
     level?: UnitLevelType;
     unitType?: UnitType;
     spells?: string[];
@@ -77,6 +75,7 @@ export interface TestUnitOptions {
     auraRanges?: number[];
     auraIsBuff?: boolean[];
     summoned?: boolean;
+    target?: string;
 }
 
 export interface CombatTestContext {
@@ -183,11 +182,7 @@ export function createTestUnit(options: TestUnitOptions = {}): Unit {
             "",
             "",
             options.stackPower ?? 1,
-            "",
-            [],
-            false,
-            options.footprintWidth,
-            options.footprintHeight,
+            options.target ?? "",
         ),
         testGridSettings,
         options.team ?? PBTypes.TeamVals.UPPER,

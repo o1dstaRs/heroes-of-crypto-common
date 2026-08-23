@@ -72,8 +72,6 @@ export function resolveMoveTargetCells(
     isSmallSize: boolean,
     path: readonly XY[],
     suppliedTargetCells?: readonly XY[],
-    footprintWidth = isSmallSize ? 1 : 2,
-    footprintHeight = isSmallSize ? 1 : 2,
 ): XY[] {
     if (suppliedTargetCells?.length) {
         return suppliedTargetCells.map((cell) => ({ ...cell }));
@@ -82,17 +80,8 @@ export function resolveMoveTargetCells(
     if (!destination) {
         return [];
     }
-    if (footprintWidth === 1 && footprintHeight === 1) {
+    if (isSmallSize) {
         return [{ ...destination }];
-    }
-    if (footprintWidth !== 2 || footprintHeight !== 2) {
-        const cells: XY[] = [];
-        for (let dx = 0; dx < footprintWidth; dx++) {
-            for (let dy = 0; dy < footprintHeight; dy++) {
-                cells.push({ x: destination.x - dx, y: destination.y - dy });
-            }
-        }
-        return cells;
     }
     return [
         { x: destination.x, y: destination.y },
@@ -123,17 +112,11 @@ export function travelledMovePath(currentCell: Readonly<XY>, path: readonly Read
 }
 
 export function resolveMoveTraversal(
-    unit: Pick<Unit, "getBaseCell" | "isSmallSize" | "getFootprintWidth" | "getFootprintHeight">,
+    unit: Pick<Unit, "getBaseCell" | "isSmallSize">,
     action: MoveUnitAction,
     resolvedRoute?: IResolvedMoveRoute,
 ): IMoveTraversal {
-    const targetCells = resolveMoveTargetCells(
-        unit.isSmallSize(),
-        action.path,
-        action.targetCells,
-        unit.getFootprintWidth(),
-        unit.getFootprintHeight(),
-    );
+    const targetCells = resolveMoveTargetCells(unit.isSmallSize(), action.path, action.targetCells);
     const pathIsFootprintOnly = isMovePathFootprintOnly(unit.isSmallSize(), action.path, action.targetCells);
     const travelledPath = pathIsFootprintOnly
         ? action.path
@@ -174,13 +157,28 @@ export function enteredFireWallCells(fireWalls: FireWalls | undefined, crossedCe
     return burning;
 }
 
+/** What a Fire Wall did to a unit that arrived on it. */
 export interface IFireWallBurnResult {
+    /** Wall cells actually entered, de-duplicated, in the order they were crossed. */
     burning: XY[];
+    /** Damage the stack absorbed across those cells. */
     total: number;
+    /** Creatures the stack lost to the flames. */
     unitsDied: number;
 }
 
-/** Apply Fire Wall damage to every newly crossed wall cell. */
+/**
+ * Burn a unit for every Fire Wall cell it just arrived on, mutating the stack and logging it.
+ *
+ * Shared on purpose: a unit can land on a wall two ways — walking there under its own move action, or
+ * being SHOVED there by map narrowing — and only the first used to charge for it, so a stack pushed into
+ * the flames by a closing board walked away untouched. One helper means the two paths cannot price the
+ * same fire differently.
+ *
+ * Damage is re-derived per cell rather than multiplied out, because a stack thinned by the first cell has
+ * a smaller maximum health for the second to take its share of. The element table is read once so every
+ * cell is priced against the same resistances the rest of the game's fire uses.
+ */
 export function burnUnitOnFireWallCells(
     unit: Unit,
     crossedCells: readonly XY[],
@@ -191,6 +189,8 @@ export function burnUnitOnFireWallCells(
     if (!fireWalls?.size() || !crossedCells.length) {
         return empty;
     }
+    // De-duplicate: a large unit reports the same cell once per body part standing in it, and the wall
+    // charges per cell entered, not per body part.
     const burning = enteredFireWallCells(fireWalls, crossedCells);
     if (!burning.length) {
         return empty;

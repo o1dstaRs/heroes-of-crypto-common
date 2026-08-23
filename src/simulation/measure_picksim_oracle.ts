@@ -20,7 +20,7 @@ import { TIER1_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getUpgradePoints, Perk } from "../perks/perk_properties";
+import { getUpgradePoints, Doctrine } from "../doctrines/doctrine_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
@@ -65,7 +65,7 @@ import { LIVETWIN_PRESET } from "./livetwin";
  * regardless of their point estimate.
  *
  * Also reported: how often collisions / collision reveals actually occur (the roadmap froze the vision-gated
- * perk head pending this number), and an informed-vs-blind ablation. That difference is an upper-bound proxy
+ * doctrine head pending this number), and an informed-vs-blind ablation. That difference is an upper-bound proxy
  * for information value, not an isolated live counter-pick effect: it includes the informed oracle's
  * omniscient collision avoidance. Its uncertainty conservatively treats each same-seed two-game re-draft pair
  * as one cluster.
@@ -281,7 +281,7 @@ const emptyTeamPickStats = (): ITeamPickStats => ({
 
 /**
  * Drive one complete pick through pick_sim. Snake order and phase gating come from the sim itself; in the two
- * simultaneous phases (perk+bundle, T2) the non-oracle side commits first, which hands the full-information
+ * simultaneous phases (doctrine+bundle, T2) the non-oracle side commits first, which hands the full-information
  * oracle its maximal (most favorable) information edge. The oracle also chooses from omniscient legal choices,
  * avoiding collisions before live reveal machinery would permit that knowledge. Baselines pick greedily from
  * their VISIBLE choices and re-pick on collision — outcome-identical to the live daemon's omniscient-pool
@@ -383,12 +383,12 @@ export function runPickPhase(
             throw new Error("Pick phase failed to complete within 300 driver iterations");
         }
         const phase = getCurrentPickPhase(state);
-        if (phase.phase === PBTypes.PickPhaseVals.PERK) {
+        if (phase.phase === PBTypes.PickPhaseVals.DOCTRINE) {
             for (const team of combinedOrder) {
-                if (teamState(team).perk === Perk.NO_PERK) {
-                    // Every policy takes the live max-budget perk; the oracle's information is free, so
+                if (teamState(team).doctrine === Doctrine.NO_DOCTRINE) {
+                    // Every policy takes the live max-budget doctrine; the oracle's information is free, so
                     // paying upgrade points for in-draft vision would only weaken its army.
-                    accept({ type: "select_perk", team, perk: SETUP_POLICY_V0.pickPerk() });
+                    accept({ type: "select_doctrine", team, doctrine: SETUP_POLICY_V0.pickDoctrine() });
                 }
             }
         } else if (phase.phase === PBTypes.PickPhaseVals.INITIAL_PICK) {
@@ -459,7 +459,7 @@ const catalogById = (): Map<number, ICatalogRef> => {
 
 export interface IPickedArmy {
     roster: IArmyUnitSpec[];
-    perk: number;
+    doctrine: number;
     augments: ISetupAugment[];
     synergies: ISetupSynergy[];
     tier1Artifact: number;
@@ -499,8 +499,8 @@ export function buildArmyFromPick(team: IPickTeamState): IPickedArmy {
     });
     return {
         roster,
-        perk: team.perk,
-        augments: SETUP_POLICY_V0.pickAugments(getUpgradePoints(team.perk)),
+        doctrine: team.doctrine,
+        augments: SETUP_POLICY_V0.pickAugments(getUpgradePoints(team.doctrine)),
         synergies: SETUP_POLICY_V0.pickSynergies(team.creatures),
         tier1Artifact: team.tier1Artifact,
         tier2Artifact: team.tier2Artifact,
@@ -630,8 +630,8 @@ export function playPickSimGame(
         seed,
         gridType: PBTypes.GridVals.NORMAL,
         ...(options.maxLaps === undefined ? {} : { maxLaps: options.maxLaps }),
-        greenPerk: lowerArmy.perk,
-        redPerk: upperArmy.perk,
+        greenDoctrine: lowerArmy.doctrine,
+        redDoctrine: upperArmy.doctrine,
         greenAugments: lowerArmy.augments,
         redAugments: upperArmy.augments,
         greenArtifactT1: lowerArmy.tier1Artifact,
@@ -1130,7 +1130,7 @@ export interface IMeasurePickSimSummary {
     config: {
         liveTwinEnv: string;
         amountMode: typeof LIVETWIN_PRESET.amountMode;
-        perk: number;
+        doctrine: number;
         grid: "NORMAL";
         pairing: {
             clusterSize: typeof PICKSIM_PAIR_CLUSTER_SIZE;
@@ -1206,7 +1206,7 @@ export async function runMeasurePickSim(options: IMeasurePickSimOptions): Promis
         config: {
             liveTwinEnv: process.env.LIVETWIN ?? "",
             amountMode: LIVETWIN_PRESET.amountMode,
-            perk: SETUP_POLICY_V0.pickPerk(),
+            doctrine: SETUP_POLICY_V0.pickDoctrine(),
             grid: "NORMAL",
             pairing: {
                 clusterSize: PICKSIM_PAIR_CLUSTER_SIZE,

@@ -11,11 +11,20 @@
 
 import CREATURES_JSON from "../../configuration/creatures.json";
 import { AbilityPowerType } from "../../abilities/ability_properties";
+import { DOUBLE_SHOT_ABILITY_NAMES } from "../../abilities/double_shot_names";
 import { getAbilityConfig, getSpellConfig } from "../../configuration/config_provider";
 import { CreatureFactions, CreatureLevels } from "../../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { isOffensiveSpellMultiplier } from "../../spells/spell_damage";
 import { SpellPowerType } from "../../spells/spell_properties";
+
+/**
+ * Whether a creature's printed kit lands a second ranged attack. Drafting reads the ability NAMES off the
+ * catalog rather than a live Unit, so it asks the shared roster directly — otherwise a new member of the
+ * family (Gargantuan's Double Throw) silently loses the second-shot weight the bot drafts on.
+ */
+const shootsTwice = (abilities: string): boolean =>
+    DOUBLE_SHOT_ABILITY_NAMES.some((abilityName) => abilities.includes(abilityName));
 
 export const RANKED_SPELL_RANGED_DRAFT_POLICY_ID = "ranked-spell-ranged-v1" as const;
 export type RankedSpellRangedDraftPolicyId = typeof RANKED_SPELL_RANGED_DRAFT_POLICY_ID;
@@ -116,7 +125,7 @@ const isRangedDamageSpellbookEntry = (entry: string): boolean => {
     try {
         const spell = getSpellConfig(entry.slice(0, separator), entry.slice(separator + 1));
         // This is the same contract used by the engine and tactical AI before they call calculateSpellDamage.
-        // Target shape alone is not damage: Wandering Mage's Smoke and Misfortune both target at range, but neither
+        // Target shape alone is not damage: Ash Moth's Smoke and Misfortune both target at range, but neither
         // is an offensive magic hit and neither should make an army look like a mage battery.
         return !spell.is_buff && isOffensiveSpellMultiplier(spell.multiplier_type);
     } catch {
@@ -160,13 +169,9 @@ const isCastableAbility = (name: string): boolean => {
     }
 };
 
-/** Protocol enum key for a player-facing creature name. Renames keep their stable wire id. */
-export const creatureEnumKeyForName = (name: string): string =>
-    name === "Wandering Mage" ? "ASH_MOTH" : name.toUpperCase().replace(/ /g, "_");
-
 /** Browser-safe display-name lookup shared by runtime placement and simulation setup paths. */
 export const creatureIdForName = (name: string): number | undefined => {
-    const id = CREATURE_IDS_BY_ENUM_KEY[creatureEnumKeyForName(name)];
+    const id = CREATURE_IDS_BY_ENUM_KEY[name.toUpperCase().replace(/ /g, "_")];
     return typeof id === "number" && id > 0 ? id : undefined;
 };
 
@@ -276,7 +281,7 @@ const hasNamedCreature = (creatureIds: readonly number[], names: ReadonlySet<str
 /**
  * Fair, public-context role fit layered over either the hand heuristic or a shipped intrinsic genome. The
  * multiplier deliberately does not inspect positions or hidden picks:
- *  - Wandering Mage becomes a real counter-pick only after enemy shooters are revealed.
+ *  - Ash Moth becomes a real counter-pick only after enemy shooters are revealed.
  *  - A Healer and its durable anchor reinforce each other in whichever one is selected later.
  *  - Angel is preferred as a ranged-line screen when both armies actually field a firing line.
  *
@@ -305,7 +310,7 @@ export const creatureRoleFitMultiplier = (
         hasNamedCreature(ownCreatureIds, ALWAYS_DURABLE_HEAL_ANCHOR_NAMES) || ownAngelHasActiveScreen;
     const candidateAngelHasActiveScreen = info.name === "Angel" && ownBackline >= 2 && knownEnemyShooters > 0;
 
-    if (info.name === "Wandering Mage" && knownEnemyShooters > 0) {
+    if (info.name === "Ash Moth" && knownEnemyShooters > 0) {
         return knownEnemyShooters >= 2 ? 3 : 2.25;
     }
 
@@ -368,7 +373,7 @@ export const scoreCreature = (creatureId: number): number => {
         c.maxDamage * (c.ranged ? 3 : 1.2) +
         c.shots * (c.ranged ? 5 : 0) +
         c.distance * (c.ranged ? 6 : 0) +
-        (c.abilities.includes("Double Shot") ? 50 : 0) +
+        (shootsTwice(c.abilities) ? 50 : 0) +
         (c.abilities.includes("Through Shot") ? 70 : 0) +
         (c.abilities.includes("Area Throw") ? 60 : 0) +
         (c.abilities.includes("Large Caliber") ? 45 : 0);
@@ -433,7 +438,7 @@ export const creatureFeatures = (creatureId: number): number[] => {
         r ? 0 : c.maxDamage,
         r ? c.shots : 0,
         r ? c.distance : 0,
-        c.abilities.includes("Double Shot") ? 1 : 0,
+        shootsTwice(c.abilities) ? 1 : 0,
         c.abilities.includes("Through Shot") ? 1 : 0,
         c.abilities.includes("Area Throw") ? 1 : 0,
         c.abilities.includes("Large Caliber") ? 1 : 0,

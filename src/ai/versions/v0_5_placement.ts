@@ -124,7 +124,15 @@ export function placeByPolicy(
     const maxEdge = Math.max(1, ...baseCells.map((c) => Math.abs(c.x - centreX)));
     const diag = Math.max(1, GRID_SIZE);
 
-    const footprintFor = (u: Unit, base: XY): XY[] => u.getFootprintCellsForBase(base);
+    const footprintFor = (u: Unit, base: XY): XY[] =>
+        u.isSmallSize()
+            ? [base]
+            : [
+                  { x: base.x, y: base.y },
+                  { x: base.x - 1, y: base.y },
+                  { x: base.x, y: base.y - 1 },
+                  { x: base.x - 1, y: base.y - 1 },
+              ];
     const fits = (u: Unit, base: XY, occ: Set<number>): boolean =>
         footprintFor(u, base).every((c) => legal.has(placeCellKey(c)) && !occ.has(placeCellKey(c)));
 

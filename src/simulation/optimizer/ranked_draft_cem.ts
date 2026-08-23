@@ -862,7 +862,7 @@ async function main(): Promise<void> {
         },
         draftSurface: { offset: 0, length: 15, tail: "projected-to-current-anchor" as const },
         setup: {
-            perk: "setup-v0 SEE_NONE",
+            doctrine: "setup-v0 SEE_NONE",
             tier2: "conditional-setup-v1 at live phase sequence 8",
             augments: "conditional-setup-v1 all",
             synergies: "fixed setup-v0 table",

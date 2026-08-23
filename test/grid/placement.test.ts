@@ -47,40 +47,34 @@ describe("placements", () => {
         expect(lowerLeft.getSize()).toBe(3);
         expect(lowerLeft.possibleCellPositions()).toHaveLength(42);
         expect(lowerLeft.possibleCellPositions(false)).toHaveLength(26);
-        expect(lowerLeft.possibleCellPositions(false, 2, 1)).toHaveLength(28);
-        expect(lowerLeft.possibleCellPositions(false, 2, 1).every((cell) => cell.x >= 2 && cell.y >= 1)).toBe(true);
         expect(lowerLeft.possibleCellHashes().size).toBe(42);
         expect(lowerLeft.isAllowed(positionFor({ x: 1, y: 1 }))).toBe(true);
         expect(lowerLeft.isAllowed(positionFor({ x: 8, y: 8 }))).toBe(false);
 
         expect(upperLeft.possibleCellPositions()).toHaveLength(64);
         expect(lowerRight.possibleCellPositions()).toHaveLength(80);
-        expect(upperRight.possibleCellPositions()[0]).toEqual({ x: 14, y: 1 });
-        expect(lowerLeft.isAllowed(positionFor({ x: 3, y: 8 }))).toBe(true);
-        expect(lowerLeft.isAllowed(positionFor({ x: 4, y: 8 }))).toBe(false);
-        expect(upperRight.isAllowed(positionFor({ x: 12, y: 8 }))).toBe(true);
-        expect(upperRight.isAllowed(positionFor({ x: 11, y: 8 }))).toBe(false);
+        expect(upperRight.possibleCellPositions()[0]).toEqual({ x: 1, y: 14 });
     });
 
-    it("depth 6 (Placement LEVEL_3) opens the board's edge line", () => {
+    it("height 6 (Placement LEVEL_3) opens the board's edge line", () => {
         const lower = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 6);
         const upper = new RectanglePlacement(testGridSettings, PlacementPositionType.UPPER_RIGHT, 6);
 
-        // 6 columns x 16 rows, INCLUDING the edge column that depths 3-5 stop short of.
+        // 16 columns x 6 rows, INCLUDING the edge row that heights 3-5 stop short of.
         expect(lower.possibleCellPositions()).toHaveLength(96);
-        expect(lower.possibleCellPositions().some((c) => c.x === 0)).toBe(true);
-        expect(lower.isAllowed(positionFor({ x: 0, y: 4 }))).toBe(true);
-        expect(lower.isAllowed(positionFor({ x: 6, y: 4 }))).toBe(false);
+        expect(lower.possibleCellPositions().some((c) => c.y === 0)).toBe(true);
+        expect(lower.isAllowed(positionFor({ x: 4, y: 0 }))).toBe(true);
+        expect(lower.isAllowed(positionFor({ x: 4, y: 6 }))).toBe(false);
 
         expect(upper.possibleCellPositions()).toHaveLength(96);
-        expect(upper.possibleCellPositions()[0]).toEqual({ x: 15, y: 0 });
-        expect(upper.isAllowed(positionFor({ x: 15, y: 11 }))).toBe(true);
-        expect(upper.isAllowed(positionFor({ x: 9, y: 11 }))).toBe(false);
+        expect(upper.possibleCellPositions()[0]).toEqual({ x: 0, y: 15 });
+        expect(upper.isAllowed(positionFor({ x: 11, y: 15 }))).toBe(true);
+        expect(upper.isAllowed(positionFor({ x: 11, y: 9 }))).toBe(false);
 
-        // Large (2x2) anchors stay inside the zone: leftmost anchor column keeps the footprint in columns 0-5.
+        // Large (2x2) anchors stay inside the zone: lowest anchor row keeps the footprint on rows 0-5.
         const largeAnchors = lower.possibleCellPositions(false);
-        expect(largeAnchors.some((c) => c.x === 1)).toBe(true);
-        expect(largeAnchors.every((c) => c.x >= 1 && c.x <= 5)).toBe(true);
+        expect(largeAnchors.some((c) => c.y === 1)).toBe(true);
+        expect(largeAnchors.every((c) => c.y >= 1 && c.y <= 5)).toBe(true);
     });
 
     it("rejects unsupported placement sizes and position types", () => {

@@ -83,10 +83,10 @@ function startEngine(combat: CombatTestContext, active: Unit, context: IDecision
     });
 }
 
-describe("v0.8 Wandering Mage anti-ranged role", () => {
+describe("v0.8 Ash Moth anti-ranged role", () => {
     test("promotes a net-positive Smoke cloud to the native decision", () => {
         const combat = createCombatTestContext();
-        const moth = nativeUnit(LOWER, "Chaos", "Wandering Mage", 50);
+        const moth = nativeUnit(LOWER, "Chaos", "Ash Moth", 50);
         const ally = createTestUnit({ team: LOWER, name: "Screened melee", attackType: MELEE, amountAlive: 30 });
         const ranger = createTestUnit({
             team: UPPER,
@@ -108,7 +108,7 @@ describe("v0.8 Wandering Mage anti-ranged role", () => {
 
     test("routes Smoke away from a stronger friendly firing line", () => {
         const combat = createCombatTestContext();
-        const moth = nativeUnit(LOWER, "Chaos", "Wandering Mage", 50);
+        const moth = nativeUnit(LOWER, "Chaos", "Ash Moth", 50);
         const friendlyRanger = createTestUnit({
             team: LOWER,
             name: "Friendly ranger",

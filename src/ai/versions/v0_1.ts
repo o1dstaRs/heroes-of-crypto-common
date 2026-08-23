@@ -16,7 +16,7 @@ import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import {
-    getFootprintCellsForPosition,
+    getCellsAroundPosition,
     getPositionForCell,
     getRangeAttackSideCenter,
     isCellWithinGrid,
@@ -63,7 +63,15 @@ export class StrategyV0_1 implements IAIStrategy {
             baseCells.push({ x: hash >> 4, y: hash & 0xf });
         }
 
-        const footprintFor = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
+        const footprintFor = (unit: Unit, base: XY): XY[] =>
+            unit.isSmallSize()
+                ? [base]
+                : [
+                      { x: base.x, y: base.y },
+                      { x: base.x - 1, y: base.y },
+                      { x: base.x, y: base.y - 1 },
+                      { x: base.x - 1, y: base.y - 1 },
+                  ];
 
         const tryPlace = (unit: Unit, preferFront: boolean): boolean => {
             const ordered = [...baseCells].sort((a, b) =>
@@ -542,7 +550,10 @@ export class StrategyV0_1 implements IAIStrategy {
         }
         const gs = context.grid.getSettings();
         const position = getPositionForCell(cell, gs.getMinX(), gs.getStep(), gs.getHalfStep());
-        return getFootprintCellsForPosition(gs, position, unit.getFootprintWidth(), unit.getFootprintHeight());
+        return getCellsAroundPosition(gs, {
+            x: position.x - gs.getHalfStep(),
+            y: position.y - gs.getHalfStep(),
+        });
     }
     /**
      * Finish an already validated movement route with a legal adjacent strike whenever possible.
@@ -652,8 +663,6 @@ export class StrategyV0_1 implements IAIStrategy {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
-            unit.getFootprintWidth(),
-            unit.getFootprintHeight(),
         );
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead());
         if (!enemies.length || !movePath.knownPaths.size) {

@@ -22,6 +22,7 @@ import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { amountForCreatureExperienceBudget, STACK_EXPERIENCE_BUDGET } from "../../src/simulation/army";
 import { calculateStackPoweredSpellDamage, isThrownOffensiveSpell } from "../../src/spells/spell_damage";
+import { Spell } from "../../src/spells/spell";
 import { SpellElement, SpellMultiplierType, SpellTargetType } from "../../src/spells/spell_properties";
 import { getMagicMirrorAbilityChance } from "../../src/spells/spell_helper";
 import type { Unit } from "../../src/units/unit";
@@ -49,7 +50,6 @@ interface IRawCreature {
 const creatures = creaturesJson as unknown as Record<string, Record<string, IRawCreature>>;
 const dragon = creatures.Nature["Magic Dragon"];
 const natureSpells = (spellsJson as unknown as Record<string, Record<string, { power: number }>>).Nature;
-const chaosSpells = (spellsJson as unknown as Record<string, Record<string, { power: number }>>).Chaos;
 
 /**
  * Every draw getRandomInt makes returns `value`.
@@ -169,10 +169,7 @@ const setupDragonFight = (opts: {
     return { ...context, fightProperties, caster, enemies, allies, engine, sceneLog };
 };
 
-const schoolOf = (name: string): string => (name === "Ring of Fire" ? "Chaos" : "Nature");
-const scrollsOf = (name: string): number =>
-    dragon.spells.filter((entry) => entry === `${schoolOf(name)}:${name}`).length;
-const rawSpell = (name: string): { power: number } => (name === "Ring of Fire" ? chaosSpells : natureSpells)[name];
+const scrollsOf = (name: string): number => dragon.spells.filter((entry) => entry === `Nature:${name}`).length;
 
 describe("Magic Dragon creature configuration", () => {
     it("is a level 4 Nature flyer that fights in melee and casts, sized like every other level 4", () => {
@@ -253,7 +250,7 @@ describe("Tome of Elements spell configuration", () => {
 
         expect(getSpellConfig("Nature", "Whirlpool").minimal_caster_stack_power).toBe(3);
         expect(getSpellConfig("Nature", "Lightning Strike").minimal_caster_stack_power).toBe(1);
-        expect(getSpellConfig("Chaos", "Ring of Fire").minimal_caster_stack_power).toBe(4);
+        expect(getSpellConfig("Nature", "Ring of Fire").minimal_caster_stack_power).toBe(4);
         expect(getSpellConfig("Nature", "Meteor Shower").minimal_caster_stack_power).toBe(5);
     });
 
@@ -264,7 +261,7 @@ describe("Tome of Elements spell configuration", () => {
     // budget — so the two-dragon row is what the spellbook actually reads on the board.
     it("prices each spell at its per-dragon damage target at full stack power", () => {
         const damage = (name: string, alive: number): number =>
-            calculateStackPoweredSpellDamage(rawSpell(name).power, alive, MAX_UNIT_STACK_POWER);
+            calculateStackPoweredSpellDamage(natureSpells[name].power, alive, MAX_UNIT_STACK_POWER);
 
         expect(damage("Lightning Strike", 1)).toBe(150);
         expect(damage("Ring of Fire", 1)).toBe(120);
@@ -276,34 +273,35 @@ describe("Tome of Elements spell configuration", () => {
     });
 
     it("keeps the ladder percentages the brief set", () => {
-        expect(rawSpell("Ring of Fire").power).toBeCloseTo(rawSpell("Lightning Strike").power * 0.8, 5);
-        expect(rawSpell("Meteor Shower").power).toBeCloseTo(rawSpell("Ring of Fire").power * 0.9, 5);
+        expect(natureSpells["Ring of Fire"].power).toBeCloseTo(natureSpells["Lightning Strike"].power * 0.8, 5);
+        expect(natureSpells["Meteor Shower"].power).toBeCloseTo(natureSpells["Ring of Fire"].power * 0.9, 5);
     });
 
     it("gives each Tome of Elements spell its element, and leaves ordinary spells elementless", () => {
         expect(getSpellConfig("Nature", "Whirlpool").element).toBe(SpellElement.WATER);
         expect(getSpellConfig("Nature", "Lightning Strike").element).toBe(SpellElement.AIR);
-        expect(getSpellConfig("Chaos", "Ring of Fire").element).toBe(SpellElement.FIRE);
+        expect(getSpellConfig("Nature", "Ring of Fire").element).toBe(SpellElement.FIRE);
+        // 2026-08-15: Meteor Shower moved FIRE -> EARTH, completing the one-spell-per-element tome
+        // (fire no longer shields Efreet/Black Dragon from it, water no longer burns harder under it).
         expect(getSpellConfig("Nature", "Meteor Shower").element).toBe(SpellElement.EARTH);
-        expect(getSpellConfig("Nature", "Meteorite").element).toBe(SpellElement.EARTH);
         expect(getSpellConfig("Life", "Heal").element).toBe(SpellElement.NO_ELEMENT);
     });
 
     // The exact ladder percentages are gone, but the ORDER is still design intent: the single-target bolt
     // out-damages the ring it splashes, which out-damages the 3x3 shower that hits the most units at once.
     it("keeps the damage ordering bolt > ring > shower", () => {
-        expect(rawSpell("Lightning Strike").power).toBeGreaterThan(rawSpell("Ring of Fire").power);
-        expect(rawSpell("Ring of Fire").power).toBeGreaterThan(rawSpell("Meteor Shower").power);
+        expect(natureSpells["Lightning Strike"].power).toBeGreaterThan(natureSpells["Ring of Fire"].power);
+        expect(natureSpells["Ring of Fire"].power).toBeGreaterThan(natureSpells["Meteor Shower"].power);
     });
 
     it("aims each spell the way its own handler reads it", () => {
         for (const name of ["Lightning Strike", "Ring of Fire", "Meteor Shower"]) {
-            const spell = getSpellConfig(schoolOf(name), name);
+            const spell = getSpellConfig("Nature", name);
             expect(spell.multiplier_type).toBe(SpellMultiplierType.UNIT_AMOUNT_STACK_POWER);
             expect(spell.is_buff).toBe(false);
         }
         expect(getSpellConfig("Nature", "Lightning Strike").spell_target_type).toBe(SpellTargetType.ANY_ENEMY);
-        expect(getSpellConfig("Chaos", "Ring of Fire").spell_target_type).toBe(SpellTargetType.ANY_ENEMY);
+        expect(getSpellConfig("Nature", "Ring of Fire").spell_target_type).toBe(SpellTargetType.ANY_ENEMY);
         // Meteor Shower is aimed at a spot on the ground, not at a creature.
         expect(getSpellConfig("Nature", "Meteor Shower").spell_target_type).toBe(SpellTargetType.FREE_CELL);
     });
@@ -557,7 +555,9 @@ describe("action engine — Meteor Shower", () => {
         expect(before[3] - setup.allies[0].getHp()).toBe(0); // allies are not caught
     });
 
-    it("deals Earth damage normally to Fire and Water Elements", () => {
+    // 2026-08-15: Meteor Shower moved FIRE -> EARTH. Falling stone is nobody's element: the Fire
+    // Element immunity and the Water Element x1.5 vulnerability both belonged to its fire days.
+    it("as earth magic, hits Fire and Water Elements at the same flat number as anyone else", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -577,9 +577,9 @@ describe("action engine — Meteor Shower", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(before[0] - setup.enemies[0].getHp()).toBe(108);
-        expect(before[1] - setup.enemies[1].getHp()).toBe(108);
-        expect(before[2] - setup.enemies[2].getHp()).toBe(108);
+        expect(before[0] - setup.enemies[0].getHp()).toBe(108); // stone is not fire — no immunity
+        expect(before[1] - setup.enemies[1].getHp()).toBe(108); // and water does not feed it
+        expect(before[2] - setup.enemies[2].getHp()).toBe(108); // elementless, the plain number
     });
 
     it("refuses a drop that catches nobody rather than burn the only scroll", () => {
@@ -675,6 +675,47 @@ describe("action engine — Whirlpool", () => {
         expect(charges("Whirlpool")).toBe(1);
         expect(charges("Lightning Strike")).toBe(4);
     });
+});
+
+describe("Magic Mirror spell buffs", () => {
+    for (const [spellName, expectedRebound] of [
+        ["Magic Mirror", 45],
+        ["Mass Magic Mirror", 37],
+    ] as const) {
+        it(`${spellName} always returns its configured share of landed magical damage`, () => {
+            // A high roll proves this is the spell buff's guaranteed damage return, not the Magic Dragon
+            // passive's chance-based rebound. Lightning Strike lands for 150; the two buffs return 30% and
+            // 25% respectively, floored before the caster's own defences are applied.
+            alwaysRoll(99);
+            const setup = setupDragonFight({
+                casterAmountAlive: 1,
+                casterStackPower: 5,
+                enemies: [{ cell: { x: 6, y: 3 } }],
+            });
+            setup.enemies[0].applyBuff(new Spell({ spellProperties: getSpellConfig("Chaos", spellName), amount: 1 }));
+            const targetHpBefore = setup.enemies[0].getHp();
+            const casterHpBefore = setup.caster.getHp();
+
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.caster.getId(),
+                spellName: "Lightning Strike",
+                targetId: setup.enemies[0].getId(),
+            });
+
+            expect(result.completed).toBe(true);
+            expect(targetHpBefore - setup.enemies[0].getHp()).toBe(150);
+            expect(casterHpBefore - setup.caster.getHp()).toBe(expectedRebound);
+            const cast = result.events.find((event) => event.type === "spell_cast");
+            expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toEqual([
+                expect.objectContaining({
+                    unitId: setup.caster.getId(),
+                    amount: expectedRebound,
+                    reboundedFromUnitId: setup.enemies[0].getId(),
+                }),
+            ]);
+        });
+    }
 });
 
 describe("Magic Reflection (passive)", () => {
@@ -887,7 +928,7 @@ describe("Magic Reflection (passive)", () => {
         ]);
     });
 
-    it("keeps direct and rebound Flesh Shield absorption in separate event buckets", () => {
+    it("never routes spell damage — direct or rebounded — through a Flesh Shield owner", () => {
         alwaysRoll(0);
         const setup = setupDragonFight({
             casterAmountAlive: 1,
@@ -914,6 +955,7 @@ describe("Magic Reflection (passive)", () => {
         });
         placeUnit(setup.grid, setup.unitsHolder, abomination, { x: 4, y: 3 });
         setup.unitsHolder.refreshAuraEffectsForAllUnits();
+        const abominationHpBefore = abomination.getHp();
 
         const result = setup.engine.apply({
             type: "cast_spell",
@@ -925,41 +967,26 @@ describe("Magic Reflection (passive)", () => {
         expect(result.completed).toBe(true);
         const cast = result.events.find((event) => event.type === "spell_cast");
         const absorbed = cast?.type === "spell_cast" ? (cast.secondary ?? []) : [];
-        expect(absorbed).toEqual([
-            expect.objectContaining({
-                source: "flesh_shield",
-                unitId: abomination.getId(),
-                amount: 120,
-            }),
-            expect.objectContaining({
-                source: "flesh_shield",
-                unitId: abomination.getId(),
-                amount: 90,
-                rebounded: true,
-            }),
-        ]);
-        expect(absorbed.filter((entry) => entry.rebounded)).toHaveLength(1);
+        // The aura absorbs physical damage only: the burning ally beside it and the mirror's rebound onto the
+        // caster are both magical, so nothing is transferred and the owner stays untouched.
+        expect(absorbed.filter((entry) => entry.source === "flesh_shield")).toEqual([]);
+        expect(abomination.getHp()).toBe(abominationHpBefore);
     });
 
-    it("does not reward or demoralize its team when friendly Ring absorption kills the owner", () => {
+    it("does not reward or demoralize its team when the Ring burns a friendly stack to death", () => {
         alwaysRoll(99); // keep Magic Reflection out of this friendly-fire assertion
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
             enemies: [{ cell: { x: 5, y: 1 } }],
-            allies: [{ cell: { x: 5, y: 2 } }],
         });
-        const abomination = createTestUnit({
+        // Standing inside the ring next to the aimed enemy, this fragile friendly stack takes the full
+        // friendly-fire splash (120) and dies.
+        const victim = createTestUnit({
             name: "Abomination",
             team: PBTypes.TeamVals.LOWER,
             maxHp: 100,
-            luck: 10,
-            stackPower: 5,
             morale: 4,
-            abilities: ["Flesh Shield Aura"],
-            auraEffects: ["Flesh Shield"],
-            auraRanges: [1],
-            auraIsBuff: [true],
         });
         const witness = createTestUnit({
             name: "Abomination",
@@ -967,7 +994,7 @@ describe("Magic Reflection (passive)", () => {
             maxHp: 10_000,
             morale: 4,
         });
-        placeUnit(setup.grid, setup.unitsHolder, abomination, { x: 4, y: 3 });
+        placeUnit(setup.grid, setup.unitsHolder, victim, { x: 5, y: 2 });
         placeUnit(setup.grid, setup.unitsHolder, witness, { x: 8, y: 8 });
         setup.unitsHolder.refreshAuraEffectsForAllUnits();
         const casterMoraleBefore = setup.caster.getMorale();
@@ -981,7 +1008,7 @@ describe("Magic Reflection (passive)", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(abomination.isDead()).toBe(true);
+        expect(victim.isDead()).toBe(true);
         expect(setup.caster.getMorale()).toBe(casterMoraleBefore);
         expect(witness.getMorale()).toBe(witnessMoraleBefore);
     });

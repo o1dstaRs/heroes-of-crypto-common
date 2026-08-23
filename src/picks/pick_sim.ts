@@ -11,7 +11,8 @@
 
 import { ArtifactTier, TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getPerkRevealMode, PERKS, Perk } from "../perks/perk_properties";
+import { getDoctrineRevealMode, DOCTRINES, Doctrine } from "../doctrines/doctrine_properties";
+import { Perk } from "../perks/perk_properties";
 import { CreatureLevelList, CreatureLevelMap, CreaturePoolByLevel } from "../units/unit_properties";
 
 export type PickTeam = typeof PBTypes.TeamVals.LOWER | typeof PBTypes.TeamVals.UPPER;
@@ -44,11 +45,11 @@ export interface ILivePickPhase {
 }
 
 /** Exact order persisted by the ranked server (PickPhaseOrder). The first step is split into TWO
- * independent simultaneous phases: PERK (perk only) then INITIAL_PICK (the starting bundle). AUGMENTS
+ * independent simultaneous phases: DOCTRINE (doctrine only) then INITIAL_PICK (the starting bundle). AUGMENTS
  * markers hand the completed draft to placement. */
 export const LIVE_PICK_PHASES: readonly ILivePickPhase[] = [
     {
-        phase: PBTypes.PickPhaseVals.PERK,
+        phase: PBTypes.PickPhaseVals.DOCTRINE,
         actors: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
         creatureLevel: 0,
     },
@@ -83,9 +84,10 @@ export const LIVE_PICK_PHASES: readonly ILivePickPhase[] = [
 ] as const;
 
 export interface IPickTeamState {
+    doctrine: Doctrine;
     perk: Perk;
     /**
-     * The one creature this team asked to have banned during the PERK phase. Optional — a team may skip it.
+     * The one creature this team asked to have banned during the DOCTRINE phase. Optional — a team may skip it.
      * Kept per team and NOT exposed through the opponent-facing views (see getVisibleCreatureChoices), so a
      * proposal cannot leak draft intent before it resolves.
      */
@@ -109,7 +111,7 @@ interface IPickTranscriptBase {
 }
 
 export type PickTranscriptEntry =
-    | (IPickTranscriptBase & { type: "perk_selected"; perk: Perk; revealedOpponentSlots: number[] })
+    | (IPickTranscriptBase & { type: "doctrine_selected"; doctrine: Doctrine; revealedOpponentSlots: number[] })
     | (IPickTranscriptBase & {
           type: "bundle_selected";
           bundleIndex: 0 | 1;
@@ -129,7 +131,7 @@ export interface IPickSimState {
     phaseSequence: number;
     creaturesBanned: number[];
     /**
-     * The creature the players' optional pre-game bans actually removed, decided when the PERK phase closes
+     * The creature the players' optional pre-game bans actually removed, decided when the DOCTRINE phase closes
      * (see resolveProposedBans). Undefined when neither team proposed one, or when the roll is still pending.
      * It is already inside `creaturesBanned`; this field records WHICH ban was the players' so the client can
      * show the outcome and the server can persist it.
@@ -141,6 +143,7 @@ export interface IPickSimState {
 }
 
 export type PickAction =
+    | { type: "select_doctrine"; team: PickTeam; doctrine: Doctrine }
     | { type: "select_perk"; team: PickTeam; perk: Perk }
     | { type: "propose_ban"; team: PickTeam; creatureId: number }
     | { type: "select_bundle"; team: PickTeam; bundleIndex: number }
@@ -151,8 +154,8 @@ export type PickRejectionReason =
     | "pick_complete"
     | "wrong_phase"
     | "not_actor"
-    | "invalid_perk"
-    | "perk_already_selected"
+    | "invalid_doctrine"
+    | "doctrine_already_selected"
     | "ban_already_proposed"
     | "creature_not_bannable"
     | "invalid_bundle"
@@ -186,6 +189,7 @@ export interface IPickTeamView {
     creaturesBanned: number[];
     creaturesPicked: number[];
     knownOpponentCreatures: number[];
+    doctrine: Doctrine;
     perk: Perk;
     bundles: PickBundle[];
     tier2Offers: number[];
@@ -237,6 +241,7 @@ const artifactOffers = (rng: PickRandomInt): [number, number, number] =>
     pickDistinct(LIVE_TIER2_ARTIFACT_IDS, LIVE_TIER2_OFFER_SIZE, rng) as [number, number, number];
 
 const emptyTeam = (bundles: [PickBundle, PickBundle], tier2Offers: [number, number, number]): IPickTeamState => ({
+    doctrine: Doctrine.NO_DOCTRINE,
     perk: Perk.NO_PERK,
     bundles,
     tier2Offers,
@@ -311,8 +316,8 @@ const phaseAccepts = (state: IPickSimState, team: PickTeam, phase: PBTypes.PickP
     return current.phase === phase && current.actors.includes(team);
 };
 
-const perkPhaseComplete = (state: IPickSimState): boolean =>
-    state.lower.perk !== Perk.NO_PERK && state.upper.perk !== Perk.NO_PERK;
+const doctrinePhaseComplete = (state: IPickSimState): boolean =>
+    state.lower.doctrine !== Doctrine.NO_DOCTRINE && state.upper.doctrine !== Doctrine.NO_DOCTRINE;
 
 const bundlePhaseComplete = (state: IPickSimState): boolean =>
     state.lower.selectedBundleIndex !== undefined && state.upper.selectedBundleIndex !== undefined;
@@ -321,8 +326,8 @@ const tier2PhaseComplete = (state: IPickSimState): boolean =>
     state.lower.tier2Artifact !== undefined && state.upper.tier2Artifact !== undefined;
 
 const advanceIfReady = (state: IPickSimState, rng: PickRandomInt): void => {
-    if (state.phaseSequence === 0 && perkPhaseComplete(state)) {
-        // The optional pre-game bans settle exactly here, as the perk step closes: late enough that both
+    if (state.phaseSequence === 0 && doctrinePhaseComplete(state)) {
+        // The optional pre-game bans settle exactly here, as the doctrine step closes: late enough that both
         // proposals are in, early enough that the result shapes the whole draft that follows.
         resolveProposedBans(state, rng);
         state.phaseSequence += 1;
@@ -356,7 +361,7 @@ const rejected = (state: IPickSimState, reason: PickRejectionReason): PickTransi
  * Creatures a team may propose for the optional pre-game ban: everything in the draft catalog that is not
  * already auto-banned and not sitting in EITHER team's starting bundle offer.
  *
- * Bundle creatures are excluded because those offers are generated before the perk phase and are already on
+ * Bundle creatures are excluded because those offers are generated before the doctrine phase and are already on
  * screen — banning one would either be a wasted ban or force an offer to be re-rolled underneath a player who
  * has already read it. Same list for both teams, so it gives nothing away.
  */
@@ -378,7 +383,7 @@ export function getBannableCreatures(state: IPickSimState): number[] {
 }
 
 /**
- * Close out the players' optional bans when the PERK phase ends.
+ * Close out the players' optional bans when the DOCTRINE phase ends.
  *
  * - nobody proposed one            -> nothing is banned
  * - both proposed the SAME unit    -> it is banned outright, no roll (they agree)
@@ -422,7 +427,7 @@ const applyProposedBan = (
     state: IPickSimState,
     action: Extract<PickAction, { type: "propose_ban" }>,
 ): PickTransition => {
-    if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.PERK)) {
+    if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.DOCTRINE)) {
         return rejected(state, isPickSimComplete(state) ? "pick_complete" : "wrong_phase");
     }
     const own = teamState(state, action.team);
@@ -440,35 +445,36 @@ const applyProposedBan = (
         type: "ban_proposed",
         creatureId: action.creatureId,
     };
-    // Deliberately does NOT advance the phase: the ban is optional, so the perk choice alone gates the step.
+    // Deliberately does NOT advance the phase: the ban is optional, so the doctrine choice alone gates the step.
     return accepted(next, event);
 };
 
-const applyPerk = (
+const applyDoctrine = (
     state: IPickSimState,
-    action: Extract<PickAction, { type: "select_perk" }>,
+    action: Extract<PickAction, { type: "select_doctrine" }>,
     rng: PickRandomInt,
 ): PickTransition => {
-    if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.PERK)) {
+    if (!phaseAccepts(state, action.team, PBTypes.PickPhaseVals.DOCTRINE)) {
         return rejected(state, isPickSimComplete(state) ? "pick_complete" : "wrong_phase");
     }
     const own = teamState(state, action.team);
-    if (own.perk !== Perk.NO_PERK) {
-        return rejected(state, "perk_already_selected");
+    if (own.doctrine !== Doctrine.NO_DOCTRINE) {
+        return rejected(state, "doctrine_already_selected");
     }
-    if (action.perk === Perk.NO_PERK || !(action.perk in PERKS)) {
-        return rejected(state, "invalid_perk");
+    if (action.doctrine === Doctrine.NO_DOCTRINE || !(action.doctrine in DOCTRINES)) {
+        return rejected(state, "invalid_doctrine");
     }
 
     const next = cloneState(state);
     const nextOwn = teamState(next, action.team);
-    nextOwn.perk = action.perk;
+    nextOwn.doctrine = action.doctrine;
+    nextOwn.perk = action.doctrine as unknown as Perk;
     // The fixed six-slot creature layout by level is [L1@0, L1@1, L2@2, L2@3, L3@4, L4@5]
-    // (CreaturePoolByLevel = [2, 2, 1, 1]). The "random3" perk reveals ONE slot per tier block rather than
+    // (CreaturePoolByLevel = [2, 2, 1, 1]). The "random3" doctrine reveals ONE slot per tier block rather than
     // drawing three uniformly: one of the two L1 slots, one of the two L2 slots, and either the L3 or L4 slot.
     // This mirrors the ranked server's legacy seeding in arango_hoc.ts (pickPhaseLogic slotsSeen seeding).
     const totalSlots = CreaturePoolByLevel.reduce((total, count) => total + count, 0);
-    const revealMode = getPerkRevealMode(action.perk);
+    const revealMode = getDoctrineRevealMode(action.doctrine);
     if (revealMode === "all") {
         nextOwn.revealedOpponentSlots = Array.from({ length: totalSlots }, (_, index) => index);
     } else if (revealMode === "random3") {
@@ -476,10 +482,10 @@ const applyPerk = (
         slots.sort((a, b) => a - b);
         nextOwn.revealedOpponentSlots = slots;
     }
-    const event: Extract<PickTranscriptEntry, { type: "perk_selected" }> = {
+    const event: Extract<PickTranscriptEntry, { type: "doctrine_selected" }> = {
         ...eventBase(next, action.team),
-        type: "perk_selected",
-        perk: action.perk,
+        type: "doctrine_selected",
+        doctrine: action.doctrine,
         revealedOpponentSlots: [...nextOwn.revealedOpponentSlots],
     };
     advanceIfReady(next, rng);
@@ -638,8 +644,14 @@ export function transitionPickSim(state: IPickSimState, action: PickAction, rng:
         return rejected(state, "not_actor");
     }
     switch (action.type) {
+        case "select_doctrine":
+            return applyDoctrine(state, action, rng);
         case "select_perk":
-            return applyPerk(state, action, rng);
+            return applyDoctrine(
+                state,
+                { type: "select_doctrine", team: action.team, doctrine: action.perk as unknown as Doctrine },
+                rng,
+            );
         case "propose_ban":
             return applyProposedBan(state, action);
         case "select_bundle":
@@ -731,6 +743,7 @@ export function getPickTeamView(state: IPickSimState, team: PickTeam): IPickTeam
         creaturesBanned: [...state.creaturesBanned],
         creaturesPicked: [...own.creatures],
         knownOpponentCreatures: getKnownOpponentCreatures(state, team),
+        doctrine: own.doctrine,
         perk: own.perk,
         bundles: state.phaseSequence === 1 ? own.bundles.map((bundle) => [...bundle] as PickBundle) : [],
         tier2Offers: state.phaseSequence === 8 ? [...own.tier2Offers] : [],

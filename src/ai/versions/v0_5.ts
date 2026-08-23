@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { hasDoubleShotAbility } from "../../abilities/ability_helper";
 import { AbilityPowerType } from "../../abilities/ability_properties";
 import type { GameAction } from "../../engine/actions";
 import {
@@ -53,6 +54,17 @@ const isAdjacentCell = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Ma
  * (attack_not_available). Check both buff and ability forms so we never select it for a strike. */
 const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbilityActive("Hidden");
 const cellKey = (c: XY): number => (c.x << 4) | c.y;
+/** True when any cell in each prepared footprint touches, preserving the legacy inclusive-diagonal rule. */
+const footprintsAreAdjacent = (left: readonly XY[], right: readonly XY[]): boolean => {
+    for (const leftCell of left) {
+        for (const rightCell of right) {
+            if (isAdjacentCell(leftCell, rightCell)) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
 // A fragile aura-emitting FLYER (e.g. Pegasus) is worth more keeping its aura on the army than diving in to
 // melee for a marginal hit — measured: Pegasus attacked 81% of turns, supporting only ~3%. ON by default.
 const auraFlyOn = process.env.V05_AURAFLY !== "off";
@@ -231,6 +243,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!enemies.length) {
             return decision;
         }
+        const enemyFootprints = enemies.map((enemy) => ({
+            base: enemy.getBaseCell(),
+            cells: enemy.getCells(),
+        }));
         const movePath = decisionPathSource(context).getMovePath(
             unit.getBaseCell(),
             matrix,
@@ -240,8 +256,6 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
-            unit.getFootprintWidth(),
-            unit.getFootprintHeight(),
         );
         if (!movePath.knownPaths.size) {
             return decision;
@@ -257,16 +271,14 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 continue;
             }
             const fp = this.footprintForCell(unit, route.cell, context);
-            const stillPinned = enemies.some((e) => e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc))));
+            const stillPinned = enemyFootprints.some((enemy) => footprintsAreAdjacent(enemy.cells, fp));
             if (stillPinned) {
                 continue; // this cell is also suppressed — no good
             }
-            const dist = Math.min(
-                ...enemies.map((e) => {
-                    const ec = e.getBaseCell();
-                    return Math.abs(route.cell.x - ec.x) + Math.abs(route.cell.y - ec.y);
-                }),
-            );
+            let dist = Infinity;
+            for (const enemy of enemyFootprints) {
+                dist = Math.min(dist, Math.abs(route.cell.x - enemy.base.x) + Math.abs(route.cell.y - enemy.base.y));
+            }
             const score = noMelee ? dist : -(route.weight ?? route.route.length);
             if (score > bestScore) {
                 bestScore = score;
@@ -388,6 +400,13 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!isCharge || !this.canHourglass(unit, context)) {
             return decision;
         }
+        // A multi-stack AOE line is a transient board opportunity: after hourglassing, either target can move
+        // and the line/cluster disappears. v0.4 deliberately repositions Skewer, Fire Breath, Chain Lightning
+        // and Lightning Spin units to create these hits, so do not let this generic charge policy erase that
+        // higher-value tactical decision. This notably preserves Pikeman's move+Skewer through two stacks.
+        if (this.meleeAoeHitCount(unit, context, decision) >= 2) {
+            return decision;
+        }
         // BUFF-WAIT: if the charge would trade into an enemy carrying a STRONG, SOON-EXPIRING temporary buff
         // (Riot / Mass Riot / Armor / Behemoth-style), it's often better to HOLD and let the buff drop first than
         // to attack into inflated stats. Wait when the target has such a buff (power >= threshold, expiring within
@@ -412,6 +431,74 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return decision;
         }
         return [{ type: "wait_turn", unitId: unit.getId() }];
+    }
+    /** Number of enemy stacks hit by the selected melee AOE, mirroring v0.4's targeting geometry. */
+    private meleeAoeHitCount(unit: Unit, context: IDecisionContext, decision: GameAction[]): number {
+        const strike = decision.find((a) => a.type === "melee_attack");
+        if (!strike || strike.type !== "melee_attack") {
+            return 0;
+        }
+        const { grid, unitsHolder } = context;
+        const enemyTeam = otherTeam(unit.getTeam());
+        const enemies = unitsHolder.getAllAllies(enemyTeam).filter((enemy) => !enemy.isDead());
+        const stand = strike.attackFrom ?? unit.getBaseCell();
+
+        if (unit.hasAbilityActive("Lightning Spin")) {
+            const footprint = this.footprintForCell(unit, stand, context);
+            return enemies.filter((enemy) =>
+                enemy.getCells().some((enemyCell) => footprint.some((cell) => isAdjacentCell(cell, enemyCell))),
+            ).length;
+        }
+
+        const target = unitsHolder.getAllUnits().get(strike.targetId);
+        if (!target || target.isDead() || target.getTeam() !== enemyTeam) {
+            return 0;
+        }
+        if (unit.hasAbilityActive("Fire Breath") || unit.hasAbilityActive("Skewer Strike")) {
+            const targetCell = target.getBaseCell();
+            const dx = Math.sign(targetCell.x - stand.x);
+            const dy = Math.sign(targetCell.y - stand.y);
+            const depth = unit.hasAbilityActive("Fire Breath") && !unit.isSmallSize() ? 2 : 1;
+            const hitIds = new Set<string>([target.getId()]);
+            for (let distance = 1; distance <= depth; distance += 1) {
+                const occupantId = grid.getOccupantUnitId({
+                    x: targetCell.x + dx * distance,
+                    y: targetCell.y + dy * distance,
+                });
+                const occupant = occupantId ? unitsHolder.getAllUnits().get(occupantId) : undefined;
+                if (occupant && !occupant.isDead() && occupant.getTeam() === enemyTeam) {
+                    hitIds.add(occupant.getId());
+                }
+            }
+            return hitIds.size;
+        }
+
+        if (unit.hasAbilityActive("Chain Lightning")) {
+            const chainable = enemies.filter(
+                (enemy) => !enemy.hasAbilityActive("Wind Element") && enemy.getMagicResist() < 100,
+            );
+            const hitIds = new Set<string>([target.getId()]);
+            let frontier: Unit[] = [target];
+            for (let layer = 0; layer < 4 && frontier.length; layer += 1) {
+                const next: Unit[] = [];
+                for (const current of frontier) {
+                    for (const enemy of chainable) {
+                        if (
+                            !hitIds.has(enemy.getId()) &&
+                            enemy
+                                .getCells()
+                                .some((enemyCell) => current.getCells().some((cell) => isAdjacentCell(cell, enemyCell)))
+                        ) {
+                            hitIds.add(enemy.getId());
+                            next.push(enemy);
+                        }
+                    }
+                }
+                frontier = next;
+            }
+            return hitIds.size;
+        }
+        return 1;
     }
     /**
      * Learned center-mountain mining (BLOCK_CENTER maps). v0.4 already breaks the block via a fixed
@@ -615,8 +702,6 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
-            unit.getFootprintWidth(),
-            unit.getFootprintHeight(),
         );
         const bc = unit.getBaseCell();
         const v4from = strike.attackFrom ?? bc;
@@ -838,8 +923,6 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
-            unit.getFootprintWidth(),
-            unit.getFootprintHeight(),
         );
         for (const routes of movePath.knownPaths.values()) {
             const route = routes[0];
@@ -1051,8 +1134,6 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
-            unit.getFootprintWidth(),
-            unit.getFootprintHeight(),
         );
         const plan = planAuraMove(unit, movePath.knownPaths, gridSettings, matrix, unitsHolder, this.auraWeight);
         // 1) A reachable cell covers more allies -> reposition there (stay in support).
@@ -1194,6 +1275,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const myAllies = unitsHolder
             .getAllAllies(unit.getTeam())
             .filter((a) => !a.isDead() && a.getId() !== unit.getId());
+        const allyFootprints = myAllies.map((ally) => ally.getCells());
         const fp = context.fightProperties;
         const v4target = strike.targetId;
         const v4from = strike.attackFrom ?? base;
@@ -1205,8 +1287,19 @@ export class StrategyV0_5 extends StrategyV0_4 {
         if (!enemies.length) {
             return decision;
         }
+        const enemyFootprints = new Map(enemies.map((enemy) => [enemy.getId(), enemy.getCells()]));
+        const footprintCache = new Map<number, XY[]>();
+        const footprintAt = (cell: XY): XY[] => {
+            const key = cellKey(cell);
+            let footprint = footprintCache.get(key);
+            if (!footprint) {
+                footprint = this.footprintForCell(unit, cell, context);
+                footprintCache.set(key, footprint);
+            }
+            return footprint;
+        };
         const footprintOk = (cell: XY): boolean => {
-            const f = this.footprintForCell(unit, cell, context);
+            const f = footprintAt(cell);
             return (
                 f.length > 0 &&
                 (grid.areAllCellsEmpty(f, unit.getId()) ||
@@ -1219,8 +1312,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
             );
         };
         const adjacentFrom = (cell: XY, e: Unit): boolean => {
-            const f = this.footprintForCell(unit, cell, context);
-            return f.some((mc) => e.getCells().some((ec) => isAdjacentCell(mc, ec)));
+            const enemyFootprint = enemyFootprints.get(e.getId());
+            return !!enemyFootprint && footprintsAreAdjacent(footprintAt(cell), enemyFootprint);
         };
 
         type Cand = { target: Unit; cell: XY; route?: IReadonlyWeightedRoute };
@@ -1248,8 +1341,6 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 unit.isSmallSize(),
                 unit.canTraverseLava(),
                 unit.hasAbilityActive("In Its Own World"),
-                unit.getFootprintWidth(),
-                unit.getFootprintHeight(),
             );
             for (const routes of movePath.knownPaths.values()) {
                 const route = routes[0];
@@ -1260,7 +1351,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
                     type: "move_unit",
                     unitId: unit.getId(),
                     path: route.route.map((cell) => ({ ...cell })),
-                    targetCells: this.footprintForCell(unit, route.cell, context),
+                    targetCells: footprintAt(route.cell),
                     hasLavaCell: route.hasLavaCell,
                     hasWaterCell: route.hasWaterCell,
                 };
@@ -1356,8 +1447,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
             // Focus-fire: how many of OUR other stacks are already adjacent to this target (so the army can
             // wipe it together). Concentrating melee on an already-engaged stack finishes it faster.
             const focusFire =
-                myAllies.filter((a) =>
-                    a.getCells().some((ac) => c.target.getCells().some((tc) => isAdjacentCell(ac, tc))),
+                allyFootprints.filter((allyFootprint) =>
+                    footprintsAreAdjacent(allyFootprint, enemyFootprints.get(c.target.getId()) ?? []),
                 ).length / 2;
             // Expected retaliation damage taken (as a fraction of our HP) — 0 if this strike kills the stack
             // or the target already retaliated this lap. The core favorable-trade signal: avoid striking a
@@ -1372,10 +1463,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
                           myHp,
                       ) / myHp;
             // Stand-support: how many of OUR stacks sit adjacent to the stand cell (screen/protect us there).
-            const fpCells = this.footprintForCell(unit, c.cell, context);
+            const fpCells = footprintAt(c.cell);
             const standSupport =
-                myAllies.filter((a) => a.getCells().some((ac) => fpCells.some((fc) => isAdjacentCell(ac, fc)))).length /
-                2;
+                allyFootprints.filter((allyFootprint) => footprintsAreAdjacent(allyFootprint, fpCells)).length / 2;
             // Target-wounded: fraction of the target stack already dead — finishing a nearly-dead stack removes
             // a whole unit from the board (worth more than chip damage on a fresh one).
             const tDead = c.target.getAmountDied();
@@ -1444,7 +1534,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 type: "move_unit",
                 unitId: unit.getId(),
                 path: best.route.route.map((c: XY) => ({ x: c.x, y: c.y })),
-                targetCells: this.footprintForCell(unit, best.cell, context),
+                targetCells: footprintAt(best.cell),
                 hasLavaCell: best.route.hasLavaCell,
                 hasWaterCell: best.route.hasWaterCell,
             });
@@ -1485,6 +1575,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const allies = unitsHolder
             .getAllAllies(unit.getTeam())
             .filter((a) => !a.isDead() && a.getId() !== unit.getId());
+        const enemyBaseCells = enemies.map((enemy) => enemy.getBaseCell());
         const centroid = allies.length
             ? {
                   x: allies.reduce((s, a) => s + a.getBaseCell().x, 0) / allies.length,
@@ -1492,7 +1583,13 @@ export class StrategyV0_5 extends StrategyV0_4 {
               }
             : base;
         const steps = Math.max(1, unit.getSteps());
-        const minEnemyDist = (c: XY): number => Math.min(...enemies.map((e) => getDistance(c, e.getBaseCell())));
+        const minEnemyDist = (cell: XY): number => {
+            let minimum = Infinity;
+            for (const enemyCell of enemyBaseCells) {
+                minimum = Math.min(minimum, getDistance(cell, enemyCell));
+            }
+            return minimum;
+        };
         const baseEnemyDist = minEnemyDist(base);
         const baseCentroidDist = getDistance(base, centroid);
         // Per-unit constants for the shoot-readiness feature: a shooter with ammo wants a cell within its
@@ -1537,8 +1634,6 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
-            unit.getFootprintWidth(),
-            unit.getFootprintHeight(),
         );
         // A candidate's full footprint must be occupiable — getMovePath keys on the anchor, but a large
         // unit's footprint can still clip an occupied cell. Mirror v0.4's moveIsBlocked guard exactly so we
@@ -1624,13 +1719,14 @@ export class StrategyV0_5 extends StrategyV0_4 {
             wShotFocus !== 0
                 ? context.unitsHolder.getAllAllies(fromTeam).filter((a) => !a.isDead() && a.getId() !== unit.getId())
                 : [];
+        const allyFootprints = myAllies.map((ally) => ally.getCells());
         let value = 0;
         let hitsEnemyRange = false;
         // Double Shot (Gargantuan) lands a SECOND full shot — target + its whole AOE splash — at 100%
         // (double_shot_ability.ts). Model that so the scorer values the shot at its true ~2x output and,
         // crucially, so the kill bonus fires on a stack we can only wipe WITH both shots (single-shot damage
         // alone reads as "can't kill"). Applies to the friendly-fire cost too (the 2nd shot re-hits allies).
-        const shots = process.env.V05_DBLSHOT !== "off" && unit.hasAbilityActive("Double Shot") ? 2 : 1;
+        const shots = process.env.V05_DBLSHOT !== "off" && hasDoubleShotAbility(unit) ? 2 : 1;
         const counted = new Set<string>();
         for (let i = 0; i < evaluation.affectedUnits.length; i += 1) {
             const divisor = evaluation.rangeAttackDivisors[i] ?? 1;
@@ -1658,9 +1754,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
                         value += wShotCaster; // silence their Healer / caster
                     }
                     if (wShotFocus !== 0) {
+                        const targetFootprint = target.getCells();
                         const focus =
-                            myAllies.filter((a) =>
-                                a.getCells().some((ac) => target.getCells().some((tc) => isAdjacentCell(ac, tc))),
+                            allyFootprints.filter((allyFootprint) =>
+                                footprintsAreAdjacent(allyFootprint, targetFootprint),
                             ).length / 2;
                         value += wShotFocus * focus; // concentrate fire on an already-engaged stack
                     }

@@ -56,10 +56,7 @@ export interface IV08A19F184LowerHumanPlacementAudit {
     readonly selectedFingerprint: string;
 }
 
-const centerFor = (unit: Unit, base: XY): XY => ({
-    x: base.x - (unit.getFootprintWidth() - 1) / 2,
-    y: base.y - (unit.getFootprintHeight() - 1) / 2,
-});
+const centerFor = (unit: Unit, base: XY): XY => (unit.isSmallSize() ? base : { x: base.x - 0.5, y: base.y - 0.5 });
 
 const normalizedPlacementFingerprint = (
     units: readonly Unit[],

@@ -65,9 +65,21 @@ export type ArtifactRequestObject = ReturnType<InstanceType<typeof m_pick_phase_
 export const RevealRequest = m_pick_phase_requests.PBTypes.RevealRequest;
 export type RevealRequest = InstanceType<typeof m_pick_phase_requests.PBTypes.RevealRequest>;
 export type RevealRequestObject = ReturnType<InstanceType<typeof m_pick_phase_requests.PBTypes.RevealRequest>["toObject"]>;
-export const PerkRequest = m_pick_phase_requests.PBTypes.PerkRequest;
-export type PerkRequest = InstanceType<typeof m_pick_phase_requests.PBTypes.PerkRequest>;
-export type PerkRequestObject = ReturnType<InstanceType<typeof m_pick_phase_requests.PBTypes.PerkRequest>["toObject"]>;
+export const DoctrineRequest = m_pick_phase_requests.PBTypes.DoctrineRequest;
+export type DoctrineRequest = InstanceType<typeof m_pick_phase_requests.PBTypes.DoctrineRequest>;
+export type DoctrineRequestObject = ReturnType<InstanceType<typeof m_pick_phase_requests.PBTypes.DoctrineRequest>["toObject"]>;
+export class PerkRequest extends m_pick_phase_requests.PBTypes.DoctrineRequest {
+    constructor(data?: any[] | { perk?: number }) {
+        super(Array.isArray(data) ? data : { doctrine: data?.perk });
+    }
+    get perk(): number {
+        return this.doctrine;
+    }
+    set perk(value: number) {
+        this.doctrine = value;
+    }
+}
+export type PerkRequestObject = ReturnType<PerkRequest["toObject"]>;
 
 import * as m_player_portal from "./player_portal";
 export const PortalMatchKind = m_player_portal.PBTypes.PortalMatchKind;
@@ -118,4 +130,3 @@ import * as m_unit from "./unit";
 export const UnitData = m_unit.PBTypes.UnitData;
 export type UnitData = InstanceType<typeof m_unit.PBTypes.UnitData>;
 export type UnitDataObject = ReturnType<InstanceType<typeof m_unit.PBTypes.UnitData>["toObject"]>;
-

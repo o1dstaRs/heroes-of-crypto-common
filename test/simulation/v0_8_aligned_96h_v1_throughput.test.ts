@@ -381,7 +381,7 @@ describe("v0.8 aligned 96-hour v1 throughput profile", () => {
             "src/ai/versions/v0_8_dominant_finish.ts",
             "src/artifacts/artifact_properties.ts",
             "src/configuration/creatures.json",
-            "src/perks/perk_properties.ts",
+            "src/doctrines/doctrine_properties.ts",
             "src/picks/pick_sim.ts",
             "src/simulation/army.ts",
             "src/simulation/battle_engine.ts",

@@ -28,14 +28,17 @@ export interface IFleshShieldResult {
 }
 
 /**
- * Flesh Shield aura (Abomination): when a unit protected by the aura takes a direct attack hit,
+ * Flesh Shield aura (Abomination): when a unit protected by the aura takes a direct PHYSICAL attack hit,
  * the aura's owner absorbs the aura-power % of that damage (scaled by stack power and the standard
  * stack-ability modifiers at aura-refresh time by calculateAuraPower). The absorbed portion is
- * recalculated against the owner's own defense — scaled by the ratio of the protected unit's effective
+ * recalculated against the owner's own armor — scaled by the ratio of the protected unit's effective
  * armor to the owner's effective armor as seen by this attacker — and dealt to the owner instead. The
  * protected unit only receives the remainder. If the owner cannot survive the full recalculated
  * transfer, only the affordable portion is redirected and the overflow remains on the protected unit.
  * Applies to direct hits, responses, multi-hits, and every unit struck by an AOE or pass-through attack.
+ *
+ * PHYSICAL ONLY: the aura is flesh, not a ward. Magical damage — cast spells, Fire Breath, Chain Lightning
+ * and every other magic-resist-reduced hit — lands on the protected unit in full and is never routed here.
  */
 export function processFleshShieldAura(
     attackerUnit: Unit,
@@ -47,9 +50,6 @@ export function processFleshShieldAura(
     sceneLog: ISceneLog,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     secondaryDamage?: ISecondaryDamage[],
-    damageType: "physical" | "magic" = "physical",
-    recordAttackerDamageStatistic = true,
-    secondaryRebounded = false,
 ): IFleshShieldResult {
     const result: IFleshShieldResult = {
         remainingDamage: damage,
@@ -95,24 +95,9 @@ export function processFleshShieldAura(
         return result;
     }
 
-    // Recalculate the absorbed chunk against the absorber's own matching defense. Physical attacks
-    // use effective armor as seen by this attacker (including piercing); magical AOE has already been
-    // reduced by the protected target's magic resistance, so convert it through the two resist ratios.
+    // Recalculate the absorbed chunk against the absorber's own armor as seen by this attacker (including
+    // piercing). Only physical damage reaches this function, so armor is the one defense that matters.
     const recalculateForAbsorber = (() => {
-        if (damageType === "magic") {
-            const targetDamageMultiplier = Math.max(0, 1 - targetUnit.getMagicResist() / 100);
-            const absorberDamageMultiplier = Math.max(0, 1 - absorberUnit.getMagicResist() / 100);
-            return (redirectedDamage: number): number => {
-                if (redirectedDamage <= 0 || absorberDamageMultiplier <= 0) {
-                    return 0;
-                }
-                if (targetDamageMultiplier <= 0) {
-                    return redirectedDamage;
-                }
-                return Math.max(1, Math.ceil((redirectedDamage * absorberDamageMultiplier) / targetDamageMultiplier));
-            };
-        }
-
         const synergyAbilityPowerIncrease = FightStateManager.getInstance()
             .getFightProperties()
             .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam());
@@ -158,21 +143,16 @@ export function processFleshShieldAura(
         sceneLog,
     );
     result.absorbedDamage = damageDealt;
-    if (recordAttackerDamageStatistic) {
-        damageStatisticHolder.add({
-            unitName: attackerUnit.getName(),
-            damage: damageDealt,
-            team: attackerUnit.getTeam(),
-            lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
-        });
-    }
+    damageStatisticHolder.add({
+        unitName: attackerUnit.getName(),
+        damage: damageDealt,
+        team: attackerUnit.getTeam(),
+        lap: FightStateManager.getInstance().getFightProperties().getCurrentLap(),
+    });
     const unitsDied = Math.max(0, amountAliveBefore - absorberUnit.getAmountAlive());
     if (secondaryDamage) {
         const aggregate = secondaryDamage.find(
-            (entry) =>
-                entry.source === "flesh_shield" &&
-                entry.unitId === absorberUnit.getId() &&
-                Boolean(entry.rebounded) === secondaryRebounded,
+            (entry) => entry.source === "flesh_shield" && entry.unitId === absorberUnit.getId(),
         );
         if (aggregate) {
             aggregate.amount += damageDealt;
@@ -184,7 +164,6 @@ export function processFleshShieldAura(
                 position: positionAtImpact,
                 amount: damageDealt,
                 unitsDied,
-                ...(secondaryRebounded ? { rebounded: true } : {}),
             });
         }
     }

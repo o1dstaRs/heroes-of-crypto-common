@@ -78,7 +78,7 @@ export const V08_CASTLING_ROUTER_VERSIONS_ENV = "V08_CASTLING_ROUTER_VERSIONS";
 export const V08_BLACKSMITH_ROLE_VERSIONS_ENV = "V08_BLACKSMITH_ROLE_VERSIONS";
 /** Exact-version A/B scope for Nightmare's threat-weighted Fire Wall roadblock router. */
 export const V08_NIGHTMARE_ROLE_VERSIONS_ENV = "V08_NIGHTMARE_ROLE_VERSIONS";
-/** Exact-version A/B scope for the Wandering Mage/Healer role routers; absent enables every v0.8-family seat. */
+/** Exact-version A/B scope for the Ash Moth/Healer role routers; absent enables every v0.8-family seat. */
 export const V08_SUPPORT_ROLE_VERSIONS_ENV = "V08_SUPPORT_ROLE_VERSIONS";
 
 const nonnegativeFinite = (value: number): number => (Number.isFinite(value) ? Math.max(0, value) : 0);
@@ -349,6 +349,7 @@ function enumerateV08BoundaryCandidates(
     unit: Unit,
     context: IDecisionContext,
     decision: GameAction[],
+    includeMountainAttacks = false,
 ): readonly IEnumeratedCandidate[] {
     return enumerateCandidates(unit, context, decision, {
         // Bound the direct-policy repair to the same practical candidate census used by live search.
@@ -356,10 +357,36 @@ function enumerateV08BoundaryCandidates(
         maxMeleePairs: 8,
         maxShotAims: 6,
         maxAreaThrowCells: 4,
+        includeMountainAttacks,
         // A rediscovered incumbent attack needs the same kill/damage metadata as generated alternatives so the
         // late finish comparator can improve target selection even when v0.7 already chose to attack.
         enrichIncumbentMetadata: true,
     }).candidates;
+}
+
+/**
+ * Cemetery stones are one-hit tactical objects, not the multi-hit classic center mountain. When the final v0.8
+ * proposal has no committed attack or cast, clear a reachable/shootable stone instead of spending the turn on
+ * generic movement, waiting, or defense. A legal attack against a living unit still takes precedence.
+ */
+export function prioritizeV08CemeteryObstacleAttack(
+    unit: Unit,
+    context: IDecisionContext,
+    decision: GameAction[],
+): GameAction[] {
+    if (
+        !context.grid.hasScatteredMountains() ||
+        context.grid.getScatteredMountainsStanding().length <= 0 ||
+        decision.some((action) => V08_POSTURE_PROTECTED_ACTION_TYPES.has(action.type))
+    ) {
+        return decision;
+    }
+    const candidates = enumerateV08BoundaryCandidates(unit, context, decision, true);
+    return (
+        selectV08DirectCombatCandidate(candidates)?.actions ??
+        candidates.find((candidate) => candidate.kind === "mine")?.actions ??
+        decision
+    );
 }
 
 /**
@@ -673,7 +700,8 @@ export class StrategyV0_8 extends StrategyV0_7 {
             rankedReplayDecision,
             this.canHourglass(unit, context),
         );
-        return repairV08BacklineWardDecision(unit, context, protectedDecision);
+        const wardDecision = repairV08BacklineWardDecision(unit, context, protectedDecision);
+        return prioritizeV08CemeteryObstacleAttack(unit, context, wardDecision);
     }
 }
 

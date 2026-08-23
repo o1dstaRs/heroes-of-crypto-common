@@ -82,7 +82,6 @@ export class UnitProperties {
     public movement_type: MovementType;
     public exp: number;
     public readonly size: number;
-    /** Fixed battlefield footprint. Width grows along X; height grows along Y. */
     public readonly footprint_width: number;
     public readonly footprint_height: number;
     public readonly level: number;
@@ -127,12 +126,20 @@ export class UnitProperties {
      * The exact inverse of `target`: the id of an enemy this unit may NOT attack or retaliate against, while
      * every other enemy stays fair game. Written by Terrifying Gaze (Manticore) and cleared in adjustBaseStats
      * as soon as the effect of the same name expires — mirroring how Aggr owns `target`. Like `target`, this is
-     * local turn state and is deliberately absent from UnitData/the wire format; the "Terrifying Gaze" effect
-     * itself is what replicates, and the id is re-derived from it.
+     * local turn state. Ranked snapshots carry it explicitly alongside the replicated "Terrifying Gaze"
+     * status because the status name alone cannot identify which of several Manticores is the forbidden one.
      */
     public forbidden_target: string;
     /** Abilities that remain visible on the card but were permanently disabled by Predatory Assimilation. */
     public stolen_abilities: string[];
+    /**
+     * Abilities handed to this unit by the CURRENTLY equipped artifact (the Wounding Charm's Deep Wounds
+     * card, for instance) — never a card the creature owns natively. applyArtifacts revokes exactly this
+     * list before it re-applies, so swapping to another artifact in the same tier takes the old ability
+     * away with it. Recording only what was granted is what keeps a Wolf's native Deep Wounds Level 1
+     * from being stripped when the charm comes off. Lazily created, like stolen_abilities.
+     */
+    public artifact_granted_abilities?: string[];
     /** Turn-start snapshot. A flyer may cross/land in Web this turn and is locked only on its next activation. */
     public web_movement_locked: boolean;
     // When set, luck is supplied authoritatively (e.g. the ranked server's per-turn roll + auras) and

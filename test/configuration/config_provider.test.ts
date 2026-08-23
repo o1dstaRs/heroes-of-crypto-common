@@ -16,6 +16,7 @@ import auraEffectsJson from "../../src/configuration/aura_effects.json";
 import creaturesJson from "../../src/configuration/creatures.json";
 import effectsJson from "../../src/configuration/effects.json";
 import spellsJson from "../../src/configuration/spells.json";
+import { AbilityPowerType } from "../../src/abilities/ability_properties";
 import {
     getAbilityConfig,
     getAuraEffectConfig,
@@ -66,45 +67,6 @@ describe("config_provider", () => {
                 expect(creature.aura_is_buff.length).toBe(creature.abilities.length);
             }
         }
-    });
-
-    it("configures horizontal two-cell creatures without rotating their footprint", () => {
-        for (const [faction, name] of [
-            ["Life", "Griffin"],
-            ["Nature", "White Tiger"],
-            ["Nature", "Wolf"],
-            ["Nature", "Unicorn"],
-            ["Nature", "Mantis"],
-            ["Nature", "Pegasus"],
-            ["Chaos", "Manticore"],
-            ["Chaos", "Nightmare"],
-            ["Might", "Hyena"],
-            ["Might", "Wyvern"],
-            ["Might", "Centaur"],
-            ["Might", "Wolf Rider"],
-            ["Might", "Nomad"],
-        ] as const) {
-            const creature = getCreatureConfig(PBTypes.TeamVals.LOWER, faction, name, `${name}_512`, 1);
-            expect(creature.footprint_width).toBe(2);
-            expect(creature.footprint_height).toBe(1);
-            expect(creature.size).toBe(1);
-        }
-
-        const fairy = getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "Fairy", "Fairy_512", 1);
-        expect(fairy.footprint_width).toBe(1);
-        expect(fairy.footprint_height).toBe(1);
-    });
-
-    it("presents the renamed Wandering Mage while accepting legacy Ash Moth payloads", () => {
-        const current = getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Wandering Mage", "wandering_mage_512", 2);
-        const legacy = getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Ash Moth", "ash_moth_512", 2);
-
-        expect(current.name).toBe("Wandering Mage");
-        expect(legacy.name).toBe("Wandering Mage");
-        expect(current.movement_type).toBe(PBTypes.MovementVals.WALK);
-        expect(legacy.movement_type).toBe(PBTypes.MovementVals.WALK);
-        expect(legacy.abilities).toEqual(current.abilities);
-        expect(legacy.spells).toEqual(current.spells);
     });
 
     it("gives Zena Handyman: her kit waives the ranged melee penalty (desc arrays aligned)", () => {
@@ -198,11 +160,11 @@ describe("config_provider", () => {
     it("loads the one-unit Abomination balance and stack-powered Flesh Shield metadata", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Chaos", "Abomination", "abomination_512", 0, 1000);
 
-        // The requested one-unit tank profile: a 1,000-XP stack is exactly one 600-HP creature.
-        expect(creature.max_hp).toBe(600);
+        // The requested one-unit tank profile: a 1,000-XP stack is exactly one 550-HP creature.
+        expect(creature.max_hp).toBe(550);
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(3.3);
-        expect(creature.base_armor).toBe(50);
+        expect(creature.base_armor).toBe(49);
         expect(creature.base_attack).toBe(22);
         expect(creature.exp).toBe(1000);
         expect(creature.amount_alive).toBe(1);
@@ -232,6 +194,17 @@ describe("config_provider", () => {
             expect(typeof ability.stack_powered).toBe("boolean");
             expect(typeof ability.can_be_cast).toBe("boolean");
         }
+    });
+
+    it("makes Trent and Gargantuan Earth Elements", () => {
+        const earthElement = getAbilityConfig("Earth Element");
+        const trent = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Trent", "trent_512", 1);
+        const gargantuan = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Gargantuan", "gargantuan_512", 1);
+
+        expect(earthElement.power).toBe(50);
+        expect(earthElement.power_type).toBe(AbilityPowerType.MAGIC_VULNERABILITY_WIND);
+        expect(trent.abilities).toContain("Earth Element");
+        expect(gargantuan.abilities).toContain("Earth Element");
     });
 
     it("loads Spit Ball's increased stack-powered chance", () => {

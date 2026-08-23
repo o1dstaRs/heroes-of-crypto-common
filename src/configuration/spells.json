@@ -1135,23 +1135,24 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
-        "Meteorite": {
-            "name": "Meteorite",
+        "Ring of Fire": {
+            "name": "Ring of Fire",
             "level": 2,
             "desc": [
-                "Calls an earth meteorite down on any 2x2 block of the battlefield.",
-                "Every enemy caught under it takes {} damage."
+                "Bursts into flame around an enemy in line of sight, dealing {} damage.",
+                "Every unit on a cell touching the target — friend or foe — burns for the same amount.",
+                "Fire magic: a Fire Element is untouched, a Water Element burns half again as hard."
             ],
-            "target": "FREE_CELL",
-            "power": 4,
+            "target": "ANY_ENEMY",
+            "power": 24,
             "power_type": "COMMON",
-            "element": "EARTH",
-            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
+            "element": "FIRE",
+            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
             "laps": 1,
             "is_buff": false,
             "self_cast_allowed": false,
             "self_debuff_applies": false,
-            "minimal_caster_stack_power": 5,
+            "minimal_caster_stack_power": 4,
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0
@@ -1162,7 +1163,7 @@
             "desc": [
                 "Calls a meteor shower down on the battlefield, dealing {} damage.",
                 "Magical: it ignores armor, but magic resistance cuts it down.",
-                "Earth magic: a storm of stone crashes into the target area."
+                "Earth magic: a Wind Element is struck half again as hard."
             ],
             "target": "FREE_CELL",
             "power": 21.6,
@@ -1358,7 +1359,7 @@
             "target": "FREE_CELL",
             "power": 25,
             "power_type": "COMMON",
-            "element": "",
+            "element": "FIRE",
             "multiplier_type": "NO_MULTIPLIER",
             "laps": 3,
             "is_buff": false,
@@ -1374,12 +1375,13 @@
             "level": 1,
             "desc": [
                 "Sends a small fireball at an enemy in line of sight, dealing {} damage.",
-                "Magical: it ignores armor, but magic resistance cuts it down."
+                "Magical: it ignores armor, but magic resistance cuts it down.",
+                "Fire magic: a Fire Element is untouched, a Water Element burns half again as hard."
             ],
             "target": "ANY_ENEMY",
             "power": 6,
             "power_type": "COMMON",
-            "element": "",
+            "element": "FIRE",
             "multiplier_type": "UNIT_AMOUNT_DAMAGE",
             "laps": 1,
             "is_buff": false,
@@ -1390,24 +1392,24 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
-        "Ring of Fire": {
-            "name": "Ring of Fire",
+        "Meteorite": {
+            "name": "Meteorite",
             "level": 2,
             "desc": [
-                "Bursts into flame around an enemy in line of sight, dealing {} damage.",
-                "Every unit on a cell touching the target — friend or foe — burns for the same amount.",
-                "Fire magic: a Fire Element is untouched, a Water Element burns half again as hard."
+                "Calls a meteorite down on any 2x2 block of the battlefield.",
+                "Every enemy caught under it takes {} damage.",
+                "Earth magic: a Wind Element is struck half again as hard."
             ],
-            "target": "ANY_ENEMY",
-            "power": 24,
+            "target": "FREE_CELL",
+            "power": 4,
             "power_type": "COMMON",
-            "element": "FIRE",
-            "multiplier_type": "UNIT_AMOUNT_STACK_POWER",
+            "element": "EARTH",
+            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
             "laps": 1,
             "is_buff": false,
             "self_cast_allowed": false,
             "self_debuff_applies": false,
-            "minimal_caster_stack_power": 4,
+            "minimal_caster_stack_power": 5,
             "conflicts_with": [],
             "is_giftable": false,
             "maximum_gift_level": 0

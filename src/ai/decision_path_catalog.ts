@@ -10,7 +10,7 @@
  */
 
 import { PBTypes } from "../generated/protobuf/v1/types";
-import type { Grid } from "../grid/grid";
+import { Grid } from "../grid/grid";
 import type { IMovePath, IReadonlyMovePath } from "../grid/path_definitions";
 import { PathHelper } from "../grid/path_helper";
 import { Unit, type IUnitAIRepr } from "../units/unit";
@@ -31,6 +31,12 @@ const BASE_FILTER_UNALLOWED_DESTINATIONS = (
 const BASE_UNIT_GET_CELLS = Unit.prototype.getCells;
 const BASE_UNIT_GET_POSITION = Unit.prototype.getPosition;
 const BASE_UNIT_IS_SMALL_SIZE = Unit.prototype.isSmallSize;
+const BASE_UNIT_GET_STEPS = Unit.prototype.getSteps;
+const BASE_UNIT_GET_TEAM = Unit.prototype.getTeam;
+const BASE_UNIT_CAN_FLY = Unit.prototype.canFly;
+const BASE_UNIT_CAN_TRAVERSE_LAVA = Unit.prototype.canTraverseLava;
+const BASE_UNIT_HAS_ABILITY_ACTIVE = Unit.prototype.hasAbilityActive;
+const BASE_GRID_GET_AGGR_MATRIX_BY_TEAM = Grid.prototype.getAggrMatrixByTeam;
 
 export type { IReadonlyKnownPaths, IReadonlyMovePath, IReadonlyWeightedRoute } from "../grid/path_definitions";
 
@@ -44,8 +50,6 @@ export interface IDecisionPathSource {
         isSmallUnit?: boolean,
         isMadeOfFire?: boolean,
         hasVineStride?: boolean,
-        footprintWidth?: number,
-        footprintHeight?: number,
     ): IReadonlyMovePath;
 }
 
@@ -67,8 +71,6 @@ interface ICanonicalMovePathInput {
     // Part of the cache key: a vine strider walks the same board at different prices, so it must not be
     // served a path canonicalised for a unit without the passive.
     hasVineStride: boolean;
-    footprintWidth: number;
-    footprintHeight: number;
 }
 
 /**
@@ -97,8 +99,7 @@ export class DecisionPathCatalog implements IDecisionPathSource {
         collectStats: boolean,
     ) {
         this.stats = collectStats ? { requests: 0, hits: 0, misses: 0, bypasses: 0 } : undefined;
-        const minimumAnchorX = canonical.footprintWidth - 1;
-        const minimumAnchorY = canonical.footprintHeight - 1;
+        const minimumAnchor = canonical.isSmallUnit ? 0 : 1;
         this.cacheSafe =
             Object.getPrototypeOf(delegate) === PathHelper.prototype &&
             delegate.getMovePath === BASE_GET_MOVE_PATH &&
@@ -115,9 +116,9 @@ export class DecisionPathCatalog implements IDecisionPathSource {
             Number.isInteger(canonical.currentCell.y) &&
             !Object.is(canonical.currentCell.x, -0) &&
             !Object.is(canonical.currentCell.y, -0) &&
-            canonical.currentCell.x >= minimumAnchorX &&
+            canonical.currentCell.x >= minimumAnchor &&
             canonical.currentCell.x < 16 &&
-            canonical.currentCell.y >= minimumAnchorY &&
+            canonical.currentCell.y >= minimumAnchor &&
             canonical.currentCell.y < 16 &&
             Number.isFinite(canonical.maxSteps) &&
             canonical.maxSteps >= 0 &&
@@ -158,6 +159,30 @@ export class DecisionPathCatalog implements IDecisionPathSource {
             (unit as IUnitAIRepr & Pick<Unit, "getPosition">).getPosition === BASE_UNIT_GET_POSITION
         );
     }
+    /**
+     * Authorize deferring the canonical finite path until a decision actually consumes it.
+     *
+     * In addition to the branded native traversal proof, every getter whose second evaluation would be skipped
+     * must be the native side-effect-free implementation. Instance overrides therefore retain the legacy eager
+     * call order, thrown errors, and RNG behavior even if the rest of their object happens to look production-like.
+     */
+    public static canDeferCanonicalMovePath(
+        source: IDecisionPathSource,
+        grid: Grid,
+        unit: IUnitAIRepr,
+        matrix: number[][],
+    ): boolean {
+        return (
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(source, grid, unit, matrix) &&
+            grid.getAggrMatrixByTeam === BASE_GRID_GET_AGGR_MATRIX_BY_TEAM &&
+            unit.getSteps === BASE_UNIT_GET_STEPS &&
+            unit.getTeam === BASE_UNIT_GET_TEAM &&
+            unit.canFly === BASE_UNIT_CAN_FLY &&
+            unit.isSmallSize === BASE_UNIT_IS_SMALL_SIZE &&
+            unit.canTraverseLava === BASE_UNIT_CAN_TRAVERSE_LAVA &&
+            unit.hasAbilityActive === BASE_UNIT_HAS_ABILITY_ACTIVE
+        );
+    }
     public getStats(): IDecisionPathCatalogStats {
         return this.stats ? { ...this.stats } : { requests: 0, hits: 0, misses: 0, bypasses: 0 };
     }
@@ -187,8 +212,6 @@ export class DecisionPathCatalog implements IDecisionPathSource {
         isSmallUnit = true,
         isMadeOfFire = false,
         hasVineStride = false,
-        footprintWidth = isSmallUnit ? 1 : 2,
-        footprintHeight = isSmallUnit ? 1 : 2,
     ): IReadonlyMovePath {
         if (this.stats) this.stats.requests++;
         if (
@@ -203,8 +226,6 @@ export class DecisionPathCatalog implements IDecisionPathSource {
                 isSmallUnit,
                 isMadeOfFire,
                 hasVineStride,
-                footprintWidth,
-                footprintHeight,
             )
         ) {
             if (this.stats) this.stats.bypasses++;
@@ -217,8 +238,6 @@ export class DecisionPathCatalog implements IDecisionPathSource {
                 isSmallUnit,
                 isMadeOfFire,
                 hasVineStride,
-                footprintWidth,
-                footprintHeight,
             );
         }
         if (this.cached !== undefined) {
@@ -237,8 +256,6 @@ export class DecisionPathCatalog implements IDecisionPathSource {
             isSmallUnit,
             isMadeOfFire,
             hasVineStride,
-            footprintWidth,
-            footprintHeight,
         );
         return this.cached;
     }
@@ -272,8 +289,6 @@ function canonicalInput(grid: Grid, unit: Unit, matrix: number[][]): ICanonicalM
         isSmallUnit: unit.isSmallSize(),
         isMadeOfFire: unit.canTraverseLava(),
         hasVineStride: unit.hasAbilityActive("In Its Own World"),
-        footprintWidth: unit.getFootprintWidth(),
-        footprintHeight: unit.getFootprintHeight(),
     };
 }
 
@@ -295,9 +310,7 @@ function sameCanonicalInput(left: ICanonicalMovePathInput, right: ICanonicalMove
         left.canFly === right.canFly &&
         left.isSmallUnit === right.isSmallUnit &&
         left.isMadeOfFire === right.isMadeOfFire &&
-        left.hasVineStride === right.hasVineStride &&
-        left.footprintWidth === right.footprintWidth &&
-        left.footprintHeight === right.footprintHeight
+        left.hasVineStride === right.hasVineStride
     );
 }
 
@@ -311,8 +324,6 @@ function matchesCanonicalRequest(
     isSmallUnit: boolean,
     isMadeOfFire: boolean,
     hasVineStride: boolean,
-    footprintWidth: number,
-    footprintHeight: number,
 ): boolean {
     return (
         canonical.matrix === matrix &&
@@ -323,8 +334,6 @@ function matchesCanonicalRequest(
         canonical.canFly === canFly &&
         canonical.isSmallUnit === isSmallUnit &&
         canonical.isMadeOfFire === isMadeOfFire &&
-        canonical.hasVineStride === hasVineStride &&
-        canonical.footprintWidth === footprintWidth &&
-        canonical.footprintHeight === footprintHeight
+        canonical.hasVineStride === hasVineStride
     );
 }

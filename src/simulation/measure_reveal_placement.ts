@@ -41,7 +41,7 @@ import { buildArmyFromPick, runPickPhase, type PickPolicyName } from "./measure_
  *
  * Cells:
  *  - drafted_fmr1/fmr05/fmr0 — PICK_SIM-driven drafts (live reducer, SEE_NONE frozen => reveals come
- *    from pick collisions, the live perk). The FMR axis maps to the draft policy BOTH seats use:
+ *    from pick collisions, the live doctrine). The FMR axis maps to the draft policy BOTH seats use:
  *    1 = "champion" (melee co-evo, the live distribution), 0 = "policy_v0" (heuristic, ranged-leaning),
  *    0.5 = per-pair deterministic coin flip between the two.
  *  - mirror cells — FIXED symmetric rosters where the revealed threat exists deterministically; the
@@ -226,8 +226,8 @@ export function playRevealGame(
             redRoster: upperArmy.roster,
             seed,
             gridType: PBTypes.GridVals.NORMAL,
-            greenPerk: lowerArmy.perk,
-            redPerk: upperArmy.perk,
+            greenDoctrine: lowerArmy.doctrine,
+            redDoctrine: upperArmy.doctrine,
             greenAugments: lowerArmy.augments,
             redAugments: upperArmy.augments,
             greenArtifactT1: lowerArmy.tier1Artifact,
@@ -255,8 +255,8 @@ export function playRevealGame(
             roster,
             seed,
             gridType: PBTypes.GridVals.NORMAL,
-            greenPerk: setup.perk,
-            redPerk: setup.perk,
+            greenDoctrine: setup.doctrine,
+            redDoctrine: setup.doctrine,
             greenAugments: setup.augments,
             redAugments: setup.augments,
             ...(treatedSide === "green" ? { greenRevealedCreatures: revealed } : { redRevealedCreatures: revealed }),

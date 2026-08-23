@@ -15,8 +15,7 @@ import { AbilityFactory } from "../../src/abilities/ability_factory";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { getPositionForCell, getPositionForCells } from "../../src/grid/grid_math";
-import { PathHelper } from "../../src/grid/path_helper";
+import { getPositionForCell } from "../../src/grid/grid_math";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
 import { createTestUnit, testGridSettings } from "../helpers/combat";
@@ -132,9 +131,14 @@ describe("Unit", () => {
 
             expect(unit.hasAbilityActive("Dodge")).toBe(false);
             expect(unit.getAbility("Dodge")).toBeUndefined();
+            // An absent ability stays absent under Break as well. This pins the fast lookup path that first
+            // establishes absence, where consulting Break cannot change the answer.
+            expect(unit.hasAbilityActive("Missing Ability")).toBe(false);
+            expect(unit.getAbility("Missing Ability")).toBeUndefined();
             expect(unit.getAbilities()).toEqual([]);
             expect(unit.getAuraEffects()).toEqual([]);
             expect(unit.getAbilityPower("Dodge")).toBe(0);
+            expect(unit.getAbilityPower("Missing Ability")).toBe(0);
             expect(unit.getSpellsCount()).toBe(0);
 
             unit.deleteAllEffects();
@@ -171,6 +175,14 @@ describe("Unit", () => {
             expect(unit.hasBuffActive("Blessing")).toBe(true);
             expect(unit.hasDebuffActive("Weakness")).toBe(true);
             expect(unit.getBuffProperties("Blessing")).toEqual(["7", "9"]);
+            const unitState = unit as unknown as {
+                unitProperties: { applied_buffs: string[]; applied_buffs_descriptions: string[] };
+            };
+            const blessingIndex = unitState.unitProperties.applied_buffs.indexOf("Blessing");
+            const blessingDescription = unitState.unitProperties.applied_buffs_descriptions[blessingIndex];
+            unitState.unitProperties.applied_buffs_descriptions[blessingIndex] = `${blessingDescription};extra`;
+            expect(unit.getBuffProperties("Blessing")).toEqual(["", ""]);
+            unitState.unitProperties.applied_buffs_descriptions[blessingIndex] = blessingDescription;
             expect(unit.getAppliedAuraEffect("Pegasus Might Aura")?.getPower()).toBe(5);
             expect(unit.hasBuffActive("Pegasus Might Aura")).toBe(true);
             expect(unit.hasDebuffActive("Range Null Field Aura")).toBe(true);
@@ -328,6 +340,20 @@ describe("Unit", () => {
 
             expect(unit.getMaxHp()).toBe(125);
             expect(unit.getHp()).toBe(125);
+        });
+
+        it("keeps first-match buff semantics while indexing one stat refresh", () => {
+            const unit = createTestUnit({ attack: 100 });
+            const first = spell("System", "Might Augment");
+            const duplicate = spell("System", "Might Augment");
+            first.setPower(10);
+            duplicate.setPower(90);
+            unit.applyBuff(first);
+            unit.applyBuff(duplicate);
+
+            expect(unit.getBuff("Might Augment")?.getPower()).toBe(10);
+            unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+            expect(unit.getBaseAttack()).toBe(110);
         });
 
         it("keeps a ranked snapshot's max HP verbatim — the pendant must not re-boost an already-boosted cap", () => {
@@ -864,43 +890,6 @@ describe("Unit", () => {
             expect(immobilizedTargets.attackCells).toEqual([{ x: 1, y: 1 }]);
             // The far side of the enemy (3,1) is reachable only by moving — it must NOT be offered.
             expect(immobilizedTargets.attackCells).not.toContainEqual({ x: 3, y: 1 });
-        });
-
-        it("offers an in-place melee attack when either cell of a 2x1 body touches the target", () => {
-            const attacker = createTestUnit({ footprintWidth: 2, footprintHeight: 1 });
-            const enemy = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-            const attackerCells = [
-                { x: 4, y: 5 },
-                { x: 5, y: 5 },
-            ];
-            const attackerPosition = getPositionForCells(testGridSettings, attackerCells)!;
-            const enemyPosition = positionForCell({ x: 3, y: 4 });
-            attacker.setPosition(attackerPosition.x, attackerPosition.y);
-            enemy.setPosition(enemyPosition.x, enemyPosition.y);
-
-            const targets = attacker.attackMeleeAllowed(
-                [enemy],
-                new Map([[enemy.getId(), enemyPosition]]),
-                [enemy],
-                attacker.getCells(),
-                new Map(),
-            );
-
-            expect(targets.unitIds.has(enemy.getId())).toBe(true);
-            expect(targets.attackCells).toContainEqual({ x: 4, y: 5 });
-            expect(
-                new PathHelper(testGridSettings).calculateClosestAttackFrom(
-                    enemyPosition,
-                    targets.attackCells,
-                    attacker.getCells(),
-                    enemy.getCells(),
-                    attacker.isSmallSize(),
-                    attacker.getAttackRange(),
-                    enemy.isSmallSize(),
-                    enemy.getTeam(),
-                    targets.attackCellHashesToLargeCells,
-                ),
-            ).toEqual(attacker.getBaseCell());
         });
 
         it("consumes an ability-derived castable spell on use (faction-prefix regression)", () => {

@@ -376,9 +376,9 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
     [Tier2Artifact.LAVA_STRIDERS]: t2(
         Tier2Artifact.LAVA_STRIDERS,
         "lava_striders",
-        "Fireproof Boots",
         "Lava Striders",
-        "Allows every allied unit to move across and stand on lava. Contact with the central lava grants Made of Fire for 2 laps: +10% to all stats and ability power.",
+        "Lava Striders",
+        "All army units may move over and stand in lava; while on central lava they gain Made of Fire (+10% to all stats and abilities).",
     ),
     [Tier2Artifact.ARCHMAGES_RING]: t2(
         Tier2Artifact.ARCHMAGES_RING,

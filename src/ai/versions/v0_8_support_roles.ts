@@ -17,7 +17,7 @@ import { buildV08BacklineProtectorIntent, isImmediateMeleeResponseExposed } from
 import { isV08DirectCombatDecision } from "./v0_8_dominant_finish";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
 
-const ASH_MOTH = "Wandering Mage";
+const ASH_MOTH = "Ash Moth";
 const HEALER = "Healer";
 const NIGHTMARE = "Nightmare";
 const SMOKE = "Smoke";
@@ -88,7 +88,7 @@ const incumbentGuaranteedKill = (
 };
 
 /**
- * Smoke is Wandering Mage's reason to exist against shooters. Candidate generation already rejects a cloud whose
+ * Smoke is Ash Moth's reason to exist against shooters. Candidate generation already rejects a cloud whose
  * exact crossed rays suppress at least as much friendly ranged output as enemy output. Promote the surviving
  * net-positive cloud to the native v0.8 proposal, so a13's size-two shortlist cannot discard this future-value
  * spell before rollout. A guaranteed kill and the universal finish window still take priority.

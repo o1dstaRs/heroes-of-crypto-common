@@ -19,6 +19,6 @@ message RevealRequest {
     int32 creature_index = 1;
 }
 
-message PerkRequest {
-    int32 perk = 1;
+message DoctrineRequest {
+    int32 doctrine = 1;
 }

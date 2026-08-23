@@ -203,7 +203,7 @@ export function rankedA19CasterEmpowerEligible(ownCreatureIds: readonly number[]
     const own = [...new Set(ownCreatureIds)].map(creatureInfo).filter((info) => info !== undefined);
     // A direct magic carry plus a real magic amplifier is the replay-proven core: Magic Dragon with
     // Nightmare's Empower and/or Satyr's Sylvan Focus. Do not spend the team augment merely because a
-    // roster contains two generic spellbooks or a control caster such as Wandering Mage.
+    // roster contains two generic spellbooks or a control caster such as Ash Moth.
     return own.some((info) => info.rangedSpellDamage) && own.some((info) => info.magicDamageAmplifier);
 }
 

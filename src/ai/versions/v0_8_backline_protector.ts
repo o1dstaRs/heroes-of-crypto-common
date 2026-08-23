@@ -118,7 +118,15 @@ export function buildV08BacklineProtectorIntent(
     return { kind, ward: wards[0], wards, flyerThreats };
 }
 
-const footprintForBase = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
+const footprintForBase = (unit: Unit, base: XY): XY[] =>
+    unit.isSmallSize()
+        ? [{ x: base.x, y: base.y }]
+        : [
+              { x: base.x, y: base.y },
+              { x: base.x - 1, y: base.y },
+              { x: base.x, y: base.y - 1 },
+              { x: base.x - 1, y: base.y - 1 },
+          ];
 
 const canLandOnFootprint = (unit: Unit, context: IDecisionContext, cells: XY[]): boolean =>
     context.grid.areAllCellsEmpty(cells, unit.getId()) ||
@@ -467,8 +475,6 @@ const followWard = (
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
-        unit.getFootprintWidth(),
-        unit.getFootprintHeight(),
     );
     let bestPreserving: IProtectorRoute | undefined;
     let bestValueSwap: IProtectorRoute | undefined;

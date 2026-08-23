@@ -38,7 +38,7 @@ import { conditionalAugments, conditionalSynergies, parseConditionalRules } from
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getUpgradePoints } from "../perks/perk_properties";
+import { getUpgradePoints } from "../doctrines/doctrine_properties";
 import type { Side } from "./battle_engine";
 import { runMatch, type IMatchConfig, type IMatchResult, type IRecordedAction } from "./battle_engine";
 import { creatureIdForName } from "./draft";
@@ -2220,7 +2220,7 @@ interface IArmySetup {
     creatureIds: number[];
     revealedOpponentCreatures: number[];
     roster: IMatchConfig["roster"];
-    perk: number;
+    doctrine: number;
     augments: NonNullable<IMatchConfig["greenAugments"]>;
     synergies: NonNullable<IMatchConfig["greenSynergies"]>;
     tier1Artifact: number;
@@ -2232,7 +2232,7 @@ function rankedArmy(army: IConditionalArmy): IArmySetup {
         creatureIds: [...army.creatureIds],
         revealedOpponentCreatures: [...army.revealedOpponentCreatures],
         roster: army.roster.map((unit) => ({ ...unit })),
-        perk: army.perk,
+        doctrine: army.doctrine,
         augments: army.augments.map((augment) => ({ ...augment })),
         synergies: army.synergies.map((synergy) => ({ ...synergy })),
         tier1Artifact: army.tier1Artifact,
@@ -2243,14 +2243,14 @@ function rankedArmy(army: IConditionalArmy): IArmySetup {
 function fixedArmy(templateName: V07ArchetypeTemplateName): IArmySetup {
     const template = v07ArchetypeTemplate(templateName);
     const creatureIds = template.roster.map((unit) => creatureIdForName(unit.creatureName));
-    const perk = SETUP_POLICY_V0.pickPerk();
+    const doctrine = SETUP_POLICY_V0.pickDoctrine();
     const rules = parseConditionalRules("all");
     return {
         creatureIds,
         revealedOpponentCreatures: [],
         roster: template.roster.map((unit) => ({ ...unit })),
-        perk,
-        augments: conditionalAugments(getUpgradePoints(perk), creatureIds, rules),
+        doctrine,
+        augments: conditionalAugments(getUpgradePoints(doctrine), creatureIds, rules),
         synergies: conditionalSynergies(creatureIds),
         // Supplemental tactical cells are artifact-free. They are not literal ranked T1/T2 offer samples.
         tier1Artifact: 0,
@@ -2588,8 +2588,8 @@ export function playV07ComposedGame(
         redRoster: upper.roster,
         seed: combatSeed,
         gridType: PBTypes.GridVals.NORMAL,
-        greenPerk: lower.perk,
-        redPerk: upper.perk,
+        greenDoctrine: lower.doctrine,
+        redDoctrine: upper.doctrine,
         greenAugments: lower.augments,
         redAugments: upper.augments,
         greenArtifactT1: lower.tier1Artifact,

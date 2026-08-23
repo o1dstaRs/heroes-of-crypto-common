@@ -69,7 +69,7 @@ const compareCatalogEntries = (left: IV08AllUnitCatalogEntry, right: IV08AllUnit
     left.level - right.level || left.unit.localeCompare(right.unit) || left.faction.localeCompare(right.faction);
 
 /**
- * Enumerate the actual enabled roster pool, then instantiate each stack without perks, augments, synergies,
+ * Enumerate the actual enabled roster pool, then instantiate each stack without doctrines, augments, synergies,
  * thefts, or battle effects. Unit construction is the authoritative intrinsic-spell boundary: raw JSON alone
  * misses spells contributed by castable ability cards, while observing a live fight would mix in grants.
  */
@@ -123,7 +123,7 @@ export const V08_ALL_UNIT_CATALOG_SHA256 = catalogFingerprint(V08_ALL_UNIT_CATAL
  * its intrinsic spell kit stops the panel until this identity and its focused census tests are reviewed.
  */
 export const V08_ALL_UNIT_EXPECTED_CATALOG_SHA256 =
-    "591455f8a38c83302e082f1d650afca503342ca946cc95c70afa71565ad09858" as const;
+    "2793f8e698b530cf08310635ebb905e763d7fe4eb187c71919b8ec9f21921502" as const;
 
 export function assertV08AllUnitCatalogCurrent(
     catalog: readonly IV08AllUnitCatalogEntry[] = V08_ALL_UNIT_CATALOG,
@@ -202,7 +202,7 @@ export interface IV08AllUnitCoverageOptions {
     baseSeed: number;
     /** Defaults to ranked's per-creature 1,000-XP stack budget. */
     amountMode?: StackAmountMode;
-    /** Defaults true: both teams receive the shipped blind perk/augment setup. */
+    /** Defaults true: both teams receive the shipped blind doctrine/augment setup. */
     liveSetup?: boolean;
     /** Defaults to the battle engine's production-aligned 60-lap cap. */
     maxLaps?: number;
@@ -635,8 +635,8 @@ export function runV08AllUnitCoverageGame(
             seed: plan.seed,
             maxLaps: options.maxLaps ?? V08_ALL_UNIT_COVERAGE_DEFAULT_MAX_LAPS,
             gridType: plan.mapType,
-            greenPerk: setup?.perk,
-            redPerk: setup?.perk,
+            greenDoctrine: setup?.doctrine,
+            redDoctrine: setup?.doctrine,
             greenAugments: setup?.augments,
             redAugments: setup?.augments,
             decisionObserver: (observation) => auditor.observeDecision(observation),

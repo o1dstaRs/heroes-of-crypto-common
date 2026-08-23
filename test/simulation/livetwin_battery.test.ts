@@ -120,7 +120,7 @@ describe("LiveTwin cohort battery", () => {
         expect(report.totalGames).toBe(300);
         expect(report.effectiveConfig.amountMode).toBe("expBudget");
         expect(report.effectiveConfig.setup).toEqual({
-            perk: 3,
+            doctrine: 3,
             augments: [
                 { kind: "Armor", value: 3 },
                 { kind: "Might", value: 3 },

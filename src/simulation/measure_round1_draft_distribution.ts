@@ -79,7 +79,7 @@ const buildAttackTypeIndex = (): Map<number, string> => {
         if (!creatures || typeof creatures !== "object") continue;
         for (const [name, cfg] of Object.entries(creatures)) {
             if (!cfg || typeof cfg !== "object") continue;
-            const enumKey = name === "Wandering Mage" ? "ASH_MOTH" : name.toUpperCase().replace(/ /g, "_");
+            const enumKey = name.toUpperCase().replace(/ /g, "_");
             const id = idByEnumKey[enumKey];
             if (typeof id !== "number" || id <= 0) continue;
             index.set(id, cfg.attack_type ?? "UNKNOWN");
@@ -178,8 +178,7 @@ function round1Rosters(drafts: number, baseSeed: number): number[][] {
 /** misplay_audit.ts's OLD heuristic roster construction, byte-identical seeding to playMisplayAuditGame. */
 function heuristicRosters(drafts: number, baseSeed: number): number[][] {
     const creatureEnum = PBTypes.CreatureVals as unknown as Record<string, number>;
-    const idForName = (name: string): number =>
-        creatureEnum[name === "Wandering Mage" ? "ASH_MOTH" : name.toUpperCase().replace(/ /g, "_")] ?? 0;
+    const idForName = (name: string): number => creatureEnum[name.toUpperCase().replace(/ /g, "_")] ?? 0;
     const rosters: number[][] = [];
     for (let i = 0; i < drafts; i += 1) {
         const seed = (baseSeed + i * 0x9e3779b1) >>> 0;
@@ -253,7 +252,7 @@ export async function main(): Promise<void> {
         round1,
         heuristic,
         limitations: [
-            "round1 uses projectDraftGenomeForShipping, which is what the ranked server's draft_policy.ts actually consumes for creature-pick decisions (composition-blind score + live TIER1_ARTIFACT_WINRATE for bundle choice); non-draft heads (artifact tier2/augments/placement/perk) are the setup-v0 anchor here and are governed by separate live logic (CONDITIONAL_SETUP_V1/setup-v0) not exercised by this script.",
+            "round1 uses projectDraftGenomeForShipping, which is what the ranked server's draft_policy.ts actually consumes for creature-pick decisions (composition-blind score + live TIER1_ARTIFACT_WINRATE for bundle choice); non-draft heads (artifact tier2/augments/placement/doctrine) are the setup-v0 anchor here and are governed by separate live logic (CONDITIONAL_SETUP_V1/setup-v0) not exercised by this script.",
             "heuristic reproduces misplay_audit.ts's OLD non-pick_sim roster construction exactly (draftRoster over DEFAULT_ROSTER_COMPOSITION with DEFAULT_DRAFT_W) so the two distributions are comparable under identical accounting; it is not itself a pick_sim draft and never fields artifacts.",
             "'caster' and 'melee' overlap for MELEE_MAGIC creatures (Angel/Harpy/Valkyrie/Troll/Ogre Mage/Behemoth) by construction; the attackType breakdown is the mutually-exclusive view.",
             "This script drafts only; it runs no fights and says nothing about win rates or AI decision quality (see measure_round1_misplay_census.ts for that).",

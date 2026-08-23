@@ -455,7 +455,7 @@ describe("v0.8 damage-spell policy", () => {
             },
             {
                 ability: "Tome of Elements",
-                entries: ["Chaos:Ring of Fire", "Chaos:Ring of Fire"],
+                entries: ["Nature:Ring of Fire", "Nature:Ring of Fire"],
                 expected: "Ring of Fire",
             },
         ] as const;

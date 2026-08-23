@@ -126,7 +126,7 @@ export const V08_CAMPAIGN_BLOCK_CENTER_QUALIFICATION_DEFAULT_GAMES = 1_024;
  */
 export const V08_CAMPAIGN_POST_A13_SPELL_EXERCISE_KITS = Object.freeze({
     Blacksmith: Object.freeze(["Craft", "Armor Rune", "Weapon Rune"]),
-    "Wandering Mage": Object.freeze(["Smoke", "Misfortune", "Fireforged Sword"]),
+    "Ash Moth": Object.freeze(["Smoke", "Misfortune", "Fireforged Sword"]),
     Trent: Object.freeze(["Vine Throw"]),
     "Battle Mage": Object.freeze(["Fire Strike", "Meteorite"]),
     Nightmare: Object.freeze(["Fire Wall"]),

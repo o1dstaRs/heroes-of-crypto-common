@@ -57,8 +57,8 @@ export const getPlacementSizes = (
             if (placementType === PlacementType.SQUARE) {
                 return [5, 5];
             } else if (placementType === PlacementType.RECTANGLE) {
-                // Depth 6: the top placement tier also opens the board's edge line (column 0 / 15),
-                // which every lower depth stops one column short of.
+                // Height 6: the top placement tier also opens the board's edge line (row 0 / 15),
+                // which every lower height stops one row short of.
                 return [6];
             } else {
                 return [0];

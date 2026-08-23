@@ -36,7 +36,7 @@ const EXPECTED_TARGETS = [
     { unit: "Mermaid", level: 1, controlUnit: "Peasant" },
     { unit: "Dryad", level: 1, controlUnit: "Peasant" },
     { unit: "Blacksmith", level: 1, controlUnit: "Peasant" },
-    { unit: "Wandering Mage", level: 1, controlUnit: "Peasant" },
+    { unit: "Ash Moth", level: 1, controlUnit: "Peasant" },
     { unit: "Zena", level: 3, controlUnit: "Crusader" },
     { unit: "Wyvern", level: 2, controlUnit: "Pikeman" },
     { unit: "Trent", level: 2, controlUnit: "Pikeman" },

@@ -20,7 +20,7 @@ export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v1" as co
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = "v0.8" as const;
 export const V08_A19_PRODUCTION_REGISTRY_IMPLEMENTATION_SOURCE = "src/ai/index.ts" as const;
-// Re-pinned after exporting the ranked AI perk-choice helpers. The v0.8 registry routing itself is unchanged;
+// Re-pinned after exporting the ranked AI doctrine-choice helpers. The v0.8 registry routing itself is unchanged;
 // this ledger intentionally binds the complete current source bytes rather than frozen qualification evidence.
 export const V08_A19_PRODUCTION_REGISTRY_IMPLEMENTATION_SHA256 =
     "4b35add5cacfe4f4a128b0179543b1b245b90cbbdba20e8f731dbc4f31d757bc" as const;

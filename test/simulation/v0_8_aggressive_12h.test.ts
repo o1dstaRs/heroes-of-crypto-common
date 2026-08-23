@@ -1507,7 +1507,7 @@ describe("v0.8 aggressive campaign orchestration", () => {
         const opponentSpellLane = lanes.find(({ lane }) => lane.unit === "Magic Dragon" && lane.owner === "opponent")!;
         expect(Object.keys(V08_CAMPAIGN_POST_A13_SPELL_EXERCISE_KITS)).toEqual([
             "Blacksmith",
-            "Wandering Mage",
+            "Ash Moth",
             "Trent",
             "Battle Mage",
             "Nightmare",

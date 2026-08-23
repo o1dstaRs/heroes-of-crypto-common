@@ -262,8 +262,8 @@ function setupForArmies(
     red: IAiMetaArmy,
 ): Pick<
     IMatchConfig,
-    | "greenPerk"
-    | "redPerk"
+    | "greenDoctrine"
+    | "redDoctrine"
     | "greenAugments"
     | "redAugments"
     | "greenArtifactT1"
@@ -275,8 +275,8 @@ function setupForArmies(
     | "placementAugmentTiming"
 > {
     return {
-        greenPerk: green.perk,
-        redPerk: red.perk,
+        greenDoctrine: green.doctrine,
+        redDoctrine: red.doctrine,
         greenAugments: green.augment.augments,
         redAugments: red.augment.augments,
         greenArtifactT1: green.artifactT1.id,

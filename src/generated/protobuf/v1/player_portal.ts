@@ -107,7 +107,7 @@ export namespace PBTypes {
         constructor(data?: any[] | {
             artifact_tier_1?: number;
             artifact_tier_2?: number;
-            perk?: number;
+            doctrine?: number;
             augment_placement?: number;
             augment_armor?: number;
             augment_might?: number;
@@ -126,8 +126,8 @@ export namespace PBTypes {
                 if ("artifact_tier_2" in data && data.artifact_tier_2 != undefined) {
                     this.artifact_tier_2 = data.artifact_tier_2;
                 }
-                if ("perk" in data && data.perk != undefined) {
-                    this.perk = data.perk;
+                if ("doctrine" in data && data.doctrine != undefined) {
+                    this.doctrine = data.doctrine;
                 }
                 if ("augment_placement" in data && data.augment_placement != undefined) {
                     this.augment_placement = data.augment_placement;
@@ -167,10 +167,10 @@ export namespace PBTypes {
         set artifact_tier_2(value: number) {
             pb_1.Message.setField(this, 2, value);
         }
-        get perk() {
+        get doctrine() {
             return pb_1.Message.getFieldWithDefault(this, 3, 0) as number;
         }
-        set perk(value: number) {
+        set doctrine(value: number) {
             pb_1.Message.setField(this, 3, value);
         }
         get augment_placement() {
@@ -224,7 +224,7 @@ export namespace PBTypes {
         static fromObject(data: {
             artifact_tier_1?: number;
             artifact_tier_2?: number;
-            perk?: number;
+            doctrine?: number;
             augment_placement?: number;
             augment_armor?: number;
             augment_might?: number;
@@ -241,8 +241,8 @@ export namespace PBTypes {
             if (data.artifact_tier_2 != null) {
                 message.artifact_tier_2 = data.artifact_tier_2;
             }
-            if (data.perk != null) {
-                message.perk = data.perk;
+            if (data.doctrine != null) {
+                message.doctrine = data.doctrine;
             }
             if (data.augment_placement != null) {
                 message.augment_placement = data.augment_placement;
@@ -274,7 +274,7 @@ export namespace PBTypes {
             const data: {
                 artifact_tier_1?: number;
                 artifact_tier_2?: number;
-                perk?: number;
+                doctrine?: number;
                 augment_placement?: number;
                 augment_armor?: number;
                 augment_might?: number;
@@ -290,8 +290,8 @@ export namespace PBTypes {
             if (this.artifact_tier_2 != null) {
                 data.artifact_tier_2 = this.artifact_tier_2;
             }
-            if (this.perk != null) {
-                data.perk = this.perk;
+            if (this.doctrine != null) {
+                data.doctrine = this.doctrine;
             }
             if (this.augment_placement != null) {
                 data.augment_placement = this.augment_placement;
@@ -327,8 +327,8 @@ export namespace PBTypes {
                 writer.writeInt32(1, this.artifact_tier_1);
             if (this.artifact_tier_2 != 0)
                 writer.writeInt32(2, this.artifact_tier_2);
-            if (this.perk != 0)
-                writer.writeInt32(3, this.perk);
+            if (this.doctrine != 0)
+                writer.writeInt32(3, this.doctrine);
             if (this.augment_placement != 0)
                 writer.writeInt32(4, this.augment_placement);
             if (this.augment_armor != 0)
@@ -361,7 +361,7 @@ export namespace PBTypes {
                         message.artifact_tier_2 = reader.readInt32();
                         break;
                     case 3:
-                        message.perk = reader.readInt32();
+                        message.doctrine = reader.readInt32();
                         break;
                     case 4:
                         message.augment_placement = reader.readInt32();

@@ -240,9 +240,8 @@ export const getCreatureConfig = (
         throw TypeError(`Unknown faction - ${factionName}`);
     }
 
-    // Existing replays and an older ranked server may still send the pre-rename display name. Resolve it
-    // to the same stable creature while every newly built UnitProperties exposes the new name.
-    const resolvedCreatureName = creatureName === "Ash Moth" ? "Wandering Mage" : creatureName;
+    // Keep the stable Ash Moth catalog identity compatible with the renamed player-facing creature.
+    const resolvedCreatureName = creatureName === "Wandering Mage" ? "Ash Moth" : creatureName;
     const creatureConfig = factionUnits[resolvedCreatureName];
     if (!creatureConfig) {
         throw TypeError(`Unknown creature - ${creatureName}`);
@@ -343,7 +342,7 @@ export const getCreatureConfig = (
 
     return new UnitProperties(
         ToFactionType[factionName],
-        creatureConfig.name,
+        creatureName === "Wandering Mage" ? creatureName : creatureConfig.name,
         creatureConfig.hp,
         creatureConfig.steps,
         morale,
@@ -393,16 +392,15 @@ export const getCreatureConfig = (
         "",
         [],
         false,
-        creatureConfig.footprint_width,
-        creatureConfig.footprint_height,
+        (creatureConfig as { footprint_width?: number }).footprint_width,
+        (creatureConfig as { footprint_height?: number }).footprint_height,
     );
 };
 
 const LEGACY_SPELL_FACTION_REDIRECTS: Readonly<Record<string, string>> = {
-    "Chaos:Meteorite": "Nature",
     "Life:Fire Strike": "Chaos",
-    "Life:Meteorite": "Nature",
-    "Nature:Ring of Fire": "Chaos",
+    "Life:Meteorite": "Chaos",
+    "Nature:Meteorite": "Chaos",
 };
 
 export const getSpellConfig = (factionName: string, spellName: string, laps?: number): SpellProperties => {
@@ -559,11 +557,15 @@ export const AURA_EFFECT_NAMES: ReadonlySet<string> = new Set(
 export const isAuraEffectName = (name: string): boolean => name.endsWith(" Aura") || AURA_EFFECT_NAMES.has(name);
 
 /**
- * The aura EFFECT names whose power type is POISON_ON_HIT — "Venom Cloud" (Wyvern, 1 cell) and the
- * 2-cell "Poison Cloud", which no creature carries since the Dryad traded it for Guiding Winds but
- * which stays declared as the wide-radius variant. Derived from the config rather than hard-coded so a third poison
- * aura only has to be declared in aura_effects.json: the on-hit poison path, the tooltip folding and
- * the client description refresh all read this set instead of matching one literal name.
+ * The aura EFFECT names whose power type is POISON_ON_HIT — today just "Venom Cloud" (Wyvern, 2 cells).
+ * "Poison Cloud" used to sit here too: the Dryad's aura until it traded poison for Guiding Winds, kept
+ * on afterwards as an unassigned declaration and removed in full once nothing carried it.
+ *
+ * Still DERIVED from the config rather than hard-coded, and that matters more now that the set holds one
+ * name: reading a literal instead is the exact bug this replaced — a second poison aura once buffed the
+ * right allies, showed the right tooltip and poisoned nobody. A new poison aura needs only a declaration
+ * in aura_effects.json; the on-hit path, the tooltip folding and the client description refresh all read
+ * this set. See test/abilities/poison_aura_config_driven.test.ts, which guards the derivation directly.
  */
 export const POISON_ON_HIT_AURA_EFFECT_NAMES: ReadonlySet<string> = new Set(
     Object.keys(auraEffectsJson).filter(

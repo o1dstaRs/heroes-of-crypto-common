@@ -44,7 +44,8 @@ import {
     Tier1Artifact,
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
-import { getUpgradePoints, Perk } from "../perks/perk_properties";
+import { getUpgradePoints, Doctrine } from "../doctrines/doctrine_properties";
+import { Perk } from "../perks/perk_properties";
 import { isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
@@ -145,7 +146,7 @@ export class FightProperties {
     private augmentMovementPerTeam: Map<TeamType, MovementAugment>;
     private artifactTier1PerTeam: Map<TeamType, Tier1Artifact>;
     private artifactTier2PerTeam: Map<TeamType, Tier2Artifact>;
-    private perkPerTeam: Map<TeamType, Perk>;
+    private doctrinePerTeam: Map<TeamType, Doctrine>;
     // Which synergy of each faction's pair this match fields. Drawn once from the game id so the draft can
     // show them before the first pick; sandbox and tests keep the default set.
     private synergyVariants: { [factionName: string]: SpecificSynergy } = { ...DEFAULT_SYNERGY_VARIANTS };
@@ -205,7 +206,7 @@ export class FightProperties {
         this.augmentMovementPerTeam = new Map();
         this.artifactTier1PerTeam = new Map();
         this.artifactTier2PerTeam = new Map();
-        this.perkPerTeam = new Map();
+        this.doctrinePerTeam = new Map();
         this.synergyUnitsLifePerTeam = new Map();
         this.synergyUnitsChaosPerTeam = new Map();
         this.synergyUnitsMightPerTeam = new Map();
@@ -1047,18 +1048,24 @@ export class FightProperties {
     public hasArtifactTier2(teamType: TeamType, artifactId: Tier2Artifact): boolean {
         return artifactId !== Tier2Artifact.NO_ARTIFACT && this.getArtifactTier2(teamType) === artifactId;
     }
-    public setPerkPerTeam(teamType: TeamType, perk: Perk): void {
+    public setDoctrinePerTeam(teamType: TeamType, doctrine: Doctrine): void {
         if (teamType === PBTypes.TeamVals.NO_TEAM) {
             return;
         }
-        this.perkPerTeam.set(teamType, perk);
+        this.doctrinePerTeam.set(teamType, doctrine);
+    }
+    public setPerkPerTeam(teamType: TeamType, perk: Perk): void {
+        this.setDoctrinePerTeam(teamType, perk as unknown as Doctrine);
+    }
+    public getDoctrine(teamType: TeamType): Doctrine {
+        return this.doctrinePerTeam.get(teamType) ?? Doctrine.NO_DOCTRINE;
     }
     public getPerk(teamType: TeamType): Perk {
-        return this.perkPerTeam.get(teamType) ?? Perk.NO_PERK;
+        return this.getDoctrine(teamType) as unknown as Perk;
     }
-    // Upgrade (augment) point budget for the team, determined by its chosen perk.
+    // Upgrade (augment) point budget for the team, determined by its chosen doctrine.
     public getUpgradePoints(teamType: TeamType): number {
-        return getUpgradePoints(this.getPerk(teamType));
+        return getUpgradePoints(this.getDoctrine(teamType));
     }
     public setAugmentPerTeam(teamType: TeamType, augmentType: AugmentType): boolean {
         if (teamType === PBTypes.TeamVals.NO_TEAM) {
