@@ -52,7 +52,7 @@ import type { GameAction } from "../engine/actions";
 import { CreatureFactions } from "../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../grid/grid_constants";
-import { getUpgradePoints, Doctrine } from "../doctrines/doctrine_properties";
+import { getUpgradePoints, Perk } from "../perks/perk_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
@@ -141,7 +141,7 @@ export interface IRankedReplayAbArmy {
     creatureIds: number[];
     roster: IArmyUnitSpec[];
     originalRoster: IArmyUnitSpec[];
-    doctrine: number;
+    perk: number;
     artifactT1: number;
     artifactT2: number;
     augments: ISetupAugmentChoice[];
@@ -379,8 +379,8 @@ export function resolveRankedReplayAbPick(
 ): IPickSimState {
     const rng = randomInt(seed);
     let state = createPickSimState(rng);
-    state = applyAccepted(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.SEE_NONE }, rng);
-    state = applyAccepted(state, { type: "select_doctrine", team: UPPER, doctrine: Doctrine.SEE_NONE }, rng);
+    state = applyAccepted(state, { type: "select_perk", team: LOWER, perk: Perk.SEE_NONE }, rng);
+    state = applyAccepted(state, { type: "select_perk", team: UPPER, perk: Perk.SEE_NONE }, rng);
 
     // Simultaneous choices consume the same pre-commit offer board.
     const lowerBundles = state.lower.bundles;
@@ -407,7 +407,7 @@ export function resolveRankedReplayAbPick(
                         publicOpponentCreatureIds: getKnownOpponentCreatures(state, team),
                         gridType: map,
                         gridSize: GRID_SIZE,
-                        ownDoctrine: own.doctrine,
+                        ownPerk: own.perk,
                         ownArtifactIds: own.tier1Artifact === undefined ? [] : [own.tier1Artifact],
                     }),
                 );
@@ -454,7 +454,7 @@ const rankedRoster = (creatureIds: readonly number[]): IArmyUnitSpec[] =>
 interface IBaseArmy {
     creatureIds: number[];
     roster: IArmyUnitSpec[];
-    doctrine: number;
+    perk: number;
     artifactT1: number;
     artifactT2: number;
     revealedOpponentCreatures: number[];
@@ -467,7 +467,7 @@ const rankedBaseArmy = (team: IPickTeamState, opponentReveals: readonly number[]
     return {
         creatureIds: [...team.creatures],
         roster: rankedRoster(team.creatures),
-        doctrine: team.doctrine,
+        perk: team.perk,
         artifactT1: team.tier1Artifact,
         artifactT2: team.tier2Artifact,
         revealedOpponentCreatures: [...opponentReveals],
@@ -477,7 +477,7 @@ const rankedBaseArmy = (team: IPickTeamState, opponentReveals: readonly number[]
 const metaBaseArmy = (army: IAiMetaArmy): IBaseArmy => ({
     creatureIds: [...army.creatureIds],
     roster: army.roster.map((unit) => ({ ...unit })),
-    doctrine: army.doctrine,
+    perk: army.perk,
     artifactT1: army.artifactT1.id,
     artifactT2: army.artifactT2.id,
     revealedOpponentCreatures: [],
@@ -582,14 +582,14 @@ export function materializeReplayAbArmy(
         publicOpponentCreatureIds: opponentCreatureIds,
         gridType: map,
         gridSize: GRID_SIZE,
-        ownDoctrine: base.doctrine,
+        ownPerk: base.perk,
         ownArtifactIds: [base.artifactT1, base.artifactT2].filter((artifact) => artifact > 0),
     });
     const rapidChargeTreatment =
         variant === "candidate" && components.setup && replayRapidChargeCoreEligible(base.creatureIds);
     let augments = rapidChargeTreatment
         ? setupAugmentsForPlan(REPLAY_RAPID_CHARGE_AUGMENT_PLAN)
-        : policy.pickAugments(getUpgradePoints(base.doctrine), base.creatureIds, context);
+        : policy.pickAugments(getUpgradePoints(base.perk), base.creatureIds, context);
     let synergies = policy.pickSynergies(base.creatureIds, context);
     let split =
         variant === "candidate" && components.splits
@@ -601,7 +601,7 @@ export function materializeReplayAbArmy(
         components.splits &&
         !replayUtilitySplitGate(augments, split.splitRoles)
     ) {
-        augments = CONTROL_SETUP_POLICY.pickAugments(getUpgradePoints(base.doctrine), base.creatureIds, context);
+        augments = CONTROL_SETUP_POLICY.pickAugments(getUpgradePoints(base.perk), base.creatureIds, context);
         synergies = CONTROL_SETUP_POLICY.pickSynergies(base.creatureIds, context);
         split = { roster: base.roster.map((unit) => ({ ...unit })), splitRoles: [] };
     }
@@ -610,7 +610,7 @@ export function materializeReplayAbArmy(
         creatureIds: [...base.creatureIds],
         roster: split.roster,
         originalRoster: base.roster.map((unit) => ({ ...unit })),
-        doctrine: base.doctrine,
+        perk: base.perk,
         artifactT1: base.artifactT1,
         artifactT2: base.artifactT2,
         augments,
@@ -673,8 +673,8 @@ const matchConfig = (
     gridType: map,
     maxLaps,
     headlessEvents: true,
-    greenDoctrine: green.doctrine,
-    redDoctrine: red.doctrine,
+    greenPerk: green.perk,
+    redPerk: red.perk,
     greenArtifactT1: green.artifactT1,
     redArtifactT1: red.artifactT1,
     greenArtifactT2: green.artifactT2,
@@ -782,7 +782,7 @@ const setupFingerprint = (candidate: IRankedReplayAbArmy, control: IRankedReplay
             JSON.stringify({
                 candidate: {
                     roster: candidate.roster,
-                    doctrine: candidate.doctrine,
+                    perk: candidate.perk,
                     t1: candidate.artifactT1,
                     t2: candidate.artifactT2,
                     augments: candidate.augments,
@@ -791,7 +791,7 @@ const setupFingerprint = (candidate: IRankedReplayAbArmy, control: IRankedReplay
                 },
                 control: {
                     roster: control.roster,
-                    doctrine: control.doctrine,
+                    perk: control.perk,
                     t1: control.artifactT1,
                     t2: control.artifactT2,
                     augments: control.augments,

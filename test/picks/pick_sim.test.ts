@@ -119,11 +119,11 @@ describe("pick_sim", () => {
         expect(state.creaturesBanned.some((creatureId) => offered.includes(creatureId))).toBe(false);
     });
 
-    it("splits PERK (doctrine) from INITIAL_PICK (bundle) into two sequential both-teams phases", () => {
+    it("splits PERK (perk) from INITIAL_PICK (bundle) into two sequential both-teams phases", () => {
         let state = createPickSimState(first);
         const last: PickRandomInt = (maxExclusive) => maxExclusive - 1;
 
-        // PERK phase (seq 0): doctrine only. Bundle selections are NOT accepted here.
+        // PERK phase (seq 0): perk only. Bundle selections are NOT accepted here.
         const rejectedBundle = apply(state, { type: "select_bundle", team: LOWER, bundleIndex: 1 });
         expect(rejectedBundle).toMatchObject({ status: "rejected", reason: "wrong_phase" });
         state = accept(state, { type: "select_perk", team: LOWER, perk: Perk.THREE_REVEALS }, last);
@@ -132,7 +132,7 @@ describe("pick_sim", () => {
         expect(state.lower.revealedOpponentSlots).toEqual([1, 3, 4]);
         expect(state.phaseSequence).toBe(0);
         state = accept(state, { type: "select_perk", team: UPPER, perk: Perk.SEE_ALL });
-        // Both doctrines chosen -> PERK advances to the INITIAL_PICK (bundle) phase.
+        // Both perks chosen -> PERK advances to the INITIAL_PICK (bundle) phase.
         expect(state.phaseSequence).toBe(1);
         expect(state.upper.revealedOpponentSlots).toEqual([0, 1, 2, 3, 4, 5]);
 

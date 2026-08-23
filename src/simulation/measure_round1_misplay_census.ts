@@ -66,7 +66,7 @@ import {
  * --draft-source round1 (default): full live pick_sim reducer driven by the round-1 genome on both seats
  *   (mirrored), matching the draft-ship acceptance harness's construction (projectDraftGenomeForShipping
  *   collapses every non-intrinsic head to the setup-v0 anchor — verified equivalent to the live ranked
- *   TIER1_ARTIFACT_WINRATE-driven bundle/T2 choice, SEE_NONE doctrine + Armor3/Might3/Sniper1 augments, and
+ *   TIER1_ARTIFACT_WINRATE-driven bundle/T2 choice, SEE_NONE perk + Armor3/Might3/Sniper1 augments, and
  *   (because SEE_NONE reveals nothing) always-tight placement).
  * --draft-source heuristic: byte-identical roster construction to misplay_audit.ts's playMisplayAuditGame
  *   (draftRoster/DEFAULT_DRAFT_W over DEFAULT_ROSTER_COMPOSITION + liveTwinSetup, no artifacts/synergies),
@@ -90,7 +90,7 @@ export interface INormalizedCensusOptions {
 }
 
 /** Round-1-vs-round-1 mirrored pick_sim draft -> full LiveTwin-equivalent army (roster, T1/T2 artifact,
- * SEE_NONE doctrine, Armor3/Might3/Sniper1 augments, always-tight placement under no vision, synergies). */
+ * SEE_NONE perk, Armor3/Might3/Sniper1 augments, always-tight placement under no vision, synergies). */
 function round1Game(genome: ILeagueGenome, options: INormalizedCensusOptions, game: number): IMatchConfig {
     const seed = (options.baseSeed + game * 0x9e3779b1) >>> 0;
     const pickSeed = hashSimulationParts("round1-census-pick", seed);
@@ -108,8 +108,8 @@ function round1Game(genome: ILeagueGenome, options: INormalizedCensusOptions, ga
         redArtifactT1: pick.state.upper.tier1Artifact,
         greenArtifactT2: pick.state.lower.tier2Artifact,
         redArtifactT2: pick.state.upper.tier2Artifact,
-        greenDoctrine: pick.state.lower.doctrine,
-        redDoctrine: pick.state.upper.doctrine,
+        greenPerk: pick.state.lower.perk,
+        redPerk: pick.state.upper.perk,
         greenAugments: pick.lowerAugments,
         redAugments: pick.upperAugments,
         greenSynergies: SETUP_POLICY_V0.pickSynergies(pick.state.lower.creatures),
@@ -146,8 +146,8 @@ function heuristicGame(options: INormalizedCensusOptions, game: number): IMatchC
         seed,
         maxLaps: options.maxLaps,
         gridType: PBTypes.GridVals.NORMAL,
-        greenDoctrine: greenSetup.doctrine,
-        redDoctrine: redSetup.doctrine,
+        greenPerk: greenSetup.perk,
+        redPerk: redSetup.perk,
         greenAugments: greenSetup.augments,
         redAugments: redSetup.augments,
     };

@@ -14,7 +14,7 @@ import { conditionalAugments, conditionalSynergies, parseConditionalRules } from
 import { SETUP_POLICY_V0 } from "../../ai/setup/setup_v0";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
-import { getUpgradePoints } from "../../doctrines/doctrine_properties";
+import { getUpgradePoints } from "../../perks/perk_properties";
 import {
     runMatch,
     type IDecisionObservation,
@@ -46,7 +46,7 @@ interface IV07AlignedV2ArmySetup {
     creatureIds: number[];
     revealedOpponentCreatures: number[];
     roster: IMatchConfig["roster"];
-    doctrine: number;
+    perk: number;
     augments: NonNullable<IMatchConfig["greenAugments"]>;
     synergies: NonNullable<IMatchConfig["greenSynergies"]>;
     tier1Artifact: number;
@@ -116,7 +116,7 @@ function rankedArmy(army: IConditionalArmy): IV07AlignedV2ArmySetup {
         creatureIds: [...army.creatureIds],
         revealedOpponentCreatures: [...army.revealedOpponentCreatures],
         roster: army.roster.map((unit) => ({ ...unit })),
-        doctrine: army.doctrine,
+        perk: army.perk,
         augments: army.augments.map((augment) => ({ ...augment })),
         synergies: army.synergies.map((synergy) => ({ ...synergy })),
         tier1Artifact: army.tier1Artifact,
@@ -129,14 +129,14 @@ function fixedArmy(
 ): IV07AlignedV2ArmySetup {
     const template = v07ArchetypeTemplate(templateName);
     const creatureIds = template.roster.map((unit) => creatureIdForName(unit.creatureName));
-    const doctrine = SETUP_POLICY_V0.pickDoctrine();
+    const perk = SETUP_POLICY_V0.pickPerk();
     const rules = parseConditionalRules("all");
     return {
         creatureIds,
         revealedOpponentCreatures: [],
         roster: template.roster.map((unit) => ({ ...unit })),
-        doctrine,
-        augments: conditionalAugments(getUpgradePoints(doctrine), creatureIds, rules),
+        perk,
+        augments: conditionalAugments(getUpgradePoints(perk), creatureIds, rules),
         synergies: conditionalSynergies(creatureIds),
         tier1Artifact: 0,
         tier2Artifact: 0,
@@ -293,8 +293,8 @@ export function playV07AlignedV2Task<Binding extends IAligned96hCandidateBinding
         redRoster: selected.upper.roster,
         seed: task.combatSeed,
         gridType,
-        greenDoctrine: selected.lower.doctrine,
-        redDoctrine: selected.upper.doctrine,
+        greenPerk: selected.lower.perk,
+        redPerk: selected.upper.perk,
         greenAugments: selected.lower.augments,
         redAugments: selected.upper.augments,
         greenArtifactT1: selected.lower.tier1Artifact,

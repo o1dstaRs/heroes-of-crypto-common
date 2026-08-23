@@ -9,7 +9,7 @@ import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { PathHelper } from "../../src/grid/path_helper";
 import { PlacementPositionType } from "../../src/grid/placement_properties";
 import { RectanglePlacement } from "../../src/grid/rectangle_placement";
-import { Doctrine } from "../../src/doctrines/doctrine_properties";
+import { Perk } from "../../src/perks/perk_properties";
 import { createCombatFactories, createUnitFromSpec } from "../../src/simulation/army";
 import {
     prepareV08A19ProdF184Pair,
@@ -62,14 +62,14 @@ describe("v0.8 A19 production f184 placement anchor", () => {
         expect(V08_A19_PROD_F184_ANCHOR.lower).toMatchObject({
             artifactT1: 10,
             artifactT2: 4,
-            doctrine: Doctrine.SEE_NONE,
+            perk: Perk.SEE_NONE,
             empower: 0,
             augmentPlan: { placement: 0, armor: 3, might: 3, sniper: 1, movement: 0 },
         });
         expect(V08_A19_PROD_F184_ANCHOR.upper).toMatchObject({
             artifactT1: 8,
             artifactT2: 9,
-            doctrine: Doctrine.SEE_NONE,
+            perk: Perk.SEE_NONE,
             empower: 0,
             augmentPlan: { placement: 0, armor: 3, might: 3, sniper: 0, movement: 1 },
         });
@@ -96,8 +96,8 @@ describe("v0.8 A19 production f184 placement anchor", () => {
         expect(next.combatSeed).not.toBe(first.combatSeed);
         expect(next.armyA).toEqual(first.armyA);
         expect(next.armyB).toEqual(first.armyB);
-        expect(first.armyA.doctrine).toBe(Doctrine.SEE_NONE);
-        expect(first.armyB.doctrine).toBe(Doctrine.SEE_NONE);
+        expect(first.armyA.perk).toBe(Perk.SEE_NONE);
+        expect(first.armyB.perk).toBe(Perk.SEE_NONE);
         expect(first.armyA.augment.planId).toBe("P0-A3-M3-S1-V0");
         expect(first.armyB.augment.planId).toBe("P0-A3-M3-S0-V1");
         expect(new Set([...first.armyA.creatureIds, ...first.armyB.creatureIds]).size).toBe(12);

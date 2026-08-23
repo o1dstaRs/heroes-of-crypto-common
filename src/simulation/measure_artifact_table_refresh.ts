@@ -21,7 +21,7 @@ import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { Tier1Artifact, Tier2Artifact } from "../artifacts/artifact_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getUpgradePoints, Doctrine } from "../doctrines/doctrine_properties";
+import { getUpgradePoints, Perk } from "../perks/perk_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
@@ -241,7 +241,7 @@ const catalogById = (): Map<number, ICatalogRef> => {
 
 export interface ITableArmArmy {
     roster: IArmyUnitSpec[];
-    doctrine: number;
+    perk: number;
     augments: ReturnType<typeof SETUP_POLICY_V0.pickAugments>;
     synergies: ReturnType<typeof SETUP_POLICY_V0.pickSynergies>;
     tier1Artifact: number;
@@ -277,10 +277,10 @@ export function runTableArmPickGame(
             throw new Error("Pick phase failed to complete within 300 driver iterations");
         }
         const phase = getCurrentPickPhase(state);
-        if (phase.phase === PBTypes.PickPhaseVals.DOCTRINE) {
+        if (phase.phase === PBTypes.PickPhaseVals.PERK) {
             for (const team of [LOWER, UPPER] as const) {
-                if (teamState(team).doctrine === Doctrine.NO_DOCTRINE) {
-                    accept({ type: "select_doctrine", team, doctrine: SETUP_POLICY_V0.pickDoctrine() });
+                if (teamState(team).perk === Perk.NO_PERK) {
+                    accept({ type: "select_perk", team, perk: SETUP_POLICY_V0.pickPerk() });
                 }
             }
         } else if (phase.phase === PBTypes.PickPhaseVals.INITIAL_PICK) {
@@ -350,10 +350,10 @@ export function runTableArmPickGame(
                 LIVETWIN_PRESET.amountMode,
             ),
         }));
-        const budget = getUpgradePoints(own.doctrine);
+        const budget = getUpgradePoints(own.perk);
         return {
             roster,
-            doctrine: own.doctrine,
+            perk: own.perk,
             augments: SETUP_POLICY_V0.pickAugments(budget),
             synergies: SETUP_POLICY_V0.pickSynergies(own.creatures),
             tier1Artifact: own.tier1Artifact,
@@ -424,8 +424,8 @@ export function playTableArmGame(cell: ITableArmCell, options: ITableArmOptions,
         redRoster: upper.roster,
         seed,
         gridType: PBTypes.GridVals.NORMAL,
-        greenDoctrine: lower.doctrine,
-        redDoctrine: upper.doctrine,
+        greenPerk: lower.perk,
+        redPerk: upper.perk,
         greenAugments: lower.augments,
         redAugments: upper.augments,
         greenArtifactT1: lower.tier1Artifact,

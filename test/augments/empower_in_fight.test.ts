@@ -16,7 +16,7 @@ import { EmpowerAugment, DefaultPlacementLevel1 } from "../../src/augments/augme
 import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
-import { Doctrine } from "../../src/doctrines/doctrine_properties";
+import { Perk } from "../../src/perks/perk_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Spell } from "../../src/spells/spell";
 import { getEmpowerPercentage } from "../../src/spells/spell_damage";
@@ -31,9 +31,9 @@ const setupTeam = (empower: EmpowerAugment) => {
     const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(PBTypes.GridVals.NORMAL);
-    fightProperties.setDoctrinePerTeam(PBTypes.TeamVals.LOWER, Doctrine.SEE_NONE);
+    fightProperties.setPerkPerTeam(PBTypes.TeamVals.LOWER, Perk.SEE_NONE);
     fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LOWER, DefaultPlacementLevel1.THREE_BY_THREE);
-    fightProperties.setDoctrinePerTeam(PBTypes.TeamVals.UPPER, Doctrine.SEE_NONE);
+    fightProperties.setPerkPerTeam(PBTypes.TeamVals.UPPER, Perk.SEE_NONE);
     fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.UPPER, DefaultPlacementLevel1.THREE_BY_THREE);
     if (empower) {
         expect(fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, { type: "Empower", value: empower })).toBe(

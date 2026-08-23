@@ -15,7 +15,7 @@ import { isMainThread, parentPort, Worker, workerData } from "node:worker_thread
 
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getUpgradePoints } from "../doctrines/doctrine_properties";
+import { getUpgradePoints } from "../perks/perk_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
@@ -45,7 +45,7 @@ import {
     pickLeagueAugments,
     pickLeagueBundle,
     pickLeagueCreature,
-    pickLeagueDoctrine,
+    pickLeaguePerk,
     pickLeaguePlacement,
     pickLeagueTier2,
     type ILeagueGenome,
@@ -72,7 +72,7 @@ export interface ILeagueEvaluationOptions {
     maxLaps?: number;
     mapTypes?: readonly number[];
     /** Default true: preserve the roadmap's SEE_NONE anchor until reveal-frequency evidence exists. */
-    freezeDoctrine?: boolean;
+    freezePerk?: boolean;
     aggregate?: LeagueAggregateMethod;
     /** Probability scale for the entropy-regularized adversarial pool. Default 0.025. */
     softminTemperature?: number;
@@ -87,7 +87,7 @@ export interface INormalizedLeagueOptions {
     fightVersion: string;
     maxLaps: number;
     mapTypes: number[];
-    freezeDoctrine: boolean;
+    freezePerk: boolean;
     aggregate: LeagueAggregateMethod;
     softminTemperature: number;
     confidenceZ: number;
@@ -216,7 +216,7 @@ function normalizeOptions(options: ILeagueEvaluationOptions): INormalizedLeagueO
         fightVersion,
         maxLaps,
         mapTypes,
-        freezeDoctrine: options.freezeDoctrine ?? true,
+        freezePerk: options.freezePerk ?? true,
         aggregate,
         softminTemperature,
         confidenceZ,
@@ -263,16 +263,16 @@ export function resolveLeaguePick(
     seed: number,
     lowerGenome: ILeagueGenome,
     upperGenome: ILeagueGenome,
-    freezeDoctrine: boolean = true,
+    freezePerk: boolean = true,
 ): IResolvedLeaguePick {
     const rng = randomInt(seed);
     let state = createPickSimState(rng);
     const genomeFor = (team: PickTeam): ILeagueGenome => (team === LOWER ? lowerGenome : upperGenome);
 
-    const lowerDoctrine = pickLeagueDoctrine(lowerGenome, freezeDoctrine);
-    const upperDoctrine = pickLeagueDoctrine(upperGenome, freezeDoctrine);
-    state = applyAccepted(state, { type: "select_doctrine", team: LOWER, doctrine: lowerDoctrine }, rng);
-    state = applyAccepted(state, { type: "select_doctrine", team: UPPER, doctrine: upperDoctrine }, rng);
+    const lowerPerk = pickLeaguePerk(lowerGenome, freezePerk);
+    const upperPerk = pickLeaguePerk(upperGenome, freezePerk);
+    state = applyAccepted(state, { type: "select_perk", team: LOWER, perk: lowerPerk }, rng);
+    state = applyAccepted(state, { type: "select_perk", team: UPPER, perk: upperPerk }, rng);
 
     const lowerBundle = pickLeagueBundle(state, LOWER, lowerGenome);
     const upperBundle = pickLeagueBundle(state, UPPER, upperGenome);
@@ -334,13 +334,13 @@ export function resolveLeaguePick(
         lowerAugments: pickLeagueAugments(
             state.lower.creatures,
             lowerOpponent,
-            getUpgradePoints(state.lower.doctrine),
+            getUpgradePoints(state.lower.perk),
             lowerGenome,
         ),
         upperAugments: pickLeagueAugments(
             state.upper.creatures,
             upperOpponent,
-            getUpgradePoints(state.upper.doctrine),
+            getUpgradePoints(state.upper.perk),
             upperGenome,
         ),
     };
@@ -432,13 +432,13 @@ export function playLeagueGame(
     const candidatePickedLower = pickAssignment === 0;
     const lowerGenome = candidatePickedLower ? candidate : opponent;
     const upperGenome = candidatePickedLower ? opponent : candidate;
-    const pick = resolveLeaguePick(pickSeed, lowerGenome, upperGenome, normalized.freezeDoctrine);
+    const pick = resolveLeaguePick(pickSeed, lowerGenome, upperGenome, normalized.freezePerk);
     const pickLower = {
         roster: leagueRoster(pick.state.lower.creatures),
         placement: pick.lowerPlacement,
         artifactT1: pick.state.lower.tier1Artifact,
         artifactT2: pick.state.lower.tier2Artifact,
-        doctrine: pick.state.lower.doctrine,
+        perk: pick.state.lower.perk,
         augments: pick.lowerAugments,
         synergies: SETUP_POLICY_V0.pickSynergies(pick.state.lower.creatures),
     };
@@ -447,7 +447,7 @@ export function playLeagueGame(
         placement: pick.upperPlacement,
         artifactT1: pick.state.upper.tier1Artifact,
         artifactT2: pick.state.upper.tier2Artifact,
-        doctrine: pick.state.upper.doctrine,
+        perk: pick.state.upper.perk,
         augments: pick.upperAugments,
         synergies: SETUP_POLICY_V0.pickSynergies(pick.state.upper.creatures),
     };
@@ -472,8 +472,8 @@ export function playLeagueGame(
             redArtifactT1: matchUpper.artifactT1,
             greenArtifactT2: matchLower.artifactT2,
             redArtifactT2: matchUpper.artifactT2,
-            greenDoctrine: matchLower.doctrine,
-            redDoctrine: matchUpper.doctrine,
+            greenPerk: matchLower.perk,
+            redPerk: matchUpper.perk,
             greenAugments: matchLower.augments,
             redAugments: matchUpper.augments,
             greenSynergies: matchLower.synergies,
@@ -644,7 +644,7 @@ export function summarizeLeagueRecords(
             "The built-in anchor/melee pool is a bootstrap smoke pool, not a powered acceptance panel; provide accumulated champions and exploiters with --pool.",
             "The deployable placement head may enable adaptive dispersion only after a legitimate AOE reveal; otherwise it uses the tight template. Placement-zone expansion and stack splitting are not yet engine action-space choices.",
             "Each offer board costs four games: both pick-seat assignments and a fixed-setup battle-side mirror for each assignment.",
-            "SEE_NONE remains frozen by default; use --unfreeze-doctrine only for an explicit reveal-value experiment.",
+            "SEE_NONE remains frozen by default; use --unfreeze-perk only for an explicit reveal-value experiment.",
             "No training or bake verdict is inferred from this report; acceptance still requires fresh-seed powered evaluation.",
         ],
         provenance: {
@@ -807,7 +807,7 @@ export function parseLeagueEvalArgs(argv: readonly string[], cwd: string = proce
         const argument = argv[index];
         if (!argument.startsWith("--")) throw new Error(`Unexpected positional argument: ${argument}`);
         const [key, inline] = argument.slice(2).split("=", 2);
-        if (key === "validate" || key === "unfreeze-doctrine") {
+        if (key === "validate" || key === "unfreeze-perk") {
             flags.add(key);
             continue;
         }
@@ -829,7 +829,7 @@ export function parseLeagueEvalArgs(argv: readonly string[], cwd: string = proce
         fightVersion: values.get("fight-version") ?? "v0.6",
         maxLaps: Number(values.get("max-laps") ?? 60),
         mapTypes: (values.get("maps") ?? String(PBTypes.GridVals.NORMAL)).split(",").map(Number),
-        freezeDoctrine: !flags.has("unfreeze-doctrine"),
+        freezePerk: !flags.has("unfreeze-perk"),
         aggregate: (values.get("aggregate") ?? "worst-case") as LeagueAggregateMethod,
         softminTemperature: Number(values.get("temperature") ?? 0.025),
         confidenceZ: Number(values.get("confidence-z") ?? 1.96),

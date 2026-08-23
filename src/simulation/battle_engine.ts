@@ -316,9 +316,6 @@ export interface IMatchConfig {
     /** Perk (Perk enum id) per team — seeds the augment upgrade-point budget (getUpgradePoints). */
     greenPerk?: number;
     redPerk?: number;
-    /** Doctrine is the main-branch name for the same setup choice. Perk remains preferred when both exist. */
-    greenDoctrine?: number;
-    redDoctrine?: number;
     /** Army augments per team ({kind,value}; kind = Placement/Armor/Might/Sniper/Movement, value = level).
      * Applied as whole-army stat buffs via UnitsHolder.applyAugments, budget-checked against the perk. */
     greenAugments?: ISetupAugment[];
@@ -676,8 +673,8 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const pathHelper = new PathHelper(gridSettings);
     const runtime = createMatchRuntime(config.seed);
     const { abilityFactory, effectFactory } = createCombatFactories();
-    const greenPerk = config.greenPerk ?? config.greenDoctrine;
-    const redPerk = config.redPerk ?? config.redDoctrine;
+    const greenPerk = config.greenPerk;
+    const redPerk = config.redPerk;
 
     const setupBeforePlacement = config.placementAugmentTiming === "setup-before-placement";
     if (setupBeforePlacement) {

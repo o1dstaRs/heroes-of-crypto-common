@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { getUpgradePoints, Doctrine } from "../doctrines/doctrine_properties";
+import { getUpgradePoints, Perk } from "../perks/perk_properties";
 import {
     creatureFeatures,
     creatureInfo,
@@ -86,7 +86,7 @@ export const LEAGUE_GENOME_LAYOUT = {
     tier2: { offset: 45, length: 12 },
     augments: { offset: 57, length: LEAGUE_AUGMENT_KINDS.length * SETUP_FEATURES.length },
     placement: { offset: 85, length: SETUP_FEATURES.length },
-    doctrines: { offset: 92, length: 3 },
+    perks: { offset: 92, length: 3 },
 } as const;
 
 export const LEAGUE_GENOME_DIM = 95;
@@ -99,9 +99,9 @@ export const LEAGUE_GENOME_KEYS: readonly string[] = [
     ...Array.from({ length: 12 }, (_, index) => `tier2.${index + 1}`),
     ...LEAGUE_AUGMENT_KINDS.flatMap((kind) => SETUP_FEATURES.map((feature) => `augment.${kind}.${feature}`)),
     ...SETUP_FEATURES.map((feature) => `placement.adaptive.${feature}`),
-    "doctrine.threeReveals",
-    "doctrine.seeAll",
-    "doctrine.seeNone",
+    "perk.threeReveals",
+    "perk.seeAll",
+    "perk.seeNone",
 ];
 
 /** Win-rate of a coin-flip: what an artifact with no measured row is worth to the anchor. */
@@ -139,7 +139,7 @@ const augmentAnchor = (): number[] => {
 /**
  * Absolute coefficients for the live setup-v0 anchor. The first eleven entries reproduce scoreCreature;
  * all new counter-draft interactions are zero, artifact heads reproduce the measured tables, augments spend
- * Armor3/Might3/Sniper1, adaptive v0.6 placement remains enabled, and SEE_NONE wins the doctrine head.
+ * Armor3/Might3/Sniper1, adaptive v0.6 placement remains enabled, and SEE_NONE wins the perk head.
  */
 export const LEAGUE_ANCHOR_GENOME: readonly number[] = [
     ...DRAFT_ANCHOR_W,
@@ -153,9 +153,9 @@ export const LEAGUE_ANCHOR_GENOME: readonly number[] = [
     ...augmentAnchor(),
     1,
     ...new Array(COMPOSITION_FEATURES.length).fill(0),
-    getUpgradePoints(Doctrine.THREE_REVEALS),
-    getUpgradePoints(Doctrine.SEE_ALL),
-    getUpgradePoints(Doctrine.SEE_NONE),
+    getUpgradePoints(Perk.THREE_REVEALS),
+    getUpgradePoints(Perk.SEE_ALL),
+    getUpgradePoints(Perk.SEE_NONE),
 ];
 
 if (LEAGUE_ANCHOR_GENOME.length !== LEAGUE_GENOME_DIM || LEAGUE_GENOME_KEYS.length !== LEAGUE_GENOME_DIM) {
@@ -194,7 +194,7 @@ export interface ILeagueAugment {
 }
 
 export interface ILeagueSetup {
-    doctrine: Doctrine;
+    perk: Perk;
     artifactT1: number;
     artifactT2: number;
     augments: ILeagueAugment[];
@@ -327,19 +327,19 @@ export function scoreLeagueGenomeCreature(
     return scoreLeagueCreature(creatureId, ownCreatures, opponentCreatures, genome.weights);
 }
 
-export function pickLeagueDoctrine(genome: ILeagueGenome, freezeDoctrine: boolean = true): Doctrine {
+export function pickLeaguePerk(genome: ILeagueGenome, freezePerk: boolean = true): Perk {
     assertLeagueWeights(genome.weights);
-    if (freezeDoctrine) {
-        return Doctrine.SEE_NONE;
+    if (freezePerk) {
+        return Perk.SEE_NONE;
     }
-    const doctrines = [Doctrine.THREE_REVEALS, Doctrine.SEE_ALL, Doctrine.SEE_NONE] as const;
-    let best: Doctrine = doctrines[0];
-    for (let i = 1; i < doctrines.length; i += 1) {
+    const perks = [Perk.THREE_REVEALS, Perk.SEE_ALL, Perk.SEE_NONE] as const;
+    let best: Perk = perks[0];
+    for (let i = 1; i < perks.length; i += 1) {
         if (
-            genome.weights[LEAGUE_GENOME_LAYOUT.doctrines.offset + i] >
-            genome.weights[LEAGUE_GENOME_LAYOUT.doctrines.offset + doctrines.indexOf(best)]
+            genome.weights[LEAGUE_GENOME_LAYOUT.perks.offset + i] >
+            genome.weights[LEAGUE_GENOME_LAYOUT.perks.offset + perks.indexOf(best)]
         ) {
-            best = doctrines[i];
+            best = perks[i];
         }
     }
     return best;

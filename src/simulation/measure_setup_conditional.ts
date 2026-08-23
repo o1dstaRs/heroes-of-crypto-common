@@ -28,7 +28,7 @@ import {
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getUpgradePoints, Doctrine } from "../doctrines/doctrine_properties";
+import { getUpgradePoints, Perk } from "../perks/perk_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
@@ -184,7 +184,7 @@ export interface IConditionalArmy {
     /** Opponent creatures legitimately revealed during this team's pick. */
     revealedOpponentCreatures: number[];
     roster: IArmyUnitSpec[];
-    doctrine: number;
+    perk: number;
     augments: ISetupAugment[];
     synergies: ISetupSynergy[];
     tier1Artifact: number;
@@ -301,10 +301,10 @@ function runConditionalPickGameWithOptions(
             throw new Error("Pick phase failed to complete within 300 driver iterations");
         }
         const phase = getCurrentPickPhase(state);
-        if (phase.phase === PBTypes.PickPhaseVals.DOCTRINE) {
+        if (phase.phase === PBTypes.PickPhaseVals.PERK) {
             for (const team of [LOWER, UPPER] as const) {
-                if (teamState(team).doctrine === Doctrine.NO_DOCTRINE) {
-                    accept({ type: "select_doctrine", team, doctrine: SETUP_POLICY_V0.pickDoctrine() });
+                if (teamState(team).perk === Perk.NO_PERK) {
+                    accept({ type: "select_perk", team, perk: SETUP_POLICY_V0.pickPerk() });
                 }
             }
         } else if (phase.phase === PBTypes.PickPhaseVals.INITIAL_PICK) {
@@ -378,7 +378,7 @@ function runConditionalPickGameWithOptions(
                 LIVETWIN_PRESET.amountMode,
             ),
         }));
-        const budget = getUpgradePoints(own.doctrine);
+        const budget = getUpgradePoints(own.perk);
         const staticAugments = SETUP_POLICY_V0.pickAugments(budget);
         const conditional = options.conditionalTeams.has(team);
         const augments = conditional ? conditionalAugments(budget, own.creatures, rules) : staticAugments;
@@ -389,7 +389,7 @@ function runConditionalPickGameWithOptions(
             creatureIds: [...own.creatures],
             revealedOpponentCreatures: getKnownOpponentCreatures(state, team),
             roster,
-            doctrine: own.doctrine,
+            perk: own.perk,
             augments,
             synergies,
             tier1Artifact: own.tier1Artifact,
@@ -525,8 +525,8 @@ export function playSetupConditionalGame(
         redRoster: upper.roster,
         seed,
         gridType: PBTypes.GridVals.NORMAL,
-        greenDoctrine: lower.doctrine,
-        redDoctrine: upper.doctrine,
+        greenPerk: lower.perk,
+        redPerk: upper.perk,
         greenAugments: lower.augments,
         redAugments: upper.augments,
         greenArtifactT1: lower.tier1Artifact,

@@ -37,7 +37,7 @@ import {
 import { getArmorPower, getMightPower, getMovementPower, getSniperPower } from "../augments/augment_properties";
 import { CreatureFactions } from "../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { Doctrine } from "../doctrines/doctrine_properties";
+import { Perk } from "../perks/perk_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
@@ -294,7 +294,7 @@ export interface IAiMetaArmy {
     artifactT1: IAiMetaArtifactChoice;
     artifactT2: IAiMetaArtifactChoice;
     augment: IAiMetaAugmentChoice;
-    doctrine: Doctrine;
+    perk: Perk;
     synergies: { faction: number; synergy: number }[];
 }
 
@@ -537,9 +537,9 @@ const materializeRankedRoster = (creatureIds: readonly number[]): IArmyUnitSpec[
 function generateRankedRosters(seed: number): [IArmyUnitSpec[], IArmyUnitSpec[]] {
     const rng = rankedPickRandomInt(seed);
     let state = createPickSimState(rng);
-    const doctrine = SETUP_POLICY_V0.pickDoctrine();
-    state = applyRankedPick(state, { type: "select_doctrine", team: LOWER, doctrine }, rng);
-    state = applyRankedPick(state, { type: "select_doctrine", team: UPPER, doctrine }, rng);
+    const perk = SETUP_POLICY_V0.pickPerk();
+    state = applyRankedPick(state, { type: "select_perk", team: LOWER, perk }, rng);
+    state = applyRankedPick(state, { type: "select_perk", team: UPPER, perk }, rng);
 
     // Both simultaneous bundle decisions consume the same pre-commit state, matching the live timeout policy.
     const lowerBundle = pickRankedBundle(getPickTeamView(state, LOWER).bundles);
@@ -838,7 +838,7 @@ export function chooseMetaArmy(
         artifactT1,
         artifactT2,
         augment,
-        doctrine: Doctrine.SEE_NONE,
+        perk: Perk.SEE_NONE,
         synergies: aiMetaSynergiesForVariants(creatureIds, synergyVariants),
     };
 }

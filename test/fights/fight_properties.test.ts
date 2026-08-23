@@ -502,7 +502,7 @@ describe("FightProperties", () => {
 
             // "fresh" — what FightStateManager.reset() builds on the client's fight-start hydrate: no
             // synergies, so the aura-range bonus is silently zero. This is the bug — the authoritative
-            // snapshot re-seeds doctrine/artifacts/augments but never synergies.
+            // snapshot re-seeds perk/artifacts/augments but never synergies.
             const fresh = new FightProperties();
             expect(fresh.getAdditionalAuraRangePerTeam(team)).toBe(0);
 

@@ -209,13 +209,13 @@ const OUT = resolve(process.env.LEAGUE_OUT || join(PACKAGE_ROOT, "sim-out", "lea
 const ROUNDS = integer("LEAGUE_ROUNDS", SMOKE ? 1 : 3);
 const BASE_SEED = integer("CEM_SEED", 1, 0) >>> 0;
 const INITIAL_POOL_SOURCE = process.env.LEAGUE_INITIAL_POOL || process.env.CEM_LEAGUE_POOL || "default";
-const FREEZE_DOCTRINE = process.env.CEM_UNFREEZE_DOCTRINE !== "1";
+const FREEZE_PERK = process.env.CEM_UNFREEZE_PERK !== "1";
 const CEM_CONFIG = {
     aggregate: process.env.CEM_AGGREGATE || "worst-case",
     elite: integer("CEM_ELITE", SMOKE ? 1 : 3),
     evalParallel: integer("CEM_EVAL_PARALLEL", SMOKE ? 1 : 12),
     fightVersion: process.env.CEM_FIGHT_VERSION || "v0.6",
-    freezeDoctrine: FREEZE_DOCTRINE,
+    freezePerk: FREEZE_PERK,
     gamesPerOpponent: integer("CEM_GAMES", SMOKE ? 8 : 2000),
     generations: integer("CEM_GENS", SMOKE ? 1 : 12),
     mapTypes: (process.env.CEM_MAPS || "1").split(",").map(Number),
@@ -231,7 +231,7 @@ const CEM_CONFIG = {
 const MATRIX_CONFIG = {
     confidenceZ: positive("LEAGUE_MATRIX_CONFIDENCE_Z", 1.96),
     fightVersion: process.env.LEAGUE_MATRIX_FIGHT_VERSION || CEM_CONFIG.fightVersion,
-    freezeDoctrine: FREEZE_DOCTRINE,
+    freezePerk: FREEZE_PERK,
     gamesPerCell: integer("LEAGUE_MATRIX_GAMES", SMOKE ? 8 : 2000),
     mapTypes: (process.env.LEAGUE_MATRIX_MAPS || CEM_CONFIG.mapTypes.join(",")).split(",").map(Number),
     maxLaps: integer("LEAGUE_MATRIX_MAX_LAPS", 60),
@@ -425,7 +425,7 @@ async function executeRound(round) {
             CEM_SIGMA_DECAY: CEM_CONFIG.sigmaDecay,
             CEM_SIGMA_FLOOR_RATIO: CEM_CONFIG.sigmaFloorRatio,
             CEM_SOFTMIN_TEMPERATURE: CEM_CONFIG.softminTemperature,
-            CEM_UNFREEZE_DOCTRINE: CEM_CONFIG.freezeDoctrine ? "0" : "1",
+            CEM_UNFREEZE_PERK: CEM_CONFIG.freezePerk ? "0" : "1",
             CEM_VAL_GAMES: CEM_CONFIG.validationGamesPerOpponent,
             CEM_ZERO_SIGMA: CEM_CONFIG.zeroSigma,
         }),
@@ -446,7 +446,7 @@ async function executeRound(round) {
         fightVersion: CEM_CONFIG.fightVersion,
         maxLaps: 60,
         mapTypes: CEM_CONFIG.mapTypes,
-        freezeDoctrine: CEM_CONFIG.freezeDoctrine,
+        freezePerk: CEM_CONFIG.freezePerk,
         aggregate: CEM_CONFIG.aggregate,
         softminTemperature: CEM_CONFIG.softminTemperature,
         confidenceZ: 1.96,
@@ -596,7 +596,7 @@ async function evaluateMatrixRow(entrant) {
         String(MATRIX_CONFIG.maxLaps),
         "--confidence-z",
         String(MATRIX_CONFIG.confidenceZ),
-        ...(MATRIX_CONFIG.freezeDoctrine ? [] : ["--unfreeze-doctrine"]),
+        ...(MATRIX_CONFIG.freezePerk ? [] : ["--unfreeze-perk"]),
     ]);
     const report = JSON.parse(stdout.slice(stdout.indexOf("{")));
     if (

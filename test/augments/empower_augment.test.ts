@@ -24,7 +24,7 @@ import {
 } from "../../src/augments/augment_properties";
 import { MAX_UNIT_STACK_POWER } from "../../src/constants";
 import { FightProperties } from "../../src/fights/fight_properties";
-import { Doctrine } from "../../src/doctrines/doctrine_properties";
+import { Perk } from "../../src/perks/perk_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { DefaultPlacementLevel1 } from "../../src/augments/augment_properties";
 import { fireWallBurnDamage, fireWallBurnPercentage, FIRE_WALL_BURN_PERCENTAGE } from "../../src/spells/fire_walls";
@@ -77,9 +77,9 @@ describe("Empower augment — power table", () => {
 
 describe("Empower augment — fight properties", () => {
     // Spymaster grants 5 upgrade points — enough to show Empower both fitting and running the team out.
-    const seedTeam = (doctrine: Doctrine = Doctrine.SEE_ALL) => {
+    const seedTeam = (perk: Perk = Perk.SEE_ALL) => {
         const fightProperties = new FightProperties();
-        fightProperties.setDoctrinePerTeam(PBTypes.TeamVals.LOWER, doctrine);
+        fightProperties.setPerkPerTeam(PBTypes.TeamVals.LOWER, perk);
         fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LOWER, DefaultPlacementLevel1.THREE_BY_THREE);
         return fightProperties;
     };

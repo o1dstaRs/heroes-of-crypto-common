@@ -22,7 +22,7 @@ var global =
     Function('return this')();
 
 goog.exportSymbol('proto.PBTypes.ArtifactRequest', null, global);
-goog.exportSymbol('proto.PBTypes.DoctrineRequest', null, global);
+goog.exportSymbol('proto.PBTypes.PerkRequest', null, global);
 goog.exportSymbol('proto.PBTypes.PickBanRequest', null, global);
 goog.exportSymbol('proto.PBTypes.PickPairRequest', null, global);
 goog.exportSymbol('proto.PBTypes.RevealRequest', null, global);
@@ -120,16 +120,16 @@ if (goog.DEBUG && !COMPILED) {
  * @extends {jspb.Message}
  * @constructor
  */
-proto.PBTypes.DoctrineRequest = function(opt_data) {
+proto.PBTypes.PerkRequest = function(opt_data) {
   jspb.Message.initialize(this, opt_data, 0, -1, null, null);
 };
-goog.inherits(proto.PBTypes.DoctrineRequest, jspb.Message);
+goog.inherits(proto.PBTypes.PerkRequest, jspb.Message);
 if (goog.DEBUG && !COMPILED) {
   /**
    * @public
    * @override
    */
-  proto.PBTypes.DoctrineRequest.displayName = 'proto.PBTypes.DoctrineRequest';
+  proto.PBTypes.PerkRequest.displayName = 'proto.PBTypes.PerkRequest';
 }
 
 
@@ -697,8 +697,8 @@ if (jspb.Message.GENERATE_TO_OBJECT) {
  *     http://goto/soy-param-migration
  * @return {!Object}
  */
-proto.PBTypes.DoctrineRequest.prototype.toObject = function(opt_includeInstance) {
-  return proto.PBTypes.DoctrineRequest.toObject(opt_includeInstance, this);
+proto.PBTypes.PerkRequest.prototype.toObject = function(opt_includeInstance) {
+  return proto.PBTypes.PerkRequest.toObject(opt_includeInstance, this);
 };
 
 
@@ -707,13 +707,13 @@ proto.PBTypes.DoctrineRequest.prototype.toObject = function(opt_includeInstance)
  * @param {boolean|undefined} includeInstance Deprecated. Whether to include
  *     the JSPB instance for transitional soy proto support:
  *     http://goto/soy-param-migration
- * @param {!proto.PBTypes.DoctrineRequest} msg The msg instance to transform.
+ * @param {!proto.PBTypes.PerkRequest} msg The msg instance to transform.
  * @return {!Object}
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.PBTypes.DoctrineRequest.toObject = function(includeInstance, msg) {
+proto.PBTypes.PerkRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
-doctrine: jspb.Message.getFieldWithDefault(msg, 1, 0)
+perk: jspb.Message.getFieldWithDefault(msg, 1, 0)
   };
 
   if (includeInstance) {
@@ -727,23 +727,23 @@ doctrine: jspb.Message.getFieldWithDefault(msg, 1, 0)
 /**
  * Deserializes binary data (in protobuf wire format).
  * @param {jspb.ByteSource} bytes The bytes to deserialize.
- * @return {!proto.PBTypes.DoctrineRequest}
+ * @return {!proto.PBTypes.PerkRequest}
  */
-proto.PBTypes.DoctrineRequest.deserializeBinary = function(bytes) {
+proto.PBTypes.PerkRequest.deserializeBinary = function(bytes) {
   var reader = new jspb.BinaryReader(bytes);
-  var msg = new proto.PBTypes.DoctrineRequest;
-  return proto.PBTypes.DoctrineRequest.deserializeBinaryFromReader(msg, reader);
+  var msg = new proto.PBTypes.PerkRequest;
+  return proto.PBTypes.PerkRequest.deserializeBinaryFromReader(msg, reader);
 };
 
 
 /**
  * Deserializes binary data (in protobuf wire format) from the
  * given reader into the given message object.
- * @param {!proto.PBTypes.DoctrineRequest} msg The message object to deserialize into.
+ * @param {!proto.PBTypes.PerkRequest} msg The message object to deserialize into.
  * @param {!jspb.BinaryReader} reader The BinaryReader to use.
- * @return {!proto.PBTypes.DoctrineRequest}
+ * @return {!proto.PBTypes.PerkRequest}
  */
-proto.PBTypes.DoctrineRequest.deserializeBinaryFromReader = function(msg, reader) {
+proto.PBTypes.PerkRequest.deserializeBinaryFromReader = function(msg, reader) {
   while (reader.nextField()) {
     if (reader.isEndGroup()) {
       break;
@@ -752,7 +752,7 @@ proto.PBTypes.DoctrineRequest.deserializeBinaryFromReader = function(msg, reader
     switch (field) {
     case 1:
       var value = /** @type {number} */ (reader.readInt32());
-      msg.setDoctrine(value);
+      msg.setPerk(value);
       break;
     default:
       reader.skipField();
@@ -767,9 +767,9 @@ proto.PBTypes.DoctrineRequest.deserializeBinaryFromReader = function(msg, reader
  * Serializes the message to binary data (in protobuf wire format).
  * @return {!Uint8Array}
  */
-proto.PBTypes.DoctrineRequest.prototype.serializeBinary = function() {
+proto.PBTypes.PerkRequest.prototype.serializeBinary = function() {
   var writer = new jspb.BinaryWriter();
-  proto.PBTypes.DoctrineRequest.serializeBinaryToWriter(this, writer);
+  proto.PBTypes.PerkRequest.serializeBinaryToWriter(this, writer);
   return writer.getResultBuffer();
 };
 
@@ -777,13 +777,13 @@ proto.PBTypes.DoctrineRequest.prototype.serializeBinary = function() {
 /**
  * Serializes the given message to binary data (in protobuf wire
  * format), writing to the given BinaryWriter.
- * @param {!proto.PBTypes.DoctrineRequest} message
+ * @param {!proto.PBTypes.PerkRequest} message
  * @param {!jspb.BinaryWriter} writer
  * @suppress {unusedLocalVariables} f is only used for nested messages
  */
-proto.PBTypes.DoctrineRequest.serializeBinaryToWriter = function(message, writer) {
+proto.PBTypes.PerkRequest.serializeBinaryToWriter = function(message, writer) {
   var f = undefined;
-  f = message.getDoctrine();
+  f = message.getPerk();
   if (f !== 0) {
     writer.writeInt32(
       1,
@@ -794,19 +794,19 @@ proto.PBTypes.DoctrineRequest.serializeBinaryToWriter = function(message, writer
 
 
 /**
- * optional int32 doctrine = 1;
+ * optional int32 perk = 1;
  * @return {number}
  */
-proto.PBTypes.DoctrineRequest.prototype.getDoctrine = function() {
+proto.PBTypes.PerkRequest.prototype.getPerk = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 1, 0));
 };
 
 
 /**
  * @param {number} value
- * @return {!proto.PBTypes.DoctrineRequest} returns this
+ * @return {!proto.PBTypes.PerkRequest} returns this
  */
-proto.PBTypes.DoctrineRequest.prototype.setDoctrine = function(value) {
+proto.PBTypes.PerkRequest.prototype.setPerk = function(value) {
   return jspb.Message.setProto3IntField(this, 1, value);
 };
 

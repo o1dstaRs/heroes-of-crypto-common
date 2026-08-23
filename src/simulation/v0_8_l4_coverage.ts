@@ -280,8 +280,8 @@ export function runV08Level4CoverageGame(options: IV08Level4CoverageOptions, gam
         redRoster: plan.redRoster,
         seed: plan.seed,
         gridType: plan.mapType,
-        greenDoctrine: setup?.doctrine,
-        redDoctrine: setup?.doctrine,
+        greenPerk: setup?.perk,
+        redPerk: setup?.perk,
         greenAugments: setup?.augments,
         redAugments: setup?.augments,
         turnExecutionObserver: (observation) =>

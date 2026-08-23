@@ -77,7 +77,7 @@ const rosterInput = (path: string): boolean =>
         "src/augments/",
         "src/configuration/",
         "src/factions/",
-        "src/doctrines/",
+        "src/perks/",
         "src/spells/",
         "src/synergies/",
         "src/units/",

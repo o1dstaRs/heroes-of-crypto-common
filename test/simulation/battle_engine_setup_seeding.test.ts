@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { FightProperties } from "../../src/fights/fight_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { Doctrine } from "../../src/doctrines/doctrine_properties";
+import { Perk } from "../../src/perks/perk_properties";
 import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { creaturesByLevel } from "../../src/simulation/army";
 import { NatureSynergy } from "../../src/synergies/synergy_properties";
@@ -52,19 +52,19 @@ const collectFirstUnitBuffs = (config: Partial<IMatchConfig>): Map<number, strin
 };
 
 describe("battle_engine setup seeding", () => {
-    const acceptedPlacementWidth = (doctrine: Doctrine, augments?: ISetupAugment[]): number => {
+    const acceptedPlacementWidth = (perk: Perk, augments?: ISetupAugment[]): number => {
         const properties = new FightProperties();
-        seedAcceptedSetupForPlacement(properties, PBTypes.TeamVals.LOWER, doctrine, augments);
+        seedAcceptedSetupForPlacement(properties, PBTypes.TeamVals.LOWER, perk, augments);
         return properties.getAugmentPlacement(PBTypes.TeamVals.LOWER)[0];
     };
 
     test("models accepted Placement L1/L2/L3 rectangle widths and rejects an over-budget expansion", () => {
-        expect(acceptedPlacementWidth(Doctrine.SEE_NONE)).toBe(3);
-        expect(acceptedPlacementWidth(Doctrine.SEE_NONE, [{ kind: "Placement", value: 0 }])).toBe(3);
-        expect(acceptedPlacementWidth(Doctrine.SEE_NONE, [{ kind: "Placement", value: 1 }])).toBe(4);
-        expect(acceptedPlacementWidth(Doctrine.SEE_NONE, [{ kind: "Placement", value: 2 }])).toBe(6);
+        expect(acceptedPlacementWidth(Perk.SEE_NONE)).toBe(3);
+        expect(acceptedPlacementWidth(Perk.SEE_NONE, [{ kind: "Placement", value: 0 }])).toBe(3);
+        expect(acceptedPlacementWidth(Perk.SEE_NONE, [{ kind: "Placement", value: 1 }])).toBe(4);
+        expect(acceptedPlacementWidth(Perk.SEE_NONE, [{ kind: "Placement", value: 2 }])).toBe(6);
         expect(
-            acceptedPlacementWidth(Doctrine.SEE_ALL, [
+            acceptedPlacementWidth(Perk.SEE_ALL, [
                 { kind: "Armor", value: 3 },
                 { kind: "Might", value: 2 },
                 { kind: "Placement", value: 1 },
@@ -91,8 +91,8 @@ describe("battle_engine setup seeding", () => {
             seed: 83030711,
             gridType: PBTypes.GridVals.NORMAL,
             maxLaps: 2,
-            greenDoctrine: Doctrine.SEE_NONE,
-            redDoctrine: Doctrine.SEE_NONE,
+            greenPerk: Perk.SEE_NONE,
+            redPerk: Perk.SEE_NONE,
         };
         const baseline = runMatch(base);
         const delayed = runMatch({
@@ -115,8 +115,8 @@ describe("battle_engine setup seeding", () => {
             seed: 83030712,
             gridType: PBTypes.GridVals.NORMAL,
             maxLaps: 1,
-            greenDoctrine: Doctrine.SEE_NONE,
-            redDoctrine: Doctrine.SEE_NONE,
+            greenPerk: Perk.SEE_NONE,
+            redPerk: Perk.SEE_NONE,
             placementAugmentTiming: "setup-before-placement",
         };
         const defaultZone = runMatch(base);
@@ -224,8 +224,8 @@ describe("battle_engine setup seeding", () => {
 
     test("artifacts survive when augments are applied to the same team", () => {
         const buffsByTeam = collectFirstUnitBuffs({
-            greenDoctrine: Doctrine.SEE_NONE,
-            redDoctrine: Doctrine.SEE_NONE,
+            greenPerk: Perk.SEE_NONE,
+            redPerk: Perk.SEE_NONE,
             greenAugments: [
                 { kind: "Armor", value: 3 },
                 { kind: "Might", value: 3 },
@@ -250,8 +250,8 @@ describe("battle_engine setup seeding", () => {
 
     test("accepts a seven-point placement, armor, and Empower setup", () => {
         const buffsByTeam = collectFirstUnitBuffs({
-            greenDoctrine: Doctrine.SEE_NONE,
-            redDoctrine: Doctrine.SEE_NONE,
+            greenPerk: Perk.SEE_NONE,
+            redPerk: Perk.SEE_NONE,
             greenAugments: [
                 { kind: "Placement", value: 1 },
                 { kind: "Armor", value: 3 },

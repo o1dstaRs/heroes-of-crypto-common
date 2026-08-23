@@ -108,7 +108,7 @@ describe("generated message constructors (new X({...}))", () => {
         const playerSetup = new PortalPB.PortalMatchSetup({
             artifact_tier_1: 3,
             artifact_tier_2: 11,
-            doctrine: 2,
+            perk: 2,
             augment_placement: 1,
             augment_armor: 3,
             augment_might: 2,
@@ -120,7 +120,7 @@ describe("generated message constructors (new X({...}))", () => {
         const opponentSetup = new PortalPB.PortalMatchSetup({
             artifact_tier_1: 12,
             artifact_tier_2: 5,
-            doctrine: 3,
+            perk: 3,
             augment_placement: 0,
             augment_armor: 2,
             augment_might: 3,

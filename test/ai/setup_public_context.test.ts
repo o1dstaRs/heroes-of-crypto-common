@@ -33,7 +33,7 @@ const setupContext = (
         publicOpponentCreatureIds: Object.freeze([...publicOpponentCreatureIds]),
         gridType,
         gridSize: 16,
-        ownDoctrine: 4,
+        ownPerk: 4,
         ownArtifactIds: Object.freeze([2, 10]),
     });
 
@@ -57,7 +57,7 @@ describe("fair setup decision context", () => {
             "gridType",
             "opponentRosterVisibility",
             "ownArtifactIds",
-            "ownDoctrine",
+            "ownPerk",
             "publicOpponentCreatureIds",
         ]);
         expect(context.decisionPhase).toBe("placement");
@@ -92,7 +92,7 @@ describe("fair setup decision context", () => {
     test("Tier-2 context is necessarily partial and strips private fields", () => {
         const context = createTier2ArtifactDecisionContext({
             publicOpponentCreatureIds: [9, 9, 15],
-            ownDoctrine: 4,
+            ownPerk: 4,
             ownArtifactIds: [2],
             // Exercise the runtime boundary as well as the discriminated TypeScript contract.
             gridType: PBTypes.GridVals.LAVA_CENTER,
@@ -108,7 +108,7 @@ describe("fair setup decision context", () => {
             publicOpponentCreatureIds: [9, 15],
             gridType: PBTypes.GridVals.LAVA_CENTER,
             gridSize: 16,
-            ownDoctrine: 4,
+            ownPerk: 4,
             ownArtifactIds: [2],
         });
         expect("opponentPlacement" in context).toBe(false);

@@ -7,7 +7,7 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  * -----------------------------------------------------------------------------
- * Cross-Entropy Method trainer for the SETUP policy weight vector (doctrine + augment spend). Mirrors cem.mjs but
+ * Cross-Entropy Method trainer for the SETUP policy weight vector (perk + augment spend). Mirrors cem.mjs but
  * fitness = the weighted policy's win rate vs the frozen heuristic anchor in a `cemSetup` self-play tournament.
  *
  * Population members are evaluated as PARALLEL SUBPROCESSES (cem_setup_eval.ts), one per candidate — this is

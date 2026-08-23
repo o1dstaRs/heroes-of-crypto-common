@@ -11,7 +11,7 @@
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import type { IAIStrategy } from "../ai/ai_strategy";
-import { Doctrine, getUpgradePoints } from "../doctrines/doctrine_properties";
+import { Perk, getUpgradePoints } from "../perks/perk_properties";
 import { creatureInfo, DEFAULT_DRAFT_W, DRAFT_ANCHOR_W, loadDraftWeights } from "../ai/setup/creature_score";
 import { loadSynergyWeights, pickSynergiesSituational } from "../ai/setup/synergy_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
@@ -136,9 +136,9 @@ export interface ITournamentOptions {
      * back (measurement / RL only need aggregate win rates). Removes the worker→main structured-clone
      * bottleneck so the pool scales to all cores. Leave off when the full game log is needed (LLM analysis). */
     lightweight?: boolean;
-    /** CEM setup-training self-play: one side drafts its doctrine + augments via the WEIGHTED setup policy
+    /** CEM setup-training self-play: one side drafts its perk + augments via the WEIGHTED setup policy
      * (env V05_SETUP_WEIGHTS), the other via the FROZEN heuristic; sides swap across the pair to cancel bias.
-     * Everything else is mirrored, so the win rate isolates the learned doctrine+augment spend. The aggregator
+     * Everything else is mirrored, so the win rate isolates the learned perk+augment spend. The aggregator
      * reads greenIsWeighted + result.winner to get the weighted policy's win rate (the CEM fitness). */
     cemSetup?: boolean;
     /** CEM draft-training self-play: each side DRAFTS its roster (from a shared offered subset per level) via
@@ -152,7 +152,7 @@ export interface ITournamentOptions {
      * pair. Win rate isolates whether composition/opponent-aware augment choice beats the blind default. */
     cemAugCA?: boolean;
     /** CEM VISION-GATED setup training: each side fields its OWN random roster; the WEIGHTED side jointly picks
-     * DOCTRINE (buying vision at a budget cost) + AUGMENTS (counter-picking only the VISIBLE fraction of the enemy
+     * PERK (buying vision at a budget cost) + AUGMENTS (counter-picking only the VISIBLE fraction of the enemy
      * army) via the setupCA policy (env V05_SETUPCA_WEIGHTS); FROZEN side uses the blind heuristic. Tests whether
      * paying for opponent vision to counter-augment beats the max-budget/no-vision default. */
     cemSetupCA?: boolean;
@@ -260,15 +260,15 @@ const augCA = (
     return out;
 };
 
-// VISION-GATED composition+opponent-aware SETUP policy (cemSetupCA). The doctrine buys VISION at a budget cost
+// VISION-GATED composition+opponent-aware SETUP policy (cemSetupCA). The perk buys VISION at a budget cost
 // (SEE_NONE 7pts/no vision, THREE_REVEALS 6pts/half vision, SEE_ALL 5pts/full vision); only the VISIBLE fraction
 // of the ENEMY composition can be used to counter-pick augments. 23 weights = [0..2] vision-value (bias, ownRanged,
 // ownAvgLvl) + [3..22] augment scorer (4 kinds x 5 feats). w=0 -> SEE_NONE + blind augments (shipped heuristic).
 // Env V05_SETUPCA_WEIGHTS.
-const SETUPCA_DOCTRINES: { doctrine: Doctrine; budget: number; vision: number }[] = [
-    { doctrine: Doctrine.SEE_NONE, budget: 7, vision: 0 },
-    { doctrine: Doctrine.THREE_REVEALS, budget: 6, vision: 0.5 },
-    { doctrine: Doctrine.SEE_ALL, budget: 5, vision: 1 },
+const SETUPCA_PERKS: { perk: Perk; budget: number; vision: number }[] = [
+    { perk: Perk.SEE_NONE, budget: 7, vision: 0 },
+    { perk: Perk.THREE_REVEALS, budget: 6, vision: 0.5 },
+    { perk: Perk.SEE_ALL, budget: 5, vision: 1 },
 ];
 const SETUPCA_DIM = 3 + AUGCA_KINDS.length * AUGCA_NFEAT; // 23
 const SETUPCA_WEIGHTS: number[] = (() => {
@@ -289,21 +289,21 @@ const setupCA = (
     own: readonly IArmyUnitSpec[],
     enemy: readonly IArmyUnitSpec[],
     w: number[],
-): { doctrine: Doctrine; augments: ISetupAugment[] } => {
+): { perk: Perk; augments: ISetupAugment[] } => {
     const ownR = rangedFracOf(own);
     const ownLvl = own.reduce((s, u) => s + u.level, 0) / Math.max(1, own.length) / 4;
-    // Vision value depends on OWN army (known when choosing the doctrine). Doctrine maximises budget + vision*value.
+    // Vision value depends on OWN army (known when choosing the perk). Perk maximises budget + vision*value.
     const visionValue = w[0] + w[1] * ownR + w[2] * ownLvl;
-    let best = SETUPCA_DOCTRINES[0];
+    let best = SETUPCA_PERKS[0];
     let bestS = -Infinity;
-    for (const p of SETUPCA_DOCTRINES) {
+    for (const p of SETUPCA_PERKS) {
         const s = p.budget + p.vision * visionValue;
         if (s > bestS) {
             bestS = s;
             best = p;
         }
     }
-    // Augments: enemy features are scaled by the chosen doctrine's VISION (0 = blind, 1 = full sight).
+    // Augments: enemy features are scaled by the chosen perk's VISION (0 = blind, 1 = full sight).
     const eR = rangedFracOf(enemy);
     const f = [ownR, ownLvl, best.vision * eR, best.vision * (1 - eR), 1];
     const aw = w.slice(3);
@@ -325,7 +325,7 @@ const setupCA = (
             rem -= lvl;
         }
     }
-    return { doctrine: best.doctrine, augments };
+    return { perk: best.perk, augments };
 };
 
 // Situational synergy weights (16-dim). Weighted reads V05_SYNERGY_WEIGHTS at load; anchor reproduces the fixed
@@ -655,7 +655,7 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     }
 
     // Augment A/B: draw two DISTINCT augments from the 12-option pool and swap sides across the pair, exactly
-    // like the artifact test. Budget defaults to 8 (NO_DOCTRINE) so any single level-1..3 augment fits.
+    // like the artifact test. Budget defaults to 8 (NO_PERK) so any single level-1..3 augment fits.
     let greenAugments: ISetupAugment[] | undefined;
     let redAugments: ISetupAugment[] | undefined;
     let greenAugment: string | undefined;
@@ -689,11 +689,11 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         redSynergies = [{ faction: f, synergy: rs }];
     }
 
-    // CEM setup training: derive doctrine + augments for each side from a policy — weighted (trained) vs frozen
+    // CEM setup training: derive perk + augments for each side from a policy — weighted (trained) vs frozen
     // (heuristic anchor), swapped across the pair. Everything else is mirrored, so the outcome isolates the
-    // learned doctrine+augment spend. The doctrine sets the augment budget (getUpgradePoints).
-    let greenDoctrine: number | undefined;
-    let redDoctrine: number | undefined;
+    // learned perk+augment spend. The perk sets the augment budget (getUpgradePoints).
+    let greenPerk: number | undefined;
+    let redPerk: number | undefined;
     let greenIsWeighted: boolean | undefined;
     if (options.cemDraft) {
         // Each side drafts from the SAME offered subsets (shared `seed`); weighted vs frozen policy, swapped
@@ -751,11 +751,11 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         // regardless of army). "2" = composition-AWARE: a ranged-heavy army leads with SNIPER-max, a melee army
         // with Armor/Might — the fair test of whether ranged competes when it gets its actual toolkit.
         if (process.env.CEM_DRAFT_AUGMENTS === "1") {
-            const gp = CEM_WEIGHTED.pickDoctrine();
-            greenDoctrine = gp;
+            const gp = CEM_WEIGHTED.pickPerk();
+            greenPerk = gp;
             greenAugments = CEM_WEIGHTED.pickAugments(getUpgradePoints(gp));
-            const rp = CEM_WEIGHTED.pickDoctrine();
-            redDoctrine = rp;
+            const rp = CEM_WEIGHTED.pickPerk();
+            redPerk = rp;
             redAugments = CEM_WEIGHTED.pickAugments(getUpgradePoints(rp));
         } else if (process.env.CEM_DRAFT_AUGMENTS === "2") {
             const rangedFrac = (r: typeof roster): number =>
@@ -773,9 +773,9 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
                           { kind: "Might", value: 3 },
                           { kind: "Sniper", value: 1 },
                       ];
-            greenDoctrine = Doctrine.SEE_NONE;
+            greenPerk = Perk.SEE_NONE;
             greenAugments = augFor(roster);
-            redDoctrine = Doctrine.SEE_NONE;
+            redPerk = Perk.SEE_NONE;
             redAugments = augFor(redRoster);
         }
     }
@@ -784,9 +784,9 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
         // composition+opponent-aware policy, frozen side via the blind heuristic; swap which is weighted per pair.
         redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel, undefined, amountMode);
         greenIsWeighted = game % 2 === 0;
-        const budget = getUpgradePoints(Doctrine.SEE_NONE);
-        greenDoctrine = Doctrine.SEE_NONE;
-        redDoctrine = Doctrine.SEE_NONE;
+        const budget = getUpgradePoints(Perk.SEE_NONE);
+        greenPerk = Perk.SEE_NONE;
+        redPerk = Perk.SEE_NONE;
         greenAugments = greenIsWeighted
             ? augCA(roster, redRoster, budget, AUGCA_WEIGHTS)
             : CEM_FROZEN.pickAugments(budget);
@@ -795,18 +795,18 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
             : augCA(redRoster, roster, budget, AUGCA_WEIGHTS);
     }
     if (options.cemSetupCA) {
-        // Vision-gated joint doctrine+augment CA vs the blind heuristic; each side its own random roster, swap per pair.
+        // Vision-gated joint perk+augment CA vs the blind heuristic; each side its own random roster, swap per pair.
         redRoster = buildRoster(makeRng((seed ^ 0x85ebca6b) >>> 0), composition, amountByLevel, undefined, amountMode);
         greenIsWeighted = game % 2 === 0;
         const frozen = () => {
-            const p = CEM_FROZEN.pickDoctrine();
-            return { doctrine: p, augments: CEM_FROZEN.pickAugments(getUpgradePoints(p)) };
+            const p = CEM_FROZEN.pickPerk();
+            return { perk: p, augments: CEM_FROZEN.pickAugments(getUpgradePoints(p)) };
         };
         const g = greenIsWeighted ? setupCA(roster, redRoster, SETUPCA_WEIGHTS) : frozen();
         const r = greenIsWeighted ? frozen() : setupCA(redRoster, roster, SETUPCA_WEIGHTS);
-        greenDoctrine = g.doctrine;
+        greenPerk = g.perk;
         greenAugments = g.augments;
-        redDoctrine = r.doctrine;
+        redPerk = r.perk;
         redAugments = r.augments;
     }
     if (options.cemSynergy) {
@@ -830,33 +830,33 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
     }
     if (options.cemSetup) {
         const setupFor = (policy: typeof CEM_FROZEN) => {
-            const doctrine = policy.pickDoctrine();
-            return { doctrine, augments: policy.pickAugments(getUpgradePoints(doctrine)) };
+            const perk = policy.pickPerk();
+            return { perk, augments: policy.pickAugments(getUpgradePoints(perk)) };
         };
         const weighted = setupFor(CEM_WEIGHTED);
         const frozen = setupFor(CEM_FROZEN);
         greenIsWeighted = game % 2 === 0; // swap which side is the weighted policy across the pair
         const g = greenIsWeighted ? weighted : frozen;
         const r = greenIsWeighted ? frozen : weighted;
-        greenDoctrine = g.doctrine;
+        greenPerk = g.perk;
         greenAugments = g.augments;
-        redDoctrine = r.doctrine;
+        redPerk = r.perk;
         redAugments = r.augments;
     }
 
-    // LIVETWIN: any side whose setup no mode above chose fields the SHIPPED live setup — doctrine SEE_NONE + the
+    // LIVETWIN: any side whose setup no mode above chose fields the SHIPPED live setup — perk SEE_NONE + the
     // blind Armor3/Might3/Sniper1 spend — exactly what ranked deploys for every AI army (default sim games
-    // field NO doctrine/augments at all, another sim-vs-live gap). Applied identically to both sides, so it never
-    // biases the A-vs-B comparison; cem*/A-B modes that set a side's doctrine or augments keep their experiment.
+    // field NO perk/augments at all, another sim-vs-live gap). Applied identically to both sides, so it never
+    // biases the A-vs-B comparison; cem*/A-B modes that set a side's perk or augments keep their experiment.
     if (liveTwin) {
-        if (greenDoctrine === undefined && greenAugments === undefined) {
+        if (greenPerk === undefined && greenAugments === undefined) {
             const setup = liveTwinSetup();
-            greenDoctrine = setup.doctrine;
+            greenPerk = setup.perk;
             greenAugments = setup.augments;
         }
-        if (redDoctrine === undefined && redAugments === undefined) {
+        if (redPerk === undefined && redAugments === undefined) {
             const setup = liveTwinSetup();
-            redDoctrine = setup.doctrine;
+            redPerk = setup.perk;
             redAugments = setup.augments;
         }
     }
@@ -875,8 +875,8 @@ export function playGame(options: ITournamentOptions, game: number): IGameRecord
             redArtifactT1,
             greenArtifactT2,
             redArtifactT2,
-            greenDoctrine,
-            redDoctrine,
+            greenPerk,
+            redPerk,
             greenAugments,
             redAugments,
             greenSynergies,

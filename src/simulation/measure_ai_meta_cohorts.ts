@@ -1127,7 +1127,7 @@ function writeSummary(
             maps: AI_META_MAPS,
             rosterSlots: "2xL1, 2xL2, 1xL3, 1xL4",
             stackSizing: "expBudget (1000 XP per stack)",
-            doctrineAndSynergies: `SEE_NONE (7 points) with ${AI_META_SYNERGY_POLICY_SPEC} faction synergy picks`,
+            perkAndSynergies: `SEE_NONE (7 points) with ${AI_META_SYNERGY_POLICY_SPEC} faction synergy picks`,
             nonMirroredGuarantee: "Opposing rosters have distinct signatures and no shared creature identities.",
             seatControl: "Each distinct matchup is fought twice with the complete armies and setups swapping seats.",
             interpretation:

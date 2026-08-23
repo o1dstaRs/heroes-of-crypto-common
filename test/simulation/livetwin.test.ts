@@ -12,7 +12,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { DEFAULT_DRAFT_W } from "../../src/ai/setup/creature_score";
-import { Doctrine } from "../../src/doctrines/doctrine_properties";
+import { Perk } from "../../src/perks/perk_properties";
 import {
     amountForCreatureExperienceBudget,
     buildRoster,
@@ -164,13 +164,13 @@ describe("LIVETWIN preset", () => {
     it("commits the live-faithful values: expBudget + all-melee drafts + SEE_NONE + no vision", () => {
         expect(LIVETWIN_PRESET.amountMode).toBe("expBudget");
         expect(LIVETWIN_PRESET.meleeRosterFraction).toBe(1);
-        expect(LIVETWIN_PRESET.doctrine).toBe(Doctrine.SEE_NONE);
+        expect(LIVETWIN_PRESET.perk).toBe(Perk.SEE_NONE);
         expect(LIVETWIN_PRESET.noVision).toBe(true);
     });
 
     it("liveTwinSetup returns the SHIPPED ranked setup: SEE_NONE + Armor3/Might3/Sniper1", () => {
         const setup = liveTwinSetup();
-        expect(setup.doctrine).toBe(Doctrine.SEE_NONE);
+        expect(setup.perk).toBe(Perk.SEE_NONE);
         expect(setup.augments).toEqual([
             { kind: "Armor", value: 3 },
             { kind: "Might", value: 3 },

@@ -23,7 +23,7 @@ import type { ISetupAugment } from "./battle_engine";
  *    STACK_EXPERIENCE_BUDGET + creature_lookup.ts amountForCreatureExperienceBudget) — L1 fields ~73-200
  *    bodies, L4 fields 1-3 — not the sim's historical {50,30,15,8} level table.
  *  - ROSTERS: live armies are drafted (and ~97% melee under the shipped draft weights), not uniform-random.
- *  - VISION/SETUP: live ranked ships doctrine SEE_NONE (no enemy vision) + the blind Armor3/Might3/Sniper1
+ *  - VISION/SETUP: live ranked ships perk SEE_NONE (no enemy vision) + the blind Armor3/Might3/Sniper1
  *    augment spend for every AI army; comp-aware policies must not see free enemy features.
  *  - SEEDS: mirrored side-swap pairs (the tournament default) stay on, so seat luck cancels.
  *
@@ -42,8 +42,6 @@ export interface ILiveTwinPreset {
     meleeRosterFraction: number;
     /** The shipped live perk: SEE_NONE (no enemy vision, max upgrade budget). */
     perk: number;
-    /** Main-branch alias for the same setup choice. */
-    doctrine: number;
     /** Zero any enemy-composition features in comp-aware setup policies (AUGCA_NOVISION semantics). */
     noVision: boolean;
 }
@@ -52,7 +50,6 @@ export const LIVETWIN_PRESET: ILiveTwinPreset = {
     amountMode: "expBudget",
     meleeRosterFraction: 1,
     perk: Perk.SEE_NONE,
-    doctrine: Perk.SEE_NONE,
     noVision: true,
 };
 
@@ -73,8 +70,7 @@ export const liveTwinMeleeFraction = (): number => {
 };
 
 /** The SHIPPED live setup both ranked AI armies actually field: SEE_NONE + blind Armor3/Might3/Sniper1. */
-export const liveTwinSetup = (): { perk: number; doctrine: number; augments: ISetupAugment[] } => ({
+export const liveTwinSetup = (): { perk: number; augments: ISetupAugment[] } => ({
     perk: LIVETWIN_PRESET.perk,
-    doctrine: LIVETWIN_PRESET.perk,
     augments: SETUP_POLICY_V0.pickAugments(getUpgradePoints(LIVETWIN_PRESET.perk)),
 });

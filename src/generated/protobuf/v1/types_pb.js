@@ -294,8 +294,7 @@ proto.PBTypes.PickPhaseVals = {
   ARTIFACT_2: 6,
   AUGMENTS: 7,
   AUGMENTS_SCOUT: 8,
-  PERK: 9,
-  DOCTRINE: 9
+  PERK: 9
 };
 
 /**
@@ -309,8 +308,7 @@ proto.PBTypes.PickPhaseActionVals = {
   SELECT_ARTIFACT: 4,
   AUGMENT: 5,
   REVEAL: 6,
-  SELECT_PERK: 7,
-  SELECT_DOCTRINE: 7
+  SELECT_PERK: 7
 };
 
 /**

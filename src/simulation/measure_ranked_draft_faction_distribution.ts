@@ -8,7 +8,7 @@
  * exactly as pick_decider.ts does (teamState.creatures / teamState.tier1Artifact / getKnownOpponentCreatures).
  * No arango, no Pick document, no fights — pick_sim resolution only.
  *
- * Approximations (creature-neutral): doctrine is fixed to THREE_REVEALS for both seats (the deployed default
+ * Approximations (creature-neutral): perk is fixed to THREE_REVEALS for both seats (the deployed default
  * reveal setting; it only changes opponent-slot visibility) and Tier-2 is taken as the first legal offer
  * (does not affect which creatures are drafted).
  *
@@ -26,7 +26,7 @@ import {
 } from "../ai/setup/draft_ship";
 import { TIER1_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { Doctrine } from "../doctrines/doctrine_properties";
+import { Perk } from "../perks/perk_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
@@ -62,14 +62,14 @@ const factionOf = (id: number): string => factionById.get(id) ?? `faction#${crea
 
 const teamState = (state: IPickSimState, team: PickTeam) => (team === LOWER ? state.lower : state.upper);
 
-const DOCTRINE_BY_NAME: Record<string, Doctrine> = {
-    three_reveals: Doctrine.THREE_REVEALS,
-    see_all: Doctrine.SEE_ALL,
-    see_none: Doctrine.SEE_NONE,
+const PERK_BY_NAME: Record<string, Perk> = {
+    three_reveals: Perk.THREE_REVEALS,
+    see_all: Perk.SEE_ALL,
+    see_none: Perk.SEE_NONE,
 };
 
 /** One mirrored ranked draft through the deployed policy on both seats. Returns both 6-creature rosters. */
-function draftRanked(seed: number, genome: ReturnType<typeof parseDraftGenome>, doctrine: Doctrine): number[][] {
+function draftRanked(seed: number, genome: ReturnType<typeof parseDraftGenome>, perk: Perk): number[][] {
     const rng = randomInt(seed);
     let state = createPickSimState(rng);
 
@@ -84,9 +84,9 @@ function draftRanked(seed: number, genome: ReturnType<typeof parseDraftGenome>, 
         state = result.state;
     };
 
-    // DOCTRINE (both) — reveal setting (deployed AI picks uniformly among the three; pass --doctrine to bound it).
-    apply({ type: "select_doctrine", team: LOWER, doctrine });
-    apply({ type: "select_doctrine", team: UPPER, doctrine });
+    // PERK (both) — reveal setting (deployed AI picks uniformly among the three; pass --perk to bound it).
+    apply({ type: "select_perk", team: LOWER, perk });
+    apply({ type: "select_perk", team: UPPER, perk });
     // INITIAL_PICK / bundle (both) — server bundle policy.
     apply({ type: "select_bundle", team: LOWER, bundleIndex: pickBundle(LOWER) });
     apply({ type: "select_bundle", team: UPPER, bundleIndex: pickBundle(UPPER) });
@@ -126,20 +126,20 @@ function main(): void {
         options: {
             drafts: { type: "string", default: "5000" },
             seed: { type: "string", default: "86004710" },
-            doctrine: { type: "string", default: "three_reveals" },
+            perk: { type: "string", default: "three_reveals" },
         },
         strict: true,
     });
     const drafts = Number(values.drafts);
     const baseSeed = Number(values.seed);
-    const doctrine = DOCTRINE_BY_NAME[values.doctrine.toLowerCase()] ?? Doctrine.THREE_REVEALS;
+    const perk = PERK_BY_NAME[values.perk.toLowerCase()] ?? Perk.THREE_REVEALS;
 
     const genome = parseDraftGenome(RANKED_VERSATILE_DRAFT_SPEC);
 
     const rosters: number[][] = [];
     for (let i = 0; i < drafts; i += 1) {
         const seed = (baseSeed + i * 0x9e3779b1) >>> 0;
-        rosters.push(...draftRanked(seed, genome, doctrine));
+        rosters.push(...draftRanked(seed, genome, perk));
     }
 
     const factionCreatureCounts: Record<string, number> = {};

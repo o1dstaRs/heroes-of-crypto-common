@@ -64,8 +64,8 @@ function replayRangedMovementFailure(
         seed,
         gridType,
         maxLaps: 60,
-        greenDoctrine: greenSetup.doctrine,
-        redDoctrine: redSetup.doctrine,
+        greenPerk: greenSetup.perk,
+        redPerk: redSetup.perk,
         greenAugments: greenSetup.augments,
         redAugments: redSetup.augments,
         decisionObserver: ({ unit, context, incumbent }) => {

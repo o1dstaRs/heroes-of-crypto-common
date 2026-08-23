@@ -39,7 +39,7 @@ const army = (names: readonly string[], setupCohort: string): IAiMetaArmy =>
             propensity: 1,
             contextualScore: 0,
         },
-        doctrine: 0,
+        perk: 0,
         synergies: [],
     }) as unknown as IAiMetaArmy;
 

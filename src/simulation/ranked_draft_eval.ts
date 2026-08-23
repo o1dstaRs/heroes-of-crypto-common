@@ -32,7 +32,7 @@ import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { TIER1_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import { buildV08A19SearchEnvironment } from "../ai/versions/v0_8_a19_profile";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getUpgradePoints } from "../doctrines/doctrine_properties";
+import { getUpgradePoints } from "../perks/perk_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
@@ -114,7 +114,7 @@ interface IRankedDraftArmy {
     creatureIds: number[];
     revealedOpponentCreatures: number[];
     roster: IArmyUnitSpec[];
-    doctrine: number;
+    perk: number;
     augments: ISetupAugment[];
     synergies: ISetupSynergy[];
     tier1Artifact: number;
@@ -580,9 +580,9 @@ export function resolveRankedDraftPick(
     let state = createPickSimState(rng);
     const teamState = (team: PickTeam): IPickTeamState => (team === LOWER ? state.lower : state.upper);
 
-    const doctrine = SETUP_POLICY_V0.pickDoctrine();
-    state = applyAccepted(state, { type: "select_doctrine", team: LOWER, doctrine }, rng);
-    state = applyAccepted(state, { type: "select_doctrine", team: UPPER, doctrine }, rng);
+    const perk = SETUP_POLICY_V0.pickPerk();
+    state = applyAccepted(state, { type: "select_perk", team: LOWER, perk }, rng);
+    state = applyAccepted(state, { type: "select_perk", team: UPPER, perk }, rng);
 
     // Both simultaneous policies decide from the same pre-commit state.
     const lowerBundle = pickCoherentDraftBundle(
@@ -668,12 +668,12 @@ function materializeArmy(
 ): IRankedDraftArmy {
     if (team.tier1Artifact === undefined) throw new Error("Complete ranked draft omitted Tier-1 artifact");
     if (team.tier2Artifact === undefined) throw new Error("Complete ranked draft omitted Tier-2 artifact");
-    const budget = getUpgradePoints(team.doctrine);
+    const budget = getUpgradePoints(team.perk);
     return {
         creatureIds: [...team.creatures],
         revealedOpponentCreatures: [...opponentReveals],
         roster: rankedDraftRoster(team.creatures),
-        doctrine: team.doctrine,
+        perk: team.perk,
         augments: setupPolicy.pickAugments(budget, team.creatures),
         synergies: setupPolicy.pickSynergies(team.creatures),
         tier1Artifact: team.tier1Artifact,
@@ -718,8 +718,8 @@ function matchConfig(
         seed,
         gridType,
         maxLaps,
-        greenDoctrine: green.doctrine,
-        redDoctrine: red.doctrine,
+        greenPerk: green.perk,
+        redPerk: red.perk,
         greenAugments: green.augments,
         redAugments: red.augments,
         greenSynergies: green.synergies,

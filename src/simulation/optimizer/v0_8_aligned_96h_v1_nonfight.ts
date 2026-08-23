@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { LEAGUE_ROUND1_DRAFT_SPEC, parseDraftGenome, projectDraftGenomeForShipping } from "../../ai/setup/draft_ship";
 import { parseConditionalRules } from "../../ai/setup/setup_conditional";
 import { V07_NONFIGHT_BEHAVIOR_SHA256, V07_NONFIGHT_SETUP_SPEC, resolveSetupPolicy } from "../../ai/setup/setup_ship";
-import { getUpgradePoints } from "../../doctrines/doctrine_properties";
+import { getUpgradePoints } from "../../perks/perk_properties";
 import { SERVER_PERSISTED_CREATURE_ORDER } from "../../picks/pick_sim";
 import { creatureIdForName } from "../draft";
 import { runRankedConditionalPickGame, shippedLeagueGenome, type IConditionalArmy } from "../measure_setup_conditional";
@@ -149,8 +149,8 @@ export const pickV08AlignedV1BoundArtifactT2 = (
     ownCreatureIdsAtTier2: readonly number[],
 ): number => DEPLOYED_SETUP.pickArtifactT2(offered, ownCreatureIdsAtTier2);
 
-export const pickV08AlignedV1BoundAugments = (doctrine: number, ownCreatureIds: readonly number[]) =>
-    DEPLOYED_SETUP.pickAugments(getUpgradePoints(doctrine), ownCreatureIds);
+export const pickV08AlignedV1BoundAugments = (perk: number, ownCreatureIds: readonly number[]) =>
+    DEPLOYED_SETUP.pickAugments(getUpgradePoints(perk), ownCreatureIds);
 
 export const pickV08AlignedV1BoundSynergies = (ownCreatureStackIds: readonly number[]) =>
     DEPLOYED_SETUP.pickSynergies(ownCreatureStackIds);
@@ -161,12 +161,12 @@ function bindArmySetup(army: IConditionalArmy): IConditionalArmy {
         creatureIds: [...army.creatureIds],
         revealedOpponentCreatures: [...army.revealedOpponentCreatures],
         roster: army.roster.map((unit) => ({ ...unit })),
-        augments: pickV08AlignedV1BoundAugments(army.doctrine, army.creatureIds),
+        augments: pickV08AlignedV1BoundAugments(army.perk, army.creatureIds),
         synergies: pickV08AlignedV1BoundSynergies(army.creatureIds),
     };
 }
 
-/** Full ranked pick path: shipped draft plus deployed doctrine/T1/T2/augment/synergy behavior. */
+/** Full ranked pick path: shipped draft plus deployed perk/T1/T2/augment/synergy behavior. */
 export function runV08AlignedV1BoundRankedPick(seed: number): { lower: IConditionalArmy; upper: IConditionalArmy } {
     const picked = runRankedConditionalPickGame(
         seed,
@@ -190,9 +190,9 @@ export interface IV08AlignedV1MatchBindingOptions {
 const rosterCreatureIds = (roster: IMatchConfig["roster"]): number[] =>
     roster.map((unit) => creatureIdForName(unit.creatureName));
 
-const sideBudget = (doctrine: number | undefined, side: "green" | "red"): number => {
-    if (doctrine === undefined) throw new Error(`v0.8 aligned ${side} setup omitted its ranked doctrine`);
-    return getUpgradePoints(doctrine);
+const sideBudget = (perk: number | undefined, side: "green" | "red"): number => {
+    if (perk === undefined) throw new Error(`v0.8 aligned ${side} setup omitted its ranked perk`);
+    return getUpgradePoints(perk);
 };
 
 /** Apply the exact non-fight contract immediately before the physical match is constructed. */
@@ -202,8 +202,8 @@ export function bindV08AlignedV1MatchConfig(
 ): IMatchConfig {
     const greenCreatureIds = rosterCreatureIds(config.roster);
     const redCreatureIds = rosterCreatureIds(config.redRoster ?? config.roster);
-    const greenBudget = sideBudget(config.greenDoctrine, "green");
-    const redBudget = sideBudget(config.redDoctrine, "red");
+    const greenBudget = sideBudget(config.greenPerk, "green");
+    const redBudget = sideBudget(config.redPerk, "red");
     const candidatePlacement = options.placementReveal ? "legitimate-reveal" : "baseline";
     return {
         ...config,
@@ -236,7 +236,7 @@ export function v08AlignedV1PhysicalSetup(config: IMatchConfig): unknown {
                 ...((green ? config.greenRevealedCreatures : config.redRevealedCreatures) ?? []),
             ],
             roster: roster.map((unit) => ({ ...unit })),
-            doctrine: (green ? config.greenDoctrine : config.redDoctrine) ?? 0,
+            perk: (green ? config.greenPerk : config.redPerk) ?? 0,
             augments: (green ? config.greenAugments : config.redAugments)?.map((augment) => ({ ...augment })) ?? [],
             synergies: (green ? config.greenSynergies : config.redSynergies)?.map((synergy) => ({ ...synergy })) ?? [],
             tier1Artifact: (green ? config.greenArtifactT1 : config.redArtifactT1) ?? 0,

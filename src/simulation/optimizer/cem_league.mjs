@@ -56,7 +56,7 @@ const SIGMA_FLOOR_RATIO = Number(process.env.CEM_SIGMA_FLOOR_RATIO || 0.2);
 const BASE_SEED = Number(process.env.CEM_SEED || 1) >>> 0;
 const SELECTION_SEED = BASE_SEED;
 const VAL_SEED = normalizeLeagueSeed(BASE_SEED ^ 0x5f356495);
-const FREEZE_DOCTRINE = process.env.CEM_UNFREEZE_DOCTRINE !== "1";
+const FREEZE_PERK = process.env.CEM_UNFREEZE_PERK !== "1";
 const AGGREGATE = process.env.CEM_AGGREGATE || "worst-case";
 const POOL_SOURCE = process.env.CEM_LEAGUE_POOL;
 const FIGHT_VERSION = process.env.CEM_FIGHT_VERSION || "v0.6";
@@ -129,7 +129,7 @@ const SELECTION_PANEL = {
     fightVersion: FIGHT_VERSION,
     maxLaps: MAX_LAPS,
     mapTypes: MAP_TYPES,
-    freezeDoctrine: FREEZE_DOCTRINE,
+    freezePerk: FREEZE_PERK,
     aggregate: AGGREGATE,
     softminTemperature: TEMPERATURE,
     confidenceZ: CONFIDENCE_Z,
@@ -141,7 +141,7 @@ const log = (message) => {
     appendFileSync(LOG, `${message}\n`);
 };
 
-const initialSigma = createLeagueCemSigma(ANCHOR, REL_SIGMA, ZERO_SIGMA, FREEZE_DOCTRINE);
+const initialSigma = createLeagueCemSigma(ANCHOR, REL_SIGMA, ZERO_SIGMA, FREEZE_PERK);
 const sigmaFloor = initialSigma.map((value) => value * SIGMA_FLOOR_RATIO);
 
 const parseLastJson = (stdout) => {
@@ -181,7 +181,7 @@ const evaluate = (weights, games, seed) =>
             "--pool",
             POOL_SNAPSHOT,
         ];
-        if (!FREEZE_DOCTRINE) args.push("--unfreeze-doctrine");
+        if (!FREEZE_PERK) args.push("--unfreeze-perk");
         const child = spawn("bun", args, { cwd: process.cwd(), env: process.env });
         activeChildren.add(child);
         let stdout = "";
@@ -239,19 +239,19 @@ async function main() {
             `games/opponent=${GAMES} evalParallel=${EVAL_PARALLEL} matchConc=${MATCH_CONC} ` +
             `aggregate=${AGGREGATE} pool=${POOL_SOURCE || "default(anchor,melee_coevo)"} ` +
             `selectionSeed=${SELECTION_SEED} selectionPanel=${SELECTION_PANEL_FINGERPRINT.slice(0, 12)} ` +
-            `freezeDoctrine=${FREEZE_DOCTRINE}`,
+            `freezePerk=${FREEZE_PERK}`,
     );
     const mean = process.env.CEM_LEAGUE_MEAN ? JSON.parse(process.env.CEM_LEAGUE_MEAN) : ANCHOR.slice();
     if (!Array.isArray(mean) || mean.length !== LEAGUE_GENOME_DIM || !mean.every(Number.isFinite)) {
         throw new Error(`CEM_LEAGUE_MEAN must contain ${LEAGUE_GENOME_DIM} finite coefficients`);
     }
-    if (FREEZE_DOCTRINE) {
+    if (FREEZE_PERK) {
         mean.splice(
-            LEAGUE_GENOME_LAYOUT.doctrines.offset,
-            LEAGUE_GENOME_LAYOUT.doctrines.length,
+            LEAGUE_GENOME_LAYOUT.perks.offset,
+            LEAGUE_GENOME_LAYOUT.perks.length,
             ...ANCHOR.slice(
-                LEAGUE_GENOME_LAYOUT.doctrines.offset,
-                LEAGUE_GENOME_LAYOUT.doctrines.offset + LEAGUE_GENOME_LAYOUT.doctrines.length,
+                LEAGUE_GENOME_LAYOUT.perks.offset,
+                LEAGUE_GENOME_LAYOUT.perks.offset + LEAGUE_GENOME_LAYOUT.perks.length,
             ),
         );
     }
@@ -259,13 +259,13 @@ async function main() {
     let best;
 
     for (let generation = 0; generation < GENS; generation += 1) {
-        const candidates = sampleLeagueCemPopulation(mean, sigma, POP, BASE_SEED, generation, FREEZE_DOCTRINE);
+        const candidates = sampleLeagueCemPopulation(mean, sigma, POP, BASE_SEED, generation, FREEZE_PERK);
         const scores = await mapLimit(candidates, EVAL_PARALLEL, (weights) => evaluate(weights, GAMES, SELECTION_SEED));
         const ranked = candidates
             .map((weights, index) => ({ weights, ...scores[index] }))
             .sort((left, right) => right.fitness - left.fitness);
         const elite = ranked.slice(0, ELITE);
-        refitLeagueCemDistribution(elite, mean, sigma, sigmaFloor, SIGMA_DECAY, FREEZE_DOCTRINE);
+        refitLeagueCemDistribution(elite, mean, sigma, sigmaFloor, SIGMA_DECAY, FREEZE_PERK);
         best = retainComparableLeagueBest(best, ranked[0], generation, SELECTION_SEED, SELECTION_PANEL_FINGERPRINT);
         log(
             `gen ${generation}: fitness=${(ranked[0].fitness * 100).toFixed(2)}% ` +
@@ -289,7 +289,7 @@ async function main() {
                         selectionSeed: best.selectionSeed,
                         selectionPanelFingerprint: best.selectionPanelFingerprint,
                         gamesPerOpponent: GAMES,
-                        freezeDoctrine: FREEZE_DOCTRINE,
+                        freezePerk: FREEZE_PERK,
                     },
                     selectionPanel: SELECTION_PANEL,
                     poolSnapshot: {

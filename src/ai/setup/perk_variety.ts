@@ -9,19 +9,15 @@
  * -----------------------------------------------------------------------------
  */
 
-import { Doctrine } from "../../doctrines/doctrine_properties";
+import { Perk } from "../../perks/perk_properties";
 
-export interface IRankedAIDoctrineChoiceContext {
+export interface IRankedAIPerkChoiceContext {
     readonly matchId: string;
     readonly team: number;
     readonly aiVersion: string;
 }
 
-export const RANKED_AI_DOCTRINE_CHOICES: readonly Doctrine[] = Object.freeze([
-    Doctrine.THREE_REVEALS,
-    Doctrine.SEE_ALL,
-    Doctrine.SEE_NONE,
-]);
+export const RANKED_AI_PERK_CHOICES: readonly Perk[] = Object.freeze([Perk.THREE_REVEALS, Perk.SEE_ALL, Perk.SEE_NONE]);
 
 const stableHash = (value: string): number => {
     let hash = 0x811c9dc5;
@@ -32,7 +28,7 @@ const stableHash = (value: string): number => {
     return hash >>> 0;
 };
 
-export const pickRankedAIDoctrine = (context: Readonly<IRankedAIDoctrineChoiceContext>): Doctrine => {
+export const pickRankedAIPerk = (context: Readonly<IRankedAIPerkChoiceContext>): Perk => {
     const key = `${context.matchId}\u0000${context.team}\u0000${context.aiVersion}`;
-    return RANKED_AI_DOCTRINE_CHOICES[stableHash(key) % RANKED_AI_DOCTRINE_CHOICES.length];
+    return RANKED_AI_PERK_CHOICES[stableHash(key) % RANKED_AI_PERK_CHOICES.length];
 };

@@ -888,8 +888,8 @@ function playStageAGame(
             redRoster: roster.map((unit) => ({ ...unit })),
             seed,
             gridType: PBTypes.GridVals.NORMAL,
-            greenDoctrine: setup.doctrine,
-            redDoctrine: setup.doctrine,
+            greenPerk: setup.perk,
+            redPerk: setup.perk,
             greenAugments: setup.augments.map((augment) => ({ ...augment })),
             redAugments: setup.augments.map((augment) => ({ ...augment })),
         });

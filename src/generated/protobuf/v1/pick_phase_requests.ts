@@ -297,40 +297,40 @@ export namespace PBTypes {
             return RevealRequest.deserialize(bytes);
         }
     }
-    export class DoctrineRequest extends pb_1.Message {
+    export class PerkRequest extends pb_1.Message {
         #one_of_decls: number[][] = [];
         constructor(data?: any[] | {
-            doctrine?: number;
+            perk?: number;
         }) {
             super();
             pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [], this.#one_of_decls);
             if (!Array.isArray(data) && typeof data == "object") {
-                if ("doctrine" in data && data.doctrine != undefined) {
-                    this.doctrine = data.doctrine;
+                if ("perk" in data && data.perk != undefined) {
+                    this.perk = data.perk;
                 }
             }
         }
-        get doctrine() {
+        get perk() {
             return pb_1.Message.getFieldWithDefault(this, 1, 0) as number;
         }
-        set doctrine(value: number) {
+        set perk(value: number) {
             pb_1.Message.setField(this, 1, value);
         }
         static fromObject(data: {
-            doctrine?: number;
-        }): DoctrineRequest {
-            const message = new DoctrineRequest({});
-            if (data.doctrine != null) {
-                message.doctrine = data.doctrine;
+            perk?: number;
+        }): PerkRequest {
+            const message = new PerkRequest({});
+            if (data.perk != null) {
+                message.perk = data.perk;
             }
             return message;
         }
         toObject() {
             const data: {
-                doctrine?: number;
+                perk?: number;
             } = {};
-            if (this.doctrine != null) {
-                data.doctrine = this.doctrine;
+            if (this.perk != null) {
+                data.perk = this.perk;
             }
             return data;
         }
@@ -338,19 +338,19 @@ export namespace PBTypes {
         serialize(w: pb_1.BinaryWriter): void;
         serialize(w?: pb_1.BinaryWriter): Uint8Array | void {
             const writer = w || new pb_1.BinaryWriter();
-            if (this.doctrine != 0)
-                writer.writeInt32(1, this.doctrine);
+            if (this.perk != 0)
+                writer.writeInt32(1, this.perk);
             if (!w)
                 return writer.getResultBuffer();
         }
-        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): DoctrineRequest {
-            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new DoctrineRequest();
+        static deserialize(bytes: Uint8Array | pb_1.BinaryReader): PerkRequest {
+            const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new PerkRequest();
             while (reader.nextField()) {
                 if (reader.isEndGroup())
                     break;
                 switch (reader.getFieldNumber()) {
                     case 1:
-                        message.doctrine = reader.readInt32();
+                        message.perk = reader.readInt32();
                         break;
                     default: reader.skipField();
                 }
@@ -360,8 +360,8 @@ export namespace PBTypes {
         serializeBinary(): Uint8Array {
             return this.serialize();
         }
-        static deserializeBinary(bytes: Uint8Array): DoctrineRequest {
-            return DoctrineRequest.deserialize(bytes);
+        static deserializeBinary(bytes: Uint8Array): PerkRequest {
+            return PerkRequest.deserialize(bytes);
         }
     }
 }

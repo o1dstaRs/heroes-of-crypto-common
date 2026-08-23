@@ -401,7 +401,7 @@ function foldRoster(histograms: Map<ArchetypeName, IRosterHistogram>, record: IA
 export interface IArchetypeRosterReport {
     draftRule: string;
     setupRule: string;
-    setup: { doctrine: number; augments: { kind: string; value: number }[] };
+    setup: { perk: number; augments: { kind: string; value: number }[] };
     /** Deterministic roster the archetype drafts from the offers seeded with `--seed` itself. */
     exampleRosterAtBaseSeed: IArmyUnitSpec[];
     /** Fraction of fielded game-sides that include each creature stack (from the matrix phase). */
@@ -439,7 +439,7 @@ function rosterReport(
         draftRule: definition.draftRule,
         setupRule: definition.setupRule,
         setup: {
-            doctrine: definition.setup.doctrine,
+            perk: definition.setup.perk,
             augments: definition.setup.augments.map((augment) => ({ ...augment })),
         },
         exampleRosterAtBaseSeed: example.roster,
@@ -511,7 +511,7 @@ export interface IMeasureArchetypesSummary {
     config: {
         liveTwinEnv: string;
         amountMode: typeof LIVETWIN_PRESET.amountMode;
-        doctrine: number;
+        perk: number;
         baseAugments: { kind: string; value: number }[];
         grid: "NORMAL";
         pairedSideSwap: true;
@@ -747,7 +747,7 @@ export async function runMeasureArchetypes(options: IMeasureArchetypesOptions): 
         config: {
             liveTwinEnv: process.env.LIVETWIN ?? "",
             amountMode: LIVETWIN_PRESET.amountMode,
-            doctrine: baseSetup.doctrine,
+            perk: baseSetup.perk,
             baseAugments: baseSetup.augments,
             grid: "NORMAL",
             pairedSideSwap: true,

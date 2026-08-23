@@ -10,7 +10,7 @@
  */
 
 import { CreatureFactions } from "../../generated/protobuf/v1/creature_gen";
-import { Doctrine } from "../../doctrines/doctrine_properties";
+import { Perk } from "../../perks/perk_properties";
 import {
     applyCreatureRoleFitMultiplier,
     creatureRoleFitMultiplier,
@@ -44,7 +44,7 @@ const bestBy = <T>(items: readonly T[], score: (item: T) => number): T | undefin
  * Heuristic setup policy v0 — the first server-authoritative "AI does the full draft/setup". Every choice is
  * grounded in the sim measurements (measure_artifacts.ts / measure_setup.ts): combine measured artifact value
  * with coherent army-building, pick the measured-best synergy per fielded faction, spend the augment budget on
- * the universally-strong Armor/Might augments, take the max-budget doctrine (vision isn't the lever here — the
+ * the universally-strong Armor/Might augments, take the max-budget perk (vision isn't the lever here — the
  * upgrade points are), and score creatures by the shared draft heuristic. Deterministic and vectorizable so a
  * later CEM pass can learn these tables/weights.
  */
@@ -59,10 +59,10 @@ export class SetupPolicyV0 implements ISetupPolicy {
     public constructor(options: Readonly<ISetupPolicyV0Options> = {}) {
         this.draftCoherence = options.draftCoherence !== false;
     }
-    /** Max upgrade-point budget among the real doctrines (SEE_NONE = 7) so the AI can afford Armor L3 + Might
+    /** Max upgrade-point budget among the real perks (SEE_NONE = 7) so the AI can afford Armor L3 + Might
      * L3. Vision isn't modelled/decisive here; the points are. */
-    public pickDoctrine(): number {
-        return Doctrine.SEE_NONE;
+    public pickPerk(): number {
+        return Perk.SEE_NONE;
     }
     public pickBundle(bundles: readonly (readonly [number, number, number])[]): number {
         if (!this.draftCoherence) {

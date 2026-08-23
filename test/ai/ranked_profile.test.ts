@@ -10,7 +10,7 @@ import {
 } from "../../src/ai";
 import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { getUpgradePoints, DOCTRINE_LIST, type Doctrine } from "../../src/doctrines/doctrine_properties";
+import { getUpgradePoints, PERK_LIST, type Perk } from "../../src/perks/perk_properties";
 
 const AUGMENT_CAPS = {
     Placement: 2,
@@ -55,8 +55,8 @@ describe("full-ranked AI profiles", () => {
     test.each([...AI_VERSIONS])("%s makes legal choices throughout ranked setup", (version) => {
         const setup = getRankedAIProfile(version).setupPolicy;
 
-        const doctrine = setup.pickDoctrine() as Doctrine;
-        expect(DOCTRINE_LIST.some((entry) => entry.id === doctrine)).toBe(true);
+        const perk = setup.pickPerk() as Perk;
+        expect(PERK_LIST.some((entry) => entry.id === perk)).toBe(true);
 
         const bannable = [PBTypes.CreatureVals.ORC, PBTypes.CreatureVals.HEALER, PBTypes.CreatureVals.CHAMPION];
         const ban = setup.pickBan(bannable);
@@ -91,7 +91,7 @@ describe("full-ranked AI profiles", () => {
             setup.pickArtifactT2(tier2Offer, [bundles[bundleIndex][0], bundles[bundleIndex][1], creature]),
         );
 
-        const budget = getUpgradePoints(doctrine);
+        const budget = getUpgradePoints(perk);
         const augments = setup.pickAugments(budget, [bundles[bundleIndex][0], bundles[bundleIndex][1], creature]);
         expect(augments.reduce((cost, augment) => cost + augment.value, 0)).toBeLessThanOrEqual(budget);
         for (const augment of augments) {

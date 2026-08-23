@@ -377,7 +377,7 @@ proto.PBTypes.PortalMatchSetup.toObject = function(includeInstance, msg) {
   var f, obj = {
 artifactTier1: jspb.Message.getFieldWithDefault(msg, 1, 0),
 artifactTier2: jspb.Message.getFieldWithDefault(msg, 2, 0),
-doctrine: jspb.Message.getFieldWithDefault(msg, 3, 0),
+perk: jspb.Message.getFieldWithDefault(msg, 3, 0),
 augmentPlacement: jspb.Message.getFieldWithDefault(msg, 4, 0),
 augmentArmor: jspb.Message.getFieldWithDefault(msg, 5, 0),
 augmentMight: jspb.Message.getFieldWithDefault(msg, 6, 0),
@@ -432,7 +432,7 @@ proto.PBTypes.PortalMatchSetup.deserializeBinaryFromReader = function(msg, reade
       break;
     case 3:
       var value = /** @type {number} */ (reader.readInt32());
-      msg.setDoctrine(value);
+      msg.setPerk(value);
       break;
     case 4:
       var value = /** @type {number} */ (reader.readInt32());
@@ -509,7 +509,7 @@ proto.PBTypes.PortalMatchSetup.serializeBinaryToWriter = function(message, write
       f
     );
   }
-  f = message.getDoctrine();
+  f = message.getPerk();
   if (f !== 0) {
     writer.writeInt32(
       3,
@@ -612,10 +612,10 @@ proto.PBTypes.PortalMatchSetup.prototype.setArtifactTier2 = function(value) {
 
 
 /**
- * optional int32 doctrine = 3;
+ * optional int32 perk = 3;
  * @return {number}
  */
-proto.PBTypes.PortalMatchSetup.prototype.getDoctrine = function() {
+proto.PBTypes.PortalMatchSetup.prototype.getPerk = function() {
   return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
@@ -624,7 +624,7 @@ proto.PBTypes.PortalMatchSetup.prototype.getDoctrine = function() {
  * @param {number} value
  * @return {!proto.PBTypes.PortalMatchSetup} returns this
  */
-proto.PBTypes.PortalMatchSetup.prototype.setDoctrine = function(value) {
+proto.PBTypes.PortalMatchSetup.prototype.setPerk = function(value) {
   return jspb.Message.setProto3IntField(this, 3, value);
 };
 

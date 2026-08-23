@@ -4,7 +4,7 @@
  *
  * The incumbent receives only pick-phase reveals and uses `legitimate-reveal`.
  * The candidate receives the same reveals plus a declared subset of the final
- * opponent roster and uses `public-roster`. No positions, stack amounts, doctrines,
+ * opponent roster and uses `public-roster`. No positions, stack amounts, perks,
  * artifacts, augments, or synergies cross the policy boundary.
  * -----------------------------------------------------------------------------
  */
@@ -407,8 +407,8 @@ function playPublicRosterPlacementGame(
         seed: board.battleSeed,
         gridType: board.gridType,
         maxLaps,
-        greenDoctrine: greenArmy.doctrine,
-        redDoctrine: redArmy.doctrine,
+        greenPerk: greenArmy.perk,
+        redPerk: redArmy.perk,
         greenAugments: greenSetup.augments,
         redAugments: redSetup.augments,
         greenArtifactT1: greenArmy.tier1Artifact,
@@ -849,7 +849,7 @@ export async function main(): Promise<void> {
         draftSpec: LEAGUE_ROUND1_DRAFT_SPEC,
         fightVersion: "v0.7",
         informationBoundary:
-            "opponent creature ids only; no positions, amounts, doctrine, artifacts, augments, synergies, or hidden state",
+            "opponent creature ids only; no positions, amounts, perk, artifacts, augments, synergies, or hidden state",
         arms,
         panel,
         target,

@@ -1113,7 +1113,7 @@ const V08_ALIGNED_V1_THROUGHPUT_SOURCE_FILES = Object.freeze([
     "src/configuration/spells.json",
     "src/generated/protobuf/v1/creature_gen.ts",
     "src/generated/protobuf/v1/types.ts",
-    "src/doctrines/doctrine_properties.ts",
+    "src/perks/perk_properties.ts",
     "src/picks/pick_sim.ts",
     "src/simulation/army.ts",
     "src/simulation/battle_engine.ts",

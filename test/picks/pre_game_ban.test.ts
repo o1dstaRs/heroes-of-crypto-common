@@ -2,7 +2,7 @@
  * -----------------------------------------------------------------------------
  * Optional pre-game unit ban.
  *
- * During the DOCTRINE step either player may additionally nominate ONE creature to be
+ * During the PERK step either player may additionally nominate ONE creature to be
  * banned. When the step closes: nobody nominated -> nothing happens; both nominated
  * the same unit -> it is banned outright; two different -> exactly one of the two,
  * 50/50. The ban REPLACES an auto-ban of its own level, so each level still loses
@@ -13,7 +13,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { Doctrine } from "../../src/doctrines/doctrine_properties";
+import { Perk } from "../../src/perks/perk_properties";
 import {
     createPickSimState,
     getBannableCreatures,
@@ -38,10 +38,10 @@ const accept = (state: IPickSimState, action: PickAction, rng: PickRandomInt = f
     return result.state;
 };
 
-/** Close the doctrine step, which is where the nominations resolve. */
-const finishDoctrines = (state: IPickSimState, rng: PickRandomInt = first): IPickSimState => {
-    let next = accept(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.SEE_NONE }, rng);
-    return accept(next, { type: "select_doctrine", team: UPPER, doctrine: Doctrine.SEE_NONE }, rng);
+/** Close the perk step, which is where the nominations resolve. */
+const finishPerks = (state: IPickSimState, rng: PickRandomInt = first): IPickSimState => {
+    let next = accept(state, { type: "select_perk", team: LOWER, perk: Perk.SEE_NONE }, rng);
+    return accept(next, { type: "select_perk", team: UPPER, perk: Perk.SEE_NONE }, rng);
 };
 
 const bansPerLevel = (state: IPickSimState): number[] => {
@@ -70,7 +70,7 @@ describe("pre-game unit ban", () => {
 
     it("bans nothing when neither player nominates one", () => {
         const before = createPickSimState(first);
-        const after = finishDoctrines(before);
+        const after = finishPerks(before);
 
         expect(after.extraBan).toBeUndefined();
         expect(after.creaturesBanned).toEqual(before.creaturesBanned);
@@ -84,7 +84,7 @@ describe("pre-game unit ban", () => {
 
         // rng that would pick either side still has to land on the agreed unit — there is nothing to roll.
         for (const rng of [() => 0, () => 1] as PickRandomInt[]) {
-            const resolved = finishDoctrines(state, rng);
+            const resolved = finishPerks(state, rng);
             expect(resolved.extraBan).toBe(target);
             expect(resolved.creaturesBanned).toContain(target);
         }
@@ -98,10 +98,10 @@ describe("pre-game unit ban", () => {
         state = accept(state, { type: "propose_ban", team: LOWER, creatureId: lowerPick });
         state = accept(state, { type: "propose_ban", team: UPPER, creatureId: upperPick });
 
-        expect(finishDoctrines(state, () => 0).extraBan).toBe(lowerPick);
-        expect(finishDoctrines(state, () => 1).extraBan).toBe(upperPick);
+        expect(finishPerks(state, () => 0).extraBan).toBe(lowerPick);
+        expect(finishPerks(state, () => 1).extraBan).toBe(upperPick);
         // Only ONE of them is ever banned.
-        const resolved = finishDoctrines(state, () => 0);
+        const resolved = finishPerks(state, () => 0);
         expect(resolved.creaturesBanned).toContain(lowerPick);
         expect(resolved.creaturesBanned).not.toContain(upperPick);
     });
@@ -111,19 +111,19 @@ describe("pre-game unit ban", () => {
         const target = getBannableCreatures(state)[0];
         state = accept(state, { type: "propose_ban", team: UPPER, creatureId: target });
 
-        const resolved = finishDoctrines(state);
+        const resolved = finishPerks(state);
         expect(resolved.extraBan).toBe(target);
         expect(resolved.creaturesBanned).toContain(target);
     });
 
     it("keeps each level's ban count unchanged by releasing an auto-ban of the same level", () => {
-        const baseline = bansPerLevel(finishDoctrines(createPickSimState(first)));
+        const baseline = bansPerLevel(finishPerks(createPickSimState(first)));
         expect(baseline).toEqual([...LIVE_AUTO_BANS_BY_LEVEL]);
 
         let state = createPickSimState(first);
         const target = getBannableCreatures(state)[0];
         state = accept(state, { type: "propose_ban", team: LOWER, creatureId: target });
-        const resolved = finishDoctrines(state);
+        const resolved = finishPerks(state);
 
         // The player steered one of that level's bans rather than adding one on top.
         expect(bansPerLevel(resolved)).toEqual(baseline);
@@ -131,7 +131,7 @@ describe("pre-game unit ban", () => {
         expect(resolved.creaturesBanned.length).toBe(baseline.reduce((sum, count) => sum + count, 0));
     });
 
-    it("refuses a second nomination, an unbannable creature, and anything after the doctrine step", () => {
+    it("refuses a second nomination, an unbannable creature, and anything after the perk step", () => {
         let state = createPickSimState(first);
         const bannable = getBannableCreatures(state);
         state = accept(state, { type: "propose_ban", team: LOWER, creatureId: bannable[0] });
@@ -143,9 +143,9 @@ describe("pre-game unit ban", () => {
             transitionPickSim(state, { type: "propose_ban", team: UPPER, creatureId: state.creaturesBanned[0] }, first),
         ).toMatchObject({ status: "rejected", reason: "creature_not_bannable" });
 
-        const afterDoctrines = finishDoctrines(state);
+        const afterPerks = finishPerks(state);
         expect(
-            transitionPickSim(afterDoctrines, { type: "propose_ban", team: UPPER, creatureId: bannable[1] }, first),
+            transitionPickSim(afterPerks, { type: "propose_ban", team: UPPER, creatureId: bannable[1] }, first),
         ).toMatchObject({ status: "rejected", reason: "wrong_phase" });
     });
 

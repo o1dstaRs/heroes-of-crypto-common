@@ -20,7 +20,7 @@ message PortalUnitPerformance {
 message PortalMatchSetup {
     int32 artifact_tier_1 = 1;
     int32 artifact_tier_2 = 2;
-    int32 doctrine = 3;
+    int32 perk = 3;
     int32 augment_placement = 4;
     int32 augment_armor = 5;
     int32 augment_might = 6;

@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { getUpgradePoints } from "../../src/doctrines/doctrine_properties";
+import { getUpgradePoints } from "../../src/perks/perk_properties";
 import {
     ARCHETYPE_NAMES,
     buildArchetypeRoster,
@@ -88,15 +88,13 @@ describe("B1 archetype payoff proxy", () => {
         const base = liveTwinSetup();
         expect(setupForArchetype("melee_coevo")).toEqual(base);
         const ranged = setupForArchetype("ranged_max_sniper3");
-        expect(ranged.doctrine).toBe(base.doctrine);
+        expect(ranged.perk).toBe(base.perk);
         expect(ranged.augments).toEqual([
             { kind: "Sniper", value: 3 },
             { kind: "Armor", value: 3 },
             { kind: "Might", value: 1 },
         ]);
-        expect(ranged.augments.reduce((sum, augment) => sum + augment.value, 0)).toBe(
-            getUpgradePoints(ranged.doctrine),
-        );
+        expect(ranged.augments.reduce((sum, augment) => sum + augment.value, 0)).toBe(getUpgradePoints(ranged.perk));
     });
 
     it("reuses a pair seed and swaps roster plus setup between sides", () => {

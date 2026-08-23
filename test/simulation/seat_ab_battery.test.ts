@@ -41,8 +41,8 @@ describe("seat_ab_battery pair construction", () => {
             expect(b.roster).toEqual(a.roster);
             expect(b.redRoster).toEqual(a.redRoster);
             expect(b.seed).toBe(a.seed);
-            expect(b.greenDoctrine).toBe(a.greenDoctrine);
-            expect(b.redDoctrine).toBe(a.redDoctrine);
+            expect(b.greenPerk).toBe(a.greenPerk);
+            expect(b.redPerk).toBe(a.redPerk);
             expect(b.greenAugments).toEqual(a.greenAugments);
             expect(b.redAugments).toEqual(a.redAugments);
         }
@@ -64,7 +64,7 @@ describe("seat_ab_battery pair construction", () => {
         for (const config of configs) {
             expect(config.roster.length).toBeGreaterThan(0);
             expect(config.redRoster!.length).toBeGreaterThan(0);
-            expect(config.greenDoctrine).toBeDefined();
+            expect(config.greenPerk).toBeDefined();
             expect(config.greenSynergies).toBeDefined();
             expect(config.redSynergies).toBeDefined();
         }

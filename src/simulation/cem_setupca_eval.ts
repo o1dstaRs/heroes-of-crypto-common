@@ -12,7 +12,7 @@
 import { runTournamentConcurrent } from "./concurrent_tournament";
 
 /**
- * CEM fitness evaluator for the VISION-GATED joint doctrine+augment setup policy. Runs a `cemSetupCA` self-play
+ * CEM fitness evaluator for the VISION-GATED joint perk+augment setup policy. Runs a `cemSetupCA` self-play
  * tournament — the WEIGHTED policy (vector from env V05_SETUPCA_WEIGHTS) vs the FROZEN blind heuristic, both
  * fielding their own random rosters — and prints the weighted policy's decisive win rate as JSON.
  *
