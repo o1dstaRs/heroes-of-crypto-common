@@ -248,5 +248,24 @@ describe("Manticore", () => {
             expect(victim.getForbiddenTarget()).toBe("");
             expect(victim.cannotAttackUnitId(manticore.getId())).toBe(false);
         });
+
+        it("preserves the forbidden target through a ranked display-only status refresh", () => {
+            const manticore = gazer();
+            const victim = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.LOWER });
+
+            // Ranked reconstructs combat effects as display entries and keeps the server authoritative for
+            // mechanics; it deliberately does not create Effect objects that could double-apply stats.
+            victim.getUnitProperties().applied_debuffs.push("Terrifying Gaze");
+            victim.getUnitProperties().applied_debuffs_laps.push(1);
+            victim.getUnitProperties().applied_debuffs_descriptions.push("Cannot attack the gazer.");
+            victim.getUnitProperties().applied_debuffs_powers.push(0);
+            victim.setForbiddenTarget(manticore.getId());
+
+            victim.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+
+            expect(victim.hasEffectActive("Terrifying Gaze")).toBe(false);
+            expect(victim.hasStatusApplied("Terrifying Gaze")).toBe(true);
+            expect(victim.cannotAttackUnitId(manticore.getId())).toBe(true);
+        });
     });
 });

@@ -2972,8 +2972,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (!this.hasStatusApplied("Aggr")) {
             this.resetTarget();
         }
-        // ...and its inverse: the fright wears off with the effect that caused it.
-        if (!this.hasEffectActive("Terrifying Gaze")) {
+        // ...and its inverse: the fright wears off with the effect that caused it. Ranked clients carry
+        // combat effects as authoritative display entries rather than Effect objects, so use the shared
+        // status seam just like Aggr above; otherwise every stat refresh immediately clears the forbidden
+        // Manticore id received in the snapshot and the client cannot expose the target-specific rule.
+        if (!this.hasStatusApplied("Terrifying Gaze")) {
             this.resetForbiddenTarget();
         }
 

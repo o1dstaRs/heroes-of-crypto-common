@@ -124,8 +124,8 @@ export class UnitProperties {
      * The exact inverse of `target`: the id of an enemy this unit may NOT attack or retaliate against, while
      * every other enemy stays fair game. Written by Terrifying Gaze (Manticore) and cleared in adjustBaseStats
      * as soon as the effect of the same name expires — mirroring how Aggr owns `target`. Like `target`, this is
-     * local turn state and is deliberately absent from UnitData/the wire format; the "Terrifying Gaze" effect
-     * itself is what replicates, and the id is re-derived from it.
+     * local turn state. Ranked snapshots carry it explicitly alongside the replicated "Terrifying Gaze"
+     * status because the status name alone cannot identify which of several Manticores is the forbidden one.
      */
     public forbidden_target: string;
     /** Abilities that remain visible on the card but were permanently disabled by Predatory Assimilation. */
