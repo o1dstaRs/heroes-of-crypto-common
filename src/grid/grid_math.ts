@@ -683,8 +683,8 @@ export function getRangeAttackSideCenter(
 
 /**
  * Whether a ranged shot fired by `fromTeamType` can see (is not blocked at) a given cell side. A
- * side is observable when the neighbouring cell is empty, holds a friendly unit, or is lava/water —
- * i.e. NOT an enemy unit hiding the edge. Through Shot only treats hard BLOCK obstacles as occluders.
+ * side is observable when the neighbouring cell is empty, holds a friendly unit, or is flat hazard
+ * terrain (lava/water/hole — narrowing consumes cells as holes) — i.e. NOT an enemy unit hiding the edge. Through Shot only treats hard BLOCK obstacles as occluders.
  * This is the authoritative "visible edge" rule, shared by the client preview and the server engine.
  */
 export function isRangeAttackSideObservable(
@@ -714,7 +714,15 @@ export function isRangeAttackSideObservable(
         return neighbour !== ObstacleType.BLOCK;
     }
     return (
-        !neighbour || neighbour === fromTeamType || neighbour === ObstacleType.LAVA || neighbour === ObstacleType.WATER
+        !neighbour ||
+        neighbour === fromTeamType ||
+        neighbour === ObstacleType.LAVA ||
+        neighbour === ObstacleType.WATER ||
+        // A HOLE is flat terrain like lava/water — nothing stands up out of it to occlude a shot. It
+        // matters because NARROWING marks the consumed ring with holes (occupyByHole): without this,
+        // every unit backed against the shrunken board's edge read as "covered" on those sides, and a
+        // packed late-game board turned whole armies unshootable (live report, game 36f3c899, lap 4+).
+        neighbour === ObstacleType.HOLE
     );
 }
 

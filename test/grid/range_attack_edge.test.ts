@@ -87,6 +87,16 @@ describe("range attack edge visibility (isRangeAttackSideObservable)", () => {
         expect(isRangeAttackSideObservable(m, cell, RangeAttackCellSide.RIGHT, UPPER)).toBe(true); // water
     });
 
+    it("treats a narrowing hole neighbour as attackable — the ring must not shield the units against it", () => {
+        // Narrowing consumes the outer ring with occupyByHole; a hole is flat like lava/water, so a
+        // target backed against the shrunken board still exposes those edges (live report, lap 4+
+        // boards where whole armies became unshootable).
+        const m = emptyMatrix();
+        setCell(m, 9, 5, ObstacleType.HOLE);
+        expect(isRangeAttackSideObservable(m, cell, RangeAttackCellSide.RIGHT, UPPER)).toBe(true);
+        expect(isRangeAttackSideObservable(m, cell, RangeAttackCellSide.RIGHT, UPPER, true)).toBe(true);
+    });
+
     it("treats an enemy-covered edge as NOT attackable (non-through shot)", () => {
         const m = emptyMatrix();
         setCell(m, 7, 5, LOWER); // an enemy stands on the LEFT edge, hiding it
