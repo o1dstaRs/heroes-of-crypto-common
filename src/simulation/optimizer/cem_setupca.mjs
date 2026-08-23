@@ -4,7 +4,7 @@
  *
  * Heroes of Crypto and Heroes of Crypto AI are registered trademarks.
  * -----------------------------------------------------------------------------
- * CEM trainer for the VISION-GATED joint perk+augment setup policy (20-dim = 4 kinds x 5 features). Mirrors
+ * CEM trainer for the VISION-GATED joint doctrine+augment setup policy (20-dim = 4 kinds x 5 features). Mirrors
  * cem_setup.mjs: mean starts at the all-zero anchor (which reproduces the value-only greedy {Armor,Might}),
  * scalar sigma (features are O(1) fractions), fitness = the weighted army-aware policy's decisive win rate vs
  * the frozen blind heuristic in a `cemAugCA` self-play tournament (cem_setupca_eval.ts), fanned out as subprocesses.

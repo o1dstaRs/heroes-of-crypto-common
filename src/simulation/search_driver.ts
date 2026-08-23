@@ -2000,6 +2000,17 @@ export class SearchDriver {
         const passiveIncumbentKind = searchPassiveActionKind(incumbent);
         const isV08Search = this.mode === "search" && V08_MOUNTAIN_CHALLENGER_VERSIONS.has(version);
         const isAggressiveV08 = this.aggressiveV08 && V08_AGGRESSIVE_VERSIONS.has(version);
+        // The v0.8 anchor emits a cemetery strike only after its final policy pass has ruled out a living-unit
+        // attack or cast. Each scattered stone dies in one hit, so this is productive terrain clearing rather
+        // than the multi-turn classic mountain mining that search is designed to replace with an advance.
+        if (
+            isV08Search &&
+            this.deps.grid.hasScatteredMountains() &&
+            this.deps.grid.getScatteredMountainsStanding().length > 0 &&
+            incumbent.some((action) => action.type === "obstacle_attack")
+        ) {
+            return incumbent;
+        }
         if (this.incumbentKinds && !this.incumbentKinds.has(incumbentKind)) {
             return incumbent;
         }

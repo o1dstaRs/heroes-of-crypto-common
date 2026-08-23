@@ -12,7 +12,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import type { IDecisionContext } from "../../src/ai";
-import { AIActionType, BasicAIAction } from "../../src/ai/ai";
+import { AIActionType, BasicAIAction, findTarget } from "../../src/ai/ai";
 import { enumerateCandidates } from "../../src/ai/candidates";
 import {
     createDecisionPathCatalog,
@@ -295,6 +295,7 @@ describe("decision-scoped path catalog", () => {
         const catalog = createDecisionPathCatalog(combat.grid, delegate, unit, matrix);
 
         expect(DecisionPathCatalog.canElideUnconsumedMeleeLayers(catalog, combat.grid, unit, matrix)).toBe(true);
+        expect(DecisionPathCatalog.canDeferCanonicalMovePath(catalog, combat.grid, unit, matrix)).toBe(true);
         expect(
             DecisionPathCatalog.canElideUnconsumedMeleeLayers(
                 catalog,
@@ -315,6 +316,24 @@ describe("decision-scoped path catalog", () => {
             ),
         ).toBe(false);
         expect(DecisionPathCatalog.canElideUnconsumedMeleeLayers(delegate, combat.grid, unit, matrix)).toBe(false);
+        expect(DecisionPathCatalog.canDeferCanonicalMovePath(delegate, combat.grid, unit, matrix)).toBe(false);
+
+        const customSteps = placeCanonicalPair();
+        const customStepsCatalog = createDecisionPathCatalog(
+            customSteps.combat.grid,
+            new PathHelper(testGridSettings),
+            customSteps.unit,
+            customSteps.matrix,
+        );
+        customSteps.unit.getSteps = () => Unit.prototype.getSteps.call(customSteps.unit);
+        expect(
+            DecisionPathCatalog.canDeferCanonicalMovePath(
+                customStepsCatalog,
+                customSteps.combat.grid,
+                customSteps.unit,
+                customSteps.matrix,
+            ),
+        ).toBe(false);
 
         class CustomPathHelper extends PathHelper {}
         const customCatalog = createDecisionPathCatalog(
@@ -548,5 +567,34 @@ describe("decision-scoped path catalog", () => {
         expect(catalogSet.candidates[0].features.expectedDamage).toBeGreaterThan(0);
         expect(catalogTail).toEqual(directTail);
         expect(catalog.getStats()).toEqual({ requests: 2, hits: 1, misses: 1, bypasses: 0 });
+    });
+
+    it("defers the finite path when native discovery already finds a reachable melee attack", () => {
+        const combat = createCombatTestContext();
+        const actor = createTestUnit({
+            team: LOWER,
+            name: "Reachable Actor",
+            attackType: MELEE,
+            initiative: 4.2,
+        });
+        const target = createTestUnit({ team: UPPER, name: "Reachable Target", attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, actor, { x: 8, y: 8 });
+        placeUnit(combat.grid, combat.unitsHolder, target, { x: 10, y: 8 });
+        const matrix = combat.grid.getMatrix();
+
+        const direct = findTarget(actor, combat.grid, matrix, combat.unitsHolder, new PathHelper(testGridSettings));
+        const pathHelper = new PathHelper(testGridSettings);
+        const catalog = createDecisionPathCatalog(combat.grid, pathHelper, actor, matrix, true);
+        const optimized = findTarget(actor, combat.grid, matrix, combat.unitsHolder, catalog);
+
+        expect(optimized).toEqual(direct);
+        expect(optimized?.actionType()).toBe(AIActionType.MOVE_AND_MELEE_ATTACK);
+        // Only the noncanonical discovery request ran. A later real consumer still gets the ordinary canonical
+        // miss and then the same shared hit, proving that deferral neither pre-fills nor poisons the catalog.
+        expect(catalog.getStats()).toEqual({ requests: 1, hits: 0, misses: 0, bypasses: 1 });
+        const args = canonicalArgs(combat, actor, matrix);
+        const miss = catalog.getMovePath(...args);
+        expect(catalog.getMovePath(...args)).toBe(miss);
+        expect(catalog.getStats()).toEqual({ requests: 3, hits: 1, misses: 1, bypasses: 1 });
     });
 });

@@ -28,7 +28,7 @@ export const V08_A19_H18_F184_HUMAN_PLACEMENT_BASE_VERSION = "v0.8" as const;
 export const V08_A19_H18_F184_HUMAN_PLACEMENT_IMPLEMENTATION_SOURCE =
     "src/ai/versions/v0_8_a19_f184_human_placement.ts" as const;
 export const V08_A19_H18_F184_HUMAN_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "840b11eb9d352bf8efba633d728eaff28e6cef1a36f6e872007c7210cd41f29b" as const;
+    "b826c104264207a0d56de745d456441ccc56ba3e9903e96640ae1acf44edfee8" as const;
 
 /**
  * Browser-safe identity for the exact production-replay opening. The source digest is

@@ -1205,6 +1205,22 @@ export class PathHelper {
         }
         const knownPaths: Map<number, IWeightedRoute[]> = new Map();
         const allowed: XY[] = [];
+        // Packed keys are collision-free 0..255 on the production board. Keep every custom/malformed case on
+        // the generic collections path: overrides can observe calls, and packed-key collisions outside 16x16
+        // are part of the public compatibility contract.
+        const usesIndexedPathState =
+            this.getNeighborCells === BASE_PATH_HELPER_GET_NEIGHBOR_CELLS &&
+            this.captureRoute === BASE_PATH_HELPER_CAPTURE_ROUTE &&
+            this.filterUnallowedDestinations === BASE_PATH_HELPER_FILTER_UNALLOWED_DESTINATIONS &&
+            this.gridSettings.getGridSize() === 16 &&
+            Number.isInteger(currentCell.x) &&
+            Number.isInteger(currentCell.y) &&
+            !Object.is(currentCell.x, -0) &&
+            !Object.is(currentCell.y, -0) &&
+            currentCell.x >= (isSmallUnit ? 0 : 1) &&
+            currentCell.x < 16 &&
+            currentCell.y >= (isSmallUnit ? 0 : 1) &&
+            currentCell.y < 16;
         let currentCellKeys: number[];
         if (isSmallUnit) {
             currentCellKeys = [(currentCell.x << 4) | currentCell.y];
@@ -1217,24 +1233,20 @@ export class PathHelper {
             ];
         }
         const initialCellKeys: Set<number> = new Set(currentCellKeys);
-        const visited: Set<number> = new Set([(currentCell.x << 4) | currentCell.y]);
-        const allowedToMoveThere: Set<number> = new Set();
-        // Packed cell keys are collision-free 0..255 on the standard board. Use a dynamic array there to preserve the
-        // exact iteratively-subtracted Float64 budgets without Map traffic; malformed/custom inputs keep the Map path.
-        const usesIndexedStepsRemaining =
-            this.getNeighborCells === PathHelper.prototype.getNeighborCells &&
-            this.gridSettings.getGridSize() === 16 &&
-            Number.isInteger(currentCell.x) &&
-            Number.isInteger(currentCell.y) &&
-            !Object.is(currentCell.x, -0) &&
-            !Object.is(currentCell.y, -0) &&
-            currentCell.x >= (isSmallUnit ? 0 : 1) &&
-            currentCell.x < 16 &&
-            currentCell.y >= (isSmallUnit ? 0 : 1) &&
-            currentCell.y < 16;
-        const indexedStepsRemaining: number[] | undefined = usesIndexedStepsRemaining ? [] : undefined;
-        const mappedStepsRemaining: Map<number, number> | undefined = usesIndexedStepsRemaining ? undefined : new Map();
         const currentCellKey = (currentCell.x << 4) | currentCell.y;
+        const indexedVisited: Uint8Array | undefined = usesIndexedPathState ? new Uint8Array(256) : undefined;
+        const visited: Set<number> | undefined = usesIndexedPathState ? undefined : new Set([currentCellKey]);
+        const indexedAllowed: Uint8Array | undefined = usesIndexedPathState ? new Uint8Array(256) : undefined;
+        const allowedToMoveThere: Set<number> | undefined = usesIndexedPathState ? undefined : new Set();
+        // Float64Array stores the same IEEE-754 values as number[]. Every queued key is written before it can
+        // be read, so no sentinel/fill is needed. The generic Map retains malformed-key behavior.
+        const indexedStepsRemaining: Float64Array | undefined = usesIndexedPathState
+            ? new Float64Array(256)
+            : undefined;
+        const mappedStepsRemaining: Map<number, number> | undefined = usesIndexedPathState ? undefined : new Map();
+        if (indexedVisited) {
+            indexedVisited[currentCellKey] = 1;
+        }
         if (indexedStepsRemaining) {
             indexedStepsRemaining[currentCellKey] = maxSteps;
         } else {
@@ -1254,7 +1266,7 @@ export class PathHelper {
         // Production aggression boards are dense and x-major. Read them directly without allocating footprint cells;
         // malformed/custom boards retain the legacy cell list and access expression so read order/errors stay exact.
         let usesDirectAggression =
-            usesIndexedStepsRemaining && !canFly && Array.isArray(aggrBoard) && aggrBoard.length === 16;
+            usesIndexedPathState && !canFly && Array.isArray(aggrBoard) && aggrBoard.length === 16;
         if (usesDirectAggression) {
             for (let x = 0; x < 16; x++) {
                 if (!Array.isArray(aggrBoard![x]) || aggrBoard![x].length !== 16) {
@@ -1339,12 +1351,12 @@ export class PathHelper {
             return cost + FIRE_WALL_CROSS_PENALTY;
         };
 
-        const indexedNeighbors: XY[] | undefined = usesIndexedStepsRemaining ? [] : undefined;
-        while (queue.length) {
-            const curWeightedRoute = queue.shift();
-            if (!curWeightedRoute) {
-                break;
-            }
+        const indexedNeighbors: XY[] | undefined = usesIndexedPathState ? [] : undefined;
+        // FIFO traversal never removes or reorders queued entries. A read cursor preserves that order while
+        // avoiding Array.shift's repeated tail compaction on every visited board cell.
+        let queueIndex = 0;
+        while (queueIndex < queue.length) {
+            const curWeightedRoute = queue[queueIndex++];
 
             const cur = curWeightedRoute.cell;
 
@@ -1358,43 +1370,43 @@ export class PathHelper {
                 const canGoUp = cur.y < 15;
                 if (canGoLeft) {
                     const x = cur.x - 1;
-                    if (!visited.has((x << 4) | cur.y)) indexedNeighbors.push({ x, y: cur.y });
+                    if (!indexedVisited![(x << 4) | cur.y]) indexedNeighbors.push({ x, y: cur.y });
                 }
                 if (canGoUp) {
                     const y = cur.y + 1;
-                    if (!visited.has((cur.x << 4) | y)) indexedNeighbors.push({ x: cur.x, y });
+                    if (!indexedVisited![(cur.x << 4) | y]) indexedNeighbors.push({ x: cur.x, y });
                 }
                 if (canGoDown) {
                     const y = cur.y - 1;
-                    if (!visited.has((cur.x << 4) | y)) indexedNeighbors.push({ x: cur.x, y });
+                    if (!indexedVisited![(cur.x << 4) | y]) indexedNeighbors.push({ x: cur.x, y });
                 }
                 if (canGoRight) {
                     const x = cur.x + 1;
-                    if (!visited.has((x << 4) | cur.y)) indexedNeighbors.push({ x, y: cur.y });
+                    if (!indexedVisited![(x << 4) | cur.y]) indexedNeighbors.push({ x, y: cur.y });
                 }
                 if (canGoLeft && canGoDown) {
                     const x = cur.x - 1;
                     const y = cur.y - 1;
-                    if (!visited.has((x << 4) | y)) indexedNeighbors.push({ x, y });
+                    if (!indexedVisited![(x << 4) | y]) indexedNeighbors.push({ x, y });
                 }
                 if (canGoLeft && canGoUp) {
                     const x = cur.x - 1;
                     const y = cur.y + 1;
-                    if (!visited.has((x << 4) | y)) indexedNeighbors.push({ x, y });
+                    if (!indexedVisited![(x << 4) | y]) indexedNeighbors.push({ x, y });
                 }
                 if (canGoRight && canGoDown) {
                     const x = cur.x + 1;
                     const y = cur.y - 1;
-                    if (!visited.has((x << 4) | y)) indexedNeighbors.push({ x, y });
+                    if (!indexedVisited![(x << 4) | y]) indexedNeighbors.push({ x, y });
                 }
                 if (canGoRight && canGoUp) {
                     const x = cur.x + 1;
                     const y = cur.y + 1;
-                    if (!visited.has((x << 4) | y)) indexedNeighbors.push({ x, y });
+                    if (!indexedVisited![(x << 4) | y]) indexedNeighbors.push({ x, y });
                 }
                 neighbors = indexedNeighbors;
             } else {
-                neighbors = this.getNeighborCells(cur, visited, isSmallUnit);
+                neighbors = this.getNeighborCells(cur, visited!, isSmallUnit);
             }
             for (const n of neighbors) {
                 const keyNeighbor = (n.x << 4) | n.y;
@@ -1402,7 +1414,8 @@ export class PathHelper {
                 // stay at least 1. Keep malformed state (for example, a size-unsafe position swap) from
                 // evaluating occupancy or aggro outside the board while recovery finds a valid re-entry.
                 if (!isSmallUnit && (n.x < 1 || n.y < 1 || !isCellWithinGrid(this.gridSettings, n))) {
-                    visited.add(keyNeighbor);
+                    if (indexedVisited) indexedVisited[keyNeighbor] = 1;
+                    else visited!.add(keyNeighbor);
                     continue;
                 }
                 const el1 = matrixElementOrDefault(matrix, n.x, n.y, 0);
@@ -1412,7 +1425,8 @@ export class PathHelper {
                             (canFly && el1 && el1 !== ObstacleType.LAVA && el1 !== ObstacleType.WATER)) &&
                         !initialCellKeys.has(keyNeighbor)
                     ) {
-                        visited.add(keyNeighbor);
+                        if (indexedVisited) indexedVisited[keyNeighbor] = 1;
+                        else visited!.add(keyNeighbor);
                         continue;
                     }
                 } else {
@@ -1436,7 +1450,8 @@ export class PathHelper {
                             (canFly && el4 && el4 !== ObstacleType.LAVA && el4 !== ObstacleType.WATER)) &&
                             !initialCellKeys.has(unitKeyDown))
                     ) {
-                        visited.add(keyNeighbor);
+                        if (indexedVisited) indexedVisited[keyNeighbor] = 1;
+                        else visited!.add(keyNeighbor);
                         continue;
                     }
                 }
@@ -1536,30 +1551,49 @@ export class PathHelper {
                             hasWaterCell: curWeightedRoute.hasWaterCell || el1 === ObstacleType.WATER,
                         };
                         if (this.captureRoute(knownPaths, keyNeighbor, weightedRoute)) {
-                            if (!allowedToMoveThere.has(keyNeighbor)) {
-                                allowedToMoveThere.add(keyNeighbor);
+                            if (
+                                !(indexedAllowed ? indexedAllowed[keyNeighbor] : allowedToMoveThere!.has(keyNeighbor))
+                            ) {
+                                if (indexedAllowed) indexedAllowed[keyNeighbor] = 1;
+                                else allowedToMoveThere!.add(keyNeighbor);
                                 allowed.push({ x: n.x, y: n.y });
                             }
                             if (!isSmallUnit) {
                                 const unitKeyLeft = ((n.x - 1) << 4) | n.y;
-                                if (!allowedToMoveThere.has(unitKeyLeft)) {
-                                    allowedToMoveThere.add(unitKeyLeft);
+                                if (
+                                    !(indexedAllowed
+                                        ? indexedAllowed[unitKeyLeft]
+                                        : allowedToMoveThere!.has(unitKeyLeft))
+                                ) {
+                                    if (indexedAllowed) indexedAllowed[unitKeyLeft] = 1;
+                                    else allowedToMoveThere!.add(unitKeyLeft);
                                     allowed.push({ x: n.x - 1, y: n.y });
                                 }
                                 const unitKeyLeftDown = ((n.x - 1) << 4) | (n.y - 1);
-                                if (!allowedToMoveThere.has(unitKeyLeftDown)) {
-                                    allowedToMoveThere.add(unitKeyLeftDown);
+                                if (
+                                    !(indexedAllowed
+                                        ? indexedAllowed[unitKeyLeftDown]
+                                        : allowedToMoveThere!.has(unitKeyLeftDown))
+                                ) {
+                                    if (indexedAllowed) indexedAllowed[unitKeyLeftDown] = 1;
+                                    else allowedToMoveThere!.add(unitKeyLeftDown);
                                     allowed.push({ x: n.x - 1, y: n.y - 1 });
                                 }
                                 const unitKeyDown = (n.x << 4) | (n.y - 1);
-                                if (!allowedToMoveThere.has(unitKeyDown)) {
-                                    allowedToMoveThere.add(unitKeyDown);
+                                if (
+                                    !(indexedAllowed
+                                        ? indexedAllowed[unitKeyDown]
+                                        : allowedToMoveThere!.has(unitKeyDown))
+                                ) {
+                                    if (indexedAllowed) indexedAllowed[unitKeyDown] = 1;
+                                    else allowedToMoveThere!.add(unitKeyDown);
                                     allowed.push({ x: n.x, y: n.y - 1 });
                                 }
                             }
                         }
                         queue.push(weightedRoute);
-                        visited.add(keyNeighbor);
+                        if (indexedVisited) indexedVisited[keyNeighbor] = 1;
+                        else visited!.add(keyNeighbor);
                     }
                 } else {
                     let moveCost: number;
@@ -1585,30 +1619,49 @@ export class PathHelper {
                         };
 
                         if (this.captureRoute(knownPaths, keyNeighbor, weightedRoute)) {
-                            if (!allowedToMoveThere.has(keyNeighbor)) {
-                                allowedToMoveThere.add(keyNeighbor);
+                            if (
+                                !(indexedAllowed ? indexedAllowed[keyNeighbor] : allowedToMoveThere!.has(keyNeighbor))
+                            ) {
+                                if (indexedAllowed) indexedAllowed[keyNeighbor] = 1;
+                                else allowedToMoveThere!.add(keyNeighbor);
                                 allowed.push({ x: n.x, y: n.y });
                             }
                             if (!isSmallUnit) {
                                 const unitKeyLeft = ((n.x - 1) << 4) | n.y;
-                                if (!allowedToMoveThere.has(unitKeyLeft)) {
-                                    allowedToMoveThere.add(unitKeyLeft);
+                                if (
+                                    !(indexedAllowed
+                                        ? indexedAllowed[unitKeyLeft]
+                                        : allowedToMoveThere!.has(unitKeyLeft))
+                                ) {
+                                    if (indexedAllowed) indexedAllowed[unitKeyLeft] = 1;
+                                    else allowedToMoveThere!.add(unitKeyLeft);
                                     allowed.push({ x: n.x - 1, y: n.y });
                                 }
                                 const unitKeyLeftDown = ((n.x - 1) << 4) | (n.y - 1);
-                                if (!allowedToMoveThere.has(unitKeyLeftDown)) {
-                                    allowedToMoveThere.add(unitKeyLeftDown);
+                                if (
+                                    !(indexedAllowed
+                                        ? indexedAllowed[unitKeyLeftDown]
+                                        : allowedToMoveThere!.has(unitKeyLeftDown))
+                                ) {
+                                    if (indexedAllowed) indexedAllowed[unitKeyLeftDown] = 1;
+                                    else allowedToMoveThere!.add(unitKeyLeftDown);
                                     allowed.push({ x: n.x - 1, y: n.y - 1 });
                                 }
                                 const unitKeyDown = (n.x << 4) | (n.y - 1);
-                                if (!allowedToMoveThere.has(unitKeyDown)) {
-                                    allowedToMoveThere.add(unitKeyDown);
+                                if (
+                                    !(indexedAllowed
+                                        ? indexedAllowed[unitKeyDown]
+                                        : allowedToMoveThere!.has(unitKeyDown))
+                                ) {
+                                    if (indexedAllowed) indexedAllowed[unitKeyDown] = 1;
+                                    else allowedToMoveThere!.add(unitKeyDown);
                                     allowed.push({ x: n.x, y: n.y - 1 });
                                 }
                             }
                         }
                         queue.push(weightedRoute);
-                        visited.add(keyNeighbor);
+                        if (indexedVisited) indexedVisited[keyNeighbor] = 1;
+                        else visited!.add(keyNeighbor);
                     }
                 }
             }
@@ -1625,12 +1678,16 @@ export class PathHelper {
             const key = (c.x << 4) | c.y;
             if (isSmallUnit) {
                 const me1 = matrixElementOrDefault(matrix, c.x, c.y, 0);
-                if ((me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) || allowedToMoveThere.has(key)) {
+                if (
+                    (me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) ||
+                    (indexedAllowed ? indexedAllowed[key] : allowedToMoveThere!.has(key))
+                ) {
                     continue;
                 }
 
                 allowed.push({ x: c.x, y: c.y });
-                allowedToMoveThere.add(key);
+                if (indexedAllowed) indexedAllowed[key] = 1;
+                else allowedToMoveThere!.add(key);
 
                 knownPaths.set(key, [
                     {
@@ -1648,14 +1705,16 @@ export class PathHelper {
                 const me1 = matrixElementOrDefault(matrix, c.x - 1, c.y, 0);
                 const me2 = matrixElementOrDefault(matrix, c.x - 1, c.y - 1, 0);
                 if (
-                    !allowedToMoveThere.has(unitKeyLeft) &&
+                    !(indexedAllowed ? indexedAllowed[unitKeyLeft] : allowedToMoveThere!.has(unitKeyLeft)) &&
                     !(me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) &&
-                    !allowedToMoveThere.has(unitKeyLeftDown) &&
+                    !(indexedAllowed ? indexedAllowed[unitKeyLeftDown] : allowedToMoveThere!.has(unitKeyLeftDown)) &&
                     !(me2 && !(isMadeOfFire && me2 === ObstacleType.LAVA))
                 ) {
-                    allowedToMoveThere.add(unitKeyLeft);
+                    if (indexedAllowed) indexedAllowed[unitKeyLeft] = 1;
+                    else allowedToMoveThere!.add(unitKeyLeft);
                     allowed.push({ x: c.x - 1, y: c.y });
-                    allowedToMoveThere.add(unitKeyLeftDown);
+                    if (indexedAllowed) indexedAllowed[unitKeyLeftDown] = 1;
+                    else allowedToMoveThere!.add(unitKeyLeftDown);
                     allowed.push({ x: c.x - 1, y: c.y - 1 });
 
                     knownPaths.set(key, [
@@ -1675,14 +1734,16 @@ export class PathHelper {
                 const me1 = matrixElementOrDefault(matrix, c.x, c.y, 0);
                 const me2 = matrixElementOrDefault(matrix, c.x, c.y - 1, 0);
                 if (
-                    !allowedToMoveThere.has(unitKeyRight) &&
+                    !(indexedAllowed ? indexedAllowed[unitKeyRight] : allowedToMoveThere!.has(unitKeyRight)) &&
                     !(me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) &&
-                    !allowedToMoveThere.has(unitKeyRightDown) &&
+                    !(indexedAllowed ? indexedAllowed[unitKeyRightDown] : allowedToMoveThere!.has(unitKeyRightDown)) &&
                     !(me2 && !(isMadeOfFire && me2 === ObstacleType.LAVA))
                 ) {
-                    allowedToMoveThere.add(unitKeyRight);
+                    if (indexedAllowed) indexedAllowed[unitKeyRight] = 1;
+                    else allowedToMoveThere!.add(unitKeyRight);
                     allowed.push({ x: c.x, y: c.y });
-                    allowedToMoveThere.add(unitKeyRightDown);
+                    if (indexedAllowed) indexedAllowed[unitKeyRightDown] = 1;
+                    else allowedToMoveThere!.add(unitKeyRightDown);
                     allowed.push({ x: c.x, y: c.y - 1 });
 
                     knownPaths.set(key, [
@@ -1702,14 +1763,16 @@ export class PathHelper {
                 const me1 = matrixElementOrDefault(matrix, c.x, c.y - 1, 0);
                 const me2 = matrixElementOrDefault(matrix, c.x - 1, c.y - 1, 0);
                 if (
-                    !allowedToMoveThere.has(unitKeyDown) &&
+                    !(indexedAllowed ? indexedAllowed[unitKeyDown] : allowedToMoveThere!.has(unitKeyDown)) &&
                     !(me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) &&
-                    !allowedToMoveThere.has(unitKeyDownLeft) &&
+                    !(indexedAllowed ? indexedAllowed[unitKeyDownLeft] : allowedToMoveThere!.has(unitKeyDownLeft)) &&
                     !(me2 && !(isMadeOfFire && me2 === ObstacleType.LAVA))
                 ) {
-                    allowedToMoveThere.add(unitKeyDown);
+                    if (indexedAllowed) indexedAllowed[unitKeyDown] = 1;
+                    else allowedToMoveThere!.add(unitKeyDown);
                     allowed.push({ x: c.x, y: c.y - 1 });
-                    allowedToMoveThere.add(unitKeyDownLeft);
+                    if (indexedAllowed) indexedAllowed[unitKeyDownLeft] = 1;
+                    else allowedToMoveThere!.add(unitKeyDownLeft);
                     allowed.push({ x: c.x - 1, y: c.y - 1 });
 
                     knownPaths.set(key, [
@@ -1729,14 +1792,16 @@ export class PathHelper {
                 const me1 = matrixElementOrDefault(matrix, c.x, c.y, 0);
                 const me2 = matrixElementOrDefault(matrix, c.x - 1, c.y, 0);
                 if (
-                    !allowedToMoveThere.has(unitKeyUp) &&
+                    !(indexedAllowed ? indexedAllowed[unitKeyUp] : allowedToMoveThere!.has(unitKeyUp)) &&
                     !(me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) &&
-                    !allowedToMoveThere.has(unitKeyUpLeft) &&
+                    !(indexedAllowed ? indexedAllowed[unitKeyUpLeft] : allowedToMoveThere!.has(unitKeyUpLeft)) &&
                     !(me2 && !(isMadeOfFire && me2 === ObstacleType.LAVA))
                 ) {
-                    allowedToMoveThere.add(unitKeyUp);
+                    if (indexedAllowed) indexedAllowed[unitKeyUp] = 1;
+                    else allowedToMoveThere!.add(unitKeyUp);
                     allowed.push({ x: c.x, y: c.y });
-                    allowedToMoveThere.add(unitKeyUpLeft);
+                    if (indexedAllowed) indexedAllowed[unitKeyUpLeft] = 1;
+                    else allowedToMoveThere!.add(unitKeyUpLeft);
                     allowed.push({ x: c.x - 1, y: c.y });
 
                     knownPaths.set(key, [
@@ -1756,7 +1821,9 @@ export class PathHelper {
         return this.filterUnallowedDestinations(
             {
                 cells: allowed,
-                hashes: allowedToMoveThere,
+                // filterUnallowedDestinations rebuilds hashes from the filtered ordered cells; the working
+                // indexed membership table is intentionally not materialized as a redundant Set.
+                hashes: allowedToMoveThere ?? new Set(),
                 knownPaths,
             },
             matrix,
@@ -1903,3 +1970,10 @@ export class PathHelper {
         return { cells: allowed, hashes: allowedHashes, knownPaths };
     }
 }
+
+// Capture the native hooks once at module initialization. Comparing against the live prototype would let a
+// prototype-level wrapper pass the fast-path gate after replacing the method, even though the indexed traversal
+// deliberately bypasses those hooks. Instance and prototype instrumentation must both retain the generic contract.
+const BASE_PATH_HELPER_GET_NEIGHBOR_CELLS = PathHelper.prototype.getNeighborCells;
+const BASE_PATH_HELPER_CAPTURE_ROUTE = PathHelper.prototype["captureRoute"];
+const BASE_PATH_HELPER_FILTER_UNALLOWED_DESTINATIONS = PathHelper.prototype["filterUnallowedDestinations"];

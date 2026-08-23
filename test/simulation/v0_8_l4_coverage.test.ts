@@ -5,7 +5,6 @@ import {
     auditV08Level4Turn,
     forceLevel4CoverageUnit,
     planV08Level4CoverageGame,
-    runV08Level4CoverageGame,
     V08_LEVEL4_CONTROL_UNIT,
     V08_LEVEL4_COVERAGE_LANES,
     V08_LEVEL4_COVERAGE_UNITS,
@@ -13,6 +12,11 @@ import {
     type IV08Level4CoverageOptions,
 } from "../../src/simulation/v0_8_l4_coverage";
 import { buildRoster, makeRng } from "../../src/simulation/army";
+import {
+    V08_LEVEL4_A13_REGRESSION_GAMES,
+    V08_LEVEL4_REGRESSION_SEEDS,
+    V08_LEVEL4_V07_REGRESSION_GAMES,
+} from "./v0_8_l4_coverage_regression_fixture";
 
 const OPTIONS: IV08Level4CoverageOptions = {
     candidateVersion: "v0.8",
@@ -106,40 +110,17 @@ describe("v0.8 forced level-4 coverage", () => {
         });
     });
 
-    // RE-PIN NEEDED (fight lane): the pure-fractional steps call (2026-08-06) reshapes these seeded
-    // games, and the rejection-free assertion now fails ONLY in full-suite runs (passes in isolation;
-    // WHICH of the two gaze pins fails varies between runs) — i.e. the fixtures are also order/env
-    // sensitive to the surrounding scoped-AI suites. Needs fresh seeds re-judged under proper isolation.
-    test.skip("keeps the exact A13 Level-4 Terrifying Gaze regressions rejection-free", () => {
-        const exactFailureOptions: IV08Level4CoverageOptions = {
-            candidateVersion: "v0.8",
-            opponentVersion: "v0.7",
-            pairsPerLane: 16,
-            baseSeed: 2026072601,
-        };
-
-        for (const game of [137, 156, 157]) {
-            const result = runV08Level4CoverageGame(exactFailureOptions, game);
-            expect(result.rejectedCandidate).toBe(0);
-        }
-    });
-
-    // RE-PIN NEEDED (fight lane): the pure-fractional steps call (2026-08-06) reshapes these seeded
-    // games, and the rejection-free assertion now fails ONLY in full-suite runs (passes in isolation;
-    // WHICH of the two gaze pins fails varies between runs) — i.e. the fixtures are also order/env
-    // sensitive to the surrounding scoped-AI suites. Needs fresh seeds re-judged under proper isolation.
-    test.skip("keeps the exact v0.7 Terrifying Gaze regressions rejection-free", () => {
-        const exactFailureOptions: IV08Level4CoverageOptions = {
-            candidateVersion: "v0.8",
-            opponentVersion: "v0.7",
-            pairsPerLane: 16,
-            baseSeed: 2026072601,
-        };
-
-        for (const game of [148, 219]) {
-            const result = runV08Level4CoverageGame(exactFailureOptions, game);
-            expect(result.rejectedCandidate).toBe(0);
-            expect(result.rejectedOpponent).toBe(0);
-        }
+    test("partitions the exact Terrifying Gaze regression census into file isolates", () => {
+        expect(V08_LEVEL4_A13_REGRESSION_GAMES).toEqual([137, 156, 157]);
+        expect(V08_LEVEL4_V07_REGRESSION_GAMES).toEqual([148, 219]);
+        expect(V08_LEVEL4_REGRESSION_SEEDS).toEqual({
+            137: 1_786_722_209,
+            148: 146_190_674,
+            156: 146_190_674,
+            157: 146_190_674,
+            219: 2_173_999_126,
+        });
+        const allGames = [...V08_LEVEL4_A13_REGRESSION_GAMES, ...V08_LEVEL4_V07_REGRESSION_GAMES];
+        expect(new Set(allGames).size).toBe(5);
     });
 });

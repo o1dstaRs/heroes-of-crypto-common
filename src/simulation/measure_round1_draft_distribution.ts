@@ -253,7 +253,7 @@ export async function main(): Promise<void> {
         round1,
         heuristic,
         limitations: [
-            "round1 uses projectDraftGenomeForShipping, which is what the ranked server's draft_policy.ts actually consumes for creature-pick decisions (composition-blind score + live TIER1_ARTIFACT_WINRATE for bundle choice); non-draft heads (artifact tier2/augments/placement/perk) are the setup-v0 anchor here and are governed by separate live logic (CONDITIONAL_SETUP_V1/setup-v0) not exercised by this script.",
+            "round1 uses projectDraftGenomeForShipping, which is what the ranked server's draft_policy.ts actually consumes for creature-pick decisions (composition-blind score + live TIER1_ARTIFACT_WINRATE for bundle choice); non-draft heads (artifact tier2/augments/placement/doctrine) are the setup-v0 anchor here and are governed by separate live logic (CONDITIONAL_SETUP_V1/setup-v0) not exercised by this script.",
             "heuristic reproduces misplay_audit.ts's OLD non-pick_sim roster construction exactly (draftRoster over DEFAULT_ROSTER_COMPOSITION with DEFAULT_DRAFT_W) so the two distributions are comparable under identical accounting; it is not itself a pick_sim draft and never fields artifacts.",
             "'caster' and 'melee' overlap for MELEE_MAGIC creatures (Angel/Harpy/Valkyrie/Troll/Ogre Mage/Behemoth) by construction; the attackType breakdown is the mutually-exclusive view.",
             "This script drafts only; it runs no fights and says nothing about win rates or AI decision quality (see measure_round1_misplay_census.ts for that).",

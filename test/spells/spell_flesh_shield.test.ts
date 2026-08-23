@@ -2,10 +2,9 @@
  * -----------------------------------------------------------------------------
  * Flesh Shield Aura (Abomination) vs CAST spell damage.
  *
- * Regression guard: applySpellDamageToUnits went straight to applyDamage, so the
- * aura absorbed Fire Breath and Chain Lightning — whose ability modules call
- * processFleshShieldAura themselves — but nothing thrown from a spellbook. Fire
- * Strike and Meteorite passed through a protected ally untouched.
+ * Regression guard for the physical-only rule: the aura is flesh, not a ward. Every
+ * point a spellbook throws is magical, so a protected ally eats a Fire Strike or a
+ * Meteorite in full and the Abomination beside it never pays a share.
  * -----------------------------------------------------------------------------
  */
 
@@ -109,10 +108,9 @@ const fireStrike = (setup: ReturnType<typeof setupFight>) => {
     };
 };
 
-const setupMeteoriteOverflow = (
+const setupMeteoriteFight = (
     casterAmountAlive = 57,
     abominationCell: { x: number; y: number } = { x: 5, y: 4 },
-    casterAbilities: string[] = [],
     magicDamageBonus = 25,
 ) => {
     const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
@@ -129,7 +127,6 @@ const setupMeteoriteOverflow = (
         stackPower: 5,
         initiative: 5,
         morale: 4,
-        abilities: casterAbilities,
     });
     placeUnit(context.grid, context.unitsHolder, caster, { x: 3, y: 3 });
     if (magicDamageBonus > 0) {
@@ -175,20 +172,12 @@ const setupMeteoriteOverflow = (
         moveHandler: new MoveHandler(context.grid.getSettings(), context.grid, context.unitsHolder),
         sceneLog: new SceneLogMock(),
         attackHandler: context.attackHandler,
-        createSummonedUnit: ({ team, unitName }) =>
-            createTestUnit({
-                name: unitName,
-                team,
-                level: PBTypes.UnitLevelVals.FIRST,
-                abilities: ["Infest"],
-                summoned: true,
-            }),
     });
     return { ...context, engine, caster, victims, abomination };
 };
 
 describe("Flesh Shield aura vs cast spell damage", () => {
-    it("hands part of a Fire Strike to the Abomination beside the target", () => {
+    it("leaves a Fire Strike entirely on the target beside the Abomination", () => {
         const unprotected = fireStrike(setupFight(false));
         const protectedRun = fireStrike(setupFight(true));
 
@@ -196,29 +185,15 @@ describe("Flesh Shield aura vs cast spell damage", () => {
         expect(unprotected.victimTook).toBeGreaterThan(0);
         expect(unprotected.abominationTook).toBe(0);
 
-        // With the aura up the victim keeps only the remainder and the Abomination eats the rest.
-        expect(protectedRun.abominationTook).toBeGreaterThan(0);
-        expect(protectedRun.victimTook).toBeLessThan(unprotected.victimTook);
-        expect(protectedRun.secondary).toEqual([
-            expect.objectContaining({
-                source: "flesh_shield",
-                amount: protectedRun.abominationTook,
-            }),
-        ]);
+        // Spell damage is magical, so the aura is inert: the victim takes exactly the unprotected amount.
+        expect(protectedRun.victimTook).toBe(unprotected.victimTook);
+        expect(protectedRun.abominationTook).toBe(0);
+        expect(protectedRun.secondary).toEqual([]);
     });
 
-    it("conserves the strike — nothing is created or lost in the transfer", () => {
-        const unprotected = fireStrike(setupFight(false));
-        const protectedRun = fireStrike(setupFight(true));
-
-        // These two units have identical 0% magic resistance, so every point removed from the protected
-        // victim must appear on the Abomination. This pins the no-disappearing-damage invariant directly.
-        expect(protectedRun.victimTook + protectedRun.abominationTook).toBe(unprotected.victimTook);
-    });
-
-    it("returns AOE overflow to protected units when the 500-HP absorber exhausts", () => {
+    it("lands a Meteorite AOE in full on protected units without touching the aura owner", () => {
         // 57 mages x Meteorite's flat 4 x a real 25% Empower bonus = 285 per victim, 570 total.
-        const setup = setupMeteoriteOverflow();
+        const setup = setupMeteoriteFight();
         const hpBefore = setup.victims.map((unit) => unit.getHp());
 
         const result = setup.engine.apply({
@@ -233,32 +208,20 @@ describe("Flesh Shield aura vs cast spell damage", () => {
         expect(cast?.type).toBe("spell_cast");
         const primary = cast?.type === "spell_cast" ? (cast.damaged ?? []) : [];
         const secondary = cast?.type === "spell_cast" ? (cast.secondary ?? []) : [];
-        const primaryDamage = primary.reduce((sum, entry) => sum + entry.amount, 0);
-        const absorbedDamage = secondary.reduce((sum, entry) => sum + entry.amount, 0);
 
-        // Two 285 hits = 570. The Abomination can pay exactly 500, so the remaining 70 lands back on the
-        // protected victims instead of disappearing when the aura source dies midway through the AOE.
-        expect(primaryDamage).toBe(70);
-        expect(absorbedDamage).toBe(500);
-        expect(primaryDamage + absorbedDamage).toBe(570);
-        expect(hpBefore.reduce((sum, hp, index) => sum + hp - setup.victims[index].getHp(), 0)).toBe(70);
-        expect(secondary).toEqual([
-            expect.objectContaining({
-                source: "flesh_shield",
-                unitId: setup.abomination.getId(),
-                amount: 500,
-                unitsDied: 1,
-            }),
-        ]);
-        expect(setup.abomination.isDead()).toBe(true);
+        expect(primary.reduce((sum, entry) => sum + entry.amount, 0)).toBe(570);
+        expect(secondary).toEqual([]);
+        expect(hpBefore.reduce((sum, hp, index) => sum + hp - setup.victims[index].getHp(), 0)).toBe(570);
+        // The Abomination stands outside the 2x2 and absorbs nothing, so it keeps every point of its 500 HP.
+        expect(setup.abomination.getHp()).toBe(500);
+        expect(setup.abomination.isDead()).toBe(false);
         expect(setup.damageStatisticHolder.get().reduce((sum, entry) => sum + entry.damage, 0)).toBe(570);
     });
 
-    it("reserves an aura owner's own simultaneous AOE hit before ally transfers", () => {
-        // 150 mages x Meteorite's flat 4 = 600 per target. The Abomination stands inside the 2x2 after both allies in
-        // cell-enumeration order; resolving those allies first used to spend its 500 HP on absorption and
-        // make the owner's own direct 500-HP hit disappear.
-        const setup = setupMeteoriteOverflow(150, { x: 7, y: 4 }, [], 0);
+    it("still lands an aura owner's own simultaneous AOE hit in full", () => {
+        // 150 mages x Meteorite's flat 4 = 600 per target. The Abomination stands inside the 2x2 and takes its
+        // own direct hit like any other victim — it is capped by its 500 HP, not by anything it absorbed.
+        const setup = setupMeteoriteFight(150, { x: 7, y: 4 }, 0);
         const victimHpBefore = setup.victims.map((unit) => unit.getHp());
 
         const result = setup.engine.apply({
@@ -280,36 +243,5 @@ describe("Flesh Shield aura vs cast spell damage", () => {
         expect(secondary).toEqual([]);
         expect(damaged.reduce((sum, entry) => sum + entry.amount, 0)).toBe(1_700);
         expect(setup.damageStatisticHolder.get().reduce((sum, entry) => sum + entry.damage, 0)).toBe(1_700);
-    });
-
-    it("attributes an absorber killed by hostile redirection to the spell for Infest", () => {
-        const setup = setupMeteoriteOverflow(57, { x: 5, y: 4 }, ["Infest"]);
-        const moraleWitness = createTestUnit({
-            name: "Abomination",
-            team: PBTypes.TeamVals.UPPER,
-            maxHp: 10_000,
-            morale: 4,
-        });
-        placeUnit(setup.grid, setup.unitsHolder, moraleWitness, { x: 9, y: 9 });
-        const casterMoraleBefore = setup.caster.getMorale();
-        const witnessMoraleBefore = moraleWitness.getMorale();
-
-        const result = setup.engine.apply({
-            type: "cast_spell",
-            casterId: setup.caster.getId(),
-            spellName: "Meteorite",
-            targetCell: { x: 6, y: 3 },
-        });
-        expect(result.completed).toBe(true);
-        expect(result.events).toContainEqual(
-            expect.objectContaining({
-                type: "unit_summoned",
-                unitName: "Arachna Spider",
-                sourceAbility: "Infest",
-            }),
-        );
-        expect(result.events.filter((event) => event.type === "unit_summoned")).toHaveLength(1);
-        expect(setup.caster.getMorale()).toBeGreaterThan(casterMoraleBefore);
-        expect(moraleWitness.getMorale()).toBeLessThan(witnessMoraleBefore);
     });
 });

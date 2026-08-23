@@ -16,7 +16,9 @@ import { FightStateManager } from "../fights/fight_state_manager";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 import type { ISecondaryDamage } from "../scene/animations";
+import { applyMagicMirrorDamage } from "../spells/magic_mirror_damage";
 import { fireforgedSwordDamage, fireforgedSwordPower } from "../spells/spell_damage";
+import { SpellElement } from "../spells/spell_properties";
 
 export const FIREFORGED_SWORD_BUFF_NAME = "Fireforged Sword";
 
@@ -66,6 +68,8 @@ export function processFireforgedSwordAbility(
         targetMagicResist: toUnit.getMagicResist(),
         targetIsFireElement: toUnit.hasAbilityActive("Fire Element"),
         targetIsWaterElement: toUnit.hasAbilityActive("Water Element"),
+        targetIsWindElement: toUnit.hasAbilityActive("Wind Element"),
+        targetIsEarthElement: toUnit.hasAbilityActive("Earth Element"),
     });
     if (burnDamage <= 0) {
         return NO_BURN;
@@ -88,17 +92,28 @@ export function processFireforgedSwordAbility(
         unitsDied: Math.max(0, amountAliveBefore - toUnit.getAmountAlive()),
     });
     sceneLog.updateLog(`${toUnit.getName()} burned for (${burnDamage}) by Fireforged Sword`);
+    const mirror = applyMagicMirrorDamage({
+        attacker: fromUnit,
+        holder: toUnit,
+        landedOnHolder: burnDamage,
+        element: SpellElement.FIRE,
+        sceneLog,
+        secondaryDamage,
+    });
+    const reflectedDeaths = mirror?.unitDied ? [fromUnit.getId()] : [];
 
     if (toUnit.isDead()) {
         sceneLog.updateLog(`${toUnit.getName()} died`);
         return {
             increaseMorale: HoCConstants.MORALE_CHANGE_FOR_KILL,
-            unitIdsDied: [toUnit.getId()],
+            unitIdsDied: [toUnit.getId(), ...reflectedDeaths],
             moraleDecreaseForTheUnitTeam: {
                 [`${toUnit.getName()}:${toUnit.getTeam()}`]: HoCConstants.MORALE_CHANGE_FOR_KILL,
             },
         };
     }
 
-    return NO_BURN;
+    return reflectedDeaths.length
+        ? { increaseMorale: 0, unitIdsDied: reflectedDeaths, moraleDecreaseForTheUnitTeam: {} }
+        : NO_BURN;
 }

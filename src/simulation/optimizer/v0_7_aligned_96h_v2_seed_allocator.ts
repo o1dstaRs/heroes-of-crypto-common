@@ -554,25 +554,38 @@ function parseScanReplay(input: IV07AlignedV2SeedScanReplayInput): {
 }
 
 function sortedUniqueUint32(values: readonly number[]): Uint32Array {
-    const sorted = [...values].map((value, index) => requireUint32(value, `seed[${index}]`)).sort((a, b) => a - b);
-    const unique: number[] = [];
+    const sorted = Array.from(values, (value, index) => requireUint32(value, `seed[${index}]`)).sort((a, b) => a - b);
+    let uniqueLength = 0;
     for (const value of sorted) {
-        if (unique[unique.length - 1] !== value) unique.push(value);
+        if (uniqueLength === 0 || sorted[uniqueLength - 1] !== value) {
+            sorted[uniqueLength] = value;
+            uniqueLength += 1;
+        }
     }
-    return Uint32Array.from(unique);
+    return Uint32Array.from(uniqueLength === sorted.length ? sorted : sorted.slice(0, uniqueLength));
 }
 
-function fingerprintSortedSeeds(seeds: Uint32Array): string {
+type SortedUint32Values = readonly number[] | Uint32Array;
+
+const HASH_LINE_BATCH_SIZE = 4_096;
+
+function fingerprintSortedSeeds(seeds: SortedUint32Values): string {
     const hash = createHash("sha256");
-    for (const seed of seeds) hash.update(`${seed}\n`);
+    const lines: string[] = [];
+    for (const seed of seeds) {
+        lines.push(`${seed}\n`);
+        if (lines.length === HASH_LINE_BATCH_SIZE) {
+            hash.update(lines.join(""));
+            lines.length = 0;
+        }
+    }
+    if (lines.length) hash.update(lines.join(""));
     return hash.digest("hex");
 }
 
-function sortedUnionFingerprint(arrays: readonly Uint32Array[]): { count: number; sha256: string } {
+function sortedUnionUint32(arrays: readonly SortedUint32Values[]): Uint32Array {
     const indices = arrays.map(() => 0);
-    const hash = createHash("sha256");
-    let count = 0;
-    let previous = -1;
+    const values: number[] = [];
     while (true) {
         let next = Number.POSITIVE_INFINITY;
         for (let index = 0; index < arrays.length; index += 1) {
@@ -583,12 +596,34 @@ function sortedUnionFingerprint(arrays: readonly Uint32Array[]): { count: number
         for (let index = 0; index < arrays.length; index += 1) {
             while (arrays[index]![indices[index]!] === next) indices[index] = indices[index]! + 1;
         }
-        if (next !== previous) {
-            hash.update(`${next}\n`);
-            count += 1;
-            previous = next;
-        }
+        values.push(next);
     }
+    return Uint32Array.from(values);
+}
+
+function sortedUnionFingerprint(arrays: readonly SortedUint32Values[]): { count: number; sha256: string } {
+    const indices = arrays.map(() => 0);
+    const hash = createHash("sha256");
+    const lines: string[] = [];
+    let count = 0;
+    while (true) {
+        let next = Number.POSITIVE_INFINITY;
+        for (let index = 0; index < arrays.length; index += 1) {
+            const value = arrays[index]![indices[index]!];
+            if (value !== undefined && value < next) next = value;
+        }
+        if (!Number.isFinite(next)) break;
+        for (let index = 0; index < arrays.length; index += 1) {
+            while (arrays[index]![indices[index]!] === next) indices[index] = indices[index]! + 1;
+        }
+        lines.push(`${next}\n`);
+        if (lines.length === HASH_LINE_BATCH_SIZE) {
+            hash.update(lines.join(""));
+            lines.length = 0;
+        }
+        count += 1;
+    }
+    if (lines.length) hash.update(lines.join(""));
     return { count, sha256: hash.digest("hex") };
 }
 
@@ -726,25 +761,33 @@ function expandComposedAffineManifest(manifest: Record<string, unknown>): number
     if (collisionLedger !== undefined && collisionLedger.length !== overrideValues.size) {
         throw new Error("composed collisionResolutions length must match ordinalOverrides");
     }
-    const usedOrdinals = new Set<number>();
+    const usedOverrideOrdinals = new Set<number>();
     const seeds: number[] = [];
-    const envelopeHash = createHash("sha256");
+    const envelopeHash = seedAudit.reservedEnvelopeSha256 === undefined ? undefined : createHash("sha256");
+    const envelopeHashLines: string[] = [];
     let mainOrdinal = 0;
+    let nextMainOrdinal = 0;
     let plannedPairs = 0;
     const register = (label: string, ordinal: number, kind: "protected" | "setup_proposal"): number => {
-        const selected = overrideValues.get(label) ?? ordinal;
-        if (overrideValues.has(label)) consumedOverrides.add(label);
-        if (overrideValues.has(label) && selected === ordinal) {
+        if (ordinal !== nextMainOrdinal) throw new Error(`composed main ordinal collision at ${label}`);
+        nextMainOrdinal += 1;
+        const overrideOrdinal = overrideValues.get(label);
+        const hasOverride = overrideOrdinal !== undefined;
+        const selected = overrideOrdinal ?? ordinal;
+        if (hasOverride) consumedOverrides.add(label);
+        if (hasOverride && selected === ordinal) {
             throw new Error(`composed override ${label} is a no-op`);
         }
         if (selected !== ordinal && selected < totalMainOrdinals) {
             throw new Error(`composed override ${label} is inside the main logical envelope`);
         }
-        if (usedOrdinals.has(selected)) throw new Error(`composed ordinal collision at ${label}`);
-        usedOrdinals.add(selected);
+        if (hasOverride && usedOverrideOrdinals.has(selected)) {
+            throw new Error(`composed ordinal collision at ${label}`);
+        }
+        if (hasOverride) usedOverrideOrdinals.add(selected);
         const seed = (offset + Math.imul(selected, oddStep)) >>> 0;
         const ledger = collisionLedgerByLabel.get(label);
-        if (overrideValues.has(label) && collisionLedger !== undefined) {
+        if (hasOverride && collisionLedger !== undefined) {
             const originalSeed = (offset + Math.imul(ordinal, oddStep)) >>> 0;
             if (
                 !ledger ||
@@ -766,7 +809,13 @@ function expandComposedAffineManifest(manifest: Record<string, unknown>): number
             throw new Error(`composed collision ledger contains an unbound entry ${label}`);
         }
         seeds.push(seed);
-        envelopeHash.update(`${label}\0${ordinal}\0${selected}\0${seed}\0${kind}\n`);
+        if (envelopeHash) {
+            envelopeHashLines.push(`${label}\0${ordinal}\0${selected}\0${seed}\0${kind}\n`);
+            if (envelopeHashLines.length === HASH_LINE_BATCH_SIZE) {
+                envelopeHash.update(envelopeHashLines.join(""));
+                envelopeHashLines.length = 0;
+            }
+        }
         return seed;
     };
     for (const cell of parsedCells) {
@@ -802,6 +851,9 @@ function expandComposedAffineManifest(manifest: Record<string, unknown>): number
     if (consumedOverrides.size !== overrideValues.size) {
         throw new Error("composed ordinalOverrides contains an unknown logical slot");
     }
+    if (nextMainOrdinal !== totalMainOrdinals) {
+        throw new Error("composed main logical envelope was not consumed exactly");
+    }
     if (collisionLedgerByLabel.size !== 0) {
         throw new Error("composed collisionResolutions contains an unknown logical slot");
     }
@@ -814,7 +866,8 @@ function expandComposedAffineManifest(manifest: Record<string, unknown>): number
     }
     if (seedAudit.reservedEnvelopeSha256 !== undefined) {
         const declared = requireSha256(seedAudit.reservedEnvelopeSha256, "composed reservedEnvelopeSha256");
-        if (envelopeHash.digest("hex") !== declared) {
+        if (envelopeHashLines.length) envelopeHash!.update(envelopeHashLines.join(""));
+        if (envelopeHash!.digest("hex") !== declared) {
             throw new Error("composed reservedEnvelopeSha256 does not match compact affine expansion");
         }
     }
@@ -1035,7 +1088,7 @@ export function ingestV07AlignedV2SeedCorpus(input: IV07AlignedV2SeedCorpusInput
         throw new Error("local and zinc seed scans must use the exact same cutoff");
     }
     const manifestPaths = new Set<string>();
-    const manifestSeeds: number[] = [];
+    const manifestSeedSets: number[][] = [];
     const manifestAttestations = input.committedManifests
         .map((inputManifest): IV07AlignedV2ManifestSeedAttestation => {
             if (!inputManifest.path.trim() || manifestPaths.has(inputManifest.path)) {
@@ -1046,18 +1099,19 @@ export function ingestV07AlignedV2SeedCorpus(input: IV07AlignedV2SeedCorpusInput
             const expansion = expandV07AlignedV2CommittedManifest(
                 parseJsonBytes(source, `committed manifest ${inputManifest.path}`),
             );
-            for (const seed of expansion.seeds) manifestSeeds.push(seed);
-            const unique = sortedUniqueUint32(expansion.seeds);
+            // Every expansion is already validated, sorted and de-duplicated. Retain those sorted runs so
+            // the corpus union can merge them linearly instead of sorting the million-entry composed run twice.
+            manifestSeedSets.push(expansion.seeds);
             return {
                 path: inputManifest.path,
                 sha256: sha256(source),
                 shape: expansion.shape,
-                expandedUniqueSeeds: unique.length,
-                expandedSeedSetSha256: fingerprintSortedSeeds(unique),
+                expandedUniqueSeeds: expansion.seeds.length,
+                expandedSeedSetSha256: fingerprintSortedSeeds(expansion.seeds),
             };
         })
         .sort((left, right) => left.path.localeCompare(right.path));
-    const manifestSet = sortedUniqueUint32(manifestSeeds);
+    const manifestSet = sortedUnionUint32(manifestSeedSets);
     const manifestCorpusSha256 = fingerprintV07AlignedV2(manifestAttestations);
     const denyset = sortedUnionFingerprint([local.seeds, zinc.seeds, manifestSet]);
     const unsigned: IV07AlignedV2SeedCorpusAttestationUnsigned = {

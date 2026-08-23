@@ -25,19 +25,12 @@ import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
 import { StrategyV0_8S } from "../../src/ai/versions/v0_8s";
 import { selectV08STargetPressureCandidate, V08S_URGENT_FINISH_START_LAP } from "../../src/ai/versions/v0_8s_finish";
 import { getSpellConfig } from "../../src/configuration/config_provider";
-import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { buildRoster, makeRng } from "../../src/simulation/army";
-import {
-    planV08BlockCenterActionGame,
-    V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_SEED,
-    withV08BlockCenterCandidateEnvironment,
-} from "../../src/simulation/v0_8_block_center_action_panel";
-import { GREEN_TEAM, runMatch } from "../../src/simulation/battle_engine";
-import { liveTwinSetup } from "../../src/simulation/livetwin";
+import { runMatch } from "../../src/simulation/battle_engine";
 import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
@@ -198,7 +191,11 @@ describe("v0.8 search measurement alias", () => {
         // Re-pinned for the pure-fractional steps call (getSteps no longer rounds, 2026-08-06): every
         // x.5-x.9-step unit reaches one straight cell less, so all seeded movement diverges. Two isolated
         // runs reproduced this digest byte-identically.
-        expect(digest("v0.7")).toBe("e58b23f2c8c1bbb71ecd7f48c9f76f56f643a5ae45e77fe73845cd1ec0b482d1");
+        // Re-pinned 2026-08-16 for the squared ranged falloff: falloff bands are squares of WHOLE cells
+        // (the fractional shot_distance stat is floored on the board) measured in king moves, and a band's
+        // last cell stays full strength, so every seeded trace diverges at its first shot. Two isolated
+        // runs reproduced this digest byte-identically.
+        expect(digest("v0.7")).toBe("fbfd4d723a7ad85811c4d360f1229556db6f051816450e33fb62febf9720ada6");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -213,7 +210,14 @@ describe("v0.8 search measurement alias", () => {
         // then again after Tsar Cannon's range, damage, attack, and armor buff. The v0.7 control above still
         // reproduces byte-identically.
         // Two isolated runs reproduced this digest.
-        expect(digest("v0.8")).toBe("ff532debdc307cfdc0b811f166ea4ad35b7523ce4039e5c6d5139eef893ecfa1");
+        // Re-pinned 2026-08-15 for the Deep-Wounds-applied-once engine fix (the attack handler and Double
+        // Punch each folded 1 + power/100 into the ability multiplier that calculateAttackDamage applied
+        // again, squaring the bonus) — v0.8's melee damage estimate mirrored that duplicate and now applies
+        // it once too, so its pricing and this trace both move. The v0.7 control hash above still reproduces
+        // byte-identically. Two isolated runs reproduced this digest.
+        // Re-pinned 2026-08-16 with the same squared-falloff change as the v0.7 control above; v0.8's own
+        // ranged pricing mirrors the engine bands, so its trace moves too. Two isolated runs reproduced it.
+        expect(digest("v0.8")).toBe("6eecf371ef5b3c9d712d7b6a2a1ad20e2908be44234e4f1911707cf4ff88d3c9");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {
@@ -425,87 +429,6 @@ describe("v0.8 search measurement alias", () => {
         const urgent = new StrategyV0_8S().decideTurn(screen, context);
         expect(urgent.some((action) => action.type === "wait_turn")).toBe(false);
         expect(urgent.some((action) => action.type === "move_unit")).toBe(true);
-    });
-
-    // RE-PIN NEEDED (fight lane): the Griffin nerf (armor 24 -> 23, owner-requested 2026-08-01) flips this
-    // seeded fight's WINNER (green -> red) — the Life side's Griffin now folds earlier, so the "Angel
-    // screening turns the lap-9 chase into a six-lap win" narrative no longer holds on seed 1_109_576_960.
-    // The Elf-productivity contract underneath is what matters; it needs re-judging on a seed where the
-    // green line still wins, or the contract asserted independently of the outcome.
-    it.skip("keeps the BLOCK_CENTER Elf productive while Angel screening ends the old lap-9 regression early", () => {
-        const options = {
-            candidateVersion: "v0.8s",
-            opponentVersion: "v0.7",
-            games: 1_024,
-            baseSeed: V08_BLOCK_CENTER_ACTION_PANEL_DEFAULT_SEED,
-            sourceCommit: "a".repeat(40),
-            sourceDirty: false,
-        } as const;
-        // Moved from game 782 after Beholder attack 15 -> 16 flipped that seed's winner to red (the
-        // fixture's Elf line lost its screened win). Game 308 — scanned from the same plan space — keeps
-        // an Elf+Angel green line and the whole contract: green elimination win in 8 laps, native ray
-        // fired, every Elf activation productive, zero rejection recovery.
-        const plan = planV08BlockCenterActionGame(options, 308);
-        const setup = liveTwinSetup();
-        const nativeDecisions: GameAction[][] = [];
-        const chosenDecisions: GameAction[][] = [];
-        const chosenActionsCompleted: boolean[][] = [];
-        const recoveryAttempts: number[] = [];
-        const elfIds = new Set<string>();
-        let result: ReturnType<typeof runMatch> | undefined;
-        withV08BlockCenterCandidateEnvironment(
-            options,
-            () =>
-                (result = runMatch({
-                    greenVersion: "v0.8s",
-                    redVersion: "v0.7",
-                    roster: plan.greenRoster,
-                    redRoster: plan.redRoster,
-                    seed: plan.seed,
-                    gridType: plan.mapType,
-                    maxLaps: 60,
-                    greenPerk: setup.perk,
-                    redPerk: setup.perk,
-                    greenAugments: setup.augments,
-                    redAugments: setup.augments,
-                    placementAugmentTiming: "setup-before-placement",
-                    decisionObserver: (observation) => {
-                        if (observation.unit.getTeam() === GREEN_TEAM && observation.unit.getName() === "Elf") {
-                            elfIds.add(observation.unit.getId());
-                            nativeDecisions.push(structuredClone(observation.incumbent));
-                        }
-                    },
-                    turnExecutionObserver: (observation) => {
-                        if (elfIds.has(observation.unitId)) {
-                            chosenDecisions.push(structuredClone(observation.chosenDecision));
-                            chosenActionsCompleted.push(observation.strategyActions.map(({ completed }) => completed));
-                            recoveryAttempts.push(observation.recoveryAttempts.length);
-                        }
-                    },
-                })),
-        );
-
-        expect(plan.seed).toBe(3_368_494_115);
-        // Angel screens this Elf/Arbalester/Valkyrie line and turns the former lap-nine chase into a six-lap win.
-        // Keep the original failure contract underneath that stronger outcome: every Elf activation is useful,
-        // it fires whenever the native ray exists, and a13 never needs rejection recovery.
-        expect(result?.winner).toBe("green");
-        expect(result?.laps).toBeLessThan(V08S_URGENT_FINISH_START_LAP);
-        expect(nativeDecisions.some((decision) => decision.some((action) => action.type === "range_attack"))).toBe(
-            true,
-        );
-        expect(
-            chosenDecisions.every((decision) =>
-                decision.some((action) => action.type === "range_attack" || action.type === "move_unit"),
-            ),
-        ).toBe(true);
-        expect(
-            chosenDecisions.every((decision) =>
-                decision.every((action) => !["wait_turn", "defend_turn", "end_turn"].includes(action.type)),
-            ),
-        ).toBe(true);
-        expect(chosenActionsCompleted.flat().every(Boolean)).toBe(true);
-        expect(recoveryAttempts.every((attempts) => attempts === 0)).toBe(true);
     });
 
     it("closes on a sole surviving enemy summon in the lap-9 sprint", () => {

@@ -8,14 +8,6 @@
         "is_buff": true,
         "power_type": "ADDITIONAL_MELEE_DAMAGE_PERCENTAGE"
     },
-    "Poison Cloud": {
-        "name": "Poison Cloud",
-        "range": 2,
-        "desc": "Affected allies apply {}% of their attack damage to the target as Poison. Poisoning an already poisoned enemy stacks: +70% poison damage per stack.",
-        "power": 15,
-        "is_buff": true,
-        "power_type": "POISON_ON_HIT"
-    },
     "Range Null Field": {
         "name": "Range Null Field",
         "range": 2,
@@ -91,7 +83,7 @@
     "Flesh Shield": {
         "name": "Flesh Shield",
         "range": 2,
-        "desc": "{}% of the attack damage dealt to this unit is absorbed by the aura's owner, recalculated against the owner's defense.",
+        "desc": "{}% of the physical damage dealt to this unit is absorbed by the aura's owner, recalculated against the owner's armor. Magical damage is not absorbed.",
         "power": 90,
         "is_buff": true,
         "power_type": "ABSORB_DAMAGE"
@@ -99,7 +91,7 @@
     "Stun": {
         "name": "Stun",
         "range": 2,
-        "desc": "Allies within range gain a {}% chance to stun the enemy they hit for a turn (base chance scaled by the Abomination's power and luck).",
+        "desc": "This unit gains a separate {}% chance to stun the enemy it hits for a turn (scaled by the Abomination's power and luck).",
         "power": 25,
         "is_buff": true,
         "power_type": "STUN_CHANCE"
@@ -139,8 +131,8 @@
     "Venom Cloud": {
         "name": "Venom Cloud",
         "range": 2,
-        "desc": "Affected allies apply {}% of their attack damage to the target as Poison. Poisoning an already poisoned enemy stacks: +70% poison damage per stack.",
-        "power": 30,
+        "desc": "Affected allies apply {}% of their attack damage to the target as Poison. Poisoning an already poisoned enemy stacks: +50% poison damage per stack.",
+        "power": 20,
         "is_buff": true,
         "power_type": "POISON_ON_HIT"
     },

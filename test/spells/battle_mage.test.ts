@@ -21,6 +21,7 @@ import { CreatureFactions } from "../../src/generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { ELEMENT_COUNTER_MULTIPLIER, FIRE_AGAINST_WATER_MULTIPLIER } from "../../src/spells/spell_damage";
 import { amountForCreatureExperienceBudget, STACK_EXPERIENCE_BUDGET } from "../../src/simulation/army";
 import { applyMagicResistToSpellDamage, calculateStackPoweredSpellDamage } from "../../src/spells/spell_damage";
 import { Spell } from "../../src/spells/spell";
@@ -55,8 +56,16 @@ const natureSpells = (spellsJson as unknown as Record<string, Record<string, { p
 const setupMageFight = (opts: {
     casterAmountAlive: number;
     casterStackPower: number;
+    casterMaxHp?: number;
+    casterMagicResist?: number;
     spells?: string[];
-    enemies?: { cell: { x: number; y: number }; maxHp?: number; magicResist?: number; amountAlive?: number }[];
+    enemies?: {
+        cell: { x: number; y: number };
+        maxHp?: number;
+        magicResist?: number;
+        amountAlive?: number;
+        abilities?: string[];
+    }[];
     allyCell?: { x: number; y: number };
     blockerCell?: { x: number; y: number };
     blockerTeam?: PBTypes.TeamVals;
@@ -72,6 +81,8 @@ const setupMageFight = (opts: {
         attackType: PBTypes.AttackVals.MELEE_MAGIC,
         spells: opts.spells ?? ["Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Fire Strike", "Nature:Meteorite"],
         amountAlive: opts.casterAmountAlive,
+        maxHp: opts.casterMaxHp ?? 10,
+        magicResist: opts.casterMagicResist ?? 0,
         stackPower: opts.casterStackPower,
         initiative: 5,
         morale: 4,
@@ -86,6 +97,7 @@ const setupMageFight = (opts: {
             maxHp: spec.maxHp ?? 10_000, // survives by default, so a test reads damage rather than a death
             magicResist: spec.magicResist ?? 0,
             amountAlive: spec.amountAlive ?? 1,
+            abilities: spec.abilities,
             initiative: 3,
             morale: 4,
         });
@@ -254,6 +266,35 @@ describe("Battle Mage spell configuration", () => {
 });
 
 describe("action engine — Fire Strike", () => {
+    it("takes Magic Mirror's guaranteed share back from the Battle Mage", () => {
+        const setup = setupMageFight({
+            casterAmountAlive: 38,
+            casterStackPower: 5,
+            casterMaxHp: 10_000,
+            enemies: [{ cell: { x: 6, y: 3 } }],
+        });
+        setup.enemies[0].applyBuff(new Spell({ spellProperties: getSpellConfig("Chaos", "Magic Mirror"), amount: 1 }));
+        const casterHpBefore = setup.caster.getHp();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Fire Strike",
+            targetId: setup.enemies[0].getId(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(casterHpBefore - setup.caster.getHp()).toBe(68); // floor((38 * 6) * 30%)
+        const cast = result.events.find((event) => event.type === "spell_cast");
+        expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toEqual([
+            expect.objectContaining({
+                unitId: setup.caster.getId(),
+                amount: 68,
+                reboundedFromUnitId: setup.enemies[0].getId(),
+            }),
+        ]);
+    });
+
     it("burns the target for the formula damage, spends one of three scrolls and ends the turn", () => {
         const setup = setupMageFight({
             casterAmountAlive: 38,
@@ -429,6 +470,43 @@ describe("action engine — Fire Strike", () => {
         expect(hpBefore - tough.enemies[0].getHp()).toBe(114); // 228 halved by 50% magic resistance
     });
 
+    it("is FIRE magic: a Fire Element is untouched and a Water Element burns half again as hard", () => {
+        // Fire Strike shipped with element "" while its siblings Ring of Fire and Meteor Shower carried
+        // FIRE, so a fireball burned an Efreet — which IS fire — for full damage. The whole element step
+        // lives in the engine already (resolveSpellVictims -> elementalDamageAgainst); the spell just
+        // never declared what it was made of.
+        // One cast per fight: Fire Strike completes the mage's turn, so a second cast in the same setup
+        // would be refused for reasons that have nothing to do with elements.
+        const burn = (abilities?: string[]): { completed: boolean; damage: number } => {
+            const setup = setupMageFight({
+                casterAmountAlive: 10,
+                casterStackPower: 1,
+                enemies: [{ cell: { x: 6, y: 3 }, abilities }],
+            });
+            const hpBefore = setup.enemies[0].getHp();
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.caster.getId(),
+                spellName: "Fire Strike",
+                targetId: setup.enemies[0].getId(),
+            });
+            return { completed: result.completed, damage: hpBefore - setup.enemies[0].getHp() };
+        };
+
+        const plain = burn();
+        expect(plain.completed).toBe(true);
+        expect(plain.damage).toBeGreaterThan(0);
+
+        // Declaring the element also brings the existing aim gate into play, which is the better outcome
+        // than a 0-damage hit: the fireball cannot be AIMED at the thing it is made of, so the mage keeps
+        // the charge instead of spending it on nothing.
+        expect(burn(["Fire Element"])).toEqual({ completed: false, damage: 0 });
+
+        const water = burn(["Water Element"]);
+        expect(water.completed).toBe(true);
+        expect(water.damage).toBe(Math.floor(plain.damage * FIRE_AGAINST_WATER_MULTIPLIER));
+    });
+
     it("casts from a single stack — its minimum stack power is 1", () => {
         const setup = setupMageFight({
             casterAmountAlive: 6,
@@ -451,6 +529,37 @@ describe("action engine — Fire Strike", () => {
 });
 
 describe("action engine — Meteorite", () => {
+    it("takes Mass Magic Mirror's guaranteed share back from the Battle Mage", () => {
+        const setup = setupMageFight({
+            casterAmountAlive: 38,
+            casterStackPower: 5,
+            casterMaxHp: 10_000,
+            enemies: [{ cell: { x: 6, y: 3 } }],
+        });
+        setup.enemies[0].applyBuff(
+            new Spell({ spellProperties: getSpellConfig("Chaos", "Mass Magic Mirror"), amount: 1 }),
+        );
+        const casterHpBefore = setup.caster.getHp();
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Meteorite",
+            targetCell: { x: 6, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        expect(casterHpBefore - setup.caster.getHp()).toBe(38); // floor((38 * 4) * 25%)
+        const cast = result.events.find((event) => event.type === "spell_cast");
+        expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toEqual([
+            expect.objectContaining({
+                unitId: setup.caster.getId(),
+                amount: 38,
+                reboundedFromUnitId: setup.enemies[0].getId(),
+            }),
+        ]);
+    });
+
     // The 2x2 whose bottom-left is (6,3) covers (6,3) (7,3) (6,4) (7,4) — the same corner convention Craft
     // and Smoke use.
     const BLOCK_ANCHOR = { x: 6, y: 3 };
@@ -485,6 +594,38 @@ describe("action engine — Meteorite", () => {
                 .find((s) => s.getName() === "Meteorite")
                 ?.getAmount(),
         ).toBe(0);
+    });
+
+    it("is EARTH magic: a Wind Element under the block is struck half again as hard", () => {
+        // Earth counters wind, so the meteorite lands on a Wind Element for
+        // ELEMENT_COUNTER_MULTIPLIER — the +50% the Wind Element card has always advertised
+        // ("Earth attacks deal 50% more damage", MAGIC_VULNERABILITY_EARTH at power 50) and which
+        // had no EARTH spell able to collect it until the tome's stones declared themselves.
+        // A Fire Element rides along as the control: it is the other pair, so a rock is just a rock.
+        const setup = setupMageFight({
+            casterAmountAlive: 38,
+            casterStackPower: 5,
+            enemies: [
+                { cell: { x: 6, y: 3 }, abilities: ["Wind Element"] },
+                { cell: { x: 7, y: 4 } },
+                { cell: { x: 7, y: 3 }, abilities: ["Fire Element"] },
+            ],
+        });
+        const hpBefore = setup.enemies.map((enemy) => enemy.getHp());
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.caster.getId(),
+            spellName: "Meteorite",
+            targetCell: BLOCK_ANCHOR,
+        });
+
+        expect(result.completed).toBe(true);
+        const plain = hpBefore[1] - setup.enemies[1].getHp();
+        expect(plain).toBe(152);
+        expect(hpBefore[0] - setup.enemies[0].getHp()).toBe(Math.floor(plain * ELEMENT_COUNTER_MULTIPLIER));
+        // A rock is not a fireball: being made of fire is no defence against it, and no weakness either.
+        expect(hpBefore[2] - setup.enemies[2].getHp()).toBe(plain);
     });
 
     it("needs no line of sight — it falls out of the sky behind a wall of bodies", () => {

@@ -138,46 +138,47 @@ export function getCellsAroundPosition(gridSettings: GridSettings, position: XY)
         return cells;
     }
 
-    const canGoLeft = position.x > gridSettings.getMinX();
-    const canGoRight = position.x < gridSettings.getMaxX();
-    const canGoDown = position.y > gridSettings.getMinY();
-    const canGoUp = position.y < gridSettings.getMaxY();
+    // This routine sits beneath both Unit.getCells and adjacent-cell evaluation, so avoid constructing four
+    // temporary world positions only to immediately map them back to cells. The scalar formulas below are the
+    // exact getCellForPosition transform and still return fresh caller-owned cell objects in legacy order.
+    const minX = gridSettings.getMinX();
+    const maxX = gridSettings.getMaxX();
+    const minY = gridSettings.getMinY();
+    const maxY = gridSettings.getMaxY();
+    const halfStep = gridSettings.getHalfStep();
+    const cellSize = gridSettings.getCellSize();
+    const canGoLeft = position.x > minX;
+    const canGoRight = position.x < maxX;
+    const canGoDown = position.y > minY;
+    const canGoUp = position.y < maxY;
+    const leftCellX = canGoLeft ? Math.floor((position.x - halfStep + maxX) / cellSize) : 0;
+    const rightCellX = canGoRight ? Math.floor((position.x + halfStep + maxX) / cellSize) : 0;
+    const downCellY = canGoDown ? Math.floor((position.y - halfStep) / cellSize) : 0;
+    const upCellY = canGoUp ? Math.floor((position.y + halfStep) / cellSize) : 0;
 
     if (canGoLeft && canGoUp) {
-        const c = getCellForPosition(gridSettings, {
-            x: position.x - gridSettings.getHalfStep(),
-            y: position.y + gridSettings.getHalfStep(),
+        cells.push({
+            x: leftCellX,
+            y: upCellY,
         });
-        if (c) {
-            cells.push(c);
-        }
     }
     if (canGoRight && canGoUp) {
-        const c = getCellForPosition(gridSettings, {
-            x: position.x + gridSettings.getHalfStep(),
-            y: position.y + gridSettings.getHalfStep(),
+        cells.push({
+            x: rightCellX,
+            y: upCellY,
         });
-        if (c) {
-            cells.push(c);
-        }
     }
     if (canGoDown && canGoLeft) {
-        const c = getCellForPosition(gridSettings, {
-            x: position.x - gridSettings.getHalfStep(),
-            y: position.y - gridSettings.getHalfStep(),
+        cells.push({
+            x: leftCellX,
+            y: downCellY,
         });
-        if (c) {
-            cells.push(c);
-        }
     }
     if (canGoDown && canGoRight) {
-        const c = getCellForPosition(gridSettings, {
-            x: position.x + gridSettings.getHalfStep(),
-            y: position.y - gridSettings.getHalfStep(),
+        cells.push({
+            x: rightCellX,
+            y: downCellY,
         });
-        if (c) {
-            cells.push(c);
-        }
     }
 
     return cells;
@@ -595,6 +596,62 @@ export function getDistanceToFurthestCorner(position: XY, gridSettings: GridSett
 }
 
 /**
+ * The shot distance the BOARD works in: whole cells, floored. The unit STAT stays fractional (5.3,
+ * 6.5, 9.5) and is calculated and displayed exactly as before on the unit card and the left sidebar —
+ * only the in-game geometry rounds down, so "6.5" means a full-damage square six cells deep.
+ */
+export function getWholeCellShotDistance(shotDistance: number): number {
+    if (!Number.isFinite(shotDistance) || shotDistance <= 0) {
+        return 0;
+    }
+
+    return Math.floor(shotDistance);
+}
+
+/**
+ * Chebyshev ("king move") distance, in whole cells, from an attacker's FOOTPRINT to a target position.
+ * 0 means the target sits on the attacker's own cells, 1 means it is adjacent (diagonals included).
+ *
+ * This is what makes the ranged falloff bands SQUARES rather than circles: a diagonal cell is exactly
+ * as far as a straight one, so the full-damage area is the square the board draws.
+ *
+ * The target is snapped to its cell first, so an aim point nudged onto a cell EDGE (the side centers
+ * a real shot resolves to - see getRangeAttackSideCenter) measures the same as that cell's center.
+ * The attacker keeps its raw position because large units are centered on a grid intersection; their
+ * half-footprint is subtracted instead, which is what makes the square hug the unit's own cells.
+ */
+export function getShotCellDistance(
+    gridSettings: GridSettings,
+    attackerPosition: XY,
+    attackerSize: number,
+    targetPosition: XY,
+): number {
+    const step = gridSettings.getStep();
+    const targetCellPosition = getPositionForCell(
+        getCellForPosition(gridSettings, targetPosition),
+        gridSettings.getMinX(),
+        step,
+        gridSettings.getHalfStep(),
+    );
+    // Half the attacker's own footprint, in pixels: 0 for a 1x1 (centered on its cell), half a cell
+    // for a 2x2 (centered on the intersection of its four cells).
+    const halfFootprint = ((Math.max(1, attackerSize) - 1) / 2) * step;
+    const dx = Math.abs(targetCellPosition.x - attackerPosition.x) - halfFootprint;
+    const dy = Math.abs(targetCellPosition.y - attackerPosition.y) - halfFootprint;
+
+    return Math.max(0, Math.round(Math.max(dx, dy) / step));
+}
+
+/**
+ * Half-width, in pixels, of the square a shooter covers at full 1/1 damage - the area the board
+ * highlights. Whole cells out from the unit's own footprint, so the edge lands on a cell border
+ * instead of cutting through one.
+ */
+export function getFullDamageSquareHalfExtent(shotDistance: number, unitSize: number, step: number): number {
+    return (getWholeCellShotDistance(shotDistance) + Math.max(1, unitSize) / 2) * step;
+}
+
+/**
  * Sides of a grid cell a ranged shot can be aimed at. The numeric values are part of the ranked
  * wire protocol (range_attack carries the chosen side as an int) and are persisted in replays, so
  * they MUST stay stable. Order matches the legacy push order in getClosestSideCenter.
@@ -657,8 +714,8 @@ export function getRangeAttackSideCenter(
 
 /**
  * Whether a ranged shot fired by `fromTeamType` can see (is not blocked at) a given cell side. A
- * side is observable when the neighbouring cell is empty, holds a friendly unit, or is lava/water —
- * i.e. NOT an enemy unit hiding the edge. Through Shot only treats hard BLOCK obstacles as occluders.
+ * side is observable when the neighbouring cell is empty, holds a friendly unit, or is flat hazard
+ * terrain (lava/water/hole — narrowing consumes cells as holes) — i.e. NOT an enemy unit hiding the edge. Through Shot only treats hard BLOCK obstacles as occluders.
  * This is the authoritative "visible edge" rule, shared by the client preview and the server engine.
  */
 export function isRangeAttackSideObservable(
@@ -688,7 +745,15 @@ export function isRangeAttackSideObservable(
         return neighbour !== ObstacleType.BLOCK;
     }
     return (
-        !neighbour || neighbour === fromTeamType || neighbour === ObstacleType.LAVA || neighbour === ObstacleType.WATER
+        !neighbour ||
+        neighbour === fromTeamType ||
+        neighbour === ObstacleType.LAVA ||
+        neighbour === ObstacleType.WATER ||
+        // A HOLE is flat terrain like lava/water — nothing stands up out of it to occlude a shot. It
+        // matters because NARROWING marks the consumed ring with holes (occupyByHole): without this,
+        // every unit backed against the shrunken board's edge read as "covered" on those sides, and a
+        // packed late-game board turned whole armies unshootable (live report, game 36f3c899, lap 4+).
+        neighbour === ObstacleType.HOLE
     );
 }
 
@@ -696,6 +761,103 @@ export interface IClosestSideCenter {
     position: XY;
     cell: XY;
     side: RangeAttackCellSide;
+}
+
+/**
+ * Every (cell, side) pair of `targetCells` a shot from `fromTeamType` can legally land on. A ranged shot
+ * always flies to the center of a VISIBLE EDGE — never to the target's geometric center — so a unit whose
+ * every edge is covered (boxed in by its own allies and/or BLOCK obstacles) offers no legal aim point and
+ * simply cannot be shot.
+ *
+ * Scans ALL of the target's cells on purpose: a 2x2 whose nearest corner is walled in may still present an
+ * open edge on a far cell, and that shot is legal. Checking only the closest cell would make such a unit
+ * unshootable.
+ */
+export function observableRangeAttackEdges(
+    gridMatrix: number[][],
+    targetCells: readonly XY[],
+    fromTeamType: TeamType,
+    isThroughShot = false,
+): Array<{ cell: XY; side: RangeAttackCellSide }> {
+    const edges: Array<{ cell: XY; side: RangeAttackCellSide }> = [];
+    for (const cell of targetCells) {
+        for (const side of RANGE_ATTACK_CELL_SIDES) {
+            if (isRangeAttackSideObservable(gridMatrix, cell, side, fromTeamType, isThroughShot)) {
+                edges.push({ cell, side });
+            }
+        }
+    }
+    return edges;
+}
+
+/** Whether any edge of `targetCells` is visible to `fromTeamType` — i.e. whether a ranged shot is possible. */
+export function hasObservableRangeAttackEdge(
+    gridMatrix: number[][],
+    targetCells: readonly XY[],
+    fromTeamType: TeamType,
+    isThroughShot = false,
+): boolean {
+    for (const cell of targetCells) {
+        for (const side of RANGE_ATTACK_CELL_SIDES) {
+            if (isRangeAttackSideObservable(gridMatrix, cell, side, fromTeamType, isThroughShot)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * The visible edge a shot resolves to, honoring the shooter's bounded intent (`aimCell` + `aimSide`) when
+ * that pair is still legal and clamping to the observable edge nearest the attacker otherwise. Returns
+ * undefined when the target presents NO visible edge, which callers must treat as "this shot is not
+ * allowed" rather than falling back to the target's center.
+ *
+ * Shared by the client preview and the authoritative engine so the two can never disagree about which
+ * shots exist.
+ */
+export function resolveRangeAttackAimEdge(
+    gridMatrix: number[][],
+    gridSettings: GridSettings,
+    targetCells: readonly XY[],
+    attackerPosition: XY,
+    fromTeamType: TeamType,
+    isThroughShot = false,
+    aimCell?: XY,
+    aimSide?: number,
+): IClosestSideCenter | undefined {
+    const edges = observableRangeAttackEdges(gridMatrix, targetCells, fromTeamType, isThroughShot);
+    if (!edges.length) {
+        return undefined;
+    }
+
+    const requested =
+        aimCell && aimSide !== undefined
+            ? edges.find((edge) => edge.cell.x === aimCell.x && edge.cell.y === aimCell.y && edge.side === aimSide)
+            : undefined;
+    if (requested) {
+        return {
+            position: getRangeAttackSideCenter(gridSettings, requested.cell, requested.side, attackerPosition),
+            cell: requested.cell,
+            side: requested.side,
+        };
+    }
+
+    // Clamp: nearest observable edge to the attacker. Deterministic — ties keep the lower side index, and
+    // cells are walked in the target's own stable order.
+    let best = edges[0];
+    let bestPosition = getRangeAttackSideCenter(gridSettings, best.cell, best.side, attackerPosition);
+    let bestDistance = getDistance(attackerPosition, bestPosition);
+    for (let i = 1; i < edges.length; i += 1) {
+        const position = getRangeAttackSideCenter(gridSettings, edges[i].cell, edges[i].side, attackerPosition);
+        const distance = getDistance(attackerPosition, position);
+        if (distance < bestDistance) {
+            best = edges[i];
+            bestPosition = position;
+            bestDistance = distance;
+        }
+    }
+    return { position: bestPosition, cell: best.cell, side: best.side };
 }
 
 /**

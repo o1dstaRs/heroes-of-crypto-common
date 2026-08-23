@@ -44,24 +44,6 @@ const TSAR_RED_ROSTER: IArmyUnitSpec[] = [
     { faction: "Life", creatureName: "Angel", level: 4, size: 2, amount: 2 },
 ];
 
-const BEHOLDER_GREEN_ROSTER: IArmyUnitSpec[] = [
-    { faction: "Might", creatureName: "Centaur", level: 1, size: 1, amount: 73 },
-    { faction: "Life", creatureName: "Arbalester", level: 1, size: 1, amount: 124 },
-    { faction: "Nature", creatureName: "Elf", level: 2, size: 1, amount: 26 },
-    { faction: "Might", creatureName: "Harpy", level: 2, size: 1, amount: 27 },
-    { faction: "Life", creatureName: "Griffin", level: 3, size: 1, amount: 9 },
-    { faction: "Nature", creatureName: "Gargantuan", level: 4, size: 2, amount: 2 },
-];
-
-const BEHOLDER_RED_ROSTER: IArmyUnitSpec[] = [
-    { faction: "Might", creatureName: "Centaur", level: 1, size: 1, amount: 73 },
-    { faction: "Might", creatureName: "Wolf Rider", level: 1, size: 1, amount: 81 },
-    { faction: "Chaos", creatureName: "Beholder", level: 2, size: 1, amount: 22 },
-    { faction: "Nature", creatureName: "White Tiger", level: 2, size: 1, amount: 25 },
-    { faction: "Life", creatureName: "Griffin", level: 3, size: 1, amount: 9 },
-    { faction: "Chaos", creatureName: "Abomination", level: 4, size: 2, amount: 1 },
-];
-
 function replayRangedMovementFailure(
     seed: number,
     gridType: number,
@@ -82,8 +64,8 @@ function replayRangedMovementFailure(
         seed,
         gridType,
         maxLaps: 60,
-        greenPerk: greenSetup.perk,
-        redPerk: redSetup.perk,
+        greenDoctrine: greenSetup.doctrine,
+        redDoctrine: redSetup.doctrine,
         greenAugments: greenSetup.augments,
         redAugments: redSetup.augments,
         decisionObserver: ({ unit, context, incumbent }) => {
@@ -145,26 +127,6 @@ describe("v0.1 ranged movement robustness", () => {
         // moves stay short of the whole-cell budget. The core never-exceeds invariant below still holds —
         // re-seed to restore the "actually uses its budget" half.
         expect(replay.moves.filter((move) => move.travelledCells > move.stepBudget)).toEqual([]);
-        expect(replay.rejected).toEqual([]);
-        expect({ green: replay.rejectedGreen, red: replay.rejectedRed }).toEqual({ green: 0, red: 0 });
-    });
-
-    // RE-PIN NEEDED (fight lane): the pure-fractional steps call (2026-08-06, no rounding in
-    // getSteps) reshapes this seeded game — the Beholder no longer happens to cross the water pool on
-    // seed 2763957387, so the crossing-specific assertions need a fresh seed that exercises them. The
-    // never-lands-on-water invariant itself is unchanged in the engine.
-    test.skip("lets a Beholder cross water but never land on it on WATER seed 2763957387", () => {
-        const replay = replayRangedMovementFailure(
-            2763957387,
-            PBTypes.GridVals.WATER_CENTER,
-            BEHOLDER_GREEN_ROSTER,
-            BEHOLDER_RED_ROSTER,
-            "Beholder",
-        );
-
-        expect(replay.moves.length).toBeGreaterThan(0);
-        expect(replay.moves.some((move) => move.crossesWater && move.hasWaterCell)).toBe(true);
-        expect(replay.moves.filter((move) => !move.canLand)).toEqual([]);
         expect(replay.rejected).toEqual([]);
         expect({ green: replay.rejectedGreen, red: replay.rejectedRed }).toEqual({ green: 0, red: 0 });
     });

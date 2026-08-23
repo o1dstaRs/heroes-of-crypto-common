@@ -461,6 +461,30 @@ describe("FightProperties", () => {
             expect(restored.getAdditionalAuraRangePerTeam(team)).toBe(0);
         });
 
+        it("keeps the legacy three-part synergy-key parsing contract", () => {
+            const team = PBTypes.TeamVals.LOWER;
+            const fightProperties = new FightProperties();
+            const auraSynergy = MightSynergy.PLUS_AURAS_RANGE;
+
+            const cases: ReadonlyArray<readonly [string, number]> = [
+                [`Might:${auraSynergy}:3`, 3],
+                // parseInt historically accepts a numeric prefix in the synergy and level components.
+                [`Might:${auraSynergy}suffix:3suffix`, 3],
+                [`Might:${auraSynergy}:0`, 0],
+                [`Might:${auraSynergy}:4`, 0],
+                [`Might:${auraSynergy}`, 0],
+                [`Might:${auraSynergy}:3:extra`, 0],
+                [`Might:${auraSynergy}:3:`, 0],
+                [`Might::${auraSynergy}:3`, 0],
+                [`Unknown:${auraSynergy}:3`, 0],
+            ];
+
+            for (const [key, expected] of cases) {
+                fightProperties.setSynergiesPerTeam(team, [key]);
+                expect(fightProperties.getAdditionalAuraRangePerTeam(team)).toBe(expected);
+            }
+        });
+
         it("setSynergiesPerTeam carries synergies across a fresh FightProperties (the ranked hydrate)", () => {
             const team = PBTypes.TeamVals.LOWER;
             // "prior" — the client's FightProperties holding a picked synergy, just before a snapshot hydrate.
@@ -478,7 +502,7 @@ describe("FightProperties", () => {
 
             // "fresh" — what FightStateManager.reset() builds on the client's fight-start hydrate: no
             // synergies, so the aura-range bonus is silently zero. This is the bug — the authoritative
-            // snapshot re-seeds perk/artifacts/augments but never synergies.
+            // snapshot re-seeds doctrine/artifacts/augments but never synergies.
             const fresh = new FightProperties();
             expect(fresh.getAdditionalAuraRangePerTeam(team)).toBe(0);
 

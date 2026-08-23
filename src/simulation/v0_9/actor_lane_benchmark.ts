@@ -38,6 +38,7 @@ import {
     type IV09ActorLaneBenchmarkReceipt,
     type IV09ActorLaneBenchmarkRun,
     type V09ActorLaneBenchmarkMode,
+    type V09ActorLaneIdleLoadTelemetry,
     type V09ActorLaneThermalTelemetry,
 } from "./actor_lane_benchmark_receipt";
 import { runV09ActorCommandsFailFast, type IV09ActorCommandLaunch, type ICommandResult } from "./orchestrator";
@@ -72,6 +73,7 @@ export interface IV09ActorLaneBenchmarkOptions {
     panelGames: number;
     repetitions: number;
     allowMissingThermalTelemetry: boolean;
+    allowWslLoadAverageOverride: boolean;
 }
 
 export type IV09ActorLaneBenchmarkReceiptBase = Omit<IV09ActorLaneBenchmarkInput, "runs" | "completedAt">;
@@ -325,7 +327,7 @@ function assertGpu(gpuUuid: string): void {
     if (observed !== gpuUuid) throw new Error(`nvidia-smi resolved unexpected GPU ${observed}`);
 }
 
-export function inspectV09ActorLaneBenchmarkHost(gpuUuid: string): IHostInspection {
+export async function inspectV09ActorLaneBenchmarkHost(gpuUuid: string): Promise<IHostInspection> {
     assertGpu(gpuUuid);
     const topology = discoverV09ActorCpuTopology();
     const telemetry = hwmonTelemetryPaths();
@@ -350,6 +352,7 @@ export function inspectV09ActorLaneBenchmarkHost(gpuUuid: string): IHostInspecti
             checkedAt: new Date().toISOString(),
             loadOne: loadavg()[0],
             maximumLoadOne,
+            instantaneousCpuUtilization: await instantaneousCpuUtilization(),
             freeMemoryBytes: freemem(),
             conflictingProcesses: conflictingProcesses(),
             gpuComputePids: gpuComputePids(gpuUuid),
@@ -358,7 +361,11 @@ export function inspectV09ActorLaneBenchmarkHost(gpuUuid: string): IHostInspecti
     };
 }
 
-function assertProductionHost(inspection: IHostInspection, thermalTelemetry: V09ActorLaneThermalTelemetry): void {
+function assertProductionHost(
+    inspection: IHostInspection,
+    thermalTelemetry: V09ActorLaneThermalTelemetry,
+    idleLoadTelemetry: V09ActorLaneIdleLoadTelemetry,
+): void {
     const { host, idle } = inspection;
     if (
         host.platform !== V09_ACTOR_LANE_SELECTION_POLICY.requiredPlatform ||
@@ -389,8 +396,19 @@ function assertProductionHost(inspection: IHostInspection, thermalTelemetry: V09
     if (idle.gpuComputePids.length) {
         throw new Error(`actor benchmark found active GPU compute PIDs: ${idle.gpuComputePids.join(",")}`);
     }
-    if (idle.loadOne > idle.maximumLoadOne) {
+    if (idleLoadTelemetry === "load_average" && idle.loadOne > idle.maximumLoadOne) {
         throw new Error(`actor benchmark host load ${idle.loadOne} exceeds idle ceiling ${idle.maximumLoadOne}`);
+    }
+    if (
+        idleLoadTelemetry === "unavailable_wsl_override" &&
+        (!/microsoft.*wsl/i.test(host.release) ||
+            idle.loadOne <= idle.maximumLoadOne ||
+            idle.instantaneousCpuUtilization > V09_ACTOR_LANE_SELECTION_POLICY.maximumInitialCpuUtilization)
+    ) {
+        throw new Error(
+            `WSL load-average override requires a WSL kernel, load above ${idle.maximumLoadOne}, and ` +
+                `instantaneous CPU utilization <= ${V09_ACTOR_LANE_SELECTION_POLICY.maximumInitialCpuUtilization}`,
+        );
     }
     if (idle.freeMemoryBytes < V09_ACTOR_LANE_SELECTION_POLICY.minimumFreeMemoryBytes) {
         throw new Error("actor benchmark host has insufficient free memory");
@@ -673,11 +691,14 @@ export async function runV09ActorLaneBenchmark(
         JSON.parse(readFileSync(options.sourceReceiptPath, "utf8")) as IV09SourceIdentityReceipt,
         repositoryRoot,
     );
-    const inspection = inspectV09ActorLaneBenchmarkHost(options.gpuUuid);
+    const inspection = await inspectV09ActorLaneBenchmarkHost(options.gpuUuid);
     const thermalTelemetry: V09ActorLaneThermalTelemetry = options.allowMissingThermalTelemetry
         ? "unavailable_user_override"
         : "observed";
-    assertProductionHost(inspection, thermalTelemetry);
+    const idleLoadTelemetry: V09ActorLaneIdleLoadTelemetry = options.allowWslLoadAverageOverride
+        ? "unavailable_wsl_override"
+        : "load_average";
+    assertProductionHost(inspection, thermalTelemetry, idleLoadTelemetry);
 
     // Creation happens only after every clean-source, host-idle, topology, GPU, and path-isolation gate passes.
     mkdirSync(outputDirectory);
@@ -688,6 +709,7 @@ export async function runV09ActorLaneBenchmark(
     const receiptBase: IV09ActorLaneBenchmarkReceiptBase = {
         mode: "production",
         thermalTelemetry,
+        idleLoadTelemetry,
         source: {
             receiptSha256: sourceReceipt.receiptSha256,
             sourceCommit: sourceReceipt.sourceCommit,
@@ -740,6 +762,7 @@ function cliOptions(): IV09ActorLaneBenchmarkOptions {
             "panel-games": { type: "string" },
             repetitions: { type: "string" },
             "allow-missing-thermal-telemetry": { type: "boolean", default: false },
+            "allow-wsl-load-average-override": { type: "boolean", default: false },
         },
         strict: true,
     });
@@ -756,6 +779,7 @@ function cliOptions(): IV09ActorLaneBenchmarkOptions {
         gpuUuid: values["gpu-uuid"],
         protectedV08Roots: values["protect-v08-root"] ?? [],
         allowMissingThermalTelemetry: values["allow-missing-thermal-telemetry"] === true,
+        allowWslLoadAverageOverride: values["allow-wsl-load-average-override"] === true,
         panelGames: parsePositiveInteger(
             values["panel-games"],
             V09_ACTOR_LANE_SELECTION_POLICY.minimumProductionPanelGames,

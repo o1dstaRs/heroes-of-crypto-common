@@ -18,7 +18,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 
 import { scoreCreatureWeighted } from "../../src/ai/setup/creature_score";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { Perk } from "../../src/perks/perk_properties";
+import { Doctrine } from "../../src/doctrines/doctrine_properties";
 import { createPickSimState, getKnownOpponentCreatures, type IPickSimState } from "../../src/picks/pick_sim";
 import type { IMatchConfig, IMatchResult } from "../../src/simulation/battle_engine";
 import {
@@ -31,7 +31,7 @@ import {
     leagueComposition,
     pickLeagueAugments,
     pickLeagueCreature,
-    pickLeaguePerk,
+    pickLeagueDoctrine,
     pickLeaguePlacement,
     scoreLeagueCreature,
 } from "../../src/simulation/league_genome";
@@ -194,7 +194,7 @@ describe("B1 full-game league genome", () => {
 
     it("anchors setup at SEE_NONE, Armor3/Might3/Sniper1 and adaptive placement", () => {
         const anchor = createLeagueGenome("anchor");
-        expect(pickLeaguePerk(anchor)).toBe(Perk.SEE_NONE);
+        expect(pickLeagueDoctrine(anchor)).toBe(Doctrine.SEE_NONE);
         expect(pickLeagueAugments([], [], 7, anchor)).toEqual([
             { kind: "Armor", value: 3 },
             { kind: "Might", value: 3 },
@@ -204,11 +204,11 @@ describe("B1 full-game league genome", () => {
 
         const changed = [...LEAGUE_ANCHOR_GENOME];
         changed[LEAGUE_GENOME_LAYOUT.placement.offset] = -1;
-        changed[LEAGUE_GENOME_LAYOUT.perks.offset + 1] = 100;
+        changed[LEAGUE_GENOME_LAYOUT.doctrines.offset + 1] = 100;
         const alternative = createLeagueGenome("alternative", changed);
         expect(pickLeaguePlacement([], [], alternative)).toBe("tight");
-        expect(pickLeaguePerk(alternative)).toBe(Perk.SEE_NONE);
-        expect(pickLeaguePerk(alternative, false)).toBe(Perk.SEE_ALL);
+        expect(pickLeagueDoctrine(alternative)).toBe(Doctrine.SEE_NONE);
+        expect(pickLeagueDoctrine(alternative, false)).toBe(Doctrine.SEE_ALL);
     });
 
     it("drives the exact pick reducer deterministically through retries to six-stack setups", () => {
@@ -233,7 +233,7 @@ describe("B1 full-game league genome", () => {
         expect(resolveLeaguePick(collisionSeed!, anchor, melee).state.lower.creatures).toHaveLength(6);
     });
 
-    it("wires draft, T2, augment, perk and deployable placement heads into a resolved setup", () => {
+    it("wires draft, T2, augment, doctrine and deployable placement heads into a resolved setup", () => {
         const changed = [...LEAGUE_ANCHOR_GENOME];
         changed[2] = 10_000; // prefer ranged draft choices
         changed[4] = -10_000;
@@ -247,8 +247,8 @@ describe("B1 full-game league genome", () => {
         changed.fill(0, LEAGUE_GENOME_LAYOUT.augments.offset + 3 * 7, LEAGUE_GENOME_LAYOUT.augments.offset + 4 * 7);
         changed[LEAGUE_GENOME_LAYOUT.augments.offset + 3 * 7] = 100; // Movement bias
         changed[LEAGUE_GENOME_LAYOUT.placement.offset] = 100;
-        changed.fill(-100, LEAGUE_GENOME_LAYOUT.perks.offset, LEAGUE_GENOME_LAYOUT.perks.offset + 3);
-        changed[LEAGUE_GENOME_LAYOUT.perks.offset + 1] = 100; // SEE_ALL
+        changed.fill(-100, LEAGUE_GENOME_LAYOUT.doctrines.offset, LEAGUE_GENOME_LAYOUT.doctrines.offset + 3);
+        changed[LEAGUE_GENOME_LAYOUT.doctrines.offset + 1] = 100; // SEE_ALL
         const alternative = createLeagueGenome("wired", changed);
         const anchor = createLeagueGenome("anchor");
         const opponent = createLeagueGenome("opponent");
@@ -262,7 +262,7 @@ describe("B1 full-game league genome", () => {
         const resolved = resolveLeaguePick(seed!, alternative, opponent, false);
         expect(resolved.state.lower.creatures).not.toEqual(baseline.state.lower.creatures);
         expect(resolved.state.lower.tier2Artifact).toBe(1);
-        expect(resolved.state.lower.perk).toBe(Perk.SEE_ALL);
+        expect(resolved.state.lower.doctrine).toBe(Doctrine.SEE_ALL);
         expect(resolved.lowerAugments).toEqual([{ kind: "Movement", value: 2 }]);
         expect(resolved.lowerPlacement).toBe("adaptive");
 
@@ -272,7 +272,7 @@ describe("B1 full-game league genome", () => {
             playLeagueGame(
                 alternative,
                 { ...opponent, prior: 1 },
-                { gamesPerOpponent: 8, baseSeed: value, freezePerk: false },
+                { gamesPerOpponent: 8, baseSeed: value, freezeDoctrine: false },
                 0,
                 {
                     matchRunner: (config) => {
@@ -285,7 +285,7 @@ describe("B1 full-game league genome", () => {
             return wiredGate === "lower" || wiredGate === "both";
         });
         expect(baseSeed).toBeDefined();
-        expect(wiredConfig?.greenPerk).toBe(Perk.SEE_ALL);
+        expect(wiredConfig?.greenDoctrine).toBe(Doctrine.SEE_ALL);
         expect(wiredConfig?.greenAugments).toEqual([{ kind: "Movement", value: 2 }]);
         expect(["lower", "both"]).toContain(wiredGate);
 
@@ -302,7 +302,7 @@ describe("B1 full-game league genome", () => {
         // hold broadly. The search stays out of the test so it cannot pass tautologically.
         const noVision = resolveLeaguePick(75, alternative, opponent, true);
         expect(getKnownOpponentCreatures(noVision.state, PBTypes.TeamVals.LOWER)).toEqual([]);
-        expect(noVision.state.lower.perk).toBe(Perk.SEE_NONE);
+        expect(noVision.state.lower.doctrine).toBe(Doctrine.SEE_NONE);
         expect(noVision.lowerPlacement).toBe("tight");
     });
 });
@@ -382,8 +382,8 @@ describe("B1 league evaluation", () => {
             expect(first.redArtifactT1).toBe(mirror.greenArtifactT1);
             expect(first.greenArtifactT2).toBe(mirror.redArtifactT2);
             expect(first.redArtifactT2).toBe(mirror.greenArtifactT2);
-            expect(first.greenPerk).toBe(mirror.redPerk);
-            expect(first.redPerk).toBe(mirror.greenPerk);
+            expect(first.greenDoctrine).toBe(mirror.redDoctrine);
+            expect(first.redDoctrine).toBe(mirror.greenDoctrine);
             expect(first.greenAugments).toEqual(mirror.redAugments);
             expect(first.redAugments).toEqual(mirror.greenAugments);
             expect(first.greenSynergies).toEqual(mirror.redSynergies);
@@ -527,12 +527,12 @@ describe("B1 league CEM validity", () => {
         softmin: fitness,
     });
 
-    it("samples deterministically while keeping the frozen perk head bit-identical", () => {
+    it("samples deterministically while keeping the frozen doctrine head bit-identical", () => {
         const sigma = createLeagueCemSigma(LEAGUE_ANCHOR_GENOME, 0.25, 2.5, true);
         const first = sampleLeagueCemPopulation(LEAGUE_ANCHOR_GENOME, sigma, 5, 17, 3, true);
         const second = sampleLeagueCemPopulation(LEAGUE_ANCHOR_GENOME, sigma, 5, 17, 3, true);
         expect(second).toEqual(first);
-        for (let dimension = LEAGUE_GENOME_LAYOUT.perks.offset; dimension < LEAGUE_GENOME_DIM; dimension += 1) {
+        for (let dimension = LEAGUE_GENOME_LAYOUT.doctrines.offset; dimension < LEAGUE_GENOME_DIM; dimension += 1) {
             expect(sigma[dimension]).toBe(0);
             expect(first.every((candidate) => candidate[dimension] === LEAGUE_ANCHOR_GENOME[dimension])).toBe(true);
         }
@@ -547,10 +547,10 @@ describe("B1 league CEM validity", () => {
             0.9,
             true,
         );
-        expect(mean.slice(LEAGUE_GENOME_LAYOUT.perks.offset)).toEqual(
-            LEAGUE_ANCHOR_GENOME.slice(LEAGUE_GENOME_LAYOUT.perks.offset),
+        expect(mean.slice(LEAGUE_GENOME_LAYOUT.doctrines.offset)).toEqual(
+            LEAGUE_ANCHOR_GENOME.slice(LEAGUE_GENOME_LAYOUT.doctrines.offset),
         );
-        expect(sigma.slice(LEAGUE_GENOME_LAYOUT.perks.offset)).toEqual([0, 0, 0]);
+        expect(sigma.slice(LEAGUE_GENOME_LAYOUT.doctrines.offset)).toEqual([0, 0, 0]);
     });
 
     it("retains comparable best provenance and rejects cross-panel comparisons", () => {
@@ -598,7 +598,7 @@ describe("B1 league CEM validity", () => {
                     CEM_POP: "2",
                     CEM_SEED: "17",
                     CEM_SOFTMIN_TEMPERATURE: "0.04",
-                    CEM_UNFREEZE_PERK: "0",
+                    CEM_UNFREEZE_DOCTRINE: "0",
                     CEM_VAL_GAMES: "8",
                 },
                 stderr: "pipe",
@@ -613,7 +613,7 @@ describe("B1 league CEM validity", () => {
                 selectionPanel: {
                     aggregate: string;
                     fightVersion: string;
-                    freezePerk: boolean;
+                    freezeDoctrine: boolean;
                     gamesPerOpponent: number;
                     mapTypes: number[];
                     pool: unknown[];
@@ -628,7 +628,7 @@ describe("B1 league CEM validity", () => {
             expect(best.selectionPanel).toMatchObject({
                 aggregate: "softmin",
                 fightVersion: "v0.6",
-                freezePerk: true,
+                freezeDoctrine: true,
                 gamesPerOpponent: 8,
                 mapTypes: [1, 2],
                 pool,

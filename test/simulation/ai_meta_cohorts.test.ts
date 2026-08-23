@@ -26,6 +26,7 @@ import {
     AI_META_SYNERGY_DEFINITIONS,
     AI_META_SYNERGY_POLICY_SPEC,
     AI_META_SYNERGY_TRACKING,
+    aiMetaSynergyVariantsForPair,
     aiMetaSynergyLevel,
     armyFeatures,
     cohortArchetypes,
@@ -39,6 +40,7 @@ import {
     type IAiMetaPairRecord,
     type IAiMetaRunOptions,
 } from "../../src/simulation/ai_meta_cohorts_core";
+import { ChaosSynergy, LifeSynergy, MightSynergy, NatureSynergy } from "../../src/synergies/synergy_properties";
 import {
     AiMetaAccumulator,
     AiMetaAggregation,
@@ -96,21 +98,42 @@ const runMetaPairInWorker = (cohort: (typeof AI_META_COHORTS)[number], pair: num
     });
 
 describe("AI meta cohort generation", () => {
-    it("pins the current study to the promoted v0.8+a13 profile and deployed synergy policy", () => {
+    it("pins the current study to the promoted v0.8+a13 profile and seeded live synergy policy", () => {
         expect(AI_META_FIGHT_VERSION).toBe("v0.8");
         expect(AI_META_FIGHT_PROFILE).toBe("v0.8+a13");
-        expect(AI_META_SYNERGY_POLICY_SPEC).toBe("v07-nonfight-4eda84635fe7");
+        expect(AI_META_SYNERGY_POLICY_SPEC).toBe("game-id-seeded-fnv1a-v1+tactical-split-placement-v1");
         expect(AI_META_SYNERGY_TRACKING).toBe("exact-active-choice-level-v1");
         expect(AI_META_SYNERGY_DEFINITIONS).toHaveLength(8);
 
-        let sawChaos = false;
-        for (let pair = 0; pair < 80 && !sawChaos; pair += 1) {
+        const seenVariants = new Set<string>();
+        const expectedVariants = new Set([
+            `${PBTypes.FactionVals.LIFE}:${LifeSynergy.PLUS_SUPPLY_PERCENTAGE}`,
+            `${PBTypes.FactionVals.LIFE}:${LifeSynergy.PLUS_MORALE_AND_LUCK}`,
+            `${PBTypes.FactionVals.CHAOS}:${ChaosSynergy.MOVEMENT}`,
+            `${PBTypes.FactionVals.CHAOS}:${ChaosSynergy.BREAK_ON_ATTACK}`,
+            `${PBTypes.FactionVals.MIGHT}:${MightSynergy.PLUS_AURAS_RANGE}`,
+            `${PBTypes.FactionVals.MIGHT}:${MightSynergy.PLUS_STACK_ABILITIES_POWER}`,
+            `${PBTypes.FactionVals.NATURE}:${NatureSynergy.INCREASE_BOARD_UNITS}`,
+            `${PBTypes.FactionVals.NATURE}:${NatureSynergy.PLUS_FLY_ARMOR}`,
+        ]);
+        for (let pair = 0; pair < 512 && seenVariants.size < expectedVariants.size; pair += 1) {
             const prepared = prepareMetaPair(options("uniform-mixed", 200), pair);
+            const variants = aiMetaSynergyVariantsForPair(prepared.setupSeed, prepared.combatSeed);
             for (const army of [prepared.armyA, prepared.armyB]) {
-                const chaos = army.synergies.find((choice) => choice.faction === 1);
+                for (const choice of army.synergies) {
+                    const expected =
+                        choice.faction === PBTypes.FactionVals.LIFE
+                            ? variants.Life
+                            : choice.faction === PBTypes.FactionVals.CHAOS
+                              ? variants.Chaos
+                              : choice.faction === PBTypes.FactionVals.MIGHT
+                                ? variants.Might
+                                : variants.Nature;
+                    expect(choice.synergy).toBe(expected);
+                    seenVariants.add(`${choice.faction}:${choice.synergy}`);
+                }
+                const chaos = army.synergies.find((choice) => choice.faction === PBTypes.FactionVals.CHAOS);
                 if (!chaos) continue;
-                sawChaos = true;
-                expect(chaos.synergy).toBe(2);
                 const creatureId = army.creatureIds.find((id) => aiMetaSynergyLevel([id, id], chaos.faction) === 1);
                 expect(creatureId).toBeDefined();
                 expect(aiMetaSynergyLevel([creatureId!], chaos.faction)).toBe(0);
@@ -119,7 +142,7 @@ describe("AI meta cohort generation", () => {
                 expect(aiMetaSynergyLevel(Array(6).fill(creatureId!), chaos.faction)).toBe(3);
             }
         }
-        expect(sawChaos).toBe(true);
+        expect(seenVariants).toEqual(expectedVariants);
     });
 
     it("uses the shipped role-aware creature picker for ranked cohort decisions", () => {
@@ -358,7 +381,7 @@ describe("AI meta cohort generation", () => {
         ).toBe(true);
         expect(record.games).toHaveLength(2);
         expect(record.games.every((game) => game.rejectedA === 0 && game.rejectedB === 0)).toBe(true);
-    });
+    }, 30_000);
 
     it("only accepts complete three-map seat-swap cycles", () => {
         for (const games of [6, 72, 150_000]) expect(() => validateAiMetaGamesPerCohort(games)).not.toThrow();

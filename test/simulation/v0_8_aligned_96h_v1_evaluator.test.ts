@@ -252,7 +252,10 @@ describe("v0.8 aligned 96-hour v1 production evaluator bridge", () => {
                 shard,
                 seedPlan,
                 binding,
-                workers: 1,
+                // This case validates eight independent records across all four maps, not single-worker
+                // scheduling (the two-seat smoke above already covers that). Run the unchanged task set in
+                // parallel so exhaustive telemetry coverage does not serialize eight full search battles.
+                workers: 8,
                 auditDirectory: join(directory, "audit"),
             });
             const records = evaluation.records as IV08AlignedV1BattleRecord[];
@@ -298,7 +301,8 @@ describe("v0.8 aligned 96-hour v1 production evaluator bridge", () => {
             }
             expect(new Set(records.map((record) => record.physicalSetupSha256)).size).toBe(4);
             expect(observations.every((observation) => observation.searchAudit !== undefined)).toBe(true);
-            expect(evaluation.auditArtifacts[0].rows).toBe(8);
+            expect(evaluation.auditArtifacts).toHaveLength(8);
+            expect(evaluation.auditArtifacts.reduce((rows, artifact) => rows + artifact.rows, 0)).toBe(8);
         } finally {
             rmSync(directory, { recursive: true, force: true });
         }

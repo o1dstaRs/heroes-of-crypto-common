@@ -107,7 +107,7 @@ export namespace PBTypes {
         constructor(data?: any[] | {
             artifact_tier_1?: number;
             artifact_tier_2?: number;
-            perk?: number;
+            doctrine?: number;
             augment_placement?: number;
             augment_armor?: number;
             augment_might?: number;
@@ -126,8 +126,8 @@ export namespace PBTypes {
                 if ("artifact_tier_2" in data && data.artifact_tier_2 != undefined) {
                     this.artifact_tier_2 = data.artifact_tier_2;
                 }
-                if ("perk" in data && data.perk != undefined) {
-                    this.perk = data.perk;
+                if ("doctrine" in data && data.doctrine != undefined) {
+                    this.doctrine = data.doctrine;
                 }
                 if ("augment_placement" in data && data.augment_placement != undefined) {
                     this.augment_placement = data.augment_placement;
@@ -167,10 +167,10 @@ export namespace PBTypes {
         set artifact_tier_2(value: number) {
             pb_1.Message.setField(this, 2, value);
         }
-        get perk() {
+        get doctrine() {
             return pb_1.Message.getFieldWithDefault(this, 3, 0) as number;
         }
-        set perk(value: number) {
+        set doctrine(value: number) {
             pb_1.Message.setField(this, 3, value);
         }
         get augment_placement() {
@@ -224,7 +224,7 @@ export namespace PBTypes {
         static fromObject(data: {
             artifact_tier_1?: number;
             artifact_tier_2?: number;
-            perk?: number;
+            doctrine?: number;
             augment_placement?: number;
             augment_armor?: number;
             augment_might?: number;
@@ -241,8 +241,8 @@ export namespace PBTypes {
             if (data.artifact_tier_2 != null) {
                 message.artifact_tier_2 = data.artifact_tier_2;
             }
-            if (data.perk != null) {
-                message.perk = data.perk;
+            if (data.doctrine != null) {
+                message.doctrine = data.doctrine;
             }
             if (data.augment_placement != null) {
                 message.augment_placement = data.augment_placement;
@@ -274,7 +274,7 @@ export namespace PBTypes {
             const data: {
                 artifact_tier_1?: number;
                 artifact_tier_2?: number;
-                perk?: number;
+                doctrine?: number;
                 augment_placement?: number;
                 augment_armor?: number;
                 augment_might?: number;
@@ -290,8 +290,8 @@ export namespace PBTypes {
             if (this.artifact_tier_2 != null) {
                 data.artifact_tier_2 = this.artifact_tier_2;
             }
-            if (this.perk != null) {
-                data.perk = this.perk;
+            if (this.doctrine != null) {
+                data.doctrine = this.doctrine;
             }
             if (this.augment_placement != null) {
                 data.augment_placement = this.augment_placement;
@@ -327,8 +327,8 @@ export namespace PBTypes {
                 writer.writeInt32(1, this.artifact_tier_1);
             if (this.artifact_tier_2 != 0)
                 writer.writeInt32(2, this.artifact_tier_2);
-            if (this.perk != 0)
-                writer.writeInt32(3, this.perk);
+            if (this.doctrine != 0)
+                writer.writeInt32(3, this.doctrine);
             if (this.augment_placement != 0)
                 writer.writeInt32(4, this.augment_placement);
             if (this.augment_armor != 0)
@@ -361,7 +361,7 @@ export namespace PBTypes {
                         message.artifact_tier_2 = reader.readInt32();
                         break;
                     case 3:
-                        message.perk = reader.readInt32();
+                        message.doctrine = reader.readInt32();
                         break;
                     case 4:
                         message.augment_placement = reader.readInt32();
@@ -426,6 +426,8 @@ export namespace PBTypes {
             mmr_after?: number;
             mmr_delta?: number;
             gold_earned?: number;
+            opponent_player_id?: string;
+            outcome_reason?: string;
         }) {
             super();
             pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [7, 8, 14, 15], this.#one_of_decls);
@@ -501,6 +503,12 @@ export namespace PBTypes {
                 }
                 if ("gold_earned" in data && data.gold_earned != undefined) {
                     this.gold_earned = data.gold_earned;
+                }
+                if ("opponent_player_id" in data && data.opponent_player_id != undefined) {
+                    this.opponent_player_id = data.opponent_player_id;
+                }
+                if ("outcome_reason" in data && data.outcome_reason != undefined) {
+                    this.outcome_reason = data.outcome_reason;
                 }
             }
         }
@@ -654,6 +662,18 @@ export namespace PBTypes {
         set gold_earned(value: number) {
             pb_1.Message.setField(this, 24, value);
         }
+        get opponent_player_id() {
+            return pb_1.Message.getFieldWithDefault(this, 25, "") as string;
+        }
+        set opponent_player_id(value: string) {
+            pb_1.Message.setField(this, 25, value);
+        }
+        get outcome_reason() {
+            return pb_1.Message.getFieldWithDefault(this, 26, "") as string;
+        }
+        set outcome_reason(value: string) {
+            pb_1.Message.setField(this, 26, value);
+        }
         static fromObject(data: {
             game_id?: string;
             won?: boolean;
@@ -679,6 +699,8 @@ export namespace PBTypes {
             mmr_after?: number;
             mmr_delta?: number;
             gold_earned?: number;
+            opponent_player_id?: string;
+            outcome_reason?: string;
         }): PortalMatch {
             const message = new PortalMatch({});
             if (data.game_id != null) {
@@ -753,6 +775,12 @@ export namespace PBTypes {
             if (data.gold_earned != null) {
                 message.gold_earned = data.gold_earned;
             }
+            if (data.opponent_player_id != null) {
+                message.opponent_player_id = data.opponent_player_id;
+            }
+            if (data.outcome_reason != null) {
+                message.outcome_reason = data.outcome_reason;
+            }
             return message;
         }
         toObject() {
@@ -781,6 +809,8 @@ export namespace PBTypes {
                 mmr_after?: number;
                 mmr_delta?: number;
                 gold_earned?: number;
+                opponent_player_id?: string;
+                outcome_reason?: string;
             } = {};
             if (this.game_id != null) {
                 data.game_id = this.game_id;
@@ -854,6 +884,12 @@ export namespace PBTypes {
             if (this.gold_earned != null) {
                 data.gold_earned = this.gold_earned;
             }
+            if (this.opponent_player_id != null) {
+                data.opponent_player_id = this.opponent_player_id;
+            }
+            if (this.outcome_reason != null) {
+                data.outcome_reason = this.outcome_reason;
+            }
             return data;
         }
         serialize(): Uint8Array;
@@ -908,6 +944,10 @@ export namespace PBTypes {
                 writer.writeSint32(23, this.mmr_delta);
             if (this.gold_earned != 0)
                 writer.writeInt32(24, this.gold_earned);
+            if (this.opponent_player_id.length)
+                writer.writeString(25, this.opponent_player_id);
+            if (this.outcome_reason.length)
+                writer.writeString(26, this.outcome_reason);
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -988,6 +1028,12 @@ export namespace PBTypes {
                         break;
                     case 24:
                         message.gold_earned = reader.readInt32();
+                        break;
+                    case 25:
+                        message.opponent_player_id = reader.readString();
+                        break;
+                    case 26:
+                        message.outcome_reason = reader.readString();
                         break;
                     default: reader.skipField();
                 }

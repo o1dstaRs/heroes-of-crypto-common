@@ -22,8 +22,8 @@ import * as AbilityHelper from "../abilities/ability_helper";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 import type { ISecondaryDamage } from "../scene/animations";
-
-import { processFleshShieldAura } from "./flesh_shield_aura_ability";
+import { applyMagicMirrorDamage } from "../spells/magic_mirror_damage";
+import { SpellElement } from "../spells/spell_properties";
 
 export interface IFireBreathResult {
     increaseMorale: number;
@@ -112,29 +112,8 @@ export function processFireBreathAbility(
             fireBreathAttackDamage = Math.floor(fireBreathAttackDamage * (1 - aegisShieldBuff.getPower() / 100));
         }
 
-        const fleshShieldResult = processFleshShieldAura(
-            fromUnit,
-            nextStandingTarget,
-            fireBreathAttackDamage,
-            false,
-            grid,
-            unitsHolder,
-            sceneLog,
-            damageStatisticHolder,
-            secondaryDamage,
-            "magic",
-        );
-        fireBreathAttackDamage = fleshShieldResult.remainingDamage;
-        increaseMoraleTotal += fleshShieldResult.increaseMorale;
-        for (const unitId of fleshShieldResult.unitIdsDied) {
-            if (!unitIdsDied.includes(unitId)) {
-                unitIdsDied.push(unitId);
-            }
-        }
-        for (const [unitNameKey, moraleDecrease] of Object.entries(fleshShieldResult.moraleDecreaseForTheUnitTeam)) {
-            moraleDecreaseForTheUnitTeam[unitNameKey] =
-                (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
-        }
+        // ABILITY Flesh Shield Aura (Abomination) does NOT apply here either: the aura only soaks physical
+        // damage, and Fire Breath is magical. Every breathed point stays on the unit that was breathed on.
 
         const positionAtImpact = { ...nextStandingTarget.getPosition() };
         const amountAliveBefore = nextStandingTarget.getAmountAlive();
@@ -165,6 +144,17 @@ export function processFireBreathAbility(
             `${fromUnit.getName()} ${attackTypeString} ${nextStandingTarget.getName()} (${fireBreathAttackDamage})` +
                 HoCLib.killTag(unitsKilled),
         );
+        const mirror = applyMagicMirrorDamage({
+            attacker: fromUnit,
+            holder: nextStandingTarget,
+            landedOnHolder: fireBreathAttackDamage,
+            element: SpellElement.FIRE,
+            sceneLog,
+            secondaryDamage,
+        });
+        if (mirror?.unitDied && !unitIdsDied.includes(fromUnit.getId())) {
+            unitIdsDied.push(fromUnit.getId());
+        }
 
         if (nextStandingTarget.isDead()) {
             unitsDead.push(nextStandingTarget);

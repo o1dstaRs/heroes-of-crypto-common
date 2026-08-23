@@ -17,6 +17,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { getDistance, type XY } from "../utils/math";
 import { Ability } from "./ability";
+import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "./double_shot_names";
 
 export function getAbilitiesWithPosisionCoefficient(
     unitAbilities: Ability[],
@@ -49,17 +50,56 @@ export function getAbilitiesWithPosisionCoefficient(
 }
 
 /**
- * The abilities whose SECOND strike the Dual Strike Charm artifact amplifies (the natives and the two the
- * Blacksmith's Craft grants). Kept here so the damage paths and the UI that previews them read one list.
+ * The abilities whose SECOND strike the Dual Strike Charm artifact amplifies (the natives, the two the
+ * Blacksmith's Craft grants, and Gargantuan's Double Throw). Kept here so the damage paths and the UI that
+ * previews them read one list.
  */
 export const DUAL_STRIKE_ABILITY_NAMES: readonly string[] = [
     "Double Punch",
     "Double Shot",
     "Crafted Double Punch",
     "Crafted Double Shot",
+    "Double Throw",
 ];
 
-export const DUAL_STRIKE_CHARM_BUFF = "Dual Strike Charm";
+/** The rosters themselves live in a leaf module so Unit/UnitsHolder can read them without a cycle. */
+export { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF };
+
+/** A unit-like that can hand back the ability object itself (Unit, RenderableUnit). */
+interface IDoubleShotBearer {
+    getAbility(abilityName: string): Ability | undefined;
+}
+
+/** The narrower AI-facing view (IUnitAIRepr), which can only answer yes/no. */
+interface IDoubleShotProbe {
+    hasAbilityActive(abilityName: string): boolean;
+}
+
+/** The unit's second-ranged-attack ability, whichever of the family it carries, or undefined for none. */
+export function getDoubleShotAbility(unit: IDoubleShotBearer): Ability | undefined {
+    for (const abilityName of DOUBLE_SHOT_ABILITY_NAMES) {
+        const ability = unit.getAbility(abilityName);
+        if (ability) {
+            return ability;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Whether the unit shoots twice — the predicate every "shots per turn" decision should ask.
+ *
+ * Accepts either unit view because the AI reasons over IUnitAIRepr, which exposes only hasAbilityActive.
+ * The two probes agree by construction: Unit.getAbility and Unit.hasAbilityActive both return
+ * undefined/false while a Break effect is muting the ability, so neither can report a second shot the
+ * other would deny.
+ */
+export function hasDoubleShotAbility(unit: IDoubleShotBearer | IDoubleShotProbe): boolean {
+    if ("getAbility" in unit) {
+        return !!getDoubleShotAbility(unit);
+    }
+    return DOUBLE_SHOT_ABILITY_NAMES.some((abilityName) => unit.hasAbilityActive(abilityName));
+}
 
 /**
  * Fold the Dual Strike Charm artifact into a second-strike multiplier. Every damage path that lands a

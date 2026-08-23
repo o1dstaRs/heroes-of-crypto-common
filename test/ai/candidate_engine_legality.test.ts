@@ -295,6 +295,72 @@ describe("enumerated candidate engine legality", () => {
         expectCandidatesToApply(harness, mine);
     });
 
+    it("applies a melee strike to a standing cemetery object without classic mountain hit counters", () => {
+        const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        combat.grid.setScatteredMountains([
+            { x: 10, y: 10 },
+            { x: 5, y: 7 },
+        ]);
+        const active = createTestUnit({ team: LOWER, name: "Cemetery cleaner", attackType: MELEE, initiative: 3 });
+        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, active, { x: 4, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 14, y: 14 });
+        const harness = activate(combat, active);
+        harness.fightProperties.setObstacleHitsLeft(0);
+        const mine = enumerateCandidates(active, harness.context, incumbentFor(active), {
+            includeMountainAttacks: true,
+        }).candidates.filter((candidate) => candidate.kind === "mine");
+
+        expect(mine).toHaveLength(1);
+        expect(mine[0]).toMatchObject({
+            standCell: { x: 4, y: 7 },
+            targetCell: { x: 5, y: 7 },
+            actions: [{ type: "obstacle_attack", attackFrom: { x: 4, y: 7 } }],
+        });
+        expectCandidatesToApply(harness, mine);
+
+        expect(harness.engine.apply(mine[0].actions[0]).completed).toBe(true);
+        expect(combat.grid.getScatteredMountainsStanding()).toEqual([{ x: 10, y: 10 }]);
+    });
+
+    it("applies a ranged strike to the nearest standing cemetery object", () => {
+        const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        combat.grid.setScatteredMountains([
+            { x: 10, y: 7 },
+            { x: 5, y: 7 },
+        ]);
+        const active = createTestUnit({
+            team: LOWER,
+            name: "Cemetery archer",
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            initiative: 3,
+        });
+        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        placeUnit(combat.grid, combat.unitsHolder, active, { x: 2, y: 7 });
+        placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 14, y: 14 });
+        active.refreshPossibleAttackTypes(true);
+        const harness = activate(combat, active);
+        harness.fightProperties.setObstacleHitsLeft(0);
+        const mine = enumerateCandidates(active, harness.context, incumbentFor(active), {
+            includeMountainAttacks: true,
+        }).candidates.filter((candidate) => candidate.kind === "mine");
+
+        expect(mine).toHaveLength(1);
+        expect(mine[0]).toMatchObject({
+            standCell: { x: 2, y: 7 },
+            targetCell: { x: 5, y: 7 },
+            actions: [{ type: "obstacle_attack" }],
+            features: { spendsRangeShot: 1 },
+        });
+        expect(mine[0].actions[0]).not.toHaveProperty("attackFrom");
+        expectCandidatesToApply(harness, mine);
+
+        expect(harness.engine.apply(mine[0].actions[0]).completed).toBe(true);
+        expect(combat.grid.getScatteredMountainsStanding()).toEqual([{ x: 10, y: 7 }]);
+    });
+
     it("applies LARGE stationary mining from every footprint-facing edge, including base (12,8) at initiative 1", () => {
         const cases: Array<{
             name: string;

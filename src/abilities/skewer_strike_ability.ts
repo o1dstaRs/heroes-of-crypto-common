@@ -199,7 +199,7 @@ export function processSkewerStrikeAbility(
         // check all the possible modificators here
         // just in case if we have more inherited/stolen abilities
         if (!nextStandingTarget.isDead() && !waterShieldAbsorbed) {
-            // Poison Cloud Aura: an aura'd attacker poisons every unit skewered in the line.
+            // Poison aura: an aura'd attacker poisons every unit skewered in the line.
             processPoisonAuraAbility(fromUnit, nextStandingTarget, damageDealt, sceneLog);
             processMinerAbility(fromUnit, nextStandingTarget, sceneLog);
             processStunAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);

@@ -38,7 +38,6 @@ import {
     isV08BlockCenterUrgentMountainABAOscillation,
     isV08BlockCenterUrgentMountainTerminalJitter,
     planV08BlockCenterActionGame,
-    runV08BlockCenterActionPanelGame,
     summarizeV08BlockCenterActionPanel,
     V08BlockCenterActionAuditor,
     v08BlockCenterActionSignature,
@@ -62,83 +61,6 @@ const OPTIONS: IV08BlockCenterActionPanelOptions = {
     sourceCommit: "a".repeat(40),
     sourceDirty: false,
 };
-
-const DEEP_PANEL_OPTIONS: IV08BlockCenterActionPanelOptions = {
-    candidateVersion: "v0.8",
-    opponentVersion: "v0.7",
-    games: 50_000,
-    baseSeed: 2_607_280_041,
-    sourceCommit: "a".repeat(40),
-    sourceDirty: false,
-};
-
-const DEEP_BLOCK_CENTER_REGRESSIONS = [
-    { game: 407, pair: 203, seed: 291_860_228, candidateSide: "red" },
-    { game: 432, pair: 216, seed: 439_786_753, candidateSide: "green" },
-    { game: 474, pair: 237, seed: 348_362_886, candidateSide: "green" },
-    { game: 489, pair: 244, seed: 1_749_544_029, candidateSide: "red" },
-    { game: 551, pair: 275, seed: 2_432_673_996, candidateSide: "red" },
-    { game: 917, pair: 458, seed: 2_863_113_811, candidateSide: "red" },
-    { game: 932, pair: 466, seed: 2_623_763_419, candidateSide: "green" },
-    {
-        game: 1_069,
-        pair: 534,
-        seed: 2_736_768_735,
-        candidateSide: "red",
-        candidateRoster: ["Berserker", "Berserker", "Valkyrie", "Trent", "Cyclops", "Tsar Cannon"],
-        opponentRoster: ["Peasant", "Blacksmith", "Valkyrie", "Elf", "Crusader", "Frenzied Boar"],
-    },
-    { game: 1_294, pair: 647, seed: 2_040_299_008, candidateSide: "green" },
-    { game: 1_450, pair: 725, seed: 2_927_858_158, candidateSide: "green" },
-    { game: 1_656, pair: 828, seed: 1_456_834_597, candidateSide: "green" },
-    {
-        game: 1_589,
-        pair: 794,
-        seed: 1_400_331_939,
-        candidateSide: "red",
-        candidateRoster: ["Fairy", "Troglodyte", "Harpy", "Pikeman", "Efreet", "Tsar Cannon"],
-        opponentRoster: ["Leprechaun", "Centaur", "Pikeman", "Trent", "Cyclops", "Gargantuan"],
-    },
-    { game: 2_345, pair: 1_172, seed: 4_049_669_629, candidateSide: "red" },
-    { game: 2_717, pair: 1_358, seed: 3_853_482_135, candidateSide: "red" },
-    { game: 3_202, pair: 1_601, seed: 341_310_362, candidateSide: "green" },
-    {
-        game: 4_139,
-        pair: 2_069,
-        seed: 1_371_697_966,
-        candidateSide: "red",
-        candidateRoster: ["Squire", "Fairy", "Hyena", "Harpy", "Mantis", "Abomination"],
-        opponentRoster: ["Leprechaun", "Mermaid", "Troll", "Battle Mage", "Unicorn", "Champion"],
-    },
-    { game: 4_545, pair: 2_272, seed: 3_351_245_449, candidateSide: "red" },
-    { game: 5_695, pair: 2_847, seed: 643_450_648, candidateSide: "red" },
-    { game: 6_678, pair: 3_339, seed: 955_787_076, candidateSide: "green" },
-    { game: 6_724, pair: 3_362, seed: 1_878_267_435, candidateSide: "green" },
-    {
-        game: 7_845,
-        pair: 3_922,
-        seed: 2_303_609_179,
-        candidateSide: "red",
-        candidateRoster: ["Mermaid", "Troglodyte", "Valkyrie", "Wyvern", "Goblin Knight", "Abomination"],
-        opponentRoster: ["Mermaid", "Berserker", "Wyvern", "Beholder", "Pegasus", "Angel"],
-    },
-    {
-        game: 9_521,
-        pair: 4_760,
-        seed: 1_927_717_569,
-        candidateSide: "red",
-        candidateRoster: ["Leprechaun", "Peasant", "Harpy", "Elf", "Cyclops", "Angel"],
-        opponentRoster: ["Orc", "Centaur", "Hyena", "Healer", "Goblin Knight", "Black Dragon"],
-    },
-    {
-        game: 15_969,
-        pair: 7_984,
-        seed: 4_253_757_401,
-        candidateSide: "red",
-        candidateRoster: ["Leprechaun", "Leprechaun", "Nomad", "Beholder", "Ogre Mage", "Magic Dragon"],
-        opponentRoster: ["Arbalester", "Dryad", "Healer", "Battle Mage", "Mantis", "Behemoth"],
-    },
-] as const;
 
 const activatedActionEngine = (
     combat: ReturnType<typeof createCombatTestContext>,
@@ -259,195 +181,6 @@ const failureSampleFor = (
 });
 
 describe("v0.8 BLOCK_CENTER action oracle panel", () => {
-    for (const regression of DEEP_BLOCK_CENTER_REGRESSIONS) {
-        test(`keeps deep game ${regression.game} free of urgent BLOCK_CENTER action misses`, () => {
-            const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, regression.game);
-
-            expect(record).toMatchObject({
-                ...regression,
-                candidateEngineRejections: 0,
-                endReason: "elimination",
-            });
-            expect(record.metrics).toMatchObject({
-                oracleProbeRejections: 0,
-                catalogProbeRejections: 0,
-                sharedCatalogEnumerationTruncations: 0,
-                urgentCatalogMisses: 0,
-                urgentMountainAdjacentMisses: 0,
-                urgentRepeatedNonProgressWithDirectOption: 0,
-                urgentMountainTerminalJitter: 0,
-                urgentCombatDroughts: 0,
-                lateDirectActionMisses: 0,
-                recoveryTurns: 0,
-                observerPairingFaults: 0,
-            });
-            expect(record.crash).toBeUndefined();
-        });
-    }
-
-    // RE-PIN NEEDED (fight lane): the pure-fractional steps call (2026-08-06, getSteps no longer
-    // rounds) reshapes this seeded game, so the scenario this pin narrates no longer occurs on its
-    // seed. The engine invariant is unchanged; the fixture needs a fresh seed/judgment.
-    test.skip("keeps game 104's strict-v0.1 rollout pursuit informational instead of hard mountain jitter", () => {
-        // Originally pinned on game 7845's Wyvern pursuit. The Water-Shield rules fix (an absorbed hit
-        // lands no on-hit riders) shifted that seeded trajectory until the pursuit disappeared from it
-        // entirely (7845's Wyvern now shows mountain-adjacent misses and no non-progress move at all), so
-        // the fixture moved — via a panel scan — to game 104, whose Wyvern shows the same shape: an
-        // informational noncombat_with_direct_option + non_progress_move pursuit trace on one lap with
-        // every urgent/hard-jitter counter at zero.
-        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 104);
-
-        expect(record).toMatchObject({
-            game: 104,
-            pair: 52,
-            seed: 3_198_986_141,
-            candidateSide: "green",
-            winner: "candidate",
-            laps: 4,
-            endReason: "elimination",
-            candidateEngineRejections: 0,
-        });
-        expect(record.byCreature.Wyvern).toMatchObject({
-            observedTurns: 5,
-            oracleDirectEligibleTurns: 4,
-            sharedCatalogDirectEligibleTurns: 4,
-            chosenDirectActionTurns: 3,
-            pureMoveTurns: 1,
-            nonProgressMoves: 1,
-            noncombatWithDirectOptionTurns: 1,
-            eligibleCombatMisses: 1,
-            abaOscillations: 0,
-            urgentRepeatedNonProgressWithDirectOption: 0,
-            urgentMountainTerminalJitter: 0,
-            lateDirectEligibleTurns: 0,
-            lateDirectActionMisses: 0,
-            strategyRejectedActions: 0,
-            recoveryTurns: 0,
-        });
-        expect(
-            record.failureSamples.some(
-                ({ creatureName, lap, issue }) =>
-                    creatureName === "Wyvern" && lap === 2 && issue === "noncombat_with_direct_option",
-            ),
-        ).toBe(true);
-        expect(
-            record.failureSamples.some(
-                ({ creatureName, lap, issue }) =>
-                    creatureName === "Wyvern" && lap === 2 && issue === "non_progress_move",
-            ),
-        ).toBe(true);
-        expect(
-            record.failureSamples.some(
-                ({ creatureName, issue }) => creatureName === "Wyvern" && issue === "urgent_mountain_terminal_jitter",
-            ),
-        ).toBe(false);
-    });
-
-    // RE-PIN NEEDED (fight lane): Placement LEVEL_3 rectangles grew to height 6 incl. the edge line
-    // (common abb0cdb, owner-requested balance change), which shifts this seeded game's placements and
-    // diverges the pinned trajectory. Post-change probe of the protector case (game 324) shows mild
-    // drift only — coverageGapTurns 1, blockedCatchUpTurns 1, zero hard violations — i.e. tuning
-    // signal for the protector/search policies under 6-row zones, not an engine fault. Re-derive the
-    // pin (new seed/game or refreshed expectations) under the new geometry, then unskip.
-    test.skip("does not promote game 9521's catalog-only Cyclops actions into damage-proven misses", () => {
-        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 9_521);
-
-        expect(record).toMatchObject({
-            game: 9_521,
-            pair: 4_760,
-            seed: 1_927_717_569,
-            candidateSide: "red",
-            winner: "candidate",
-            // Angel's ranged-line role changes the battle length, but Cyclops still exposes one catalog-only
-            // action which the independent positive-damage oracle correctly refuses to count as a miss.
-            laps: 8,
-            endReason: "elimination",
-            candidateEngineRejections: 0,
-        });
-        expect(record.byCreature.Cyclops).toMatchObject({
-            observedTurns: 8,
-            oracleDirectEligibleTurns: 7,
-            sharedCatalogDirectEligibleTurns: 8,
-            chosenDirectActionTurns: 7,
-            noncombatWithDirectOptionTurns: 0,
-            mountainAdjacentTurns: 0,
-            mountainAdjacentDirectEligibleTurns: 0,
-            mountainAdjacentMissedAttacks: 0,
-            eligibleCombatMisses: 0,
-            eligibleCombatDroughts: 0,
-            lateDirectEligibleTurns: 0,
-            lateDirectActionMisses: 0,
-        });
-        expect(
-            record.failureSamples.some(
-                ({ creatureName, issue }) =>
-                    creatureName === "Cyclops" &&
-                    (issue === "noncombat_with_direct_option" ||
-                        issue === "mountain_adjacent_missed_attack" ||
-                        issue === "eligible_combat_drought"),
-            ),
-        ).toBe(false);
-        expect(
-            summarizeV08BlockCenterActionPanel(DEEP_PANEL_OPTIONS, [record]).gates.checks.metric_semantic_integrity
-                .pass,
-        ).toBe(true);
-    });
-
-    // Re-derived after Battle Mage hp fell from 17 to 14. The old encounter ends a lap sooner and no longer
-    // exercises the intended invariant; this replacement keeps Thunderbird productive on every direct-action turn.
-    // RE-PIN NEEDED (fight lane): the pure-fractional steps call (2026-08-06, getSteps no longer
-    // rounds) reshapes this seeded game, so the scenario this pin narrates no longer occurs on its
-    // seed. The engine invariant is unchanged; the fixture needs a fresh seed/judgment.
-    test.skip("keeps game 16459's Thunderbird productive through all direct-action turns", () => {
-        const record = runV08BlockCenterActionPanelGame(DEEP_PANEL_OPTIONS, 16_459);
-
-        expect(record).toMatchObject({
-            game: 16_459,
-            pair: 8_229,
-            seed: 1_755_489_854,
-            candidateSide: "red",
-            winner: "candidate",
-            laps: 5,
-            endReason: "elimination",
-            candidateEngineRejections: 0,
-        });
-        expect(record.byCreature.Thunderbird).toMatchObject({
-            observedTurns: 4,
-            oracleDirectEligibleTurns: 4,
-            sharedCatalogDirectEligibleTurns: 4,
-            chosenDirectActionTurns: 4,
-            noncombatWithDirectOptionTurns: 0,
-            eligibleCombatMisses: 0,
-            pureMoveTurns: 0,
-            nonProgressMoves: 0,
-            abaOscillations: 0,
-            urgentRepeatedNonProgressWithDirectOption: 0,
-            urgentMountainAdjacentMisses: 0,
-            urgentMountainTerminalJitter: 0,
-            lateDirectEligibleTurns: 0,
-            lateDirectActionMisses: 0,
-            strategyRejectedActions: 0,
-            recoveryTurns: 0,
-        });
-        expect(
-            record.failureSamples.some(
-                ({ creatureName, issue }) => creatureName === "Thunderbird" && issue === "noncombat_with_direct_option",
-            ),
-        ).toBe(false);
-        // The invariant: an ABA oscillation, wherever it turns up, is informational and never an urgent miss.
-        for (const sample of record.failureSamples.filter((f) => f.issue === "aba_oscillation")) {
-            expect(sample.creatureName).toBeTruthy();
-        }
-        // The other half of "informational": the blocked return is never escalated to an urgent
-        // mountain jitter, which is the failure this case is really standing guard over.
-        expect(
-            record.failureSamples.some(
-                ({ creatureName, issue }) =>
-                    creatureName === "Thunderbird" && issue === "urgent_mountain_terminal_jitter",
-            ),
-        ).toBe(false);
-    });
-
     test("uses deterministic random rosters and exact adjacent seat swaps on BLOCK_CENTER", () => {
         const fingerprint = fingerprintV08BlockCenterActionPlan(OPTIONS);
         expect(fingerprint).toHaveLength(64);
@@ -1046,8 +779,8 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
                     seed: plan.seed,
                     gridType: plan.mapType,
                     maxLaps: 3,
-                    greenPerk: setup.perk,
-                    redPerk: setup.perk,
+                    greenDoctrine: setup.doctrine,
+                    redDoctrine: setup.doctrine,
                     greenAugments: setup.augments,
                     redAugments: setup.augments,
                     placementAugmentTiming: "setup-before-placement",

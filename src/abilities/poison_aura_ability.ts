@@ -15,7 +15,7 @@ import { Unit } from "../units/unit";
 import { applyPoisonEffect } from "./poison_ability";
 
 /**
- * Venom Cloud Aura (Wyvern) and the currently unassigned Poison Cloud Aura, both 2 cells: every ally standing
+ * Venom Cloud Aura (Wyvern, 2 cells) and any future poison aura: every ally standing
  * inside the aura, when it lands a hit, ALSO applies a portion of that hit's damage to the target as Poison. The
  * portion = the aura's configured base power (%) plus the ATTACKER's luck. The aura buff that carries the
  * base power sits on the attacker (mirrors the Flesh Shield Aura buff-on-hit pattern).

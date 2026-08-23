@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { hasDoubleShotAbility } from "../../abilities/ability_helper";
 import type { GameAction } from "../../engine/actions";
 import { canWaitOnHourglass } from "../../engine/hourglass";
 import { FightStateManager } from "../../fights/fight_state_manager";
@@ -585,8 +586,8 @@ export class StrategyV0_2 extends StrategyV0_1 {
             this.requireResolvedPrimaryRangeTarget() &&
             !isThroughShot &&
             !isAOE &&
-            !unit.hasAbilityActive("Double Shot") &&
-            !unit.hasAbilityActive("Crafted Double Shot");
+            // Covers the whole second-shot family (Double Shot, its crafted twin, Double Throw).
+            !hasDoubleShotAbility(unit);
 
         let best: IShotPlan | undefined;
         let canonicalShots:

@@ -40,6 +40,7 @@ import type { GameAction } from "../../src/engine/actions";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import {
+    getPositionForCell,
     getRangeAttackSideCenter,
     isRangeAttackSideObservable,
     RANGE_ATTACK_CELL_SIDES,
@@ -63,6 +64,14 @@ const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
+// This regression intentionally runs three complete max-lap matches. Leave enough wall-clock headroom when
+// a parallel simulation campaign saturates the host; the match count and exact action-log checks stay intact.
+//
+// 10_000 was BELOW the package-wide 30s default (test/setup_timeout.ts), so this test opted itself out of
+// the very protection that default exists for: on GitHub's shared runners the three matches take 12–16s and
+// it timed out on nearly every push. Matches the "genuinely long simulations set their own higher explicit
+// timeout" convention instead — ~4x the slowest observed CI cost, with the assertions untouched.
+const FULL_MATCH_REGRESSION_TIMEOUT_MS = 60_000;
 
 function setupMountainDecision(
     enemyCell: { x: number; y: number },
@@ -666,6 +675,79 @@ describe("v0.8 candidate policy", () => {
         expect(repairedSequence.map((action) => action.type)).toEqual(["move_unit"]);
     });
 
+    it("attacks cemetery objects with melee and ranged units while keeping living-enemy attacks first", () => {
+        const meleeCombat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        meleeCombat.grid.setScatteredMountains([{ x: 5, y: 7 }]);
+        const meleeFight = FightStateManager.getInstance().getFightProperties();
+        meleeFight.setGridType(PBTypes.GridVals.BLOCK_CENTER);
+        const melee = createTestUnit({ team: LOWER, attackType: MELEE, initiative: 3, name: "Cemetery miner" });
+        const distantEnemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Distant enemy" });
+        placeUnit(meleeCombat.grid, meleeCombat.unitsHolder, melee, { x: 4, y: 7 });
+        placeUnit(meleeCombat.grid, meleeCombat.unitsHolder, distantEnemy, { x: 14, y: 14 });
+        const meleeContext: IDecisionContext = {
+            grid: meleeCombat.grid,
+            matrix: meleeCombat.grid.getMatrix(),
+            unitsHolder: meleeCombat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: meleeCombat.attackHandler,
+            fightProperties: meleeFight,
+        };
+
+        expect(new StrategyV0_8().decideTurn(melee, meleeContext)).toMatchObject([
+            { type: "obstacle_attack", attackFrom: { x: 4, y: 7 } },
+        ]);
+
+        const adjacentEnemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Adjacent enemy" });
+        placeUnit(meleeCombat.grid, meleeCombat.unitsHolder, adjacentEnemy, { x: 4, y: 6 });
+        const enemyFirst = new StrategyV0_8().decideTurn(melee, meleeContext);
+        expect(
+            enemyFirst.some((action) => action.type === "melee_attack" && action.targetId === adjacentEnemy.getId()),
+        ).toBe(true);
+
+        const rangedCombat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
+        rangedCombat.grid.setScatteredMountains([
+            { x: 10, y: 7 },
+            { x: 5, y: 7 },
+        ]);
+        const rangedFight = FightStateManager.getInstance().getFightProperties();
+        rangedFight.setGridType(PBTypes.GridVals.BLOCK_CENTER);
+        const ranged = createTestUnit({
+            team: LOWER,
+            attackType: RANGE,
+            rangeShots: 5,
+            shotDistance: 30,
+            initiative: 3,
+            name: "Cemetery archer",
+        });
+        const hiddenEnemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Hidden enemy" });
+        hiddenEnemy.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Hidden"), amount: 1 }));
+        placeUnit(rangedCombat.grid, rangedCombat.unitsHolder, ranged, { x: 2, y: 7 });
+        placeUnit(rangedCombat.grid, rangedCombat.unitsHolder, hiddenEnemy, { x: 14, y: 14 });
+        ranged.refreshPossibleAttackTypes(true);
+        const rangedContext: IDecisionContext = {
+            grid: rangedCombat.grid,
+            matrix: rangedCombat.grid.getMatrix(),
+            unitsHolder: rangedCombat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: rangedCombat.attackHandler,
+            fightProperties: rangedFight,
+        };
+        const rangedDecision = new StrategyV0_8().decideTurn(ranged, rangedContext);
+
+        expect(rangedDecision).toEqual([
+            {
+                type: "obstacle_attack",
+                attackerId: ranged.getId(),
+                targetPosition: getPositionForCell(
+                    { x: 5, y: 7 },
+                    testGridSettings.getMinX(),
+                    testGridSettings.getStep(),
+                    testGridSettings.getHalfStep(),
+                ),
+            },
+        ]);
+    });
+
     it("replaces legacy BLOCK_CENTER mining with a reachable enemy attack before considering movement", () => {
         process.env.V06_LEGACY_MINE = "1";
         const { unit, enemy, context } = setupMountainDecision({ x: 5, y: 3 }, 5);
@@ -702,6 +784,41 @@ describe("v0.8 candidate policy", () => {
 
         context.fightProperties!.enqueueHourglass(unit.getId());
         expect(new StrategyV0_8().decideTurn(unit, context)).toEqual(defend);
+    });
+
+    it("has Scavenger attack an adjacent enemy instead of defending while Backstab routes are constrained", () => {
+        const combat = createCombatTestContext();
+        const scavenger = createTestUnit({
+            team: LOWER,
+            attackType: MELEE,
+            luck: 10,
+            name: "Scavenger",
+            abilities: ["Backstab"],
+        });
+        const hyena = createTestUnit({ team: UPPER, attackType: MELEE, name: "Hyena" });
+        const fairy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Fairy" });
+        const crusader = createTestUnit({ team: UPPER, attackType: MELEE, name: "Crusader" });
+        placeUnit(combat.grid, combat.unitsHolder, scavenger, { x: 8, y: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, hyena, { x: 7, y: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, fairy, { x: 7, y: 11 });
+        placeUnit(combat.grid, combat.unitsHolder, crusader, { x: 9, y: 10 });
+        const context: IDecisionContext = {
+            grid: combat.grid,
+            matrix: combat.grid.getMatrix(),
+            unitsHolder: combat.unitsHolder,
+            pathHelper: new PathHelper(testGridSettings),
+            attackHandler: combat.attackHandler,
+            fightProperties: FightStateManager.getInstance().getFightProperties(),
+        };
+
+        const decision = new StrategyV0_8().decideTurn(scavenger, context);
+        const attack = decision.find(
+            (action): action is Extract<GameAction, { type: "melee_attack" }> => action.type === "melee_attack",
+        );
+
+        expect(decision.some((action) => action.type === "defend_turn")).toBe(false);
+        expect(attack?.attackerId).toBe(scavenger.getId());
+        expect([hyena.getId(), fairy.getId(), crusader.getId()]).toContain(attack?.targetId);
     });
 
     it("holds one- and two-shooter melee screens only when their amount-aware ranged output is stronger", () => {
@@ -860,21 +977,25 @@ describe("v0.8 candidate policy", () => {
         expect(prioritizeV08Decision(unit, context, directCombat)).toBe(directCombat);
     });
 
-    it("changes only the candidate seat and keeps the promoted profile mountain-free", () => {
-        const seed = 20260718;
-        const roster = buildRoster(makeRng(seed));
-        const config = { redVersion: "v0.6", roster, seed, maxLaps: 60 } as const;
-        const baseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
-        const candidate = runMatch({ ...structuredClone(config), greenVersion: "v0.8" });
-        const repeatedBaseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
+    it(
+        "changes only the candidate seat and keeps the promoted profile mountain-free",
+        () => {
+            const seed = 20260718;
+            const roster = buildRoster(makeRng(seed));
+            const config = { redVersion: "v0.6", roster, seed, maxLaps: 60 } as const;
+            const baseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
+            const candidate = runMatch({ ...structuredClone(config), greenVersion: "v0.8" });
+            const repeatedBaseline = runMatch({ ...structuredClone(config), greenVersion: "v0.7" });
 
-        expect(candidate.outcome.green.version).toBe("v0.8");
-        expect(repeatedBaseline).toEqual(baseline);
-        expect(candidate).not.toEqual(baseline);
-        expect(
-            candidate.actions
-                .filter((action) => action.side === "green")
-                .filter((action) => action.actionType === "obstacle_attack"),
-        ).toEqual([]);
-    });
+            expect(candidate.outcome.green.version).toBe("v0.8");
+            expect(repeatedBaseline).toEqual(baseline);
+            expect(candidate).not.toEqual(baseline);
+            expect(
+                candidate.actions
+                    .filter((action) => action.side === "green")
+                    .filter((action) => action.actionType === "obstacle_attack"),
+            ).toEqual([]);
+        },
+        FULL_MATCH_REGRESSION_TIMEOUT_MS,
+    );
 });

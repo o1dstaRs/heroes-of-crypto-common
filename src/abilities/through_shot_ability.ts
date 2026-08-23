@@ -129,9 +129,13 @@ export function processThroughShotAbility(
                 attackerUnit.calculateAttackDamage(
                     targetUnit,
                     PBTypes.AttackVals.RANGE,
+                    // The ATTACKER's team power, like every other damage path. This argument reaches
+                    // getEnemyArmor -> calculateAbilityMultiplier(Piercing Spear), i.e. it scales the
+                    // SHOOTER's armor-ignore; handing it the defender's team dropped the shooter's own
+                    // Might synergy from its pierce (52 shown vs 39 dealt).
                     FightStateManager.getInstance()
                         .getFightProperties()
-                        .getAdditionalAbilityPowerPerTeam(targetUnit.getTeam()),
+                        .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),
                     hoverRangeAttackDivisor,
                     throughShotMultiplier,
                     false,
@@ -191,7 +195,7 @@ export function processThroughShotAbility(
                 false,
                 attackerUnit,
             );
-            // Poison Cloud Aura: an aura'd attacker poisons every unit the shot passes through.
+            // Poison aura: an aura'd attacker poisons every unit the shot passes through.
             processPoisonAuraAbility(attackerUnit, targetUnit, damageDealt, sceneLog);
             damageStatisticHolder.add({
                 unitName: attackerUnit.getName(),
@@ -229,6 +233,14 @@ export function processThroughShotAbility(
                     hoverRangeAttackDivisor,
                 );
             }
+        }
+
+        // ABILITY Arrows Wingshield Aura (Angel): "the owner is immune to being shot through". The bolt
+        // reaches HIM — he is shot AT, and takes this hit — but it stops in his shield instead of
+        // carrying on down the lane, so whatever stands behind him is spared. Placed outside the
+        // hit/miss branches on purpose: his body blocks the lane whether or not the shot connected.
+        if (targetUnit.hasAbilityActive("Arrows Wingshield Aura")) {
+            break;
         }
     }
 

@@ -22,7 +22,7 @@ import {
 } from "../../src/ai/setup/setup_ship";
 import { SETUP_POLICY_V0 } from "../../src/ai/setup/setup_v0";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { getUpgradePoints } from "../../src/perks/perk_properties";
+import { getUpgradePoints } from "../../src/doctrines/doctrine_properties";
 import { SERVER_PERSISTED_CREATURE_ORDER } from "../../src/picks/pick_sim";
 import { LEAGUE_ANCHOR_GENOME, LEAGUE_GENOME_LAYOUT } from "../../src/simulation/league_genome";
 import { runRankedConditionalPickGame, shippedLeagueGenome } from "../../src/simulation/measure_setup_conditional";
@@ -113,7 +113,7 @@ describe("v0.8 aligned deployed-v0.7 non-fight binding", () => {
 
     it("matches deployed Tier-2, augment, and synergy decisions in all seven cohorts", () => {
         const deployed = resolveSetupPolicy(V07_NONFIGHT_SETUP_SPEC);
-        const perk = SETUP_POLICY_V0.pickPerk();
+        const doctrine = SETUP_POLICY_V0.pickDoctrine();
         const offers = [1, 4, 10];
         expect(SETUP_COHORTS).toHaveLength(7);
         for (const cohort of SETUP_COHORTS) {
@@ -121,8 +121,8 @@ describe("v0.8 aligned deployed-v0.7 non-fight binding", () => {
             expect(pickV08AlignedV1BoundArtifactT2(offers, creatureIds.slice(0, 5))).toBe(
                 deployed.pickArtifactT2(offers, creatureIds.slice(0, 5)),
             );
-            expect(pickV08AlignedV1BoundAugments(perk, creatureIds)).toEqual(
-                deployed.pickAugments(getUpgradePoints(perk), creatureIds),
+            expect(pickV08AlignedV1BoundAugments(doctrine, creatureIds)).toEqual(
+                deployed.pickAugments(getUpgradePoints(doctrine), creatureIds),
             );
             expect(pickV08AlignedV1BoundSynergies(creatureIds)).toEqual(deployed.pickSynergies(creatureIds));
         }
@@ -144,11 +144,11 @@ describe("v0.8 aligned deployed-v0.7 non-fight binding", () => {
             const actual = runV08AlignedV1BoundRankedPick(seed);
             for (const seat of ["lower", "upper"] as const) {
                 expect(actual[seat].creatureIds).toEqual(expected[seat].creatureIds);
-                expect(actual[seat].perk).toBe(expected[seat].perk);
+                expect(actual[seat].doctrine).toBe(expected[seat].doctrine);
                 expect(actual[seat].tier1Artifact).toBe(expected[seat].tier1Artifact);
                 expect(actual[seat].tier2Artifact).toBe(expected[seat].tier2Artifact);
                 expect(actual[seat].augments).toEqual(
-                    deployed.pickAugments(getUpgradePoints(actual[seat].perk), actual[seat].creatureIds),
+                    deployed.pickAugments(getUpgradePoints(actual[seat].doctrine), actual[seat].creatureIds),
                 );
                 expect(actual[seat].synergies).toEqual(deployed.pickSynergies(actual[seat].creatureIds));
             }
@@ -158,7 +158,7 @@ describe("v0.8 aligned deployed-v0.7 non-fight binding", () => {
     it("binds both physical seats explicitly and keeps fixed templates artifact-free", () => {
         const lower = v07ArchetypeTemplate("mage_frontline").roster.map((unit) => ({ ...unit }));
         const upper = v07ArchetypeTemplate("ranged_control").roster.map((unit) => ({ ...unit }));
-        const perk = SETUP_POLICY_V0.pickPerk();
+        const doctrine = SETUP_POLICY_V0.pickDoctrine();
         const base = {
             greenVersion: "v0.8s",
             redVersion: "v0.7",
@@ -166,8 +166,8 @@ describe("v0.8 aligned deployed-v0.7 non-fight binding", () => {
             redRoster: upper,
             seed: 11,
             gridType: PBTypes.GridVals.NORMAL,
-            greenPerk: perk,
-            redPerk: perk,
+            greenDoctrine: doctrine,
+            redDoctrine: doctrine,
             greenArtifactT1: 3,
             redArtifactT1: 4,
             greenArtifactT2: 5,

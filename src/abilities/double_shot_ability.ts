@@ -22,7 +22,7 @@ import type { IDamageStatistic } from "../scene/scene_stats";
 import type { IVisibleDamage } from "../scene/animations";
 import { FightStateManager } from "../fights/fight_state_manager";
 
-import { withDualStrikeCharm } from "./ability_helper";
+import { getDoubleShotAbility, withDualStrikeCharm } from "./ability_helper";
 import { processRangeAOEAbility } from "./aoe_range_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
@@ -55,8 +55,10 @@ export function processDoubleShotAbility(
     isAOE: boolean,
 ): IDoubleShotResult {
     const animationData: IAnimationData[] = [];
-    // Crafted Double Shot (granted by the Blacksmith's Craft) behaves identically to Double Shot.
-    const doubleShotAbility = fromUnit.getAbility("Double Shot") ?? fromUnit.getAbility("Crafted Double Shot");
+    // Crafted Double Shot (granted by the Blacksmith's Craft) and Gargantuan's Double Throw run this exact
+    // path; what separates them is the ability's own stack_powered flag, which calculateAbilityMultiplier
+    // reads below — the throw is stack-independent, so both boulders land full damage plus luck.
+    const doubleShotAbility = getDoubleShotAbility(fromUnit);
     const unitIdsDied: string[] = [];
 
     let damageFromAttack = 0;
@@ -86,6 +88,17 @@ export function processDoubleShotAbility(
         };
     }
 
+    // The second arrow LEAVES THE BOW before we know whether it lands, exactly as the first one does
+    // (attack_handler pushes the primary shot's animation and only then rolls its miss). Rolling first
+    // and returning early meant a missed second volley drew nothing at all: the player saw one arrow for
+    // a two-shot attack and had only the combat log to tell them a second was ever fired — which read as
+    // "double shot sometimes doesn't fire", since it looked right whenever the roll happened to hit.
+    animationData.push({
+        fromPosition: fromUnit.getPosition(),
+        toPosition: hoverRangeAttackPosition,
+        affectedUnit: toUnit,
+    });
+
     const isSecondAttackMissed =
         HoCLib.getRandomInt(0, 100) <
         fromUnit.calculateMissChance(
@@ -106,12 +119,6 @@ export function processDoubleShotAbility(
             moraleDecreaseForTheUnitTeam,
         };
     }
-
-    animationData.push({
-        fromPosition: fromUnit.getPosition(),
-        toPosition: hoverRangeAttackPosition,
-        affectedUnit: toUnit,
-    });
     let aoeRangeAttackResult = processRangeAOEAbility(
         fromUnit,
         affectedUnits,

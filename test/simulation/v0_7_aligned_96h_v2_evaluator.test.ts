@@ -171,7 +171,7 @@ function army(templateName: "mage_frontline" | "ranged_precision"): IConditional
         creatureIds: template.roster.map((unit) => creatureIdForName(unit.creatureName)),
         revealedOpponentCreatures: [],
         roster: template.roster.map((unit) => ({ ...unit })),
-        perk: 0,
+        doctrine: 0,
         augments: [],
         synergies: [],
         tier1Artifact: 0,

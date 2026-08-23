@@ -10,7 +10,7 @@
  */
 
 import { CreatureFactions } from "../../generated/protobuf/v1/creature_gen";
-import { Perk } from "../../perks/perk_properties";
+import { Doctrine } from "../../doctrines/doctrine_properties";
 import {
     applyCreatureRoleFitMultiplier,
     creatureRoleFitMultiplier,
@@ -61,8 +61,8 @@ export class SetupPolicyV0 implements ISetupPolicy {
     }
     /** Max upgrade-point budget among the real doctrines (SEE_NONE = 7) so the AI can afford Armor L3 + Might
      * L3. Vision isn't modelled/decisive here; the points are. */
-    public pickPerk(): number {
-        return Perk.SEE_NONE;
+    public pickDoctrine(): number {
+        return Doctrine.SEE_NONE;
     }
     public pickBundle(bundles: readonly (readonly [number, number, number])[]): number {
         if (!this.draftCoherence) {

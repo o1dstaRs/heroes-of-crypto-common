@@ -21,6 +21,8 @@ const unit = (overrides: Partial<ITacticalSplitUnit> & Pick<ITacticalSplitUnit, 
     hpPerCreature: overrides.hpPerCreature ?? 20,
     auraUtilityCount: overrides.auraUtilityCount ?? 0,
     supportSpellCount: overrides.supportSpellCount ?? 0,
+    waterShieldUtilityCount: overrides.waterShieldUtilityCount ?? 0,
+    rangedCoverCount: overrides.rangedCoverCount ?? 0,
 });
 
 describe("tactical stack splitting", () => {
@@ -41,6 +43,24 @@ describe("tactical stack splitting", () => {
             summoned: false,
             auraUtilityCount: 1,
             supportSpellCount: 1,
+            waterShieldUtilityCount: 0,
+            rangedCoverCount: 0,
+        });
+    });
+
+    it("recognizes Water Shield and magic attackers as independent split utilities", () => {
+        const description = tacticalSplitUnitFromUnit(
+            createTestUnit({
+                name: "Shielded Mage",
+                amountAlive: 5,
+                attackType: PBTypes.AttackVals.MAGIC,
+                abilities: ["Water Shield"],
+            }),
+        );
+
+        expect(description).toMatchObject({
+            waterShieldUtilityCount: 1,
+            rangedCoverCount: 1,
         });
     });
 
@@ -98,6 +118,22 @@ describe("tactical stack splitting", () => {
         const berserker = unit({ id: "berserker-full", identity: "Berserker:1", amount: 20 });
         expect(planTacticalStackSplits([berserker], 7)).toEqual([
             { sourceUnitId: "berserker-full", amount: 1, role: "bait" },
+        ]);
+    });
+
+    it("reserves one-model Water Shield and ranged cover children before generic bait", () => {
+        const shield = unit({ id: "mermaid-full", identity: "Mermaid:1", waterShieldUtilityCount: 1 });
+        const cover = unit({
+            id: "dryad-full",
+            identity: "Dryad:1",
+            attackType: PBTypes.AttackVals.RANGE,
+            rangedCoverCount: 1,
+        });
+        const bait = unit({ id: "fairy-full", identity: "Fairy:1" });
+
+        expect(planTacticalStackSplits([shield, cover, bait], 8)).toEqual([
+            { sourceUnitId: "mermaid-full", amount: 1, role: "shield" },
+            { sourceUnitId: "dryad-full", amount: 1, role: "cover" },
         ]);
     });
 
@@ -192,5 +228,30 @@ describe("tactical stack splitting", () => {
 
         expect([7, 8]).toContain(placed.get("decoy")?.x);
         expect(placed.get("decoy")?.y).toBe(4);
+    });
+
+    it("places ranged cover in a protected rear corner", () => {
+        const legal = new Set<number>();
+        for (let x = 0; x < 16; x += 1) {
+            for (let y = 0; y <= 2; y += 1) legal.add((x << 4) | y);
+        }
+        const placed = applyTacticalSplitPlacement(
+            new Map([
+                ["tank", { x: 7, y: 2 }],
+                ["cover", { x: 8, y: 1 }],
+            ]),
+            [
+                { id: "tank", small: true },
+                { id: "cover", small: true },
+            ],
+            {
+                team: PBTypes.TeamVals.LOWER,
+                gridType: PBTypes.GridVals.NORMAL,
+                legalCellHashes: legal,
+                splitStacks: [{ unitId: "cover", role: "cover" }],
+            },
+        );
+
+        expect(placed.get("cover")).toEqual({ x: 0, y: 0 });
     });
 });

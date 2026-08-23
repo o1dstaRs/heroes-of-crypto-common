@@ -15,6 +15,7 @@ import { FightStateManager } from "../fights/fight_state_manager";
 import { runMatch, type IMatchResult, type Side } from "./battle_engine";
 import {
     AI_META_FIGHT_VERSION,
+    aiMetaSynergyVariantsForPair,
     prepareMetaPair,
     type IAiMetaArmy,
     type IAiMetaGameOutcome,
@@ -22,6 +23,7 @@ import {
     type IAiMetaRunOptions,
 } from "./ai_meta_cohorts_core";
 import { createAiMetaMatchStrategyOverrides, type AiMetaStrategyProfileId } from "./ai_meta_strategy_profile";
+import { materializeReplayAbSplits } from "./ranked_replay_tactics_ab_core";
 
 interface IAiMetaWorkerData {
     options: IAiMetaRunOptions;
@@ -46,30 +48,43 @@ const configFor = (
     seed: number,
     map: number,
     strategyProfileId: AiMetaStrategyProfileId,
-): Parameters<typeof runMatch>[0] => ({
-    greenVersion: AI_META_FIGHT_VERSION,
-    redVersion: AI_META_FIGHT_VERSION,
-    roster: green.roster,
-    redRoster: red.roster,
-    seed,
-    gridType: map,
-    greenPerk: green.perk,
-    redPerk: red.perk,
-    greenAugments: green.augment.augments,
-    redAugments: red.augment.augments,
-    greenArtifactT1: green.artifactT1.id,
-    redArtifactT1: red.artifactT1.id,
-    greenArtifactT2: green.artifactT2.id,
-    redArtifactT2: red.artifactT2.id,
-    greenSynergies: green.synergies,
-    redSynergies: red.synergies,
-    placementAugmentTiming: "setup-before-placement",
-    headlessEvents: true,
-    ...createAiMetaMatchStrategyOverrides(strategyProfileId, {
-        greenOpponentCreatureIds: red.creatureIds,
-        redOpponentCreatureIds: green.creatureIds,
-    }),
-});
+    synergyVariants: ReturnType<typeof aiMetaSynergyVariantsForPair>,
+): Parameters<typeof runMatch>[0] => {
+    const greenSplit = materializeReplayAbSplits(
+        green.roster,
+        green.creatureIds,
+        green.augment.augments,
+        green.synergies,
+    );
+    const redSplit = materializeReplayAbSplits(red.roster, red.creatureIds, red.augment.augments, red.synergies);
+    return {
+        greenVersion: AI_META_FIGHT_VERSION,
+        redVersion: AI_META_FIGHT_VERSION,
+        roster: greenSplit.roster,
+        redRoster: redSplit.roster,
+        seed,
+        gridType: map,
+        greenDoctrine: green.doctrine,
+        redDoctrine: red.doctrine,
+        greenAugments: green.augment.augments,
+        redAugments: red.augment.augments,
+        greenArtifactT1: green.artifactT1.id,
+        redArtifactT1: red.artifactT1.id,
+        greenArtifactT2: green.artifactT2.id,
+        redArtifactT2: red.artifactT2.id,
+        greenSynergies: green.synergies,
+        redSynergies: red.synergies,
+        synergyVariants,
+        greenTacticalSplitStacks: greenSplit.splitRoles,
+        redTacticalSplitStacks: redSplit.splitRoles,
+        placementAugmentTiming: "setup-before-placement",
+        headlessEvents: true,
+        ...createAiMetaMatchStrategyOverrides(strategyProfileId, {
+            greenOpponentCreatureIds: red.creatureIds,
+            redOpponentCreatureIds: green.creatureIds,
+        }),
+    };
+};
 
 function gameOutcome(result: IMatchResult, aIsGreen: boolean): IAiMetaGameOutcome {
     const sideA: Side = aIsGreen ? "green" : "red";
@@ -97,12 +112,27 @@ export function playMetaPair(
     strategyProfileId: AiMetaStrategyProfileId,
 ): IAiMetaPairRecord {
     const prepared = prepareMetaPair(options, pair);
+    const synergyVariants = aiMetaSynergyVariantsForPair(prepared.setupSeed, prepared.combatSeed);
     FightStateManager.getInstance();
     const aGreen = runMatch(
-        configFor(prepared.armyA, prepared.armyB, prepared.combatSeed, prepared.map, strategyProfileId),
+        configFor(
+            prepared.armyA,
+            prepared.armyB,
+            prepared.combatSeed,
+            prepared.map,
+            strategyProfileId,
+            synergyVariants,
+        ),
     );
     const bGreen = runMatch(
-        configFor(prepared.armyB, prepared.armyA, prepared.combatSeed, prepared.map, strategyProfileId),
+        configFor(
+            prepared.armyB,
+            prepared.armyA,
+            prepared.combatSeed,
+            prepared.map,
+            strategyProfileId,
+            synergyVariants,
+        ),
     );
     return {
         ...prepared,

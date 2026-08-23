@@ -17,15 +17,15 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCell } from "../../src/grid/grid_math";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { restoreBattle, snapshotBattle } from "../../src/simulation/battle_snapshot";
-import type { Unit } from "../../src/units/unit";
 import type { UnitsHolder } from "../../src/units/units_holder";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
+const numberBitsView = new DataView(new ArrayBuffer(8));
+
 function numberBits(value: number): string {
-    const view = new DataView(new ArrayBuffer(8));
-    view.setFloat64(0, value, false);
-    return view.getBigUint64(0, false).toString(16).padStart(16, "0");
+    numberBitsView.setFloat64(0, value, false);
+    return numberBitsView.getBigUint64(0, false).toString(16).padStart(16, "0");
 }
 
 function exactValue(value: unknown): unknown {
@@ -56,11 +56,7 @@ function exactValue(value: unknown): unknown {
     };
 }
 
-function semanticBattleState(
-    unitsHolder: UnitsHolder,
-    grid: ReturnType<typeof createCombatTestContext>["grid"],
-): unknown {
-    const snapshot = snapshotBattle(unitsHolder, grid, FightStateManager.getInstance().getFightProperties());
+function semanticBattleState(snapshot: ReturnType<typeof snapshotBattle>): unknown {
     const holder = { ...snapshot.holder };
     delete holder.auraRefreshFingerprint;
 
@@ -91,26 +87,15 @@ function compareWithForcedFullRefresh(
 
     const changed = unitsHolder.refreshAuraEffectsIfNeeded();
     const candidateAfter = snapshotBattle(unitsHolder, grid, fightProperties);
-    const candidateState = semanticBattleState(unitsHolder, grid);
+    const candidateState = semanticBattleState(candidateAfter);
 
     restoreBattle(before, unitsHolder, grid, fightProperties);
     unitsHolder.refreshAuraEffectsForAllUnits();
-    const oracleState = semanticBattleState(unitsHolder, grid);
+    const oracleState = semanticBattleState(snapshotBattle(unitsHolder, grid, fightProperties));
     expect(candidateState).toEqual(oracleState);
 
     restoreBattle(candidateAfter, unitsHolder, grid, fightProperties);
     return changed;
-}
-
-function makeRng(seed: number): () => number {
-    let state = seed >>> 0;
-    return () => {
-        state = (state + 0x6d2b79f5) >>> 0;
-        let value = state;
-        value = Math.imul(value ^ (value >>> 15), value | 1);
-        value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-        return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-    };
 }
 
 describe("aura refresh dirty invalidation", () => {
@@ -131,7 +116,7 @@ describe("aura refresh dirty invalidation", () => {
         const upperEmitter = createTestUnit({
             name: "Upper Emitter",
             team: PBTypes.TeamVals.UPPER,
-            auraEffects: ["Range Null Field", "Poison Cloud"],
+            auraEffects: ["Range Null Field", "Venom Cloud"],
         });
         const upperRanged = createTestUnit({
             name: "Upper Ranged",
@@ -188,11 +173,11 @@ describe("aura refresh dirty invalidation", () => {
 
         upperEmitter.applyDamage(1_000_000, 0, new SceneLogMock());
         compare(false);
-        expect(upperRanged.hasBuffActive("Poison Cloud Aura")).toBe(true);
+        expect(upperRanged.hasBuffActive("Venom Cloud Aura")).toBe(true);
 
         unitsHolder.deleteUnitById(upperEmitter.getId());
         compare(true);
-        expect(upperRanged.hasBuffActive("Poison Cloud Aura")).toBe(false);
+        expect(upperRanged.hasBuffActive("Venom Cloud Aura")).toBe(false);
 
         const offGridPosition = positionForCell({ x: 30, y: 30 });
         upperRanged.setPosition(offGridPosition.x, offGridPosition.y);
@@ -220,6 +205,18 @@ describe("aura refresh dirty invalidation", () => {
         expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
         expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
 
+        delete defaultProperties.experimental;
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(false);
+
+        // Object.keys only saw enumerable keys in the original exact-shape check. Keep failing closed when a
+        // required field exists but is hidden and an enumerable extra field takes its place in the key count.
+        Object.defineProperty(defaultProperties, "is_buff", { enumerable: false });
+        defaultProperties.experimental = 1;
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
+        expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
+
+        Object.defineProperty(defaultProperties, "is_buff", { enumerable: true });
         delete defaultProperties.experimental;
         expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(true);
         expect(unitsHolder.refreshAuraEffectsIfNeeded()).toBe(false);
@@ -324,153 +321,5 @@ describe("aura refresh dirty invalidation", () => {
         expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
         expect(unit.hasBuffActive("Manual Aura")).toBe(false);
         expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(false);
-    });
-
-    it("matches the forced full oracle through deterministic mixed-event traces", () => {
-        const deep = process.env.A13_AURA_ORACLE_DEEP === "1";
-        const seedCount = deep ? 64 : 12;
-        const stepsPerSeed = deep ? 192 : 64;
-
-        for (let seed = 1; seed <= seedCount; seed++) {
-            const { grid, unitsHolder } = createCombatTestContext();
-            const units: Unit[] = [
-                createTestUnit({
-                    name: `Lower Aura ${seed}`,
-                    team: PBTypes.TeamVals.LOWER,
-                    stackPower: 2,
-                    auraEffects: [
-                        "Luck",
-                        "Flesh Shield",
-                        "Sharpened Weapons",
-                        "Disguise",
-                        "Tie up the Horses",
-                        "War Anger",
-                    ],
-                }),
-                createTestUnit({
-                    name: `Lower Large ${seed}`,
-                    team: PBTypes.TeamVals.LOWER,
-                    size: PBTypes.UnitSizeVals.LARGE,
-                    attackType: PBTypes.AttackVals.RANGE,
-                    rangeShots: 3,
-                }),
-                createTestUnit({
-                    name: `Lower Walker ${seed}`,
-                    team: PBTypes.TeamVals.LOWER,
-                }),
-                createTestUnit({
-                    name: `Upper Aura ${seed}`,
-                    team: PBTypes.TeamVals.UPPER,
-                    size: PBTypes.UnitSizeVals.LARGE,
-                    stackPower: 4,
-                    auraEffects: [
-                        "Range Null Field",
-                        "Poison Cloud",
-                        "Web",
-                        "Arrows Wingshield",
-                        "Absorb Penalties",
-                        "Pegasus Might",
-                        "Wolf Trail",
-                    ],
-                }),
-                createTestUnit({
-                    name: `Upper Flyer ${seed}`,
-                    team: PBTypes.TeamVals.UPPER,
-                    movementType: PBTypes.MovementVals.FLY,
-                }),
-                createTestUnit({
-                    name: `Upper Ranged ${seed}`,
-                    team: PBTypes.TeamVals.UPPER,
-                    attackType: PBTypes.AttackVals.RANGE,
-                    rangeShots: 3,
-                }),
-            ];
-            const initialCells = [
-                { x: 3, y: 3 },
-                { x: 5, y: 4 },
-                { x: 7, y: 4 },
-                { x: 10, y: 10 },
-                { x: 8, y: 9 },
-                { x: 6, y: 8 },
-            ];
-            for (let i = 0; i < units.length; i++) {
-                placeUnit(grid, unitsHolder, units[i], initialCells[i]);
-            }
-
-            const random = makeRng(seed * 0x9e3779b1);
-            expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(true);
-
-            for (let step = 0; step < stepsPerSeed; step++) {
-                const unit = units[Math.floor(random() * units.length)];
-                const properties = unit.getUnitProperties() as {
-                    attack_type: number;
-                    luck: number;
-                    movement_type: number;
-                };
-
-                switch (step % 10) {
-                    case 0:
-                        break;
-                    case 1: {
-                        const position = positionForCell({
-                            x: 1 + Math.floor(random() * 14),
-                            y: 1 + Math.floor(random() * 14),
-                        });
-                        unit.setPosition(position.x, position.y);
-                        break;
-                    }
-                    case 2:
-                        units[step % 2 === 0 ? 0 : 3].setStackPower(1 + Math.floor(random() * 5));
-                        break;
-                    case 3:
-                        properties.luck = Math.floor(random() * 21) - 10;
-                        break;
-                    case 4:
-                        if (unit.hasEffectActive("Break")) {
-                            unit.deleteEffect("Break");
-                        } else {
-                            unit.applyEffect(new EffectFactory().makeEffect("Break")!);
-                        }
-                        break;
-                    case 5: {
-                        const aura = unit.getAuraEffects()[0];
-                        if (aura) {
-                            random() < 0.5 ? aura.extendRange() : aura.narrowRange();
-                        }
-                        break;
-                    }
-                    case 6: {
-                        const auraBuff = unit.getBuffs().find((buff) => buff.getName().endsWith(" Aura"));
-                        const auraDebuff = unit.getDebuffs().find((debuff) => debuff.getName().endsWith(" Aura"));
-                        if (auraBuff) {
-                            unit.deleteBuff(auraBuff.getName());
-                        } else if (auraDebuff) {
-                            unit.deleteDebuff(auraDebuff.getName());
-                        }
-                        break;
-                    }
-                    case 7:
-                        properties.attack_type =
-                            properties.attack_type === PBTypes.AttackVals.RANGE
-                                ? PBTypes.AttackVals.MELEE
-                                : PBTypes.AttackVals.RANGE;
-                        break;
-                    case 8:
-                        properties.movement_type =
-                            properties.movement_type === PBTypes.MovementVals.FLY
-                                ? PBTypes.MovementVals.WALK
-                                : PBTypes.MovementVals.FLY;
-                        break;
-                    case 9: {
-                        const orderedUnits = unitsHolder.getAllUnits() as Map<string, Unit>;
-                        orderedUnits.delete(unit.getId());
-                        orderedUnits.set(unit.getId(), unit);
-                        break;
-                    }
-                }
-
-                compareWithForcedFullRefresh(unitsHolder, grid);
-            }
-        }
     });
 });

@@ -48,6 +48,18 @@
         "aura_effect": null,
         "can_be_cast": false
     },
+    "Double Throw": {
+        "name": "Double Throw",
+        "type": "ADDITIONAL_ATTACK",
+        "desc": ["Hurls a second boulder for {}% of the calculated damage"],
+        "power": 100,
+        "power_type": "TOTAL_DAMAGE_PERCENTAGE",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
     "Crafted Double Shot": {
         "name": "Crafted Double Shot",
         "type": "ADDITIONAL_ATTACK",
@@ -273,6 +285,18 @@
         "desc": ["Gives Water immunity. Fire attacks deal {}% more damage"],
         "power": 50,
         "power_type": "MAGIC_VULNERABILITY_FIRE",
+        "skip_reponse": false,
+        "stack_powered": false,
+        "effect": null,
+        "aura_effect": null,
+        "can_be_cast": false
+    },
+    "Earth Element": {
+        "name": "Earth Element",
+        "type": "DEFENCE",
+        "desc": ["Gives Earth immunity. Wind attacks deal {}% more damage"],
+        "power": 50,
+        "power_type": "MAGIC_VULNERABILITY_WIND",
         "skip_reponse": false,
         "stack_powered": false,
         "effect": null,
@@ -554,21 +578,6 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Poison Cloud Aura": {
-        "name": "Poison Cloud Aura",
-        "type": "BUFF_AURA",
-        "desc": [
-            "Allies within 2 cells apply {}% of their attack damage to the target as Poison",
-            "Poisoning an already poisoned enemy stacks: +70% poison damage per stack"
-        ],
-        "power": 15,
-        "power_type": "POISON_ON_HIT",
-        "skip_reponse": false,
-        "stack_powered": false,
-        "effect": null,
-        "aura_effect": "Poison Cloud",
-        "can_be_cast": false
-    },
     "Sylvan Focus Aura": {
         "name": "Sylvan Focus Aura",
         "type": "BUFF_AURA",
@@ -598,9 +607,9 @@
         "type": "BUFF_AURA",
         "desc": [
             "Allies within 2 cells apply {}% of their attack damage to the target as Poison",
-            "Poisoning an already poisoned enemy stacks: +70% poison damage per stack"
+            "Poisoning an already poisoned enemy stacks: +50% poison damage per stack"
         ],
-        "power": 30,
+        "power": 20,
         "power_type": "POISON_ON_HIT",
         "skip_reponse": false,
         "stack_powered": false,
@@ -683,7 +692,8 @@
         "type": "ATTACK",
         "desc": [
             "Maximum targets: {}. Ranged attacks hit the chosen enemy, then bounce to the nearest eligible enemies.",
-            "A 1-cell gap keeps full damage; a 2-cell gap halves it. Each enemy is hit once, and allies are never hit."
+            "A 1-cell gap keeps full damage; a 2-cell gap halves it and ends the flight there.",
+            "A dodged target also ends it. Each enemy is hit once, and allies are never hit."
         ],
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",
@@ -1196,7 +1206,9 @@
         "type": "ATTACK",
         "desc": [
             "On attack or reponse, deals {}/{}/{}/{}% of the damage",
-            "to the connected enemy (Wind). Depending on how far the enemy is from the target"
+            "to the connected enemy (Wind). Depending on how far the enemy is from the target.",
+            "Earth Elements take 50% more. A Wind Element earths the bolt: it takes nothing",
+            "and the chain stops there"
         ],
         "power": 80,
         "power_type": "MAGIC_DAMAGE",
@@ -1313,9 +1325,9 @@
         "name": "Flesh Shield Aura",
         "type": "BUFF_AURA",
         "desc": [
-            "Absorbs {}% of the attack damage dealt to allies within range.",
-            "The absorbed damage is recalculated against the owner's defense",
-            "and dealt to the owner instead."
+            "Absorbs {}% of the physical damage dealt to allies within range.",
+            "The absorbed damage is recalculated against the owner's armor",
+            "and dealt to the owner instead. Magical damage is not absorbed."
         ],
         "power": 90,
         "power_type": "ABSORB_DAMAGE",
@@ -1328,7 +1340,7 @@
     "Stun Aura": {
         "name": "Stun Aura",
         "type": "BUFF_AURA",
-        "desc": ["Allies within 2 cells have a {}% chance to stun the enemy they hit for 1 turn"],
+        "desc": ["Allies within 2 cells have a separate {}% chance to stun the enemy they hit for 1 turn"],
         "power": 25,
         "power_type": "STUN_CHANCE",
         "skip_reponse": false,

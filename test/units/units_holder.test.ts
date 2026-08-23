@@ -192,10 +192,14 @@ describe("UnitsHolder", () => {
     it("removes units from holder, grid, and fight queues", () => {
         const { unitsHolder, grid } = createCombatTestContext();
         const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        // Seed the id into initial properties too: resetTarget() would otherwise make this test pass while
+        // retaining a dangling target on a unit hydrated from a mid-fight snapshot.
+        const aggravated = createTestUnit({ team: PBTypes.TeamVals.UPPER, target: unit.getId() });
         const unitCell = { x: 2, y: 2 };
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         placeUnit(grid, unitsHolder, unit, unitCell);
+        placeUnit(grid, unitsHolder, aggravated, { x: 3, y: 3 });
         fightProperties.enqueueUpNext(unit.getId());
         fightProperties.enqueueMoralePlus(unit.getId());
         fightProperties.enqueueMoraleMinus(unit.getId());
@@ -209,6 +213,7 @@ describe("UnitsHolder", () => {
         expect(fightProperties.moralePlusIncludes(unit.getId())).toBe(false);
         expect(fightProperties.moraleMinusIncludes(unit.getId())).toBe(false);
         expect(fightProperties.hourglassIncludes(unit.getId())).toBe(false);
+        expect(aggravated.getTarget()).toBe("");
         expect(unitsHolder.deleteUnitById("missing")).toBe(true);
     });
 

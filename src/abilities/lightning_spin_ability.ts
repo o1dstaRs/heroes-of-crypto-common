@@ -195,7 +195,7 @@ export function processLightningSpinAbility(
                 false,
                 fromUnit,
             );
-            // Poison Cloud Aura: an aura'd attacker poisons every enemy caught in the spin.
+            // Poison aura: an aura'd attacker poisons every enemy caught in the spin.
             processPoisonAuraAbility(fromUnit, enemy, damageDealt, sceneLog);
             damageStatisticHolder.add({
                 unitName: fromUnit.getName(),

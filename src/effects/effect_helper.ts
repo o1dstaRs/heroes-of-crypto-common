@@ -21,6 +21,11 @@ import type { XY } from "../utils/math";
 import { AuraEffectProperties } from "./effect_properties";
 
 const auraCellKeysPerGrid = new WeakMap<GridSettings, Map<number, Map<number, ReadonlyArray<number>>>>();
+export interface IAuraCellKeyMembershipView {
+    has(cellKey: number): boolean;
+}
+
+const auraCellMembershipByView = new WeakMap<ReadonlyArray<number>, IAuraCellKeyMembershipView>();
 
 export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectProperties): boolean {
     if (auraEffectProperties.power_type === AbilityPowerType.DISABLE_FLY_MOVEMENT) {
@@ -181,6 +186,22 @@ export function getAuraCellKeysView(gridSettings: GridSettings, cell: XY, auraRa
     const calculated = Object.freeze(calculateAuraCellKeys(gridSettings, cell, auraRange));
     keysPerRange.set(auraRange, calculated);
     return calculated;
+}
+
+/** Shared membership view for hot AI scoring; its lifetime follows the corresponding immutable geometry view. */
+export function getAuraCellKeyMembershipView(
+    gridSettings: GridSettings,
+    cell: XY,
+    auraRange: number,
+): IAuraCellKeyMembershipView {
+    const keys = getAuraCellKeysView(gridSettings, cell, auraRange);
+    let membership = auraCellMembershipByView.get(keys);
+    if (!membership) {
+        const set = new Set(keys);
+        membership = Object.freeze({ has: (cellKey: number): boolean => set.has(cellKey) });
+        auraCellMembershipByView.set(keys, membership);
+    }
+    return membership;
 }
 
 export function getAuraCellKeys(gridSettings: GridSettings, cell: XY, auraRange: number): number[] {

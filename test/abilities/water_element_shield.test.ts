@@ -15,25 +15,32 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { createTestUnit } from "../helpers/combat";
 
-// "Fire Element" (Efreet, Black Dragon) and "Water Element" (Mermaid) are opposing affinities: each deals
-// +power% (50) to the other. The vulnerability lives on the defender's element ability and is read by
-// Unit.getElementalDamageMultiplier, which feeds calculateAttackDamage — so it covers normal attacks and
-// Fire Breath (whose per-target damage also routes through calculateAttackDamage).
-describe("Water Element (Fire <-> Water +50% affinity)", () => {
-    it("deals +50% both directions between Fire and Water element units, 1x otherwise", () => {
+// Fire <-> Water and Wind <-> Earth are opposing affinities: each deals +power% (50) to the other. The
+// vulnerability lives on the defender's element ability and is read by Unit.getElementalDamageMultiplier,
+// which feeds calculateAttackDamage — so it covers normal attacks and Fire Breath.
+describe("Elemental unit affinities", () => {
+    it("deals +50% both directions within each opposing pair, 1x otherwise", () => {
         const mermaid = createTestUnit({ name: "Mermaid", abilities: ["Water Element"] });
         const efreet = createTestUnit({ name: "Efreet", abilities: ["Fire Element"] });
+        const thunderbird = createTestUnit({ name: "Thunderbird", abilities: ["Wind Element"] });
+        const trent = createTestUnit({ name: "Trent", abilities: ["Earth Element"] });
         const plain = createTestUnit({ name: "Plain", abilities: [] });
 
         // The config powers must actually be loaded for the multiplier to mean anything.
         expect(mermaid.getAbility("Water Element")?.getPower()).toBe(50);
         expect(efreet.getAbility("Fire Element")?.getPower()).toBe(50);
+        expect(thunderbird.getAbility("Wind Element")?.getPower()).toBe(50);
+        expect(trent.getAbility("Earth Element")?.getPower()).toBe(50);
 
         expect(mermaid.getElementalDamageMultiplier(efreet)).toBeCloseTo(1.5, 5);
         expect(efreet.getElementalDamageMultiplier(mermaid)).toBeCloseTo(1.5, 5);
+        expect(thunderbird.getElementalDamageMultiplier(trent)).toBeCloseTo(1.5, 5);
+        expect(trent.getElementalDamageMultiplier(thunderbird)).toBeCloseTo(1.5, 5);
         // No interaction against non-elemental units, or between same elements.
         expect(mermaid.getElementalDamageMultiplier(plain)).toBe(1);
         expect(efreet.getElementalDamageMultiplier(plain)).toBe(1);
+        expect(trent.getElementalDamageMultiplier(plain)).toBe(1);
+        expect(trent.getElementalDamageMultiplier(mermaid)).toBe(1);
         expect(mermaid.getElementalDamageMultiplier(createTestUnit({ abilities: ["Water Element"] }))).toBe(1);
     });
 

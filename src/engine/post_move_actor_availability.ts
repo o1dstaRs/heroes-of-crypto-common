@@ -10,6 +10,7 @@
  */
 
 import { getSpellConfig } from "../configuration/config_provider";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { fireWallBurnDamage, FireWalls } from "../spells/fire_walls";
 import { madeOfFireBoostedMaxHp } from "../units/movement_stat_modifiers";
 import { projectStackDamage, type IStackHpState } from "../units/stack_damage";
@@ -171,6 +172,73 @@ export function enteredFireWallCells(fireWalls: FireWalls | undefined, crossedCe
         }
     }
     return burning;
+}
+
+/** What a Fire Wall did to a unit that arrived on it. */
+export interface IFireWallBurnResult {
+    /** Wall cells actually entered, de-duplicated, in the order they were crossed. */
+    burning: XY[];
+    /** Damage the stack absorbed across those cells. */
+    total: number;
+    /** Creatures the stack lost to the flames. */
+    unitsDied: number;
+}
+
+/**
+ * Burn a unit for every Fire Wall cell it just arrived on, mutating the stack and logging it.
+ *
+ * Shared on purpose: a unit can land on a wall two ways — walking there under its own move action, or
+ * being SHOVED there by map narrowing — and only the first used to charge for it, so a stack pushed into
+ * the flames by a closing board walked away untouched. One helper means the two paths cannot price the
+ * same fire differently.
+ *
+ * Damage is re-derived per cell rather than multiplied out, because a stack thinned by the first cell has
+ * a smaller maximum health for the second to take its share of. The element table is read once so every
+ * cell is priced against the same resistances the rest of the game's fire uses.
+ */
+export function burnUnitOnFireWallCells(
+    unit: Unit,
+    crossedCells: readonly XY[],
+    fireWalls: FireWalls | undefined,
+    sceneLog: ISceneLog,
+): IFireWallBurnResult {
+    const empty: IFireWallBurnResult = { burning: [], total: 0, unitsDied: 0 };
+    if (!fireWalls?.size() || !crossedCells.length) {
+        return empty;
+    }
+    // De-duplicate: a large unit reports the same cell once per body part standing in it, and the wall
+    // charges per cell entered, not per body part.
+    const burning = enteredFireWallCells(fireWalls, crossedCells);
+    if (!burning.length) {
+        return empty;
+    }
+
+    const amountAliveBefore = unit.getAmountAlive();
+    const burnTarget = {
+        isFireElement: unit.hasAbilityActive("Fire Element"),
+        isWaterElement: unit.hasAbilityActive("Water Element"),
+        isWindElement: unit.hasAbilityActive("Wind Element"),
+        isEarthElement: unit.hasAbilityActive("Earth Element"),
+    };
+    let total = 0;
+    for (const cell of burning) {
+        const damage = fireWallBurnDamage(unit.getCumulativeMaxHp(), fireWalls.burnPercentageAt(cell), burnTarget);
+        if (damage <= 0) {
+            break;
+        }
+        total += unit.applyDamage(damage, 0, sceneLog);
+        if (unit.isDead()) {
+            break;
+        }
+    }
+    if (total <= 0) {
+        return empty;
+    }
+
+    sceneLog.updateLog(
+        `${unit.getName()} was seared by the Fire Wall for ${total} damage crossing ${burning.length} of it`,
+    );
+    return { burning, total, unitsDied: Math.max(0, amountAliveBefore - unit.getAmountAlive()) };
 }
 
 /**

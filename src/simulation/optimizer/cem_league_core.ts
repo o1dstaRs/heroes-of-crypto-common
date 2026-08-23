@@ -36,20 +36,20 @@ const createGaussian = (seed: number): (() => number) => {
     };
 };
 
-export const leagueCemDimensionIsTrainable = (dimension: number, freezePerk: boolean): boolean =>
-    !freezePerk ||
-    dimension < LEAGUE_GENOME_LAYOUT.perks.offset ||
-    dimension >= LEAGUE_GENOME_LAYOUT.perks.offset + LEAGUE_GENOME_LAYOUT.perks.length;
+export const leagueCemDimensionIsTrainable = (dimension: number, freezeDoctrine: boolean): boolean =>
+    !freezeDoctrine ||
+    dimension < LEAGUE_GENOME_LAYOUT.doctrines.offset ||
+    dimension >= LEAGUE_GENOME_LAYOUT.doctrines.offset + LEAGUE_GENOME_LAYOUT.doctrines.length;
 
 export function createLeagueCemSigma(
     anchor: readonly number[],
     relativeSigma: number,
     zeroSigma: number,
-    freezePerk: boolean,
+    freezeDoctrine: boolean,
 ): number[] {
     if (anchor.length !== LEAGUE_GENOME_DIM) throw new RangeError("League CEM anchor dimension mismatch");
     return anchor.map((coefficient, dimension) => {
-        if (!leagueCemDimensionIsTrainable(dimension, freezePerk)) return 0;
+        if (!leagueCemDimensionIsTrainable(dimension, freezeDoctrine)) return 0;
         return coefficient === 0 ? zeroSigma : relativeSigma * (Math.abs(coefficient) + 0.5);
     });
 }
@@ -60,7 +60,7 @@ export function sampleLeagueCemPopulation(
     population: number,
     baseSeed: number,
     generation: number,
-    freezePerk: boolean,
+    freezeDoctrine: boolean,
 ): number[][] {
     if (mean.length !== LEAGUE_GENOME_DIM || sigma.length !== LEAGUE_GENOME_DIM) {
         throw new RangeError("League CEM distribution dimension mismatch");
@@ -70,7 +70,9 @@ export function sampleLeagueCemPopulation(
     for (let candidate = 1; candidate < population; candidate += 1) {
         candidates.push(
             mean.map((value, dimension) =>
-                leagueCemDimensionIsTrainable(dimension, freezePerk) ? value + sigma[dimension] * gaussian() : value,
+                leagueCemDimensionIsTrainable(dimension, freezeDoctrine)
+                    ? value + sigma[dimension] * gaussian()
+                    : value,
             ),
         );
     }
@@ -83,10 +85,10 @@ export function refitLeagueCemDistribution(
     sigma: number[],
     sigmaFloor: readonly number[],
     sigmaDecay: number,
-    freezePerk: boolean,
+    freezeDoctrine: boolean,
 ): void {
     for (let dimension = 0; dimension < LEAGUE_GENOME_DIM; dimension += 1) {
-        if (!leagueCemDimensionIsTrainable(dimension, freezePerk)) {
+        if (!leagueCemDimensionIsTrainable(dimension, freezeDoctrine)) {
             sigma[dimension] = 0;
             continue;
         }

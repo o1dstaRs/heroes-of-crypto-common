@@ -16,7 +16,6 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 import { withDualStrikeCharm } from "./ability_helper";
-import { hasAnyDeepWoundsAbility } from "./deep_wounds_ability";
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processPenetratingBiteAbility } from "./penetrating_bite_ability";
 
@@ -70,10 +69,8 @@ export function processDoublePunchAbility(fromUnit: Unit, toUnit: Unit, sceneLog
             abilityMultiplier *= (100 - paralysisAttackerEffect.getPower()) / 100;
         }
 
-        const deepWoundsEffect = toUnit.getEffect("Deep Wounds");
-        if (deepWoundsEffect && hasAnyDeepWoundsAbility(fromUnit)) {
-            abilityMultiplier *= 1 + deepWoundsEffect.getPower() / 100;
-        }
+        // NO Deep Wounds step here: calculateAttackDamage below applies the target's stacked amplification
+        // itself. Folding it into abilityMultiplier as well squared it on this second punch too.
 
         damageFromAttack =
             processLuckyStrikeAbility(

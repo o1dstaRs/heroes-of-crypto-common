@@ -3,9 +3,10 @@ import { describe, expect, test } from "bun:test";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { FightProperties } from "../../src/fights/fight_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { Perk } from "../../src/perks/perk_properties";
+import { Doctrine } from "../../src/doctrines/doctrine_properties";
 import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { creaturesByLevel } from "../../src/simulation/army";
+import { NatureSynergy } from "../../src/synergies/synergy_properties";
 import {
     runMatch,
     seedAcceptedSetupForPlacement,
@@ -51,19 +52,19 @@ const collectFirstUnitBuffs = (config: Partial<IMatchConfig>): Map<number, strin
 };
 
 describe("battle_engine setup seeding", () => {
-    const acceptedPlacementWidth = (perk: Perk, augments?: ISetupAugment[]): number => {
+    const acceptedPlacementWidth = (doctrine: Doctrine, augments?: ISetupAugment[]): number => {
         const properties = new FightProperties();
-        seedAcceptedSetupForPlacement(properties, PBTypes.TeamVals.LOWER, perk, augments);
+        seedAcceptedSetupForPlacement(properties, PBTypes.TeamVals.LOWER, doctrine, augments);
         return properties.getAugmentPlacement(PBTypes.TeamVals.LOWER)[0];
     };
 
     test("models accepted Placement L1/L2/L3 rectangle widths and rejects an over-budget expansion", () => {
-        expect(acceptedPlacementWidth(Perk.SEE_NONE)).toBe(3);
-        expect(acceptedPlacementWidth(Perk.SEE_NONE, [{ kind: "Placement", value: 0 }])).toBe(3);
-        expect(acceptedPlacementWidth(Perk.SEE_NONE, [{ kind: "Placement", value: 1 }])).toBe(4);
-        expect(acceptedPlacementWidth(Perk.SEE_NONE, [{ kind: "Placement", value: 2 }])).toBe(6);
+        expect(acceptedPlacementWidth(Doctrine.SEE_NONE)).toBe(3);
+        expect(acceptedPlacementWidth(Doctrine.SEE_NONE, [{ kind: "Placement", value: 0 }])).toBe(3);
+        expect(acceptedPlacementWidth(Doctrine.SEE_NONE, [{ kind: "Placement", value: 1 }])).toBe(4);
+        expect(acceptedPlacementWidth(Doctrine.SEE_NONE, [{ kind: "Placement", value: 2 }])).toBe(6);
         expect(
-            acceptedPlacementWidth(Perk.SEE_ALL, [
+            acceptedPlacementWidth(Doctrine.SEE_ALL, [
                 { kind: "Armor", value: 3 },
                 { kind: "Might", value: 2 },
                 { kind: "Placement", value: 1 },
@@ -90,8 +91,8 @@ describe("battle_engine setup seeding", () => {
             seed: 83030711,
             gridType: PBTypes.GridVals.NORMAL,
             maxLaps: 2,
-            greenPerk: Perk.SEE_NONE,
-            redPerk: Perk.SEE_NONE,
+            greenDoctrine: Doctrine.SEE_NONE,
+            redDoctrine: Doctrine.SEE_NONE,
         };
         const baseline = runMatch(base);
         const delayed = runMatch({
@@ -114,8 +115,8 @@ describe("battle_engine setup seeding", () => {
             seed: 83030712,
             gridType: PBTypes.GridVals.NORMAL,
             maxLaps: 1,
-            greenPerk: Perk.SEE_NONE,
-            redPerk: Perk.SEE_NONE,
+            greenDoctrine: Doctrine.SEE_NONE,
+            redDoctrine: Doctrine.SEE_NONE,
             placementAugmentTiming: "setup-before-placement",
         };
         const defaultZone = runMatch(base);
@@ -163,10 +164,68 @@ describe("battle_engine setup seeding", () => {
         }
     });
 
+    test("uses the configured seeded synergy variant for combat and board capacity", () => {
+        const natureRoster = [
+            { faction: "Nature", creatureName: "Fairy", level: 1, size: 1, amount: 10 },
+            { faction: "Nature", creatureName: "Dryad", level: 1, size: 1, amount: 10 },
+        ];
+        const observed = new Map<number, { variant: number; placementSlots: number; flyArmor: number }>();
+        runMatch({
+            greenVersion: "v0.7",
+            redVersion: "v0.7",
+            roster: natureRoster,
+            redRoster: natureRoster.map((unit) => ({ ...unit })),
+            seed: 83030715,
+            gridType: PBTypes.GridVals.NORMAL,
+            maxLaps: 1,
+            synergyVariants: { Nature: NatureSynergy.INCREASE_BOARD_UNITS },
+            greenSynergies: [{ faction: PBTypes.FactionVals.NATURE, synergy: NatureSynergy.INCREASE_BOARD_UNITS }],
+            redSynergies: [{ faction: PBTypes.FactionVals.NATURE, synergy: NatureSynergy.INCREASE_BOARD_UNITS }],
+            decisionObserver: ({ unit, context }) => {
+                const team = unit.getTeam();
+                if (!observed.has(team)) {
+                    observed.set(team, {
+                        variant: context.fightProperties.getSynergyVariants().Nature,
+                        placementSlots: context.fightProperties.getNumberOfUnitsAvailableForPlacement(team),
+                        flyArmor: context.fightProperties.getAdditionalFlyArmorPerTeam(team),
+                    });
+                }
+            },
+        });
+
+        expect(observed.size).toBe(2);
+        for (const state of observed.values()) {
+            expect(state.variant).toBe(NatureSynergy.INCREASE_BOARD_UNITS);
+            expect(state.placementSlots).toBe(8);
+            expect(state.flyArmor).toBe(0);
+        }
+    });
+
+    test("rejects a setup choice that conflicts with the configured seeded variant", () => {
+        const natureRoster = [
+            { faction: "Nature", creatureName: "Fairy", level: 1, size: 1, amount: 10 },
+            { faction: "Nature", creatureName: "Dryad", level: 1, size: 1, amount: 10 },
+        ];
+        expect(() =>
+            runMatch({
+                greenVersion: "v0.7",
+                redVersion: "v0.7",
+                roster: natureRoster,
+                redRoster: natureRoster.map((unit) => ({ ...unit })),
+                seed: 83030716,
+                gridType: PBTypes.GridVals.NORMAL,
+                maxLaps: 1,
+                synergyVariants: { Nature: NatureSynergy.INCREASE_BOARD_UNITS },
+                greenSynergies: [{ faction: PBTypes.FactionVals.NATURE, synergy: NatureSynergy.PLUS_FLY_ARMOR }],
+                redSynergies: [{ faction: PBTypes.FactionVals.NATURE, synergy: NatureSynergy.INCREASE_BOARD_UNITS }],
+            }),
+        ).toThrow("does not match the configured Nature variant");
+    });
+
     test("artifacts survive when augments are applied to the same team", () => {
         const buffsByTeam = collectFirstUnitBuffs({
-            greenPerk: Perk.SEE_NONE,
-            redPerk: Perk.SEE_NONE,
+            greenDoctrine: Doctrine.SEE_NONE,
+            redDoctrine: Doctrine.SEE_NONE,
             greenAugments: [
                 { kind: "Armor", value: 3 },
                 { kind: "Might", value: 3 },
@@ -191,8 +250,8 @@ describe("battle_engine setup seeding", () => {
 
     test("accepts a seven-point placement, armor, and Empower setup", () => {
         const buffsByTeam = collectFirstUnitBuffs({
-            greenPerk: Perk.SEE_NONE,
-            redPerk: Perk.SEE_NONE,
+            greenDoctrine: Doctrine.SEE_NONE,
+            redDoctrine: Doctrine.SEE_NONE,
             greenAugments: [
                 { kind: "Placement", value: 1 },
                 { kind: "Armor", value: 3 },

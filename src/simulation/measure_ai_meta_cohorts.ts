@@ -9,11 +9,9 @@
  * -----------------------------------------------------------------------------
  */
 
-import { createHash } from "node:crypto";
-import { createWriteStream, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import { arch, availableParallelism, cpus, platform, release, totalmem } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
 import { Worker } from "node:worker_threads";
 import { createGzip, type Gzip } from "node:zlib";
 
@@ -65,6 +63,8 @@ import {
     type IAiMetaUnitInteractionAnalysis,
 } from "./ai_meta_unit_interactions";
 import { creaturesByLevel, DEFAULT_ROSTER_COMPOSITION } from "./army";
+import { captureGitSourceStatus } from "./git_source_status";
+import { fingerprintSourceTree } from "./source_tree_fingerprint";
 
 interface ICountedOutcome {
     score: number;
@@ -880,6 +880,8 @@ export interface IAiMetaWorkerPoolStats {
 export interface IAiMetaWorkerPoolOptions {
     recycleAfterPairs?: number;
     beforeWorkerStart?: () => void;
+    /** Alternate worker entry used by lifecycle tests; production always uses the real cohort worker. */
+    workerUrl?: URL;
 }
 
 export async function runAiMetaWorkerPool(
@@ -895,7 +897,7 @@ export async function runAiMetaWorkerPool(
     }
     const total = options.games / AI_META_GAMES_PER_MATCHUP;
     const poolSize = Math.max(1, Math.min(Math.floor(concurrency), total));
-    const workerUrl = new URL("./ai_meta_cohorts_worker.ts", import.meta.url);
+    const workerUrl = workerPoolOptions.workerUrl ?? new URL("./ai_meta_cohorts_worker.ts", import.meta.url);
     const workerEnvironment = sanitizedAiMetaEnvironment(process.env, fightProfile);
     return new Promise<IAiMetaWorkerPoolStats>((resolvePromise, rejectPromise) => {
         const workers = new Set<Worker>();
@@ -999,28 +1001,8 @@ function finishGzip(gzip: Gzip, output: ReturnType<typeof createWriteStream>): P
     });
 }
 
-const git = (args: string[]): string => {
-    try {
-        return execFileSync("git", args, { encoding: "utf8" }).trim();
-    } catch {
-        return "unknown";
-    }
-};
-
 function sourceFingerprint(): string {
-    const hash = createHash("sha256");
-    const visit = (directory: string): string[] =>
-        readdirSync(resolve(process.cwd(), directory), { withFileTypes: true })
-            .sort((left, right) => left.name.localeCompare(right.name))
-            .flatMap((entry) => {
-                const path = join(directory, entry.name);
-                return entry.isDirectory() ? visit(path) : entry.isFile() ? [path] : [];
-            });
-    for (const path of [...visit("src"), "package.json"]) {
-        hash.update(path);
-        hash.update(readFileSync(resolve(process.cwd(), path)));
-    }
-    return hash.digest("hex");
+    return fingerprintSourceTree(process.cwd(), ["src"], ["package.json"]);
 }
 
 export interface IAiMetaSourceIdentity {
@@ -1041,10 +1023,10 @@ export interface IAiMetaSourceIdentity {
 }
 
 export function captureAiMetaSourceIdentity(): IAiMetaSourceIdentity {
-    const status = git(["status", "--short"]);
+    const { commit, status } = captureGitSourceStatus();
     const processors = cpus();
     return {
-        commonCommit: git(["rev-parse", "HEAD"]),
+        commonCommit: commit,
         commonDirty: Boolean(status),
         commonStatus: status.split("\n").filter(Boolean),
         sourceSha256: sourceFingerprint(),
@@ -1145,7 +1127,7 @@ function writeSummary(
             maps: AI_META_MAPS,
             rosterSlots: "2xL1, 2xL2, 1xL3, 1xL4",
             stackSizing: "expBudget (1000 XP per stack)",
-            perkAndSynergies: `SEE_NONE (7 points) with ${AI_META_SYNERGY_POLICY_SPEC} faction synergy picks`,
+            doctrineAndSynergies: `SEE_NONE (7 points) with ${AI_META_SYNERGY_POLICY_SPEC} faction synergy picks`,
             nonMirroredGuarantee: "Opposing rosters have distinct signatures and no shared creature identities.",
             seatControl: "Each distinct matchup is fought twice with the complete armies and setups swapping seats.",
             interpretation:

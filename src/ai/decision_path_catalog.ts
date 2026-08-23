@@ -10,7 +10,7 @@
  */
 
 import { PBTypes } from "../generated/protobuf/v1/types";
-import type { Grid } from "../grid/grid";
+import { Grid } from "../grid/grid";
 import type { IMovePath, IReadonlyMovePath } from "../grid/path_definitions";
 import { PathHelper } from "../grid/path_helper";
 import { Unit, type IUnitAIRepr } from "../units/unit";
@@ -31,6 +31,12 @@ const BASE_FILTER_UNALLOWED_DESTINATIONS = (
 const BASE_UNIT_GET_CELLS = Unit.prototype.getCells;
 const BASE_UNIT_GET_POSITION = Unit.prototype.getPosition;
 const BASE_UNIT_IS_SMALL_SIZE = Unit.prototype.isSmallSize;
+const BASE_UNIT_GET_STEPS = Unit.prototype.getSteps;
+const BASE_UNIT_GET_TEAM = Unit.prototype.getTeam;
+const BASE_UNIT_CAN_FLY = Unit.prototype.canFly;
+const BASE_UNIT_CAN_TRAVERSE_LAVA = Unit.prototype.canTraverseLava;
+const BASE_UNIT_HAS_ABILITY_ACTIVE = Unit.prototype.hasAbilityActive;
+const BASE_GRID_GET_AGGR_MATRIX_BY_TEAM = Grid.prototype.getAggrMatrixByTeam;
 
 export type { IReadonlyKnownPaths, IReadonlyMovePath, IReadonlyWeightedRoute } from "../grid/path_definitions";
 
@@ -156,6 +162,30 @@ export class DecisionPathCatalog implements IDecisionPathSource {
             unit.getCells === BASE_UNIT_GET_CELLS &&
             unit.isSmallSize === BASE_UNIT_IS_SMALL_SIZE &&
             (unit as IUnitAIRepr & Pick<Unit, "getPosition">).getPosition === BASE_UNIT_GET_POSITION
+        );
+    }
+    /**
+     * Authorize deferring the canonical finite path until a decision actually consumes it.
+     *
+     * In addition to the branded native traversal proof, every getter whose second evaluation would be skipped
+     * must be the native side-effect-free implementation. Instance overrides therefore retain the legacy eager
+     * call order, thrown errors, and RNG behavior even if the rest of their object happens to look production-like.
+     */
+    public static canDeferCanonicalMovePath(
+        source: IDecisionPathSource,
+        grid: Grid,
+        unit: IUnitAIRepr,
+        matrix: number[][],
+    ): boolean {
+        return (
+            DecisionPathCatalog.canElideUnconsumedMeleeLayers(source, grid, unit, matrix) &&
+            grid.getAggrMatrixByTeam === BASE_GRID_GET_AGGR_MATRIX_BY_TEAM &&
+            unit.getSteps === BASE_UNIT_GET_STEPS &&
+            unit.getTeam === BASE_UNIT_GET_TEAM &&
+            unit.canFly === BASE_UNIT_CAN_FLY &&
+            unit.isSmallSize === BASE_UNIT_IS_SMALL_SIZE &&
+            unit.canTraverseLava === BASE_UNIT_CAN_TRAVERSE_LAVA &&
+            unit.hasAbilityActive === BASE_UNIT_HAS_ABILITY_ACTIVE
         );
     }
     public getStats(): IDecisionPathCatalogStats {

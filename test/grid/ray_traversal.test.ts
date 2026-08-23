@@ -11,133 +11,16 @@
 
 import { describe, expect, it } from "bun:test";
 
-import {
-    getCellForPosition,
-    getPositionForCell,
-    getRangeAttackSideCenter,
-    projectLineToFieldEdge,
-    RangeAttackCellSide,
-} from "../../src/grid/grid_math";
-import { traceGridRayCells, type GridRayCellIntersection } from "../../src/grid/ray_traversal";
+import { getRangeAttackSideCenter, RangeAttackCellSide } from "../../src/grid/grid_math";
+import { traceGridRayCells } from "../../src/grid/ray_traversal";
 import { GridSettings } from "../../src/grid/grid_settings";
-import type { XY } from "../../src/utils/math";
-import { testGridSettings } from "../helpers/combat";
-
-const GS = testGridSettings;
-
-/** The removed pixel-by-pixel production implementation, retained here only as a differential oracle. */
-function legacyPixelTrace(gridSettings: GridSettings, start: XY, end: XY): GridRayCellIntersection[] {
-    const intersections: GridRayCellIntersection[] = [];
-    const cellKeys: number[] = [];
-    let x0 = Math.round(start.x);
-    let y0 = Math.round(start.y);
-    const x1 = Math.round(end.x);
-    const y1 = Math.round(end.y);
-    const deltaX = Math.abs(x1 - x0);
-    const deltaY = Math.abs(y1 - y0);
-    const directionX = x0 < x1 ? 1 : -1;
-    const directionY = y0 < y1 ? 1 : -1;
-    let error = deltaX - deltaY;
-
-    while (true) {
-        const position = { x: x0, y: y0 };
-        const cell = getCellForPosition(gridSettings, position);
-        const cellKey = (cell.x << 4) | cell.y;
-        if (!cellKeys.includes(cellKey)) {
-            intersections.push([cell, position]);
-            cellKeys.push(cellKey);
-        }
-        if (x0 === x1 && y0 === y1) {
-            break;
-        }
-        const doubledError = 2 * error;
-        if (doubledError > -deltaY) {
-            error -= deltaY;
-            x0 += directionX;
-        }
-        if (doubledError < deltaX) {
-            error += deltaX;
-            y0 += directionY;
-        }
-    }
-
-    return intersections;
-}
-
-/**
- * The oracle walk again, but comparing as it goes instead of materialising the expected trace.
- *
- * The exhaustive case below runs this ~1M times, and building an array of {cell, position} tuples per ray —
- * two allocations per PIXEL stepped, plus a linear `includes` over the visited keys — cost more than the
- * function under test by a wide margin. Same walk, same `(x << 4) | y` key (so identical collision
- * behaviour for off-board cells), one scratch object, and a Set lookup.
- *
- * Returns false on the first divergence; the caller rebuilds the full expected trace only to print a diff.
- */
-const oracleScratch = { x: 0, y: 0 };
-function legacyTraceMatches(
-    gridSettings: GridSettings,
-    start: XY,
-    end: XY,
-    actual: GridRayCellIntersection[],
-): boolean {
-    const seen = new Set<number>();
-    let matched = 0;
-    let x0 = Math.round(start.x);
-    let y0 = Math.round(start.y);
-    const x1 = Math.round(end.x);
-    const y1 = Math.round(end.y);
-    const deltaX = Math.abs(x1 - x0);
-    const deltaY = Math.abs(y1 - y0);
-    const directionX = x0 < x1 ? 1 : -1;
-    const directionY = y0 < y1 ? 1 : -1;
-    let error = deltaX - deltaY;
-
-    for (;;) {
-        oracleScratch.x = x0;
-        oracleScratch.y = y0;
-        const cell = getCellForPosition(gridSettings, oracleScratch);
-        const cellKey = (cell.x << 4) | cell.y;
-        if (!seen.has(cellKey)) {
-            seen.add(cellKey);
-            const entry = actual[matched];
-            if (
-                entry === undefined ||
-                entry[0].x !== cell.x ||
-                entry[0].y !== cell.y ||
-                entry[1].x !== x0 ||
-                entry[1].y !== y0
-            ) {
-                return false;
-            }
-            matched += 1;
-        }
-        if (x0 === x1 && y0 === y1) {
-            break;
-        }
-        const doubledError = 2 * error;
-        if (doubledError > -deltaY) {
-            error -= deltaY;
-            x0 += directionX;
-        }
-        if (doubledError < deltaX) {
-            error += deltaX;
-            y0 += directionY;
-        }
-    }
-
-    return matched === actual.length;
-}
-
-function assertLegacyEquivalent(start: XY, end: XY, gridSettings = GS): void {
-    const actual = traceGridRayCells(gridSettings, start, end);
-    if (!legacyTraceMatches(gridSettings, start, end, actual)) {
-        // Only now is the array oracle worth building — it gives the assertion a readable diff.
-        expect(actual).toEqual(legacyPixelTrace(gridSettings, start, end));
-    }
-}
-
-const cellCenter = (cell: XY): XY => getPositionForCell(cell, GS.getMinX(), GS.getStep(), GS.getHalfStep());
+import {
+    assertLegacyEquivalent,
+    cellCenter,
+    GS,
+    RAY_TRAVERSAL_DIFFERENTIAL_SHARD_CENSUSES,
+    RAY_TRAVERSAL_DIFFERENTIAL_SHARD_COUNT,
+} from "./ray_traversal_differential_fixture";
 
 describe("traceGridRayCells", () => {
     it("preserves corner ties without adding strict-supercover side cells", () => {
@@ -195,48 +78,25 @@ describe("traceGridRayCells", () => {
         expect(traceGridRayCells(GS, { x: 0, y: 0 }, { x: Infinity, y: 0 })).toEqual([]);
     });
 
-    it("exhaustively matches every legal shot side and projected through-shot trajectory", () => {
-        const sideValues = [
-            RangeAttackCellSide.LEFT,
-            RangeAttackCellSide.RIGHT,
-            RangeAttackCellSide.DOWN,
-            RangeAttackCellSide.UP,
-        ];
-        let cases = 0;
-        for (let attackerX = 0; attackerX < GS.getGridSize(); attackerX += 1) {
-            for (let attackerY = 0; attackerY < GS.getGridSize(); attackerY += 1) {
-                const start = cellCenter({ x: attackerX, y: attackerY });
-                for (let targetX = 0; targetX < GS.getGridSize(); targetX += 1) {
-                    for (let targetY = 0; targetY < GS.getGridSize(); targetY += 1) {
-                        const targetCell = { x: targetX, y: targetY };
-                        for (const side of sideValues) {
-                            const end = getRangeAttackSideCenter(GS, targetCell, side, start);
-                            assertLegacyEquivalent(start, end);
-                            assertLegacyEquivalent(start, projectLineToFieldEdge(GS, start.x, start.y, end.x, end.y));
-                            cases += 2;
-                        }
-                    }
-                }
-            }
-        }
-        for (let attackerX = 1; attackerX < GS.getGridSize(); attackerX += 1) {
-            for (let attackerY = 1; attackerY < GS.getGridSize(); attackerY += 1) {
-                const start = cellCenter({ x: attackerX - 0.5, y: attackerY - 0.5 });
-                for (let targetX = 0; targetX < GS.getGridSize(); targetX += 1) {
-                    for (let targetY = 0; targetY < GS.getGridSize(); targetY += 1) {
-                        const targetCell = { x: targetX, y: targetY };
-                        for (const side of sideValues) {
-                            const end = getRangeAttackSideCenter(GS, targetCell, side, start);
-                            assertLegacyEquivalent(start, end);
-                            assertLegacyEquivalent(start, projectLineToFieldEdge(GS, start.x, start.y, end.x, end.y));
-                            cases += 2;
-                        }
-                    }
-                }
-            }
-        }
-        expect(cases).toBe(985_088);
-    }, 60_000);
+    it("partitions the exact exhaustive differential census across disjoint attacker-origin shards", () => {
+        expect(RAY_TRAVERSAL_DIFFERENTIAL_SHARD_CENSUSES).toHaveLength(RAY_TRAVERSAL_DIFFERENTIAL_SHARD_COUNT);
+        expect(
+            RAY_TRAVERSAL_DIFFERENTIAL_SHARD_CENSUSES.reduce(
+                (total, shard) => ({
+                    origins: total.origins + shard.origins,
+                    legalShotCases: total.legalShotCases + shard.legalShotCases,
+                    uniqueLegalRays: total.uniqueLegalRays + shard.uniqueLegalRays,
+                    centerCases: total.centerCases + shard.centerCases,
+                }),
+                { origins: 0, legalShotCases: 0, uniqueLegalRays: 0, centerCases: 0 },
+            ),
+        ).toEqual({
+            origins: 481,
+            legalShotCases: 985_088,
+            uniqueLegalRays: 478_922,
+            centerCases: 123_136,
+        });
+    });
 
     it("preserves the legacy large-unit corner alias cell", () => {
         const sideValues = [
@@ -250,34 +110,6 @@ describe("traceGridRayCells", () => {
         const cells = traceGridRayCells(GS, start, end).map(([cell]) => cell);
         expect(cells).toContainEqual({ x: 2, y: 4 });
         assertLegacyEquivalent(start, end);
-    });
-
-    it("exhaustively matches small and large attacker centers to every target center", () => {
-        let cases = 0;
-        for (let attackerX = 0; attackerX < GS.getGridSize(); attackerX += 1) {
-            for (let attackerY = 0; attackerY < GS.getGridSize(); attackerY += 1) {
-                const start = cellCenter({ x: attackerX, y: attackerY });
-                for (let targetX = 0; targetX < GS.getGridSize(); targetX += 1) {
-                    for (let targetY = 0; targetY < GS.getGridSize(); targetY += 1) {
-                        assertLegacyEquivalent(start, cellCenter({ x: targetX, y: targetY }));
-                        cases += 1;
-                    }
-                }
-            }
-        }
-        for (let attackerX = 1; attackerX < GS.getGridSize(); attackerX += 1) {
-            for (let attackerY = 1; attackerY < GS.getGridSize(); attackerY += 1) {
-                // Large-unit world positions lie on the vertex shared by their four occupied cells.
-                const start = cellCenter({ x: attackerX - 0.5, y: attackerY - 0.5 });
-                for (let targetX = 0; targetX < GS.getGridSize(); targetX += 1) {
-                    for (let targetY = 0; targetY < GS.getGridSize(); targetY += 1) {
-                        assertLegacyEquivalent(start, cellCenter({ x: targetX, y: targetY }));
-                        cases += 1;
-                    }
-                }
-            }
-        }
-        expect(cases).toBe(123_136);
     });
 
     it("preserves the legacy packed-key collision outside the legal grid", () => {

@@ -108,7 +108,7 @@ describe("generated message constructors (new X({...}))", () => {
         const playerSetup = new PortalPB.PortalMatchSetup({
             artifact_tier_1: 3,
             artifact_tier_2: 11,
-            perk: 2,
+            doctrine: 2,
             augment_placement: 1,
             augment_armor: 3,
             augment_might: 2,
@@ -120,7 +120,7 @@ describe("generated message constructors (new X({...}))", () => {
         const opponentSetup = new PortalPB.PortalMatchSetup({
             artifact_tier_1: 12,
             artifact_tier_2: 5,
-            perk: 3,
+            doctrine: 3,
             augment_placement: 0,
             augment_armor: 2,
             augment_might: 3,
@@ -154,6 +154,7 @@ describe("generated message constructors (new X({...}))", () => {
             mmr_after: 890,
             mmr_delta: -12,
             gold_earned: 0,
+            opponent_player_id: "22222222-2222-4222-8222-222222222222",
         };
         roundTrip(
             new PortalPB.PortalUnitPerformance({ creature_id: 1, damage_dealt: 1400 }),

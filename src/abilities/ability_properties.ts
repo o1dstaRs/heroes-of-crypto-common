@@ -102,6 +102,9 @@ export enum AbilityPowerType {
     STUN_CHANCE = 68,
     // A live holder prevents either side from using Hourglass. The engine gate lives in engine/hourglass.ts.
     DISABLE_HOURGLASS = 69,
+    // The fourth elemental affinity: an Earth Element is immune to earth and vulnerable to wind.
+    // Appended to keep every existing serialized numeric value stable.
+    MAGIC_VULNERABILITY_WIND = 70,
 }
 
 export const AllAbilityPowerTypes = [
@@ -175,6 +178,7 @@ export const AllAbilityPowerTypes = [
     AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE,
     AbilityPowerType.STUN_CHANCE,
     AbilityPowerType.DISABLE_HOURGLASS,
+    AbilityPowerType.MAGIC_VULNERABILITY_WIND,
 ];
 
 export type AllAbilityPowerType = (typeof AllAbilityPowerTypes)[number];
@@ -251,6 +255,7 @@ export const ToAbilityPowerType: { [abilityPowerTypeName: string]: AbilityPowerT
     ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE: AbilityPowerType.ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE,
     STUN_CHANCE: AbilityPowerType.STUN_CHANCE,
     DISABLE_HOURGLASS: AbilityPowerType.DISABLE_HOURGLASS,
+    MAGIC_VULNERABILITY_WIND: AbilityPowerType.MAGIC_VULNERABILITY_WIND,
 };
 
 export enum AbilityType {

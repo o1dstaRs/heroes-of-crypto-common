@@ -80,7 +80,7 @@ export function traceGridRayCells(gridSettings: GridSettings, start: XY, end: XY
     const startY = Math.round(start.y);
     const endX = Math.round(end.x);
     const endY = Math.round(end.y);
-    if (![startX, startY, endX, endY].every(Number.isFinite)) {
+    if (!Number.isFinite(startX) || !Number.isFinite(startY) || !Number.isFinite(endX) || !Number.isFinite(endY)) {
         return [];
     }
 
@@ -90,14 +90,10 @@ export function traceGridRayCells(gridSettings: GridSettings, start: XY, end: XY
     const directionX = startX < endX ? 1 : -1;
     const directionY = startY < endY ? 1 : -1;
     const cellSize = gridSettings.getCellSize();
-    const xOrigin = -gridSettings.getMaxX();
+    const maxX = gridSettings.getMaxX();
+    const xOrigin = -maxX;
     // getCellForPosition historically maps y as floor(y / cellSize), independent of GridSettings.minY.
     const yOrigin = 0;
-
-    const positionAt = (step: number): XY => ({
-        x: startX + directionX * axisDisplacement(deltaX, majorExtent, step),
-        y: startY + directionY * axisDisplacement(deltaY, majorExtent, step),
-    });
 
     if (majorExtent === 0) {
         const position = { x: startX, y: startY };
@@ -108,25 +104,44 @@ export function traceGridRayCells(gridSettings: GridSettings, start: XY, end: XY
     // Preserve the legacy 16-wide packed key exactly, including its collisions for malformed/out-of-grid
     // cells. Legal in-grid cells are collision-free; retaining the historical key makes differential fuzzing
     // exact even for projected field-edge endpoints at x/y === gridSize.
-    const seenCellKeys = new Set<number>();
+    const seenCellKeys: number[] = [];
+    let seenCellKeySet: Set<number> | undefined;
     let previousCellX: number | undefined;
     let previousCellY: number | undefined;
     let step = 0;
     while (step <= majorExtent) {
-        const position = positionAt(step);
-        const cell = getCellForPosition(gridSettings, position);
-        if (cell.x !== previousCellX || cell.y !== previousCellY) {
-            const cellKey = (cell.x << 4) | cell.y;
-            if (!seenCellKeys.has(cellKey)) {
-                intersections.push([cell, position]);
-                seenCellKeys.add(cellKey);
+        const positionX = startX + directionX * axisDisplacement(deltaX, majorExtent, step);
+        const positionY = startY + directionY * axisDisplacement(deltaY, majorExtent, step);
+        // Keep the hot transition scan scalar. Objects are part of the public result, but constructing the
+        // temporary position and cell for every examined boundary roughly doubles allocation in ranged-heavy
+        // searches. These are exactly getCellForPosition's two historical formulas.
+        const cellX = Math.floor((positionX + maxX) / cellSize);
+        const cellY = Math.floor(positionY / cellSize);
+        if (cellX !== previousCellX || cellY !== previousCellY) {
+            const cellKey = (cellX << 4) | cellY;
+            const isNewCell = seenCellKeySet ? !seenCellKeySet.has(cellKey) : !seenCellKeys.includes(cellKey);
+            if (isNewCell) {
+                intersections.push([
+                    { x: cellX, y: cellY },
+                    { x: positionX, y: positionY },
+                ]);
+                if (seenCellKeySet) {
+                    seenCellKeySet.add(cellKey);
+                } else {
+                    seenCellKeys.push(cellKey);
+                    // Legal 16x16 rays cross at most 31 unique cells. Keep their tiny membership list as an
+                    // allocation-light array, but retain Set complexity for extreme custom/out-of-grid rays.
+                    if (seenCellKeys.length === 32) {
+                        seenCellKeySet = new Set(seenCellKeys);
+                    }
+                }
             }
-            previousCellX = cell.x;
-            previousCellY = cell.y;
+            previousCellX = cellX;
+            previousCellY = cellY;
         }
 
-        const nextX = firstStepOutsideCell(startX, directionX, deltaX, majorExtent, cell.x, xOrigin, cellSize);
-        const nextY = firstStepOutsideCell(startY, directionY, deltaY, majorExtent, cell.y, yOrigin, cellSize);
+        const nextX = firstStepOutsideCell(startX, directionX, deltaX, majorExtent, cellX, xOrigin, cellSize);
+        const nextY = firstStepOutsideCell(startY, directionY, deltaY, majorExtent, cellY, yOrigin, cellSize);
         const nextStep = Math.min(nextX, nextY);
         if (!Number.isFinite(nextStep) || nextStep > majorExtent) {
             break;

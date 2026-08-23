@@ -113,11 +113,11 @@ class LegacyNeighborPathHelper extends PathHelper {
     }
 }
 
+const numberBitsView = new DataView(new ArrayBuffer(8));
+
 const numberBits = (value: number): string => {
-    const buffer = new ArrayBuffer(8);
-    const view = new DataView(buffer);
-    view.setFloat64(0, value, false);
-    return view.getBigUint64(0, false).toString(16).padStart(16, "0");
+    numberBitsView.setFloat64(0, value, false);
+    return numberBitsView.getBigUint64(0, false).toString(16).padStart(16, "0");
 };
 
 const xySnapshot = (cell: XY): [string, string] => [numberBits(cell.x), numberBits(cell.y)];

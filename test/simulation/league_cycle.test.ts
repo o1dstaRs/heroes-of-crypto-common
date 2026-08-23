@@ -95,7 +95,7 @@ describe("B1 iterative league smoke", () => {
             CEM_MATCH_CONC: "1",
             CEM_POP: "2",
             CEM_SEED: "2654435762",
-            CEM_UNFREEZE_PERK: "0",
+            CEM_UNFREEZE_DOCTRINE: "0",
             CEM_VAL_GAMES: "8",
             LEAGUE_INITIAL_POOL: poolPath,
             LEAGUE_MATRIX_GAMES: "8",

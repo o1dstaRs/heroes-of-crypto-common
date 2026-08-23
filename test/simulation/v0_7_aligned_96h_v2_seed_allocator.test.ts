@@ -322,7 +322,9 @@ describe("v0.7 aligned 96-hour v2 seed allocator", () => {
             else expect(expansion.shape, name).toBe("no_seed_reservation");
             if (name === "v0_7_composed_ranked_ladder_20260716.json") {
                 expect(expansion.seeds).toHaveLength(1_081_000);
-                expect(new Set(expansion.seeds).size).toBe(1_081_000);
+                expect(expansion.seeds.every((seed, index) => index === 0 || expansion.seeds[index - 1]! < seed)).toBe(
+                    true,
+                );
             }
         }
         expect(observedShapes).toEqual(

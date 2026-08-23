@@ -39,11 +39,15 @@ const fallenAngel = (amount: number, options: { spentSpell?: boolean; withAbilit
 describe("self-resurrection on death", () => {
     it("brings a LONE stack back — the split-Angel case", () => {
         const { angel, unitsHolder, properties } = fallenAngel(1);
+        const aggravated = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        unitsHolder.addUnit(aggravated);
+        aggravated.setTarget(angel.getId());
 
         // false = the unit was not deleted, i.e. it resurrected instead.
         expect(unitsHolder.deleteUnitById(angel.getId(), true)).toBe(false);
         expect(properties.amount_alive).toBe(1);
         expect(properties.amount_died).toBe(0);
+        expect(aggravated.getTarget()).toBe(angel.getId());
     });
 
     it("still brings back half of a larger stack", () => {

@@ -230,6 +230,8 @@ describe("render_ai_meta_report", () => {
         expect(html).toContain("function supported(row){return finite(row.pairs)&&row.pairs>0}");
         expect(html).toContain(".filter(supported)");
         expect(html).toContain("if(!supported(row)||!finite(row.rate)");
+        expect(html).toContain("var hasSupport=supported(row)");
+        expect(html).toContain('td(hasSupport?rate(row.scoreRate):"—","rate-cell")');
     });
 
     test("renders adjusted ally combinations and a per-unit counter picker", () => {

@@ -102,4 +102,41 @@ describe("Giant's Maul rescales the AOE ability descriptions", () => {
         unit.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
         expect(lightningSpinDamagePercent(unit)).toContain("100% damage");
     });
+
+    it("prints the owner's LUCK in the percentage, with the Maul stacking on top of it", () => {
+        // This pass is the LAST writer of these cards — the client chains up to it, and in ranked it is the
+        // only writer — and it used to print the ability's base power, so Gargantuan's Area Throw read a
+        // flat "100%" however lucky the stack was while the shot itself landed 100% + luck.
+        const areaThrowPercent = (unit: Unit): string | undefined => {
+            const props = unit.getUnitProperties();
+            return props.abilities_descriptions[props.abilities.indexOf("Area Throw")];
+        };
+
+        const lucky = createTestUnit({
+            name: "Thrower",
+            team: GREEN,
+            attackType: PBTypes.AttackVals.RANGE,
+            abilities: ["Area Throw"],
+            stackPower: 5,
+            luck: 5,
+        });
+        lucky.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(areaThrowPercent(lucky)).toContain("105%");
+
+        giveGiantsMaul(lucky, 40);
+        lucky.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(areaThrowPercent(lucky)).toContain("147%"); // 105 x 1.4, the order the AOE tail applies them
+
+        // Area Throw is not stack-powered, so a lone survivor still throws the full percentage + luck.
+        const alone = createTestUnit({
+            name: "Last Thrower",
+            team: GREEN,
+            attackType: PBTypes.AttackVals.RANGE,
+            abilities: ["Area Throw"],
+            stackPower: 1,
+            luck: 5,
+        });
+        alone.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(areaThrowPercent(alone)).toContain("105%");
+    });
 });

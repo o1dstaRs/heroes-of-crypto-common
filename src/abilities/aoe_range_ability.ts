@@ -58,6 +58,10 @@ export function processRangeAOEAbility(
     // Per-victim scaling applied to the raw hit before artifacts/resistances — Zena's Chakram halves
     // the bounce onto a target two cells removed (see chakram_ability.damageFactorByUnitId).
     perUnitDamageFactors?: Record<string, number>,
+    // Zena's Chakram rolls its dodges up front, in flight order, because a dodge ENDS the flight
+    // (chakram_ability.resolveChakramFlightMisses). Those verdicts are reused here rather than rolled
+    // again: a second roll could hand a hit to a victim the disc already stopped short of.
+    preRolledMissByUnitId?: Readonly<Record<string, boolean>>,
 ): IAOERangeAttackResult {
     const unitIdsDied: string[] = [];
     const perUnitDamage: IAOERangeAttackResult["perUnitDamage"] = [];
@@ -102,13 +106,14 @@ export function processRangeAOEAbility(
             }
 
             const isAttackMissed =
+                preRolledMissByUnitId?.[unit.getId()] ??
                 HoCLib.getRandomInt(0, 100) <
-                attackerUnit.calculateMissChance(
-                    unit,
-                    FightStateManager.getInstance()
-                        .getFightProperties()
-                        .getAdditionalAbilityPowerPerTeam(unit.getTeam()),
-                );
+                    attackerUnit.calculateMissChance(
+                        unit,
+                        FightStateManager.getInstance()
+                            .getFightProperties()
+                            .getAdditionalAbilityPowerPerTeam(unit.getTeam()),
+                    );
             if (isAttackMissed) {
                 sceneLog.updateLog(
                     `${attackerUnit.getName()} misses 🏹 ${isAttack ? "on" : "resp on"} ${unit.getName()}`,
@@ -216,7 +221,7 @@ export function processRangeAOEAbility(
                     false,
                     attackerUnit,
                 );
-                // Poison Cloud Aura: an aura'd attacker poisons every unit its AOE hits, not just the primary.
+                // Poison aura: an aura'd attacker poisons every unit its AOE hits, not just the primary.
                 processPoisonAuraAbility(attackerUnit, unit, damageDealt, sceneLog);
                 const unitsKilled = Math.max(0, amountAliveBeforeDamage - unit.getAmountAlive());
                 perUnitDamage.push({
@@ -344,6 +349,16 @@ export function evaluateAffectedUnits(
         affectedUnits.push(occupantUnit);
         cellKeys.push(cellKey);
         unitIds.push(occupantId);
+    }
+
+    // ABILITY Arrows Wingshield Aura (Angel): "the owner ... does not propagate AOE range damage".
+    // A blast that catches the Angel stops at him — he soaks it and nobody around him is splashed.
+    // Applied HERE rather than in processRangeAOEAbility because the client's hover preview calls this
+    // same function to outline and price the victims, so what is highlighted is what actually gets hit.
+    // Two Angels in one blast both soak it; neither passes it on.
+    const shieldBearers = affectedUnits.filter((unit) => unit.hasAbilityActive("Arrows Wingshield Aura"));
+    if (shieldBearers.length) {
+        return [shieldBearers, shieldBearers];
     }
 
     if (affectedUnits.length) {

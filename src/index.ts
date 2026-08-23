@@ -15,7 +15,7 @@ export * as GridConstants from "./grid/grid_constants";
 export * as GridMath from "./grid/grid_math";
 export * as Augment from "./augments/augment_properties";
 export * as Artifact from "./artifacts/artifact_properties";
-export * as Perk from "./perks/perk_properties";
+export * as Doctrine from "./doctrines/doctrine_properties";
 export * from "./abilities/ability";
 export * from "./scene/animations";
 export * as AbilityHelper from "./abilities/ability_helper";
@@ -52,6 +52,8 @@ export * from "./handlers/move_handler";
 export * from "./handlers/attack_handler";
 export * from "./spells/spell_properties";
 export * from "./spells/spell_damage";
+export * from "./spells/spell_cast_projection";
+export * from "./spells/magic_mirror_damage";
 export * from "./synergies/synergy_properties";
 export * from "./grid/path_definitions";
 export * from "./grid/path_helper";
@@ -64,6 +66,8 @@ export * from "./obstacles/obstacle_type";
 export * from "./units/unit_properties";
 export * from "./units/units_holder";
 export * from "./units/unit";
+export * from "./damage/damage_projection";
+export * from "./damage/ability_damage_projection";
 export * from "./scene/scene_log_interface";
 export * from "./scene/scene_stats";
 export * from "./scene/statistic_holder_interface";
@@ -82,6 +86,8 @@ export {
     isMindlessAiUnit,
     MINDLESS_AI_ABILITY,
     MINDLESS_AI_VERSION,
+    pickRankedAIDoctrine,
+    RANKED_AI_DOCTRINE_CHOICES,
     enumerateCandidates,
     getEnemiesCellsWithinMovementRange,
     AI_VERSIONS,
@@ -127,6 +133,7 @@ export {
 export type {
     IAIPolicyEvent,
     IAIStrategy,
+    IRankedAIDoctrineChoiceContext,
     IRankedAIProfile,
     IRankedAISetupPolicy,
     IDecisionContext,
@@ -141,7 +148,7 @@ export type {
     IV09ModelArtifact,
     IV09QualificationReceipt,
 } from "./ai";
-// Setup AI (draft/placement policy) — perk, bundle, creatures, artifacts, synergies, augments.
+// Setup AI (draft/placement policy) — doctrine, bundle, creatures, artifacts, synergies, augments.
 export { SETUP_POLICY_V0, SETUP_POLICY_V0_DRAFT_ROLLBACK, SetupPolicyV0 } from "./ai/setup/setup_v0";
 export type { ISetupPolicyV0Options } from "./ai/setup/setup_v0";
 export { createPlacementSetupDecisionContext, createTier2ArtifactDecisionContext } from "./ai/setup/setup_strategy";

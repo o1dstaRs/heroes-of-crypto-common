@@ -44,7 +44,7 @@ import {
     Tier1Artifact,
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
-import { getUpgradePoints, Perk } from "../perks/perk_properties";
+import { getUpgradePoints, Doctrine } from "../doctrines/doctrine_properties";
 import { isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
@@ -71,6 +71,46 @@ import { Vines } from "../spells/vines";
 import { FireWalls } from "../spells/fire_walls";
 
 type RandomIntFn = (min: number, max: number) => number;
+
+interface IParsedSynergyKey {
+    faction: FactionType;
+    specificSynergy: SpecificSynergy;
+    level: number;
+}
+
+// Production synergy keys come from this immutable configuration table. Parse those 24 keys once at module
+// load instead of splitting the same four per-team strings throughout every battle stat refresh. Raw legacy or
+// authoritative keys that are not in the table retain the permissive historical parseInt behavior below.
+const PARSED_CANONICAL_SYNERGY_KEYS: ReadonlyMap<string, IParsedSynergyKey> = new Map(
+    Object.keys(SynergyKeysToPower).map((key) => {
+        const [factionName, specificSynergy, level] = key.split(":");
+        return [
+            key,
+            {
+                faction: ToFactionType[factionName],
+                specificSynergy: parseInt(specificSynergy) as SpecificSynergy,
+                level: parseInt(level),
+            },
+        ];
+    }),
+);
+
+const parseLegacySynergyKey = (synergy: string): IParsedSynergyKey | undefined => {
+    const factionSeparator = synergy.indexOf(":");
+    if (factionSeparator < 0) {
+        return undefined;
+    }
+    const levelSeparator = synergy.indexOf(":", factionSeparator + 1);
+    // This is the allocation-free equivalent of the historical `split(":").length === 3` shape guard.
+    if (levelSeparator < 0 || synergy.indexOf(":", levelSeparator + 1) >= 0) {
+        return undefined;
+    }
+    return {
+        faction: ToFactionType[synergy.slice(0, factionSeparator) as keyof typeof ToFactionType],
+        specificSynergy: parseInt(synergy.slice(factionSeparator + 1, levelSeparator)) as SpecificSynergy,
+        level: parseInt(synergy.slice(levelSeparator + 1)),
+    };
+};
 
 export class FightProperties {
     private id: string;
@@ -105,7 +145,7 @@ export class FightProperties {
     private augmentMovementPerTeam: Map<TeamType, MovementAugment>;
     private artifactTier1PerTeam: Map<TeamType, Tier1Artifact>;
     private artifactTier2PerTeam: Map<TeamType, Tier2Artifact>;
-    private perkPerTeam: Map<TeamType, Perk>;
+    private doctrinePerTeam: Map<TeamType, Doctrine>;
     // Which synergy of each faction's pair this match fields. Drawn once from the game id so the draft can
     // show them before the first pick; sandbox and tests keep the default set.
     private synergyVariants: { [factionName: string]: SpecificSynergy } = { ...DEFAULT_SYNERGY_VARIANTS };
@@ -165,7 +205,7 @@ export class FightProperties {
         this.augmentMovementPerTeam = new Map();
         this.artifactTier1PerTeam = new Map();
         this.artifactTier2PerTeam = new Map();
-        this.perkPerTeam = new Map();
+        this.doctrinePerTeam = new Map();
         this.synergyUnitsLifePerTeam = new Map();
         this.synergyUnitsChaosPerTeam = new Map();
         this.synergyUnitsMightPerTeam = new Map();
@@ -1007,18 +1047,18 @@ export class FightProperties {
     public hasArtifactTier2(teamType: TeamType, artifactId: Tier2Artifact): boolean {
         return artifactId !== Tier2Artifact.NO_ARTIFACT && this.getArtifactTier2(teamType) === artifactId;
     }
-    public setPerkPerTeam(teamType: TeamType, perk: Perk): void {
+    public setDoctrinePerTeam(teamType: TeamType, doctrine: Doctrine): void {
         if (teamType === PBTypes.TeamVals.NO_TEAM) {
             return;
         }
-        this.perkPerTeam.set(teamType, perk);
+        this.doctrinePerTeam.set(teamType, doctrine);
     }
-    public getPerk(teamType: TeamType): Perk {
-        return this.perkPerTeam.get(teamType) ?? Perk.NO_PERK;
+    public getDoctrine(teamType: TeamType): Doctrine {
+        return this.doctrinePerTeam.get(teamType) ?? Doctrine.NO_DOCTRINE;
     }
-    // Upgrade (augment) point budget for the team, determined by its chosen perk.
+    // Upgrade (augment) point budget for the team, determined by its chosen doctrine.
     public getUpgradePoints(teamType: TeamType): number {
-        return getUpgradePoints(this.getPerk(teamType));
+        return getUpgradePoints(this.getDoctrine(teamType));
     }
     public setAugmentPerTeam(teamType: TeamType, augmentType: AugmentType): boolean {
         if (teamType === PBTypes.TeamVals.NO_TEAM) {
@@ -1356,21 +1396,18 @@ export class FightProperties {
         }
 
         for (const synergy of synergies) {
-            const synergySplitArr = synergy.split(":");
-            if (synergySplitArr.length !== 3) {
+            const parsed = PARSED_CANONICAL_SYNERGY_KEYS.get(synergy) ?? parseLegacySynergyKey(synergy);
+            if (!parsed) {
                 continue;
             }
 
-            const factionPart = ToFactionType[synergySplitArr[0] as keyof typeof ToFactionType];
-            if (factionPart !== faction) {
+            if (parsed.faction !== faction) {
                 continue;
             }
 
-            const specificSynergyPart = parseInt(synergySplitArr[1]) as SpecificSynergy;
-            if (specificSynergy === specificSynergyPart) {
-                const synergyLevelPart = parseInt(synergySplitArr[2]);
-                if (synergyLevelPart && synergyLevelPart <= MAX_SYNERGY_LEVEL) {
-                    return synergyLevelPart;
+            if (specificSynergy === parsed.specificSynergy) {
+                if (parsed.level && parsed.level <= MAX_SYNERGY_LEVEL) {
+                    return parsed.level;
                 }
             }
         }

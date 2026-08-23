@@ -18,9 +18,10 @@ import {
     applyMagicResistToSpellDamage,
     calculateSpellDamage,
     isOffensiveSpellMultiplier,
+    maximumElementalSpellDamage,
     offensiveSpellDamageAgainstTarget,
 } from "../../src/spells/spell_damage";
-import { SpellMultiplierType } from "../../src/spells/spell_properties";
+import { SpellElement, SpellMultiplierType } from "../../src/spells/spell_properties";
 
 interface IRawSpell {
     power: number;
@@ -150,5 +151,27 @@ describe("offensive spell damage projection", () => {
         expect(applyElementAndResistToSpellDamage(1000, 0, 0)).toBe(0);
         expect(applyElementAndResistToSpellDamage(1000, 1.5, 0)).toBe(1500);
         expect(applyElementAndResistToSpellDamage(1000, 1.5, 50)).toBe(750);
+    });
+
+    // The spellbook card is read BEFORE a target is chosen, so the only honest figure it can bound the cast
+    // with is the top of the band — and against the element a spell counters that is half again the printed
+    // number, which is why the bare figure was not even an upper bound.
+    describe("the most a spell can land before resistance", () => {
+        it("adds half again for the element the spell counters, in both directions of each pair", () => {
+            expect(maximumElementalSpellDamage(300, SpellElement.FIRE)).toBe(450);
+            expect(maximumElementalSpellDamage(300, SpellElement.WATER)).toBe(450);
+            expect(maximumElementalSpellDamage(300, SpellElement.AIR)).toBe(450);
+            expect(maximumElementalSpellDamage(300, SpellElement.EARTH)).toBe(450);
+        });
+
+        it("leaves an elementless spell at its own figure", () => {
+            expect(maximumElementalSpellDamage(300, SpellElement.NO_ELEMENT)).toBe(300);
+            expect(maximumElementalSpellDamage(0, SpellElement.NO_ELEMENT)).toBe(0);
+        });
+
+        it("floors the counter the way the cast does", () => {
+            // 345 * 1.5 = 517.5 -> the cast lands 517, so the card may not promise 518.
+            expect(maximumElementalSpellDamage(345, SpellElement.AIR)).toBe(517);
+        });
     });
 });

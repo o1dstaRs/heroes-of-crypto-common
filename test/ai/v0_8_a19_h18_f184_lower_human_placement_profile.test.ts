@@ -296,7 +296,7 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             "3711c6671beb1e0f0bf3198d1e37596d3c2731814c260026352745b620bbfe24",
         );
         expect(serializedSha256(V08_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK_PROFILE)).toBe(
-            "a93b88690f70593847672ab8f6038c94ef9d62cb68bf9f53f1174732e7e820d0",
+            "288e4f03dd7f9ac579bd0fd17fb7c4834fbad592950c1b3baa063dac091d5ee7",
         );
     });
 
@@ -363,7 +363,7 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             placementComposition: ["exact-f184-lower", "generic-ranked-placement", "plain-v0.8"],
         });
         expect(fingerprintV08AlignedV1(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_PROFILE)).toBe(
-            "5a0b0d62ab9712acef3bd7372a301f96b1cb7fdeb873bad0abe273ac6033d61e",
+            "51db7d904fb13cedb64aa44a710c230cc625533371f4f732cbd7be79f7f120d8",
         );
         expect(Object.isFrozen(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_PROFILE)).toBe(true);
         expect(Object.isFrozen(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_SEARCH)).toBe(true);
@@ -600,11 +600,10 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             "tournament-entrant-a-router",
             "battle-engine-search-team-scope",
         ]);
-        // Promotion intentionally changed the registry/search router and the tournament's native control. Those
-        // current bytes are pinned by the production profile; retain these two entries here as immutable
-        // qualification provenance while continuing to verify the unchanged policy implementations.
+        // Promotion intentionally changed the registry/search router and the tournament's native control, and
+        // subsequent shipped policy work changed the generic search driver. Retain those historical entries as
+        // immutable qualification provenance while continuing to verify the unchanged policy implementations.
         const currentImplementationRoles = new Set([
-            "search-driver",
             "armageddon-endgame",
             "boar-battle-mage-flank-placement",
             "compact-placement",

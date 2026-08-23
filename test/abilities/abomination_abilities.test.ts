@@ -199,28 +199,35 @@ describe("Flesh Shield aura (damage absorption)", () => {
         expect(abomination.getHp()).toBe(155);
     });
 
-    it("recalculates magical AOE absorption through the owner's magic resistance", () => {
-        const { grid, unitsHolder, damageStatisticHolder, abomination, ally, attacker } = setupAuraTrio({
-            abominationLuck: 10,
-            allyMagicResist: 0,
-            abominationMagicResist: 50,
-        });
-        const result = processFleshShieldAura(
-            attacker,
-            ally,
+    it("ignores magic resistance entirely — armor is the only defense in the transfer", () => {
+        // The aura is physical-only, so a magic-resistant owner soaks exactly as much as a bare one.
+        const resistant = setupAuraTrio({ allyMagicResist: 0, abominationMagicResist: 50 });
+        const bare = setupAuraTrio({ allyMagicResist: 0, abominationMagicResist: 0 });
+
+        const withResist = processFleshShieldAura(
+            resistant.attacker,
+            resistant.ally,
             100,
             false,
-            grid,
-            unitsHolder,
+            resistant.grid,
+            resistant.unitsHolder,
             new SceneLogMock(),
-            damageStatisticHolder,
-            undefined,
-            "magic",
+            resistant.damageStatisticHolder,
+        );
+        const withoutResist = processFleshShieldAura(
+            bare.attacker,
+            bare.ally,
+            100,
+            false,
+            bare.grid,
+            bare.unitsHolder,
+            new SceneLogMock(),
+            bare.damageStatisticHolder,
         );
 
-        expect(result.remainingDamage).toBe(0);
-        expect(result.absorbedDamage).toBe(50);
-        expect(abomination.getHp()).toBe(150);
+        expect(withResist.absorbedDamage).toBe(withoutResist.absorbedDamage);
+        expect(withResist.remainingDamage).toBe(withoutResist.remainingDamage);
+        expect(resistant.abomination.getHp()).toBe(bare.abomination.getHp());
     });
 
     it("does not absorb its own damage or trigger for units outside the aura", () => {
@@ -791,6 +798,29 @@ describe("Stun Aura (ally buff, stun-on-hit)", () => {
         // The base (no-luck) Abomination's ally buff agrees with its own stored aura power.
         const baseAura = abomination.getAuraEffects().find((a) => a.getName() === "Stun");
         expect(ally.getBuff("Stun Aura")?.getPower()).toBeCloseTo(abomination.calculateAuraPower(baseAura!, 0), 5);
+    });
+
+    it("caps the displayed chance at the same 100% maximum as the projected aura", () => {
+        const abomination = createTestUnit({
+            name: "Abomination",
+            team: PBTypes.TeamVals.LOWER,
+            abilities: ["Stun Aura"],
+            auraEffects: ["Stun"],
+            auraRanges: [2],
+            auraIsBuff: [true],
+            stackPower: 5,
+            luck: 10,
+        });
+        abomination.adjustBaseStats(true, 1, 80, 0, 0, 0, 10);
+
+        const auraEffect = abomination.getAuraEffects().find((a) => a.getName() === "Stun");
+        expect(auraEffect).toBeDefined();
+        expect(abomination.calculateAuraPower(auraEffect!, 80)).toBe(100);
+
+        const props = abomination.getUnitProperties();
+        const index = props.abilities.indexOf("Stun Aura");
+        expect(props.abilities_descriptions[index]).toContain("separate 100% chance");
+        expect(props.abilities_descriptions[index]).not.toContain("115%");
     });
 
     it("is carried by the real Abomination as a stack-powered range-2 BUFF aura card", () => {

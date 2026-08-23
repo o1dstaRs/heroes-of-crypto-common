@@ -13,6 +13,7 @@ import { describe, expect, it } from "bun:test";
 
 import { ObstacleType } from "../../src/obstacles/obstacle_type";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { GridSettings } from "../../src/grid/grid_settings";
 import {
     adjustClosestPointSideCenterPoint,
     arePointsConnected,
@@ -29,6 +30,9 @@ import {
     getClosestVH,
     getCrossingPoints,
     getDistanceToFurthestCorner,
+    getFullDamageSquareHalfExtent,
+    getShotCellDistance,
+    getWholeCellShotDistance,
     getLargeUnitAttackCells,
     getPositionForCell,
     getPositionForCells,
@@ -97,6 +101,72 @@ describe("grid_math", () => {
         expect(getPositionForCells(testGridSettings, [])).toBeUndefined();
     });
 
+    it("preserves exact around-position cells for seeded fractional, boundary, and malformed inputs", () => {
+        const legacyGetCellsAroundPosition = (
+            settings: GridSettings,
+            position: { x: number; y: number },
+        ): { x: number; y: number }[] => {
+            const cells: { x: number; y: number }[] = [];
+            const canGoLeft = position.x > settings.getMinX();
+            const canGoRight = position.x < settings.getMaxX();
+            const canGoDown = position.y > settings.getMinY();
+            const canGoUp = position.y < settings.getMaxY();
+            const pushCell = (x: number, y: number): void => {
+                cells.push(getCellForPosition(settings, { x, y }));
+            };
+            if (canGoLeft && canGoUp) {
+                pushCell(position.x - settings.getHalfStep(), position.y + settings.getHalfStep());
+            }
+            if (canGoRight && canGoUp) {
+                pushCell(position.x + settings.getHalfStep(), position.y + settings.getHalfStep());
+            }
+            if (canGoDown && canGoLeft) {
+                pushCell(position.x - settings.getHalfStep(), position.y - settings.getHalfStep());
+            }
+            if (canGoDown && canGoRight) {
+                pushCell(position.x + settings.getHalfStep(), position.y - settings.getHalfStep());
+            }
+            return cells;
+        };
+        let randomState = 0x7a11_ce55;
+        const random = (): number => {
+            randomState = (randomState + 0x6d2b79f5) >>> 0;
+            let value = randomState;
+            value = Math.imul(value ^ (value >>> 15), value | 1);
+            value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+            return ((value ^ (value >>> 14)) >>> 0) / 0x1_0000_0000;
+        };
+        const settingsCases = [
+            testGridSettings,
+            new GridSettings(7, 1_000, -50, 500, -500, 1, 1),
+            new GridSettings(17, 1_000, 10, 500, -500, 1, 1),
+            new GridSettings(16, 2_047, 0, 1_023.5, -1_023.5, 1, 1),
+            new GridSettings(31, 997, -300, 498.5, -498.5, 1, 1),
+        ];
+        for (const settings of settingsCases) {
+            const positions = [
+                { x: settings.getMinX(), y: settings.getMinY() },
+                { x: settings.getMaxX(), y: settings.getMaxY() },
+                { x: Number.NaN, y: 0 },
+                { x: 0, y: Number.POSITIVE_INFINITY },
+            ];
+            for (let index = 0; index < 2_000; index++) {
+                const xSpan = settings.getMaxX() - settings.getMinX();
+                const ySpan = settings.getMaxY() - settings.getMinY();
+                positions.push({
+                    x: settings.getMinX() - 512 + random() * (xSpan + 1_024),
+                    y: settings.getMinY() - 512 + random() * (ySpan + 1_024),
+                });
+            }
+
+            for (const position of positions) {
+                expect(getCellsAroundPosition(settings, position)).toEqual(
+                    legacyGetCellsAroundPosition(settings, position),
+                );
+            }
+        }
+    });
+
     it("reconstructs a 2x2 footprint center from its baseCell (max corner)", () => {
         // The footprint center for the 2x2 at {5,6}x{5,6} (asserted above) is the shared corner of the
         // four cells. A 2x2 unit's baseCell is always its MAX corner, and the center sits half a step
@@ -157,6 +227,55 @@ describe("grid_math", () => {
         expect(reverseVh).toContainEqual({ x: testGridSettings.getMinX(), y: 384 });
         expect(adjustClosestPointSideCenterPoint({ x: 1, y: 1 }, { x: 2, y: 2 })).toEqual({ x: 0, y: 0 });
         expect(getDistanceToFurthestCorner({ x: 0, y: 0 }, testGridSettings)).toBeGreaterThan(0);
+    });
+
+    it("plays a fractional shot distance as a square of whole cells", () => {
+        // The unit card and the left sidebar keep the fractional stat; only the board floors it.
+        expect(getWholeCellShotDistance(6.5)).toBe(6);
+        expect(getWholeCellShotDistance(4)).toBe(4);
+        expect(getWholeCellShotDistance(0.9)).toBe(0);
+        expect(getWholeCellShotDistance(0)).toBe(0);
+        expect(getWholeCellShotDistance(Number.NaN)).toBe(0);
+
+        const center = (cell: { x: number; y: number }) =>
+            getPositionForCell(
+                cell,
+                testGridSettings.getMinX(),
+                testGridSettings.getStep(),
+                testGridSettings.getHalfStep(),
+            );
+        const smallAt = { x: 5, y: 5 };
+        const cellsAway = (cell: { x: number; y: number }) =>
+            getShotCellDistance(testGridSettings, center(smallAt), 1, center(cell));
+
+        expect(cellsAway(smallAt)).toBe(0);
+        expect(cellsAway({ x: 8, y: 5 })).toBe(3);
+        // King moves: the diagonal is exactly as far as the straight line, which is what turns the
+        // full-damage area from a circle into a square.
+        expect(cellsAway({ x: 8, y: 8 })).toBe(3);
+        expect(cellsAway({ x: 2, y: 8 })).toBe(3);
+        expect(cellsAway({ x: 8, y: 6 })).toBe(3);
+
+        // An aim point nudged onto a cell EDGE still measures as that cell.
+        const edge = getRangeAttackSideCenter(
+            testGridSettings,
+            { x: 8, y: 5 },
+            RangeAttackCellSide.LEFT,
+            center(smallAt),
+        );
+        expect(getShotCellDistance(testGridSettings, center(smallAt), 1, edge)).toBe(3);
+
+        // A 2x2 measures from its footprint: its own cells are 0 away, the next ring is 1.
+        const largeCenter = center({ x: 4.5, y: 4.5 });
+        expect(getShotCellDistance(testGridSettings, largeCenter, 2, center({ x: 5, y: 5 }))).toBe(0);
+        expect(getShotCellDistance(testGridSettings, largeCenter, 2, center({ x: 6, y: 6 }))).toBe(1);
+        expect(getShotCellDistance(testGridSettings, largeCenter, 2, center({ x: 3, y: 4 }))).toBe(1);
+
+        // The drawn square hugs whole cells: half a cell for a 1x1, a full cell for a 2x2.
+        const step = testGridSettings.getStep();
+        expect(getFullDamageSquareHalfExtent(6.5, 1, step)).toBe(6.5 * step);
+        expect(getFullDamageSquareHalfExtent(6.5, 2, step)).toBe(7 * step);
+        expect(getFullDamageSquareHalfExtent(0.5, 1, step)).toBe(0.5 * step);
     });
 
     it("finds random adjacent cells only within the grid", () => {

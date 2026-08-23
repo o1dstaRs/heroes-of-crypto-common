@@ -15,6 +15,10 @@ artifact or promotes v0.9 automatically.
   every learner launch pins the UUID rather than a numeric device index.
 - The campaign uses its own Python 3.12 virtual environment with PyTorch `2.11.0+cu130` and NumPy
   `2.2.6`.
+- WSL exposes a host-global load average that can remain elevated while the visible training environment is idle.
+  On WSL only, `--allow-wsl-load-average-override` replaces the initial load-average admission check with a
+  sealed instantaneous CPU-utilization sample. Conflicting training processes, GPU compute processes, memory,
+  affinity, and every between-candidate availability check remain mandatory.
 - Every initialization must name at least one reserved v0.8 output path with `--protect-v08-root`; repeat the
   option for every v0.8 root that must be protected. A v0.9 output may not equal, contain, or be contained
   by any protected root.
@@ -35,6 +39,13 @@ artifact or promotes v0.9 automatically.
   validated merge with shard `1/2` can qualify a model.
 - The production server circuit breaker is 25 ms. The qualification gate is strict production-CPU turn
   p99 `<20 ms`; training-host latency is recorded but is not used as a production performance gate.
+- A non-x64 teacher host may contribute only after the frozen source passes a paired 96-game teacher-parity
+  panel against an admitted x64 host. `cross_arch_teacher_parity.ts` requires exact schedules, candidates,
+  features, selected labels/actions, and outcomes. Only `teacherMean`/`teacherStdErr` may differ, with an
+  absolute tolerance of `1e-12`; the sealed receipt records both raw shard hashes and every observed delta.
+  Raw JSONL byte equality is intentionally not required because equivalent ARM64/x64 floating-point results
+  can differ by one ULP. A receipt admits an architecture for that exact frozen source, phase, and split only;
+  wide-teacher admission does not implicitly admit either DAgger phase.
 
 ## Initialize once on the RTX host
 
@@ -66,7 +77,8 @@ bun src/simulation/v0_9/actor_lane_benchmark.ts \
   --repository "$(pwd)" \
   --source-receipt "$SOURCE_RECEIPT" \
   --gpu-uuid GPU-5126d018-ec86-be8b-1bf5-b5ac323d3350 \
-  --protect-v08-root "$V08_OUTPUT"
+  --protect-v08-root "$V08_OUTPUT" \
+  --allow-wsl-load-average-override
 
 # Only when the host exposes neither CPU temperature nor throttle telemetry:
 # add --allow-missing-thermal-telemetry to the preceding benchmark command.
@@ -109,6 +121,28 @@ bun src/simulation/v0_9/orchestrator.ts smoke \
 Do not start the full campaign unless this smoke succeeds. Smoke actor data remains under
 `$CAMPAIGN/il-smoke`; the full run starts and validates its own `$CAMPAIGN/il` shards and cannot consume
 the smoke IL.
+
+## Cross-architecture teacher admission
+
+Run the same production-search seed panel independently on the candidate architecture and an admitted x64
+host. Keep both result directories outside the campaign. Once both contain at least 96 corresponding shards,
+seal their comparison:
+
+```bash
+bun src/simulation/v0_9/cross_arch_teacher_parity.ts \
+  --left /path/to/arm64-panel/v0.8-a13 \
+  --right /path/to/x64-panel/v0.8-a13 \
+  --left-arch darwin-arm64-m4-max \
+  --right-arch linux-x64 \
+  --minimum-games 96 \
+  --out /path/to/cross-arch-teacher-parity.json
+```
+
+The production command refuses panels below 96 games and marks only a complete production panel eligible for
+distributed teacher work. It fails closed on missing or extra shards, invalid row chains, mixed phases/splits,
+any changed feature/candidate/action, different teacher labels or outcomes, nullability changes, or
+teacher-score drift above `1e-12`. Re-run the panel for every source freeze and every corpus phase/split that
+will use the architecture; never carry architecture admission across commits or phases.
 
 ## Unattended training-host run
 

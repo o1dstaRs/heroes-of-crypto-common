@@ -2426,7 +2426,11 @@ describe("v0.8 protected ranged positioning", () => {
         const partialBand = setupSupportedBandAdvance({
             destination: { x: 5, y: 5 },
             guardCell: { x: 6, y: 4 },
-            shotDistance: 3,
+            // 3 -> 2 now that falloff bands are squares of whole cells and the band's last cell stays at
+            // full strength: at 3 both the current cell (6 away) and the destination (4 away) land in the
+            // SAME 1/2 band, which is the case the sameBand fixture above already covers. 2 restores this
+            // fixture's subject — a strictly better PARTIAL band (1/4 -> 1/2) that is still not full damage.
+            shotDistance: 2,
             targetAbilities: ["No Melee"],
         });
         partialBand.context.decisionOrigin = "root";
