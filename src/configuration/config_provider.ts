@@ -240,7 +240,9 @@ export const getCreatureConfig = (
         throw TypeError(`Unknown faction - ${factionName}`);
     }
 
-    const creatureConfig = factionUnits[creatureName];
+    // Keep the stable Ash Moth catalog identity compatible with the renamed player-facing creature.
+    const resolvedCreatureName = creatureName === "Wandering Mage" ? "Ash Moth" : creatureName;
+    const creatureConfig = factionUnits[resolvedCreatureName];
     if (!creatureConfig) {
         throw TypeError(`Unknown creature - ${creatureName}`);
     }
@@ -340,7 +342,7 @@ export const getCreatureConfig = (
 
     return new UnitProperties(
         ToFactionType[factionName],
-        creatureConfig.name,
+        creatureName === "Wandering Mage" ? creatureName : creatureConfig.name,
         creatureConfig.hp,
         creatureConfig.steps,
         morale,
@@ -388,17 +390,23 @@ export const getCreatureConfig = (
         largeTextureName,
         MAX_UNIT_STACK_POWER,
         "",
+        [],
+        false,
+        (creatureConfig as { footprint_width?: number }).footprint_width,
+        (creatureConfig as { footprint_height?: number }).footprint_height,
     );
 };
 
-// Fire Strike and Meteorite moved from Life to Chaos with the Battle Mage spellbook redesign. Accept old
-// saved/replay payloads that still carry the former prefix, but resolve them to the real Chaos definition
-// (including its faction value, so the client renders Chaos corners rather than Life corners).
-const LEGACY_LIFE_TO_CHAOS_SPELLS: ReadonlySet<string> = new Set(["Fire Strike", "Meteorite"]);
+const LEGACY_SPELL_FACTION_REDIRECTS: Readonly<Record<string, string>> = {
+    "Life:Fire Strike": "Chaos",
+    "Life:Meteorite": "Chaos",
+    "Nature:Meteorite": "Chaos",
+};
 
 export const getSpellConfig = (factionName: string, spellName: string, laps?: number): SpellProperties => {
+    const requestedFactionName = factionName || "System";
     const resolvedFactionName =
-        factionName === "Life" && LEGACY_LIFE_TO_CHAOS_SPELLS.has(spellName) ? "Chaos" : factionName || "System";
+        LEGACY_SPELL_FACTION_REDIRECTS[`${requestedFactionName}:${spellName}`] ?? requestedFactionName;
     // @ts-ignore: we do not know the type here yet
     const raceSpells = spellsJson[resolvedFactionName];
     if (!raceSpells) {

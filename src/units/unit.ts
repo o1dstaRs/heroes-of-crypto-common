@@ -40,7 +40,7 @@ import { EffectFactory } from "../effects/effect_factory";
 import {
     getCellForPosition,
     getCellsAroundCell,
-    getCellsAroundPosition,
+    getFootprintCellsForPosition,
     getLargeUnitAttackCells,
     isPositionWithinGrid,
     getDistanceToFurthestCorner,
@@ -168,6 +168,8 @@ export interface IUnitPropertiesProvider {
     getExp(): number;
 
     getSize(): number;
+    getFootprintWidth(): number;
+    getFootprintHeight(): number;
 
     getAmountAlive(): number;
 
@@ -194,6 +196,8 @@ export interface IUnitAIRepr {
     getSteps(): number;
     getInitiative(): number;
     getSize(): number;
+    getFootprintWidth(): number;
+    getFootprintHeight(): number;
     canFly(): boolean;
     canTraverseLava(): boolean;
     getTarget(): string;
@@ -216,6 +220,8 @@ export interface IUnitAIRepr {
 
 export interface IBoardObj {
     isSmallSize(): boolean;
+    getFootprintWidth(): number;
+    getFootprintHeight(): number;
     getPosition(): XY;
     setRenderPosition(x: number, y: number): void;
 }
@@ -1450,32 +1456,39 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return getCellForPosition(this.gridSettings, this.getPosition());
     }
     public getCenter(): XY {
-        if (this.isSmallSize()) {
-            return this.getPosition();
-        } else {
-            return {
-                x: this.getPosition().x + this.gridSettings.getHalfStep(),
-                y: this.getPosition().y + this.gridSettings.getHalfStep(),
-            };
-        }
+        return {
+            x: this.getPosition().x + (this.getFootprintWidth() > 1 ? this.gridSettings.getHalfStep() : 0),
+            y: this.getPosition().y + (this.getFootprintHeight() > 1 ? this.gridSettings.getHalfStep() : 0),
+        };
     }
     public getCells(): XY[] {
-        if (this.isSmallSize()) {
-            const bodyCellPos = getCellForPosition(this.gridSettings, this.getPosition());
-            if (!bodyCellPos) {
-                return [];
+        return getFootprintCellsForPosition(
+            this.gridSettings,
+            this.getPosition(),
+            this.getFootprintWidth(),
+            this.getFootprintHeight(),
+        );
+    }
+    public getFootprintCellsForBase(baseCell: XY): XY[] {
+        const cells: XY[] = [];
+        for (let dx = 0; dx < this.getFootprintWidth(); dx++) {
+            for (let dy = 0; dy < this.getFootprintHeight(); dy++) {
+                cells.push({ x: baseCell.x - dx, y: baseCell.y - dy });
             }
-
-            return [bodyCellPos];
         }
-
-        return getCellsAroundPosition(this.gridSettings, this.getPosition());
+        return cells;
     }
     public getSize(): number {
         return this.unitProperties.size;
     }
     public isSmallSize(): boolean {
-        return this.unitProperties.size === 1;
+        return this.getFootprintWidth() === 1 && this.getFootprintHeight() === 1;
+    }
+    public getFootprintWidth(): number {
+        return this.unitProperties.footprint_width ?? this.unitProperties.size;
+    }
+    public getFootprintHeight(): number {
+        return this.unitProperties.footprint_height ?? this.unitProperties.size;
     }
     public isSummoned(): boolean {
         return this.summoned;

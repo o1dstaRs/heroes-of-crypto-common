@@ -912,6 +912,17 @@ export class PathHelper {
 
         return xMax - xMin === 1 && yMax - yMin === 1;
     }
+    public areCellsFormingFootprint(cells: XY[] | undefined, width: number, height: number): boolean {
+        if (!cells || cells.length !== Math.max(1, Math.floor(width)) * Math.max(1, Math.floor(height))) {
+            return false;
+        }
+        const xs = cells.map((cell) => cell.x);
+        const ys = cells.map((cell) => cell.y);
+        return (
+            Math.max(...xs) - Math.min(...xs) === Math.max(1, Math.floor(width)) - 1 &&
+            Math.max(...ys) - Math.min(...ys) === Math.max(1, Math.floor(height)) - 1
+        );
+    }
     public getClosestSquareCellIndices(
         mousePosition: XY,
         allowedPlacementCellHashes?: ReadonlySet<number>,
@@ -1180,6 +1191,8 @@ export class PathHelper {
         isSmallUnit = true,
         isMadeOfFire = false,
         hasVineStride = false,
+        _footprintWidth = isSmallUnit ? 1 : 2,
+        _footprintHeight = isSmallUnit ? 1 : 2,
     ): IMovePath {
         const knownPaths: Map<number, IWeightedRoute[]> = new Map();
         const allowed: XY[] = [];

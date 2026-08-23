@@ -87,7 +87,11 @@ export class RectanglePlacement implements IPlacement {
     public possibleCellHashes(): Set<number> {
         return this.possibleCellHashesSet;
     }
-    public possibleCellPositions(isSmallUnit = true): XY[] {
+    public possibleCellPositions(
+        isSmallUnit = true,
+        _footprintWidth = isSmallUnit ? 1 : 2,
+        _footprintHeight = isSmallUnit ? 1 : 2,
+    ): XY[] {
         let x;
         let y;
         let sx;
@@ -96,7 +100,6 @@ export class RectanglePlacement implements IPlacement {
         let borderY;
         const diff = isSmallUnit ? 0 : 1;
         const isSmallestPlacement = this.size === 3;
-        // Cell-space twin of the constructor's edgeInset: height 6 starts on the edge row itself.
         const edgeRowInset = this.size >= 6 ? 0 : 1;
 
         switch (this.placementPositionType) {
@@ -136,7 +139,7 @@ export class RectanglePlacement implements IPlacement {
                 throw new Error("Invalid placement position type.");
         }
 
-        const possiblePositions: XY[] = new Array((this.size - diff) * (this.size - diff));
+        const possiblePositions: XY[] = [];
         let possiblePositionsIndex = 0;
 
         for (let px = x; px !== borderX; px += sx) {

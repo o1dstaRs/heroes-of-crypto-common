@@ -131,6 +131,12 @@ export class AttackTarget implements IBoardObj {
     public isSmallSize(): boolean {
         return this.size === 1;
     }
+    public getFootprintWidth(): number {
+        return this.size;
+    }
+    public getFootprintHeight(): number {
+        return this.size;
+    }
     public setRenderPosition(x: number, y: number): void {
         this.renderPosition.x = x;
         this.renderPosition.y = y;

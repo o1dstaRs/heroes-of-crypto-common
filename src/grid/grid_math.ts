@@ -184,6 +184,24 @@ export function getCellsAroundPosition(gridSettings: GridSettings, position: XY)
     return cells;
 }
 
+export function getFootprintCellsForPosition(
+    gridSettings: GridSettings,
+    position: XY,
+    width: number,
+    height: number,
+): XY[] {
+    if (width === 2 && height === 2) return getCellsAroundPosition(gridSettings, position);
+    const base = getCellForPosition(gridSettings, position);
+    const cells: XY[] = [];
+    for (let dx = 0; dx < Math.max(1, Math.floor(width)); dx += 1) {
+        for (let dy = 0; dy < Math.max(1, Math.floor(height)); dy += 1) {
+            const cell = { x: base.x - dx, y: base.y - dy };
+            if (isCellWithinGrid(gridSettings, cell)) cells.push(cell);
+        }
+    }
+    return cells;
+}
+
 export function isPositionWithinGrid(gridSettings: GridSettings, position: XY): boolean {
     if (!position) {
         return false;
@@ -336,6 +354,8 @@ export function getLargeUnitAttackCells(
     enemyCell: XY,
     currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
     fromPathHashes?: Set<number>,
+    _footprintWidth = 2,
+    _footprintHeight = 2,
 ): XY[] {
     const attackCells: XY[] = [];
 
