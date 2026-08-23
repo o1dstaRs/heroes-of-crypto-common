@@ -594,6 +594,36 @@ export function getDistanceToFurthestCorner(position: XY, gridSettings: GridSett
     );
 }
 
+export function getWholeCellShotDistance(shotDistance: number): number {
+    if (!Number.isFinite(shotDistance) || shotDistance <= 0) {
+        return 0;
+    }
+    return Math.floor(shotDistance);
+}
+
+export function getShotCellDistance(
+    gridSettings: GridSettings,
+    attackerPosition: XY,
+    attackerSize: number,
+    targetPosition: XY,
+): number {
+    const step = gridSettings.getStep();
+    const targetCellPosition = getPositionForCell(
+        getCellForPosition(gridSettings, targetPosition),
+        gridSettings.getMinX(),
+        step,
+        gridSettings.getHalfStep(),
+    );
+    const halfFootprint = ((Math.max(1, attackerSize) - 1) / 2) * step;
+    const dx = Math.abs(targetCellPosition.x - attackerPosition.x) - halfFootprint;
+    const dy = Math.abs(targetCellPosition.y - attackerPosition.y) - halfFootprint;
+    return Math.max(0, Math.round(Math.max(dx, dy) / step));
+}
+
+export function getFullDamageSquareHalfExtent(shotDistance: number, unitSize: number, step: number): number {
+    return (getWholeCellShotDistance(shotDistance) + Math.max(1, unitSize) / 2) * step;
+}
+
 /**
  * Sides of a grid cell a ranged shot can be aimed at. The numeric values are part of the ranked
  * wire protocol (range_attack carries the chosen side as an int) and are persisted in replays, so

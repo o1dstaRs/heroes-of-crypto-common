@@ -165,6 +165,47 @@ export interface ISpellSightGrid {
     getOccupantUnitId(cell: XY): string | undefined;
 }
 
+function isThrownSpellSideObservable(
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    cell: XY,
+    side: XY,
+    isTransparentUnit?: (unitId: string) => boolean,
+): boolean {
+    const neighbour = { x: cell.x + side.x, y: cell.y + side.y };
+    if (!isWithinGrid(neighbour)) {
+        return true;
+    }
+    const occupant = grid.getOccupantUnitId(neighbour);
+    if (!occupant || occupant === "L" || occupant === "W") {
+        return true;
+    }
+    if (occupant === "B" || occupant === "H") {
+        return false;
+    }
+    return isTransparentUnit?.(occupant) === true;
+}
+
+const THROWN_SPELL_SIDE_OFFSETS: readonly XY[] = [
+    { x: -1, y: 0 },
+    { x: 1, y: 0 },
+    { x: 0, y: -1 },
+    { x: 0, y: 1 },
+];
+
+export function hasObservableThrownSpellEdge(
+    grid: ISpellSightGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    targetCells: readonly XY[],
+    isTransparentUnit?: (unitId: string) => boolean,
+): boolean {
+    return targetCells.some((cell) =>
+        THROWN_SPELL_SIDE_OFFSETS.some((side) =>
+            isThrownSpellSideObservable(grid, isWithinGrid, cell, side, isTransparentUnit),
+        ),
+    );
+}
+
 /**
  * Is the straight line from `from` to `to` clear enough for a THROWN spell to reach its target?
  *
@@ -276,9 +317,16 @@ export function isTargetedSpellLineOfSightClear(
     from: XY,
     to: XY,
     isTransparentUnit?: (unitId: string) => boolean,
+    targetCells?: readonly XY[],
 ): boolean {
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return true;
+    }
+    if (
+        spellName === "Fire Strike" &&
+        !hasObservableThrownSpellEdge(grid, isWithinGrid, targetCells ?? [to], isTransparentUnit)
+    ) {
+        return false;
     }
     const blocker = firstTargetedSpellSightBlocker(spellName, grid, isWithinGrid, from, to, isTransparentUnit);
     if (!blocker) {
@@ -376,12 +424,28 @@ export function thrownSpellReachesAimedTarget(
     from: XY,
     to: XY,
     isTransparentUnit?: (unitId: string) => boolean,
+    targetCells?: readonly XY[],
 ): boolean {
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return true;
     }
+    if (
+        spellName === "Fire Strike" &&
+        !hasObservableThrownSpellEdge(grid, isWithinGrid, targetCells ?? [to], isTransparentUnit)
+    ) {
+        return false;
+    }
     const impact = resolveThrownSpellImpact(spellName, grid, isWithinGrid, from, to, isTransparentUnit);
     return !impact.blockedByTerrain && !impact.interceptedBy;
+}
+
+export function cellTargetedSpellBlockCells(spellName: string, origin: XY): XY[] {
+    const spread = spellName === "Meteor Shower" ? [-1, 0, 1] : [0, 1];
+    return spread.flatMap((dx) => spread.map((dy) => ({ x: origin.x + dx, y: origin.y + dy })));
+}
+
+export function cellTargetedSpellBlockFitsGrid(gridSettings: GridSettings, spellName: string, origin: XY): boolean {
+    return cellTargetedSpellBlockCells(spellName, origin).every((cell) => isCellWithinGrid(gridSettings, cell));
 }
 
 export function canCastSummon(spell: Spell, gridMatrix: number[][], emptyGridCell?: XY): boolean {
@@ -679,13 +743,23 @@ export function calculateBuffsDebuffsEffect(
  */
 export const getMagicMirrorPower = (targetUnit: Unit): number => {
     let mirrorPower = 0;
-    const magicMirrorBuff = targetUnit.getBuff("Magic Mirror");
-    const massMagicMirrorBuff = targetUnit.getBuff("Mass Magic Mirror");
-    if (magicMirrorBuff) {
-        mirrorPower = magicMirrorBuff.getPower();
+    const getPower = (buffName: string): number | undefined => {
+        const appliedBuff = targetUnit.getBuff(buffName);
+        if (appliedBuff) {
+            return appliedBuff.getPower();
+        }
+
+        const unitProperties = targetUnit.getUnitProperties();
+        const buffIndex = unitProperties.applied_buffs.indexOf(buffName);
+        return buffIndex >= 0 ? unitProperties.applied_buffs_powers[buffIndex] : undefined;
+    };
+    const magicMirrorPower = getPower("Magic Mirror");
+    const massMagicMirrorPower = getPower("Mass Magic Mirror");
+    if (magicMirrorPower !== undefined) {
+        mirrorPower = magicMirrorPower;
     }
-    if (massMagicMirrorBuff) {
-        mirrorPower = Math.max(mirrorPower, massMagicMirrorBuff.getPower());
+    if (massMagicMirrorPower !== undefined) {
+        mirrorPower = Math.max(mirrorPower, massMagicMirrorPower);
     }
     // FLAT and stable: the Ogre Mage's Magic Mirror / Mass Magic Mirror reflect exactly their configured
     // percentage (30 / 25) — NOT stack-scaled and NOT moved by luck (unlike the Magic Dragon's ability). The
