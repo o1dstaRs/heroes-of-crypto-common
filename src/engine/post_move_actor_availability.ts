@@ -10,6 +10,7 @@
  */
 
 import { getSpellConfig } from "../configuration/config_provider";
+import type { ISceneLog } from "../scene/scene_log_interface";
 import { fireWallBurnDamage, FireWalls } from "../spells/fire_walls";
 import { madeOfFireBoostedMaxHp } from "../units/movement_stat_modifiers";
 import { projectStackDamage, type IStackHpState } from "../units/stack_damage";
@@ -171,6 +172,56 @@ export function enteredFireWallCells(fireWalls: FireWalls | undefined, crossedCe
         }
     }
     return burning;
+}
+
+export interface IFireWallBurnResult {
+    burning: XY[];
+    total: number;
+    unitsDied: number;
+}
+
+/** Apply Fire Wall damage to every newly crossed wall cell. */
+export function burnUnitOnFireWallCells(
+    unit: Unit,
+    crossedCells: readonly XY[],
+    fireWalls: FireWalls | undefined,
+    sceneLog: ISceneLog,
+): IFireWallBurnResult {
+    const empty: IFireWallBurnResult = { burning: [], total: 0, unitsDied: 0 };
+    if (!fireWalls?.size() || !crossedCells.length) {
+        return empty;
+    }
+    const burning = enteredFireWallCells(fireWalls, crossedCells);
+    if (!burning.length) {
+        return empty;
+    }
+
+    const amountAliveBefore = unit.getAmountAlive();
+    const burnTarget = {
+        isFireElement: unit.hasAbilityActive("Fire Element"),
+        isWaterElement: unit.hasAbilityActive("Water Element"),
+        isWindElement: unit.hasAbilityActive("Wind Element"),
+        isEarthElement: unit.hasAbilityActive("Earth Element"),
+    };
+    let total = 0;
+    for (const cell of burning) {
+        const damage = fireWallBurnDamage(unit.getCumulativeMaxHp(), fireWalls.burnPercentageAt(cell), burnTarget);
+        if (damage <= 0) {
+            break;
+        }
+        total += unit.applyDamage(damage, 0, sceneLog);
+        if (unit.isDead()) {
+            break;
+        }
+    }
+    if (total <= 0) {
+        return empty;
+    }
+
+    sceneLog.updateLog(
+        `${unit.getName()} was seared by the Fire Wall for ${total} damage crossing ${burning.length} of it`,
+    );
+    return { burning, total, unitsDied: Math.max(0, amountAliveBefore - unit.getAmountAlive()) };
 }
 
 /**

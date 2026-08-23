@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { getUpgradePoints, Doctrine } from "../doctrines/doctrine_properties";
+import { getUpgradePoints, Perk } from "../perks/perk_properties";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import type { StackAmountMode } from "./army";
 import type { ISetupAugment } from "./battle_engine";
@@ -40,7 +40,9 @@ export interface ILiveTwinPreset {
     /** Fraction of games fielding melee-DRAFTED (DEFAULT_DRAFT_W) rosters — live headline = 1 (roadmap F2:
      * "every gate reports its headline on FIGHT_MELEE_ROSTERS=1 + SEE_NONE"). */
     meleeRosterFraction: number;
-    /** The shipped live doctrine: SEE_NONE (no enemy vision, max upgrade budget). */
+    /** The shipped live perk: SEE_NONE (no enemy vision, max upgrade budget). */
+    perk: number;
+    /** Main-branch alias for the same setup choice. */
     doctrine: number;
     /** Zero any enemy-composition features in comp-aware setup policies (AUGCA_NOVISION semantics). */
     noVision: boolean;
@@ -49,7 +51,8 @@ export interface ILiveTwinPreset {
 export const LIVETWIN_PRESET: ILiveTwinPreset = {
     amountMode: "expBudget",
     meleeRosterFraction: 1,
-    doctrine: Doctrine.SEE_NONE,
+    perk: Perk.SEE_NONE,
+    doctrine: Perk.SEE_NONE,
     noVision: true,
 };
 
@@ -70,7 +73,8 @@ export const liveTwinMeleeFraction = (): number => {
 };
 
 /** The SHIPPED live setup both ranked AI armies actually field: SEE_NONE + blind Armor3/Might3/Sniper1. */
-export const liveTwinSetup = (): { doctrine: number; augments: ISetupAugment[] } => ({
-    doctrine: LIVETWIN_PRESET.doctrine,
-    augments: SETUP_POLICY_V0.pickAugments(getUpgradePoints(LIVETWIN_PRESET.doctrine)),
+export const liveTwinSetup = (): { perk: number; doctrine: number; augments: ISetupAugment[] } => ({
+    perk: LIVETWIN_PRESET.perk,
+    doctrine: LIVETWIN_PRESET.perk,
+    augments: SETUP_POLICY_V0.pickAugments(getUpgradePoints(LIVETWIN_PRESET.perk)),
 });

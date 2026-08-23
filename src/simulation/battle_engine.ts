@@ -21,6 +21,7 @@ import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import { captureAITargetMemory, clearAITargetMemory, recordAITargetMemory, restoreAITargetMemory } from "../ai/ai";
 import { createDecisionPathCatalog } from "../ai/decision_path_catalog";
 import type { PlacementPolicyVariant } from "../ai/setup/setup_ship";
+import { applyTacticalSplitPlacement, type TacticalSplitRole } from "../ai/tactical_split_placement";
 import { StrategyV0_8 } from "../ai/versions/v0_8";
 import { V08_A13_PRODUCTION_VERSION } from "../ai/versions/v0_8_a13_profile";
 import {
@@ -55,6 +56,7 @@ import { SceneLogMock } from "../scene/scene_log_mock";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import { FightProperties } from "../fights/fight_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
+import type { SpecificSynergy } from "../synergies/synergy_properties";
 import { ArtifactTier } from "../artifacts/artifact_properties";
 import { DefaultPlacementLevel1, type AugmentType } from "../augments/augment_properties";
 import type { Unit } from "../units/unit";
@@ -314,6 +316,9 @@ export interface IMatchConfig {
     /** Perk (Perk enum id) per team — seeds the augment upgrade-point budget (getUpgradePoints). */
     greenPerk?: number;
     redPerk?: number;
+    /** Doctrine is the main-branch name for the same setup choice. Perk remains preferred when both exist. */
+    greenDoctrine?: number;
+    redDoctrine?: number;
     /** Army augments per team ({kind,value}; kind = Placement/Armor/Might/Sniper/Movement, value = level).
      * Applied as whole-army stat buffs via UnitsHolder.applyAugments, budget-checked against the perk. */
     greenAugments?: ISetupAugment[];
@@ -329,6 +334,11 @@ export interface IMatchConfig {
      * read them live. Effective level is composition-gated (needs enough units of the faction). */
     greenSynergies?: ISetupSynergy[];
     redSynergies?: ISetupSynergy[];
+    /** One active synergy variant for each faction, shared by both teams for the full match. */
+    synergyVariants?: { [factionName: string]: SpecificSynergy };
+    /** Pre-fight split children, addressed by their index in each materialized roster. */
+    greenTacticalSplitStacks?: readonly ITacticalSplitRosterStack[];
+    redTacticalSplitStacks?: readonly ITacticalSplitRosterStack[];
     /** Creature ids of RED stacks legitimately revealed to GREEN during the pick phase (collisions/perk
      * reveals — pick_sim getKnownOpponentCreatures). Forwarded into GREEN's placement context; consumed
      * only by the env-gated reveal-conditioned placement (V07_PLACEMENT_REVEAL). Absent = today's behavior. */
@@ -413,6 +423,11 @@ export interface ISetupSynergy {
     synergy: number;
     /** Ignored — the effective level is derived from the team's unit count in that faction. */
     level?: number;
+}
+
+export interface ITacticalSplitRosterStack {
+    rosterIndex: number;
+    role: TacticalSplitRole;
 }
 
 export interface IPlacementRecord {
@@ -644,6 +659,9 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
 
     FightStateManager.getInstance().reset();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
+    if (config.synergyVariants) {
+        fightProperties.setSynergyVariants(config.synergyVariants);
+    }
     const effectiveGridType = config.gridType ?? PBTypes.GridVals.NORMAL;
     // Reset still consumes FightProperties' seeded live-map roll, preserving every downstream RNG draw.
     // Explicit simulation maps then replace that roll in both state holders so combat map checks agree.
@@ -658,11 +676,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const pathHelper = new PathHelper(gridSettings);
     const runtime = createMatchRuntime(config.seed);
     const { abilityFactory, effectFactory } = createCombatFactories();
+    const greenPerk = config.greenPerk ?? config.greenDoctrine;
+    const redPerk = config.redPerk ?? config.redDoctrine;
 
     const setupBeforePlacement = config.placementAugmentTiming === "setup-before-placement";
     if (setupBeforePlacement) {
-        seedAcceptedSetupForPlacement(fightProperties, GREEN_TEAM, config.greenPerk, config.greenAugments);
-        seedAcceptedSetupForPlacement(fightProperties, RED_TEAM, config.redPerk, config.redAugments);
+        seedAcceptedSetupForPlacement(fightProperties, GREEN_TEAM, greenPerk, config.greenAugments);
+        seedAcceptedSetupForPlacement(fightProperties, RED_TEAM, redPerk, config.redAugments);
     }
     const greenZone = new RectanglePlacement(
         gridSettings,
@@ -992,6 +1012,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             config.greenRevealedCreatures,
             config.greenSetupPlacementPolicy,
             greenPublicOpponentCreatureIds,
+            config.greenTacticalSplitStacks,
         ),
         red: placeArmy(
             redUnits,
@@ -1006,6 +1027,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             config.redRevealedCreatures,
             config.redSetupPlacementPolicy,
             redPublicOpponentCreatureIds,
+            config.redTacticalSplitStacks,
         ),
     };
 
@@ -1025,14 +1047,14 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const greenSetup = teamHasSetup(
         config.greenArtifactT1,
         config.greenArtifactT2,
-        config.greenPerk,
+        greenPerk,
         config.greenAugments,
         config.greenSynergies,
     );
     const redSetup = teamHasSetup(
         config.redArtifactT1,
         config.redArtifactT2,
-        config.redPerk,
+        redPerk,
         config.redAugments,
         config.redSynergies,
     );
@@ -1098,6 +1120,12 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 for (const s of synergies) {
                     const level = Math.min(Math.floor(cnt(s.faction) / 2), 3);
                     if (level >= 1) {
+                        const activeVariant = config.synergyVariants?.[ToFactionName[s.faction]];
+                        if (activeVariant !== undefined && activeVariant !== s.synergy) {
+                            throw new Error(
+                                `Synergy ${s.synergy} does not match the configured ${ToFactionName[s.faction]} variant ${activeVariant}`,
+                            );
+                        }
                         fightProperties.updateSynergyPerTeam(team, s.faction, s.synergy, level);
                     }
                 }
@@ -1106,7 +1134,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         applyTeamSetup(
             GREEN_TEAM,
             greenUnits,
-            config.greenPerk,
+            greenPerk,
             config.greenArtifactT1,
             config.greenArtifactT2,
             config.greenAugments,
@@ -1115,7 +1143,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         applyTeamSetup(
             RED_TEAM,
             redUnits,
-            config.redPerk,
+            redPerk,
             config.redArtifactT1,
             config.redArtifactT2,
             config.redAugments,
@@ -1740,12 +1768,13 @@ function placeArmy(
     revealedOpponentCreatures?: readonly number[],
     setupPlacementPolicy?: PlacementPolicyVariant,
     publicOpponentCreatureIds?: readonly number[],
+    tacticalSplitStacks?: readonly ITacticalSplitRosterStack[],
 ): IPlacementRecord[] {
     const records: IPlacementRecord[] = [];
     const legal = zone.possibleCellHashes();
     const occupied = new Set<number>();
 
-    const desired = strategy.placeArmy(units, {
+    const incumbent = strategy.placeArmy(units, {
         team,
         grid,
         unitsHolder,
@@ -1755,6 +1784,23 @@ function placeArmy(
         ...(publicOpponentCreatureIds ? { publicOpponentCreatureIds } : {}),
         ...(setupPlacementPolicy ? { setupPlacementPolicy } : {}),
     });
+    const splitStacks =
+        tacticalSplitStacks?.flatMap((split) => {
+            const unit = units[split.rosterIndex];
+            return unit ? [{ unitId: unit.getId(), role: split.role }] : [];
+        }) ?? [];
+    const desired = splitStacks.length
+        ? applyTacticalSplitPlacement(
+              incumbent,
+              units.map((unit) => ({ id: unit.getId(), small: unit.isSmallSize() })),
+              {
+                  team,
+                  gridType: grid.getGridType(),
+                  legalCellHashes: legal,
+                  splitStacks,
+              },
+          )
+        : incumbent;
 
     const tryPlaceAt = (unit: Unit, base: XY): boolean => {
         const cells = footprintCells(unit, base);

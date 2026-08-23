@@ -228,6 +228,8 @@ export function elementalSpellMultiplier(params: {
     targetIsFireElement: boolean;
     targetIsWaterElement: boolean;
     targetIsWindElement: boolean;
+    /** Compatibility with callers that already report the fourth elemental flag. */
+    targetIsEarthElement?: boolean;
 }): number {
     const { element, targetIsFireElement, targetIsWaterElement, targetIsWindElement } = params;
     if (element === SpellElement.FIRE) {
@@ -243,6 +245,28 @@ export function elementalSpellMultiplier(params: {
         return targetIsWindElement ? 0 : 1;
     }
     return 1;
+}
+
+/** Maximum pre-resist value an elemental spell can reach against any elemental target. */
+export function maximumElementalSpellDamage(rawDamage: number, element: SpellElement): number {
+    const elementFlags: Array<Partial<Parameters<typeof elementalSpellMultiplier>[0]>> = [
+        {},
+        { targetIsFireElement: true },
+        { targetIsWaterElement: true },
+        { targetIsWindElement: true },
+        { targetIsEarthElement: true },
+    ];
+
+    return elementFlags.reduce((most, flags) => {
+        const multiplier = elementalSpellMultiplier({
+            element,
+            targetIsFireElement: false,
+            targetIsWaterElement: false,
+            targetIsWindElement: false,
+            ...flags,
+        });
+        return Math.max(most, applyElementAndResistToSpellDamage(rawDamage, multiplier, 0));
+    }, 0);
 }
 
 /**
@@ -263,6 +287,9 @@ export function fireforgedSwordDamage(params: {
     targetMagicResist: number;
     targetIsFireElement: boolean;
     targetIsWaterElement: boolean;
+    /** Accepted for compatibility; the current fire/water rules remain authoritative. */
+    targetIsWindElement?: boolean;
+    targetIsEarthElement?: boolean;
 }): number {
     const { damageDealt, swordPercentage, targetMagicResist, targetIsFireElement, targetIsWaterElement } = params;
     if (targetIsFireElement || targetMagicResist >= 100) {

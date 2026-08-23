@@ -20,6 +20,7 @@ import { getCraftChances } from "../abilities/craft_ability";
 import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { empowerMultiplier } from "../augments/augment_properties";
 import { getSpellConfig } from "../configuration/config_provider";
+import { projectShotCost } from "../damage/damage_projection";
 import {
     LUCK_CHANGE_FOR_SHIELD,
     LUCK_MAX_CHANGE_FOR_TURN,
@@ -1232,19 +1233,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * Call this from EVERY path that consumes a volley so the two can never drift apart again.
      */
     public spendShotsAgainst(target?: Unit): number {
-        for (const ability of this.getAbilities()) {
-            if (ability.getPowerType() === AbilityPowerType.UNLIMITED_SUPPLIES) {
-                return 0;
-            }
-        }
-        const cost =
-            target?.hasAbilityActive("Dense Flesh") === true
-                ? Math.max(1, Math.floor(target.getAbility("Dense Flesh")?.getPower() ?? 1))
-                : 1;
+        const cost = projectShotCost(this, target);
         for (let i = 0; i < cost; i++) {
             this.decreaseNumberOfShots();
         }
         return cost;
+    }
+    /** Pure counterpart of spendShotsAgainst, used by previews and follow-up-volley gating. */
+    public projectRangeShotsAfterVolleys(target?: Unit, volleys = 1): number {
+        const cost = projectShotCost(this, target) * Math.max(0, volleys);
+        if (cost <= 0) {
+            return this.getRangeShots();
+        }
+        if (this.unitProperties.range_shots_mod) {
+            return this.unitProperties.range_shots_mod;
+        }
+        return Math.max(0, Math.floor(this.unitProperties.range_shots) - cost);
     }
     public decreaseNumberOfShots(): void {
         this.unitProperties.range_shots -= 1;
@@ -2005,6 +2009,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism");
     }
     public canBeHealed(): boolean {
+        return !this.hasAbilityActive("Mechanism");
+    }
+    public canBePoisoned(): boolean {
         return !this.hasAbilityActive("Mechanism");
     }
     // Total Deep Wounds a unit applies in one hit. The cards STACK — their base powers sum — but the flat
