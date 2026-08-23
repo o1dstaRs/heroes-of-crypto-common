@@ -524,8 +524,8 @@ export function runV08PostA13CoverageGame(
         redRoster: plan.redRoster,
         seed: plan.seed,
         gridType: plan.mapType,
-        greenDoctrine: setup?.doctrine,
-        redDoctrine: setup?.doctrine,
+        greenPerk: setup?.perk,
+        redPerk: setup?.perk,
         greenAugments: setup?.augments,
         redAugments: setup?.augments,
         decisionObserver: (observation) =>

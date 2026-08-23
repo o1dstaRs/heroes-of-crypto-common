@@ -22,7 +22,6 @@ import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { amountForCreatureExperienceBudget, STACK_EXPERIENCE_BUDGET } from "../../src/simulation/army";
 import { calculateStackPoweredSpellDamage, isThrownOffensiveSpell } from "../../src/spells/spell_damage";
-import { Spell } from "../../src/spells/spell";
 import { SpellElement, SpellMultiplierType, SpellTargetType } from "../../src/spells/spell_properties";
 import { getMagicMirrorAbilityChance } from "../../src/spells/spell_helper";
 import type { Unit } from "../../src/units/unit";
@@ -678,47 +677,6 @@ describe("action engine — Whirlpool", () => {
     });
 });
 
-describe("Magic Mirror spell buffs", () => {
-    for (const [spellName, expectedRebound] of [
-        ["Magic Mirror", 45],
-        ["Mass Magic Mirror", 37],
-    ] as const) {
-        it(`${spellName} always returns its configured share of landed magical damage`, () => {
-            // A high roll proves this is the spell buff's guaranteed damage return, not the Magic Dragon
-            // passive's chance-based rebound. Lightning Strike lands for 150; the two buffs return 30% and
-            // 25% respectively, floored before the caster's own defences are applied.
-            alwaysRoll(99);
-            const setup = setupDragonFight({
-                casterAmountAlive: 1,
-                casterStackPower: 5,
-                enemies: [{ cell: { x: 6, y: 3 } }],
-            });
-            setup.enemies[0].applyBuff(new Spell({ spellProperties: getSpellConfig("Chaos", spellName), amount: 1 }));
-            const targetHpBefore = setup.enemies[0].getHp();
-            const casterHpBefore = setup.caster.getHp();
-
-            const result = setup.engine.apply({
-                type: "cast_spell",
-                casterId: setup.caster.getId(),
-                spellName: "Lightning Strike",
-                targetId: setup.enemies[0].getId(),
-            });
-
-            expect(result.completed).toBe(true);
-            expect(targetHpBefore - setup.enemies[0].getHp()).toBe(150);
-            expect(casterHpBefore - setup.caster.getHp()).toBe(expectedRebound);
-            const cast = result.events.find((event) => event.type === "spell_cast");
-            expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toEqual([
-                expect.objectContaining({
-                    unitId: setup.caster.getId(),
-                    amount: expectedRebound,
-                    reboundedFromUnitId: setup.enemies[0].getId(),
-                }),
-            ]);
-        });
-    }
-});
-
 describe("Magic Reflection (passive)", () => {
     // STACK-SCALED, like the game's other percentages: the configured 75 is what a FULL stack rebounds, and
     // a depleted one rebounds proportionally less -- 15/30/45/60/75 across the five tiers -- before luck
@@ -929,7 +887,7 @@ describe("Magic Reflection (passive)", () => {
         ]);
     });
 
-    it("never routes spell damage — direct or rebounded — through a Flesh Shield owner", () => {
+    it("keeps direct and rebound Flesh Shield absorption in separate event buckets", () => {
         alwaysRoll(0);
         const setup = setupDragonFight({
             casterAmountAlive: 1,
@@ -956,7 +914,6 @@ describe("Magic Reflection (passive)", () => {
         });
         placeUnit(setup.grid, setup.unitsHolder, abomination, { x: 4, y: 3 });
         setup.unitsHolder.refreshAuraEffectsForAllUnits();
-        const abominationHpBefore = abomination.getHp();
 
         const result = setup.engine.apply({
             type: "cast_spell",
@@ -968,26 +925,41 @@ describe("Magic Reflection (passive)", () => {
         expect(result.completed).toBe(true);
         const cast = result.events.find((event) => event.type === "spell_cast");
         const absorbed = cast?.type === "spell_cast" ? (cast.secondary ?? []) : [];
-        // The aura absorbs physical damage only: the burning ally beside it and the mirror's rebound onto the
-        // caster are both magical, so nothing is transferred and the owner stays untouched.
-        expect(absorbed.filter((entry) => entry.source === "flesh_shield")).toEqual([]);
-        expect(abomination.getHp()).toBe(abominationHpBefore);
+        expect(absorbed).toEqual([
+            expect.objectContaining({
+                source: "flesh_shield",
+                unitId: abomination.getId(),
+                amount: 120,
+            }),
+            expect.objectContaining({
+                source: "flesh_shield",
+                unitId: abomination.getId(),
+                amount: 90,
+                rebounded: true,
+            }),
+        ]);
+        expect(absorbed.filter((entry) => entry.rebounded)).toHaveLength(1);
     });
 
-    it("does not reward or demoralize its team when the Ring burns a friendly stack to death", () => {
+    it("does not reward or demoralize its team when friendly Ring absorption kills the owner", () => {
         alwaysRoll(99); // keep Magic Reflection out of this friendly-fire assertion
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
             enemies: [{ cell: { x: 5, y: 1 } }],
+            allies: [{ cell: { x: 5, y: 2 } }],
         });
-        // Standing inside the ring next to the aimed enemy, this fragile friendly stack takes the full
-        // friendly-fire splash (120) and dies.
-        const victim = createTestUnit({
+        const abomination = createTestUnit({
             name: "Abomination",
             team: PBTypes.TeamVals.LOWER,
             maxHp: 100,
+            luck: 10,
+            stackPower: 5,
             morale: 4,
+            abilities: ["Flesh Shield Aura"],
+            auraEffects: ["Flesh Shield"],
+            auraRanges: [1],
+            auraIsBuff: [true],
         });
         const witness = createTestUnit({
             name: "Abomination",
@@ -995,7 +967,7 @@ describe("Magic Reflection (passive)", () => {
             maxHp: 10_000,
             morale: 4,
         });
-        placeUnit(setup.grid, setup.unitsHolder, victim, { x: 5, y: 2 });
+        placeUnit(setup.grid, setup.unitsHolder, abomination, { x: 4, y: 3 });
         placeUnit(setup.grid, setup.unitsHolder, witness, { x: 8, y: 8 });
         setup.unitsHolder.refreshAuraEffectsForAllUnits();
         const casterMoraleBefore = setup.caster.getMorale();
@@ -1009,7 +981,7 @@ describe("Magic Reflection (passive)", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(victim.isDead()).toBe(true);
+        expect(abomination.isDead()).toBe(true);
         expect(setup.caster.getMorale()).toBe(casterMoraleBefore);
         expect(witness.getMorale()).toBe(witnessMoraleBefore);
     });

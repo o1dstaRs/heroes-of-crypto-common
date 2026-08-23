@@ -16,7 +16,6 @@ import auraEffectsJson from "../../src/configuration/aura_effects.json";
 import creaturesJson from "../../src/configuration/creatures.json";
 import effectsJson from "../../src/configuration/effects.json";
 import spellsJson from "../../src/configuration/spells.json";
-import { AbilityPowerType } from "../../src/abilities/ability_properties";
 import {
     getAbilityConfig,
     getAuraEffectConfig,
@@ -199,11 +198,11 @@ describe("config_provider", () => {
     it("loads the one-unit Abomination balance and stack-powered Flesh Shield metadata", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Chaos", "Abomination", "abomination_512", 0, 1000);
 
-        // The requested one-unit tank profile: a 1,000-XP stack is exactly one 550-HP creature.
-        expect(creature.max_hp).toBe(550);
+        // The requested one-unit tank profile: a 1,000-XP stack is exactly one 600-HP creature.
+        expect(creature.max_hp).toBe(600);
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(3.3);
-        expect(creature.base_armor).toBe(49);
+        expect(creature.base_armor).toBe(50);
         expect(creature.base_attack).toBe(22);
         expect(creature.exp).toBe(1000);
         expect(creature.amount_alive).toBe(1);
@@ -233,17 +232,6 @@ describe("config_provider", () => {
             expect(typeof ability.stack_powered).toBe("boolean");
             expect(typeof ability.can_be_cast).toBe("boolean");
         }
-    });
-
-    it("makes Trent and Gargantuan Earth Elements", () => {
-        const earthElement = getAbilityConfig("Earth Element");
-        const trent = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Trent", "trent_512", 1);
-        const gargantuan = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Gargantuan", "gargantuan_512", 1);
-
-        expect(earthElement.power).toBe(50);
-        expect(earthElement.power_type).toBe(AbilityPowerType.MAGIC_VULNERABILITY_WIND);
-        expect(trent.abilities).toContain("Earth Element");
-        expect(gargantuan.abilities).toContain("Earth Element");
     });
 
     it("loads Spit Ball's increased stack-powered chance", () => {

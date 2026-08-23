@@ -48,46 +48,6 @@ export interface IRangeAttackEvaluation {
 }
 
 /**
- * Immutable trajectory/interception geometry for repeatedly evaluating one unchanged ranged shot.
- *
- * The object deliberately exposes only the resolved geometry. Smoke-prefix indexes and uncapped base
- * divisors live in module-private metadata, so callers cannot accidentally invalidate a prepared ray. This
- * API intentionally does not hash mutable Unit/Grid state: it is valid only inside a synchronous, mutation-
- * free planning scope. Live Smoke is the one supported mutable overlay and is re-read by
- * evaluatePreparedRangeAttack.
- *
- * @internal
- */
-export interface IPreparedRangeAttackEvaluation {
-    readonly affectedUnits: ReadonlyArray<ReadonlyArray<Unit>>;
-    readonly affectedCells: ReadonlyArray<ReadonlyArray<Readonly<HoCMath.XY>>>;
-    readonly attackObstacle?: Readonly<{
-        position: Readonly<HoCMath.XY>;
-        size: number;
-        distance: number;
-    }>;
-}
-
-interface IPreparedRangeAttackMetadata {
-    readonly owner: AttackHandler;
-    readonly rayCells: ReadonlyArray<Readonly<HoCMath.XY>>;
-    readonly firstRayIndexBySmokeKey: ReadonlyMap<number, number>;
-    readonly hitRayIndices: readonly number[];
-    readonly baseRangeAttackDivisors: readonly number[];
-    readonly liveSmokeClouds: SmokeClouds;
-    readonly liveSmokeRevision: number;
-    readonly liveSmokeByHit: readonly boolean[];
-}
-
-interface IRangeAttackPreparationCapture {
-    readonly hitRayIndices: number[];
-    readonly baseRangeAttackDivisors: number[];
-    readonly liveSmokeByHit: boolean[];
-}
-
-const preparedRangeAttackMetadata = new WeakMap<IPreparedRangeAttackEvaluation, IPreparedRangeAttackMetadata>();
-
-/**
  * Multiplier on a Resurrection cast's hit-point budget (the caster's cumulative max hp). 1.5 = the raise is
  * 50% stronger than the Angel stack's own health, so a single Angel is worth casting with. Applied before
  * Holy Cross, which scales the already-boosted budget like it does healing.
@@ -178,26 +138,15 @@ export class AttackHandler {
     ): number {
         let rangeAttackDivisor = 1;
 
-        // Range falloff: damage halves for every full shot-distance band of range. The bands are SQUARES of
-        // whole cells, not circles — the board floors the fractional shot_distance stat (which the unit card
-        // and the left sidebar keep showing unrounded) and measures in king moves, so a 6.5 archer deals a
-        // full 1/1 to every cell inside the 6-cell square around it, 1/2 out to 12 cells, and so on.
-        // Only the Sniper ability negates falloff entirely. Farsight Quiver no longer removes falloff —
-        // instead it extends the archer's basic shot_distance (adjustBaseStats), pushing these bands out.
+        // Range falloff: damage halves for every full shot-distance of range. Only the Sniper ability negates
+        // it entirely. Farsight Quiver no longer removes falloff — instead it extends the archer's basic
+        // shot_distance (adjustBaseStats), pushing this threshold out so full-damage range is larger.
         if (!attackerUnit.hasAbilityActive("Sniper")) {
-            const bandCells = GridMath.getWholeCellShotDistance(attackerUnit.getRangeShotDistance());
-            if (bandCells > 0) {
-                let cellsAway = GridMath.getShotCellDistance(
-                    this.gridSettings,
-                    attackerPosition,
-                    attackerUnit.getSize(),
-                    attackPosition,
-                );
-                // The band's LAST cell is still full strength — it is the edge of the square the player sees.
-                while (cellsAway > bandCells) {
-                    cellsAway -= bandCells;
-                    rangeAttackDivisor *= 2;
-                }
+            const shotDistancePixels = Math.ceil(attackerUnit.getRangeShotDistance() * this.gridSettings.getStep());
+            let distance = HoCMath.getDistance(attackerPosition, attackPosition);
+            while (distance >= shotDistancePixels) {
+                distance -= shotDistancePixels;
+                rangeAttackDivisor *= 2;
             }
         }
         if (rangeAttackDivisor < 1) {
@@ -218,7 +167,6 @@ export class AttackHandler {
         isSelection = false,
         isAOEShot = false,
         hypotheticalSmokeCells?: readonly HoCMath.XY[],
-        preparedHypotheticalSmokeKeys?: ReadonlySet<number>,
     ): IRangeAttackEvaluation {
         // Through Shot keeps travelling past the aimed target to the edge of the field, so it can
         // hit every unit standing on that line - not just the ones up to the hovered target.
@@ -242,163 +190,7 @@ export class AttackHandler {
             isSelection,
             isAOEShot,
             hypotheticalSmokeCells,
-            preparedHypotheticalSmokeKeys,
         );
-    }
-    /**
-     * Resolve an unchanged shot's ray, unit groups, terrain interception and base falloff once. This is useful
-     * for pure look-ahead overlays such as comparing many hypothetical Smoke placements. Normal one-off combat
-     * should continue to call evaluateRangeAttack.
-     *
-     * @internal
-     */
-    public prepareRangeAttack(
-        allUnits: ReadonlyMap<string, Unit>,
-        fromUnit: Unit,
-        fromPosition: HoCMath.XY,
-        toPosition: HoCMath.XY,
-        isThroughShot = false,
-        isSelection = false,
-        isAOEShot = false,
-    ): IPreparedRangeAttackEvaluation {
-        const lineEndPosition = isThroughShot
-            ? GridMath.projectLineToFieldEdge(
-                  this.gridSettings,
-                  fromPosition.x,
-                  fromPosition.y,
-                  toPosition.x,
-                  toPosition.y,
-              )
-            : toPosition;
-        const cellsToPositions = traceGridRayCells(this.gridSettings, fromPosition, lineEndPosition);
-        const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
-        const liveSmokeRevision = smokeClouds.getRevision();
-        const capture: IRangeAttackPreparationCapture = {
-            hitRayIndices: [],
-            baseRangeAttackDivisors: [],
-            liveSmokeByHit: [],
-        };
-        const evaluation = this.getAffectedUnitsAndObstacles(
-            allUnits,
-            cellsToPositions,
-            fromUnit,
-            fromPosition,
-            isThroughShot,
-            isSelection,
-            isAOEShot,
-            undefined,
-            undefined,
-            capture,
-        );
-        const affectedUnits = Object.freeze(
-            evaluation.affectedUnits.map((group) => Object.freeze([...group]) as readonly Unit[]),
-        );
-        const affectedCells = Object.freeze(
-            evaluation.affectedCells.map((group) =>
-                Object.freeze(group.map((cell) => Object.freeze({ x: cell.x, y: cell.y }))),
-            ),
-        );
-        const attackObstacle = evaluation.attackObstacle
-            ? Object.freeze({
-                  position: Object.freeze({
-                      x: evaluation.attackObstacle.position.x,
-                      y: evaluation.attackObstacle.position.y,
-                  }),
-                  size: evaluation.attackObstacle.size,
-                  distance: evaluation.attackObstacle.distance,
-              })
-            : undefined;
-        const prepared = Object.freeze({ affectedUnits, affectedCells, attackObstacle });
-        const rayCells = Object.freeze(cellsToPositions.map(([cell]) => Object.freeze({ x: cell.x, y: cell.y })));
-        const firstRayIndexBySmokeKey = new Map<number, number>();
-        for (let index = 0; index < rayCells.length; index += 1) {
-            const key = SmokeClouds.key(rayCells[index]);
-            if (!firstRayIndexBySmokeKey.has(key)) {
-                firstRayIndexBySmokeKey.set(key, index);
-            }
-        }
-        preparedRangeAttackMetadata.set(prepared, {
-            owner: this,
-            rayCells,
-            firstRayIndexBySmokeKey,
-            hitRayIndices: Object.freeze(capture.hitRayIndices),
-            baseRangeAttackDivisors: Object.freeze(capture.baseRangeAttackDivisors),
-            liveSmokeClouds: smokeClouds,
-            liveSmokeRevision,
-            liveSmokeByHit: Object.freeze(capture.liveSmokeByHit),
-        });
-        return prepared;
-    }
-    /**
-     * Apply current live Smoke plus an optional hypothetical footprint to prepared immutable geometry. Each
-     * call returns caller-owned arrays, matching evaluateRangeAttack's mutation/ownership contract.
-     *
-     * @internal
-     */
-    public evaluatePreparedRangeAttack(
-        prepared: IPreparedRangeAttackEvaluation,
-        hypotheticalSmokeCells?: readonly HoCMath.XY[],
-        preparedHypotheticalSmokeKeys?: ReadonlySet<number>,
-    ): IRangeAttackEvaluation {
-        const metadata = preparedRangeAttackMetadata.get(prepared);
-        if (!metadata || metadata.owner !== this) {
-            throw new TypeError("Prepared range attack was not created by this AttackHandler instance");
-        }
-        const hypotheticalSmokeKeys =
-            preparedHypotheticalSmokeKeys ??
-            (hypotheticalSmokeCells?.length
-                ? new Set(hypotheticalSmokeCells.map((cell) => SmokeClouds.key(cell)))
-                : undefined);
-        const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
-        let liveSmokeByHit = metadata.liveSmokeByHit;
-        if (smokeClouds !== metadata.liveSmokeClouds || smokeClouds.getRevision() !== metadata.liveSmokeRevision) {
-            const recomputed: boolean[] = [];
-            let pathCrossedSmoke = false;
-            let nextHit = 0;
-            for (
-                let rayIndex = 0;
-                rayIndex < metadata.rayCells.length && nextHit < metadata.hitRayIndices.length;
-                rayIndex += 1
-            ) {
-                if (!pathCrossedSmoke && smokeClouds.has(metadata.rayCells[rayIndex])) {
-                    pathCrossedSmoke = true;
-                }
-                while (metadata.hitRayIndices[nextHit] === rayIndex) {
-                    recomputed.push(pathCrossedSmoke);
-                    nextHit += 1;
-                }
-            }
-            liveSmokeByHit = recomputed;
-        }
-        const rangeAttackDivisors = metadata.baseRangeAttackDivisors.map((baseDivisor, hitIndex) => {
-            let pathCrossedSmoke = liveSmokeByHit[hitIndex] ?? false;
-            if (!pathCrossedSmoke && hypotheticalSmokeKeys?.size) {
-                const hitRayIndex = metadata.hitRayIndices[hitIndex];
-                for (const smokeKey of hypotheticalSmokeKeys) {
-                    const smokeRayIndex = metadata.firstRayIndexBySmokeKey.get(smokeKey);
-                    if (smokeRayIndex !== undefined && smokeRayIndex <= hitRayIndex) {
-                        pathCrossedSmoke = true;
-                        break;
-                    }
-                }
-            }
-            return pathCrossedSmoke ? Math.min(8, baseDivisor * 2) : baseDivisor;
-        });
-        return {
-            rangeAttackDivisors,
-            affectedUnits: prepared.affectedUnits.map((group) => [...group]),
-            affectedCells: prepared.affectedCells.map((group) => group.map((cell) => ({ x: cell.x, y: cell.y }))),
-            attackObstacle: prepared.attackObstacle
-                ? {
-                      position: {
-                          x: prepared.attackObstacle.position.x,
-                          y: prepared.attackObstacle.position.y,
-                      },
-                      size: prepared.attackObstacle.size,
-                      distance: prepared.attackObstacle.distance,
-                  }
-                : undefined,
-        };
     }
     /** Ordered, de-duplicated obstacle cells crossed before the supplied aim point. */
     public getObstacleIntersections(fromPosition: HoCMath.XY, toPosition: HoCMath.XY): IAttackObstacle[] {
@@ -978,7 +770,8 @@ export class AttackHandler {
             // Cannon has no radius for — and this early return skips it entirely, so the crafted double shot
             // silently did nothing. Re-run the through shot here, scaling the volley by the Double Shot
             // multiplier: 100% for the base ability, stack-scaled 20/40/60/80/100% + luck for the crafted one.
-            const doubleShotAbility = AbilityHelper.getDoubleShotAbility(attackerUnit);
+            const doubleShotAbility =
+                attackerUnit.getAbility("Double Shot") ?? attackerUnit.getAbility("Crafted Double Shot");
             if (
                 !suppressDoubleShot &&
                 doubleShotAbility &&
@@ -1135,38 +928,16 @@ export class AttackHandler {
         // ABILITY Chakram (Zena): the disc may hit up to the attacker's stack power in TOTAL. After the
         // primary, it bounces among enemies standing apart — 1 empty cell keeps full bounce damage and 2
         // halves it — nearest first, each enemy at most once, then it returns to Zena.
-        // resolveChakramTrajectory PRECOMPUTES the geometry deterministically: the red hover preview shows
-        // this planned flight (a preview cannot know which way a dodge will fall), and the client replays
-        // whatever survives the dodge pass below, so the disc it flies is the disc that dealt the damage.
+        // resolveChakramTrajectory PRECOMPUTES the whole flight deterministically, so the client replay and
+        // red hover preview use the exact same capped victims.
         // Victims JOIN affectedUnits, so they resolve through the very same AOE tail as Large Caliber /
         // Area Throw (Giant's Maul, status resistance, Flesh Shield ordering, per-unit numbers).
-        const plannedChakramFlight = AllAbilities.resolveChakramTrajectory(
+        const chakramTrajectory = AllAbilities.resolveChakramTrajectory(
             attackerUnit,
             targetUnit,
             unitsHolder,
             this.grid,
         );
-        // A dodge ENDS the throw: the disc never touched that victim, so it never left it either and the
-        // enemy behind is never reached. The rolls happen here, in flight order, because
-        // resolveChakramTrajectory has to stay pure geometry for the hover preview. The primary reuses
-        // the shot's own miss roll above instead of rolling a second time against the same pair — which
-        // also puts its damage and its on-hit riders on one verdict rather than two.
-        const chakramFlight = plannedChakramFlight.hitUnits.length
-            ? AllAbilities.resolveChakramFlightMisses(
-                  plannedChakramFlight,
-                  targetUnit,
-                  isAttackMissed,
-                  (victim) =>
-                      HoCLib.getRandomInt(0, 100) <
-                      attackerUnit.calculateMissChance(
-                          victim,
-                          FightStateManager.getInstance()
-                              .getFightProperties()
-                              .getAdditionalAbilityPowerPerTeam(victim.getTeam()),
-                      ),
-              )
-            : undefined;
-        const chakramTrajectory = chakramFlight?.trajectory ?? plannedChakramFlight;
         if (chakramTrajectory.hitUnits.length && affectedUnits) {
             for (const hitUnit of chakramTrajectory.hitUnits) {
                 if (!affectedUnits.some((unit) => unit.getId() === hitUnit.getId())) {
@@ -1206,7 +977,6 @@ export class AttackHandler {
             true,
             (damageForAnimation.secondary ??= []),
             chakramTrajectory.damageFactorByUnitId,
-            chakramFlight?.missByUnitId,
         );
         let attackDamageApplied = true;
         if (aoeRangeAttackResult.landed) {
@@ -1288,30 +1058,12 @@ export class AttackHandler {
             // ABILITY Chakram (Zena) on the RESPONSE: a counter-throw behaves EXACTLY like the initiating one —
             // same stack-power total-target cap, separation chain, ally exclusion and Angel stop, with the
             // RESPONDER as the attacker and its shooter as the primary victim.
-            const plannedResponseChakramFlight = AllAbilities.resolveChakramTrajectory(
+            const responseChakramTrajectory = AllAbilities.resolveChakramTrajectory(
                 targetUnit,
                 rangeResponseUnit,
                 unitsHolder,
                 this.grid,
             );
-            // Dodges end the counter-throw exactly as they end the initiating one, and its primary
-            // likewise reuses the counter-shot's own miss roll rather than rolling again.
-            const responseChakramFlight = plannedResponseChakramFlight.hitUnits.length
-                ? AllAbilities.resolveChakramFlightMisses(
-                      plannedResponseChakramFlight,
-                      rangeResponseUnit,
-                      isResponseMissed,
-                      (victim) =>
-                          HoCLib.getRandomInt(0, 100) <
-                          targetUnit.calculateMissChance(
-                              victim,
-                              FightStateManager.getInstance()
-                                  .getFightProperties()
-                                  .getAdditionalAbilityPowerPerTeam(victim.getTeam()),
-                          ),
-                  )
-                : undefined;
-            const responseChakramTrajectory = responseChakramFlight?.trajectory ?? plannedResponseChakramFlight;
             if (responseChakramTrajectory.hitUnits.length) {
                 for (const hitUnit of responseChakramTrajectory.hitUnits) {
                     if (!rangeResponseUnits.some((unit) => unit.getId() === hitUnit.getId())) {
@@ -1353,7 +1105,6 @@ export class AttackHandler {
                 false,
                 (damageForAnimation.secondary ??= []),
                 responseChakramTrajectory.damageFactorByUnitId,
-                responseChakramFlight?.missByUnitId,
             );
             if (aoeRangeResponseResult.landed) {
                 damageFromResponse = AllAbilities.processLuckyStrikeAbility(
@@ -2085,10 +1836,10 @@ export class AttackHandler {
             }
         }
 
-        // NO Deep Wounds step here. Unit.calculateAttackDamage owns the amplification (its chain resolves
-        // `1 + targetPower/100` in damage/damage_projection), so folding it into abilityMultiplier as well
-        // squared it: at power 63 a hit landed for 132 instead of 82. One owner, one application, and the
-        // hover projects the very same chain.
+        const deepWoundsTargetEffect = targetUnit.getEffect("Deep Wounds");
+        if (deepWoundsTargetEffect && AllAbilities.hasAnyDeepWoundsAbility(attackerUnit)) {
+            abilityMultiplier *= 1 + deepWoundsTargetEffect.getPower() / 100;
+        }
 
         const isAttackMissed =
             HoCLib.getRandomInt(0, 100) <
@@ -2343,9 +2094,10 @@ export class AttackHandler {
                         abilityMultiplier *= (100 - paralysisTargetUnitEffect.getPower()) / 100;
                     }
 
-                    // Deep Wounds is applied by Unit.calculateAttackDamage below (the responder is the
-                    // attacker of this hit, the original attacker its victim) — see the note on the
-                    // outgoing swing above. Folding it in here too would square it on the response as well.
+                    const deepWoundsAttackerEffect = attackerUnit.getEffect("Deep Wounds");
+                    if (deepWoundsAttackerEffect && AllAbilities.hasAnyDeepWoundsAbility(targetUnit)) {
+                        abilityMultiplier *= 1 + deepWoundsAttackerEffect.getPower() / 100;
+                    }
 
                     let damageFromResponse =
                         AllAbilities.processLuckyStrikeAbility(
@@ -2931,7 +2683,8 @@ export class AttackHandler {
             attackerUnit.getAttackTypeSelection() === PBTypes.AttackVals.RANGE &&
             this.canLandRangeAttack(attackerUnit, this.grid.getEnemyAggrMatrixByUnitId(attackerUnit.getId()))
         ) {
-            const doubleShotAbility = AbilityHelper.getDoubleShotAbility(attackerUnit);
+            const doubleShotAbility =
+                attackerUnit.getAbility("Double Shot") ?? attackerUnit.getAbility("Crafted Double Shot");
             const trajectoryTargets = this.grid.hasScatteredMountains()
                 ? this.getObstacleIntersections(attackerUnit.getPosition(), targetPosition).slice(
                       0,
@@ -3127,8 +2880,6 @@ export class AttackHandler {
         isSelection = false,
         isAOEShot = false,
         hypotheticalSmokeCells?: readonly HoCMath.XY[],
-        preparedHypotheticalSmokeKeys?: ReadonlySet<number>,
-        preparationCapture?: IRangeAttackPreparationCapture,
     ): IRangeAttackEvaluation {
         const affectedUnitIds: string[] = [];
         const affectedUnits: Array<Unit[]> = [];
@@ -3143,15 +2894,12 @@ export class AttackHandler {
         const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
         // AI planning can project a not-yet-cast cloud without touching FightProperties. Hypothetical cells
         // supplement (rather than replace) live smoke, so the same evaluator is truthful in later laps too.
-        const hypotheticalSmokeKeys =
-            preparedHypotheticalSmokeKeys ??
-            (hypotheticalSmokeCells?.length
-                ? new Set(hypotheticalSmokeCells.map((cell) => SmokeClouds.key(cell)))
-                : undefined);
+        const hypotheticalSmokeKeys = hypotheticalSmokeCells?.length
+            ? new Set(hypotheticalSmokeCells.map((cell) => SmokeClouds.key(cell)))
+            : undefined;
         let pathCrossedSmoke = false;
 
-        for (let rayIndex = 0; rayIndex < cellsToPositions.length; rayIndex += 1) {
-            const cellToPosition = cellsToPositions[rayIndex];
+        for (const cellToPosition of cellsToPositions) {
             const cell = cellToPosition[0];
             const position = cellToPosition[1];
 
@@ -3247,11 +2995,6 @@ export class AttackHandler {
             // Smoke halves damage by doubling the range-falloff divisor (capped at 8, same ceiling as
             // getRangeAttackDivisor). pathCrossedSmoke is sticky for the rest of this ray.
             let divisor = this.getRangeAttackDivisor(attackerUnit, position, attackerPosition);
-            if (preparationCapture) {
-                preparationCapture.hitRayIndices.push(rayIndex);
-                preparationCapture.baseRangeAttackDivisors.push(divisor);
-                preparationCapture.liveSmokeByHit.push(pathCrossedSmoke);
-            }
             if (pathCrossedSmoke) {
                 divisor = Math.min(8, divisor * 2);
             }

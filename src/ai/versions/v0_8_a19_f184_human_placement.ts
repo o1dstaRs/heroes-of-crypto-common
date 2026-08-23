@@ -18,10 +18,8 @@ import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { creatureIdForName, creatureInfo } from "../setup/creature_score";
 
-// Re-pinned for the perk -> doctrine rename; same anchor bytes as V08_A19_PROD_F184_FIXTURE_SHA256,
-// whose values did not move — only the field name did.
 export const V08_A19_F184_HUMAN_PLACEMENT_FIXTURE_SHA256 =
-    "6649cc5a3fe134f0289c1d6ffb8a056cf25e1a56d6c45f5a34f53354b1cdc0a1" as const;
+    "aa524842a6cfeaf96260a10be9dd52c8be36d92654d843af4f496ed192a8b87c" as const;
 
 export const V08_A19_F184_HUMAN_PLACEMENT_POLICY = Object.freeze({
     schema: "hoc.v0_8_a19_f184_human_placement.v10" as const,

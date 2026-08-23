@@ -77,7 +77,6 @@ export interface TestUnitOptions {
     auraRanges?: number[];
     auraIsBuff?: boolean[];
     summoned?: boolean;
-    target?: string;
 }
 
 export interface CombatTestContext {

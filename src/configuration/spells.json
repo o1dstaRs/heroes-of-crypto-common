@@ -1358,7 +1358,7 @@
             "target": "FREE_CELL",
             "power": 25,
             "power_type": "COMMON",
-            "element": "FIRE",
+            "element": "",
             "multiplier_type": "NO_MULTIPLIER",
             "laps": 3,
             "is_buff": false,
@@ -1374,13 +1374,12 @@
             "level": 1,
             "desc": [
                 "Sends a small fireball at an enemy in line of sight, dealing {} damage.",
-                "Magical: it ignores armor, but magic resistance cuts it down.",
-                "Fire magic: a Fire Element is untouched, a Water Element burns half again as hard."
+                "Magical: it ignores armor, but magic resistance cuts it down."
             ],
             "target": "ANY_ENEMY",
             "power": 6,
             "power_type": "COMMON",
-            "element": "FIRE",
+            "element": "",
             "multiplier_type": "UNIT_AMOUNT_DAMAGE",
             "laps": 1,
             "is_buff": false,

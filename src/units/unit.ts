@@ -16,7 +16,6 @@ import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
 import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilities/absolving_arrow_ability";
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
-import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/double_shot_names";
 import { getCraftChances } from "../abilities/craft_ability";
 import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { empowerMultiplier } from "../augments/augment_properties";
@@ -33,7 +32,6 @@ import {
     MIN_ARMAGEDDON_DAMAGE_FIRST_WAVE,
     GUIDING_WINDS_MAX_PERCENT,
 } from "../constants";
-import { applyAttackDamageChain, projectShotCost, resolveAttackDamageChain } from "../damage/damage_projection";
 import { AuraEffect } from "../effects/aura_effect";
 import { Effect } from "../effects/effect";
 import { EffectFactory } from "../effects/effect_factory";
@@ -391,33 +389,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return undefined;
     }
-    /**
-     * Power of an active buff from either a live AppliedSpell or authoritative snapshot display state.
-     *
-     * Ranked clients hydrate the parallel applied_buffs arrays without rebuilding `this.buffs`, so a mechanic
-     * used by both engine and preview cannot rely on getBuff() alone. Reading only the power is safe: unlike
-     * stat derivation, it does not re-apply the buff or double-count authoritative modifiers.
-     */
-    public getBuffPower(buffName: string): number | undefined {
-        const live = this.getBuff(buffName);
-        if (live) {
-            return live.getPower();
-        }
-
-        const names = this.unitProperties.applied_buffs;
-        const laps = this.unitProperties.applied_buffs_laps;
-        const powers = this.unitProperties.applied_buffs_powers;
-        if (names.length !== laps.length || names.length !== powers.length) {
-            return undefined;
-        }
-        for (let i = names.length - 1; i >= 0; i--) {
-            if (names[i] === buffName && laps[i] > 0) {
-                return Number.isFinite(powers[i]) ? powers[i] : undefined;
-            }
-        }
-
-        return undefined;
-    }
     public getBuffs(): AppliedSpell[] {
         return this.buffs;
     }
@@ -492,36 +463,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.parseSpells();
             this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
         }
-    }
-    /**
-     * Grant an ability that belongs to the equipped ARTIFACT rather than to the creature, and remember
-     * that the artifact is the one lending it. A card the unit already owns is left alone and NOT
-     * recorded, so taking the artifact off can never strip a native ability.
-     */
-    public grantArtifactAbility(abilityName: string): void {
-        if (this.abilities.some((ability) => ability.getName() === abilityName)) {
-            return;
-        }
-        this.grantAbility(abilityName);
-        // grantAbility declines to restore a permanently stolen card; only record what actually landed.
-        if (!this.abilities.some((ability) => ability.getName() === abilityName)) {
-            return;
-        }
-        this.unitProperties.artifact_granted_abilities ??= [];
-        if (!this.unitProperties.artifact_granted_abilities.includes(abilityName)) {
-            this.unitProperties.artifact_granted_abilities.push(abilityName);
-        }
-    }
-    /** Take back every ability the equipped artifact lent this unit. Natives are untouched. */
-    public revokeArtifactGrantedAbilities(): void {
-        const granted = this.unitProperties.artifact_granted_abilities;
-        if (!granted?.length) {
-            return;
-        }
-        for (const abilityName of granted) {
-            this.deleteAbility(abilityName);
-        }
-        this.unitProperties.artifact_granted_abilities = [];
     }
     public addAbility(ability: Ability): void {
         if (this.abilities.some((currentAbility) => currentAbility.getName() === ability.getName())) {
@@ -803,11 +744,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return false;
     }
     public getAbility(abilityName: string): Ability | undefined {
-        // Missing-ability probes dominate AI evaluation. Establish absence before consulting Break: Break can
-        // mute an ability that exists, but it cannot change an absent lookup's undefined/false/zero result.
+        if (this.hasEffectActive("Break")) {
+            return undefined;
+        }
+
         for (const a of this.abilities) {
             if (abilityName === a.getName()) {
-                return this.hasEffectActive("Break") ? undefined : a;
+                return a;
             }
         }
 
@@ -1126,9 +1069,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return false;
     }
     public hasAbilityActive(abilityName: string): boolean {
+        if (this.hasEffectActive("Break")) {
+            return false;
+        }
+
         for (const ab of this.abilities) {
             if (ab.getName() === abilityName) {
-                return !this.hasEffectActive("Break");
+                return true;
             }
         }
 
@@ -1168,9 +1115,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return undefined;
     }
     public getAbilityPower(abilityName: string): number {
+        if (this.hasEffectActive("Break")) {
+            return 0;
+        }
+
         for (const ab of this.abilities) {
             if (ab.getName() === abilityName) {
-                return this.hasEffectActive("Break") ? 0 : ab.getPower();
+                return ab.getPower();
             }
         }
 
@@ -1281,29 +1232,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * Call this from EVERY path that consumes a volley so the two can never drift apart again.
      */
     public spendShotsAgainst(target?: Unit): number {
-        const cost = projectShotCost(this, target);
+        for (const ability of this.getAbilities()) {
+            if (ability.getPowerType() === AbilityPowerType.UNLIMITED_SUPPLIES) {
+                return 0;
+            }
+        }
+        const cost =
+            target?.hasAbilityActive("Dense Flesh") === true
+                ? Math.max(1, Math.floor(target.getAbility("Dense Flesh")?.getPower() ?? 1))
+                : 1;
         for (let i = 0; i < cost; i++) {
             this.decreaseNumberOfShots();
         }
         return cost;
-    }
-    /**
-     * How many arrows would REMAIN after firing `volleys` volleys at `target` — spendShotsAgainst's
-     * pure counterpart, so a preview can gate a follow-up volley (Double Shot's second arrow) on exactly
-     * the `getRangeShots() <= 0` bail calculateAttackDamage will hit. Nothing is spent here.
-     */
-    public projectRangeShotsAfterVolleys(target?: Unit, volleys = 1): number {
-        const cost = projectShotCost(this, target) * Math.max(0, volleys);
-        if (cost <= 0) {
-            return this.getRangeShots();
-        }
-        // range_shots_mod overrides the depleting counter (a stolen Endless Quiver never runs dry), and
-        // decreaseNumberOfShots only ever touches range_shots — so the mod survives any number of volleys.
-        if (this.unitProperties.range_shots_mod) {
-            return this.unitProperties.range_shots_mod;
-        }
-
-        return Math.max(0, Math.floor(this.unitProperties.range_shots) - cost);
     }
     public decreaseNumberOfShots(): void {
         this.unitProperties.range_shots -= 1;
@@ -1987,7 +1928,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
-        // A poison aura is not stack-powered: the affected ally applies the flat base % (its own luck is
+        // Poison Cloud is not stack-powered: the affected ally applies the flat base % (its own luck is
         // added at hit time in processPoisonAuraAbility), so the stored aura power is just the base value.
         if (auraEffect.getPowerType() === AbilityPowerType.POISON_ON_HIT) {
             return auraEffect.getPower();
@@ -2064,11 +2005,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.hasAbilityActive("Madness") || this.hasAbilityActive("Mechanism");
     }
     public canBeHealed(): boolean {
-        return !this.hasAbilityActive("Mechanism");
-    }
-    // Mechanism constructs are machines: the Mechanism ability text promises immunity to poison, and there is
-    // nothing alive in them for a damage-over-time to corrode. Enforced at the applyPoisonEffect chokepoint.
-    public canBePoisoned(): boolean {
         return !this.hasAbilityActive("Mechanism");
     }
     // Total Deep Wounds a unit applies in one hit. The cards STACK — their base powers sum — but the flat
@@ -2370,10 +2306,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         );
     }
     /**
-     * Elemental affinity multiplier for the two opposed pairs: Fire <-> Water and Wind <-> Earth. The
-     * vulnerability lives on the DEFENDER's element ability (power 50 = "takes 50% more from the opposing
-     * element"). Feeding this into calculateAttackDamage covers normal melee/ranged attacks and abilities whose
-     * damage routes through them, such as Fire Breath.
+     * Water <-> Fire elemental affinity multiplier. The vulnerability lives on the DEFENDER's element ability
+     * (Fire Element / Water Element, power 50 = "takes 50% more from the opposing element"): a Fire-Element
+     * attacker vs a Water-Element target, and a Water-Element attacker vs a Fire-Element target, each deal
+     * +power% more. Feeding this into calculateAttackDamage covers normal melee/ranged attacks AND Fire Breath
+     * (whose per-target damage routes through calculateAttackDamage).
      */
     public getElementalDamageMultiplier(enemyUnit: Unit): number {
         if (this.hasAbilityActive("Fire Element") && enemyUnit.hasAbilityActive("Water Element")) {
@@ -2382,23 +2319,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (this.hasAbilityActive("Water Element") && enemyUnit.hasAbilityActive("Fire Element")) {
             return 1 + (enemyUnit.getAbility("Fire Element")?.getPower() ?? 0) / 100;
         }
-        if (this.hasAbilityActive("Wind Element") && enemyUnit.hasAbilityActive("Earth Element")) {
-            return 1 + (enemyUnit.getAbility("Earth Element")?.getPower() ?? 0) / 100;
-        }
-        if (this.hasAbilityActive("Earth Element") && enemyUnit.hasAbilityActive("Wind Element")) {
-            return 1 + (enemyUnit.getAbility("Wind Element")?.getPower() ?? 0) / 100;
-        }
         return 1;
     }
-    /**
-     * Resolve one attack: ROLL inside the band and spend the volley's arrows.
-     *
-     * The band, the multiplier chain (melee-poke penalty, ability multiplier, Deep Wounds, elemental
-     * affinity) and the single Math.floor all come from resolveAttackDamageChain/applyAttackDamageChain
-     * in damage/damage_projection — the SAME helpers every preview projects with. Anything that has to
-     * predict this number must go through projectAttackDamage rather than re-deriving the formula: the
-     * hover's hand-kept copy of it drifted 40 ways before this was shared.
-     */
     public calculateAttackDamage(
         enemyUnit: Unit,
         attackType: AttackType,
@@ -2407,17 +2329,24 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         abilityMultiplier = 1,
         decreaseNumberOfShots = true,
     ): number {
-        const chain = resolveAttackDamageChain({
-            attacker: this,
-            target: enemyUnit,
-            attackType,
+        const min = this.calculateAttackDamageMin(
+            this.getAttack(),
+            enemyUnit,
+            attackType === PBTypes.AttackVals.RANGE,
             synergyAbilityPowerIncrease,
             divisor,
-            abilityMultiplier,
-        });
-
-        if (chain.spendsShot) {
-            if (chain.outOfShots) {
+        );
+        const max = this.calculateAttackDamageMax(
+            this.getAttack(),
+            enemyUnit,
+            attackType === PBTypes.AttackVals.RANGE,
+            synergyAbilityPowerIncrease,
+            divisor,
+        );
+        const attackingByMelee =
+            attackType === PBTypes.AttackVals.MELEE || attackType === PBTypes.AttackVals.MELEE_MAGIC;
+        if (!attackingByMelee && attackType === PBTypes.AttackVals.RANGE) {
+            if (this.getRangeShots() <= 0) {
                 return 0;
             }
             if (decreaseNumberOfShots) {
@@ -2426,7 +2355,36 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        return applyAttackDamageChain(chain, getRandomInt(chain.rollMin, chain.rollMaxExclusive));
+        const attackTypeMultiplier =
+            attackingByMelee &&
+            this.unitProperties.attack_type === PBTypes.AttackVals.RANGE &&
+            !this.hasAbilityActive("Handyman")
+                ? 0.5
+                : 1;
+
+        // Deep Wounds damage bonus: if THIS attacker inflicts Deep Wounds and the target already carries the
+        // stacked "Deep Wounds" effect from a prior hit, this strike deals that % more damage. (calculate-
+        // ActiveDeepWoundsEffect encoded this but was never wired into damage — this is where it applies, so it
+        // works in ranked and sandbox alike since both run this same path.)
+        let deepWoundsMultiplier = 1;
+        const deepWoundsPower = enemyUnit.getEffect("Deep Wounds")?.getPower() ?? 0;
+        if (
+            deepWoundsPower > 0 &&
+            (this.getAbility("Deep Wounds Level 0") ||
+                this.getAbility("Deep Wounds Level 1") ||
+                this.getAbility("Deep Wounds Level 2") ||
+                this.getAbility("Deep Wounds Level 3"))
+        ) {
+            deepWoundsMultiplier = 1 + deepWoundsPower / 100;
+        }
+
+        return Math.floor(
+            getRandomInt(min, max) *
+                attackTypeMultiplier *
+                abilityMultiplier *
+                deepWoundsMultiplier *
+                this.getElementalDamageMultiplier(enemyUnit),
+        );
     }
     public canSkipResponse(): boolean {
         if (!this.hasAbilityActive("Break")) {
@@ -2717,12 +2675,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 continue;
             }
             const description = this.unitProperties.applied_buffs_descriptions[i];
-            const firstSeparator = description.indexOf(";");
-            const secondSeparator = description.indexOf(";", firstSeparator + 1);
-            // Preserve the exact three-field wire contract without allocating a split array in every stat refresh.
-            if (firstSeparator >= 0 && secondSeparator >= 0 && description.indexOf(";", secondSeparator + 1) < 0) {
-                buffProperties[0] = description.slice(firstSeparator + 1, secondSeparator);
-                buffProperties[1] = description.slice(secondSeparator + 1);
+            const splitDescription = description.split(";");
+            if (splitDescription.length === 3) {
+                buffProperties[0] = splitDescription[1];
+                buffProperties[1] = splitDescription[2];
                 break;
             }
         }
@@ -2966,35 +2922,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ? this.unitProperties.base_attack
             : undefined;
 
-        // Stat refresh probes the same compact buff list dozens of times. Index it once for this refresh,
-        // preserving getBuff's first-match behavior for defensive compatibility with malformed duplicate rows.
-        // The index is deliberately local: buff mutation, battle rollback, and authoritative reconstruction cannot
-        // make it stale, and the AppliedSpell objects themselves remain the exact live instances.
-        const statBuffs: Record<string, AppliedSpell | undefined> = {};
-        for (const buff of this.buffs) {
-            const name = buff.getName();
-            if (statBuffs[name] === undefined) {
-                statBuffs[name] = buff;
-            }
-        }
-
-        // Aggr's forced target belongs to the status for exactly as long as that status is active.
-        // Sandbox owns a real Effect object; ranked deliberately owns only the authoritative display
-        // entry. Use the cross-mode predicate or every ranked refresh immediately clears the target that
-        // the snapshot just restored, leaving the client unable to explain or preview the forced attack.
-        if (!this.hasStatusApplied("Aggr")) {
+        // target
+        if (!this.hasEffectActive("Aggr")) {
             this.resetTarget();
         }
-        // ...and its inverse: the fright wears off with the effect that caused it. Ranked clients carry
-        // combat effects as authoritative display entries rather than Effect objects, so use the shared
-        // status seam just like Aggr above; otherwise every stat refresh immediately clears the forbidden
-        // Manticore id received in the snapshot and the client cannot expose the target-specific rule.
-        if (!this.hasStatusApplied("Terrifying Gaze")) {
+        // ...and its inverse: the fright wears off with the effect that caused it.
+        if (!this.hasEffectActive("Terrifying Gaze")) {
             this.resetForbiddenTarget();
         }
 
         // HP
-        const madeOfFireBuff = statBuffs["Made of Fire"];
+        const madeOfFireBuff = this.getBuff("Made of Fire");
         const baseStatsDiff = calculateBuffsDebuffsEffect(this.getBuffs(), this.getDebuffs());
         const hasUnyieldingPower = this.hasAbilityActive("Unyielding Power");
 
@@ -3016,7 +2954,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
             // ARTIFACTS: Pendant of Vitality adds % HP here. Tome of Amplification is intentionally absent from
             // base-stat recomputation: it applies only at the unit-cast buff boundary (spells/castable_buff.ts).
-            const pendantOfVitalityBuff = statBuffs["Pendant of Vitality"];
+            const pendantOfVitalityBuff = this.getBuff("Pendant of Vitality");
             if (pendantOfVitalityBuff) {
                 this.unitProperties.max_hp += roundUnitStat(
                     (this.unitProperties.max_hp / 100) * pendantOfVitalityBuff.getPower(),
@@ -3052,9 +2990,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 // rolls, synergy or artifact luck. See the Sadness block below for the morale equivalent.
                 const luckBuffed =
                     baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER ||
-                    !!statBuffs["Luck Aura"] ||
-                    !!statBuffs["Clover of Fortune"] ||
-                    !!statBuffs.Fortune;
+                    this.hasBuffActive("Luck Aura") ||
+                    this.hasBuffActive("Clover of Fortune") ||
+                    this.hasBuffActive("Fortune");
                 this.unitProperties.luck = luckBuffed ? 0 : -LUCK_MAX_VALUE_TOTAL;
                 this.unitProperties.luck_mod = 0;
             } else if (baseStatsDiff.baseStats.luck === Number.MAX_SAFE_INTEGER) {
@@ -3079,11 +3017,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
                 // ARTIFACTS: Cursed Ward (+luck) and Clover of Fortune (+luck).
                 let artifactLuck = 0;
-                const cursedWardLuckBuff = statBuffs["Cursed Ward"];
+                const cursedWardLuckBuff = this.getBuff("Cursed Ward");
                 if (cursedWardLuckBuff) {
                     artifactLuck += cursedWardLuckBuff.getPower();
                 }
-                const cloverOfFortuneBuff = statBuffs["Clover of Fortune"];
+                const cloverOfFortuneBuff = this.getBuff("Clover of Fortune");
                 if (cloverOfFortuneBuff) {
                     artifactLuck += cloverOfFortuneBuff.getPower();
                 }
@@ -3113,11 +3051,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
             // ARTIFACTS: Cursed Ward (-morale) and Crown of Command (+morale). Crown's first stored
             // property carries morale; its AppliedSpell power carries movement and its second property armor.
-            const cursedWardMoraleBuff = statBuffs["Cursed Ward"];
+            const cursedWardMoraleBuff = this.getBuff("Cursed Ward");
             if (cursedWardMoraleBuff) {
                 this.unitProperties.morale -= parseInt(this.getBuffProperties("Cursed Ward")[1] || "0", 10);
             }
-            const crownOfCommandMoraleBuff = statBuffs["Crown of Command"];
+            const crownOfCommandMoraleBuff = this.getBuff("Crown of Command");
             if (crownOfCommandMoraleBuff) {
                 this.unitProperties.morale += parseInt(this.getBuffProperties("Crown of Command")[0] || "0", 10);
             }
@@ -3127,14 +3065,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         } else {
             let lockedMorale = false;
             if (this.hasDebuffActive("Sadness")) {
-                if (statBuffs.Courage) {
+                if (this.hasBuffActive("Courage")) {
                     this.unitProperties.morale = 0;
                     lockedMorale = true;
                 } else {
                     this.unitProperties.morale = -MORALE_MAX_VALUE_TOTAL;
                 }
             }
-            if (statBuffs.Courage) {
+            if (this.hasBuffActive("Courage")) {
                 if (this.hasDebuffActive("Sadness")) {
                     this.unitProperties.morale = 0;
                     lockedMorale = true;
@@ -3175,11 +3113,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (pegasusMightAura) {
             this.unitProperties.base_armor += pegasusMightAura.getPower();
         }
-        const windFlowBuff = statBuffs["Wind Flow"];
+        const windFlowBuff = this.getBuff("Wind Flow");
         if (windFlowBuff) {
             this.unitProperties.base_armor += windFlowBuff.getPower();
         }
-        const armorAugmentBuff = statBuffs["Armor Augment"];
+        const armorAugmentBuff = this.getBuff("Armor Augment");
         if (armorAugmentBuff) {
             this.unitProperties.base_armor += roundUnitStat(
                 (this.unitProperties.base_armor / 100) * armorAugmentBuff.getPower(),
@@ -3192,28 +3130,28 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Titan Plate: +% defense as an ADDITIONAL stat (armor_mod), not folded into base_armor — so it never
         // compounds with the armor multiplier or other % defense buffs, and (feeding armor_mod) it guards melee
         // AND ranged. Capture 15% of base here (pre-multiplier); apply into armor_mod at the Veteran Helm block.
-        const titanPlateBuff = statBuffs["Titan Plate"];
+        const titanPlateBuff = this.getBuff("Titan Plate");
         const titanPlateArmorBonus = titanPlateBuff
             ? roundUnitStat((this.unitProperties.base_armor / 100) * titanPlateBuff.getPower(), 2)
             : 0;
-        const ironPlateBuff = statBuffs["Iron Plate"];
+        const ironPlateBuff = this.getBuff("Iron Plate");
         if (ironPlateBuff) {
             this.unitProperties.base_armor += ironPlateBuff.getPower();
         }
         // ARTIFACT Winged Boots: flat armour for flyers, alongside the movement it grants below. Only
         // flying units ever carry the buff (applyArtifacts gates it), so its presence is sufficient here.
         // The armour is the SECOND stored value — the power is the steps, which the movement hook reads.
-        const wingedBootsArmorBuff = statBuffs["Winged Boots"];
+        const wingedBootsArmorBuff = this.getBuff("Winged Boots");
         if (wingedBootsArmorBuff) {
             this.unitProperties.base_armor += parseInt(this.getBuffProperties("Winged Boots")[1] || "0", 10);
         }
         // Crown of Command carries armor in its second stored property (movement remains the buff power and
         // morale the first property), so all three values survive authoritative ranked snapshots.
-        const crownOfCommandArmorBuff = statBuffs["Crown of Command"];
+        const crownOfCommandArmorBuff = this.getBuff("Crown of Command");
         if (crownOfCommandArmorBuff) {
             this.unitProperties.base_armor += parseInt(this.getBuffProperties("Crown of Command")[1] || "0", 10);
         }
-        const berserkersBondArmorBuff = statBuffs["Berserkers Bond"];
+        const berserkersBondArmorBuff = this.getBuff("Berserkers Bond");
         if (berserkersBondArmorBuff) {
             this.unitProperties.base_armor = Math.max(
                 1,
@@ -3259,7 +3197,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (this.getMovementType() === PBTypes.MovementVals.FLY && synergyFlyArmorIncrease > 0) {
             armorModMultiplier = synergyFlyArmorIncrease / 100;
         }
-        const spiritualArmorBuff = statBuffs["Spiritual Armor"];
+        const spiritualArmorBuff = this.getBuff("Spiritual Armor");
         if (spiritualArmorBuff) {
             armorModMultiplier = (spiritualArmorBuff.getPower() / 100) * (1 + armorModMultiplier);
         }
@@ -3277,7 +3215,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // armor_mod feeds BOTH getArmor and getRangeArmor it now protects vs melee AND ranged — the "+defense
         // (all)" it was always described as (folding into base_armor only guarded melee). Additive off base, so
         // it never compounds with other % defense buffs.
-        const veteranHelmArmorBuff = statBuffs["Veteran Helm"];
+        const veteranHelmArmorBuff = this.getBuff("Veteran Helm");
         if (veteranHelmArmorBuff) {
             this.unitProperties.armor_mod += roundUnitStat(
                 (this.unitProperties.base_armor / 100) * veteranHelmArmorBuff.getPower(),
@@ -3291,7 +3229,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.armor_mod = roundUnitStat(this.unitProperties.armor_mod + titanPlateArmorBonus, 2);
         }
 
-        const angelicHostBuff = statBuffs["Angelic Host"];
+        const angelicHostBuff = this.getBuff("Angelic Host");
         if (angelicHostBuff) {
             this.unitProperties.armor_mod = roundUnitStat(
                 this.unitProperties.armor_mod + angelicHostBuff.getPower(),
@@ -3335,7 +3273,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // so a percentage gave a level 1 unit 21% of nothing and a level 2 unit barely one point. Applied to
         // the base here, BEFORE the independent ability rolls below, so Magic Shield / Wardguard / Warding
         // Mane still compose on top of the raised figure.
-        const armorAugmentMagicBuff = statBuffs["Armor Augment"];
+        const armorAugmentMagicBuff = this.getBuff("Armor Augment");
         if (armorAugmentMagicBuff) {
             this.unitProperties.magic_resist = roundUnitStat(
                 this.unitProperties.magic_resist + armorAugmentMagicBuff.getPower(),
@@ -3433,13 +3371,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.unitProperties.steps_mod += tieUpTheHorsesAuraEffect.getPower();
             }
         }
-        const movementAugmentBuff = statBuffs["Movement Augment"];
+        const movementAugmentBuff = this.getBuff("Movement Augment");
         if (movementAugmentBuff) {
             this.unitProperties.steps += movementAugmentBuff.getPower();
         }
         // ARTIFACTS: movement. Swift Boots (melee) and Winged Boots (flyers) are only applied to eligible
         // units in applyArtifacts, so buff presence is sufficient. Crown of Command grants +steps to all.
-        const swiftBootsBuff = statBuffs["Swift Boots"];
+        const swiftBootsBuff = this.getBuff("Swift Boots");
         if (swiftBootsBuff) {
             // Percent of base steps (power is a %), not a flat +1 — scales with the unit's own movement.
             this.unitProperties.steps += roundUnitStat(
@@ -3447,15 +3385,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 2,
             );
         }
-        const wingedBootsBuff = statBuffs["Winged Boots"];
+        const wingedBootsBuff = this.getBuff("Winged Boots");
         if (wingedBootsBuff) {
             this.unitProperties.steps += wingedBootsBuff.getPower();
         }
-        const crownOfCommandStepsBuff = statBuffs["Crown of Command"];
+        const crownOfCommandStepsBuff = this.getBuff("Crown of Command");
         if (crownOfCommandStepsBuff) {
             this.unitProperties.steps += crownOfCommandStepsBuff.getPower();
         }
-        const battleRoarBuff = statBuffs["Battle Roar"];
+        const battleRoarBuff = this.getBuff("Battle Roar");
         if (battleRoarBuff) {
             this.unitProperties.steps_mod += battleRoarBuff.getPower();
         }
@@ -3523,7 +3461,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.base_attack += pegasusMightAura.getPower();
         }
 
-        const mightAugmentBuff = statBuffs["Might Augment"];
+        const mightAugmentBuff = this.getBuff("Might Augment");
 
         if (this.getAttackTypeSelection() !== PBTypes.AttackVals.RANGE && mightAugmentBuff) {
             this.unitProperties.base_attack += roundUnitStat(
@@ -3532,7 +3470,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             );
         }
 
-        const sniperAugmentBuff = statBuffs["Sniper Augment"];
+        const sniperAugmentBuff = this.getBuff("Sniper Augment");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && sniperAugmentBuff) {
             const buffProperties = this.getBuffProperties(sniperAugmentBuff.getName());
             if (buffProperties?.length === 2) {
@@ -3552,7 +3490,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // off the INITIAL shot_distance (not the Sniper-Augment-boosted value above), so it doesn't compound with
         // Sniper Augment. This pushes out the range-falloff threshold (attack_handler.getRangeAttackDivisor)
         // rather than removing falloff entirely (which is what it used to do).
-        const farsightQuiverBuff = statBuffs["Farsight Quiver"];
+        const farsightQuiverBuff = this.getBuff("Farsight Quiver");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && farsightQuiverBuff) {
             this.unitProperties.shot_distance += roundUnitStat(
                 (this.initialUnitProperties.shot_distance / 100) * farsightQuiverBuff.getPower(),
@@ -3573,11 +3511,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // ARTIFACTS: attack. Flat bonuses first, then percentage bonuses off the running base_attack.
-        const keenBladeBuff = statBuffs["Keen Blade"];
+        const keenBladeBuff = this.getBuff("Keen Blade");
         if (keenBladeBuff) {
             this.unitProperties.base_attack += keenBladeBuff.getPower();
         }
-        const berserkersBondAttackBuff = statBuffs["Berserkers Bond"];
+        const berserkersBondAttackBuff = this.getBuff("Berserkers Bond");
         if (berserkersBondAttackBuff) {
             this.unitProperties.base_attack += berserkersBondAttackBuff.getPower();
         }
@@ -3585,17 +3523,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Warlord's Edge: +% attack as an ADDITIONAL stat (attack_mod), not folded into base_attack — so it never
         // compounds with the Sharpened Weapons aura multiplier and isn't amplified by base_attack-derived effects
         // (Riot/Weakness). Capture 15% of base here (pre-aura); apply into attack_mod after those overwrites below.
-        const warlordsEdgeBuff = statBuffs["Warlords Edge"];
+        const warlordsEdgeBuff = this.getBuff("Warlords Edge");
         const warlordsEdgeAttackBonus = warlordsEdgeBuff
             ? roundUnitStat((this.unitProperties.base_attack / 100) * warlordsEdgeBuff.getPower(), 2)
             : 0;
-        const huntersLongbowAttackBuff = statBuffs["Hunters Longbow"];
+        const huntersLongbowAttackBuff = this.getBuff("Hunters Longbow");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && huntersLongbowAttackBuff) {
             // Flat additional attack (NOT a percent of base attack) for ranged units.
             const longbowAttackFlat = parseInt(this.getBuffProperties("Hunters Longbow")[0] || "0", 10);
             this.unitProperties.base_attack += longbowAttackFlat;
         }
-        const pendantOfVitalityAttackBuff = statBuffs["Pendant of Vitality"];
+        const pendantOfVitalityAttackBuff = this.getBuff("Pendant of Vitality");
         if (pendantOfVitalityAttackBuff) {
             // parseFloat (not parseInt) so a fractional penalty like 12.5% applies exactly rather than truncating to 12.
             const pendantAttackPenaltyPercent = parseFloat(this.getBuffProperties("Pendant of Vitality")[1] || "0");
@@ -3619,7 +3557,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // still shows 2-3" report). The transform is idempotent and non-stacking, and on the server /
         // sandbox the label stays in lockstep with the object, so this only corrects the display path.
         const appliedBuffLabels = this.unitProperties.applied_buffs ?? [];
-        const blessed = !!statBuffs["Blessing"] || appliedBuffLabels.includes("Blessing");
+        const blessed = !!this.getBuff("Blessing") || appliedBuffLabels.includes("Blessing");
         const roared = !!battleRoarBuff || appliedBuffLabels.includes("Battle Roar");
         // Curse is Blessing's mirror: every roll drops to the MINIMUM, so a 2-4 attacker reads 2-2. Same
         // dual read of object + DISPLAY list, for the same reason (ranked mirrors debuff names but never
@@ -3639,8 +3577,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.attack_damage_max = this.unitProperties.attack_damage_min;
         }
 
-        const riotBuff = statBuffs["Riot"];
-        const massRiotBuff = statBuffs["Mass Riot"];
+        const riotBuff = this.getBuff("Riot");
+        const massRiotBuff = this.getBuff("Mass Riot");
         if (riotBuff) {
             this.unitProperties.attack_mod = (this.unitProperties.base_attack * riotBuff.getPower()) / 100;
         } else if (massRiotBuff) {
@@ -3988,13 +3926,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Miner scales with stack power, luck and Might synergy. Keep the shared/server-owned description
         // aligned with the amount processMinerAbility actually transfers, including sane decimal rounding.
         this.refreshMinerDescription(_synergyAbilityPowerIncrease);
-        // The second-shot cards are a live percentage too: the ability's power plus the owner's CURRENT
-        // luck, and for the stack-powered members its current stack tier on top.
-        this.refreshDoubleShotDescriptions(_synergyAbilityPowerIncrease);
-        // The non-magical AOE damage cards: the live percentage the fight applies — the owner's luck, Might
-        // synergy and stack scaling through calculateAbilityMultiplier, then ARTIFACT Giant's Maul on top
-        // while its buff is up. Runs LAST, so it is the figure every surface ends up showing.
-        this.refreshGiantsMaulAoeDescriptions(_synergyAbilityPowerIncrease);
+        // ARTIFACT Giant's Maul: while its buff is active, the non-magical AOE abilities deal +% damage, so
+        // their damage-% cards must show the BOOSTED figure the fight actually applies, not the base 100%.
+        this.refreshGiantsMaulAoeDescriptions();
     }
     /**
      * The non-magical AOE damage abilities Giant's Maul boosts (the same set that reads its buff in the
@@ -4009,22 +3943,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         "Skewer Strike",
         "Large Caliber",
     ];
-    /**
-     * Re-render each AOE ability's damage-% card with the percentage the fight ACTUALLY applies.
-     *
-     * This pass runs on every refresh, not only while Giant's Maul is up, and it is the LAST writer of
-     * these cards — the client's RenderableUnit chains up to this method after its own pass, and in ranked
-     * it is the only writer at all, because a player reads the description the server put in the snapshot.
-     * So whatever it prints is what every surface shows.
-     *
-     * It used to print the ability's BASE power times the Maul factor, which threw away everything
-     * calculateAbilityMultiplier folds in — the owner's luck above all, but also Might synergy, Made of
-     * Fire, and (for a stack-powered ability) the stack scaling. Gargantuan's Area Throw therefore read a
-     * flat "100%" no matter how lucky the stack was, while the shot itself landed 100% + luck. Take the
-     * engine's own coefficient and apply the Maul on top of it, exactly as processRangeAOEAbility does:
-     * ability multiplier first, then `damage * (1 + maul%)` at impact.
-     */
-    private refreshGiantsMaulAoeDescriptions(synergyAbilityPowerIncrease: number): void {
+    /** Re-render each Maul-boosted AOE ability's damage-% card at power x (1 + Maul%) while the buff is up. */
+    private refreshGiantsMaulAoeDescriptions(): void {
         const maulBuff = this.getBuff("Giants Maul");
         const factor = maulBuff ? 1 + maulBuff.getPower() / 100 : 1;
         for (const abilityName of Unit.GIANTS_MAUL_AOE_DESCRIPTION_ABILITIES) {
@@ -4036,11 +3956,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             if (!ability) {
                 continue;
             }
-            // Two decimals, trailing zeros dropped: a stack-powered card lands on fractions (Large Caliber
-            // at stack 3 with 5 luck is 63), and rounding those to whole numbers hid the luck it just gained.
-            const rescaled = Number(
-                (this.calculateAbilityMultiplier(ability, synergyAbilityPowerIncrease) * 100 * factor).toFixed(2),
-            );
+            const rescaled = Math.round(ability.getPower() * factor);
             this.unitProperties.abilities_descriptions[index] = ability
                 .getDesc()
                 .join("\n")
@@ -4056,42 +3972,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * attack.
      */
     /** Rewrite the Stun Aura card with the chance the field is CURRENTLY rolling (luck included). */
-    /**
-     * Rewrite the second-shot cards with the percentage the volley will ACTUALLY land.
-     *
-     * calculateAbilityMultiplier folds in the owner's luck and Might synergy, and then either dilutes the
-     * power across the stack (Double Shot, Crafted Double Shot) or does not (Gargantuan's Double Throw,
-     * which is stack-independent and therefore reads a flat "100 + luck"). Without this the card printed
-     * the seeded figure — a Double Throw with 5 luck promises 105% and the card said 100%.
-     *
-     * Lives in common rather than only in the client's RenderableUnit for the reason spelled out on
-     * refreshBlindFuryDescription: a ranked player reads the description the SERVER put in the snapshot.
-     */
-    private refreshDoubleShotDescriptions(synergyAbilityPowerIncrease: number): void {
-        for (const abilityName of DOUBLE_SHOT_ABILITY_NAMES) {
-            const index = this.unitProperties.abilities.indexOf(abilityName);
-            if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
-                continue;
-            }
-            const ability = this.abilities.find((candidate) => candidate.getName() === abilityName);
-            if (!ability) {
-                continue;
-            }
-            // The Dual Strike Charm rides the same multiplier the damage path applies, so a charm-carrying
-            // unit's card shows the boosted number rather than going quiet about it. Folded inline rather
-            // than through ability_helper.withDualStrikeCharm: that module imports Unit, and importing it
-            // back here would close a cycle (which is also why the name list lives in a leaf module).
-            const charm = this.getBuff(DUAL_STRIKE_CHARM_BUFF);
-            const multiplier = this.calculateAbilityMultiplier(ability, synergyAbilityPowerIncrease);
-            const percentage = Number(
-                ((charm ? multiplier * (1 + charm.getPower() / 100) : multiplier) * 100).toFixed(2),
-            );
-            this.unitProperties.abilities_descriptions[index] = ability
-                .getDesc()
-                .join("\n")
-                .replace(/\{\}/g, percentage.toString());
-        }
-    }
     private refreshStunAuraDescription(synergyAbilityPowerIncrease: number): void {
         const index = this.unitProperties.abilities.indexOf("Stun Aura");
         if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
@@ -4101,14 +3981,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (!ability) {
             return;
         }
-        const auraEffect = ability.getAuraEffect();
-        if (!auraEffect) {
-            return;
-        }
-        // Use the aura calculation itself, rather than the similar-looking generic ability calculation.
-        // Combat stores this exact value on allies' Stun Aura buffs; it also owns the 0..100 clamp and avoids
-        // pulling in modifiers (such as Made of Fire) that do not affect aura projection.
-        const chance = Number(this.calculateAuraPower(auraEffect, synergyAbilityPowerIncrease).toFixed(2));
+        const chance = Number(this.calculateAbilityApplyChance(ability, synergyAbilityPowerIncrease).toFixed(2));
         this.unitProperties.abilities_descriptions[index] = ability
             .getDesc()
             .join("\n")

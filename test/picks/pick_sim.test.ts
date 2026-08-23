@@ -12,7 +12,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { Doctrine } from "../../src/doctrines/doctrine_properties";
+import { Perk } from "../../src/perks/perk_properties";
 import {
     createPickSimState,
     getKnownOpponentCreatures,
@@ -40,9 +40,9 @@ const accept = (state: IPickSimState, action: PickAction, rng: PickRandomInt = f
     return result.state;
 };
 
-const finishDoctrinePhase = (state: IPickSimState): IPickSimState => {
-    state = accept(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.SEE_NONE });
-    return accept(state, { type: "select_doctrine", team: UPPER, doctrine: Doctrine.SEE_NONE });
+const finishPerkPhase = (state: IPickSimState): IPickSimState => {
+    state = accept(state, { type: "select_perk", team: LOWER, perk: Perk.SEE_NONE });
+    return accept(state, { type: "select_perk", team: UPPER, perk: Perk.SEE_NONE });
 };
 
 const finishBundlePhase = (state: IPickSimState): IPickSimState => {
@@ -119,20 +119,20 @@ describe("pick_sim", () => {
         expect(state.creaturesBanned.some((creatureId) => offered.includes(creatureId))).toBe(false);
     });
 
-    it("splits DOCTRINE (doctrine) from INITIAL_PICK (bundle) into two sequential both-teams phases", () => {
+    it("splits PERK (doctrine) from INITIAL_PICK (bundle) into two sequential both-teams phases", () => {
         let state = createPickSimState(first);
         const last: PickRandomInt = (maxExclusive) => maxExclusive - 1;
 
-        // DOCTRINE phase (seq 0): doctrine only. Bundle selections are NOT accepted here.
+        // PERK phase (seq 0): doctrine only. Bundle selections are NOT accepted here.
         const rejectedBundle = apply(state, { type: "select_bundle", team: LOWER, bundleIndex: 1 });
         expect(rejectedBundle).toMatchObject({ status: "rejected", reason: "wrong_phase" });
-        state = accept(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.THREE_REVEALS }, last);
+        state = accept(state, { type: "select_perk", team: LOWER, perk: Perk.THREE_REVEALS }, last);
         // By-level reveal (server arango_hoc.ts): one L1 slot (rng(2)->1), one L2 slot (2+1=3),
         // and the L3 slot (rng(2)->1 truthy -> 4); sorted [1, 3, 4].
         expect(state.lower.revealedOpponentSlots).toEqual([1, 3, 4]);
         expect(state.phaseSequence).toBe(0);
-        state = accept(state, { type: "select_doctrine", team: UPPER, doctrine: Doctrine.SEE_ALL });
-        // Both doctrines chosen -> DOCTRINE advances to the INITIAL_PICK (bundle) phase.
+        state = accept(state, { type: "select_perk", team: UPPER, perk: Perk.SEE_ALL });
+        // Both doctrines chosen -> PERK advances to the INITIAL_PICK (bundle) phase.
         expect(state.phaseSequence).toBe(1);
         expect(state.upper.revealedOpponentSlots).toEqual([0, 1, 2, 3, 4, 5]);
 
@@ -141,8 +141,8 @@ describe("pick_sim", () => {
             [1, 4, 1],
             [2, 5, 2],
         ]);
-        const rejectedDoctrine = apply(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.SEE_NONE });
-        expect(rejectedDoctrine).toMatchObject({ status: "rejected", reason: "wrong_phase" });
+        const rejectedPerk = apply(state, { type: "select_perk", team: LOWER, perk: Perk.SEE_NONE });
+        expect(rejectedPerk).toMatchObject({ status: "rejected", reason: "wrong_phase" });
         state = accept(state, { type: "select_bundle", team: UPPER, bundleIndex: 0 });
         expect(state.phaseSequence).toBe(1);
         state = accept(state, { type: "select_bundle", team: LOWER, bundleIndex: 1 });
@@ -154,7 +154,7 @@ describe("pick_sim", () => {
     });
 
     it("reveals a hidden collision without advancing, then enforces the shared exclusive pool", () => {
-        let state = finishBundlePhase(finishDoctrinePhase(createPickSimState(first)));
+        let state = finishBundlePhase(finishPerkPhase(createPickSimState(first)));
         const before = state;
         const collision = apply(state, { type: "pick_creature", team: LOWER, creatureId: 3 });
 
@@ -179,7 +179,7 @@ describe("pick_sim", () => {
     });
 
     it("runs the exact snake order through simultaneous Tier-2 picks to completion", () => {
-        let state = finishBundlePhase(finishDoctrinePhase(createPickSimState(first)));
+        let state = finishBundlePhase(finishPerkPhase(createPickSimState(first)));
         const creatureActions: PickAction[] = [
             { type: "pick_creature", team: LOWER, creatureId: 2 },
             { type: "pick_creature", team: UPPER, creatureId: 11 },
@@ -211,8 +211,8 @@ describe("pick_sim", () => {
         expect(state.lower.remainingByLevel).toEqual([0, 0, 0, 0]);
         expect(state.upper.remainingByLevel).toEqual([0, 0, 0, 0]);
         expect(state.transcript.map((event) => event.type)).toEqual([
-            "doctrine_selected",
-            "doctrine_selected",
+            "perk_selected",
+            "perk_selected",
             "bundle_selected",
             "bundle_selected",
             "creature_picked",
@@ -229,7 +229,7 @@ describe("pick_sim", () => {
     });
 
     it("rejects out-of-turn actions without mutating state or consuming RNG", () => {
-        const state = finishBundlePhase(finishDoctrinePhase(createPickSimState(first)));
+        const state = finishBundlePhase(finishPerkPhase(createPickSimState(first)));
         let draws = 0;
         const rng: PickRandomInt = () => {
             draws += 1;
@@ -244,17 +244,17 @@ describe("pick_sim", () => {
 
     it("does not expose future reveal slots or alias transcript entries through transition events", () => {
         let state = createPickSimState(first);
-        const result = apply(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.SEE_ALL });
+        const result = apply(state, { type: "select_perk", team: LOWER, perk: Perk.SEE_ALL });
         expect(result.status).toBe("accepted");
         state = result.state;
 
         expect(getPickTeamView(state, LOWER)).not.toHaveProperty("revealedOpponentSlots");
         expect(getPickTeamView(state, LOWER).knownOpponentCreatures).toEqual([]);
-        if (result.status === "accepted" && result.event.type === "doctrine_selected") {
+        if (result.status === "accepted" && result.event.type === "perk_selected") {
             result.event.revealedOpponentSlots.length = 0;
         }
         expect(state.transcript[0]).toMatchObject({
-            type: "doctrine_selected",
+            type: "perk_selected",
             revealedOpponentSlots: [0, 1, 2, 3, 4, 5],
         });
     });

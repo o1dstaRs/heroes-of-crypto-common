@@ -166,68 +166,6 @@ export interface ISpellSightGrid {
 }
 
 /**
- * Whether a thrown spell can see a given side of one of the target's cells — the spell-side twin of
- * GridMath.isRangeAttackSideObservable, expressed in the occupant-id vocabulary this module already speaks.
- *
- * An edge is covered by a body the throw would hit before the target (so the spell lands there instead) or
- * by hard terrain ("B" mountain, "H" narrowed hole). It is NOT covered by open ground, by lava/water — a
- * projectile flies over both — or by a body the throw is transparent to, which for Fire Strike is the
- * caster's own troops it arcs above.
- */
-function isThrownSpellSideObservable(
-    grid: ISpellSightGrid,
-    isWithinGrid: (cell: XY) => boolean,
-    cell: XY,
-    side: XY,
-    isTransparentUnit?: (unitId: string) => boolean,
-): boolean {
-    const neighbour = { x: cell.x + side.x, y: cell.y + side.y };
-    // Off-board is open sky, not cover: a unit on the board edge still presents that edge.
-    if (!isWithinGrid(neighbour)) {
-        return true;
-    }
-    const occupant = grid.getOccupantUnitId(neighbour);
-    if (!occupant || occupant === "L" || occupant === "W") {
-        return true;
-    }
-    if (occupant === "B" || occupant === "H") {
-        return false;
-    }
-    return isTransparentUnit?.(occupant) === true;
-}
-
-const THROWN_SPELL_SIDE_OFFSETS: readonly XY[] = [
-    { x: -1, y: 0 },
-    { x: 1, y: 0 },
-    { x: 0, y: -1 },
-    { x: 0, y: 1 },
-];
-
-/**
- * Whether ANY edge of `targetCells` is visible to a thrown spell. A throw lands on the center of a visible
- * edge, exactly as a ranged shot does, so a unit covered on every side offers nothing legal to aim at and
- * cannot be targeted — rather than being hit through its middle.
- *
- * Scans every cell of the target: a 2x2 whose near corner is walled in may still present an open edge on a
- * far cell, and that throw is legal.
- */
-export function hasObservableThrownSpellEdge(
-    grid: ISpellSightGrid,
-    isWithinGrid: (cell: XY) => boolean,
-    targetCells: readonly XY[],
-    isTransparentUnit?: (unitId: string) => boolean,
-): boolean {
-    for (const cell of targetCells) {
-        for (const side of THROWN_SPELL_SIDE_OFFSETS) {
-            if (isThrownSpellSideObservable(grid, isWithinGrid, cell, side, isTransparentUnit)) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-/**
  * Is the straight line from `from` to `to` clear enough for a THROWN spell to reach its target?
  *
  * The rule an archer's shot obeys: everything strictly BETWEEN the two cells must be clear. The target stands
@@ -338,26 +276,9 @@ export function isTargetedSpellLineOfSightClear(
     from: XY,
     to: XY,
     isTransparentUnit?: (unitId: string) => boolean,
-    // The target's WHOLE footprint, for the visible-edge gate below. Optional so existing cell-only callers
-    // still compile; they degrade to checking the base cell, which is exact for a 1x1 target.
-    targetCells?: readonly XY[],
 ): boolean {
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return true;
-    }
-    // Fire Strike lands on the center of a VISIBLE EDGE of its target, never on the target's middle, so a
-    // unit covered on every side has no legal aim point and the cast is refused outright (owner 2026-08-15
-    // — the same rule ranged shots obey). Checked before the line walk because it is a property of the
-    // TARGET, independent of which lane the throw takes.
-    //
-    // Fire Strike ONLY. Vine Throw snares one named enemy and Ring of Fire resolves on the aimed target
-    // through their own cast paths; neither is a shot at an edge, and gating them here would silently
-    // delete legal casts the engine still performs.
-    if (
-        spellName === "Fire Strike" &&
-        !hasObservableThrownSpellEdge(grid, isWithinGrid, targetCells ?? [to], isTransparentUnit)
-    ) {
-        return false;
     }
     const blocker = firstTargetedSpellSightBlocker(spellName, grid, isWithinGrid, from, to, isTransparentUnit);
     if (!blocker) {
@@ -400,34 +321,6 @@ export function firstTargetedSpellSightBlocker(
         spellName === "Vine Throw" ? "creatures" : "creatures-and-terrain",
         isTransparentUnit,
     );
-}
-
-/**
- * The block of cells a CELL-targeted spell covers when aimed at `origin`.
- *
- * Meteor Shower's 3x3 is CENTRED on the aimed cell — an odd-sided footprint pivots about the cursor, the way
- * the Fire Wall's 3-cell line does. Everything else here is 2x2 (Meteorite, Smoke, Craft) and hangs off the
- * aimed cell as its bottom-left corner, because an even-sided block has no centre cell to anchor on.
- *
- * The ONE place either footprint is derived: meteoriteCast / meteorShowerCast read their block out of this,
- * and so does the client's aim outline and every damage label drawn inside it. A preview whose footprint
- * differs from the cast's is worse than no preview at all.
- */
-export function cellTargetedSpellBlockCells(spellName: string, origin: XY): XY[] {
-    const spread = spellName === "Meteor Shower" ? [-1, 0, 1] : [0, 1];
-    return spread.flatMap((dx) => spread.map((dy) => ({ x: origin.x + dx, y: origin.y + dy })));
-}
-
-/**
- * Whether a called-down block aimed at `origin` actually LANDS: the WHOLE footprint has to be on the board.
- *
- * This is the gate meteoriteCast and meteorShowerCast apply before anything else happens, so a drop aimed at
- * the board's edge is refused outright — no damage, no charge spent. The aim preview asks the same question
- * through the same helper, because labelling damage on a cast the engine refuses is the loudest possible lie
- * a hover can tell: it promised 152 and 4104 on drops that never landed.
- */
-export function cellTargetedSpellBlockFitsGrid(gridSettings: GridSettings, spellName: string, origin: XY): boolean {
-    return cellTargetedSpellBlockCells(spellName, origin).every((cell) => isCellWithinGrid(gridSettings, cell));
 }
 
 /** What a thrown spell actually hits: the aimed target, or the first body that gets in the way. */
@@ -483,18 +376,9 @@ export function thrownSpellReachesAimedTarget(
     from: XY,
     to: XY,
     isTransparentUnit?: (unitId: string) => boolean,
-    targetCells?: readonly XY[],
 ): boolean {
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return true;
-    }
-    // Same Fire-Strike-only visible-edge gate the engine applies, so the AI never scores a throw the cast
-    // would refuse. Scoped identically — see isTargetedSpellLineOfSightClear.
-    if (
-        spellName === "Fire Strike" &&
-        !hasObservableThrownSpellEdge(grid, isWithinGrid, targetCells ?? [to], isTransparentUnit)
-    ) {
-        return false;
     }
     const impact = resolveThrownSpellImpact(spellName, grid, isWithinGrid, from, to, isTransparentUnit);
     return !impact.blockedByTerrain && !impact.interceptedBy;
@@ -616,7 +500,6 @@ export function canCastSpell(
             targetIsFireElement: targetUnit.hasAbilityActive("Fire Element"),
             targetIsWaterElement: targetUnit.hasAbilityActive("Water Element"),
             targetIsWindElement: targetUnit.hasAbilityActive("Wind Element"),
-            targetIsEarthElement: targetUnit.hasAbilityActive("Earth Element"),
         }) <= 0;
 
     const notAlreadyApplied = (): boolean => {
@@ -789,20 +672,20 @@ export function calculateBuffsDebuffsEffect(
 }
 
 /**
- * The deterministic share of magical damage returned by Magic Mirror or Mass Magic Mirror.
- *
- * The buff's configured power is the whole answer: it is not stack-scaled and luck does not move it. When
- * both historical buff records are present, the stronger one wins rather than reflecting the same hit twice.
+ * The reflected share, as a percentage: the buff's own power PLUS the holder's luck, clamped to 0..100.
+ * Luck moves it the same way it moves every other percentage in the game, so a lucky unit mirrors more —
+ * and the spell card shows this exact figure rather than the flat configured number (see
+ * magicMirrorDescriptionPercent, which the client uses to fill the {} placeholders).
  */
 export const getMagicMirrorPower = (targetUnit: Unit): number => {
     let mirrorPower = 0;
-    const magicMirrorPower = targetUnit.getBuffPower("Magic Mirror");
-    const massMagicMirrorPower = targetUnit.getBuffPower("Mass Magic Mirror");
-    if (magicMirrorPower !== undefined) {
-        mirrorPower = magicMirrorPower;
+    const magicMirrorBuff = targetUnit.getBuff("Magic Mirror");
+    const massMagicMirrorBuff = targetUnit.getBuff("Mass Magic Mirror");
+    if (magicMirrorBuff) {
+        mirrorPower = magicMirrorBuff.getPower();
     }
-    if (massMagicMirrorPower !== undefined) {
-        mirrorPower = Math.max(mirrorPower, massMagicMirrorPower);
+    if (massMagicMirrorBuff) {
+        mirrorPower = Math.max(mirrorPower, massMagicMirrorBuff.getPower());
     }
     // FLAT and stable: the Ogre Mage's Magic Mirror / Mass Magic Mirror reflect exactly their configured
     // percentage (30 / 25) — NOT stack-scaled and NOT moved by luck (unlike the Magic Dragon's ability). The
@@ -858,31 +741,15 @@ export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
 export const getMagicMirrorAbilityShare = (targetUnit: Unit): number => getMagicMirrorAbilityChance(targetUnit);
 
 /**
- * Whether the Magic Reflection passive rebounds an incoming spell. The Magic Mirror spell buffs return
- * damage deterministically instead and are resolved by {@link rollMagicMirrorDamageShare}.
+ * Whether an incoming spell rebounds off `targetUnit` — its effects whole, its damage cut to the mirror's own
+ * share (getMagicMirrorAbilityShare) — landing on the caster IN ADDITION to landing on the holder, which is
+ * hit in full either way. Only the passive ability rebounds a spell; the Magic Mirror buff keeps its own
+ * partial behaviour.
  */
 export const reboundsSpell = (targetUnit: Unit): boolean => {
     const chance = getMagicMirrorAbilityChance(targetUnit);
 
     return chance > 0 && getRandomInt(0, 100) < chance;
-};
-
-/**
- * Resolve the percentage of landed magical damage this holder returns to the caster for one incoming spell.
- *
- * Magic Mirror and Mass Magic Mirror always return their configured share. Magic Reflection remains a proc:
- * when it succeeds with a stronger share than the active spell buff, that stronger share wins for this hit.
- * This preserves the existing non-stacking mirror rule and never consumes randomness when the passive could
- * not improve the guaranteed result.
- */
-export const rollMagicMirrorDamageShare = (targetUnit: Unit): number => {
-    const guaranteedShare = getMagicMirrorPower(targetUnit);
-    const passiveShare = getMagicMirrorAbilityShare(targetUnit);
-    if (passiveShare <= guaranteedShare) {
-        return guaranteedShare;
-    }
-
-    return getRandomInt(0, 100) < passiveShare ? passiveShare : guaranteedShare;
 };
 
 export const isMirrored = (targetUnit: Unit): boolean => {

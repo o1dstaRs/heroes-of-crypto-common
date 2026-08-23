@@ -10,8 +10,6 @@
  */
 
 import { execFileSync } from "node:child_process";
-
-import { hasDoubleShotAbility } from "../abilities/ability_helper";
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
@@ -166,13 +164,6 @@ export interface IV08BlockCenterActionPanelOptions {
     sourceCommit?: string;
     /** Set by the CLI from git status; a dirty source is recorded but can never pass qualification. */
     sourceDirty?: boolean;
-    /**
-     * Let finite search operation caps, rather than host timing, decide search behavior. Omitted/false keeps
-     * the production deadline semantics a real qualification pass must measure. Regression FIXTURES set it
-     * true: their recorded action logs are only reproducible when a slow shared runner cannot shorten the
-     * search and change which action the candidate picks.
-     */
-    searchOfflineDeterministicWork?: boolean;
 }
 
 export interface IV08BlockCenterActionPlan {
@@ -879,7 +870,7 @@ function findIndependentRangeOption(
     const forcedTargetId = liveForcedTargetId(unit, context);
     const isThrough = unit.hasAbilityActive("Through Shot");
     const isArea = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
-    const shots = hasDoubleShotAbility(unit) ? 2 : 1;
+    const shots = unit.getAbility("Double Shot") || unit.getAbility("Crafted Double Shot") ? 2 : 1;
     const prefix: GameAction[] =
         unit.getAttackTypeSelection() === RANGE
             ? []
@@ -974,7 +965,7 @@ function findIndependentAreaThrowOption(
         unit.getAttackTypeSelection() === RANGE
             ? []
             : [{ type: "select_attack_type", unitId: unit.getId(), attackType: RANGE }];
-    const shots = hasDoubleShotAbility(unit) ? 2 : 1;
+    const shots = unit.getAbility("Double Shot") || unit.getAbility("Crafted Double Shot") ? 2 : 1;
     const forcedTargetId = liveForcedTargetId(unit, context);
     for (let x = 0; x < settings.getGridSize(); x += 1) {
         for (let y = 0; y < settings.getGridSize(); y += 1) {
@@ -1083,7 +1074,6 @@ const canTargetOffensiveSpell = (caster: Unit, target: Unit, spell: Spell, conte
             spell.getName() === "Fire Strike"
                 ? (unitId) => context.unitsHolder.getAllUnits().get(unitId)?.getTeam() === caster.getTeam()
                 : undefined,
-            target.getCells(),
         )
     );
 };
@@ -2153,9 +2143,8 @@ export function runV08BlockCenterActionPanelGame(
         seed: plan.seed,
         gridType: plan.mapType,
         maxLaps: options.maxLaps,
-        searchOfflineDeterministicWork: options.searchOfflineDeterministicWork === true,
-        greenDoctrine: setup?.doctrine,
-        redDoctrine: setup?.doctrine,
+        greenPerk: setup?.perk,
+        redPerk: setup?.perk,
         greenAugments: setup?.augments,
         redAugments: setup?.augments,
         placementAugmentTiming: "setup-before-placement",

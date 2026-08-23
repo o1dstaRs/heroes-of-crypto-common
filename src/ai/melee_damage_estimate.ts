@@ -136,13 +136,12 @@ export function estimatePrimaryMeleeDamage(
         handlerMultiplier *= unit.calculateAbilityMultiplier(ability, attackerAbilityPower);
     }
 
-    // Deep Wounds is applied ONCE, by Unit.calculateAttackDamage — it is a term of the engine's product
-    // (roll * attackTypeMultiplier * abilityMultiplier * deepWoundsMultiplier * ...), not part of the
-    // multiplier AttackHandler supplies. It used to be folded into handlerMultiplier as well, mirroring a
-    // handler-side duplicate that squared the bonus; both the duplicate and this mirror are gone.
     const deepWoundsMultiplier = hasAnyDeepWoundsAbility(unit)
         ? 1 + (target.getEffect("Deep Wounds")?.getPower() ?? 0) / 100
         : 1;
+    // AttackHandler includes Deep Wounds in its supplied ability multiplier and Unit.calculateAttackDamage
+    // applies the same target-state multiplier again. Preserve that authoritative behavior here.
+    handlerMultiplier *= deepWoundsMultiplier;
 
     const luckyStrike = unit.getAbility("Lucky Strike");
     const luckyChance = luckyStrike

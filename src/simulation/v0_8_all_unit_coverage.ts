@@ -69,7 +69,7 @@ const compareCatalogEntries = (left: IV08AllUnitCatalogEntry, right: IV08AllUnit
     left.level - right.level || left.unit.localeCompare(right.unit) || left.faction.localeCompare(right.faction);
 
 /**
- * Enumerate the actual enabled roster pool, then instantiate each stack without doctrines, augments, synergies,
+ * Enumerate the actual enabled roster pool, then instantiate each stack without perks, augments, synergies,
  * thefts, or battle effects. Unit construction is the authoritative intrinsic-spell boundary: raw JSON alone
  * misses spells contributed by castable ability cards, while observing a live fight would mix in grants.
  */
@@ -202,7 +202,7 @@ export interface IV08AllUnitCoverageOptions {
     baseSeed: number;
     /** Defaults to ranked's per-creature 1,000-XP stack budget. */
     amountMode?: StackAmountMode;
-    /** Defaults true: both teams receive the shipped blind doctrine/augment setup. */
+    /** Defaults true: both teams receive the shipped blind perk/augment setup. */
     liveSetup?: boolean;
     /** Defaults to the battle engine's production-aligned 60-lap cap. */
     maxLaps?: number;
@@ -635,8 +635,8 @@ export function runV08AllUnitCoverageGame(
             seed: plan.seed,
             maxLaps: options.maxLaps ?? V08_ALL_UNIT_COVERAGE_DEFAULT_MAX_LAPS,
             gridType: plan.mapType,
-            greenDoctrine: setup?.doctrine,
-            redDoctrine: setup?.doctrine,
+            greenPerk: setup?.perk,
+            redPerk: setup?.perk,
             greenAugments: setup?.augments,
             redAugments: setup?.augments,
             decisionObserver: (observation) => auditor.observeDecision(observation),

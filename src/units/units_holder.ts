@@ -26,7 +26,6 @@ import {
     Tier1Artifact,
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
-import { DOUBLE_SHOT_ABILITY_NAMES } from "../abilities/double_shot_names";
 import { getSpellConfig, POISON_ON_HIT_AURA_EFFECT_NAMES } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effects/effect_properties";
@@ -415,12 +414,6 @@ export class UnitsHolder {
                 // (see applyDualArtifact); clear it too so nothing accumulates across recompute.
                 unit.deleteDebuff(buffName);
             }
-            // Artifacts can lend an ABILITY as well as a buff (the Wounding Charm's Deep Wounds card).
-            // Buffs above are cleared by name every recompute; the lent ability needs the same treatment
-            // or it outlives the artifact — swapping to another Tier 1 left the army permanently
-            // inflicting Deep Wounds while showing a different artifact's benefit. Only cards the
-            // artifact itself handed over are taken back, so natives survive the swap.
-            unit.revokeArtifactGrantedAbilities();
 
             if (!isPositionWithinGrid(this.gridSettings, unit.getPosition())) {
                 continue;
@@ -564,12 +557,8 @@ export class UnitsHolder {
                 // Combat-time markers (checked by the relevant hook via unit.getBuff).
                 case Tier1Artifact.DUAL_STRIKE_CHARM:
                     // Only meaningful on units that actually get a second attack in the fight, so restrict the
-                    // marker buff to units with Double Punch (melee) or one of the ranged second-shot
-                    // abilities — Double Shot and Gargantuan's full-power Double Throw alike.
-                    if (
-                        unit.hasAbilityActive("Double Punch") ||
-                        DOUBLE_SHOT_ABILITY_NAMES.some((abilityName) => unit.hasAbilityActive(abilityName))
-                    ) {
+                    // marker buff to units with Double Punch (melee) or Double Shot (ranged).
+                    if (unit.hasAbilityActive("Double Punch") || unit.hasAbilityActive("Double Shot")) {
                         applyArtifactBuff("Dual Strike Charm", AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT);
                     }
                     break;
@@ -580,9 +569,7 @@ export class UnitsHolder {
                     // stack it on top, since processDeepWoundsAbility sums the cards a unit holds. The buff
                     // itself is just the visible marker — nothing reads its power.
                     applyArtifactBuff("Wounding Charm", AP.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT);
-                    // Granted through the artifact channel so the cleanup pass above can take it back
-                    // when the charm is swapped out. A native Level 1 (the Wolf) is left alone.
-                    unit.grantArtifactAbility("Deep Wounds Level 1");
+                    unit.grantAbility("Deep Wounds Level 1");
                     break;
                 case Tier1Artifact.BROKEN_AEGIS:
                     // Upside (offensive break, resolved in getBreakChancePerTeam) vs downside (self-miss).
@@ -752,18 +739,6 @@ export class UnitsHolder {
             if (unitToDelete) {
                 this.allUnits.delete(unitId);
                 this.grid.cleanupAll(unitId, unitToDelete.getAttackRange(), unitToDelete.isSmallSize());
-            }
-
-            // Aggr stores its source as an id on every affected unit. Most attack paths resolve that id
-            // through this holder and naturally release the lock once the source is gone, but targeted
-            // spell validation reads the raw id. Clear dangling references at the ownership boundary so
-            // every action surface agrees immediately after a real deletion (and after a missing-id heal).
-            for (const unit of this.allUnits.values()) {
-                if (unit.getTarget() === unitId) {
-                    // Do not use resetTarget(): a ranked/battle-snapshot hydrate may have captured this
-                    // mid-fight id in initialUnitProperties, which would merely restore the same dangling id.
-                    unit.setTarget("");
-                }
             }
 
             FightStateManager.getInstance().getFightProperties().removeFromHourglassQueue(unitId);
@@ -1074,15 +1049,15 @@ export class UnitsHolder {
         return true;
     }
     private appendAuraDefinition(target: AuraRefreshFingerprintValue[], properties: AuraEffectProperties): boolean {
-        const keys = Object.keys(properties);
+        const keys = Object.keys(properties).sort();
         if (
             keys.length !== 6 ||
-            !Object.prototype.propertyIsEnumerable.call(properties, "desc") ||
-            !Object.prototype.propertyIsEnumerable.call(properties, "is_buff") ||
-            !Object.prototype.propertyIsEnumerable.call(properties, "name") ||
-            !Object.prototype.propertyIsEnumerable.call(properties, "power") ||
-            !Object.prototype.propertyIsEnumerable.call(properties, "power_type") ||
-            !Object.prototype.propertyIsEnumerable.call(properties, "range") ||
+            keys[0] !== "desc" ||
+            keys[1] !== "is_buff" ||
+            keys[2] !== "name" ||
+            keys[3] !== "power" ||
+            keys[4] !== "power_type" ||
+            keys[5] !== "range" ||
             typeof properties.name !== "string" ||
             typeof properties.desc !== "string" ||
             typeof properties.range !== "number" ||
@@ -1272,22 +1247,14 @@ export class UnitsHolder {
         // installs a fresh post-refresh fingerprint after this method returns successfully.
         this.auraRefreshFingerprint = undefined;
         this.auraRefreshKnownEmpty = false;
-        const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         // setup the initial empty maps
-        const upperAuraEffects = new Map<number, AppliedAuraEffectProperties[]>();
-        const lowerAuraEffects = new Map<number, AppliedAuraEffectProperties[]>();
-        this.teamsAuraEffects = new Map([
-            [PBTypes.TeamVals.UPPER, upperAuraEffects],
-            [PBTypes.TeamVals.LOWER, lowerAuraEffects],
-        ]);
-        const upperAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
-        const lowerAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
+        this.teamsAuraEffects = new Map();
+        for (let i = 0; i < (Object.keys(PBTypes.TeamVals).length - 2) >> 1; i++) {
+            this.teamsAuraEffects.set((i + 1) as TeamType, new Map());
+        }
 
-        // Fill each cell with its strongest aura of each name as sources are visited. The companion indexes
-        // retain first-seen order while allowing a stronger later source to replace the value in-place. This
-        // produces the same final arrays as the old append-everything-then-squash pass without allocating and
-        // walking the duplicate AppliedAuraEffectProperties entries created by overlapping source footprints.
+        // fill the maps with the aura effects, duplicate auras allowed
         for (const u of this.getAllUnitsIterator()) {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
                 continue;
@@ -1296,82 +1263,83 @@ export class UnitsHolder {
             u.cleanAuraEffects();
 
             const unitAuraEffects = u.getAuraEffects();
-            if (!unitAuraEffects.length) {
-                continue;
-            }
-            const unitTeam = u.getTeam();
-            const oppositeTeam = u.getOppositeTeam();
-            const unitCells = u.getCells();
-            const baseCell = u.getBaseCell();
-            const additionalAbilityPower = fightProperties.getAdditionalAbilityPowerPerTeam(unitTeam);
-            const additionalAuraRange = fightProperties.getAdditionalAuraRangePerTeam(unitTeam);
             for (const uae of unitAuraEffects) {
-                // Aura power, range, recipient team, and source are identical for every cell in this unit's
-                // footprint. Compute them once instead of cloning and recalculating them for every occupied cell
-                // (four times for a large creature). AppliedAuraEffectProperties is refresh-local and read-only.
-                uae.toDefault();
-                const unitAuraEffectProperties = uae.getProperties();
-                if (unitAuraEffectProperties.power) {
-                    unitAuraEffectProperties.power = u.calculateAuraPower(uae, additionalAbilityPower);
-                }
+                for (const c of u.getCells()) {
+                    uae.toDefault();
+                    const unitAuraEffectProperties = uae.getProperties();
+                    if (unitAuraEffectProperties.power) {
+                        unitAuraEffectProperties.power = u.calculateAuraPower(
+                            uae,
+                            FightStateManager.getInstance()
+                                .getFightProperties()
+                                .getAdditionalAbilityPowerPerTeam(u.getTeam()),
+                        );
+                    }
 
-                const auraRange = unitAuraEffectProperties.range + additionalAuraRange;
+                    const auraRange =
+                        unitAuraEffectProperties.range +
+                        FightStateManager.getInstance().getFightProperties().getAdditionalAuraRangePerTeam(u.getTeam());
 
-                if (auraRange < 0) {
-                    continue;
-                }
+                    if (auraRange < 0) {
+                        continue;
+                    }
 
-                const recipientTeam = unitAuraEffectProperties.is_buff ? unitTeam : oppositeTeam;
-                const teamAuraEffects =
-                    recipientTeam === PBTypes.TeamVals.UPPER
-                        ? upperAuraEffects
-                        : recipientTeam === PBTypes.TeamVals.LOWER
-                          ? lowerAuraEffects
-                          : undefined;
-                const teamAuraEffectIndexes =
-                    recipientTeam === PBTypes.TeamVals.UPPER
-                        ? upperAuraEffectIndexes
-                        : recipientTeam === PBTypes.TeamVals.LOWER
-                          ? lowerAuraEffectIndexes
-                          : undefined;
+                    const teamAuraEffects = this.teamsAuraEffects.get(
+                        unitAuraEffectProperties.is_buff ? u.getTeam() : u.getOppositeTeam(),
+                    );
 
-                if (!teamAuraEffects || !teamAuraEffectIndexes) {
-                    continue;
-                }
+                    if (!teamAuraEffects) {
+                        continue;
+                    }
 
-                for (const c of unitCells) {
                     const affectedCellKeys = EffectHelper.getAuraCellKeysView(this.gridSettings, c, auraRange);
                     for (const ack of affectedCellKeys) {
-                        let teamAuraEffectsPerCell = teamAuraEffects.get(ack);
+                        if (!teamAuraEffects.has(ack)) {
+                            teamAuraEffects.set(ack, []);
+                        }
+
+                        const teamAuraEffectsPerCell = teamAuraEffects.get(ack);
                         if (!teamAuraEffectsPerCell) {
-                            teamAuraEffectsPerCell = [];
-                            teamAuraEffects.set(ack, teamAuraEffectsPerCell);
+                            continue;
                         }
 
-                        let auraEffectIndexes = teamAuraEffectIndexes[ack];
-                        if (!auraEffectIndexes) {
-                            auraEffectIndexes = new Map();
-                            teamAuraEffectIndexes[ack] = auraEffectIndexes;
+                        const baseCell = u.getBaseCell();
+                        if (!baseCell) {
+                            continue;
                         }
 
-                        const existingIndex = auraEffectIndexes.get(unitAuraEffectProperties.name);
-                        if (existingIndex === undefined) {
-                            auraEffectIndexes.set(unitAuraEffectProperties.name, teamAuraEffectsPerCell.length);
-                            teamAuraEffectsPerCell.push(
-                                new AppliedAuraEffectProperties(unitAuraEffectProperties, baseCell),
-                            );
-                        } else if (
-                            unitAuraEffectProperties.power >
-                            teamAuraEffectsPerCell[existingIndex].getAuraEffectProperties().power
-                        ) {
-                            teamAuraEffectsPerCell[existingIndex] = new AppliedAuraEffectProperties(
-                                unitAuraEffectProperties,
-                                baseCell,
-                            );
-                        }
+                        teamAuraEffectsPerCell.push(
+                            new AppliedAuraEffectProperties(unitAuraEffectProperties, baseCell),
+                        );
                     }
                 }
             }
+        }
+
+        // within the same team, squash aura effects where for the same auras, the one with bigger power will be applied
+        for (const [team, cells] of this.teamsAuraEffects) {
+            const newValue = new Map<number, AppliedAuraEffectProperties[]>();
+            for (const [cellKey, appliedAuraEffects] of cells) {
+                const auraEffectsMap = new Map<string, AppliedAuraEffectProperties>();
+                for (const aae of appliedAuraEffects) {
+                    const auraEffectProperties = aae.getAuraEffectProperties();
+                    if (!auraEffectsMap.has(auraEffectProperties.name)) {
+                        auraEffectsMap.set(auraEffectProperties.name, aae);
+                    } else {
+                        const existingAppliedAuraEffect = auraEffectsMap.get(auraEffectProperties.name);
+                        if (!existingAppliedAuraEffect) {
+                            continue;
+                        }
+                        const existingAuraEffectProperties = existingAppliedAuraEffect.getAuraEffectProperties();
+
+                        if (auraEffectProperties.power > existingAuraEffectProperties.power) {
+                            auraEffectsMap.set(auraEffectProperties.name, aae);
+                        }
+                    }
+                }
+                newValue.set(cellKey, Array.from(auraEffectsMap.values()));
+            }
+            this.teamsAuraEffects.set(team, newValue);
         }
 
         // apply aura effects to the units
@@ -1381,7 +1349,8 @@ export class UnitsHolder {
                 continue;
             }
 
-            const unitAuraNamesToApply: string[] = [];
+            let unitAuraNamesToApply: string[] = [];
+            let unitAppliedAuraEffectProperties: AppliedAuraEffectProperties[] = [];
             for (const c of u.getCells()) {
                 const cellKey = (c.x << 4) | c.y;
                 const appliedAuraEffects = teamAuraEffects.get(cellKey);
@@ -1393,34 +1362,35 @@ export class UnitsHolder {
                     const auraEffectProperties = aae.getAuraEffectProperties();
                     if (!unitAuraNamesToApply.includes(auraEffectProperties.name)) {
                         unitAuraNamesToApply.push(`${auraEffectProperties.name} Aura`);
-                        this.applyAuraEffectToUnit(u, aae);
+                        unitAppliedAuraEffectProperties.push(aae);
                     }
+                }
+            }
+
+            for (let i = 0; i < unitAppliedAuraEffectProperties.length; i++) {
+                const appliedAuraEffectProperties = unitAppliedAuraEffectProperties[i];
+                const auraEffectProperties = appliedAuraEffectProperties.getAuraEffectProperties();
+                if (EffectHelper.canApplyAuraEffect(u, auraEffectProperties)) {
+                    u.applyAuraEffect(
+                        `${auraEffectProperties.name} Aura`,
+                        auraEffectProperties.desc.replace(
+                            /\{\}/g,
+                            // A poison aura's applied % is the base plus the AFFECTED ally's own luck (added
+                            // at hit time in processPoisonAuraAbility), so fold that ally's luck into the
+                            // shown number here instead of a separate "(plus luck)" clause. Others keep base.
+                            (POISON_ON_HIT_AURA_EFFECT_NAMES.has(auraEffectProperties.name)
+                                ? Math.max(0, auraEffectProperties.power + u.getLuck())
+                                : auraEffectProperties.power
+                            ).toString(),
+                        ),
+                        auraEffectProperties.is_buff,
+                        Number(auraEffectProperties.power.toFixed(1)),
+                        appliedAuraEffectProperties.getSourceCellAsString(),
+                    );
                 }
             }
         }
         this.auraRefreshKnownEmpty = this.isAuraStateProvablyEmpty();
-    }
-    private applyAuraEffectToUnit(unit: Unit, appliedAuraEffectProperties: AppliedAuraEffectProperties): void {
-        const auraEffectProperties = appliedAuraEffectProperties.getAuraEffectProperties();
-        if (!EffectHelper.canApplyAuraEffect(unit, auraEffectProperties)) {
-            return;
-        }
-
-        unit.applyAuraEffect(
-            `${auraEffectProperties.name} Aura`,
-            auraEffectProperties.desc.replace(
-                /\{\}/g,
-                // A poison aura's applied % is the base plus the AFFECTED ally's own luck (added at hit time in
-                // processPoisonAuraAbility), so fold that ally's luck into the shown number here. Others keep base.
-                (POISON_ON_HIT_AURA_EFFECT_NAMES.has(auraEffectProperties.name)
-                    ? Math.max(0, auraEffectProperties.power + unit.getLuck())
-                    : auraEffectProperties.power
-                ).toString(),
-            ),
-            auraEffectProperties.is_buff,
-            Number(auraEffectProperties.power.toFixed(1)),
-            appliedAuraEffectProperties.getSourceCellAsString(),
-        );
     }
     public addUnit(unit: Unit): void {
         this.allUnits.set(unit.getId(), unit);
