@@ -212,6 +212,8 @@ function reachableRoutes(unit: Unit, context: IDecisionContext): IReadonlyWeight
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     );
     const routes: IReadonlyWeightedRoute[] = [];
     for (const routeList of movePath.knownPaths.values()) {
@@ -278,7 +280,15 @@ function routeView(
         return undefined;
     }
     const enemyAggro = context.grid.getEnemyAggrMatrixByUnitId(unit.getId());
-    if (attackHandler.canBeAttackedByMelee(position, unit.isSmallSize(), enemyAggro)) {
+    if (
+        attackHandler.canBeAttackedByMelee(
+            position,
+            unit.isSmallSize(),
+            enemyAggro,
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
+        )
+    ) {
         return undefined;
     }
     const protection = protectionAt(footprint, enemies, frontliners);
@@ -445,6 +455,8 @@ function supportedPrepinEgress(
             unit.getPosition(),
             unit.isSmallSize(),
             context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         ) ||
         !attackHandler.canLandRangeAttack(unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId())) ||
         v08DominantFinishState(context.unitsHolder, unit.getTeam(), fightProperties.getCurrentLap()).active
@@ -466,6 +478,8 @@ function supportedPrepinEgress(
             target.getPosition(),
             target.isSmallSize(),
             context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
+            target.getFootprintWidth(),
+            target.getFootprintHeight(),
         );
     if (targetCanCounter) return decision;
     emitFunnel("target_no_counter");
@@ -533,6 +547,8 @@ function supportedPrepinEgress(
                 origin,
                 unit.isSmallSize(),
                 context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
+                unit.getFootprintWidth(),
+                unit.getFootprintHeight(),
             ) ||
             pendingThreats.some((threat) => withinMeleeHorizon(footprint, threat))
         ) {
@@ -718,6 +734,8 @@ function supportedBandAdvance(
             unit.getPosition(),
             unit.isSmallSize(),
             context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         ) ||
         !attackHandler.canLandRangeAttack(unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId()))
     ) {
@@ -739,6 +757,8 @@ function supportedBandAdvance(
             target.getPosition(),
             target.isSmallSize(),
             context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
+            target.getFootprintWidth(),
+            target.getFootprintHeight(),
         );
     if (targetCanCounter) return decision;
     emitFunnel("target_no_counter");
@@ -957,6 +977,8 @@ function protectedAdvanceShotCatalog(
             target.getPosition(),
             target.isSmallSize(),
             context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
+            target.getFootprintWidth(),
+            target.getFootprintHeight(),
         );
     if (targetCanCounter && !responseNeutralAdvance) {
         return { decision };
@@ -2037,6 +2059,8 @@ function pinnedRetreat(
             unit.getPosition(),
             unit.isSmallSize(),
             context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         )
     ) {
         return decision;

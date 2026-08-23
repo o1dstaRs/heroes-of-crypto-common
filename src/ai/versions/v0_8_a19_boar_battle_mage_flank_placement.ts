@@ -63,10 +63,7 @@ interface IPlacementEvaluation {
 
 const key = (cell: XY): number => (cell.x << 4) | cell.y;
 
-const footprintFor = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [base]
-        : [base, { x: base.x - 1, y: base.y }, { x: base.x, y: base.y - 1 }, { x: base.x - 1, y: base.y - 1 }];
+const footprintFor = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
 
 const placementIsCompleteAndLegal = (
     units: readonly Unit[],

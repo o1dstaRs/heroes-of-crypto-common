@@ -13,7 +13,7 @@ import { getAbilitiesWithPosisionCoefficient } from "../abilities/ability_helper
 import { hasAnyDeepWoundsAbility } from "../abilities/deep_wounds_ability";
 import type { GameAction } from "../engine/actions";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getCellsAroundPosition, getPositionForCell } from "../grid/grid_math";
+import { getFootprintCellsForPosition, getPositionForCell } from "../grid/grid_math";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import type { IDecisionContext } from "./ai_strategy";
@@ -44,10 +44,7 @@ function standCells(unit: Unit, context: IDecisionContext, standCell: XY): XY[] 
     }
     const settings = context.grid.getSettings();
     const position = getPositionForCell(standCell, settings.getMinX(), settings.getStep(), settings.getHalfStep());
-    return getCellsAroundPosition(settings, {
-        x: position.x - settings.getHalfStep(),
-        y: position.y - settings.getHalfStep(),
-    });
+    return getFootprintCellsForPosition(settings, position, unit.getFootprintWidth(), unit.getFootprintHeight());
 }
 
 function chargeDistance(actions: readonly GameAction[]): number {

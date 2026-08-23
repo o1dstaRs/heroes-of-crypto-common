@@ -808,17 +808,23 @@ export class UnitsHolder {
             return enemyList;
         }
 
-        let checkCells: XY[];
-
-        if (attacker.isSmallSize()) {
-            // use either target move position on current
-            // depending on the action type (attack vs response)
-            checkCells = getCellsAroundCell(this.gridSettings, firstCheckCell);
-        } else {
-            checkCells = [];
-            for (let i = -2; i <= 1; i++) {
-                for (let j = -2; j <= 1; j++) {
-                    checkCells.push({ x: firstCheckCell.x + i, y: firstCheckCell.y + j });
+        // Use the complete body at its current location (response/idle checks), or rebuild it from
+        // the proposed top-right anchor (attack checks). This keeps adjacency correct for every
+        // rectangular footprint, including the fixed-horizontal 2x1 body.
+        const footprintCells = isAttack
+            ? Array.from({ length: attacker.getFootprintWidth() * attacker.getFootprintHeight() }, (_, index) => ({
+                  x: firstCheckCell.x - (index % attacker.getFootprintWidth()),
+                  y: firstCheckCell.y - Math.floor(index / attacker.getFootprintWidth()),
+              }))
+            : attacker.getCells();
+        const checkCells: XY[] = [];
+        const checkCellHashes = new Set<number>();
+        for (const footprintCell of footprintCells) {
+            for (const cell of getCellsAroundCell(this.gridSettings, footprintCell)) {
+                const hash = (cell.x << 4) | cell.y;
+                if (!checkCellHashes.has(hash)) {
+                    checkCellHashes.add(hash);
+                    checkCells.push(cell);
                 }
             }
         }

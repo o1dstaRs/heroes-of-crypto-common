@@ -396,7 +396,7 @@ export function canCastSummon(spell: Spell, gridMatrix: number[][], emptyGridCel
  * The spell's ICON texture key. Spell names are rendered as text now, so there is no longer a companion
  * "<spell>_font" title strip: those had to be hand-authored per spell, and a missing one silently dropped
  * the spell from the whole spellbook (RenderableUnit could not build the card without it) — which is how
- * Ash Moth shipped with an empty book. One icon is all a new spell needs.
+ * Wandering Mage shipped with an empty book. One icon is all a new spell needs.
  */
 export const spellToTextureName = (spellName: string): string => `${spellName.toLowerCase().replace(/ /g, "_")}_256`;
 

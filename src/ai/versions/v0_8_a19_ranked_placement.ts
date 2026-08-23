@@ -100,17 +100,12 @@ const inspectPublicRoster = (publicIds: readonly number[]): IPublicRosterThreats
     return { flyers, splashAoe };
 };
 
-const footprintFor = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [base]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+const footprintFor = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
 
-const centerFor = (unit: Unit, base: XY): XY => (unit.isSmallSize() ? base : { x: base.x - 0.5, y: base.y - 0.5 });
+const centerFor = (unit: Unit, base: XY): XY => ({
+    x: base.x - (unit.getFootprintWidth() - 1) / 2,
+    y: base.y - (unit.getFootprintHeight() - 1) / 2,
+});
 
 const frontness = (team: IPlacementContext["team"], cell: XY): number =>
     team === PBTypes.TeamVals.LOWER ? cell.y : GRID_SIZE - 1 - cell.y;
@@ -167,7 +162,7 @@ const normalizedPlacementFingerprint = (
             unit.getName(),
             unit.getLevel(),
             unit.getAmountAlive(),
-            unit.isSmallSize() ? 1 : 4,
+            unit.getFootprintWidth() * unit.getFootprintHeight(),
             unit.getAttackType(),
         ]);
         return {

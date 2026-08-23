@@ -113,8 +113,8 @@ describe("v0.8 exact all-unit coverage panel", () => {
             ),
         );
         expect(Object.keys(intrinsic)).toEqual([
-            "Ash Moth",
             "Blacksmith",
+            "Wandering Mage",
             "Battle Mage",
             "Harpy",
             "Healer",

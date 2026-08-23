@@ -576,15 +576,7 @@ export function v08BlockCenterActionSignature(actions: readonly GameAction[]): s
         .join("|");
 }
 
-const footprintForBase = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+const footprintForBase = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
 
 const routeMoveAction = (unit: Unit, route: IReadonlyWeightedRoute): Extract<GameAction, { type: "move_unit" }> => ({
     type: "move_unit",
@@ -620,6 +612,8 @@ const routesForUnit = (unit: Unit, context: IDecisionContext): IReadonlyWeighted
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     );
     const routes: IReadonlyWeightedRoute[] = [];
     const seen = new Set<string>();
@@ -853,7 +847,16 @@ function findIndependentRangeOption(
         const projected = actorAfterRoute(unit, context, route);
         if (!projected) continue;
         const position = getPositionForCells(context.grid.getSettings(), footprintForBase(unit, route.cell));
-        if (position && !attackHandler.canBeAttackedByMelee(position, unit.isSmallSize(), enemyAggression)) {
+        if (
+            position &&
+            !attackHandler.canBeAttackedByMelee(
+                position,
+                unit.isSmallSize(),
+                enemyAggression,
+                unit.getFootprintWidth(),
+                unit.getFootprintHeight(),
+            )
+        ) {
             origins.push({
                 position,
                 route,

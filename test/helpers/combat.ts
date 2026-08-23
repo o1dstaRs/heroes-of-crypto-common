@@ -67,6 +67,8 @@ export interface TestUnitOptions {
     initiative?: number;
     movementType?: MovementType;
     size?: UnitSizeType;
+    footprintWidth?: number;
+    footprintHeight?: number;
     level?: UnitLevelType;
     unitType?: UnitType;
     spells?: string[];
@@ -182,6 +184,10 @@ export function createTestUnit(options: TestUnitOptions = {}): Unit {
             "",
             options.stackPower ?? 1,
             "",
+            [],
+            false,
+            options.footprintWidth,
+            options.footprintHeight,
         ),
         testGridSettings,
         options.team ?? PBTypes.TeamVals.UPPER,

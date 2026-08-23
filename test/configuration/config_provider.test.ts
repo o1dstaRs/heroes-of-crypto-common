@@ -68,6 +68,45 @@ describe("config_provider", () => {
         }
     });
 
+    it("configures horizontal two-cell creatures without rotating their footprint", () => {
+        for (const [faction, name] of [
+            ["Life", "Griffin"],
+            ["Nature", "White Tiger"],
+            ["Nature", "Wolf"],
+            ["Nature", "Unicorn"],
+            ["Nature", "Mantis"],
+            ["Nature", "Pegasus"],
+            ["Chaos", "Manticore"],
+            ["Chaos", "Nightmare"],
+            ["Might", "Hyena"],
+            ["Might", "Wyvern"],
+            ["Might", "Centaur"],
+            ["Might", "Wolf Rider"],
+            ["Might", "Nomad"],
+        ] as const) {
+            const creature = getCreatureConfig(PBTypes.TeamVals.LOWER, faction, name, `${name}_512`, 1);
+            expect(creature.footprint_width).toBe(2);
+            expect(creature.footprint_height).toBe(1);
+            expect(creature.size).toBe(1);
+        }
+
+        const fairy = getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "Fairy", "Fairy_512", 1);
+        expect(fairy.footprint_width).toBe(1);
+        expect(fairy.footprint_height).toBe(1);
+    });
+
+    it("presents the renamed Wandering Mage while accepting legacy Ash Moth payloads", () => {
+        const current = getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Wandering Mage", "wandering_mage_512", 2);
+        const legacy = getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Ash Moth", "ash_moth_512", 2);
+
+        expect(current.name).toBe("Wandering Mage");
+        expect(legacy.name).toBe("Wandering Mage");
+        expect(current.movement_type).toBe(PBTypes.MovementVals.WALK);
+        expect(legacy.movement_type).toBe(PBTypes.MovementVals.WALK);
+        expect(legacy.abilities).toEqual(current.abilities);
+        expect(legacy.spells).toEqual(current.spells);
+    });
+
     it("gives Zena Handyman: her kit waives the ranged melee penalty (desc arrays aligned)", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Zena", "zena_512", 0, 141);
 

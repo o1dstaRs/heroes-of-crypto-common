@@ -240,7 +240,10 @@ export const getCreatureConfig = (
         throw TypeError(`Unknown faction - ${factionName}`);
     }
 
-    const creatureConfig = factionUnits[creatureName];
+    // Existing replays and an older ranked server may still send the pre-rename display name. Resolve it
+    // to the same stable creature while every newly built UnitProperties exposes the new name.
+    const resolvedCreatureName = creatureName === "Ash Moth" ? "Wandering Mage" : creatureName;
+    const creatureConfig = factionUnits[resolvedCreatureName];
     if (!creatureConfig) {
         throw TypeError(`Unknown creature - ${creatureName}`);
     }
@@ -388,17 +391,24 @@ export const getCreatureConfig = (
         largeTextureName,
         MAX_UNIT_STACK_POWER,
         "",
+        [],
+        false,
+        creatureConfig.footprint_width,
+        creatureConfig.footprint_height,
     );
 };
 
-// Fire Strike and Meteorite moved from Life to Chaos with the Battle Mage spellbook redesign. Accept old
-// saved/replay payloads that still carry the former prefix, but resolve them to the real Chaos definition
-// (including its faction value, so the client renders Chaos corners rather than Life corners).
-const LEGACY_LIFE_TO_CHAOS_SPELLS: ReadonlySet<string> = new Set(["Fire Strike", "Meteorite"]);
+const LEGACY_SPELL_FACTION_REDIRECTS: Readonly<Record<string, string>> = {
+    "Chaos:Meteorite": "Nature",
+    "Life:Fire Strike": "Chaos",
+    "Life:Meteorite": "Nature",
+    "Nature:Ring of Fire": "Chaos",
+};
 
 export const getSpellConfig = (factionName: string, spellName: string, laps?: number): SpellProperties => {
+    const requestedFactionName = factionName || "System";
     const resolvedFactionName =
-        factionName === "Life" && LEGACY_LIFE_TO_CHAOS_SPELLS.has(spellName) ? "Chaos" : factionName || "System";
+        LEGACY_SPELL_FACTION_REDIRECTS[`${requestedFactionName}:${spellName}`] ?? requestedFactionName;
     // @ts-ignore: we do not know the type here yet
     const raceSpells = spellsJson[resolvedFactionName];
     if (!raceSpells) {

@@ -82,6 +82,9 @@ export class UnitProperties {
     public movement_type: MovementType;
     public exp: number;
     public readonly size: number;
+    /** Fixed battlefield footprint. Width grows along X; height grows along Y. */
+    public readonly footprint_width: number;
+    public readonly footprint_height: number;
     public readonly level: number;
     public readonly spells: string[];
     /** True once `spells` is a runtime/snapshot charge list rather than raw creature configuration. */
@@ -234,6 +237,8 @@ export class UnitProperties {
         target: string,
         stolenAbilities: string[] = [],
         webMovementLocked = false,
+        footprintWidth?: number,
+        footprintHeight?: number,
     ) {
         this.id = createSecureUuid();
         this.faction = faction;
@@ -265,6 +270,8 @@ export class UnitProperties {
         this.movement_type = movement_type;
         this.exp = exp;
         this.size = size;
+        this.footprint_width = Math.max(1, Math.floor(footprintWidth ?? size));
+        this.footprint_height = Math.max(1, Math.floor(footprintHeight ?? size));
         this.level = level;
         this.spells = structuredClone(spells);
         this.abilities = structuredClone(abilities);

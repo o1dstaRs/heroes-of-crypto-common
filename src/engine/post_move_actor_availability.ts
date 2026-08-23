@@ -71,6 +71,8 @@ export function resolveMoveTargetCells(
     isSmallSize: boolean,
     path: readonly XY[],
     suppliedTargetCells?: readonly XY[],
+    footprintWidth = isSmallSize ? 1 : 2,
+    footprintHeight = isSmallSize ? 1 : 2,
 ): XY[] {
     if (suppliedTargetCells?.length) {
         return suppliedTargetCells.map((cell) => ({ ...cell }));
@@ -79,8 +81,17 @@ export function resolveMoveTargetCells(
     if (!destination) {
         return [];
     }
-    if (isSmallSize) {
+    if (footprintWidth === 1 && footprintHeight === 1) {
         return [{ ...destination }];
+    }
+    if (footprintWidth !== 2 || footprintHeight !== 2) {
+        const cells: XY[] = [];
+        for (let dx = 0; dx < footprintWidth; dx++) {
+            for (let dy = 0; dy < footprintHeight; dy++) {
+                cells.push({ x: destination.x - dx, y: destination.y - dy });
+            }
+        }
+        return cells;
     }
     return [
         { x: destination.x, y: destination.y },
@@ -111,11 +122,17 @@ export function travelledMovePath(currentCell: Readonly<XY>, path: readonly Read
 }
 
 export function resolveMoveTraversal(
-    unit: Pick<Unit, "getBaseCell" | "isSmallSize">,
+    unit: Pick<Unit, "getBaseCell" | "isSmallSize" | "getFootprintWidth" | "getFootprintHeight">,
     action: MoveUnitAction,
     resolvedRoute?: IResolvedMoveRoute,
 ): IMoveTraversal {
-    const targetCells = resolveMoveTargetCells(unit.isSmallSize(), action.path, action.targetCells);
+    const targetCells = resolveMoveTargetCells(
+        unit.isSmallSize(),
+        action.path,
+        action.targetCells,
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
+    );
     const pathIsFootprintOnly = isMovePathFootprintOnly(unit.isSmallSize(), action.path, action.targetCells);
     const travelledPath = pathIsFootprintOnly
         ? action.path

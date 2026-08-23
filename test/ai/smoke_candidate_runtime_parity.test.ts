@@ -44,7 +44,7 @@ const RANGE = PBTypes.AttackVals.RANGE;
 function nativeAshMoth(): Unit {
     const effectFactory = new EffectFactory();
     return Unit.createUnit(
-        getCreatureConfig(LOWER, "Chaos", "Ash Moth", "", 50),
+        getCreatureConfig(LOWER, "Chaos", "Wandering Mage", "", 50),
         testGridSettings,
         LOWER,
         PBTypes.UnitVals.CREATURE,
@@ -605,7 +605,7 @@ describe("Smoke candidate/runtime parity", () => {
         ).toBe(chargesBefore - 1);
     });
 
-    test("never emits the legacy candidate that overlaps its own Ash Moth caster", () => {
+    test("never emits the legacy candidate that overlaps its own Wandering Mage caster", () => {
         const harness = smokeHarness(PBTypes.GridVals.NORMAL, { x: 2, y: 8 }, { x: 4, y: 8 });
         const casterOverlap = smokeCells({ x: 2, y: 8 });
 

@@ -366,7 +366,7 @@ describe("battle engine turn execution observer", () => {
         // Re-pinned 31 -> 10 -> 20 after enabling Abomination (41), then Champion/Frenzied Boar (42/43),
         // shifted roster draws the same way. Re-pinned 20 -> 35 after v0.1 stopped emitting illegal
         // forced-target melees, which changed the fight trajectory while retaining a genuine skip.
-        // Re-pinned 35 -> 33 after enabling Ash Moth (49) grew the L1 pool 15 -> 16 and shifted the seeded
+        // Re-pinned 35 -> 33 after enabling Wandering Mage (49) grew the L1 pool 15 -> 16 and shifted the seeded
         // roster draw off a skipping trajectory.
         // Re-pinned 33 -> 31 after enabling Zena (50) grew the L2 pool the same way.
         // Re-pinned 31 -> 21 after enabling Monk (54) grew the L3 pool, then 21 -> 29 after Battle Mage (55),
@@ -430,7 +430,7 @@ describe("battle engine turn execution observer", () => {
     test.skip("reports a deliberately rejected strategy action separately from defend recovery", () => {
         let injectedUnitId: string | undefined;
         // Seed 35 -> 33 -> 31 -> 21 -> 29 -> 63 alongside the skip test above: this injection needs a turn
-        // whose incumbent decided to skip, and every catalog growth (Ash Moth, Zena, Monk, then Battle Mage /
+        // whose incumbent decided to skip, and every catalog growth (Wandering Mage, Zena, Monk, then Battle Mage /
         // Nightmare / Magic Dragon) shifts the previous seed off that trajectory.
         const { result, turns } = runObservedMatchWithV01Transform(63, 5, (unit, _context, incumbent) => {
             if (!injectedUnitId && incumbent.some((action) => action.type === "end_turn")) {

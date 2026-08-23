@@ -338,6 +338,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const nearest = (cell: XY): number => Math.min(...enemies.map((e) => getDistance(cell, e.getBaseCell())));
         let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
@@ -607,6 +609,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const baseTarget = unitsHolder.getAllUnits().get(strike.targetId);
         const baseReach = baseTarget ? chainReach(baseTarget) : 1;
@@ -684,6 +688,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const baseCount = adjEnemies(strike.attackFrom ?? unit.getBaseCell()).length;
         const cands: { cell: XY; route?: IReadonlyWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
@@ -761,6 +767,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const nearest = (cell: XY): number => Math.min(...ranges.map((t) => getDistance(cell, t.getBaseCell())));
         let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
@@ -836,6 +844,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const baseTarget = unitsHolder.getAllUnits().get(strike.targetId);
         const baseHits = baseTarget ? lineHits(strike.attackFrom ?? unit.getBaseCell(), baseTarget) : 1;
@@ -1142,6 +1152,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const adjToTarget = (cell: XY): boolean => target.getCells().some((tc) => isAdjacentCell(tc, cell));
         let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
@@ -1264,6 +1276,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const adjToTarget = (cell: XY): boolean => target.getCells().some((tc) => isAdjacentCell(tc, cell));
         let best: { cell: XY; cover: number; weight: number } | undefined;
@@ -1386,6 +1400,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const nearestSiegeDist = (cell: XY): number =>
             Math.min(...siege.map((s) => getDistance(cell, s.getBaseCell())));
@@ -1463,15 +1479,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         }
         // Deeper = safer first-pick (farther from the enemy); used only to break ties (and to seed unit 1).
         const frontness = (cc: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cc.y : -cc.y);
-        const footprintFor = (u: Unit, base: XY): XY[] =>
-            u.isSmallSize()
-                ? [base]
-                : [
-                      { x: base.x, y: base.y },
-                      { x: base.x - 1, y: base.y },
-                      { x: base.x, y: base.y - 1 },
-                      { x: base.x - 1, y: base.y - 1 },
-                  ];
+        const footprintFor = (u: Unit, base: XY): XY[] => u.getFootprintCellsForBase(base);
         const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1);
         const placed: XY[] = [];
         for (const u of [...units].sort(bySizeLargeFirst)) {

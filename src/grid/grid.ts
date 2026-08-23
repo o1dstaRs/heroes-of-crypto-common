@@ -12,7 +12,7 @@
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { GridType } from "../generated/protobuf/v1/types_gen";
-import { isCellWithinGrid } from "./grid_math";
+import { getCellsAroundFootprint, isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { type XY, updateMatrixElementIfExists } from "../utils/math";
 import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } from "./grid_constants";
@@ -278,47 +278,16 @@ export class Grid {
     public getRegisteredCells(unitId: string): XY[] {
         return this.cellsByUnitId[unitId] ? this.cellsByUnitId[unitId].map((cell) => ({ ...cell })) : [];
     }
-    public cleanupAll(unitId: string, attackRange: number, isSmallUnit: boolean) {
+    public cleanupAll(unitId: string, attackRange: number, _isSmallUnit: boolean) {
         const occupiedCells = this.cellsByUnitId[unitId];
         const team = this.unitIdToTeam[unitId];
         // delete this.unitIdToTeam[unitId];
         if (occupiedCells) {
             if (occupiedCells.length) {
-                let xMin = Number.MAX_SAFE_INTEGER;
-                let xMax = Number.MIN_SAFE_INTEGER;
-                let yMin = Number.MAX_SAFE_INTEGER;
-                let yMax = Number.MIN_SAFE_INTEGER;
-
+                const aggrGrid = attackRange ? this.boardAggrPerTeam.get(team) : undefined;
+                this.updateAggrGridForFootprint(occupiedCells, attackRange, -1, aggrGrid);
                 for (const oc of occupiedCells) {
                     this.boardCoord[oc.x][oc.y] = NO_UNIT;
-                    let aggrGrid: number[][] | undefined;
-                    if (attackRange) {
-                        aggrGrid = this.boardAggrPerTeam.get(team);
-                    }
-
-                    // Update aggregation grid for each cell that had a unit, regardless of size
-                    if (isSmallUnit) {
-                        this.updateAggrGrid(oc, attackRange, -1, aggrGrid);
-                    }
-
-                    // Track bounding box for large units (for potential other logic)
-                    if (!isSmallUnit) {
-                        xMin = Math.min(xMin, oc.x);
-                        xMax = Math.max(xMax, oc.x);
-                        yMin = Math.min(yMin, oc.y);
-                        yMax = Math.max(yMax, oc.y);
-                    }
-                }
-
-                // Still update corners for large units with proper mask if needed for other logic
-                if (!isSmallUnit && xMin !== xMax && yMin !== yMax && attackRange) {
-                    const aggrGrid = this.boardAggrPerTeam.get(team);
-                    if (aggrGrid) {
-                        this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, -1, aggrGrid, UPDATE_DOWN_LEFT);
-                        this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, -1, aggrGrid, UPDATE_UP_LEFT);
-                        this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, -1, aggrGrid, UPDATE_DOWN_RIGHT);
-                        this.updateAggrGrid({ x: xMax, y: yMax }, attackRange, -1, aggrGrid, UPDATE_UP_RIGHT);
-                    }
                 }
             }
             this.cellsByUnitId[unitId] = [];
@@ -412,7 +381,7 @@ export class Grid {
      * overlap. Callers placing a new unit omit it, so another stack's cells remain blocked.
      */
     public canOccupyCells(cells: XY[], canOccupyLava: boolean, canOccupyWater: boolean, ownUnitId?: string): boolean {
-        if (cells.length !== 1 && cells.length !== 4) {
+        if (!cells.length) {
             return false;
         }
 
@@ -475,7 +444,7 @@ export class Grid {
         canOccupyLava: boolean,
         canOccupyWater: boolean,
     ): boolean {
-        if (!unitId || !team || !cells.length || !(cells.length === 1 || cells.length === 4)) {
+        if (!unitId || !team || !cells.length) {
             return false;
         }
 
@@ -497,7 +466,7 @@ export class Grid {
         }
 
         const occupiedCells = this.cellsByUnitId[unitId];
-        if (occupiedCells?.length && occupiedCells.length !== 4) {
+        if (occupiedCells?.length && occupiedCells.length !== cells.length) {
             return false;
         }
 
@@ -507,11 +476,8 @@ export class Grid {
         }
 
         if (occupiedCells?.length) {
+            this.updateAggrGridForFootprint(occupiedCells, attackRange, -1, aggrGrid);
             const processed: Set<number> = new Set();
-            let xMin = Number.MAX_SAFE_INTEGER;
-            let xMax = Number.MIN_SAFE_INTEGER;
-            let yMin = Number.MAX_SAFE_INTEGER;
-            let yMax = Number.MIN_SAFE_INTEGER;
             for (const oc of occupiedCells) {
                 const key = (oc.x << 4) | oc.y;
                 if (processed.has(key)) {
@@ -535,32 +501,13 @@ export class Grid {
                     } else {
                         this.boardCoord[oc.x][oc.y] = NO_UNIT;
                     }
-                    // Update aggregation grid for each cell that is being vacated
-                    if (aggrGrid && occupiedCells.length === 1) {
-                        this.updateAggrGrid(oc, attackRange, -1, aggrGrid);
-                    }
                 }
 
-                xMin = Math.min(xMin, oc.x);
-                xMax = Math.max(xMax, oc.x);
-                yMin = Math.min(yMin, oc.y);
-                yMax = Math.max(yMax, oc.y);
                 processed.add(key);
-            }
-            // Still update corners for large units with proper mask if needed for other logic
-            if (xMin !== xMax && yMin !== yMax && aggrGrid) {
-                this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, -1, aggrGrid, UPDATE_DOWN_LEFT);
-                this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, -1, aggrGrid, UPDATE_UP_LEFT);
-                this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, -1, aggrGrid, UPDATE_DOWN_RIGHT);
-                this.updateAggrGrid({ x: xMax, y: yMax }, attackRange, -1, aggrGrid, UPDATE_UP_RIGHT);
             }
         }
 
         const processed: Set<number> = new Set();
-        let xMin = Number.MAX_SAFE_INTEGER;
-        let xMax = Number.MIN_SAFE_INTEGER;
-        let yMin = Number.MAX_SAFE_INTEGER;
-        let yMax = Number.MIN_SAFE_INTEGER;
         for (const c of cells) {
             if (
                 c.x < 0 ||
@@ -576,23 +523,9 @@ export class Grid {
                 continue;
             }
             this.boardCoord[c.x][c.y] = unitId;
-            // Update aggregation grid for each cell that is being occupied
-            if (aggrGrid && cells.length === 1) {
-                this.updateAggrGrid(c, attackRange, 1, aggrGrid);
-            }
-            xMin = Math.min(xMin, c.x);
-            xMax = Math.max(xMax, c.x);
-            yMin = Math.min(yMin, c.y);
-            yMax = Math.max(yMax, c.y);
             processed.add(key);
         }
-        // Still update corners for large units with proper mask if needed for other logic
-        if (xMin !== xMax && yMin !== yMax && aggrGrid) {
-            this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_LEFT);
-            this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_LEFT);
-            this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_RIGHT);
-            this.updateAggrGrid({ x: xMax, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_RIGHT);
-        }
+        this.updateAggrGridForFootprint(cells, attackRange, 1, aggrGrid);
         this.cellsByUnitId[unitId] = cells;
 
         return true;
@@ -627,26 +560,7 @@ export class Grid {
             if (!aggrGrid) {
                 continue;
             }
-            if (cells.length === 1) {
-                this.updateAggrGrid(cells[0], attackRange, 1, aggrGrid);
-                continue;
-            }
-            let xMin = Number.MAX_SAFE_INTEGER;
-            let xMax = Number.MIN_SAFE_INTEGER;
-            let yMin = Number.MAX_SAFE_INTEGER;
-            let yMax = Number.MIN_SAFE_INTEGER;
-            for (const c of cells) {
-                xMin = Math.min(xMin, c.x);
-                xMax = Math.max(xMax, c.x);
-                yMin = Math.min(yMin, c.y);
-                yMax = Math.max(yMax, c.y);
-            }
-            if (xMin !== xMax && yMin !== yMax) {
-                this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_LEFT);
-                this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_LEFT);
-                this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_RIGHT);
-                this.updateAggrGrid({ x: xMax, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_RIGHT);
-            }
+            this.updateAggrGridForFootprint(cells, attackRange, 1, aggrGrid);
         }
     }
     public getOccupantUnitId(cell: XY): string | undefined {
@@ -865,6 +779,18 @@ export class Grid {
             column < this.availableCenterEnd
         );
     }
+    private updateAggrGridForFootprint(
+        cells: readonly XY[],
+        range: number,
+        updBy: number,
+        aggrGrid?: number[][],
+    ): void {
+        if (!aggrGrid || !range || !updBy || !cells.length) return;
+        for (const cell of getCellsAroundFootprint(this.gridSettings, cells)) {
+            updateMatrixElementIfExists(aggrGrid, cell.y, cell.x, updBy);
+        }
+    }
+
     private updateAggrGrid(
         cell: XY,
         range: number,

@@ -44,6 +44,8 @@ export interface IDecisionPathSource {
         isSmallUnit?: boolean,
         isMadeOfFire?: boolean,
         hasVineStride?: boolean,
+        footprintWidth?: number,
+        footprintHeight?: number,
     ): IReadonlyMovePath;
 }
 
@@ -65,6 +67,8 @@ interface ICanonicalMovePathInput {
     // Part of the cache key: a vine strider walks the same board at different prices, so it must not be
     // served a path canonicalised for a unit without the passive.
     hasVineStride: boolean;
+    footprintWidth: number;
+    footprintHeight: number;
 }
 
 /**
@@ -93,7 +97,8 @@ export class DecisionPathCatalog implements IDecisionPathSource {
         collectStats: boolean,
     ) {
         this.stats = collectStats ? { requests: 0, hits: 0, misses: 0, bypasses: 0 } : undefined;
-        const minimumAnchor = canonical.isSmallUnit ? 0 : 1;
+        const minimumAnchorX = canonical.footprintWidth - 1;
+        const minimumAnchorY = canonical.footprintHeight - 1;
         this.cacheSafe =
             Object.getPrototypeOf(delegate) === PathHelper.prototype &&
             delegate.getMovePath === BASE_GET_MOVE_PATH &&
@@ -110,9 +115,9 @@ export class DecisionPathCatalog implements IDecisionPathSource {
             Number.isInteger(canonical.currentCell.y) &&
             !Object.is(canonical.currentCell.x, -0) &&
             !Object.is(canonical.currentCell.y, -0) &&
-            canonical.currentCell.x >= minimumAnchor &&
+            canonical.currentCell.x >= minimumAnchorX &&
             canonical.currentCell.x < 16 &&
-            canonical.currentCell.y >= minimumAnchor &&
+            canonical.currentCell.y >= minimumAnchorY &&
             canonical.currentCell.y < 16 &&
             Number.isFinite(canonical.maxSteps) &&
             canonical.maxSteps >= 0 &&
@@ -182,6 +187,8 @@ export class DecisionPathCatalog implements IDecisionPathSource {
         isSmallUnit = true,
         isMadeOfFire = false,
         hasVineStride = false,
+        footprintWidth = isSmallUnit ? 1 : 2,
+        footprintHeight = isSmallUnit ? 1 : 2,
     ): IReadonlyMovePath {
         if (this.stats) this.stats.requests++;
         if (
@@ -196,6 +203,8 @@ export class DecisionPathCatalog implements IDecisionPathSource {
                 isSmallUnit,
                 isMadeOfFire,
                 hasVineStride,
+                footprintWidth,
+                footprintHeight,
             )
         ) {
             if (this.stats) this.stats.bypasses++;
@@ -208,6 +217,8 @@ export class DecisionPathCatalog implements IDecisionPathSource {
                 isSmallUnit,
                 isMadeOfFire,
                 hasVineStride,
+                footprintWidth,
+                footprintHeight,
             );
         }
         if (this.cached !== undefined) {
@@ -226,6 +237,8 @@ export class DecisionPathCatalog implements IDecisionPathSource {
             isSmallUnit,
             isMadeOfFire,
             hasVineStride,
+            footprintWidth,
+            footprintHeight,
         );
         return this.cached;
     }
@@ -259,6 +272,8 @@ function canonicalInput(grid: Grid, unit: Unit, matrix: number[][]): ICanonicalM
         isSmallUnit: unit.isSmallSize(),
         isMadeOfFire: unit.canTraverseLava(),
         hasVineStride: unit.hasAbilityActive("In Its Own World"),
+        footprintWidth: unit.getFootprintWidth(),
+        footprintHeight: unit.getFootprintHeight(),
     };
 }
 
@@ -280,7 +295,9 @@ function sameCanonicalInput(left: ICanonicalMovePathInput, right: ICanonicalMove
         left.canFly === right.canFly &&
         left.isSmallUnit === right.isSmallUnit &&
         left.isMadeOfFire === right.isMadeOfFire &&
-        left.hasVineStride === right.hasVineStride
+        left.hasVineStride === right.hasVineStride &&
+        left.footprintWidth === right.footprintWidth &&
+        left.footprintHeight === right.footprintHeight
     );
 }
 
@@ -294,6 +311,8 @@ function matchesCanonicalRequest(
     isSmallUnit: boolean,
     isMadeOfFire: boolean,
     hasVineStride: boolean,
+    footprintWidth: number,
+    footprintHeight: number,
 ): boolean {
     return (
         canonical.matrix === matrix &&
@@ -304,6 +323,8 @@ function matchesCanonicalRequest(
         canonical.canFly === canFly &&
         canonical.isSmallUnit === isSmallUnit &&
         canonical.isMadeOfFire === isMadeOfFire &&
-        canonical.hasVineStride === hasVineStride
+        canonical.hasVineStride === hasVineStride &&
+        canonical.footprintWidth === footprintWidth &&
+        canonical.footprintHeight === footprintHeight
     );
 }

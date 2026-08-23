@@ -78,7 +78,7 @@ describe("pick_sim", () => {
             16,
             15,
             14,
-            13, // four globally distinct L1 offers (16-creature pool: Mermaid, Dryad, Blacksmith, Ash Moth)
+            13, // four globally distinct L1 offers (16-creature pool: Mermaid, Dryad, Blacksmith, Wandering Mage)
             16,
             15,
             14,

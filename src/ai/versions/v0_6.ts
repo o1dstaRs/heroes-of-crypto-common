@@ -240,6 +240,8 @@ export class StrategyV0_6 extends StrategyV0_5 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         if (!movePath.knownPaths.size) {
             return decision;
@@ -322,15 +324,7 @@ function placeArmyDispersed(units: Unit[], context: IPlacementContext): Map<stri
     const xs = baseCells.map((c) => c.x);
     const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
     const edgeness = (c: XY): number => Math.abs(c.x - centreX);
-    const footprintFor = (u: Unit, base: XY): XY[] =>
-        u.isSmallSize()
-            ? [base]
-            : [
-                  { x: base.x, y: base.y },
-                  { x: base.x - 1, y: base.y },
-                  { x: base.x, y: base.y - 1 },
-                  { x: base.x - 1, y: base.y - 1 },
-              ];
+    const footprintFor = (u: Unit, base: XY): XY[] => u.getFootprintCellsForBase(base);
     const footprintFree = (fp: XY[]): boolean => fp.every((c) => legal.has(key(c)) && !occupied.has(key(c)));
     const clusters = (fp: XY[]): boolean => {
         for (const c of fp) {

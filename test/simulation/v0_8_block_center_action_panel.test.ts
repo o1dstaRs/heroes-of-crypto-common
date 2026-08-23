@@ -861,7 +861,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             amountAlive: 1,
             stackPower: 4,
             initiative: 1,
-            spells: ["Nature:Ring of Fire"],
+            spells: ["Chaos:Ring of Fire"],
         });
         const aimTarget = createTestUnit({
             team: PBTypes.TeamVals.UPPER,

@@ -16,7 +16,12 @@ import { getSpellConfig } from "../../src/configuration/config_provider";
 import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_KILL } from "../../src/constants";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { getPositionForCell } from "../../src/grid/grid_math";
+import {
+    getPositionForCell,
+    getPositionForCells,
+    getRangeAttackSideCenter,
+    RangeAttackCellSide,
+} from "../../src/grid/grid_math";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { AttackTarget } from "../../src/handlers/attack_handler";
 import { Spell } from "../../src/spells/spell";
@@ -153,6 +158,86 @@ describe("AttackHandler", () => {
             expect(evaluation.rangeAttackDivisors.length).toBeGreaterThan(0);
             expect(evaluation.affectedUnits.flat()).toContain(target);
             expect(evaluation.affectedCells.length).toBeGreaterThan(0);
+        });
+
+        it("does not pin a 2x1 shooter through a phantom second row", () => {
+            const { attackHandler } = createCombatTestContext();
+            const shooter = createTestUnit({
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                footprintWidth: 2,
+                footprintHeight: 1,
+            });
+            const position = getPositionForCells(testGridSettings, [
+                { x: 4, y: 5 },
+                { x: 5, y: 5 },
+            ])!;
+            shooter.setPosition(position.x, position.y);
+
+            const enemyAggression = Array.from({ length: testGridSettings.getGridSize() }, () =>
+                Array(testGridSettings.getGridSize()).fill(1),
+            );
+            enemyAggression[4][4] = 2;
+            enemyAggression[5][4] = 2;
+
+            expect(
+                attackHandler.canBeAttackedByMelee(
+                    shooter.getPosition(),
+                    shooter.isSmallSize(),
+                    enemyAggression,
+                    shooter.getFootprintWidth(),
+                    shooter.getFootprintHeight(),
+                ),
+            ).toBe(false);
+            expect(attackHandler.canLandRangeAttack(shooter, enemyAggression)).toBe(true);
+        });
+
+        it("lands shots from a 2x1 shooter on either cell of a 2x1 target", () => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const shooter = createTestUnit({
+                team: PBTypes.TeamVals.UPPER,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                footprintWidth: 2,
+                footprintHeight: 1,
+            });
+            const target = createTestUnit({
+                team: PBTypes.TeamVals.LOWER,
+                footprintWidth: 2,
+                footprintHeight: 1,
+            });
+            const shooterCells = [
+                { x: 2, y: 3 },
+                { x: 3, y: 3 },
+            ];
+            const targetCells = [
+                { x: 9, y: 7 },
+                { x: 10, y: 7 },
+            ];
+            const shooterPosition = getPositionForCells(testGridSettings, shooterCells)!;
+            const targetPosition = getPositionForCells(testGridSettings, targetCells)!;
+            shooter.setPosition(shooterPosition.x, shooterPosition.y);
+            target.setPosition(targetPosition.x, targetPosition.y);
+            grid.occupyCells(shooterCells, shooter.getId(), shooter.getTeam(), shooter.getAttackRange(), false, false);
+            grid.occupyCells(targetCells, target.getId(), target.getTeam(), target.getAttackRange(), false, false);
+            unitsHolder.addUnit(shooter);
+            unitsHolder.addUnit(target);
+
+            for (const targetCell of targetCells) {
+                const aim = getRangeAttackSideCenter(
+                    testGridSettings,
+                    targetCell,
+                    RangeAttackCellSide.DOWN,
+                    shooter.getPosition(),
+                );
+                const evaluation = attackHandler.evaluateRangeAttack(
+                    unitsHolder.getAllUnits(),
+                    shooter,
+                    shooter.getPosition(),
+                    aim,
+                );
+                expect(evaluation.affectedUnits.flat()).toContain(target);
+            }
         });
     });
 

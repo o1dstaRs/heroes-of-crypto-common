@@ -180,7 +180,7 @@ describe("v0.8 search measurement alias", () => {
 
         // Re-pinned after the hasUnactedTeammate wait gate changed these seeded action traces. Two isolated
         // runs produced the same hashes with no rejected actions or rejected waits for either version.
-        // Re-pinned again after enabling Ash Moth (Chaos L1) grew the L1 draft pool 15 -> 16, which shifts
+        // Re-pinned again after enabling Wandering Mage (Chaos L1) grew the L1 draft pool 15 -> 16, which shifts
         // every seeded roster draw and therefore both traces. Two isolated runs reproduced these hashes.
         // Re-pinned again after enabling Zena (Chaos L2) grew the L2 draft pool 12 -> 13, shifting the same
         // seeded draw. Two isolated runs reproduced these hashes.

@@ -125,7 +125,9 @@ const V07_CATALOG_MAX_CREATURE_ID: number = PBTypes.CreatureVals.ANGEL;
 const POST_V07_FREEZE_ABILITIES: ReadonlySet<string> = new Set(["Sylvan Focus Aura", "Arcane Ward Aura"]);
 
 const creatureEnumId = (creatureName: string): number =>
-    (PBTypes.CreatureVals as unknown as Record<string, number>)[creatureName.toUpperCase().replace(/ /g, "_")] ?? 0;
+    (PBTypes.CreatureVals as unknown as Record<string, number>)[
+        creatureName === "Wandering Mage" ? "ASH_MOTH" : creatureName.toUpperCase().replace(/ /g, "_")
+    ] ?? 0;
 
 /** Trait sets are derived from the enabled PB-enum catalog, never from unreleased JSON-only creatures. */
 export function classifyEnabledV07ArchetypeCreatures(): IV07ArchetypeTaxonomy {

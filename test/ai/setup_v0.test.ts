@@ -75,7 +75,7 @@ describe("SetupPolicyV0", () => {
         expect(eligibleBacklineProtectorChoices([abomination, queen], [], [])).toEqual([abomination, queen]);
     });
 
-    test("uses public opponent and own-roster context for Ash Moth, Healer, and Angel roles", () => {
+    test("uses public opponent and own-roster context for Wandering Mage, Healer, and Angel roles", () => {
         const ashMoth = PBTypes.CreatureVals.ASH_MOTH;
         const blacksmith = PBTypes.CreatureVals.BLACKSMITH;
         const enemyRanger = PBTypes.CreatureVals.ORC;

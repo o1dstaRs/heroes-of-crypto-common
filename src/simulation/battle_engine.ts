@@ -557,15 +557,7 @@ const publicCreatureIdsFromRoster = (roster: readonly IArmyUnitSpec[]): number[]
     return [...ids];
 };
 
-const footprintCells = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+const footprintCells = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
 
 // --- Skip audit -------------------------------------------------------------
 // Env/flag-gated instrumentation to answer "why do units skip turns". Every acting turn is bucketed into
@@ -1461,9 +1453,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 } else if (action.type === "melee_attack") {
                     const tgt = unitsHolder.getAllUnits().get(action.targetId);
                     const af = action.attackFrom ?? unit.getBaseCell();
-                    const afCells = unit.isSmallSize()
-                        ? [af]
-                        : [af, { x: af.x, y: af.y - 1 }, { x: af.x - 1, y: af.y }, { x: af.x - 1, y: af.y - 1 }];
+                    const afCells = unit.getFootprintCellsForBase(af);
                     const bc = unit.getBaseCell();
                     const stationary = af.x === bc.x && af.y === bc.y;
                     const sel = unit.getAttackTypeSelection();

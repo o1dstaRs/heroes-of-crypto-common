@@ -220,17 +220,12 @@ const idsEqual = (left: readonly number[], right: readonly number[]): boolean =>
 const openingIds = (opening: IOpeningRecipe): number[] =>
     sortedIds(opening.ownUnits.map(({ creatureId }) => creatureId));
 
-const footprintFor = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [base]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+const footprintFor = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
 
-const centerFor = (unit: Unit, base: XY): XY => (unit.isSmallSize() ? base : { x: base.x - 0.5, y: base.y - 0.5 });
+const centerFor = (unit: Unit, base: XY): XY => ({
+    x: base.x - (unit.getFootprintWidth() - 1) / 2,
+    y: base.y - (unit.getFootprintHeight() - 1) / 2,
+});
 
 const exactLegalZoneForTeam = (team: IPlacementContext["team"]): Set<number> => {
     const legal = new Set<number>();

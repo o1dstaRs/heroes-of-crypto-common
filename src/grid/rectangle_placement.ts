@@ -25,7 +25,7 @@ export class RectanglePlacement implements IPlacement {
     private readonly possibleCellHashesSet: Set<number>;
     public constructor(gridSettings: GridSettings, placementPositionType: PlacementPositionType, size = 3) {
         if (![3, 4, 5, 6].includes(size)) {
-            throw new Error("Only the following placements heights are supported: 3, 4, 5, 6.");
+            throw new Error("Only the following placement depths are supported: 3, 4, 5, 6.");
         }
         this.gridSettings = gridSettings;
         this.placementPositionType = placementPositionType;
@@ -34,34 +34,34 @@ export class RectanglePlacement implements IPlacement {
 
         const sizeShift = size * gridSettings.getStep();
         const isSmallestPlacement = size === 3;
-        // Heights 3-5 stop one row short of the board edge; height 6 (Placement augment LEVEL_3) opens
-        // the edge line itself, so the zone starts at the very first/last row.
+        // Depths 3-5 stop one column short of the board edge; depth 6 (Placement augment LEVEL_3) opens
+        // the edge line itself, so the zone starts at the very first/last column.
         const edgeInset = size >= 6 ? 0 : gridSettings.getStep();
 
         switch (placementPositionType) {
             case PlacementPositionType.LOWER_LEFT:
-                this.xLeft = gridSettings.getMinX() + (isSmallestPlacement ? gridSettings.getStep() : 0);
-                this.xRight = gridSettings.getMaxX() - (isSmallestPlacement ? gridSettings.getStep() : 0);
-                this.yUpper = gridSettings.getMinY() + edgeInset + sizeShift;
-                this.yLower = gridSettings.getMinY() + edgeInset;
+                this.xLeft = gridSettings.getMinX() + edgeInset;
+                this.xRight = gridSettings.getMinX() + edgeInset + sizeShift;
+                this.yLower = gridSettings.getMinY() + (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.yUpper = gridSettings.getMaxY() - (isSmallestPlacement ? gridSettings.getStep() : 0);
                 break;
             case PlacementPositionType.UPPER_LEFT:
-                this.xLeft = gridSettings.getMinX() + (isSmallestPlacement ? gridSettings.getStep() : 0);
-                this.xRight = gridSettings.getMaxX() - (isSmallestPlacement ? gridSettings.getStep() : 0);
-                this.yLower = gridSettings.getMaxY() - edgeInset - sizeShift;
-                this.yUpper = gridSettings.getMaxY() - edgeInset;
+                this.xLeft = gridSettings.getMaxX() - edgeInset - sizeShift;
+                this.xRight = gridSettings.getMaxX() - edgeInset;
+                this.yLower = gridSettings.getMinY() + (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.yUpper = gridSettings.getMaxY() - (isSmallestPlacement ? gridSettings.getStep() : 0);
                 break;
             case PlacementPositionType.LOWER_RIGHT:
-                this.xLeft = gridSettings.getMinX() + (isSmallestPlacement ? gridSettings.getStep() : 0);
-                this.xRight = gridSettings.getMaxX() - (isSmallestPlacement ? gridSettings.getStep() : 0);
-                this.yUpper = gridSettings.getMinY() + edgeInset + sizeShift;
-                this.yLower = gridSettings.getMinY() + edgeInset;
+                this.xLeft = gridSettings.getMinX() + edgeInset;
+                this.xRight = gridSettings.getMinX() + edgeInset + sizeShift;
+                this.yLower = gridSettings.getMinY() + (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.yUpper = gridSettings.getMaxY() - (isSmallestPlacement ? gridSettings.getStep() : 0);
                 break;
             case PlacementPositionType.UPPER_RIGHT:
-                this.xLeft = gridSettings.getMinX() + (isSmallestPlacement ? gridSettings.getStep() : 0);
-                this.xRight = gridSettings.getMaxX() - (isSmallestPlacement ? gridSettings.getStep() : 0);
-                this.yLower = gridSettings.getMaxY() - edgeInset - sizeShift;
-                this.yUpper = gridSettings.getMaxY() - edgeInset;
+                this.xLeft = gridSettings.getMaxX() - edgeInset - sizeShift;
+                this.xRight = gridSettings.getMaxX() - edgeInset;
+                this.yLower = gridSettings.getMinY() + (isSmallestPlacement ? gridSettings.getStep() : 0);
+                this.yUpper = gridSettings.getMaxY() - (isSmallestPlacement ? gridSettings.getStep() : 0);
                 break;
             default:
                 throw new Error("Unknown placement position type provided for the SquarePlacement");
@@ -87,56 +87,61 @@ export class RectanglePlacement implements IPlacement {
     public possibleCellHashes(): Set<number> {
         return this.possibleCellHashesSet;
     }
-    public possibleCellPositions(isSmallUnit = true): XY[] {
+    public possibleCellPositions(
+        isSmallUnit = true,
+        footprintWidth = isSmallUnit ? 1 : 2,
+        footprintHeight = isSmallUnit ? 1 : 2,
+    ): XY[] {
         let x;
         let y;
         let sx;
         let sy;
         let borderX;
         let borderY;
-        const diff = isSmallUnit ? 0 : 1;
+        const diffX = Math.max(0, Math.floor(footprintWidth) - 1);
+        const diffY = Math.max(0, Math.floor(footprintHeight) - 1);
         const isSmallestPlacement = this.size === 3;
-        // Cell-space twin of the constructor's edgeInset: height 6 starts on the edge row itself.
-        const edgeRowInset = this.size >= 6 ? 0 : 1;
+        // Cell-space twin of the constructor's edgeInset: depth 6 starts on the edge column itself.
+        const edgeColumnInset = this.size >= 6 ? 0 : 1;
 
         switch (this.placementPositionType) {
             case PlacementPositionType.LOWER_LEFT:
-                x = (isSmallestPlacement ? 1 : 0) + diff;
-                y = edgeRowInset + diff;
+                x = edgeColumnInset + diffX;
+                y = (isSmallestPlacement ? 1 : 0) + diffY;
                 sx = 1;
                 sy = 1;
-                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
-                borderY = y + this.size - diff;
+                borderX = x + this.size - diffX;
+                borderY = y + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diffY;
                 break;
             case PlacementPositionType.UPPER_LEFT:
-                x = (isSmallestPlacement ? 1 : 0) + diff;
-                y = this.gridSettings.getGridSize() - 1 - edgeRowInset;
-                sx = 1;
-                sy = -1;
-                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
-                borderY = y - this.size + diff;
+                x = this.gridSettings.getGridSize() - 1 - edgeColumnInset;
+                y = (isSmallestPlacement ? 1 : 0) + diffY;
+                sx = -1;
+                sy = 1;
+                borderX = x - this.size + diffX;
+                borderY = y + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diffY;
                 break;
             case PlacementPositionType.LOWER_RIGHT:
-                x = (isSmallestPlacement ? 1 : 0) + diff;
-                y = edgeRowInset + diff;
+                x = edgeColumnInset + diffX;
+                y = (isSmallestPlacement ? 1 : 0) + diffY;
                 sx = 1;
                 sy = 1;
-                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
-                borderY = y + this.size - diff;
+                borderX = x + this.size - diffX;
+                borderY = y + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diffY;
                 break;
             case PlacementPositionType.UPPER_RIGHT:
-                x = (isSmallestPlacement ? 1 : 0) + diff;
-                y = this.gridSettings.getGridSize() - 1 - edgeRowInset;
-                sx = 1;
-                sy = -1;
-                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
-                borderY = y - this.size + diff;
+                x = this.gridSettings.getGridSize() - 1 - edgeColumnInset;
+                y = (isSmallestPlacement ? 1 : 0) + diffY;
+                sx = -1;
+                sy = 1;
+                borderX = x - this.size + diffX;
+                borderY = y + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diffY;
                 break;
             default:
                 throw new Error("Invalid placement position type.");
         }
 
-        const possiblePositions: XY[] = new Array((this.size - diff) * (this.size - diff));
+        const possiblePositions: XY[] = [];
         let possiblePositionsIndex = 0;
 
         for (let px = x; px !== borderX; px += sx) {

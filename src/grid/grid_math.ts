@@ -183,6 +183,30 @@ export function getCellsAroundPosition(gridSettings: GridSettings, position: XY)
     return cells;
 }
 
+/**
+ * Cells occupied by a fixed, non-rotating rectangular footprint.
+ * The base cell is the upper-right cell, matching the existing 2x2 anchor convention.
+ */
+export function getFootprintCellsForPosition(
+    gridSettings: GridSettings,
+    position: XY,
+    width: number,
+    height: number,
+): XY[] {
+    if (!position) return [];
+    const base = getCellForPosition(gridSettings, position);
+    const footprintWidth = Math.max(1, Math.floor(width));
+    const footprintHeight = Math.max(1, Math.floor(height));
+    const cells: XY[] = [];
+    for (let dx = 0; dx < footprintWidth; dx += 1) {
+        for (let dy = 0; dy < footprintHeight; dy += 1) {
+            const cell = { x: base.x - dx, y: base.y - dy };
+            if (isCellWithinGrid(gridSettings, cell)) cells.push(cell);
+        }
+    }
+    return cells;
+}
+
 export function isPositionWithinGrid(gridSettings: GridSettings, position: XY): boolean {
     if (!position) {
         return false;
@@ -223,7 +247,7 @@ export function getPositionForCells(gridSettings: GridSettings, cells: XY[]): XY
         return getPositionForCell(cells[0], gridSettings.getMinX(), gridSettings.getStep(), gridSettings.getHalfStep());
     }
 
-    if (cells.length !== 4) {
+    if (!cells.length) {
         return undefined;
     }
 
@@ -238,6 +262,9 @@ export function getPositionForCells(gridSettings: GridSettings, cells: XY[]): XY
         yMin = Math.min(yMin, c.y);
         yMax = Math.max(yMax, c.y);
     }
+
+    const expectedCount = (xMax - xMin + 1) * (yMax - yMin + 1);
+    if (expectedCount !== cells.length) return undefined;
 
     return getPositionForCell(
         { x: xMin + (xMax - xMin) / 2, y: yMin + (yMax - yMin) / 2 },
@@ -335,6 +362,8 @@ export function getLargeUnitAttackCells(
     enemyCell: XY,
     currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
     fromPathHashes?: Set<number>,
+    footprintWidth = 2,
+    footprintHeight = 2,
 ): XY[] {
     const attackCells: XY[] = [];
 
@@ -349,9 +378,11 @@ export function getLargeUnitAttackCells(
             return;
         }
 
-        cellsToCheck.push({ x: cell.x - 1, y: cell.y });
-        cellsToCheck.push({ x: cell.x - 1, y: cell.y - 1 });
-        cellsToCheck.push({ x: cell.x, y: cell.y - 1 });
+        for (let dx = 0; dx < footprintWidth; dx++) {
+            for (let dy = 0; dy < footprintHeight; dy++) {
+                if (dx || dy) cellsToCheck.push({ x: cell.x - dx, y: cell.y - dy });
+            }
+        }
 
         let allCellsCompliant = true;
         for (const ctc of cellsToCheck) {

@@ -10,6 +10,7 @@
  */
 
 import { AbilityFactory } from "../abilities/ability_factory";
+import { creatureIdForName } from "../ai/setup/creature_score";
 import { getCreatureConfig } from "../configuration/config_provider";
 import CREATURES_JSON from "../configuration/creatures.json";
 import { EffectFactory } from "../effects/effect_factory";
@@ -164,7 +165,6 @@ interface ICatalogEntry {
 
 let catalogCache: ICatalogEntry[] | undefined;
 
-const creatureEnum = PBTypes.CreatureVals as unknown as Record<string, number>;
 const SUMMON_ONLY_CREATURES = new Set(["Arachna Spider"]);
 
 /**
@@ -176,8 +176,7 @@ function isCreatureEnabled(creatureName: string): boolean {
     if (SUMMON_ONLY_CREATURES.has(creatureName)) {
         return false;
     }
-    const enumKey = creatureName.toUpperCase().replace(/ /g, "_");
-    const id = creatureEnum[enumKey];
+    const id = creatureIdForName(creatureName);
     return typeof id === "number" && id > 0;
 }
 

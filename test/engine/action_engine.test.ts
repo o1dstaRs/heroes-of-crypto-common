@@ -41,12 +41,16 @@ const setupActionFight = (
         lowerDamageMax?: number;
         lowerRangeShots?: number;
         lowerSize?: UnitSizeType;
+        lowerFootprintWidth?: number;
+        lowerFootprintHeight?: number;
         lowerSpells?: string[];
         lowerStackPower?: number;
         lowerMovementType?: MovementType;
         supportMovementType?: MovementType;
         upperMovementType?: MovementType;
         upperAttackType?: AttackType;
+        upperFootprintWidth?: number;
+        upperFootprintHeight?: number;
         upperDamageMin?: number;
         upperDamageMax?: number;
         upperRangeShots?: number;
@@ -82,6 +86,8 @@ const setupActionFight = (
         abilities: opts.lowerAbilities,
         rangeShots: opts.lowerRangeShots ?? 0,
         size: opts.lowerSize,
+        footprintWidth: opts.lowerFootprintWidth,
+        footprintHeight: opts.lowerFootprintHeight,
         initiative: 5,
         morale: 4,
         spells: opts.lowerSpells,
@@ -92,6 +98,8 @@ const setupActionFight = (
         name: "Upper",
         team: PBTypes.TeamVals.UPPER,
         attackType: opts.upperAttackType,
+        footprintWidth: opts.upperFootprintWidth,
+        footprintHeight: opts.upperFootprintHeight,
         initiative: 3,
         morale: 4,
         abilities: opts.upperAbilities,
@@ -620,6 +628,61 @@ describe("GameActionEngine", () => {
         });
     });
 
+    it("moves a 2x1 footprint vertically as one body and rejects a one-cell landing", () => {
+        const currentCell = { x: 3, y: 3 };
+        const targetCell = { x: 3, y: 4 };
+        const path = [currentCell, targetCell];
+        const targetCells = [
+            { x: 3, y: 4 },
+            { x: 2, y: 4 },
+        ];
+        const setup = setupActionFight({
+            lowerCell: currentCell,
+            lowerFootprintWidth: 2,
+            lowerFootprintHeight: 1,
+            supportCell: { x: 6, y: 3 },
+            currentActiveKnownPaths: new Map([[cellKey(targetCell), [weightedRoute(path)]]]),
+        });
+        const currentCells = [
+            { x: 3, y: 3 },
+            { x: 2, y: 3 },
+        ];
+        const currentPosition = getPositionForCells(setup.grid.getSettings(), currentCells)!;
+        setup.grid.cleanupAll(setup.lower.getId(), setup.lower.getAttackRange(), setup.lower.isSmallSize());
+        setup.lower.setPosition(currentPosition.x, currentPosition.y);
+        expect(
+            setup.grid.occupyCells(
+                currentCells,
+                setup.lower.getId(),
+                setup.lower.getTeam(),
+                setup.lower.getAttackRange(),
+                false,
+                false,
+            ),
+        ).toBe(true);
+
+        const malformed = setup.engine.apply({
+            type: "move_unit",
+            unitId: setup.lower.getId(),
+            path,
+            targetCells: [targetCell],
+        });
+        expect(malformed.completed).toBe(false);
+        expect(malformed.rejectionReason).toBe("invalid_move");
+
+        const result = setup.engine.apply({
+            type: "move_unit",
+            unitId: setup.lower.getId(),
+            path,
+            targetCells,
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.lower.getBaseCell()).toEqual(targetCell);
+        expect(setup.lower.getCells()).toEqual(targetCells);
+        expect(targetCells.every((cell) => setup.grid.getOccupantUnitId(cell) === setup.lower.getId())).toBe(true);
+    });
+
     it("moves a large lava walker across its own footprint onto lava", () => {
         const currentCell = { x: 5, y: 7 };
         const targetCell = { x: 6, y: 7 };
@@ -690,6 +753,47 @@ describe("GameActionEngine", () => {
         });
         expect(setup.upper.getCumulativeHp()).toBeLessThan(setup.upper.getCumulativeMaxHp());
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+    });
+
+    it("lets a horizontal 2x1 attacker strike in place through either body cell", () => {
+        const setup = setupActionFight({
+            lowerCell: { x: 3, y: 3 },
+            lowerFootprintWidth: 2,
+            lowerFootprintHeight: 1,
+            supportCell: { x: 6, y: 3 },
+            upperCell: { x: 1, y: 2 },
+        });
+        const lowerCells = [
+            { x: 3, y: 3 },
+            { x: 2, y: 3 },
+        ];
+        const lowerPosition = getPositionForCells(setup.grid.getSettings(), lowerCells)!;
+        setup.grid.cleanupAll(setup.lower.getId(), setup.lower.getAttackRange(), setup.lower.isSmallSize());
+        setup.lower.setPosition(lowerPosition.x, lowerPosition.y);
+        expect(
+            setup.grid.occupyCells(
+                lowerCells,
+                setup.lower.getId(),
+                setup.lower.getTeam(),
+                setup.lower.getAttackRange(),
+                false,
+                false,
+            ),
+        ).toBe(true);
+        setup.lower.refreshPossibleAttackTypes(true);
+
+        const result = setup.engine.apply({
+            type: "melee_attack",
+            attackerId: setup.lower.getId(),
+            targetId: setup.upper.getId(),
+            attackFrom: { x: 3, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events.some((event) => event.type === "unit_moved")).toBe(false);
+        expect(setup.lower.getBaseCell()).toEqual({ x: 3, y: 3 });
+        expect(setup.lower.getCells()).toEqual(lowerCells);
+        expect(setup.upper.getCumulativeHp()).toBeLessThan(setup.upper.getCumulativeMaxHp());
     });
 
     it("performs a move-melee attack when the supplied path matches known paths", () => {
@@ -936,6 +1040,53 @@ describe("GameActionEngine", () => {
         );
         expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+    });
+
+    it.each([
+        { x: 8, y: 7 },
+        { x: 9, y: 7 },
+    ])("lets a 2x1 shooter fire at target body cell %j of a 2x1 unit", (aimCell) => {
+        const setup = setupActionFight({
+            lowerAttackType: PBTypes.AttackVals.RANGE,
+            lowerRangeShots: 3,
+            lowerFootprintWidth: 2,
+            lowerFootprintHeight: 1,
+            lowerCell: { x: 3, y: 3 },
+            supportCell: { x: 1, y: 3 },
+            upperFootprintWidth: 2,
+            upperFootprintHeight: 1,
+            upperCell: { x: 9, y: 7 },
+        });
+        const shooterCells = [
+            { x: 2, y: 3 },
+            { x: 3, y: 3 },
+        ];
+        const targetCells = [
+            { x: 8, y: 7 },
+            { x: 9, y: 7 },
+        ];
+        for (const [unit, cells] of [
+            [setup.lower, shooterCells],
+            [setup.upper, targetCells],
+        ] as const) {
+            setup.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
+            const position = getPositionForCells(setup.grid.getSettings(), cells)!;
+            unit.setPosition(position.x, position.y);
+            setup.grid.occupyCells(cells, unit.getId(), unit.getTeam(), unit.getAttackRange(), false, false);
+        }
+        setup.lower.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.upper.getCumulativeHp();
+
+        const result = setup.engine.apply({
+            type: "range_attack",
+            attackerId: setup.lower.getId(),
+            targetId: setup.upper.getId(),
+            aimCell,
+            aimSide: RangeAttackCellSide.DOWN,
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
     });
 
     it("rejects a range attack from a unit standing in a Range Null Field", () => {
@@ -2750,7 +2901,7 @@ describe("action engine — custom targeted spell legality", () => {
         // lone target now legitimately catches nobody and the engine refuses it. Parking the ally beside the
         // target (it burns friend or foe) gives the ring something to hit, while (6,4) stays off the
         // caster's line to (6,3) so this still tests LINE OF SIGHT rather than accidentally blocking it.
-        { spellName: "Ring of Fire", spells: ["Nature:Ring of Fire"], stackPower: 4, supportCell: { x: 6, y: 4 } },
+        { spellName: "Ring of Fire", spells: ["Chaos:Ring of Fire"], stackPower: 4, supportCell: { x: 6, y: 4 } },
     ];
 
     for (const spellCase of enemySpells) {

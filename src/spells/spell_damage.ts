@@ -218,7 +218,7 @@ export const FIRE_AGAINST_WATER_MULTIPLIER = FIREFORGED_SWORD_WATER_MULTIPLIER;
  * and cannot be burned (Fire Shield, Fire Breath, the Fireforged blade all say so), a Water Element takes
  * fire half again as hard, and a Wind Element lets lightning pass straight through (Chain Lightning skips
  * it outright). Water spells wash over a Water Element for the same reason fire cannot burn a Fire Element.
- * An elementless spell — every spell but the Tome of Elements' four — is unaffected and returns 1.
+ * An elementless spell — anything not explicitly tagged in configuration — is unaffected and returns 1.
  *
  * Pure and Unit-free so the spellbook card, the hover preview, the engine and the tests all price an
  * elemental hit identically.

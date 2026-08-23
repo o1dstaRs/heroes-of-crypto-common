@@ -201,15 +201,7 @@ export function layoutRevealPlacement(
     const centreX = (minX + Math.max(...xs)) / 2;
     /** Default: distance from the zone's x-centre (corner-ness); cornerShift: distance from the low-x edge. */
     const edgeness = options.cornerShift ? (c: XY): number => c.x - minX : (c: XY): number => Math.abs(c.x - centreX);
-    const footprintFor = (u: Unit, base: XY): XY[] =>
-        u.isSmallSize()
-            ? [base]
-            : [
-                  { x: base.x, y: base.y },
-                  { x: base.x - 1, y: base.y },
-                  { x: base.x, y: base.y - 1 },
-                  { x: base.x - 1, y: base.y - 1 },
-              ];
+    const footprintFor = (u: Unit, base: XY): XY[] => u.getFootprintCellsForBase(base);
     const footprintFree = (fp: XY[]): boolean => fp.every((c) => legal.has(key(c)) && !occupied.has(key(c)));
     /** True when any already-placed stack sits within the Chebyshev `ring` of any footprint cell. */
     const clusters = (fp: XY[], ring: number): boolean => {

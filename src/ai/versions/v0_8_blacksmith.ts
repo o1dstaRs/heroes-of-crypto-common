@@ -54,15 +54,7 @@ const craftCells = (anchor: XY): XY[] => [
     { x: anchor.x + 1, y: anchor.y + 1 },
 ];
 
-const footprintForBase = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+const footprintForBase = (unit: Unit, base: XY): XY[] => unit.getFootprintCellsForBase(base);
 
 const footprintDistance = (left: readonly XY[], right: readonly XY[]): number => {
     let closest = Infinity;

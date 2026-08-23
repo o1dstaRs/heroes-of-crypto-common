@@ -171,6 +171,24 @@ describe("UnitsHolder", () => {
         expect(unitsHolder.haveDistancesToClosestEnemiesDecreased()).toBe(true);
     });
 
+    it("checks adjacency around the actual horizontal 2x1 body", () => {
+        const { unitsHolder, grid } = createCombatTestContext();
+        const attacker = createTestUnit({
+            team: PBTypes.TeamVals.LOWER,
+            footprintWidth: 2,
+            footprintHeight: 1,
+        });
+        const touchingLeftCorner = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const outsideBody = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+
+        placeUnit(grid, unitsHolder, attacker, { x: 5, y: 5 });
+        placeUnit(grid, unitsHolder, touchingLeftCorner, { x: 3, y: 4 });
+        placeUnit(grid, unitsHolder, outsideBody, { x: 5, y: 3 });
+
+        expect(unitsHolder.allEnemiesAroundUnit(attacker, true, { x: 5, y: 5 })).toEqual([touchingLeftCorner]);
+        expect(unitsHolder.allEnemiesAroundUnit(attacker, false)).toEqual([touchingLeftCorner]);
+    });
+
     it("removes units from holder, grid, and fight queues", () => {
         const { unitsHolder, grid } = createCombatTestContext();
         const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER });

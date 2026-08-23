@@ -851,13 +851,11 @@ export function countMeleeThreatsToCell(cell: HoCMath.XY, matrix: number[][], en
  * the execution-time landing rule separately without restricting transit.
  */
 export function canUnitLandAt(unit: IUnitAIRepr, grid: Grid, baseCell: HoCMath.XY): boolean {
-    const cells = [baseCell];
-    if (!unit.isSmallSize()) {
-        cells.push(
-            { x: baseCell.x, y: baseCell.y - 1 },
-            { x: baseCell.x - 1, y: baseCell.y },
-            { x: baseCell.x - 1, y: baseCell.y - 1 },
-        );
+    const cells: HoCMath.XY[] = [];
+    for (let dx = 0; dx < unit.getFootprintWidth(); dx++) {
+        for (let dy = 0; dy < unit.getFootprintHeight(); dy++) {
+            cells.push({ x: baseCell.x - dx, y: baseCell.y - dy });
+        }
     }
     if (cells.some((cell) => !GridMath.isCellWithinGrid(grid.getSettings(), cell))) {
         return false;
@@ -1023,6 +1021,8 @@ export function findMountainMeleeStrike(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     );
     const knownPaths = movePath.knownPaths;
 
@@ -1197,6 +1197,8 @@ function preferBackstabAttackCell(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     ).knownPaths;
 
     // Among the cells adjacent to the target on the backstab side, pick the cheapest reachable one.
@@ -1500,6 +1502,8 @@ function doFindTarget(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     );
 
     const actualMovePath = pathHelper.getMovePath(
@@ -1513,6 +1517,8 @@ function doFindTarget(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     );
 
     let movePath = infiniteMovePath;

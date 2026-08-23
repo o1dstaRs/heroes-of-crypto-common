@@ -432,8 +432,14 @@ export class GameActionEngine {
         if (!action.path.length) {
             return this.reject("invalid_move");
         }
-        const targetCells = resolveMoveTargetCells(unit.isSmallSize(), action.path, action.targetCells);
-        if (!targetCells.length) {
+        const targetCells = resolveMoveTargetCells(
+            unit.isSmallSize(),
+            action.path,
+            action.targetCells,
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
+        );
+        if (!targetCells.length || !this.isValidPlacementFootprint(unit, targetCells)) {
             return this.reject("invalid_move");
         }
         const pathIsFootprintOnly = isMovePathFootprintOnly(unit.isSmallSize(), action.path, action.targetCells);
@@ -780,6 +786,8 @@ export class GameActionEngine {
                 primaryRangeTarget.getPosition(),
                 primaryRangeTarget.isSmallSize(),
                 this.context.grid.getEnemyAggrMatrixByUnitId(primaryRangeTarget.getId()),
+                primaryRangeTarget.getFootprintWidth(),
+                primaryRangeTarget.getFootprintHeight(),
             )
         ) {
             const responseEval = this.context.attackHandler.evaluateRangeAttack(
@@ -1336,7 +1344,7 @@ export class GameActionEngine {
         return { completed: true, events };
     }
     /**
-     * Smoke spell (Ash Moth / Book of Chaos): throws a 2x2 smoke cloud onto FREE cells anywhere on the
+     * Smoke spell (Wandering Mage / Book of Chaos): throws a 2x2 smoke cloud onto FREE cells anywhere on the
      * battlefield. Only empty cells of the 2x2 block become smoked — cells already occupied by a creature (or
      * off-grid) are skipped, so the cloud shapes around whatever is standing in it. Ranged attacks crossing a
      * smoked cell have their damage halved (divisor x2); a creature stepping on a smoked cell dispels it; the
@@ -1915,7 +1923,7 @@ export class GameActionEngine {
      * A Fire Element caught in a Ring of Fire takes nothing at all and never reaches the resistance step —
      * it IS the fire. A Water Element takes half again as much and then resists that. Lightning passes
      * straight through a Wind Element, and a Whirlpool washes over a Water Element. Every spell that is not
-     * elemental — which is all of them but the Tome of Elements' four — comes through here unchanged, right
+     * elemental — anything not explicitly tagged in configuration — comes through here unchanged, right
      * down to the fractional raw damage the old call site passed through untouched.
      */
     private elementalDamageAgainst(spell: Spell, rawDamage: number, unit: Unit): number {
@@ -2394,16 +2402,13 @@ export class GameActionEngine {
         if (!targetCell) {
             return [];
         }
-        if (unit.isSmallSize()) {
-            return [{ ...targetCell }];
+        const cells: XY[] = [];
+        for (let dy = 0; dy < unit.getFootprintHeight(); dy++) {
+            for (let dx = unit.getFootprintWidth() - 1; dx >= 0; dx--) {
+                cells.push({ x: targetCell.x - dx, y: targetCell.y - dy });
+            }
         }
-
-        return [
-            { x: targetCell.x - 1, y: targetCell.y },
-            { x: targetCell.x, y: targetCell.y },
-            { x: targetCell.x - 1, y: targetCell.y - 1 },
-            { x: targetCell.x, y: targetCell.y - 1 },
-        ];
+        return cells;
     }
     private createSummonEvents(
         caster: Unit,
@@ -2812,7 +2817,7 @@ export class GameActionEngine {
         }
 
         if (pathIsFootprintOnly) {
-            return this.findKnownRouteForLargeFootprint(targetCells, knownPaths) ?? new Error("invalid_move");
+            return this.findKnownRouteForFootprint(unit, targetCells, knownPaths) ?? new Error("invalid_move");
         }
 
         const destination = path[path.length - 1];
@@ -2837,14 +2842,15 @@ export class GameActionEngine {
         // UNreachable destination has no entry in knownPaths, so line 1300 above still rejects it.
         return this.canonicalRoute(routes) ?? new Error("invalid_move");
     }
-    private findKnownRouteForLargeFootprint(
+    private findKnownRouteForFootprint(
+        unit: Unit,
         targetCells: XY[],
         knownPaths: ReadonlyMap<number, IWeightedRoute[]>,
     ): IWeightedRoute | undefined {
         for (const cell of targetCells) {
             const routes = knownPaths.get(this.cellKey(cell));
             const matchingRoute = routes?.find((route) =>
-                this.cellsMatchAsSet(targetCells, this.getLargeRouteFootprint(route.cell)),
+                this.cellsMatchAsSet(targetCells, this.getRouteFootprint(unit, route.cell)),
             );
             if (matchingRoute) {
                 return matchingRoute;
@@ -2901,13 +2907,14 @@ export class GameActionEngine {
 
         return true;
     }
-    private getLargeRouteFootprint(anchorCell: XY): XY[] {
-        return [
-            { x: anchorCell.x - 1, y: anchorCell.y - 1 },
-            { x: anchorCell.x, y: anchorCell.y - 1 },
-            { x: anchorCell.x - 1, y: anchorCell.y },
-            { x: anchorCell.x, y: anchorCell.y },
-        ];
+    private getRouteFootprint(unit: Unit, anchorCell: XY): XY[] {
+        const cells: XY[] = [];
+        for (let dx = 0; dx < unit.getFootprintWidth(); dx++) {
+            for (let dy = 0; dy < unit.getFootprintHeight(); dy++) {
+                cells.push({ x: anchorCell.x - dx, y: anchorCell.y - dy });
+            }
+        }
+        return cells;
     }
     private cellsMatchInOrder(left: XY[], right: XY[]): boolean {
         return (
@@ -3007,38 +3014,39 @@ export class GameActionEngine {
                 ((right.x - centerX) ** 2 + (right.y - centerY) ** 2),
         );
 
-        return anchors.map((anchor) =>
-            splitUnit.isSmallSize()
-                ? [anchor]
-                : [
-                      { x: anchor.x, y: anchor.y },
-                      { x: anchor.x + 1, y: anchor.y },
-                      { x: anchor.x, y: anchor.y + 1 },
-                      { x: anchor.x + 1, y: anchor.y + 1 },
-                  ],
-        );
+        return anchors.map((anchor) => {
+            const cells: XY[] = [];
+            for (let dx = 0; dx < splitUnit.getFootprintWidth(); dx++) {
+                for (let dy = 0; dy < splitUnit.getFootprintHeight(); dy++) {
+                    cells.push({ x: anchor.x + dx, y: anchor.y + dy });
+                }
+            }
+            return cells;
+        });
     }
     private isValidPlacementFootprint(unit: Unit, cells: XY[]): boolean {
-        if (unit.isSmallSize()) {
-            return cells.length === 1;
-        }
-        if (cells.length !== 4) {
+        const width = unit.getFootprintWidth();
+        const height = unit.getFootprintHeight();
+        if (cells.length !== width * height) {
             return false;
         }
 
         const xs = new Set(cells.map((cell) => cell.x));
         const ys = new Set(cells.map((cell) => cell.y));
-        if (xs.size !== 2 || ys.size !== 2) {
+        if (xs.size !== width || ys.size !== height) {
             return false;
         }
         const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
         const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
-        if (maxX - minX !== 1 || maxY - minY !== 1) {
+        if (maxX - minX !== width - 1 || maxY - minY !== height - 1) {
             return false;
         }
 
-        const required = new Set([`${minX}:${minY}`, `${maxX}:${minY}`, `${minX}:${maxY}`, `${maxX}:${maxY}`]);
-        return cells.every((cell) => required.has(`${cell.x}:${cell.y}`));
+        const required = new Set<string>();
+        for (let x = minX; x <= maxX; x++) {
+            for (let y = minY; y <= maxY; y++) required.add(`${x}:${y}`);
+        }
+        return required.size === cells.length && cells.every((cell) => required.has(`${cell.x}:${cell.y}`));
     }
     private getOccupiedCellsForUnit(unit: Unit): XY[] {
         return unit.getCells().filter((cell) => this.context.grid.getOccupantUnitId(cell) === unit.getId());
@@ -3237,7 +3245,7 @@ export class GameActionEngine {
         }
 
         const cells =
-            corpseCells.length === (spawned.isSmallSize() ? 1 : 4)
+            corpseCells.length === spawned.getFootprintWidth() * spawned.getFootprintHeight()
                 ? corpseCells
                 : this.resolveSummonCells(spawned, corpseCells[0]);
         const position = getPositionForCells(this.context.grid.getSettings(), cells);

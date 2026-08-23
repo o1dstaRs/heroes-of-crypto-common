@@ -123,7 +123,7 @@ export const V08_ALL_UNIT_CATALOG_SHA256 = catalogFingerprint(V08_ALL_UNIT_CATAL
  * its intrinsic spell kit stops the panel until this identity and its focused census tests are reviewed.
  */
 export const V08_ALL_UNIT_EXPECTED_CATALOG_SHA256 =
-    "2793f8e698b530cf08310635ebb905e763d7fe4eb187c71919b8ec9f21921502" as const;
+    "591455f8a38c83302e082f1d650afca503342ca946cc95c70afa71565ad09858" as const;
 
 export function assertV08AllUnitCatalogCurrent(
     catalog: readonly IV08AllUnitCatalogEntry[] = V08_ALL_UNIT_CATALOG,

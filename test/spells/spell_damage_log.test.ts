@@ -45,7 +45,7 @@ const setup = (magicResist: number) => {
         name: "Magic Dragon",
         team: PBTypes.TeamVals.LOWER,
         attackType: PBTypes.AttackVals.MELEE_MAGIC,
-        spells: ["Nature:Lightning Strike", "Nature:Ring of Fire"],
+        spells: ["Nature:Lightning Strike", "Chaos:Ring of Fire"],
         amountAlive: 20,
         stackPower: 5,
         initiative: 5,

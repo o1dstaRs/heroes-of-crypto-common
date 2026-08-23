@@ -9,7 +9,7 @@ Production A13 was trained from common commit
 `80059c9f34d918285eeb996589c9e3335efc240a`. Twelve playable creatures were added after
 that source snapshot:
 
-- L1: Mermaid, Dryad, Blacksmith, Ash Moth
+- L1: Mermaid, Dryad, Blacksmith, Wandering Mage
 - L2: Wyvern, Trent, Manticore, Battle Mage
 - L3: Zena, Monk, Nightmare
 - L4: Magic Dragon

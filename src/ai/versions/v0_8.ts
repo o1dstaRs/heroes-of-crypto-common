@@ -78,7 +78,7 @@ export const V08_CASTLING_ROUTER_VERSIONS_ENV = "V08_CASTLING_ROUTER_VERSIONS";
 export const V08_BLACKSMITH_ROLE_VERSIONS_ENV = "V08_BLACKSMITH_ROLE_VERSIONS";
 /** Exact-version A/B scope for Nightmare's threat-weighted Fire Wall roadblock router. */
 export const V08_NIGHTMARE_ROLE_VERSIONS_ENV = "V08_NIGHTMARE_ROLE_VERSIONS";
-/** Exact-version A/B scope for the Ash Moth/Healer role routers; absent enables every v0.8-family seat. */
+/** Exact-version A/B scope for the Wandering Mage/Healer role routers; absent enables every v0.8-family seat. */
 export const V08_SUPPORT_ROLE_VERSIONS_ENV = "V08_SUPPORT_ROLE_VERSIONS";
 
 const nonnegativeFinite = (value: number): number => (Number.isFinite(value) ? Math.max(0, value) : 0);

@@ -91,6 +91,21 @@ export class AttackTarget implements IBoardObj {
     public isSmallSize(): boolean {
         return this.size === 1;
     }
+    public getFootprintWidth(): number {
+        return this.size;
+    }
+    public getFootprintHeight(): number {
+        return this.size;
+    }
+    public getFootprintCellsForBase(baseCell: HoCMath.XY): HoCMath.XY[] {
+        const cells: HoCMath.XY[] = [];
+        for (let dx = 0; dx < this.getFootprintWidth(); dx++) {
+            for (let dy = 0; dy < this.getFootprintHeight(); dy++) {
+                cells.push({ x: baseCell.x - dx, y: baseCell.y - dy });
+            }
+        }
+        return cells;
+    }
     public setRenderPosition(x: number, y: number): void {
         this.renderPosition.x = x;
         this.renderPosition.y = y;
@@ -237,7 +252,13 @@ export class AttackHandler {
             // isRangeCapable, not attack_type === RANGE: a melee unit holding a stolen Endless Quiver
             // (Predatory Assimilation) is a legitimate shooter too.
             unit.isRangeCapable() &&
-            !this.canBeAttackedByMelee(unit.getPosition(), unit.isSmallSize(), aggrMatrix) &&
+            !this.canBeAttackedByMelee(
+                unit.getPosition(),
+                unit.isSmallSize(),
+                aggrMatrix,
+                unit.getFootprintWidth(),
+                unit.getFootprintHeight(),
+            ) &&
             unit.getRangeShots() > 0 &&
             !unit.hasDebuffActive("Range Null Field Aura") &&
             // hasStatusApplied for Rangebane: it is applied in COMBAT (Spit Ball), so a ranked client — which
@@ -247,7 +268,22 @@ export class AttackHandler {
             !unit.hasStatusApplied("Rangebane")
         );
     }
-    public canBeAttackedByMelee(unitPosition: HoCMath.XY, isSmallUnit: boolean, enemyAggrMatrix?: number[][]): boolean {
+    private getAttackFromFootprint(unit: Unit, anchor: HoCMath.XY): HoCMath.XY[] {
+        const cells: HoCMath.XY[] = [];
+        for (let dx = 0; dx < unit.getFootprintWidth(); dx++) {
+            for (let dy = 0; dy < unit.getFootprintHeight(); dy++) {
+                cells.push({ x: anchor.x - dx, y: anchor.y - dy });
+            }
+        }
+        return cells;
+    }
+    public canBeAttackedByMelee(
+        unitPosition: HoCMath.XY,
+        isSmallUnit: boolean,
+        enemyAggrMatrix?: number[][],
+        footprintWidth = isSmallUnit ? 1 : 2,
+        footprintHeight = isSmallUnit ? 1 : 2,
+    ): boolean {
         let cells: HoCMath.XY[];
         if (isSmallUnit) {
             const cell = GridMath.getCellForPosition(this.gridSettings, unitPosition);
@@ -256,8 +292,15 @@ export class AttackHandler {
             } else {
                 cells = [];
             }
-        } else {
+        } else if (footprintWidth === 2 && footprintHeight === 2) {
             cells = GridMath.getCellsAroundPosition(this.gridSettings, unitPosition);
+        } else {
+            cells = GridMath.getFootprintCellsForPosition(
+                this.gridSettings,
+                unitPosition,
+                footprintWidth,
+                footprintHeight,
+            );
         }
 
         for (const cell of cells) {
@@ -1623,14 +1666,7 @@ export class AttackHandler {
             return { completed: false, unitIdsDied, animationData };
         }
 
-        const attackFromCells = [attackFromCell];
-        if (!attackerUnit.isSmallSize()) {
-            attackFromCells.push(
-                { x: attackFromCell.x, y: attackFromCell.y - 1 },
-                { x: attackFromCell.x - 1, y: attackFromCell.y },
-                { x: attackFromCell.x - 1, y: attackFromCell.y - 1 },
-            );
-        }
+        const attackFromCells = this.getAttackFromFootprint(attackerUnit, attackFromCell);
 
         if (!this.grid.areCellsAdjacent(attackFromCells, targetUnit.getCells())) {
             return { completed: false, unitIdsDied, animationData };
@@ -1701,16 +1737,9 @@ export class AttackHandler {
                 return { completed: false, unitIdsDied, animationData };
             }
         } else {
-            const position = GridMath.getPositionForCell(
-                attackFromCell,
-                this.gridSettings.getMinX(),
-                this.gridSettings.getStep(),
-                this.gridSettings.getHalfStep(),
-            );
-            const cells = GridMath.getCellsAroundPosition(this.gridSettings, {
-                x: position.x - this.gridSettings.getHalfStep(),
-                y: position.y - this.gridSettings.getHalfStep(),
-            });
+            const cells = attackFromCells;
+            const position = GridMath.getPositionForCells(this.gridSettings, cells);
+            if (!position) return { completed: false, unitIdsDied, animationData };
             if (
                 (this.grid.areAllCellsEmpty(cells, attackerUnit.getId()) ||
                     this.grid.canOccupyCells(
@@ -1738,11 +1767,7 @@ export class AttackHandler {
                     return { completed: false, unitIdsDied, animationData };
                 }
 
-                attackerUnit.setPosition(
-                    position.x - this.gridSettings.getHalfStep(),
-                    position.y - this.gridSettings.getHalfStep(),
-                    false,
-                );
+                attackerUnit.setPosition(position.x, position.y, false);
 
                 this.grid.occupyCells(
                     cells,
@@ -2690,14 +2715,7 @@ export class AttackHandler {
                 return { completed: rangeLanded, unitIdsDied: [], animationData };
             }
 
-            const attackFromCells = [attackFromCell];
-            if (!attackerUnit.isSmallSize()) {
-                attackFromCells.push(
-                    { x: attackFromCell.x, y: attackFromCell.y - 1 },
-                    { x: attackFromCell.x - 1, y: attackFromCell.y },
-                    { x: attackFromCell.x - 1, y: attackFromCell.y - 1 },
-                );
-            }
+            const attackFromCells = this.getAttackFromFootprint(attackerUnit, attackFromCell);
 
             for (const c of attackFromCells) {
                 // Two-mountain BLOCK_CENTER: the 2x2 corridor between the mountains is WALKABLE, so a
@@ -2787,16 +2805,9 @@ export class AttackHandler {
                     return { completed: rangeLanded, unitIdsDied: [], animationData };
                 }
             } else {
-                const position = GridMath.getPositionForCell(
-                    attackFromCell,
-                    this.gridSettings.getMinX(),
-                    this.gridSettings.getStep(),
-                    this.gridSettings.getHalfStep(),
-                );
-                const cells = GridMath.getCellsAroundPosition(this.gridSettings, {
-                    x: position.x - this.gridSettings.getHalfStep(),
-                    y: position.y - this.gridSettings.getHalfStep(),
-                });
+                const cells = attackFromCells;
+                const position = GridMath.getPositionForCells(this.gridSettings, cells);
+                if (!position) return { completed: rangeLanded, unitIdsDied: [], animationData };
                 if (
                     (this.grid.areAllCellsEmpty(cells, attackerUnit.getId()) ||
                         this.grid.canOccupyCells(
@@ -2825,11 +2836,7 @@ export class AttackHandler {
                         return { completed: rangeLanded, unitIdsDied: [], animationData };
                     }
 
-                    attackerUnit.setPosition(
-                        position.x - this.gridSettings.getHalfStep(),
-                        position.y - this.gridSettings.getHalfStep(),
-                        false,
-                    );
+                    attackerUnit.setPosition(position.x, position.y, false);
 
                     this.grid.occupyCells(
                         cells,

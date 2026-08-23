@@ -19,7 +19,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import {
     getCellsAroundCell,
     getCellsAroundFootprint,
-    getCellsAroundPosition,
+    getFootprintCellsForPosition,
     getPositionForCell,
     getPositionForCells,
     getRangeAttackSideCenter,
@@ -582,6 +582,8 @@ export function getEnemiesCellsWithinMovementRange(unit: Unit, context: IDecisio
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     ).cells;
     const out: XY[] = [];
     for (const c of moveCells) {
@@ -822,6 +824,8 @@ class CandidateGenerator {
                 this.unit.isSmallSize(),
                 this.unit.canTraverseLava(),
                 this.unit.hasAbilityActive("In Its Own World"),
+                this.unit.getFootprintWidth(),
+                this.unit.getFootprintHeight(),
             );
         }
         return this.movePathCache;
@@ -832,7 +836,12 @@ class CandidateGenerator {
         }
         const gs = this.context.grid.getSettings();
         const position = getPositionForCell(cell, gs.getMinX(), gs.getStep(), gs.getHalfStep());
-        return getCellsAroundPosition(gs, { x: position.x - gs.getHalfStep(), y: position.y - gs.getHalfStep() });
+        return getFootprintCellsForPosition(
+            gs,
+            position,
+            this.unit.getFootprintWidth(),
+            this.unit.getFootprintHeight(),
+        );
     }
     private footprintOk(cell: XY): boolean {
         const f = this.footprintForCell(cell);
@@ -1455,6 +1464,8 @@ class CandidateGenerator {
                 origin,
                 this.unit.isSmallSize(),
                 this.context.grid.getEnemyAggrMatrixByUnitId(this.unit.getId()),
+                this.unit.getFootprintWidth(),
+                this.unit.getFootprintHeight(),
             ) ||
             this.unit.getRangeShots() <= 0 ||
             this.unit.hasDebuffActive("Range Null Field Aura") ||
@@ -1798,6 +1809,8 @@ class CandidateGenerator {
                     origin,
                     this.unit.isSmallSize(),
                     grid.getEnemyAggrMatrixByUnitId(this.unit.getId()),
+                    this.unit.getFootprintWidth(),
+                    this.unit.getFootprintHeight(),
                 )
             ) {
                 continue;

@@ -136,6 +136,8 @@ export class StrategyV0_3 extends StrategyV0_2 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         let bestCell = base;
         let bestRoute: IReadonlyWeightedRoute | undefined;
@@ -208,6 +210,8 @@ export class StrategyV0_3 extends StrategyV0_2 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const meleeAllies = unitsHolder
             .getAllAllies(unit.getTeam())
@@ -353,15 +357,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
         const xs = baseCells.map((cc) => cc.x);
         const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
         const edgeness = (cc: XY): number => Math.abs(cc.x - centreX);
-        const footprintFor = (u: Unit, base: XY): XY[] =>
-            u.isSmallSize()
-                ? [base]
-                : [
-                      { x: base.x, y: base.y },
-                      { x: base.x - 1, y: base.y },
-                      { x: base.x, y: base.y - 1 },
-                      { x: base.x - 1, y: base.y - 1 },
-                  ];
+        const footprintFor = (u: Unit, base: XY): XY[] => u.getFootprintCellsForBase(base);
         const placeBy = (u: Unit, compare: (a: XY, b: XY) => number): void => {
             for (const base of [...baseCells].sort(compare)) {
                 const footprint = footprintFor(u, base);

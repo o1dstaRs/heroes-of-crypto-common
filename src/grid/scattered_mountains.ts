@@ -12,15 +12,17 @@
 import type { XY } from "../utils/math";
 
 /** How many single-cell mountains a scattered BLOCK_CENTER layout drops. */
-export const SCATTERED_MOUNTAIN_COUNT = 12;
-/** The neutral middle band the rocks land in: this many full-width rows, centred vertically. */
+export const SCATTERED_MOUNTAIN_COUNT = 9;
+/**
+ * The fixed Cemetery spawn lane: four world-X columns across the middle and all sixteen world-Y rows.
+ * On the portrait battlefield this is the visible 4-wide × 16-high strip between both placement zones.
+ */
 export const SCATTERED_MOUNTAIN_BAND_ROWS = 4;
 /**
- * Distinct rock art variants the client can draw (variant indices are 0..VARIANTS-1). Fewer variants than
- * COUNT, so the deal below hands out the full set first and only then repeats — at 12 slots from 8 variants
- * exactly four stones repeat, spread by the shuffle rather than clustered.
+ * Distinct Cemetery slabs the client can draw (variant indices are 0..VARIANTS-1). COUNT and VARIANTS match,
+ * so every generated board contains all nine designs exactly once in a freshly shuffled order.
  */
-export const SCATTERED_MOUNTAIN_VARIANTS = 8;
+export const SCATTERED_MOUNTAIN_VARIANTS = 9;
 
 export interface ISeededScatteredMountain {
     cell: XY;
@@ -37,7 +39,7 @@ export interface ISeededScatteredMountain {
  * every seat saw different stones while the server still carved the classic two 2x2 mountains — invisible
  * walls for everyone and no stones at all for the seat that never rolled.
  *
- * The band/count mirror the sandbox roll exactly (middle SCATTERED_MOUNTAIN_BAND_ROWS rows, full width,
+ * The band/count mirror the sandbox roll exactly (middle SCATTERED_MOUNTAIN_BAND_ROWS columns, full height,
  * partial Fisher-Yates for distinct uniform cells; art variants deal the full deck before repeating).
  */
 export const scatteredMountainsForSeed = (seed: string, gridSize = 16): ISeededScatteredMountain[] => {
@@ -59,8 +61,8 @@ export const scatteredMountainsForSeed = (seed: string, gridSize = 16): ISeededS
 
     const free: XY[] = [];
     const bandStart = (gridSize >> 1) - (SCATTERED_MOUNTAIN_BAND_ROWS >> 1);
-    for (let x = 0; x < gridSize; x++) {
-        for (let y = bandStart; y < bandStart + SCATTERED_MOUNTAIN_BAND_ROWS; y++) {
+    for (let x = bandStart; x < bandStart + SCATTERED_MOUNTAIN_BAND_ROWS; x++) {
+        for (let y = 0; y < gridSize; y++) {
             free.push({ x, y });
         }
     }

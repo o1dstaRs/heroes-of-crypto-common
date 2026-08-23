@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { scoreCreatureWeighted } from "../ai/setup/creature_score";
+import { creatureEnumKeyForName, scoreCreatureWeighted } from "../ai/setup/creature_score";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import {
     creaturesByLevel,
@@ -30,7 +30,7 @@ import {
 
 const creatureEnum = PBTypes.CreatureVals as unknown as Record<string, number>;
 /** Map a roster creatureName to its CreatureVals enum id (0 if unknown). Shared with the synergy application. */
-export const creatureIdForName = (name: string): number => creatureEnum[name.toUpperCase().replace(/ /g, "_")] ?? 0;
+export const creatureIdForName = (name: string): number => creatureEnum[creatureEnumKeyForName(name)] ?? 0;
 const idForName = creatureIdForName;
 
 /** Number of creatures offered per level slot-group (the "reveal" size). Capped by the pool. */

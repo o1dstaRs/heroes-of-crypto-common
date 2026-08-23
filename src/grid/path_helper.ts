@@ -878,7 +878,12 @@ export class PathHelper {
         return undefined;
     }
     public areCellsFormingSquare(cells?: XY[]): boolean {
-        if (!cells || cells.length !== 4) {
+        return this.areCellsFormingFootprint(cells, 2, 2);
+    }
+    public areCellsFormingFootprint(cells: XY[] | undefined, width: number, height: number): boolean {
+        const normalizedWidth = Math.max(1, Math.floor(width));
+        const normalizedHeight = Math.max(1, Math.floor(height));
+        if (!cells || cells.length !== normalizedWidth * normalizedHeight) {
             return false;
         }
 
@@ -910,7 +915,7 @@ export class PathHelper {
             yMax = Math.max(yMax, c.y);
         }
 
-        return xMax - xMin === 1 && yMax - yMin === 1;
+        return xMax - xMin === normalizedWidth - 1 && yMax - yMin === normalizedHeight - 1;
     }
     public getClosestSquareCellIndices(
         mousePosition: XY,
@@ -1164,12 +1169,12 @@ export class PathHelper {
 
         const isInPlacementAndAllowedCount = isInTeamPlacement && (canPlaceMore || isInsideGridAtOwnPosition);
 
-        // --- for large units, if we have a candidate square selection, validate that shape
+        // Multi-cell units keep their configured rectangular footprint; it never rotates.
         if (!isInPlacementAndAllowedCount || unit.isSmallSize()) {
             return isInPlacementAndAllowedCount;
         }
 
-        return this.areCellsFormingSquare(cells);
+        return this.areCellsFormingFootprint(cells, unit.getFootprintWidth(), unit.getFootprintHeight());
     }
     public getMovePath(
         currentCell: XY,
@@ -1180,7 +1185,24 @@ export class PathHelper {
         isSmallUnit = true,
         isMadeOfFire = false,
         hasVineStride = false,
+        footprintWidth = isSmallUnit ? 1 : 2,
+        footprintHeight = isSmallUnit ? 1 : 2,
     ): IMovePath {
+        const normalizedWidth = Math.max(1, Math.floor(footprintWidth));
+        const normalizedHeight = Math.max(1, Math.floor(footprintHeight));
+        if (!((normalizedWidth === 1 && normalizedHeight === 1) || (normalizedWidth === 2 && normalizedHeight === 2))) {
+            return this.getRectangularMovePath(
+                currentCell,
+                matrix,
+                maxSteps,
+                aggrBoard,
+                canFly,
+                isMadeOfFire,
+                hasVineStride,
+                normalizedWidth,
+                normalizedHeight,
+            );
+        }
         const knownPaths: Map<number, IWeightedRoute[]> = new Map();
         const allowed: XY[] = [];
         let currentCellKeys: number[];
@@ -1741,5 +1763,143 @@ export class PathHelper {
             isSmallUnit,
             isMadeOfFire,
         );
+    }
+
+    /** Pathfinding for fixed non-square footprints such as 2x1 creatures. The anchor is always top-right. */
+    private getRectangularMovePath(
+        currentCell: XY,
+        matrix: number[][],
+        maxSteps: number,
+        aggrBoard: number[][] | undefined,
+        canFly: boolean,
+        isMadeOfFire: boolean,
+        hasVineStride: boolean,
+        footprintWidth: number,
+        footprintHeight: number,
+    ): IMovePath {
+        const hash = (cell: XY): number => (cell.x << 4) | cell.y;
+        const footprint = (anchor: XY): XY[] => {
+            const cells: XY[] = [];
+            for (let dx = 0; dx < footprintWidth; dx += 1) {
+                for (let dy = 0; dy < footprintHeight; dy += 1) {
+                    cells.push({ x: anchor.x - dx, y: anchor.y - dy });
+                }
+            }
+            return cells;
+        };
+        const initialKeys = new Set(footprint(currentCell).map(hash));
+        const terrainAllowsPassage = (cell: XY): boolean => {
+            if (!isCellWithinGrid(this.gridSettings, cell)) return false;
+            if (canFly) return true;
+            const value = matrixElementOrDefault(matrix, cell.x, cell.y, 0);
+            if (!value || initialKeys.has(hash(cell))) return true;
+            return isMadeOfFire && value === ObstacleType.LAVA;
+        };
+        const anchorAllowsPassage = (anchor: XY): boolean => footprint(anchor).every(terrainAllowsPassage);
+        const anchorAllowsLanding = (anchor: XY): boolean =>
+            footprint(anchor).every((cell) => {
+                if (!isCellWithinGrid(this.gridSettings, cell)) return false;
+                const value = matrixElementOrDefault(matrix, cell.x, cell.y, 0);
+                if (!value || initialKeys.has(hash(cell))) return true;
+                return isMadeOfFire && value === ObstacleType.LAVA;
+            });
+
+        const vines = FightStateManager.getInstance().getFightProperties().getVines();
+        const fireWalls = FightStateManager.getInstance().getFightProperties().getFireWalls();
+        const movementCost = (from: XY, to: XY, route: IWeightedRoute): number => {
+            const diagonal = from.x !== to.x && from.y !== to.y;
+            let cost = diagonal ? PathHelper.DIAGONAL_MOVE_COST : 1;
+            if (!canFly && aggrBoard) {
+                const occupied = footprint(to);
+                const averageAggression =
+                    occupied.reduce((sum, cell) => sum + (aggrBoard[cell.x]?.[cell.y] || 1), 0) / occupied.length;
+                if (averageAggression > 1) {
+                    if (route.firstAggrMet) cost *= averageAggression;
+                    else route.firstAggrMet = true;
+                }
+            }
+            const occupied = footprint(to);
+            if (occupied.some((cell) => vines.has(cell))) {
+                cost = hasVineStride
+                    ? (diagonal ? 1 : 1) * VINE_STRIDE_COST_MULTIPLIER
+                    : canFly
+                      ? cost
+                      : cost + VINE_CROSS_PENALTY;
+            }
+            if (occupied.some((cell) => fireWalls.has(cell))) cost += FIRE_WALL_CROSS_PENALTY;
+            return cost;
+        };
+
+        const knownPaths = new Map<number, IWeightedRoute[]>();
+        const bestWeight = new Map<number, number>([[hash(currentCell), 0]]);
+        const queue: IWeightedRoute[] = [
+            {
+                cell: { ...currentCell },
+                route: [{ ...currentCell }],
+                weight: 0,
+                firstAggrMet: false,
+                hasLavaCell: false,
+                hasWaterCell: false,
+            },
+        ];
+        const allowed: XY[] = [];
+        const allowedHashes = new Set<number>();
+        const cardinalDirections = [
+            { dx: -1, dy: 0 },
+            { dx: 1, dy: 0 },
+            { dx: 0, dy: -1 },
+            { dx: 0, dy: 1 },
+        ];
+        const directions = canFly
+            ? [...cardinalDirections, { dx: -1, dy: -1 }, { dx: -1, dy: 1 }, { dx: 1, dy: -1 }, { dx: 1, dy: 1 }]
+            : cardinalDirections;
+
+        while (queue.length) {
+            queue.sort((left, right) => left.weight - right.weight);
+            const current = queue.shift()!;
+            if (current.weight > (bestWeight.get(hash(current.cell)) ?? Number.POSITIVE_INFINITY)) continue;
+            for (const { dx, dy } of directions) {
+                const next = { x: current.cell.x + dx, y: current.cell.y + dy };
+                if (next.x < footprintWidth - 1 || next.y < footprintHeight - 1) continue;
+                if (!anchorAllowsPassage(next)) continue;
+                const nextRoute: IWeightedRoute = {
+                    cell: next,
+                    route: [...current.route, next],
+                    weight: current.weight,
+                    firstAggrMet: current.firstAggrMet,
+                    hasLavaCell: current.hasLavaCell,
+                    hasWaterCell: current.hasWaterCell,
+                };
+                const stepCost = movementCost(current.cell, next, nextRoute);
+                nextRoute.weight += stepCost;
+                if (nextRoute.weight > maxSteps + 1e-9) continue;
+                const nextKey = hash(next);
+                if (nextRoute.weight >= (bestWeight.get(nextKey) ?? Number.POSITIVE_INFINITY) - 1e-9) continue;
+                bestWeight.set(nextKey, nextRoute.weight);
+                const occupied = footprint(next);
+                nextRoute.hasLavaCell =
+                    current.hasLavaCell ||
+                    occupied.some((cell) => matrixElementOrDefault(matrix, cell.x, cell.y, 0) === ObstacleType.LAVA);
+                nextRoute.hasWaterCell =
+                    current.hasWaterCell ||
+                    occupied.some((cell) => matrixElementOrDefault(matrix, cell.x, cell.y, 0) === ObstacleType.WATER);
+                queue.push(nextRoute);
+                if (anchorAllowsLanding(next)) {
+                    // Flyers may use blocked anchors as transit nodes, but callers consume knownPaths
+                    // as legal destinations (including automatic melee approach selection). Expose a
+                    // route only when every cell of the fixed footprint can actually land there.
+                    knownPaths.set(nextKey, [nextRoute]);
+                    for (const cell of occupied) {
+                        const cellKey = hash(cell);
+                        if (!allowedHashes.has(cellKey)) {
+                            allowedHashes.add(cellKey);
+                            allowed.push(cell);
+                        }
+                    }
+                }
+            }
+        }
+
+        return { cells: allowed, hashes: allowedHashes, knownPaths };
     }
 }

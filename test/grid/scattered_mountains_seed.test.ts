@@ -21,10 +21,10 @@ describe("scatteredMountainsForSeed", () => {
 
     // The Cemetery board's stone count is a design number, so pin it here: it drives both the ranked seeded
     // layout and the sandbox roll, and a silent change to either would alter every BLOCK_CENTER board.
-    it("scatters twelve stones, and the band has room for them", () => {
-        expect(SCATTERED_MOUNTAIN_COUNT).toBe(12);
+    it("scatters nine stones, and the fixed 4x16 lane has room for them", () => {
+        expect(SCATTERED_MOUNTAIN_COUNT).toBe(9);
         expect(SCATTERED_MOUNTAIN_COUNT).toBeLessThanOrEqual(16 * SCATTERED_MOUNTAIN_BAND_ROWS);
-        expect(scatteredMountainsForSeed("count-pin").length).toBe(12);
+        expect(scatteredMountainsForSeed("count-pin").length).toBe(9);
     });
 
     it("drops the full count of distinct cells inside the neutral band", () => {
@@ -33,10 +33,10 @@ describe("scatteredMountainsForSeed", () => {
         const bandStart = 8 - (SCATTERED_MOUNTAIN_BAND_ROWS >> 1);
         const seen = new Set<string>();
         for (const rock of layout) {
-            expect(rock.cell.x).toBeGreaterThanOrEqual(0);
-            expect(rock.cell.x).toBeLessThan(16);
-            expect(rock.cell.y).toBeGreaterThanOrEqual(bandStart);
-            expect(rock.cell.y).toBeLessThan(bandStart + SCATTERED_MOUNTAIN_BAND_ROWS);
+            expect(rock.cell.x).toBeGreaterThanOrEqual(bandStart);
+            expect(rock.cell.x).toBeLessThan(bandStart + SCATTERED_MOUNTAIN_BAND_ROWS);
+            expect(rock.cell.y).toBeGreaterThanOrEqual(0);
+            expect(rock.cell.y).toBeLessThan(16);
             expect(rock.variant).toBeGreaterThanOrEqual(0);
             expect(rock.variant).toBeLessThan(SCATTERED_MOUNTAIN_VARIANTS);
             seen.add(`${rock.cell.x},${rock.cell.y}`);
@@ -44,10 +44,10 @@ describe("scatteredMountainsForSeed", () => {
         expect(seen.size).toBe(SCATTERED_MOUNTAIN_COUNT);
     });
 
-    it("deals every art variant before repeating any", () => {
+    it("deals all nine art variants exactly once", () => {
         const layout = scatteredMountainsForSeed("variant-spread-check");
         const variants = new Set(layout.map((rock) => rock.variant));
-        // More rocks than variants, so at least the full set must appear.
+        expect(layout.length).toBe(SCATTERED_MOUNTAIN_VARIANTS);
         expect(variants.size).toBe(SCATTERED_MOUNTAIN_VARIANTS);
     });
 });

@@ -79,7 +79,7 @@ const buildAttackTypeIndex = (): Map<number, string> => {
         if (!creatures || typeof creatures !== "object") continue;
         for (const [name, cfg] of Object.entries(creatures)) {
             if (!cfg || typeof cfg !== "object") continue;
-            const enumKey = name.toUpperCase().replace(/ /g, "_");
+            const enumKey = name === "Wandering Mage" ? "ASH_MOTH" : name.toUpperCase().replace(/ /g, "_");
             const id = idByEnumKey[enumKey];
             if (typeof id !== "number" || id <= 0) continue;
             index.set(id, cfg.attack_type ?? "UNKNOWN");
@@ -178,7 +178,8 @@ function round1Rosters(drafts: number, baseSeed: number): number[][] {
 /** misplay_audit.ts's OLD heuristic roster construction, byte-identical seeding to playMisplayAuditGame. */
 function heuristicRosters(drafts: number, baseSeed: number): number[][] {
     const creatureEnum = PBTypes.CreatureVals as unknown as Record<string, number>;
-    const idForName = (name: string): number => creatureEnum[name.toUpperCase().replace(/ /g, "_")] ?? 0;
+    const idForName = (name: string): number =>
+        creatureEnum[name === "Wandering Mage" ? "ASH_MOTH" : name.toUpperCase().replace(/ /g, "_")] ?? 0;
     const rosters: number[][] = [];
     for (let i = 0; i < drafts; i += 1) {
         const seed = (baseSeed + i * 0x9e3779b1) >>> 0;

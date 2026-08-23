@@ -15,7 +15,8 @@ import { AbilityFactory } from "../../src/abilities/ability_factory";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { getPositionForCell } from "../../src/grid/grid_math";
+import { getPositionForCell, getPositionForCells } from "../../src/grid/grid_math";
+import { PathHelper } from "../../src/grid/path_helper";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
 import { createTestUnit, testGridSettings } from "../helpers/combat";
@@ -863,6 +864,43 @@ describe("Unit", () => {
             expect(immobilizedTargets.attackCells).toEqual([{ x: 1, y: 1 }]);
             // The far side of the enemy (3,1) is reachable only by moving — it must NOT be offered.
             expect(immobilizedTargets.attackCells).not.toContainEqual({ x: 3, y: 1 });
+        });
+
+        it("offers an in-place melee attack when either cell of a 2x1 body touches the target", () => {
+            const attacker = createTestUnit({ footprintWidth: 2, footprintHeight: 1 });
+            const enemy = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            const attackerCells = [
+                { x: 4, y: 5 },
+                { x: 5, y: 5 },
+            ];
+            const attackerPosition = getPositionForCells(testGridSettings, attackerCells)!;
+            const enemyPosition = positionForCell({ x: 3, y: 4 });
+            attacker.setPosition(attackerPosition.x, attackerPosition.y);
+            enemy.setPosition(enemyPosition.x, enemyPosition.y);
+
+            const targets = attacker.attackMeleeAllowed(
+                [enemy],
+                new Map([[enemy.getId(), enemyPosition]]),
+                [enemy],
+                attacker.getCells(),
+                new Map(),
+            );
+
+            expect(targets.unitIds.has(enemy.getId())).toBe(true);
+            expect(targets.attackCells).toContainEqual({ x: 4, y: 5 });
+            expect(
+                new PathHelper(testGridSettings).calculateClosestAttackFrom(
+                    enemyPosition,
+                    targets.attackCells,
+                    attacker.getCells(),
+                    enemy.getCells(),
+                    attacker.isSmallSize(),
+                    attacker.getAttackRange(),
+                    enemy.isSmallSize(),
+                    enemy.getTeam(),
+                    targets.attackCellHashesToLargeCells,
+                ),
+            ).toEqual(attacker.getBaseCell());
         });
 
         it("consumes an ability-derived castable spell on use (faction-prefix regression)", () => {

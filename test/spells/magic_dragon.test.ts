@@ -49,6 +49,7 @@ interface IRawCreature {
 const creatures = creaturesJson as unknown as Record<string, Record<string, IRawCreature>>;
 const dragon = creatures.Nature["Magic Dragon"];
 const natureSpells = (spellsJson as unknown as Record<string, Record<string, { power: number }>>).Nature;
+const chaosSpells = (spellsJson as unknown as Record<string, Record<string, { power: number }>>).Chaos;
 
 /**
  * Every draw getRandomInt makes returns `value`.
@@ -168,7 +169,10 @@ const setupDragonFight = (opts: {
     return { ...context, fightProperties, caster, enemies, allies, engine, sceneLog };
 };
 
-const scrollsOf = (name: string): number => dragon.spells.filter((entry) => entry === `Nature:${name}`).length;
+const schoolOf = (name: string): string => (name === "Ring of Fire" ? "Chaos" : "Nature");
+const scrollsOf = (name: string): number =>
+    dragon.spells.filter((entry) => entry === `${schoolOf(name)}:${name}`).length;
+const rawSpell = (name: string): { power: number } => (name === "Ring of Fire" ? chaosSpells : natureSpells)[name];
 
 describe("Magic Dragon creature configuration", () => {
     it("is a level 4 Nature flyer that fights in melee and casts, sized like every other level 4", () => {
@@ -249,7 +253,7 @@ describe("Tome of Elements spell configuration", () => {
 
         expect(getSpellConfig("Nature", "Whirlpool").minimal_caster_stack_power).toBe(3);
         expect(getSpellConfig("Nature", "Lightning Strike").minimal_caster_stack_power).toBe(1);
-        expect(getSpellConfig("Nature", "Ring of Fire").minimal_caster_stack_power).toBe(4);
+        expect(getSpellConfig("Chaos", "Ring of Fire").minimal_caster_stack_power).toBe(4);
         expect(getSpellConfig("Nature", "Meteor Shower").minimal_caster_stack_power).toBe(5);
     });
 
@@ -260,7 +264,7 @@ describe("Tome of Elements spell configuration", () => {
     // budget — so the two-dragon row is what the spellbook actually reads on the board.
     it("prices each spell at its per-dragon damage target at full stack power", () => {
         const damage = (name: string, alive: number): number =>
-            calculateStackPoweredSpellDamage(natureSpells[name].power, alive, MAX_UNIT_STACK_POWER);
+            calculateStackPoweredSpellDamage(rawSpell(name).power, alive, MAX_UNIT_STACK_POWER);
 
         expect(damage("Lightning Strike", 1)).toBe(150);
         expect(damage("Ring of Fire", 1)).toBe(120);
@@ -272,33 +276,34 @@ describe("Tome of Elements spell configuration", () => {
     });
 
     it("keeps the ladder percentages the brief set", () => {
-        expect(natureSpells["Ring of Fire"].power).toBeCloseTo(natureSpells["Lightning Strike"].power * 0.8, 5);
-        expect(natureSpells["Meteor Shower"].power).toBeCloseTo(natureSpells["Ring of Fire"].power * 0.9, 5);
+        expect(rawSpell("Ring of Fire").power).toBeCloseTo(rawSpell("Lightning Strike").power * 0.8, 5);
+        expect(rawSpell("Meteor Shower").power).toBeCloseTo(rawSpell("Ring of Fire").power * 0.9, 5);
     });
 
     it("gives each Tome of Elements spell its element, and leaves ordinary spells elementless", () => {
         expect(getSpellConfig("Nature", "Whirlpool").element).toBe(SpellElement.WATER);
         expect(getSpellConfig("Nature", "Lightning Strike").element).toBe(SpellElement.AIR);
-        expect(getSpellConfig("Nature", "Ring of Fire").element).toBe(SpellElement.FIRE);
-        expect(getSpellConfig("Nature", "Meteor Shower").element).toBe(SpellElement.FIRE);
+        expect(getSpellConfig("Chaos", "Ring of Fire").element).toBe(SpellElement.FIRE);
+        expect(getSpellConfig("Nature", "Meteor Shower").element).toBe(SpellElement.EARTH);
+        expect(getSpellConfig("Nature", "Meteorite").element).toBe(SpellElement.EARTH);
         expect(getSpellConfig("Life", "Heal").element).toBe(SpellElement.NO_ELEMENT);
     });
 
     // The exact ladder percentages are gone, but the ORDER is still design intent: the single-target bolt
     // out-damages the ring it splashes, which out-damages the 3x3 shower that hits the most units at once.
     it("keeps the damage ordering bolt > ring > shower", () => {
-        expect(natureSpells["Lightning Strike"].power).toBeGreaterThan(natureSpells["Ring of Fire"].power);
-        expect(natureSpells["Ring of Fire"].power).toBeGreaterThan(natureSpells["Meteor Shower"].power);
+        expect(rawSpell("Lightning Strike").power).toBeGreaterThan(rawSpell("Ring of Fire").power);
+        expect(rawSpell("Ring of Fire").power).toBeGreaterThan(rawSpell("Meteor Shower").power);
     });
 
     it("aims each spell the way its own handler reads it", () => {
         for (const name of ["Lightning Strike", "Ring of Fire", "Meteor Shower"]) {
-            const spell = getSpellConfig("Nature", name);
+            const spell = getSpellConfig(schoolOf(name), name);
             expect(spell.multiplier_type).toBe(SpellMultiplierType.UNIT_AMOUNT_STACK_POWER);
             expect(spell.is_buff).toBe(false);
         }
         expect(getSpellConfig("Nature", "Lightning Strike").spell_target_type).toBe(SpellTargetType.ANY_ENEMY);
-        expect(getSpellConfig("Nature", "Ring of Fire").spell_target_type).toBe(SpellTargetType.ANY_ENEMY);
+        expect(getSpellConfig("Chaos", "Ring of Fire").spell_target_type).toBe(SpellTargetType.ANY_ENEMY);
         // Meteor Shower is aimed at a spot on the ground, not at a creature.
         expect(getSpellConfig("Nature", "Meteor Shower").spell_target_type).toBe(SpellTargetType.FREE_CELL);
     });
@@ -552,7 +557,7 @@ describe("action engine — Meteor Shower", () => {
         expect(before[3] - setup.allies[0].getHp()).toBe(0); // allies are not caught
     });
 
-    it("cannot burn a Fire Element caught in the block, and burns a Water Element half again as hard", () => {
+    it("deals Earth damage normally to Fire and Water Elements", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -572,9 +577,9 @@ describe("action engine — Meteor Shower", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(before[0] - setup.enemies[0].getHp()).toBe(0); // it IS the fire
-        expect(before[1] - setup.enemies[1].getHp()).toBe(162); // 108 x 1.5
-        expect(before[2] - setup.enemies[2].getHp()).toBe(108); // elementless, the plain number
+        expect(before[0] - setup.enemies[0].getHp()).toBe(108);
+        expect(before[1] - setup.enemies[1].getHp()).toBe(108);
+        expect(before[2] - setup.enemies[2].getHp()).toBe(108);
     });
 
     it("refuses a drop that catches nobody rather than burn the only scroll", () => {

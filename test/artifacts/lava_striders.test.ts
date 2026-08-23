@@ -11,7 +11,11 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { Tier2Artifact } from "../../src/artifacts/artifact_properties";
+import {
+    formatArtifactDescription,
+    getTier2ArtifactProperties,
+    Tier2Artifact,
+} from "../../src/artifacts/artifact_properties";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
@@ -31,6 +35,15 @@ const armyWithLavaStriders = () => {
 };
 
 describe("Lava Striders", () => {
+    it("presents the artifact to players as Fireproof Boots with its complete terrain effect", () => {
+        const artifact = getTier2ArtifactProperties(Tier2Artifact.LAVA_STRIDERS);
+
+        expect(artifact.name).toBe("Fireproof Boots");
+        expect(formatArtifactDescription(artifact)).toBe(
+            "Allows every allied unit to move across and stand on lava. Contact with the central lava grants Made of Fire for 2 laps: +10% to all stats and ability power.",
+        );
+    });
+
     it("never grants the Made of Fire ability, however often the army is refreshed", () => {
         const { unitsHolder, unit } = armyWithLavaStriders();
         const fightProperties = FightStateManager.getInstance().getFightProperties();
