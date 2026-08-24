@@ -13,9 +13,11 @@ import type { XY } from "../utils/math";
 
 /** How many single-cell mountains a scattered BLOCK_CENTER layout drops. */
 export const SCATTERED_MOUNTAIN_COUNT = 12;
-/** The neutral middle band the rocks land in: this many full-WIDTH rows, centred vertically —
- *  the horizontal belt between the bottom and top deployment fields (RectanglePlacement carves
- *  y 1-3 and y 12-14 across the full board width, so mid-board rows never collide with either army). */
+/** The neutral middle band the rocks land in: this many full-HEIGHT columns, centred horizontally.
+ *  This seeded layout is RANKED-only, and ranked deployment is SIDE-oriented (the server's
+ *  SideRectanglePlacement carves x 1-3 and x 12-14 over the full board height), so the vertical
+ *  mid-board strip is the one band that collides with neither army. The sandbox rolls its own
+ *  band in Sandbox.rollScatteredMountains against its own (bottom/top) zones. */
 export const SCATTERED_MOUNTAIN_BAND_ROWS = 4;
 /**
  * Distinct obstacle art variants the client can draw (variant indices are 0..VARIANTS-1) — the nine-barrel
@@ -40,8 +42,9 @@ export interface ISeededScatteredMountain {
  * every seat saw different stones while the server still carved the classic two 2x2 mountains — invisible
  * walls for everyone and no stones at all for the seat that never rolled.
  *
- * The band/count mirror the sandbox roll exactly (middle SCATTERED_MOUNTAIN_BAND_ROWS columns, full height,
- * partial Fisher-Yates for distinct uniform cells; art variants deal the full deck before repeating).
+ * Same drawing discipline as the sandbox roll (partial Fisher-Yates for distinct uniform cells; art
+ * variants deal the full deck before repeating), but the band orientation follows RANKED's side zones —
+ * the sandbox band follows its own bottom/top zones instead.
  */
 export const scatteredMountainsForSeed = (seed: string, gridSize = 16): ISeededScatteredMountain[] => {
     // FNV-1a seed hash (identical to synergyVariantsForSeed), then a mulberry32 stream for the draws —
@@ -62,13 +65,14 @@ export const scatteredMountainsForSeed = (seed: string, gridSize = 16): ISeededS
 
     const free: XY[] = [];
     const bandStart = (gridSize >> 1) - (SCATTERED_MOUNTAIN_BAND_ROWS >> 1);
-    // Middle ROWS, full width: the deployment fields are the bottom and top row bands (y 1-3 and
-    // y 12-14, full width), so the neutral strip is the horizontal mid-board belt between them. A
-    // vertical strip would run straight through both fields and drop stones into the armies' laps.
-    // The "12 barrels read as ~9" bug was never the band: it was variant indices past the atlas
-    // (fixed by the deck deal below). Mirrors the sandbox roll exactly.
-    for (let x = 0; x < gridSize; x++) {
-        for (let y = bandStart; y < bandStart + SCATTERED_MOUNTAIN_BAND_ROWS; y++) {
+    // Middle COLUMNS, full height. Ranked (the only consumer of this seeded layout) deploys on the
+    // LEFT/RIGHT flanks — the server's SideRectanglePlacement carves x 1-3 and x 12-14 over the full
+    // board height — so the vertical mid-board strip is the one band that collides with neither army.
+    // A horizontal band would cross both side zones and drop stones into the armies' laps. (The
+    // "12 barrels read as ~9" complaint itself was variant indices past the nine-art atlas, fixed by
+    // the deck deal below.) The sandbox's own roll uses ROWS because its zones are still bottom/top.
+    for (let x = bandStart; x < bandStart + SCATTERED_MOUNTAIN_BAND_ROWS; x++) {
+        for (let y = 0; y < gridSize; y++) {
             free.push({ x, y });
         }
     }
