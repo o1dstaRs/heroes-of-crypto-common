@@ -105,21 +105,15 @@ export function resolveMoveTargetCells(
     if (width === 1 && height === 1) {
         return [{ ...destination }];
     }
-    if (width === 2 && height === 2) {
-        // Kept verbatim, and deliberately so: this fallback reads `destination` as the block's BOTTOM-LEFT
-        // cell, which is the opposite anchor from the top-right one PathHelper and Unit.getBaseCell use.
-        // For a 2x2 both readings name a legal square and every large unit that has ever moved through this
-        // branch landed on this one, so re-anchoring it here would shift them all by a cell — a live and
-        // AI-weight change that has to be decided on its own, not smuggled in with rectangles.
-        return [
-            { x: destination.x, y: destination.y },
-            { x: destination.x + 1, y: destination.y },
-            { x: destination.x, y: destination.y + 1 },
-            { x: destination.x + 1, y: destination.y + 1 },
-        ];
-    }
-    // Every other shape is anchored the way the rest of the engine anchors a body. The route's last cell IS
-    // the anchor the pather produced, so the footprint hangs off it towards -x / -y.
+    // The route's last cell IS an anchor, so the body hangs off it towards -x / -y like every other footprint
+    // in the engine.
+    //
+    // This branch used to grow +dx / +dy for a 2x2, reading `destination` as the block's BOTTOM-LEFT cell —
+    // the opposite corner. That was never consistent even for a square: `moveUnit` hands the same cell to
+    // `resolveKnownMoveRoute`, which looks it up as a knownPaths KEY, and those keys are anchors. One of the
+    // two readings had to be wrong, and the pather is the authority on which. It stayed invisible because
+    // this is a FALLBACK: every move_unit producer in the engine, the AI, the server and the client supplies
+    // `targetCells` explicitly, so nothing live has ever taken this path with a multi-cell unit.
     return getFootprintCellsForAnchor(destination, width, height);
 }
 

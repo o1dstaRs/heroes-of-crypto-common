@@ -357,15 +357,9 @@ describe("action engine footprints — placement", () => {
  * this reading, so re-anchoring it is a live change to take on its own), and pinning it here is what stops it
  * being "tidied up" while rectangles are being added around it.
  */
+/** A walk with no explicit targetCells lands the body ANCHORED on the route's last cell, for every shape. */
 const walkDestinationCells = (destination: XY, width: number, height: number): XY[] =>
-    width === 2 && height === 2
-        ? [
-              { x: destination.x, y: destination.y },
-              { x: destination.x + 1, y: destination.y },
-              { x: destination.x, y: destination.y + 1 },
-              { x: destination.x + 1, y: destination.y + 1 },
-          ]
-        : getFootprintCellsForAnchor(destination, width, height);
+    getFootprintCellsForAnchor(destination, width, height);
 
 describe("action engine footprints — movement", () => {
     for (const [width, height] of SHAPES) {
@@ -451,20 +445,18 @@ describe("action engine footprints — movement", () => {
         });
     }
 
-    it("resolveMoveTargetCells keeps both shipped shapes verbatim, cell order included", () => {
+    it("resolveMoveTargetCells anchors every shape on the route's last cell", () => {
         const destination = { x: 4, y: 5 };
         const path = [{ x: 3, y: 5 }, destination];
 
         expect(resolveMoveTargetCells(true, path)).toEqual([destination]);
-        // The large fallback reads `destination` as the block's BOTTOM-LEFT cell. That disagrees with the
-        // anchor rule everywhere else, and it is kept on purpose: every large unit that ever moved through
-        // this branch landed on this reading, so re-anchoring it is a live change to decide on its own.
-        expect(resolveMoveTargetCells(false, path)).toEqual([
-            { x: 4, y: 5 },
-            { x: 5, y: 5 },
-            { x: 4, y: 6 },
-            { x: 5, y: 6 },
-        ]);
+        // The route's last cell is an ANCHOR — moveUnit hands the same cell to resolveKnownMoveRoute, which
+        // looks it up as a knownPaths key, and those keys are anchors. The large branch used to grow +dx/+dy
+        // from it instead, i.e. read it as the block's bottom-left cell; nothing live ever took that path
+        // because every move_unit producer supplies targetCells explicitly.
+        expect(sortCells(resolveMoveTargetCells(false, path))).toEqual(
+            sortCells(getFootprintCellsForAnchor(destination, 2, 2)),
+        );
         expect(resolveMoveTargetCells(false, path, undefined, 2, 2)).toEqual(resolveMoveTargetCells(false, path));
     });
 

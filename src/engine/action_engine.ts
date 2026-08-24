@@ -802,7 +802,7 @@ export class GameActionEngine {
             !primaryRangeTarget.hasStatusApplied("Rangebane") &&
             !this.context.attackHandler.canBeAttackedByMelee(
                 primaryRangeTarget.getPosition(),
-                primaryRangeTarget.isSmallSize(),
+                primaryRangeTarget,
                 this.context.grid.getEnemyAggrMatrixByUnitId(primaryRangeTarget.getId()),
             )
         ) {

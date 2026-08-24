@@ -862,7 +862,7 @@ function findIndependentRangeOption(
         const projected = actorAfterRoute(unit, context, route);
         if (!projected) continue;
         const position = getPositionForCells(context.grid.getSettings(), footprintForBase(unit, route.cell));
-        if (position && !attackHandler.canBeAttackedByMelee(position, unit.isSmallSize(), enemyAggression)) {
+        if (position && !attackHandler.canBeAttackedByMelee(position, unit, enemyAggression)) {
             origins.push({
                 position,
                 route,
