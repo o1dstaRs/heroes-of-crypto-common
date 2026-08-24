@@ -33,10 +33,12 @@ describe("scatteredMountainsForSeed", () => {
         const bandStart = 8 - (SCATTERED_MOUNTAIN_BAND_ROWS >> 1);
         const seen = new Set<string>();
         for (const rock of layout) {
-            expect(rock.cell.x).toBeGreaterThanOrEqual(0);
-            expect(rock.cell.x).toBeLessThan(16);
-            expect(rock.cell.y).toBeGreaterThanOrEqual(bandStart);
-            expect(rock.cell.y).toBeLessThan(bandStart + SCATTERED_MOUNTAIN_BAND_ROWS);
+            // Side-oriented board: the neutral strip is the middle COLUMNS, full height — between the
+            // left and right deployment fields, never inside them.
+            expect(rock.cell.y).toBeGreaterThanOrEqual(0);
+            expect(rock.cell.y).toBeLessThan(16);
+            expect(rock.cell.x).toBeGreaterThanOrEqual(bandStart);
+            expect(rock.cell.x).toBeLessThan(bandStart + SCATTERED_MOUNTAIN_BAND_ROWS);
             expect(rock.variant).toBeGreaterThanOrEqual(0);
             expect(rock.variant).toBeLessThan(SCATTERED_MOUNTAIN_VARIANTS);
             seen.add(`${rock.cell.x},${rock.cell.y}`);
