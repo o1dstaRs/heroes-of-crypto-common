@@ -87,14 +87,20 @@ export const DOCTRINES: { [key in Doctrine]: DoctrineProperties } = {
         5,
         "all",
     ),
-    [Doctrine.SEE_NONE]: doctrine(
-        Doctrine.SEE_NONE,
-        "see_none",
-        "Blind Fury",
-        "See none of the opponent's picks. Grants 7 upgrade points.",
-        7,
-        "none",
-    ),
+    // Renamed from "Blind Fury" (owner call 2026-08-24): that name collides with Troglodyte's ability.
+    // The art still ships under the old slug, so the imageKey is pinned rather than name-derived until
+    // a doctrine_battle_trance asset lands.
+    [Doctrine.SEE_NONE]: {
+        ...doctrine(
+            Doctrine.SEE_NONE,
+            "see_none",
+            "Battle Trance",
+            "See none of the opponent's picks. Grants 7 upgrade points.",
+            7,
+            "none",
+        ),
+        imageKey: "doctrine_blind_fury",
+    },
 };
 
 export const getDoctrineProperties = (doctrineId: Doctrine): DoctrineProperties =>

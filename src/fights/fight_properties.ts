@@ -45,7 +45,6 @@ import {
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
 import { getUpgradePoints, Doctrine } from "../doctrines/doctrine_properties";
-import { Perk } from "../perks/perk_properties";
 import { isPositionWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
@@ -1054,14 +1053,8 @@ export class FightProperties {
         }
         this.doctrinePerTeam.set(teamType, doctrine);
     }
-    public setPerkPerTeam(teamType: TeamType, perk: Perk): void {
-        this.setDoctrinePerTeam(teamType, perk as unknown as Doctrine);
-    }
     public getDoctrine(teamType: TeamType): Doctrine {
         return this.doctrinePerTeam.get(teamType) ?? Doctrine.NO_DOCTRINE;
-    }
-    public getPerk(teamType: TeamType): Perk {
-        return this.getDoctrine(teamType) as unknown as Perk;
     }
     // Upgrade (augment) point budget for the team, determined by its chosen doctrine.
     public getUpgradePoints(teamType: TeamType): number {

@@ -12,7 +12,6 @@
 import { ArtifactTier, TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { getDoctrineRevealMode, DOCTRINES, Doctrine } from "../doctrines/doctrine_properties";
-import { Perk } from "../perks/perk_properties";
 import { CreatureLevelList, CreatureLevelMap, CreaturePoolByLevel } from "../units/unit_properties";
 
 export type PickTeam = typeof PBTypes.TeamVals.LOWER | typeof PBTypes.TeamVals.UPPER;
@@ -85,7 +84,6 @@ export const LIVE_PICK_PHASES: readonly ILivePickPhase[] = [
 
 export interface IPickTeamState {
     doctrine: Doctrine;
-    perk: Perk;
     /**
      * The one creature this team asked to have banned during the DOCTRINE phase. Optional — a team may skip it.
      * Kept per team and NOT exposed through the opponent-facing views (see getVisibleCreatureChoices), so a
@@ -144,7 +142,7 @@ export interface IPickSimState {
 
 export type PickAction =
     | { type: "select_doctrine"; team: PickTeam; doctrine: Doctrine }
-    | { type: "select_perk"; team: PickTeam; perk: Perk }
+    | { type: "select_doctrine"; team: PickTeam; doctrine: Doctrine }
     | { type: "propose_ban"; team: PickTeam; creatureId: number }
     | { type: "select_bundle"; team: PickTeam; bundleIndex: number }
     | { type: "pick_creature"; team: PickTeam; creatureId: number }
@@ -190,7 +188,6 @@ export interface IPickTeamView {
     creaturesPicked: number[];
     knownOpponentCreatures: number[];
     doctrine: Doctrine;
-    perk: Perk;
     bundles: PickBundle[];
     tier2Offers: number[];
     artifacts: [tier: number, artifactId: number][];
@@ -242,7 +239,6 @@ const artifactOffers = (rng: PickRandomInt): [number, number, number] =>
 
 const emptyTeam = (bundles: [PickBundle, PickBundle], tier2Offers: [number, number, number]): IPickTeamState => ({
     doctrine: Doctrine.NO_DOCTRINE,
-    perk: Perk.NO_PERK,
     bundles,
     tier2Offers,
     creatures: [],
@@ -468,7 +464,6 @@ const applyDoctrine = (
     const next = cloneState(state);
     const nextOwn = teamState(next, action.team);
     nextOwn.doctrine = action.doctrine;
-    nextOwn.perk = action.doctrine as unknown as Perk;
     // The fixed six-slot creature layout by level is [L1@0, L1@1, L2@2, L2@3, L3@4, L4@5]
     // (CreaturePoolByLevel = [2, 2, 1, 1]). The "random3" doctrine reveals ONE slot per tier block rather than
     // drawing three uniformly: one of the two L1 slots, one of the two L2 slots, and either the L3 or L4 slot.
@@ -646,10 +641,10 @@ export function transitionPickSim(state: IPickSimState, action: PickAction, rng:
     switch (action.type) {
         case "select_doctrine":
             return applyDoctrine(state, action, rng);
-        case "select_perk":
+        case "select_doctrine":
             return applyDoctrine(
                 state,
-                { type: "select_doctrine", team: action.team, doctrine: action.perk as unknown as Doctrine },
+                { type: "select_doctrine", team: action.team, doctrine: action.doctrine as unknown as Doctrine },
                 rng,
             );
         case "propose_ban":
@@ -744,7 +739,6 @@ export function getPickTeamView(state: IPickSimState, team: PickTeam): IPickTeam
         creaturesPicked: [...own.creatures],
         knownOpponentCreatures: getKnownOpponentCreatures(state, team),
         doctrine: own.doctrine,
-        perk: own.perk,
         bundles: state.phaseSequence === 1 ? own.bundles.map((bundle) => [...bundle] as PickBundle) : [],
         tier2Offers: state.phaseSequence === 8 ? [...own.tier2Offers] : [],
         artifacts,
