@@ -227,10 +227,15 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
 };
 
 /**
- * The optional rectangular footprint of a creature. `size` stays the LEGACY SQUARE size: it picks the
- * texture (_128 vs _256) and feeds every non-geometry consumer, so a creature that occupies a WxH block
- * declares that block here and leaves `size` alone. The two are therefore allowed to disagree — a 1x2
- * creature is `size: 1` with `footprint_height: 2` — and nothing derives one from the other.
+ * The optional rectangular footprint of a creature. `size` remains the LEGACY SQUARE size — it picks the art
+ * tier (_128 vs _256) and still feeds the wire's UnitSizeVals enum and every consumer this migration has not
+ * reached — while the footprint is what the engine reserves on the board.
+ *
+ * The two must agree on `size === max(width, height)`, enforced below. It is not derivable in either
+ * direction (2x1 and 1x2 both max to 2), so it is declared and checked rather than computed, and the
+ * direction of the rule is deliberate: an un-migrated `size === 2 ? large : small` branch then treats a
+ * rectangle as the BIGGER square, which over-reserves cells and refuses a legal placement. The opposite
+ * choice would have it under-reserve and let a second stack overlap the half of the body it forgot.
  */
 interface ICreatureFootprintConfig {
     footprint_width?: unknown;
@@ -256,6 +261,58 @@ const getCreatureFootprintSide = (
     }
 
     return value;
+};
+
+/**
+ * QA/dev footprint overrides, so a rectangular body can be exercised end to end — headless sims, the server,
+ * and a real browser match — WITHOUT changing any shipped creature's data. Turning a creature rectangular is
+ * a balance and art decision, not an engineering one; this is the switch that lets the engineering be proven
+ * before that decision is made.
+ *
+ * Node/CI:  HOC_FOOTPRINT_OVERRIDES="White Tiger=2x1,Hyena=2x1"
+ * Browser:  globalThis.__hocFootprintOverrides = "White Tiger=2x1"   (before the first unit is built)
+ *
+ * Parsed on every read rather than cached, so a dev console can flip it mid-session. Malformed entries are
+ * ignored — this is a diagnostic lever, and an unparsable one must not take a real match down with it.
+ *
+ * An override deliberately leaves `size` alone and so skips the size === max(W, H) rule the JSON must obey:
+ * it exists to exercise the ENGINE, and re-tiering the art mid-session would only ask for a _256 texture the
+ * overridden creature does not have. A creature that ships rectangular declares both, and gets art to match.
+ */
+const readFootprintOverrideSource = (): string => {
+    const injected = (globalThis as { __hocFootprintOverrides?: unknown }).__hocFootprintOverrides;
+    if (typeof injected === "string" && injected) {
+        return injected;
+    }
+    // `process` is absent in the browser bundle and `env` can be absent in exotic hosts.
+    const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+    return env?.HOC_FOOTPRINT_OVERRIDES ?? "";
+};
+
+const getCreatureFootprintOverride = (creatureName: string): { width: number; height: number } | undefined => {
+    const source = readFootprintOverrideSource();
+    if (!source) {
+        return undefined;
+    }
+    for (const entry of source.split(",")) {
+        const separator = entry.lastIndexOf("=");
+        if (separator <= 0) {
+            continue;
+        }
+        if (entry.slice(0, separator).trim() !== creatureName) {
+            continue;
+        }
+        const shape = /^([0-9]+)x([0-9]+)$/.exec(entry.slice(separator + 1).trim());
+        if (!shape) {
+            continue;
+        }
+        const width = Number(shape[1]);
+        const height = Number(shape[2]);
+        if (width > 0 && height > 0) {
+            return { width, height };
+        }
+    }
+    return undefined;
 };
 
 export const getCreatureConfig = (
@@ -300,6 +357,17 @@ export const getCreatureConfig = (
         "footprint_height",
         creatureFootprint.footprint_height,
     );
+    const footprintOverride = getCreatureFootprintOverride(creatureName);
+    if (footprintOverride === undefined && (footprintWidth !== undefined || footprintHeight !== undefined)) {
+        const declaredSize = creatureConfig.size;
+        const width = footprintWidth ?? declaredSize;
+        const height = footprintHeight ?? declaredSize;
+        if (Math.max(width, height) !== declaredSize) {
+            throw new TypeError(
+                `Invalid footprint for creature ${creatureName}: size ${declaredSize} must equal max(${width}, ${height})`,
+            );
+        }
+    }
 
     const luck = DEFAULT_LUCK_PER_FACTION[factionName] ?? 0;
     const morale = DEFAULT_MORALE_PER_FACTION[factionName] ?? 0;
@@ -430,8 +498,8 @@ export const getCreatureConfig = (
         "",
         [],
         false,
-        footprintWidth,
-        footprintHeight,
+        footprintOverride?.width ?? footprintWidth,
+        footprintOverride?.height ?? footprintHeight,
     );
 };
 

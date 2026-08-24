@@ -23,8 +23,11 @@ export const V08_A19_H18_RANKED_PLACEMENT_CANDIDATE_ID = "a19-h18-ranked-placeme
 export const V08_A19_H18_RANKED_PLACEMENT_BASE_VERSION = "v0.8" as const;
 export const V08_A19_H18_RANKED_PLACEMENT_IMPLEMENTATION_SOURCE =
     "src/ai/versions/v0_8_a19_ranked_placement.ts" as const;
+// Re-pinned for rectangular unit footprints (2026-08-24): the layout's hand-written 1x1-or-2x2 expansion was
+// replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
+// qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H18_RANKED_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "bdef5884d15c92a0eb6fa9d1b70cd85a802964f70da9a235bc208b6c85365eb2" as const;
+    "685062dd403c6281c680881e8578239f08d97b4cfec52d27c4401958c51cbfa8" as const;
 
 /**
  * Browser-safe identity for the production-replay-derived anti-flyer role correction. The source digest is

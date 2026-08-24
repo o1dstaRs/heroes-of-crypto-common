@@ -42,6 +42,7 @@ import type {
 import { decisionFireWalls } from "../decision_fight_state";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { estimatePrimaryMeleeDamage } from "../melee_damage_estimate";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { otherTeam } from "./v0_1";
 import {
     isV08DirectCombatDecision,
@@ -213,6 +214,8 @@ function reachableRoutes(unit: Unit, context: IDecisionContext): IReadonlyWeight
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     );
     const routes: IReadonlyWeightedRoute[] = [];
     for (const routeList of movePath.knownPaths.values()) {
@@ -231,17 +234,9 @@ function reachableRoutes(unit: Unit, context: IDecisionContext): IReadonlyWeight
     return routes;
 }
 
-function footprintForAnchor(unit: Unit, anchor: XY): XY[] {
-    if (unit.isSmallSize()) {
-        return [{ x: anchor.x, y: anchor.y }];
-    }
-    return [
-        { x: anchor.x, y: anchor.y },
-        { x: anchor.x, y: anchor.y - 1 },
-        { x: anchor.x - 1, y: anchor.y },
-        { x: anchor.x - 1, y: anchor.y - 1 },
-    ];
-}
+// The unit's real body, from the one shared expansion. This is what becomes `move_unit.targetCells` for every
+// repositioning shot, so a presumed 2x2 is an outright rejected action for any other shape.
+const footprintForAnchor = (unit: Unit, anchor: XY): XY[] => footprintCellsForAnchor(unit, anchor);
 
 function moveAction(unit: Unit, route: IReadonlyWeightedRoute, footprint: XY[]): GameAction {
     return {
@@ -279,7 +274,7 @@ function routeView(
         return undefined;
     }
     const enemyAggro = context.grid.getEnemyAggrMatrixByUnitId(unit.getId());
-    if (attackHandler.canBeAttackedByMelee(position, unit.isSmallSize(), enemyAggro)) {
+    if (attackHandler.canBeAttackedByMelee(position, unit, enemyAggro)) {
         return undefined;
     }
     const protection = protectionAt(footprint, enemies, frontliners);
@@ -444,7 +439,7 @@ function supportedPrepinEgress(
         unit.hasStatusApplied("Rangebane") ||
         attackHandler.canBeAttackedByMelee(
             unit.getPosition(),
-            unit.isSmallSize(),
+            unit,
             context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
         ) ||
         !attackHandler.canLandRangeAttack(unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId())) ||
@@ -465,7 +460,7 @@ function supportedPrepinEgress(
         !target.hasStatusApplied("Rangebane") &&
         !attackHandler.canBeAttackedByMelee(
             target.getPosition(),
-            target.isSmallSize(),
+            target,
             context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
         );
     if (targetCanCounter) return decision;
@@ -530,11 +525,7 @@ function supportedPrepinEgress(
         const origin = getPositionForCells(settings, footprint);
         if (
             !origin ||
-            attackHandler.canBeAttackedByMelee(
-                origin,
-                unit.isSmallSize(),
-                context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
-            ) ||
+            attackHandler.canBeAttackedByMelee(origin, unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId())) ||
             pendingThreats.some((threat) => withinMeleeHorizon(footprint, threat))
         ) {
             continue;
@@ -717,7 +708,7 @@ function supportedBandAdvance(
         unit.hasStatusApplied("Rangebane") ||
         attackHandler.canBeAttackedByMelee(
             unit.getPosition(),
-            unit.isSmallSize(),
+            unit,
             context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
         ) ||
         !attackHandler.canLandRangeAttack(unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId()))
@@ -738,7 +729,7 @@ function supportedBandAdvance(
         !target.hasStatusApplied("Rangebane") &&
         !attackHandler.canBeAttackedByMelee(
             target.getPosition(),
-            target.isSmallSize(),
+            target,
             context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
         );
     if (targetCanCounter) return decision;
@@ -956,7 +947,7 @@ function protectedAdvanceShotCatalog(
         !target.hasStatusApplied("Rangebane") &&
         !attackHandler.canBeAttackedByMelee(
             target.getPosition(),
-            target.isSmallSize(),
+            target,
             context.grid.getEnemyAggrMatrixByUnitId(target.getId()),
         );
     if (targetCanCounter && !responseNeutralAdvance) {
@@ -2036,7 +2027,7 @@ function pinnedRetreat(
     if (
         !attackHandler.canBeAttackedByMelee(
             unit.getPosition(),
-            unit.isSmallSize(),
+            unit,
             context.grid.getEnemyAggrMatrixByUnitId(unit.getId()),
         )
     ) {

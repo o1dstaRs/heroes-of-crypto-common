@@ -12,7 +12,7 @@
 import CREATURES_JSON from "../../configuration/creatures.json";
 import { AbilityPowerType } from "../../abilities/ability_properties";
 import { DOUBLE_SHOT_ABILITY_NAMES } from "../../abilities/double_shot_names";
-import { getAbilityConfig, getSpellConfig } from "../../configuration/config_provider";
+import { getAbilityConfig, getCreatureConfig, getSpellConfig } from "../../configuration/config_provider";
 import { CreatureFactions, CreatureLevels } from "../../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { normalizeFootprintSide } from "../../grid/grid_math";
@@ -80,8 +80,10 @@ export interface ICreatureInfo {
      * `footprintHeight` rows (y). Draft and the reveal-conditioned placement policies only ever hold a
      * creature ID — there is no Unit to ask before the army exists — so shape has to travel with the
      * identity, or a policy that reserves zone depth, screens a firing line or measures a gap has to guess.
-     * Derived exactly the way UnitProperties derives it (footprint_width/height falling back to `size`), so
-     * the shipped square shapes report 1x1 and 2x2 and no consumer can drift from the engine.
+     *
+     * This is the shape the engine will actually build the stack with, resolved through the engine's own
+     * creature config rather than read off the catalog row — see resolveCreatureFootprint below for why the
+     * two are not the same thing. The shipped roster is entirely square, so every creature reports 1x1 or 2x2.
      *
      * Descriptive ONLY. These are deliberately absent from DRAFT_FEATURE_NAMES: the baked DRAFT_ANCHOR_W /
      * DEFAULT_DRAFT_W vectors are fit on that fixed basis, and pricing a footprint as cost or value is a
@@ -193,11 +195,47 @@ export const creatureIdForName = (name: string): number | undefined => {
     return typeof id === "number" && id > 0 ? id : undefined;
 };
 
-/** id -> creature info, built once by inverting the CreatureVals enum against creatures.json (enum key =
+/**
+ * The footprint the ENGINE will give this creature's stack, which is not always the one its catalog row
+ * declares: HOC_FOOTPRINT_OVERRIDES (and its browser twin `globalThis.__hocFootprintOverrides`) can reshape a
+ * creature without touching creatures.json, and today that override is the ONLY way a rectangle reaches the
+ * board at all. Reading the row directly would therefore leave the draft and the reveal-conditioned placement
+ * policies planning around a 1x1 body that the engine then places as a 2x1 — and an anchor chosen for the
+ * wrong shape is not a weak move, it is an action the engine rejects.
+ *
+ * Asking getCreatureConfig keeps the resolution order (override, then declared footprint, then the legacy
+ * square `size`) in the one place that owns it instead of copying it here, where it could drift. The cost is
+ * paid once per index build. A catalog row too malformed to build full UnitProperties from falls back to the
+ * declared shape: this index is a draft convenience, and it must not be the thing that takes a match down.
+ */
+const resolveCreatureFootprint = (
+    factionName: string,
+    creatureName: string,
+    cfg: { size?: number; footprint_width?: number; footprint_height?: number },
+): { width: number; height: number } => {
+    try {
+        const properties = getCreatureConfig(
+            PBTypes.TeamVals.LOWER,
+            factionName,
+            creatureName,
+            // Only the art tier is derived from this name, and nothing here looks at textures.
+            `${creatureName.replace(/ /g, "_")}_512`,
+            1,
+        );
+        return { width: properties.footprint_width, height: properties.footprint_height };
+    } catch {
+        return {
+            width: normalizeFootprintSide(cfg.footprint_width, cfg.size ?? 1),
+            height: normalizeFootprintSide(cfg.footprint_height, cfg.size ?? 1),
+        };
+    }
+};
+
+/** id -> creature info, built by inverting the CreatureVals enum against creatures.json (enum key =
  * NAME_UPPER_SNAKE, e.g. "Black Dragon" -> BLACK_DRAGON). Only creatures with a real enum id are indexed. */
 const buildIndex = (): Map<number, ICreatureInfo> => {
     const index = new Map<number, ICreatureInfo>();
-    for (const [, creatures] of Object.entries(CreatureJsonShape)) {
+    for (const [factionName, creatures] of Object.entries(CreatureJsonShape)) {
         if (!creatures || typeof creatures !== "object") {
             continue;
         }
@@ -211,6 +249,7 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
             }
             const abilityList = cfg.abilities ?? [];
             const spellList = cfg.spells ?? [];
+            const footprint = resolveCreatureFootprint(factionName, name, cfg);
             index.set(id, {
                 id,
                 name,
@@ -238,21 +277,39 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 magicDamageAmplifier:
                     spellList.some(isMagicDamageAmplifyingSpellbookEntry) ||
                     abilityList.some(isMagicDamageAmplifyingAbility),
-                // Same fallback chain as UnitProperties: an explicit rectangle wins, otherwise the legacy
-                // square `size`, otherwise 1x1. Going through the engine's own normalizer keeps a malformed
-                // or fractional catalog entry from becoming a footprint the grid cannot represent.
-                footprintWidth: normalizeFootprintSide(cfg.footprint_width, cfg.size ?? 1),
-                footprintHeight: normalizeFootprintSide(cfg.footprint_height, cfg.size ?? 1),
+                footprintWidth: footprint.width,
+                footprintHeight: footprint.height,
             });
         }
     }
     return index;
 };
 
+/**
+ * The raw override string, read only to notice that it CHANGED — the grammar stays in config_provider, this
+ * is a cache key and not a second parser. config_provider deliberately re-reads the overrides on every unit
+ * build so a shape can be flipped mid-session; an index cached for the life of the process would keep
+ * answering with the shape from before the flip, which is exactly the engine/AI disagreement the resolution
+ * above exists to remove. Reading it is free in the runtimes the sims and the server use, and the index is
+ * only ever rebuilt when the string actually differs.
+ */
+const footprintOverrideSource = (): string => {
+    const injected = (globalThis as { __hocFootprintOverrides?: unknown }).__hocFootprintOverrides;
+    if (typeof injected === "string" && injected) {
+        return injected;
+    }
+    // `process` is absent in the browser bundle and `env` can be absent in exotic hosts.
+    const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+    return env?.HOC_FOOTPRINT_OVERRIDES ?? "";
+};
+
 let indexCache: Map<number, ICreatureInfo> | undefined;
+let indexCacheFootprintOverrides: string | undefined;
 const creatureIndex = (): Map<number, ICreatureInfo> => {
-    if (!indexCache) {
+    const footprintOverrides = footprintOverrideSource();
+    if (!indexCache || indexCacheFootprintOverrides !== footprintOverrides) {
         indexCache = buildIndex();
+        indexCacheFootprintOverrides = footprintOverrides;
     }
     return indexCache;
 };

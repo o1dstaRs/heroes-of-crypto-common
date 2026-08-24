@@ -463,9 +463,12 @@ export interface IAIStrategy {
     readonly version: string;
 
     /**
-     * Choose a base cell for each of this team's units before the fight. Returns unitId -> base cell
-     * (top-left cell for large units). The battle engine validates each cell is inside the team's
-     * placement zone and non-overlapping; any unit left unplaced is auto-placed by the engine.
+     * Choose a base cell for each of this team's units before the fight. Returns unitId -> base cell: the
+     * ANCHOR of the unit's footprint, which is its max-x / max-y cell — the body extends towards -x and -y,
+     * by (W - 1) columns and (H - 1) rows. (This said "top-left cell for large units", which never matched
+     * the code; a policy written against it would lay every non-1x1 unit out one cell off on both axes.)
+     * The battle engine validates each cell is inside the team's placement zone and non-overlapping; any
+     * unit left unplaced is auto-placed by the engine.
      */
     placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY>;
 

@@ -25,12 +25,16 @@ import {
     getCellsAroundCell,
     getCellsAroundFootprint,
     getCellForPosition,
+    getFootprintAnchorForCells,
+    getFootprintCellsForAnchor,
     getPositionForCell,
     getPositionForCells,
     isCellWithinGrid,
+    isFootprintWithinGrid,
     resolveRangeAttackAimEdge,
 } from "../grid/grid_math";
 import type { IWeightedRoute } from "../grid/path_definitions";
+import { PathHelper } from "../grid/path_helper";
 import type { AttackHandler } from "../handlers/attack_handler";
 import type { IAnimationData, ISecondaryDamage, IVisibleDamage } from "../scene/animations";
 import { amplifyCastBuffForTarget } from "../spells/castable_buff";
@@ -158,10 +162,27 @@ export class GameActionEngine {
     private readonly context: IGameActionEngineContext;
     private readonly turnEngine: TurnEngine;
     private readonly headlessEvents: boolean;
+    /**
+     * Built on first use and then kept: PathHelper owns nothing but the grid settings, and this engine's
+     * Grid never swaps them, so one instance answers every footprint question for the whole fight.
+     */
+    private footprintRules?: PathHelper;
     public constructor(context: IGameActionEngineContext) {
         this.context = context;
         this.turnEngine = new TurnEngine(context);
         this.headlessEvents = context.eventMode === "headless";
+    }
+    /**
+     * The shape rules live in PathHelper, beside the pather that produces the anchors and the pre-fight
+     * preview that draws them. The engine asking the same object is what keeps "the board offered me this
+     * block" and "the engine accepted this block" from ever being two different rules.
+     */
+    private getFootprintRules(): PathHelper {
+        if (!this.footprintRules) {
+            this.footprintRules = new PathHelper(this.context.grid.getSettings());
+        }
+
+        return this.footprintRules;
     }
     public apply(action: GameAction): IGameActionResult {
         // Fight actions run under an effect-application capture: everything the action lands on any
@@ -423,11 +444,35 @@ export class GameActionEngine {
         if (!action.path.length) {
             return this.reject("invalid_move");
         }
-        const targetCells = resolveMoveTargetCells(unit.isSmallSize(), action.path, action.targetCells);
-        if (!targetCells.length) {
+        // The mover's real shape, not a size bit. Reading a 1x2 as "not small" hands it a 2x2 body and
+        // occupies two cells nothing ever checked; 1x1 and 2x2 are the W === H instances of the same rule,
+        // so both shipped shapes resolve to exactly the block they always did.
+        const footprintWidth = unit.getFootprintWidth();
+        const footprintHeight = unit.getFootprintHeight();
+        const targetCells = resolveMoveTargetCells(
+            unit.isSmallSize(),
+            action.path,
+            action.targetCells,
+            footprintWidth,
+            footprintHeight,
+        );
+        // A move declares where the BODY lands, so the cells it names have to be that body: W*H distinct
+        // on-board cells tiling the mover's own rectangle. Placement and split have always been held to this
+        // (isValidPlacementFootprint); movement never was, because with only squares on the board the
+        // supplied set could not name a different legal shape. It can now — a 1x2 and a 2x1 have the same
+        // cell COUNT — and a mover whose registration is a different rectangle from its position is an
+        // occupancy desync no later move repairs. Every legitimate move already satisfies this: the two
+        // shipped shapes tile their own square, and the fallback below builds the set from the route itself.
+        if (!this.isValidPlacementFootprint(unit, targetCells)) {
             return this.reject("invalid_move");
         }
-        const pathIsFootprintOnly = isMovePathFootprintOnly(unit.isSmallSize(), action.path, action.targetCells);
+        const pathIsFootprintOnly = isMovePathFootprintOnly(
+            unit.isSmallSize(),
+            action.path,
+            action.targetCells,
+            footprintWidth,
+            footprintHeight,
+        );
         const knownMoveRoute = this.resolveKnownMoveRoute(unit, action.path, targetCells, pathIsFootprintOnly);
         if (knownMoveRoute instanceof Error) {
             return this.reject("invalid_move");
@@ -473,6 +518,10 @@ export class GameActionEngine {
         }
 
         const result = this.context.moveHandler.finishDirectedUnitMove(unit, targetCells, to);
+        // A missing newPosition is the ONLY way a refused occupancy stamp reaches this side: the stamp is
+        // made inside finishDirectedUnitMove, which owns it. Re-deriving the verdict here from the grid's
+        // registration would be worse than useless — it cannot tell a genuine refusal apart from a caller
+        // that registered the unit by hand on fewer cells than its body covers.
         if (result.deleteUnit || !result.newPosition) {
             return this.reject("move_blocked", result.log || undefined);
         }
@@ -1937,10 +1986,10 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const cells = getCellsAroundFootprint(
-            this.context.grid.getSettings(),
-            target.isSmallSize() ? [to] : target.getCells(),
-        );
+        // The ring is lifted from the target's own cells whatever its shape. For a 1x1 that IS `[to]` (its
+        // single cell is its base cell), so nothing about the shipped shapes changes, but a rectangle would
+        // otherwise be ringed as the 2x2 the size bit claims it is.
+        const cells = getCellsAroundFootprint(this.context.grid.getSettings(), target.getCells());
         // evaluateAffectedUnits dedupes by unit, so a large creature straddling two of the ring's cells burns
         // once. The aimed target owns none of these cells, so it is already absent; it is filtered by id too
         // so the "spares its target" rule survives any future change to how occupancy is reported.
@@ -2191,6 +2240,22 @@ export class GameActionEngine {
         if (!cells.length) {
             return this.reject("spell_not_available");
         }
+        // The gate at the top of this cast could only prove the ANCHOR cell was free: the creature that
+        // would stand on it did not exist yet. It does now, so put its whole body through the same
+        // authoritative gate. Every shipped summon is a 1x1, for which this re-asks the identical question
+        // and gets the identical answer; for anything wider it is the difference between refusing the cast
+        // and dropping a body across cells that were never looked at.
+        if (
+            !SpellHelper.canCastSummon(
+                spell,
+                this.context.grid.getMatrix(),
+                targetCell,
+                summoned.getFootprintWidth(),
+                summoned.getFootprintHeight(),
+            )
+        ) {
+            return this.reject("spell_not_available");
+        }
         const position = getPositionForCells(this.context.grid.getSettings(), cells);
         if (!position) {
             return this.reject("spell_not_available");
@@ -2219,6 +2284,14 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
     }
+    /**
+     * The cells a summoned creature stands on with its ANCHOR (top-right cell) on `targetCell`.
+     *
+     * The 2x2 list is kept hand-written, cell ORDER included: it is the order Unit.getCells produces for a
+     * large body and it travels out on the `unit_summoned` event into every recorded fight, so reproducing
+     * it exactly is what keeps existing replays and the seeded runs behind the baked AI weights readable.
+     * Only a genuinely rectangular summon takes the shared expansion.
+     */
     private resolveSummonCells(unit: Unit, targetCell?: XY): XY[] {
         if (!targetCell) {
             return [];
@@ -2226,13 +2299,18 @@ export class GameActionEngine {
         if (unit.isSmallSize()) {
             return [{ ...targetCell }];
         }
+        const width = unit.getFootprintWidth();
+        const height = unit.getFootprintHeight();
+        if (width === 2 && height === 2) {
+            return [
+                { x: targetCell.x - 1, y: targetCell.y },
+                { x: targetCell.x, y: targetCell.y },
+                { x: targetCell.x - 1, y: targetCell.y - 1 },
+                { x: targetCell.x, y: targetCell.y - 1 },
+            ];
+        }
 
-        return [
-            { x: targetCell.x - 1, y: targetCell.y },
-            { x: targetCell.x, y: targetCell.y },
-            { x: targetCell.x - 1, y: targetCell.y - 1 },
-            { x: targetCell.x, y: targetCell.y - 1 },
-        ];
+        return getFootprintCellsForAnchor(targetCell, width, height);
     }
     private createSummonEvents(
         caster: Unit,
@@ -2242,12 +2320,17 @@ export class GameActionEngine {
         cells: XY[],
         merged: boolean,
     ): GameEvent[] {
+        // The anchor, never `cells[0]`. A footprint is an unordered set of cells and the list a large body
+        // produces starts at its top-LEFT cell, so index 0 named a cell the summon is not anchored on —
+        // while everything downstream (the log line, the client's cast animation) reads this as "where the
+        // spell landed". For a 1x1 the two are the same cell, which is every summon shipped today.
+        const anchorCell = getFootprintAnchorForCells(cells);
         return [
             {
                 type: "spell_cast",
                 casterId: caster.getId(),
                 spellName: spell.getName(),
-                targetCell: cells[0] ? { ...cells[0] } : undefined,
+                targetCell: anchorCell ? { ...anchorCell } : undefined,
                 unitIdsDied: [],
                 animations: [],
             },
@@ -2641,7 +2724,7 @@ export class GameActionEngine {
         }
 
         if (pathIsFootprintOnly) {
-            return this.findKnownRouteForLargeFootprint(targetCells, knownPaths) ?? new Error("invalid_move");
+            return this.findKnownRouteForFootprint(unit, targetCells, knownPaths) ?? new Error("invalid_move");
         }
 
         const destination = path[path.length - 1];
@@ -2666,14 +2749,22 @@ export class GameActionEngine {
         // UNreachable destination has no entry in knownPaths, so line 1300 above still rejects it.
         return this.canonicalRoute(routes) ?? new Error("invalid_move");
     }
-    private findKnownRouteForLargeFootprint(
+    /**
+     * The known route whose destination footprint IS the move's target cells.
+     *
+     * `route.cell` is an anchor the pather reached, so the body it implies is the unit's own footprint hung
+     * off it. That used to be spelled as a literal 2x2 block, which answered "no route" for every other
+     * shape — and a footprint-only move with no route is rejected as invalid_move.
+     */
+    private findKnownRouteForFootprint(
+        unit: Unit,
         targetCells: XY[],
         knownPaths: ReadonlyMap<number, IWeightedRoute[]>,
     ): IWeightedRoute | undefined {
         for (const cell of targetCells) {
             const routes = knownPaths.get(this.cellKey(cell));
             const matchingRoute = routes?.find((route) =>
-                this.cellsMatchAsSet(targetCells, this.getLargeRouteFootprint(route.cell)),
+                this.cellsMatchAsSet(targetCells, unit.getFootprintCellsForAnchor(route.cell)),
             );
             if (matchingRoute) {
                 return matchingRoute;
@@ -2729,14 +2820,6 @@ export class GameActionEngine {
         }
 
         return true;
-    }
-    private getLargeRouteFootprint(anchorCell: XY): XY[] {
-        return [
-            { x: anchorCell.x - 1, y: anchorCell.y - 1 },
-            { x: anchorCell.x, y: anchorCell.y - 1 },
-            { x: anchorCell.x - 1, y: anchorCell.y },
-            { x: anchorCell.x, y: anchorCell.y },
-        ];
     }
     private cellsMatchInOrder(left: XY[], right: XY[]): boolean {
         return (
@@ -2807,6 +2890,14 @@ export class GameActionEngine {
         const centerY = sourceCells.reduce((sum, cell) => sum + cell.y, 0) / sourceCells.length;
         const sourceKeys = new Set(sourceCells.map((cell) => `${cell.x}:${cell.y}`));
 
+        // Each candidate is the peeled stack's ANCHOR — its top-right cell — because that is the one
+        // convention the rest of the engine reads a body from. This used to grow the block from the
+        // candidate towards +x/+y, i.e. treat it as the MINIMUM corner, which is the opposite reading:
+        // legal landings next to the donor were reported as overlapping it and the block actually offered
+        // sat a cell away from where the ring said it would.
+        const width = splitUnit.getFootprintWidth();
+        const height = splitUnit.getFootprintHeight();
+        const gridSettings = this.context.grid.getSettings();
         const anchors: XY[] = [];
         const seen = new Set<string>();
         for (const cell of sourceCells) {
@@ -2815,17 +2906,19 @@ export class GameActionEngine {
                     if (dx === 0 && dy === 0) {
                         continue;
                     }
-                    const x = cell.x + dx;
-                    const y = cell.y + dy;
-                    if (x < 0 || y < 0) {
+                    const anchor = { x: cell.x + dx, y: cell.y + dy };
+                    // An anchor whose body hangs off the board is not a candidate at all. The old
+                    // `x < 0 || y < 0` test is the 1x1 instance of this; a 1x2 additionally needs a cell
+                    // below the anchor, which is what used to be offered and then silently refused.
+                    if (!isFootprintWithinGrid(gridSettings, anchor, width, height)) {
                         continue;
                     }
-                    const key = `${x}:${y}`;
+                    const key = `${anchor.x}:${anchor.y}`;
                     if (sourceKeys.has(key) || seen.has(key)) {
                         continue;
                     }
                     seen.add(key);
-                    anchors.push({ x, y });
+                    anchors.push(anchor);
                 }
             }
         }
@@ -2836,38 +2929,23 @@ export class GameActionEngine {
                 ((right.x - centerX) ** 2 + (right.y - centerY) ** 2),
         );
 
-        return anchors.map((anchor) =>
-            splitUnit.isSmallSize()
-                ? [anchor]
-                : [
-                      { x: anchor.x, y: anchor.y },
-                      { x: anchor.x + 1, y: anchor.y },
-                      { x: anchor.x, y: anchor.y + 1 },
-                      { x: anchor.x + 1, y: anchor.y + 1 },
-                  ],
-        );
+        return anchors.map((anchor) => splitUnit.getFootprintCellsForAnchor(anchor));
     }
+    /**
+     * Whether `cells` is exactly the block this unit stands on: W*H DISTINCT on-board cells tiling its own
+     * W x H rectangle, nothing more and nothing less.
+     *
+     * This one gate is why a rectangle could not be placed, split or summoned: the rule it replaced was
+     * literally "one cell, or four cells forming a square", so a 1x2's two cells were refused before any
+     * other check ran. Asking PathHelper keeps the engine's answer identical to the one the pre-fight
+     * preview and the pather already give, instead of a third hand-rolled copy of the same rectangle test.
+     */
     private isValidPlacementFootprint(unit: Unit, cells: XY[]): boolean {
-        if (unit.isSmallSize()) {
-            return cells.length === 1;
-        }
-        if (cells.length !== 4) {
-            return false;
-        }
-
-        const xs = new Set(cells.map((cell) => cell.x));
-        const ys = new Set(cells.map((cell) => cell.y));
-        if (xs.size !== 2 || ys.size !== 2) {
-            return false;
-        }
-        const [minX, maxX] = [Math.min(...xs), Math.max(...xs)];
-        const [minY, maxY] = [Math.min(...ys), Math.max(...ys)];
-        if (maxX - minX !== 1 || maxY - minY !== 1) {
-            return false;
-        }
-
-        const required = new Set([`${minX}:${minY}`, `${maxX}:${minY}`, `${minX}:${maxY}`, `${maxX}:${maxY}`]);
-        return cells.every((cell) => required.has(`${cell.x}:${cell.y}`));
+        return this.getFootprintRules().areCellsFormingFootprint(
+            cells,
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
+        );
     }
     private getOccupiedCellsForUnit(unit: Unit): XY[] {
         return unit.getCells().filter((cell) => this.context.grid.getOccupantUnitId(cell) === unit.getId());
@@ -3065,10 +3143,18 @@ export class GameActionEngine {
             return undefined;
         }
 
-        const cells =
-            corpseCells.length === (spawned.isSmallSize() ? 1 : 4)
-                ? corpseCells
-                : this.resolveSummonCells(spawned, corpseCells[0]);
+        // Reuse the corpse's own cells when they are exactly the shape the spawn needs, otherwise anchor the
+        // spawn on the corpse's ANCHOR cell. Two things were wrong with counting cells: a 1x2 corpse has the
+        // same cell COUNT as a 2x1 one, and `corpseCells[0]` is not the anchor — a large body lists its
+        // top-LEFT cell first — so a spider rising from a large corpse appeared a column off the body it
+        // came from.
+        const corpseAnchor = getFootprintAnchorForCells(corpseCells);
+        if (!corpseAnchor) {
+            return undefined;
+        }
+        const cells = this.isValidPlacementFootprint(spawned, corpseCells)
+            ? corpseCells
+            : this.resolveSummonCells(spawned, corpseAnchor);
         const position = getPositionForCells(this.context.grid.getSettings(), cells);
         if (!cells.length || !position) {
             return undefined;

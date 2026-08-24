@@ -19,8 +19,9 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import {
     getCellsAroundCell,
     getCellsAroundFootprint,
-    getCellsAroundPosition,
+    getFootprintCellsForPosition,
     getPositionForCell,
+    getPositionForFootprintAnchor,
     getPositionForCells,
     getRangeAttackSideCenter,
     isCellWithinGrid,
@@ -1099,17 +1100,30 @@ class CandidateGenerator {
                 this.unit.isSmallSize(),
                 this.unit.canTraverseLava(),
                 this.unit.hasAbilityActive("In Its Own World"),
+                this.unit.getFootprintWidth(),
+                this.unit.getFootprintHeight(),
             );
         }
         return this.movePathCache;
     }
+    /**
+     * The unit's real body at a candidate anchor. This is what becomes every generated candidate's
+     * `move_unit.targetCells`, so it is also the shape the engine will occupy — the round trip through
+     * `getPositionForCell(...) - halfStep` into `getCellsAroundPosition` it replaces could only ever describe
+     * a 2x2, and handed a rectangle a body two cells too tall that the engine then refused as `invalid_move`.
+     * Routed through the position so the two shipped shapes keep their exact legacy cell ORDER — this list is
+     * iterated by the mountain-strike search, where the order decides which of two equidistant mountains a
+     * large unit mines, and the ordering the generic anchor expansion produces is not the one that has always
+     * come out of getCellsAroundPosition.
+     */
     private footprintForCell(cell: XY): XY[] {
-        if (this.unit.isSmallSize()) {
-            return [{ x: cell.x, y: cell.y }];
-        }
         const gs = this.context.grid.getSettings();
-        const position = getPositionForCell(cell, gs.getMinX(), gs.getStep(), gs.getHalfStep());
-        return getCellsAroundPosition(gs, { x: position.x - gs.getHalfStep(), y: position.y - gs.getHalfStep() });
+        return getFootprintCellsForPosition(
+            gs,
+            getPositionForFootprintAnchor(gs, cell, this.unit.getFootprintWidth(), this.unit.getFootprintHeight()),
+            this.unit.getFootprintWidth(),
+            this.unit.getFootprintHeight(),
+        );
     }
     private footprintOk(cell: XY): boolean {
         const f = this.footprintForCell(cell);

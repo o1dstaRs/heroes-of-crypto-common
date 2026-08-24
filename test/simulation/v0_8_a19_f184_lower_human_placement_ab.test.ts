@@ -199,7 +199,7 @@ describe("v0.8+A19 f184 LOWER-only causal placement A/B", () => {
         );
         expect(V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_CANDIDATE_IDENTITY).toMatchObject({
             candidateId: "a19-h18-prod-f184-opening-lower-only-v1-research",
-            implementationSha256: "5f631b85dcc13fc1c0199d2a2aa6d2ac10f07dce903a8ba9120d5784a24c8464",
+            implementationSha256: "0e2f6a5eab0cfa228754a6f76f394289833fc734f703f8444c6ad3463862a698",
         });
         expect(V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_SOURCE_FILES).toContain(
             "src/simulation/v0_8_a19_f184_lower_human_placement_ab_worker.ts",

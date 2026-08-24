@@ -11,6 +11,7 @@
 
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { isSpellUsableByCaster } from "../../spells/spell_helper";
 import { creatureIdForName, creatureInfo } from "../setup/creature_score";
 import {
@@ -22,6 +23,7 @@ import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IPlacementContext } from "../ai_strategy";
 import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
+import { byFootprintAreaLargestFirst } from "./v0_1";
 
 /**
  * REVEAL-CONDITIONED PLACEMENT (V07_PLACEMENT_REVEAL=on, DEFAULT OFF). Optional
@@ -173,7 +175,6 @@ const hasNativeSpellbook = (unit: Unit): boolean => {
     return creatureId !== undefined && creatureInfo(creatureId)?.nativeSpellbook === true;
 };
 const isMeleeUnit = (unit: Unit): boolean => unit.getAttackType() === MELEE;
-const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1);
 
 /**
  * Parameterized deployment layout shared by all three reveal heuristics. Role order and comparators
@@ -201,15 +202,10 @@ export function layoutRevealPlacement(
     const centreX = (minX + Math.max(...xs)) / 2;
     /** Default: distance from the zone's x-centre (corner-ness); cornerShift: distance from the low-x edge. */
     const edgeness = options.cornerShift ? (c: XY): number => c.x - minX : (c: XY): number => Math.abs(c.x - centreX);
-    const footprintFor = (u: Unit, base: XY): XY[] =>
-        u.isSmallSize()
-            ? [base]
-            : [
-                  { x: base.x, y: base.y },
-                  { x: base.x - 1, y: base.y },
-                  { x: base.x, y: base.y - 1 },
-                  { x: base.x - 1, y: base.y - 1 },
-              ];
+    // The unit's real body. This one helper backs the gap ring, the shooter screen and the corner shift, so a
+    // presumed 2x2 corrupts all three at once — most visibly the screen, whose entire purpose is the
+    // `areCellsAdjacent(wardFootprint, guardFootprint)` test a few lines down.
+    const footprintFor = (u: Unit, base: XY): XY[] => footprintCellsForAnchor(u, base);
     const footprintFree = (fp: XY[]): boolean => fp.every((c) => legal.has(key(c)) && !occupied.has(key(c)));
     /** True when any already-placed stack sits within the Chebyshev `ring` of any footprint cell. */
     const clusters = (fp: XY[], ring: number): boolean => {
@@ -262,16 +258,16 @@ export function layoutRevealPlacement(
     const byGuardPriority = (a: Unit, b: Unit): number =>
         (options.screenBacklineProtectors
             ? preference(a, options.preferredGuardUnitIds) - preference(b, options.preferredGuardUnitIds)
-            : 0) || bySizeLargeFirst(a, b);
+            : 0) || byFootprintAreaLargestFirst(a, b);
     const byBacklinePriority = (a: Unit, b: Unit): number =>
         (options.screenBacklineProtectors
             ? preference(a, options.preferredBacklineUnitIds) - preference(b, options.preferredBacklineUnitIds)
-            : 0) || bySizeLargeFirst(a, b);
+            : 0) || byFootprintAreaLargestFirst(a, b);
     const backline = units.filter(isBackline).sort(byBacklinePriority);
     // When v0.8 treats an exact-MELEE spellcaster as a ward, keep the role partitions disjoint. Otherwise the
     // front-wall pass would place it a second time, overwrite its deep placement, and leave ghost occupancy.
-    const melee = units.filter((unit) => isPhysicalMelee(unit) && !isBackline(unit)).sort(bySizeLargeFirst);
-    const support = units.filter((u) => !isBackline(u) && !isPhysicalMelee(u)).sort(bySizeLargeFirst);
+    const melee = units.filter((unit) => isPhysicalMelee(unit) && !isBackline(unit)).sort(byFootprintAreaLargestFirst);
+    const support = units.filter((u) => !isBackline(u) && !isPhysicalMelee(u)).sort(byFootprintAreaLargestFirst);
     const isForwardPhysical = (unit: Unit): boolean =>
         unit.canFly() ||
         (!!options.physicalMeleeMagicRoles &&

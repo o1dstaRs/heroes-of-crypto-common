@@ -12,10 +12,12 @@
 import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { creatureIdForName, creatureInfo } from "../setup/creature_score";
+import { footprintArea, footprintCenterForAnchor } from "./v0_1";
 import { FLYER_SCREEN_THRESHOLD, SPLASH_AOE_ABILITIES, layoutRevealPlacement } from "./v0_7_placement_reveal";
 
 export const V08_A19_RANKED_PLACEMENT_POLICY = Object.freeze({
@@ -100,17 +102,14 @@ const inspectPublicRoster = (publicIds: readonly number[]): IPublicRosterThreats
     return { flyers, splashAoe };
 };
 
-const footprintFor = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [base]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+// The unit's real body, from the one shared expansion. This feeds the treatment's own legality gate, so the
+// 1x1-or-2x2 copy this replaced made a rectangle report `candidate-incomplete-or-illegal` and silently
+// disabled the whole treatment (or, worse, validated a layout whose real footprint overlaps a neighbour).
+const footprintFor = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
-const centerFor = (unit: Unit, base: XY): XY => (unit.isSmallSize() ? base : { x: base.x - 0.5, y: base.y - 0.5 });
+// Formations are compared by where the BODIES sit, so the anchor is pulled back half a cell per extra column
+// and row: unchanged for a 1x1 and a 2x2, and a rectangle now leans only along its long side.
+const centerFor = footprintCenterForAnchor;
 
 const frontness = (team: IPlacementContext["team"], cell: XY): number =>
     team === PBTypes.TeamVals.LOWER ? cell.y : GRID_SIZE - 1 - cell.y;
@@ -167,7 +166,9 @@ const normalizedPlacementFingerprint = (
             unit.getName(),
             unit.getLevel(),
             unit.getAmountAlive(),
-            unit.isSmallSize() ? 1 : 4,
+            // The body's cell COUNT, which is what the old `isSmallSize() ? 1 : 4` was spelling out. Same 1
+            // and 4 for the shipped shapes, and a rectangle no longer answers 4 for a two-cell body.
+            footprintArea(unit),
             unit.getAttackType(),
         ]);
         return {

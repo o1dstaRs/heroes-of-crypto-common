@@ -16,7 +16,6 @@ import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import {
-    getCellsAroundPosition,
     getPositionForCell,
     getRangeAttackSideCenter,
     isCellWithinGrid,
@@ -24,6 +23,7 @@ import {
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../../grid/grid_math";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { VINE_STRIDE_COST_MULTIPLIER } from "../../spells/vines";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
@@ -38,6 +38,33 @@ export const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 
 export const otherTeam = (team: number): number =>
     team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+
+/** How many cells a unit's body covers. The packing difficulty every deployment layout orders by. */
+export const footprintArea = (unit: Unit): number => unit.getFootprintWidth() * unit.getFootprintHeight();
+
+/**
+ * Deployment order: the biggest body first, because it has the fewest legal anchors and a greedy layout that
+ * seats it last is the one that runs out of room.
+ *
+ * Every layout in this directory used to phrase this as `(b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1)`,
+ * a boolean that puts a 2x1 in the same bucket as a 2x2 even though a 2x2 is strictly harder to place. Area
+ * reproduces the shipped 1x1-vs-2x2 order exactly (1 before 4, both directions) and sorts a rectangle between
+ * them; `Array.prototype.sort` is stable, so equal-area ties keep the caller's original sequence as before.
+ */
+export const byFootprintAreaLargestFirst = (a: Unit, b: Unit): number => footprintArea(b) - footprintArea(a);
+
+/**
+ * The GEOMETRIC CENTRE of a unit's body, in (possibly fractional) cell coordinates, for an anchor cell.
+ *
+ * Placement scorers compare formations by where the bodies actually sit, not by where their anchors are, so
+ * the anchor has to be pulled back half a cell per extra column and row. The shipped shapes keep their exact
+ * values — nothing for a 1x1, `-0.5` on both axes for a 2x2 — and a rectangle now leans only along its long
+ * side instead of being displaced diagonally by a phantom second row or column.
+ */
+export const footprintCenterForAnchor = (unit: Unit, anchor: XY): XY => ({
+    x: anchor.x - (unit.getFootprintWidth() - 1) / 2,
+    y: anchor.y - (unit.getFootprintHeight() - 1) / 2,
+});
 
 /**
  * v0.1 — the simple baseline. Decision-making is the shipping heuristic (`AI.findTarget` + the same
@@ -63,15 +90,11 @@ export class StrategyV0_1 implements IAIStrategy {
             baseCells.push({ x: hash >> 4, y: hash & 0xf });
         }
 
-        const footprintFor = (unit: Unit, base: XY): XY[] =>
-            unit.isSmallSize()
-                ? [base]
-                : [
-                      { x: base.x, y: base.y },
-                      { x: base.x - 1, y: base.y },
-                      { x: base.x, y: base.y - 1 },
-                      { x: base.x - 1, y: base.y - 1 },
-                  ];
+        // The deployment test below is "does the whole BODY fit here", so it has to be the unit's real
+        // footprint. This used to expand every non-small unit into a 2x2 block, which for a 2x1 both denied
+        // it the zone's left column (a cell it never needed) and reserved a row it does not stand on, so a
+        // legal layout was reported as impossible and the stack fell through to the engine's scatter.
+        const footprintFor = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
         const tryPlace = (unit: Unit, preferFront: boolean): boolean => {
             const ordered = [...baseCells].sort((a, b) =>
@@ -94,7 +117,10 @@ export class StrategyV0_1 implements IAIStrategy {
         // Melee front-to-back first (they form the wall), then ranged/other back-to-front.
         const isMelee = (unit: Unit): boolean => unit.getAttackType() === PBTypes.AttackVals.MELEE;
         const ordered = [...units].sort((a, b) => {
-            const sizeDelta = (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1); // large first (harder to fit)
+            // Biggest body first, because it is the one with the fewest legal anchors. Area orders the two
+            // shipped shapes exactly as the old small/large flag did (1 before 4) and additionally seats a
+            // rectangle where it belongs: harder to fit than a 1x1, easier than a 2x2.
+            const sizeDelta = byFootprintAreaLargestFirst(a, b);
             if (sizeDelta !== 0) {
                 return sizeDelta;
             }
@@ -544,16 +570,27 @@ export class StrategyV0_1 implements IAIStrategy {
         }
         return true;
     }
-    protected footprintForCell(unit: Unit, cell: XY, context: IDecisionContext): XY[] {
-        if (unit.isSmallSize()) {
-            return [{ x: cell.x, y: cell.y }];
-        }
-        const gs = context.grid.getSettings();
-        const position = getPositionForCell(cell, gs.getMinX(), gs.getStep(), gs.getHalfStep());
-        return getCellsAroundPosition(gs, {
-            x: position.x - gs.getHalfStep(),
-            y: position.y - gs.getHalfStep(),
-        });
+    /**
+     * The cells `unit` would occupy standing on `cell` — the ONE footprint every strategy from v0.1 to v0.9
+     * (and every a13/a19 decorator that inherits `decideTurn`) uses to build `move_unit.targetCells` and to
+     * test a stand cell.
+     *
+     * It used to synthesise the block by shifting the cell centre half a step down-left and asking
+     * `getCellsAroundPosition`, which can only ever describe a 2x2. A rectangle therefore proposed a body it
+     * does not have: the engine rejected the move outright, and the adjacency tests fed from it were wrong on
+     * both axes. Delegating to the shared expansion keeps 1x1 and 2x2 on exactly the cells they had and makes
+     * every other shape correct for free.
+     *
+     * The 2x2 cells come out in the shared helper's order (anchor first) rather than `getCellsAroundPosition`'s
+     * (top-left first). Nothing here or in the engine reads the list positionally — occupancy, adjacency and
+     * `getPositionForCells` all treat it as a set — and it is now the same order the client already sends for a
+     * human's large-unit move, so AI and human `move_unit` payloads finally agree.
+     *
+     * `context` stays in the signature because every subclass calls through it positionally; the grid is no
+     * longer needed to answer the question.
+     */
+    protected footprintForCell(unit: Unit, cell: XY, _context: IDecisionContext): XY[] {
+        return footprintCellsForAnchor(unit, cell);
     }
     /**
      * Finish an already validated movement route with a legal adjacent strike whenever possible.
@@ -663,6 +700,8 @@ export class StrategyV0_1 implements IAIStrategy {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const enemies = unitsHolder.getAllAllies(enemyTeam).filter((u) => !u.isDead());
         if (!enemies.length || !movePath.knownPaths.size) {

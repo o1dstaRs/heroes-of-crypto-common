@@ -14,7 +14,7 @@ import { travelledMovePath } from "../engine/post_move_actor_availability";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
 import { NO_UPDATE, UPDATE_DOWN, UPDATE_LEFT, UPDATE_RIGHT, UPDATE_UP } from "../grid/grid_constants";
-import { getCellsAroundPosition, getPositionForCell, getPositionForCells } from "../grid/grid_math";
+import { getFootprintAnchorForCells, getPositionForCell, getPositionForCells } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import type { IWeightedRoute } from "../grid/path_definitions";
 import { Unit } from "../units/unit";
@@ -61,13 +61,16 @@ export class MoveHandler {
 
             const unitId = unit.getId();
 
-            const currentPosition = unit.getPosition();
-            let cells: XY[];
-            if (unit.isSmallSize()) {
-                cells = [cell];
-            } else {
-                cells = getCellsAroundPosition(this.gridSettings, currentPosition);
-            }
+            // Shove the unit's OWN body. `cell` is merely the cell the lap sweep happened to look the
+            // occupant up by, so it names one cell of the footprint rather than the footprint: for a 1x1 it
+            // is the whole thing, but anything larger has to carry every cell it stands on. getCells()
+            // answers that for every shape, and for the two shipped ones it is the same expansion (and the
+            // same cell ORDER) the isSmallSize fork produced — a 1x1's single cell is exactly `cell`, and a
+            // 2x2's four cells are exactly getCellsAroundPosition of the unit's position. The old fork could
+            // only say "one cell" or "a 2x2 block", so a 1x2 was shoved as a square: two of the four target
+            // cells belonged to nobody, the occupancy checks below failed on them, and the narrowing loop ran
+            // out of shifts and DESTROYED the unit.
+            const cells = unit.getCells();
 
             let targetCells = [];
             for (const c of cells) {
@@ -325,24 +328,47 @@ export class MoveHandler {
         }
 
         // this.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
-        if (unit.isSmallSize()) {
-            this.grid.occupyCell(
-                targetCells[0],
-                unit.getId(),
-                unit.getTeam(),
-                unit.getAttackRange(),
-                unit.canTraverseLava(),
-                unit.hasAbilityActive("Made of Water"),
-            );
-        } else {
-            this.grid.occupyCells(
-                targetCells,
-                unit.getId(),
-                unit.getTeam(),
-                unit.getAttackRange(),
-                unit.canTraverseLava(),
-                unit.hasAbilityActive("Made of Water"),
-            );
+        //
+        // Which occupancy API to use is a question about how the unit is REGISTERED, not about how big it is
+        // assumed to be: occupyCells refuses a unit whose current registration is a single cell (ranked's
+        // occupancy reconcile leans on that refusal to spot a half-applied move), so a one-cell body still
+        // has to go through occupyCell. Every other shape — the 2x2 and every rectangle alike — goes through
+        // occupyCells, which no longer cares how many cells the footprint has.
+        //
+        // The anchor is the footprint's TOP-RIGHT cell, so it is the maximum corner of targetCells rather
+        // than whichever cell the caller happened to list first.
+        const anchor = getFootprintAnchorForCells(targetCells);
+        const occupied =
+            unit.isSmallSize() && anchor
+                ? this.grid.occupyCell(
+                      anchor,
+                      unit.getId(),
+                      unit.getTeam(),
+                      unit.getAttackRange(),
+                      unit.canTraverseLava(),
+                      unit.hasAbilityActive("Made of Water"),
+                  )
+                : this.grid.occupyCells(
+                      targetCells,
+                      unit.getId(),
+                      unit.getTeam(),
+                      unit.getAttackRange(),
+                      unit.canTraverseLava(),
+                      unit.hasAbilityActive("Made of Water"),
+                  );
+        // A refused stamp must NOT be followed by setPosition. This return value used to be discarded, and
+        // moving the body anyway is the worst failure this file can produce: the unit is then rendered,
+        // measured and pathed to on cells the grid still calls empty, while the cells it really left stay
+        // blocked by a ghost — an occupancy desync that no later move can repair and that ranked sees as the
+        // client and the server disagreeing about the board. Refusing loudly instead costs one move: the
+        // caller in the action engine already treats a missing newPosition as `move_blocked`, and the lap
+        // narrowing puts the message straight into the fight log.
+        if (!occupied) {
+            return {
+                log: `${unit.getName()} could not occupy ${targetCells.map((c) => `(${c.x},${c.y})`).join(" ")}`,
+                deleteUnit: false,
+                newPosition: undefined,
+            };
         }
         // Smoke spell: a creature stepping onto a smoked cell disperses the smoke from EVERY cell it now
         // occupies (large units clear their whole 2x2 footprint). Collected so the action engine can emit a

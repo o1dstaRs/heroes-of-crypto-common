@@ -11,13 +11,14 @@
 
 import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { auraRelevanceWeight, setPreferAttackOverMining } from "../ai";
 import { GRID_SIZE } from "../../grid/grid_constants";
-import { otherTeam } from "./v0_1";
+import { byFootprintAreaLargestFirst, otherTeam } from "./v0_1";
 import { StrategyV0_5 } from "./v0_5";
 import { routeAreaThrow } from "./area_throw_router";
 import { routeUniversalCaster } from "./caster_router";
@@ -240,6 +241,8 @@ export class StrategyV0_6 extends StrategyV0_5 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         if (!movePath.knownPaths.size) {
             return decision;
@@ -322,15 +325,10 @@ function placeArmyDispersed(units: Unit[], context: IPlacementContext): Map<stri
     const xs = baseCells.map((c) => c.x);
     const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
     const edgeness = (c: XY): number => Math.abs(c.x - centreX);
-    const footprintFor = (u: Unit, base: XY): XY[] =>
-        u.isSmallSize()
-            ? [base]
-            : [
-                  { x: base.x, y: base.y },
-                  { x: base.x - 1, y: base.y },
-                  { x: base.x, y: base.y - 1 },
-                  { x: base.x - 1, y: base.y - 1 },
-              ];
+    // The unit's real body. The whole point of this layout is the 1-cell anti-splash gap, and `clusters`
+    // walks the ring of exactly these cells: a phantom 2x2 makes the gap tighter than intended on a
+    // rectangle's narrow axis and looser on its wide one, which is the opposite of what the dispersion buys.
+    const footprintFor = (u: Unit, base: XY): XY[] => footprintCellsForAnchor(u, base);
     const footprintFree = (fp: XY[]): boolean => fp.every((c) => legal.has(key(c)) && !occupied.has(key(c)));
     const clusters = (fp: XY[]): boolean => {
         for (const c of fp) {
@@ -367,12 +365,11 @@ function placeArmyDispersed(units: Unit[], context: IPlacementContext): Map<stri
             }
         }
     };
-    const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1);
     const isRange = (u: Unit): boolean => u.getAttackType() === RANGE;
     const isMeleeU = (u: Unit): boolean => u.getAttackType() === MELEE;
-    const ranged = units.filter(isRange).sort(bySizeLargeFirst);
-    const melee = units.filter(isMeleeU).sort(bySizeLargeFirst);
-    const support = units.filter((u) => !isRange(u) && !isMeleeU(u)).sort(bySizeLargeFirst);
+    const ranged = units.filter(isRange).sort(byFootprintAreaLargestFirst);
+    const melee = units.filter(isMeleeU).sort(byFootprintAreaLargestFirst);
+    const support = units.filter((u) => !isRange(u) && !isMeleeU(u)).sort(byFootprintAreaLargestFirst);
     for (const u of ranged) {
         placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(b) - edgeness(a));
     }

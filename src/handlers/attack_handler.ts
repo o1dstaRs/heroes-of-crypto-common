@@ -39,6 +39,7 @@ import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { canUnitRespondToMelee } from "./melee_response";
+import type { IFootprintShaped } from "../simulation/footprint";
 
 export interface IRangeAttackEvaluation {
     rangeAttackDivisors: number[];
@@ -451,7 +452,7 @@ export class AttackHandler {
             // isRangeCapable, not attack_type === RANGE: a melee unit holding a stolen Endless Quiver
             // (Predatory Assimilation) is a legitimate shooter too.
             unit.isRangeCapable() &&
-            !this.canBeAttackedByMelee(unit.getPosition(), unit.isSmallSize(), aggrMatrix) &&
+            !this.canBeAttackedByMelee(unit.getPosition(), unit, aggrMatrix) &&
             unit.getRangeShots() > 0 &&
             !unit.hasDebuffActive("Range Null Field Aura") &&
             // hasStatusApplied for Rangebane: it is applied in COMBAT (Spit Ball), so a ranked client — which
@@ -461,21 +462,37 @@ export class AttackHandler {
             !unit.hasStatusApplied("Rangebane")
         );
     }
-    public canBeAttackedByMelee(unitPosition: HoCMath.XY, isSmallUnit: boolean, enemyAggrMatrix?: number[][]): boolean {
-        let cells: HoCMath.XY[];
-        if (isSmallUnit) {
-            const cell = GridMath.getCellForPosition(this.gridSettings, unitPosition);
-            if (cell) {
-                cells = [cell];
-            } else {
-                cells = [];
-            }
-        } else {
-            cells = GridMath.getCellsAroundPosition(this.gridSettings, unitPosition);
-        }
+    /**
+     * Whether an enemy melee body already threatens any cell of the unit standing at `unitPosition` — the pin
+     * that stops a shooter from firing, and the "you will be attacked if you stand here" preview.
+     *
+     * Pass the unit itself (anything reporting its own shape). The `boolean` form is the LEGACY signature and
+     * means exactly what it always did — true = one cell, false = a 2x2 block — so callers that have not been
+     * converted yet keep their present answers; it is deprecated because it cannot describe a rectangle. A
+     * 1x2 squeezed through it is tested on two cells it does not stand on and, on the axis it really extends
+     * along, on none of the cells it does: it reads as pinned where it is safe and shoots where it is pinned.
+     *
+     * @param footprint the threatened unit, or the legacy `isSmallUnit` boolean.
+     */
+    public canBeAttackedByMelee(
+        unitPosition: HoCMath.XY,
+        footprint: boolean | IFootprintShaped,
+        enemyAggrMatrix?: number[][],
+    ): boolean {
+        const isLegacyBoolean = typeof footprint === "boolean";
+        const width = isLegacyBoolean ? (footprint ? 1 : 2) : footprint.getFootprintWidth();
+        const height = isLegacyBoolean ? (footprint ? 1 : 2) : footprint.getFootprintHeight();
+        // One expansion for every shape. It reproduces both shipped branches verbatim — the single
+        // getCellForPosition cell for a 1x1, and getCellsAroundPosition's four cells (in that order) for a
+        // 2x2 — because those are the fast paths inside it.
+        const cells = GridMath.getFootprintCellsForPosition(this.gridSettings, unitPosition, width, height);
 
         for (const cell of cells) {
-            if (enemyAggrMatrix && enemyAggrMatrix[cell.x][cell.y] > 1) {
+            // Footprint cells are deliberately UNCLIPPED (a body is W*H cells or it is not a footprint) while
+            // the aggro board is only gridSize x gridSize, so an off-board cell would index `undefined` and
+            // throw instead of answering. Ground nobody can stand on threatens nobody.
+            const aggrColumn = enemyAggrMatrix?.[cell.x];
+            if (aggrColumn && aggrColumn[cell.y] > 1) {
                 return true;
             }
         }
@@ -1878,14 +1895,13 @@ export class AttackHandler {
             return { completed: false, unitIdsDied, animationData };
         }
 
-        const attackFromCells = [attackFromCell];
-        if (!attackerUnit.isSmallSize()) {
-            attackFromCells.push(
-                { x: attackFromCell.x, y: attackFromCell.y - 1 },
-                { x: attackFromCell.x - 1, y: attackFromCell.y },
-                { x: attackFromCell.x - 1, y: attackFromCell.y - 1 },
-            );
-        }
+        // Every cell the attacker's body would cover if it struck from `attackFromCell`. That cell is the
+        // footprint's ANCHOR — its top-right corner — so the body reaches back towards -x and -y, which is
+        // what the three hand-written neighbours here spelled out for a 2x2. The shared expansion returns
+        // those same four cells in that same order, and the anchor alone for a 1x1; a rectangle finally gets
+        // its real body instead of an assumed square one, which decides both the adjacency test below and
+        // which ground the attacker has to be able to stand on.
+        const attackFromCells = attackerUnit.getFootprintCellsForAnchor(attackFromCell);
 
         if (!this.grid.areCellsAdjacent(attackFromCells, targetUnit.getCells())) {
             return { completed: false, unitIdsDied, animationData };
@@ -1956,16 +1972,27 @@ export class AttackHandler {
                 return { completed: false, unitIdsDied, animationData };
             }
         } else {
-            const position = GridMath.getPositionForCell(
+            // Where the body ends up when it steps onto the attack-from anchor, and which cells it then
+            // covers. `position` is the footprint's geometric CENTRE, which for a 2x2 is verbatim the legacy
+            // arithmetic this replaces (the anchor cell's centre, minus half a step on each axis) and for a
+            // 1x1 the cell centre itself; the cell list likewise keeps the shipped shapes' exact cells and
+            // ORDER, since those are the fast paths inside the shared helpers. The hardcoded half-step
+            // shifted a rectangle by half a cell on the axis it is only ONE cell wide, so its body landed
+            // off the grid lines and its cells no longer matched what had just been occupied.
+            const footprintWidth = attackerUnit.getFootprintWidth();
+            const footprintHeight = attackerUnit.getFootprintHeight();
+            const position = GridMath.getPositionForFootprintAnchor(
+                this.gridSettings,
                 attackFromCell,
-                this.gridSettings.getMinX(),
-                this.gridSettings.getStep(),
-                this.gridSettings.getHalfStep(),
+                footprintWidth,
+                footprintHeight,
             );
-            const cells = GridMath.getCellsAroundPosition(this.gridSettings, {
-                x: position.x - this.gridSettings.getHalfStep(),
-                y: position.y - this.gridSettings.getHalfStep(),
-            });
+            const cells = GridMath.getFootprintCellsForPosition(
+                this.gridSettings,
+                position,
+                footprintWidth,
+                footprintHeight,
+            );
             if (
                 (this.grid.areAllCellsEmpty(cells, attackerUnit.getId()) ||
                     this.grid.canOccupyCells(
@@ -1993,11 +2020,7 @@ export class AttackHandler {
                     return { completed: false, unitIdsDied, animationData };
                 }
 
-                attackerUnit.setPosition(
-                    position.x - this.gridSettings.getHalfStep(),
-                    position.y - this.gridSettings.getHalfStep(),
-                    false,
-                );
+                attackerUnit.setPosition(position.x, position.y, false);
 
                 this.grid.occupyCells(
                     cells,
@@ -2047,12 +2070,16 @@ export class AttackHandler {
             abilityMultiplier *= (100 - paralysisAttackerEffect.getPower()) / 100;
         }
 
+        // Backstab compares the two ANCHOR cells, so it needs the victim's real HEIGHT to know how far its
+        // body reaches down from that anchor. The boolean can only say 1 or 2 and would read a 1x2 as a 2x2 —
+        // right by accident there, wrong for a 2x1, whose body is one row tall.
         const abilitiesWithPositionCoeff = AbilityHelper.getAbilitiesWithPosisionCoefficient(
             attackerUnit.getAbilities(),
             attackFromCell,
             GridMath.getCellForPosition(this.gridSettings, targetUnit.getPosition()),
             targetUnit.isSmallSize(),
             attackerUnit.getTeam(),
+            targetUnit.getFootprintHeight(),
         );
 
         if (abilitiesWithPositionCoeff.length) {
@@ -2300,12 +2327,15 @@ export class AttackHandler {
                     this.sceneLog.updateLog(`${targetUnit.getName()} misses ⚔️ resp on ${attackerUnit.getName()}`);
                 } else if (!hasLightningSpinResponseLanded && !attackerUnit.isDead()) {
                     abilityMultiplier = 1;
+                    // Mirror of the outgoing swing above: on the response the original attacker is the
+                    // victim, so its footprint height is the one Backstab has to clear.
                     const abilitiesWithPositionCoeffResp = AbilityHelper.getAbilitiesWithPosisionCoefficient(
                         targetUnit.getAbilities(),
                         GridMath.getCellForPosition(this.gridSettings, targetUnit.getPosition()),
                         attackFromCell,
                         attackerUnit.isSmallSize(),
                         targetUnit.getTeam(),
+                        attackerUnit.getFootprintHeight(),
                     );
 
                     if (abilitiesWithPositionCoeffResp.length) {
@@ -2943,14 +2973,11 @@ export class AttackHandler {
                 return { completed: rangeLanded, unitIdsDied: [], animationData };
             }
 
-            const attackFromCells = [attackFromCell];
-            if (!attackerUnit.isSmallSize()) {
-                attackFromCells.push(
-                    { x: attackFromCell.x, y: attackFromCell.y - 1 },
-                    { x: attackFromCell.x - 1, y: attackFromCell.y },
-                    { x: attackFromCell.x - 1, y: attackFromCell.y - 1 },
-                );
-            }
+            // The attacker's whole body at the attack-from ANCHOR, exactly as in handleMeleeAttack above —
+            // this was an independent copy of the same hardcoded 2x2 expansion. Every cell of it is then
+            // tested for adjacency to the mountain, so a rectangle reaching the corridor with its far half
+            // is a legal attacker just like a 2x2 is.
+            const attackFromCells = attackerUnit.getFootprintCellsForAnchor(attackFromCell);
 
             for (const c of attackFromCells) {
                 // Two-mountain BLOCK_CENTER: the 2x2 corridor between the mountains is WALKABLE, so a
@@ -3040,16 +3067,24 @@ export class AttackHandler {
                     return { completed: rangeLanded, unitIdsDied: [], animationData };
                 }
             } else {
-                const position = GridMath.getPositionForCell(
+                // The obstacle path's own copy of the melee "step onto the attack-from anchor" arithmetic —
+                // see the note there. This file has already been bitten twice by world-vs-grid coordinate
+                // confusion on obstacle attacks, so the two copies are kept in step by going through the
+                // same pair of helpers rather than by repeating the offsets.
+                const footprintWidth = attackerUnit.getFootprintWidth();
+                const footprintHeight = attackerUnit.getFootprintHeight();
+                const position = GridMath.getPositionForFootprintAnchor(
+                    this.gridSettings,
                     attackFromCell,
-                    this.gridSettings.getMinX(),
-                    this.gridSettings.getStep(),
-                    this.gridSettings.getHalfStep(),
+                    footprintWidth,
+                    footprintHeight,
                 );
-                const cells = GridMath.getCellsAroundPosition(this.gridSettings, {
-                    x: position.x - this.gridSettings.getHalfStep(),
-                    y: position.y - this.gridSettings.getHalfStep(),
-                });
+                const cells = GridMath.getFootprintCellsForPosition(
+                    this.gridSettings,
+                    position,
+                    footprintWidth,
+                    footprintHeight,
+                );
                 if (
                     (this.grid.areAllCellsEmpty(cells, attackerUnit.getId()) ||
                         this.grid.canOccupyCells(
@@ -3078,11 +3113,7 @@ export class AttackHandler {
                         return { completed: rangeLanded, unitIdsDied: [], animationData };
                     }
 
-                    attackerUnit.setPosition(
-                        position.x - this.gridSettings.getHalfStep(),
-                        position.y - this.gridSettings.getHalfStep(),
-                        false,
-                    );
+                    attackerUnit.setPosition(position.x, position.y, false);
 
                     this.grid.occupyCells(
                         cells,
@@ -3177,6 +3208,9 @@ export class AttackHandler {
                 continue;
             }
 
+            // The ray walks CELLS, so one victim can be met several times over: a 2x2 always straddles two
+            // of them on a straight shot, and a rectangle standing along the lane straddles its whole long
+            // side. Dedupe by unit id — the shot pierces a body once, however many of its cells it crosses.
             if ((attackerUnit && attackerUnit.getId() === possibleUnitId) || affectedUnitIds.includes(possibleUnitId)) {
                 continue;
             }
@@ -3213,6 +3247,10 @@ export class AttackHandler {
                 }
 
                 if (isSelection || isCellOccupied) {
+                    // Large Caliber / Area Throw splash the ring of the cell the shot LANDED on, so several
+                    // ring cells can belong to one neighbour — two for any 2x2, two for a 1x2 lying along
+                    // the ring's edge. `unitIds` (seeded with the primary victim) is what keeps the splash
+                    // one hit per body rather than one hit per covered cell.
                     const cells = GridMath.getCellsAroundCell(this.gridSettings, cell);
 
                     for (const c of cells) {

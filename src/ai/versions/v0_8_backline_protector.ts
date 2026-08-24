@@ -20,6 +20,7 @@ import type { IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { estimatePrimaryMeleeDamage } from "../melee_damage_estimate";
 import { creatureInfo } from "../setup/creature_score";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { otherTeam } from "./v0_1";
 import { enemyFieldsSplashAoe, layoutRevealPlacement, opponentCreatureIdsForPlacement } from "./v0_7_placement_reveal";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
@@ -118,15 +119,10 @@ export function buildV08BacklineProtectorIntent(
     return { kind, ward: wards[0], wards, flyerThreats };
 }
 
-const footprintForBase = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+// The unit's real body, from the one shared expansion. Abomination, Angel and Arachna Queen exist to cover a
+// ward at a fixed footprint DISTANCE, so a phantom 2x2 got the coverage test wrong on one axis, landed the
+// protector on cells it cannot occupy, and emitted `move_unit.targetCells` the engine then rejected.
+const footprintForBase = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
 const canLandOnFootprint = (unit: Unit, context: IDecisionContext, cells: XY[]): boolean =>
     context.grid.areAllCellsEmpty(cells, unit.getId()) ||
@@ -475,6 +471,8 @@ const followWard = (
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     );
     let bestPreserving: IProtectorRoute | undefined;
     let bestValueSwap: IProtectorRoute | undefined;

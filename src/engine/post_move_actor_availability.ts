@@ -57,7 +57,18 @@ export interface IPostMoveActorAvailability {
     readonly stack: IStackHpState;
 }
 
-const moveCellKey = (cell: XY): number => (cell.x << 4) | cell.y;
+/**
+ * An injective cell key over any coordinate a footprint can produce, not just the on-board ones.
+ *
+ * This used to be `(x << 4) | y`, which is only one-to-one while both coordinates sit inside [0, 15]. That
+ * held while every cell reaching this set came from the board, and it stopped holding with rectangles: a
+ * footprint list is deliberately UNCLIPPED, so a body anchored on the edge legitimately reports a cell at
+ * x === -1 or y === -1, and two different such cells could pack to the same number and compare equal. The
+ * offset multiply costs the same and cannot collide, so the comparison below means what it says for every
+ * shape. On-board cells are unaffected: the mapping is still one number per cell.
+ */
+const CELL_KEY_ORIGIN = 512;
+const moveCellKey = (cell: XY): number => (cell.x + CELL_KEY_ORIGIN) * 1024 + (cell.y + CELL_KEY_ORIGIN);
 
 /** Preserve GameActionEngine's exact set comparison, including its equal-length prerequisite. */
 export function moveCellsMatchAsSet(left: readonly XY[], right: readonly XY[]): boolean {

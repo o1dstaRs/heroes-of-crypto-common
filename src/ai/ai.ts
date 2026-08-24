@@ -197,7 +197,7 @@ export class BasicAIAction implements IAIAction {
 export function findTarget(
     unit: IUnitAIRepr,
     grid: Grid,
-    matrix: number[][], // matrix for big unit has 4 cells filled
+    matrix: number[][], // a unit fills every cell of its footprint here: one for a 1x1, four for a 2x2, two for a 1x2
     unitsHolder: UnitsHolder,
     pathHelper: IDecisionPathSource,
 ): BasicAIAction | undefined {
@@ -851,19 +851,33 @@ export function countMeleeThreatsToCell(cell: HoCMath.XY, matrix: number[][], en
 }
 
 /**
+ * The acting unit's WxH footprint, for the geometry below that used to fork on `isSmallSize()`.
+ *
+ * The size read is defensive on purpose: `IUnitAIRepr` is routinely satisfied by hand-written stand-ins that
+ * implement only the handful of methods the caller exercises, and for those "small or large" is still the
+ * only shape they can express. A unit that does declare a footprint always wins, so a 1x2 is never rounded
+ * up to the 2x2 that `!isSmallSize()` used to imply.
+ */
+function footprintOf(unit: IUnitAIRepr): { height: number; width: number } {
+    const fallback = unit.isSmallSize() ? 1 : 2;
+    return {
+        height: GridMath.normalizeFootprintSide(unit.getFootprintHeight?.(), fallback),
+        width: GridMath.normalizeFootprintSide(unit.getFootprintWidth?.(), fallback),
+    };
+}
+
+/**
  * Whether the engine can place this unit's full footprint at `baseCell`. Pathfinding may route flyers
  * and Lava Striders across hazards they cannot finish a move on, so attack-from selection must apply
  * the execution-time landing rule separately without restricting transit.
  */
 export function canUnitLandAt(unit: IUnitAIRepr, grid: Grid, baseCell: HoCMath.XY): boolean {
-    const cells = [baseCell];
-    if (!unit.isSmallSize()) {
-        cells.push(
-            { x: baseCell.x, y: baseCell.y - 1 },
-            { x: baseCell.x - 1, y: baseCell.y },
-            { x: baseCell.x - 1, y: baseCell.y - 1 },
-        );
-    }
+    // Ask for the unit's OWN cells. The hand-written 2x2 block this replaces demanded four free cells of
+    // every unit that was not small, so a 1x2 was judged unable to stand anywhere it could actually stand —
+    // and it probed the (x - 1) column the body never occupies. getFootprintCellsForAnchor emits the same
+    // four cells in the same order for a 2x2 and the single cell for a 1x1.
+    const { width, height } = footprintOf(unit);
+    const cells = GridMath.getFootprintCellsForAnchor(baseCell, width, height);
     if (cells.some((cell) => !GridMath.isCellWithinGrid(grid.getSettings(), cell))) {
         return false;
     }
@@ -1019,6 +1033,7 @@ export function findMountainMeleeStrike(
     }
     const unitCell = unit.getBaseCell();
     const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const mountainStrikeFootprint = footprintOf(unit);
     const movePath = pathHelper.getMovePath(
         unitCell,
         matrix,
@@ -1028,6 +1043,8 @@ export function findMountainMeleeStrike(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        mountainStrikeFootprint.width,
+        mountainStrikeFootprint.height,
     );
     const knownPaths = movePath.knownPaths;
 
@@ -1160,6 +1177,11 @@ function preferBackstabAttackCell(
     if (type !== AIActionType.MELEE_ATTACK && type !== AIActionType.MOVE_AND_MELEE_ATTACK) {
         return action;
     }
+    // One-cell carriers only, as shipped. The eight cells around the victim are attack anchors for ANY body
+    // (an anchor is one of its own cells), so the scan stays legal for a rectangle — but the bonus itself is
+    // priced by the engine against the victim's footprint HEIGHT, and widening the gate here would also
+    // change which cell a 2x2 Scavenger picks today. Both belong to the balance pass that gives a creature a
+    // rectangular footprint, not to the geometry one.
     if (!unit.isSmallSize() || !unit.hasAbilityActive("Backstab")) {
         return action;
     }
@@ -1193,6 +1215,7 @@ function preferBackstabAttackCell(
     // there this turn. Recompute reachability with a zero aggression matrix to get true raw-movement
     // reach (the Scavenger accepts the slightly riskier step in exchange for the damage bonus).
     const zeroAggr = matrix.map((row) => row.map(() => 0));
+    const backstabFootprint = footprintOf(unit);
     const knownPaths = pathHelper.getMovePath(
         unitCell,
         matrix,
@@ -1202,6 +1225,8 @@ function preferBackstabAttackCell(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        backstabFootprint.width,
+        backstabFootprint.height,
     ).knownPaths;
 
     // Among the cells adjacent to the target on the backstab side, pick the cheapest reachable one.
@@ -1497,6 +1522,9 @@ function doFindTarget(
     // to see grid use grid.print(unit.getId());
 
     const max_steps = 100; // unit.steps
+    // Both walks below are the SAME body, so they take the same footprint: reachability belongs to the
+    // whole block, and an anchor whose 1x2 body does not fit is not a place this unit can end its turn.
+    const { width: footprintWidth, height: footprintHeight } = footprintOf(unit);
     const infiniteMovePath = pathHelper.getMovePath(
         unitCell,
         matrix,
@@ -1508,6 +1536,8 @@ function doFindTarget(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        footprintWidth,
+        footprintHeight,
     );
 
     let actualMovePath: IReadonlyMovePath | undefined;
@@ -1524,6 +1554,8 @@ function doFindTarget(
                 unit.isSmallSize(),
                 unit.canTraverseLava(),
                 unit.hasAbilityActive("In Its Own World"),
+                footprintWidth,
+                footprintHeight,
             );
         }
         return actualMovePath;
@@ -1545,7 +1577,8 @@ function doFindTarget(
 
     /*
     Note:
-    any big unit in matrix occupies 4 cells, the current unit is provided by upper right cell:
+    a unit occupies its whole W x H block in the matrix and is named by the block's upper right cell,
+    so the body hangs towards -x and -y (below, a 2x2 named by (2,2) and a 1x2 named by (6,2)):
     3 ---- 0 0 0 0 0 0 0
     2 ---- 0 2 2 0 0 - x
     1 ---- 0 2 2 0 0 - -
@@ -2010,6 +2043,54 @@ function cellKey(xy: HoCMath.XY): number {
     return (xy.x << 4) | xy.y;
 }
 
+/**
+ * Every anchor a WxH attacker can strike a WxH target from, as a set operation instead of a case table.
+ *
+ * Ring each of the target's own cells with the attacker's per-axis border, drop the anchors whose body would
+ * stand ON the target, and keep whatever the board leaves free. That is the same question the quadrant table
+ * below answers for two squares, but the table cannot be generalised term by term: its literal 2 is the
+ * attacker's width and its height at once, so on a 1x2 one of the two axes is always wrong — and an
+ * attack-from cell that is not really adjacent is an action the engine refuses.
+ */
+function getFootprintCellsForAttacker(
+    cellToAttack: HoCMath.XY,
+    matrix: number[][],
+    attacker: IUnitAIRepr,
+    isCurrentUnitSmall: boolean,
+    attackerWidth: number,
+    attackerHeight: number,
+    targetWidth: number,
+    targetHeight: number,
+): HoCMath.XY[] {
+    const targetCells = GridMath.getFootprintCellsForAnchor(cellToAttack, targetWidth, targetHeight);
+    const targetXMin = cellToAttack.x - targetWidth + 1;
+    const targetYMin = cellToAttack.y - targetHeight + 1;
+    const anchors: HoCMath.XY[] = [];
+    // Cells reached from two different target cells are the common case, and the ring around one target cell
+    // can well contain an anchor that overlaps another one. Keyed as text because an anchor may sit off the
+    // board on either axis here, and the packed (x << 4) | y key aliases every negative coordinate together.
+    const seen = new Set<string>();
+    for (const targetCell of targetCells) {
+        for (const anchor of getFootprintBorderCells(targetCell, 1, attackerWidth, attackerHeight)) {
+            const standsOnTarget =
+                anchor.x >= targetXMin &&
+                anchor.x - attackerWidth + 1 <= cellToAttack.x &&
+                anchor.y >= targetYMin &&
+                anchor.y - attackerHeight + 1 <= cellToAttack.y;
+            if (standsOnTarget) {
+                continue;
+            }
+            const key = `${anchor.x},${anchor.y}`;
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            anchors.push(anchor);
+        }
+    }
+    return filterCells(anchors, matrix, isCurrentUnitSmall, attacker, attackerWidth, attackerHeight);
+}
+
 /*
 find cells for the given cell that attacker can stand at
 
@@ -2047,7 +2128,25 @@ export function getCellsForAttacker(
     attacker: IUnitAIRepr,
     isCurrentUnitSmall = true,
     isTargetUnitSmall = true,
+    targetWidth = isTargetUnitSmall ? 1 : 2,
+    targetHeight = isTargetUnitSmall ? 1 : 2,
 ): HoCMath.XY[] {
+    // The quadrant table below is exact for the two squares and is left untouched for them, order included.
+    // As soon as either body is a rectangle it stops meaning anything, so both shapes are read for real and
+    // the whole question is asked again as geometry.
+    const { width: attackerWidth, height: attackerHeight } = footprintOf(attacker);
+    if (attackerWidth !== attackerHeight || targetWidth !== targetHeight) {
+        return getFootprintCellsForAttacker(
+            cellToAttack,
+            matrix,
+            attacker,
+            isCurrentUnitSmall,
+            attackerWidth,
+            attackerHeight,
+            targetWidth,
+            targetHeight,
+        );
+    }
     const borderCells = filterCells(
         getBorderCells(cellToAttack, isCurrentUnitSmall),
         matrix,
@@ -2105,12 +2204,17 @@ function getLayersForAttacker(
     isTargetUnitSmall = true,
 ): HoCMath.XY[][] {
     const result: HoCMath.XY[][] = [];
+    // The debug print has to show the ring the decision path actually walks, so it reads the same footprint
+    // buildMeleeTargetLayers does rather than the caller's small/large flag.
+    const { width, height } = footprintOf(attacker);
     for (let i = 1; i < matrix.length / 2; i++) {
         const borderCells = filterCells(
-            getBorderCells(cellToAttack, isCurrentUnitSmall, i),
+            getBorderCells(cellToAttack, isCurrentUnitSmall, i, width, height),
             matrix,
             isCurrentUnitSmall,
             attacker,
+            width,
+            height,
         );
         result[i - 1] = borderCells;
     }
@@ -2121,8 +2225,54 @@ function getLayersForAttacker(
     }
 }
 
+/**
+ * The anchors of a WxH body standing exactly `distance` cells from `currentCell`.
+ *
+ * The body hangs down and to the LEFT of its anchor, so the anchors form the perimeter of the box
+ * `[x - d, x + d + (W - 1)] x [y - d, y + d + (H - 1)]` — the same `distance + 1` extension the 2x2 branch
+ * below spells out, but taken one axis at a time. A 1x2 has no left column and a 2x1 no bottom row, so the
+ * legacy both-axes extension would offer anchors whose body never reaches the target: the AI would then
+ * propose an attack from a cell that is not adjacent to anything, and the engine would reject it.
+ */
+function getFootprintBorderCells(
+    currentCell: HoCMath.XY,
+    distance: number,
+    width: number,
+    height: number,
+): HoCMath.XY[] {
+    const xMin = currentCell.x - distance;
+    const xMax = currentCell.x + distance + width - 1;
+    const yMin = currentCell.y - distance;
+    const yMax = currentCell.y + distance + height - 1;
+    const borderCells: HoCMath.XY[] = [];
+    for (let x = xMin; x <= xMax; x++) {
+        borderCells.push({ x, y: yMin });
+    }
+    for (let x = xMin; x <= xMax; x++) {
+        borderCells.push({ x, y: yMax });
+    }
+    // The rows already carried the corners out, so the columns walk their interior only.
+    for (let y = yMin + 1; y < yMax; y++) {
+        borderCells.push({ x: xMin, y });
+        borderCells.push({ x: xMax, y });
+    }
+    return borderCells;
+}
+
 // return border cells that the small or big unit has
-function getBorderCells(currentCell: HoCMath.XY, isSmallUnit = true, distance = 1): HoCMath.XY[] {
+function getBorderCells(
+    currentCell: HoCMath.XY,
+    isSmallUnit = true,
+    distance = 1,
+    width = isSmallUnit ? 1 : 2,
+    height = isSmallUnit ? 1 : 2,
+): HoCMath.XY[] {
+    // Only a genuinely rectangular body takes the per-axis path. Both squares keep their hand-written ring,
+    // which decides not just WHICH anchors are offered but in which ORDER — and that order picks the winner
+    // among equal-cost stand cells further down.
+    if (width !== height) {
+        return getFootprintBorderCells(currentCell, distance, width, height);
+    }
     const borderCells = [];
     borderCells.push({ x: currentCell.x - distance, y: currentCell.y + distance });
     borderCells.push({ x: currentCell.x - distance, y: currentCell.y });
@@ -2159,11 +2309,25 @@ function filterCells(
     matrix: number[][],
     isAttackerSmall = true,
     attacker: IUnitAIRepr,
+    width = isAttackerSmall ? 1 : 2,
+    height = isAttackerSmall ? 1 : 2,
 ): HoCMath.XY[] {
     const filtered = [];
+    // As above, the two squares keep their literal clearance probes. The three extra cells they test are the
+    // 2x2 body written out; a rectangle has to be asked about its own, or a 1x2 anchor is refused because the
+    // column to its left — which it never occupies — happens to be taken.
+    const isRectangularBody = width !== height;
     for (const cell of cells) {
         if (isFree(cell, matrix, attacker)) {
-            if (isAttackerSmall) {
+            if (isRectangularBody) {
+                if (
+                    GridMath.getFootprintCellsForAnchor(cell, width, height).every((bodyCell) =>
+                        isFree(bodyCell, matrix, attacker),
+                    )
+                ) {
+                    filtered.push(cell);
+                }
+            } else if (isAttackerSmall) {
                 filtered.push(cell);
             } else if (
                 isFree({ x: cell.x - 1, y: cell.y }, matrix, attacker) &&

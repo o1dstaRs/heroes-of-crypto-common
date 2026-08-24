@@ -19,6 +19,7 @@ import {
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../../grid/grid_math";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { canCastSpell, canMassCastSpell } from "../../spells/spell_helper";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
@@ -26,7 +27,7 @@ import { getDistance, type XY } from "../../utils/math";
 import { canUnitLandAt } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
-import { otherTeam } from "./v0_1";
+import { byFootprintAreaLargestFirst, otherTeam } from "./v0_1";
 import { StrategyV0_3 } from "./v0_3";
 
 const RANGE = PBTypes.AttackVals.RANGE;
@@ -64,6 +65,26 @@ const AOE_ABILITIES = ["Area Throw", "Fire Breath", "Through Shot", "Skewer Stri
 const AOE_NAMES = new Set(["Black Dragon", "Pikeman", "Gargantuan", "Cyclops", "Tsar Cannon"]);
 const isAoEUnit = (u: Unit): boolean =>
     AOE_NAMES.has(u.getName()) || AOE_ABILITIES.some((ab) => u.hasAbilityActive(ab));
+
+/**
+ * How far past its target a Fire Breath wave carries: the depth of the BREATHER's own body along the wave.
+ *
+ * The scorer used to spell this as `isSmallSize() ? 1 : 2`, which has no axis — and depth genuinely is
+ * axis-dependent once a body can be a rectangle. A 2x1 is two cells deep only when it breathes sideways; a
+ * 1x2 only when it breathes up or down; on a diagonal the body's Chebyshev extent is what reaches. Both
+ * shipped shapes have W == H, so every existing hit-set (and the dirCoverage/dirValue/dirKill/dirThreat
+ * features the v0.5 vector bakes off it) comes out exactly as before. A unit without the ability breathes
+ * nothing and keeps the single-cell line.
+ */
+export const fireBreathDepthAlong = (unit: Unit, dx: number, dy: number): number => {
+    if (!unit.hasAbilityActive("Fire Breath")) {
+        return 1;
+    }
+    if (dx !== 0 && dy !== 0) {
+        return Math.max(unit.getFootprintWidth(), unit.getFootprintHeight());
+    }
+    return dy === 0 ? unit.getFootprintWidth() : unit.getFootprintHeight();
+};
 
 /**
  * v0.4 — extends the v0.3 champion with four requested human-tactics overrides. Each is a guarded branch
@@ -338,6 +359,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const nearest = (cell: XY): number => Math.min(...enemies.map((e) => getDistance(cell, e.getBaseCell())));
         let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
@@ -376,7 +399,17 @@ export class StrategyV0_4 extends StrategyV0_3 {
             let bestFront = front(tc);
             for (const u of units) {
                 if (u.getId() === t.getId() || u.getAttackType() !== MELEE || FRONT_TANKS.has(u.getName())) continue;
-                if (u.isSmallSize() !== t.isSmallSize()) continue;
+                // A swap exchanges two anchors outright, so it is only legal between units whose BODIES are
+                // congruent. `isSmallSize()` cannot say that: a 2x1 and a 1x2 both answer "not small", and
+                // swapping those two transposes each footprint into cells the other never reserved — an
+                // overlapping layout the engine rejects, dropping both stacks to the scatter fallback. For
+                // the two shipped shapes the pairwise test is exactly the old boolean.
+                if (
+                    u.getFootprintWidth() !== t.getFootprintWidth() ||
+                    u.getFootprintHeight() !== t.getFootprintHeight()
+                ) {
+                    continue;
+                }
                 const uc = placed.get(u.getId());
                 if (uc && front(uc) > bestFront) {
                     bestFront = front(uc);
@@ -607,6 +640,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const baseTarget = unitsHolder.getAllUnits().get(strike.targetId);
         const baseReach = baseTarget ? chainReach(baseTarget) : 1;
@@ -684,6 +719,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const baseCount = adjEnemies(strike.attackFrom ?? unit.getBaseCell()).length;
         const cands: { cell: XY; route?: IReadonlyWeightedRoute }[] = [{ cell: unit.getBaseCell() }];
@@ -761,6 +798,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const nearest = (cell: XY): number => Math.min(...ranges.map((t) => getDistance(cell, t.getBaseCell())));
         let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
@@ -804,7 +843,6 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (enemies.length < 2) {
             return decision; // need at least two enemies for a multi-stack hit
         }
-        const depth = fireBreath ? (unit.isSmallSize() ? 1 : 2) : 1;
         const occupantEnemy = (cell: XY): Unit | undefined => {
             if (cell.x < 0 || cell.y < 0) {
                 return undefined;
@@ -819,6 +857,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             const dx = Math.sign(tc.x - cell.x);
             const dy = Math.sign(tc.y - cell.y);
             const hit = new Set<string>([target.getId()]);
+            const depth = fireBreathDepthAlong(unit, dx, dy);
             for (let k = 1; k <= depth; k += 1) {
                 const occ = occupantEnemy({ x: tc.x + dx * k, y: tc.y + dy * k });
                 if (occ) {
@@ -836,6 +875,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const baseTarget = unitsHolder.getAllUnits().get(strike.targetId);
         const baseHits = baseTarget ? lineHits(strike.attackFrom ?? unit.getBaseCell(), baseTarget) : 1;
@@ -1142,6 +1183,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const adjToTarget = (cell: XY): boolean => target.getCells().some((tc) => isAdjacentCell(tc, cell));
         let best: { cell: XY; route: IReadonlyWeightedRoute } | undefined;
@@ -1264,6 +1307,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const adjToTarget = (cell: XY): boolean => target.getCells().some((tc) => isAdjacentCell(tc, cell));
         let best: { cell: XY; cover: number; weight: number } | undefined;
@@ -1386,6 +1431,8 @@ export class StrategyV0_4 extends StrategyV0_3 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const nearestSiegeDist = (cell: XY): number =>
             Math.min(...siege.map((s) => getDistance(cell, s.getBaseCell())));
@@ -1463,18 +1510,13 @@ export class StrategyV0_4 extends StrategyV0_3 {
         }
         // Deeper = safer first-pick (farther from the enemy); used only to break ties (and to seed unit 1).
         const frontness = (cc: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cc.y : -cc.y);
-        const footprintFor = (u: Unit, base: XY): XY[] =>
-            u.isSmallSize()
-                ? [base]
-                : [
-                      { x: base.x, y: base.y },
-                      { x: base.x - 1, y: base.y },
-                      { x: base.x, y: base.y - 1 },
-                      { x: base.x - 1, y: base.y - 1 },
-                  ];
-        const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1);
+        // The unit's real body. The spread below reserves this footprint against the stacks placed after it,
+        // so a presumed 2x2 would both refuse legal anchors and fence off cells nobody occupies — and this
+        // layout is the INCUMBENT the learned v0.5 placement policy is scored against, so a wrong shape here
+        // does not just lose one deployment, it moves the baseline a trained policy is measured on.
+        const footprintFor = (u: Unit, base: XY): XY[] => footprintCellsForAnchor(u, base);
         const placed: XY[] = [];
-        for (const u of [...units].sort(bySizeLargeFirst)) {
+        for (const u of [...units].sort(byFootprintAreaLargestFirst)) {
             let bestBase: XY | undefined;
             let bestSpacing = -Infinity;
             let bestFront = -Infinity;

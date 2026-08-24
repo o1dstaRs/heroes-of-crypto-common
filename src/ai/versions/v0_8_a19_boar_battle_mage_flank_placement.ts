@@ -11,6 +11,7 @@
 
 import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
@@ -63,10 +64,10 @@ interface IPlacementEvaluation {
 
 const key = (cell: XY): number => (cell.x << 4) | cell.y;
 
-const footprintFor = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [base]
-        : [base, { x: base.x - 1, y: base.y }, { x: base.x, y: base.y - 1 }, { x: base.x - 1, y: base.y - 1 }];
+// The unit's real body, from the one shared expansion. This feeds the treatment's own legality gate, so the
+// 1x1-or-2x2 copy this replaced made a rectangle report `candidate-incomplete-or-illegal` and silently
+// disabled the whole treatment (or, worse, validated a layout whose real footprint overlaps a neighbour).
+const footprintFor = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
 const placementIsCompleteAndLegal = (
     units: readonly Unit[],

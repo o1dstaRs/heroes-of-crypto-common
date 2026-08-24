@@ -29,13 +29,39 @@ const indexedCreatures = (): { factionName: string; creatureName: string; creatu
     return out;
 };
 
+const FOOTPRINT_OVERRIDE_ENV = "HOC_FOOTPRINT_OVERRIDES";
+
+/**
+ * Run with an explicit override string, or with overrides definitively off. Both directions are set here
+ * rather than assumed, because these tests are also run from harnesses that export HOC_FOOTPRINT_OVERRIDES
+ * for the whole process — a "shipped roster is square" assertion that silently inherits a rectangle from the
+ * ambient environment would be reporting on a board nobody configured.
+ */
+const withFootprintOverrides = <T>(overrides: string, run: () => T): T => {
+    const previous = process.env[FOOTPRINT_OVERRIDE_ENV];
+    if (overrides) {
+        process.env[FOOTPRINT_OVERRIDE_ENV] = overrides;
+    } else {
+        delete process.env[FOOTPRINT_OVERRIDE_ENV];
+    }
+    try {
+        return run();
+    } finally {
+        if (previous === undefined) {
+            delete process.env[FOOTPRINT_OVERRIDE_ENV];
+        } else {
+            process.env[FOOTPRINT_OVERRIDE_ENV] = previous;
+        }
+    }
+};
+
 describe("draft-time creature footprint", () => {
     // The whole point of putting a footprint on ICreatureInfo is that a placement policy holding only a
     // creature id can reason about shape. That is worth nothing unless it is the SAME shape the engine will
     // build the Unit with, so pin the two derivations against each other for the entire catalog rather than
     // spot-checking a couple of creatures: an AI that plans on a shape the engine disagrees with proposes
     // illegal anchors, and the engine rejects them.
-    test("matches the shape UnitProperties derives, for every creature in the catalog", () => {
+    const expectCatalogWideParity = (): void => {
         const creatures = indexedCreatures();
         expect(creatures.length).toBeGreaterThan(0);
 
@@ -61,21 +87,61 @@ describe("draft-time creature footprint", () => {
                 height: properties.footprint_height,
             });
         }
+    };
+
+    test("matches the shape UnitProperties derives, for every creature in the catalog", () => {
+        withFootprintOverrides("", expectCatalogWideParity);
+    });
+
+    // Same pin, with rectangles in play: parity that only holds for squares would not have caught anything.
+    test("matches the shape UnitProperties derives while a footprint override is active", () => {
+        withFootprintOverrides("White Tiger=2x1,Hyena=1x2", expectCatalogWideParity);
     });
 
     // Today's roster is entirely square, so this doubles as the "no behaviour moved" guard: if a rectangle
     // ever lands in creatures.json this test is the intended place to notice it, not a live ranked match.
     test("reports the legacy square shapes as exactly size x size", () => {
-        for (const { factionName, creatureName, creatureId } of indexedCreatures()) {
-            const size = catalog[factionName][creatureName].size ?? 1;
-            const info = creatureInfo(creatureId)!;
-            expect({ creatureName, width: info.footprintWidth, height: info.footprintHeight }).toEqual({
-                creatureName,
-                width: size,
-                height: size,
-            });
-            expect(size === 1 || size === 2).toBeTrue();
-        }
+        withFootprintOverrides("", () => {
+            for (const { factionName, creatureName, creatureId } of indexedCreatures()) {
+                const size = catalog[factionName][creatureName].size ?? 1;
+                const info = creatureInfo(creatureId)!;
+                expect({ creatureName, width: info.footprintWidth, height: info.footprintHeight }).toEqual({
+                    creatureName,
+                    width: size,
+                    height: size,
+                });
+                expect(size === 1 || size === 2).toBeTrue();
+            }
+        });
+    });
+
+    // HOC_FOOTPRINT_OVERRIDES is the only thing that puts a rectangle on the board today, so it is also the
+    // only configuration in which a draft-time footprint can be WRONG. Reading creatures.json directly would
+    // pass every assertion above and still hand the placement policies a 1x1 White Tiger that the engine then
+    // places as a 2x1 — the anchor is then chosen for a body one column too narrow, and the engine rejects it.
+    test("follows a QA footprint override, in both axes, and reverts when it is removed", () => {
+        const whiteTiger = creatureIdForName("White Tiger")!;
+        const hyena = creatureIdForName("Hyena")!;
+        const peasant = creatureIdForName("Peasant")!;
+
+        withFootprintOverrides("White Tiger=2x1,Hyena=1x2", () => {
+            const tiger = creatureInfo(whiteTiger)!;
+            expect([tiger.footprintWidth, tiger.footprintHeight]).toEqual([2, 1]);
+            // The transpose is asserted separately: an axis swap is the single most likely bug here, and one
+            // orientation on its own cannot see it.
+            const hyenaInfo = creatureInfo(hyena)!;
+            expect([hyenaInfo.footprintWidth, hyenaInfo.footprintHeight]).toEqual([1, 2]);
+            // A creature the override does not name must be untouched.
+            const peasantInfo = creatureInfo(peasant)!;
+            expect([peasantInfo.footprintWidth, peasantInfo.footprintHeight]).toEqual([1, 1]);
+        });
+
+        // The index is cached for the process, so a stale entry would keep reporting the rectangle after the
+        // override is gone — which in a multi-file test run means one harness reshaping another's board.
+        withFootprintOverrides("", () => {
+            const tiger = creatureInfo(whiteTiger)!;
+            expect([tiger.footprintWidth, tiger.footprintHeight]).toEqual([1, 1]);
+        });
     });
 
     // A footprint is a cost-and-value signal, but pricing it is a balance decision. The baked draft vectors

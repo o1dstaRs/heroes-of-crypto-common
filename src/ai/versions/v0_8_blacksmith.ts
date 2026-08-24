@@ -12,6 +12,7 @@
 import { hasDoubleShotAbility } from "../../abilities/ability_helper";
 import { evaluateAffectedUnits } from "../../abilities/aoe_range_ability";
 import type { GameAction } from "../../engine/actions";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { isSpellUsableByCaster } from "../../spells/spell_helper";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
@@ -55,15 +56,9 @@ const craftCells = (anchor: XY): XY[] => [
     { x: anchor.x + 1, y: anchor.y + 1 },
 ];
 
-const footprintForBase = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+// The unit's real body, from the one shared expansion — the same aura-coverage and fixed-cell reasoning as
+// the backline protector, which used to keep its own identical copy of this.
+const footprintForBase = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
 const footprintDistance = (left: readonly XY[], right: readonly XY[]): number => {
     let closest = Infinity;
