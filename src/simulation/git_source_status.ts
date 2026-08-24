@@ -79,24 +79,35 @@ export function parseGitSourceStatus(output: string): IGitSourceStatus {
     return { commit, status: status.join("\n").trim() };
 }
 
+// Hung-git protection, learned from a CI flake: a host git config with core.fsmonitor enabled makes
+// `git status` spawn the fsmonitor daemon, which inherits our stdout pipe — execFileSync then waits
+// forever for EOF (the test runner reported it as a 30s timeout plus a "dangling process"). Disable
+// the daemon and optional locks per call, never allow a terminal prompt, and cap the wall time; every
+// failure path below already degrades to "unknown and dirty".
+const GIT_SAFE_ARGS = ["-c", "core.fsmonitor=false"] as const;
+const GIT_SAFE_OPTIONS = {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout: 15_000,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" },
+} as const;
+
 /** Capture HEAD and working-tree status in one Git process. */
 export function captureGitSourceStatus(cwd: string = process.cwd()): IGitSourceStatus {
     try {
         return parseGitSourceStatus(
-            execFileSync("git", ["status", "--porcelain=v2", "--branch", "--no-ahead-behind"], {
+            execFileSync("git", [...GIT_SAFE_ARGS, "status", "--porcelain=v2", "--branch", "--no-ahead-behind"], {
+                ...GIT_SAFE_OPTIONS,
                 cwd,
-                encoding: "utf8",
-                stdio: ["ignore", "pipe", "ignore"],
             }),
         );
     } catch {
         // Preserve the old pair of best-effort Git calls: a missing repository/tool marks the source unknown
         // and dirty rather than allowing an evidence run to present incomplete provenance as clean.
         try {
-            const commit = execFileSync("git", ["rev-parse", "HEAD"], {
+            const commit = execFileSync("git", [...GIT_SAFE_ARGS, "rev-parse", "HEAD"], {
+                ...GIT_SAFE_OPTIONS,
                 cwd,
-                encoding: "utf8",
-                stdio: ["ignore", "pipe", "ignore"],
             }).trim();
             return { commit, status: "unknown" };
         } catch {

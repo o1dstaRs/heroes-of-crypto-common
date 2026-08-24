@@ -19,8 +19,19 @@ import { captureGitSourceStatus } from "../../src/simulation/git_source_status";
 
 const temporaryDirectories: string[] = [];
 
+// Fully isolate the fixture repos from the HOST's git config: a runner whose global config enables
+// core.fsmonitor makes `git status` spawn a daemon that inherits our pipe and hangs execFileSync
+// (seen once in CI as 30s timeouts + a "dangling process"). No host config, no prompts, hard cap.
+const GIT_TEST_ENV = {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_OPTIONAL_LOCKS: "0",
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_SYSTEM: "/dev/null",
+};
+
 function git(root: string, ...args: string[]): string {
-    return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+    return execFileSync("git", args, { cwd: root, encoding: "utf8", env: GIT_TEST_ENV, timeout: 15_000 }).trim();
 }
 
 function repository(): string {
