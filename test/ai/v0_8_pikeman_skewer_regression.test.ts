@@ -26,9 +26,9 @@ describe("v0.8 Pikeman Skewer regression", () => {
             abilities: ["Aggr", "Skewer Strike", "Wardguard"],
         });
         const goblin = createTestUnit({ team: UPPER, name: "Goblin Knight", amountAlive: 7, maxHp: 10 });
-        const ashMoth = createTestUnit({
+        const wanderingMage = createTestUnit({
             team: UPPER,
-            name: "Ash Moth",
+            name: "Wandering Mage",
             attackType: PBTypes.AttackVals.MAGIC,
             amountAlive: 25,
         });
@@ -37,7 +37,7 @@ describe("v0.8 Pikeman Skewer regression", () => {
 
         placeUnit(combat.grid, combat.unitsHolder, pikeman, { x: 4, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, goblin, { x: 5, y: 6 });
-        placeUnit(combat.grid, combat.unitsHolder, ashMoth, { x: 2, y: 6 });
+        placeUnit(combat.grid, combat.unitsHolder, wanderingMage, { x: 2, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, blackDragon, { x: 1, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 10, y: 2 });
         fightProperties.setTeamUnitsAlive(LOWER, 2);
@@ -58,7 +58,7 @@ describe("v0.8 Pikeman Skewer regression", () => {
             expect(decision).toContainEqual(
                 expect.objectContaining({
                     type: "melee_attack",
-                    targetId: ashMoth.getId(),
+                    targetId: wanderingMage.getId(),
                     attackFrom: { x: 3, y: 6 },
                 }),
             );

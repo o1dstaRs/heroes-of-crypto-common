@@ -927,8 +927,8 @@
             "spells": [],
             "abilities": ["Dense Flesh", "Flesh Shield Aura", "Stun Aura"]
         },
-        "Ash Moth": {
-            "name": "Ash Moth",
+        "Wandering Mage": {
+            "name": "Wandering Mage",
             "hp": 6,
             "steps": 7.5,
             "initiative": 5.6,

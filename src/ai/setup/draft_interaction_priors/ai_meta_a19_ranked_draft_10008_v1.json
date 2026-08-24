@@ -88,7 +88,7 @@
             "conservativeLiftPp": 4.914025447022052
         },
         {
-            "unit": "Ash Moth",
+            "unit": "Wandering Mage",
             "enemyUnit": "Nomad",
             "support": 91,
             "conservativeLiftPp": -2.968762598134172
@@ -143,7 +143,7 @@
         },
         {
             "unit": "Nomad",
-            "enemyUnit": "Ash Moth",
+            "enemyUnit": "Wandering Mage",
             "support": 91,
             "conservativeLiftPp": 2.968762598134166
         },

@@ -75,11 +75,11 @@ describe("SetupPolicyV0", () => {
         expect(eligibleBacklineProtectorChoices([abomination, queen], [], [])).toEqual([abomination, queen]);
     });
 
-    test("uses public opponent and own-roster context for Ash Moth, Healer, and Angel roles", () => {
-        const ashMoth = PBTypes.CreatureVals.ASH_MOTH;
+    test("uses public opponent and own-roster context for Wandering Mage, Healer, and Angel roles", () => {
+        const wanderingMage = PBTypes.CreatureVals.WANDERING_MAGE;
         const blacksmith = PBTypes.CreatureVals.BLACKSMITH;
         const enemyRanger = PBTypes.CreatureVals.ORC;
-        expect(policy.pickCreature(1, [ashMoth, blacksmith], [], [enemyRanger])).toBe(ashMoth);
+        expect(policy.pickCreature(1, [wanderingMage, blacksmith], [], [enemyRanger])).toBe(wanderingMage);
 
         const healer = PBTypes.CreatureVals.HEALER;
         const pikeman = PBTypes.CreatureVals.PIKEMAN;

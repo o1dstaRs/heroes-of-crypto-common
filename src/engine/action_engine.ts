@@ -1268,7 +1268,7 @@ export class GameActionEngine {
         return { completed: true, events };
     }
     /**
-     * Smoke spell (Ash Moth / Book of Chaos): throws a 2x2 smoke cloud onto FREE cells anywhere on the
+     * Smoke spell (Wandering Mage / Book of Chaos): throws a 2x2 smoke cloud onto FREE cells anywhere on the
      * battlefield. Only empty cells of the 2x2 block become smoked — cells already occupied by a creature (or
      * off-grid) are skipped, so the cloud shapes around whatever is standing in it. Ranged attacks crossing a
      * smoked cell have their damage halved (divisor x2); a creature stepping on a smoked cell dispels it; the

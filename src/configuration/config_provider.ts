@@ -240,9 +240,7 @@ export const getCreatureConfig = (
         throw TypeError(`Unknown faction - ${factionName}`);
     }
 
-    // Keep the stable Ash Moth catalog identity compatible with the renamed player-facing creature.
-    const resolvedCreatureName = creatureName === "Wandering Mage" ? "Ash Moth" : creatureName;
-    const creatureConfig = factionUnits[resolvedCreatureName];
+    const creatureConfig = factionUnits[creatureName];
     if (!creatureConfig) {
         throw TypeError(`Unknown creature - ${creatureName}`);
     }

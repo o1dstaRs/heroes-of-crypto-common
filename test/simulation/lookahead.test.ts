@@ -373,7 +373,7 @@ describe("lookahead driver — replay determinism / no RNG leak", () => {
     it("marks every strategy decision made inside LookaheadDriver as a rollout", () => {
         try {
             const h = buildBattle(1313, "v0.5");
-            // 10 -> 14 turns after Ash Moth grew the L1 pool: the seeded roster shifted such that at turn 10
+            // 10 -> 14 turns after Wandering Mage grew the L1 pool: the seeded roster shifted such that at turn 10
             // this battle reaches a state where the driver short-circuits without rolling out, so the probe
             // observed nothing. Same seed, played a little further, where rollouts genuinely happen again.
             h.playTurns(14);

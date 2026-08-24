@@ -47,7 +47,7 @@ export const V08_POST_A13_COVERAGE_TARGETS = Object.freeze([
     Object.freeze({ unit: "Mermaid", level: 1, controlUnit: "Peasant" }),
     Object.freeze({ unit: "Dryad", level: 1, controlUnit: "Peasant" }),
     Object.freeze({ unit: "Blacksmith", level: 1, controlUnit: "Peasant" }),
-    Object.freeze({ unit: "Ash Moth", level: 1, controlUnit: "Peasant" }),
+    Object.freeze({ unit: "Wandering Mage", level: 1, controlUnit: "Peasant" }),
     Object.freeze({ unit: "Zena", level: 3, controlUnit: "Crusader" }),
     Object.freeze({ unit: "Wyvern", level: 2, controlUnit: "Pikeman" }),
     Object.freeze({ unit: "Trent", level: 2, controlUnit: "Pikeman" }),

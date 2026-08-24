@@ -125,7 +125,7 @@ const isRangedDamageSpellbookEntry = (entry: string): boolean => {
     try {
         const spell = getSpellConfig(entry.slice(0, separator), entry.slice(separator + 1));
         // This is the same contract used by the engine and tactical AI before they call calculateSpellDamage.
-        // Target shape alone is not damage: Ash Moth's Smoke and Misfortune both target at range, but neither
+        // Target shape alone is not damage: Wandering Mage's Smoke and Misfortune both target at range, but neither
         // is an offensive magic hit and neither should make an army look like a mage battery.
         return !spell.is_buff && isOffensiveSpellMultiplier(spell.multiplier_type);
     } catch {
@@ -281,7 +281,7 @@ const hasNamedCreature = (creatureIds: readonly number[], names: ReadonlySet<str
 /**
  * Fair, public-context role fit layered over either the hand heuristic or a shipped intrinsic genome. The
  * multiplier deliberately does not inspect positions or hidden picks:
- *  - Ash Moth becomes a real counter-pick only after enemy shooters are revealed.
+ *  - Wandering Mage becomes a real counter-pick only after enemy shooters are revealed.
  *  - A Healer and its durable anchor reinforce each other in whichever one is selected later.
  *  - Angel is preferred as a ranged-line screen when both armies actually field a firing line.
  *
@@ -310,7 +310,7 @@ export const creatureRoleFitMultiplier = (
         hasNamedCreature(ownCreatureIds, ALWAYS_DURABLE_HEAL_ANCHOR_NAMES) || ownAngelHasActiveScreen;
     const candidateAngelHasActiveScreen = info.name === "Angel" && ownBackline >= 2 && knownEnemyShooters > 0;
 
-    if (info.name === "Ash Moth" && knownEnemyShooters > 0) {
+    if (info.name === "Wandering Mage" && knownEnemyShooters > 0) {
         return knownEnemyShooters >= 2 ? 3 : 2.25;
     }
 
