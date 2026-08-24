@@ -13,8 +13,9 @@ import type { XY } from "../utils/math";
 
 /** How many single-cell mountains a scattered BLOCK_CENTER layout drops. */
 export const SCATTERED_MOUNTAIN_COUNT = 12;
-/** The neutral middle band the rocks land in: this many full-HEIGHT columns, centred horizontally —
- *  the vertical strip between the left and right deployment fields of the side-oriented board. */
+/** The neutral middle band the rocks land in: this many full-WIDTH rows, centred vertically —
+ *  the horizontal belt between the bottom and top deployment fields (RectanglePlacement carves
+ *  y 1-3 and y 12-14 across the full board width, so mid-board rows never collide with either army). */
 export const SCATTERED_MOUNTAIN_BAND_ROWS = 4;
 /**
  * Distinct obstacle art variants the client can draw (variant indices are 0..VARIANTS-1) — the nine-barrel
@@ -61,12 +62,13 @@ export const scatteredMountainsForSeed = (seed: string, gridSize = 16): ISeededS
 
     const free: XY[] = [];
     const bandStart = (gridSize >> 1) - (SCATTERED_MOUNTAIN_BAND_ROWS >> 1);
-    // Middle COLUMNS, full height: the side-oriented board deploys armies on the left/right flanks, so
-    // the neutral strip runs vertically between them. The old horizontal band crossed both deployment
-    // zones and dropped stones into the armies' laps (which is how "12 barrels" read as ~9 on a live
-    // board). Mirrors the sandbox roll exactly.
-    for (let x = bandStart; x < bandStart + SCATTERED_MOUNTAIN_BAND_ROWS; x++) {
-        for (let y = 0; y < gridSize; y++) {
+    // Middle ROWS, full width: the deployment fields are the bottom and top row bands (y 1-3 and
+    // y 12-14, full width), so the neutral strip is the horizontal mid-board belt between them. A
+    // vertical strip would run straight through both fields and drop stones into the armies' laps.
+    // The "12 barrels read as ~9" bug was never the band: it was variant indices past the atlas
+    // (fixed by the deck deal below). Mirrors the sandbox roll exactly.
+    for (let x = 0; x < gridSize; x++) {
+        for (let y = bandStart; y < bandStart + SCATTERED_MOUNTAIN_BAND_ROWS; y++) {
             free.push({ x, y });
         }
     }
