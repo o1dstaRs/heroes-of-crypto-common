@@ -12,7 +12,7 @@
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { GridType } from "../generated/protobuf/v1/types_gen";
-import { isCellWithinGrid } from "./grid_math";
+import { getCellsAroundFootprint, isCellWithinGrid } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { type XY, updateMatrixElementIfExists } from "../utils/math";
 import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } from "./grid_constants";
@@ -278,48 +278,27 @@ export class Grid {
     public getRegisteredCells(unitId: string): XY[] {
         return this.cellsByUnitId[unitId] ? this.cellsByUnitId[unitId].map((cell) => ({ ...cell })) : [];
     }
-    public cleanupAll(unitId: string, attackRange: number, isSmallUnit: boolean) {
+    /**
+     * `_isSmallUnit` no longer decides anything: the cells this grid has REGISTERED for the unit are the
+     * footprint, whatever its shape, and stampAggrRing lifts the ring of exactly those cells. It stays in the
+     * signature because every caller in the engine, the sandbox and the ranked scene passes it positionally.
+     */
+    public cleanupAll(unitId: string, attackRange: number, _isSmallUnit: boolean) {
         const occupiedCells = this.cellsByUnitId[unitId];
         const team = this.unitIdToTeam[unitId];
         // delete this.unitIdToTeam[unitId];
         if (occupiedCells) {
             if (occupiedCells.length) {
-                let xMin = Number.MAX_SAFE_INTEGER;
-                let xMax = Number.MIN_SAFE_INTEGER;
-                let yMin = Number.MAX_SAFE_INTEGER;
-                let yMax = Number.MIN_SAFE_INTEGER;
+                let aggrGrid: number[][] | undefined;
+                if (attackRange) {
+                    aggrGrid = this.boardAggrPerTeam.get(team);
+                }
 
                 for (const oc of occupiedCells) {
                     this.boardCoord[oc.x][oc.y] = NO_UNIT;
-                    let aggrGrid: number[][] | undefined;
-                    if (attackRange) {
-                        aggrGrid = this.boardAggrPerTeam.get(team);
-                    }
-
-                    // Update aggregation grid for each cell that had a unit, regardless of size
-                    if (isSmallUnit) {
-                        this.updateAggrGrid(oc, attackRange, -1, aggrGrid);
-                    }
-
-                    // Track bounding box for large units (for potential other logic)
-                    if (!isSmallUnit) {
-                        xMin = Math.min(xMin, oc.x);
-                        xMax = Math.max(xMax, oc.x);
-                        yMin = Math.min(yMin, oc.y);
-                        yMax = Math.max(yMax, oc.y);
-                    }
                 }
 
-                // Still update corners for large units with proper mask if needed for other logic
-                if (!isSmallUnit && xMin !== xMax && yMin !== yMax && attackRange) {
-                    const aggrGrid = this.boardAggrPerTeam.get(team);
-                    if (aggrGrid) {
-                        this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, -1, aggrGrid, UPDATE_DOWN_LEFT);
-                        this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, -1, aggrGrid, UPDATE_UP_LEFT);
-                        this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, -1, aggrGrid, UPDATE_DOWN_RIGHT);
-                        this.updateAggrGrid({ x: xMax, y: yMax }, attackRange, -1, aggrGrid, UPDATE_UP_RIGHT);
-                    }
-                }
+                this.stampAggrRing(occupiedCells, -1, aggrGrid);
             }
             this.cellsByUnitId[unitId] = [];
         }
@@ -407,12 +386,14 @@ export class Grid {
         return this.gridSettings;
     }
     /**
-     * Whether one complete footprint may occupy ordinary cells plus traversable terrain. Existing large units
-     * may overlap part of their current 2x2 footprint while sliding one cell; `ownUnitId` permits only that
-     * overlap. Callers placing a new unit omit it, so another stack's cells remain blocked.
+     * Whether one complete footprint may occupy ordinary cells plus traversable terrain. Any non-empty set of
+     * cells is judged — a 1x1, a 2x2 and every WxH rectangle in between — because the shape is the caller's
+     * business and this only answers "is that ground free". Existing units may overlap part of their current
+     * footprint while sliding one cell; `ownUnitId` permits only that overlap. Callers placing a new unit omit
+     * it, so another stack's cells remain blocked.
      */
     public canOccupyCells(cells: XY[], canOccupyLava: boolean, canOccupyWater: boolean, ownUnitId?: string): boolean {
-        if (cells.length !== 1 && cells.length !== 4) {
+        if (!cells.length) {
             return false;
         }
 
@@ -475,7 +456,7 @@ export class Grid {
         canOccupyLava: boolean,
         canOccupyWater: boolean,
     ): boolean {
-        if (!unitId || !team || !cells.length || !(cells.length === 1 || cells.length === 4)) {
+        if (!unitId || !team || !cells.length) {
             return false;
         }
 
@@ -497,8 +478,18 @@ export class Grid {
         }
 
         const occupiedCells = this.cellsByUnitId[unitId];
-        if (occupiedCells?.length && occupiedCells.length !== 4) {
-            return false;
+        // A unit may only be re-registered over a footprint of the same SIZE as the one it already holds (or
+        // over nothing at all); anything else means the caller grew or shrank a body without cleanupAll and
+        // would strand cells nobody owns. The legacy gate spelled that as "the previous registration must be
+        // a 2x2", because occupyCells was the large-unit path and small stacks came through occupyCell — a
+        // single-cell registration was therefore frozen here, and ranked's occupancy reconcile leans on that
+        // refusal to detect a half-applied move. Keep the legacy reading verbatim for the two shipped sizes
+        // and apply the size rule only to the rectangles that never went through the old path.
+        if (occupiedCells?.length) {
+            const isLegacyFootprint = cells.length === 1 || cells.length === 4;
+            if (isLegacyFootprint ? occupiedCells.length !== 4 : occupiedCells.length !== cells.length) {
+                return false;
+            }
         }
 
         let aggrGrid: number[][] | undefined;
@@ -508,10 +499,7 @@ export class Grid {
 
         if (occupiedCells?.length) {
             const processed: Set<number> = new Set();
-            let xMin = Number.MAX_SAFE_INTEGER;
-            let xMax = Number.MIN_SAFE_INTEGER;
-            let yMin = Number.MAX_SAFE_INTEGER;
-            let yMax = Number.MIN_SAFE_INTEGER;
+            const vacatedCells: XY[] = [];
             for (const oc of occupiedCells) {
                 const key = (oc.x << 4) | oc.y;
                 if (processed.has(key)) {
@@ -535,32 +523,20 @@ export class Grid {
                     } else {
                         this.boardCoord[oc.x][oc.y] = NO_UNIT;
                     }
-                    // Update aggregation grid for each cell that is being vacated
-                    if (aggrGrid && occupiedCells.length === 1) {
-                        this.updateAggrGrid(oc, attackRange, -1, aggrGrid);
-                    }
                 }
 
-                xMin = Math.min(xMin, oc.x);
-                xMax = Math.max(xMax, oc.x);
-                yMin = Math.min(yMin, oc.y);
-                yMax = Math.max(yMax, oc.y);
+                vacatedCells.push(oc);
                 processed.add(key);
             }
-            // Still update corners for large units with proper mask if needed for other logic
-            if (xMin !== xMax && yMin !== yMax && aggrGrid) {
-                this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, -1, aggrGrid, UPDATE_DOWN_LEFT);
-                this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, -1, aggrGrid, UPDATE_UP_LEFT);
-                this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, -1, aggrGrid, UPDATE_DOWN_RIGHT);
-                this.updateAggrGrid({ x: xMax, y: yMax }, attackRange, -1, aggrGrid, UPDATE_UP_RIGHT);
-            }
+            // The ring comes off the whole body it is leaving, exactly as it went on. A cell the unit no
+            // longer owns still counts towards that body: the mask form this replaces also worked off the
+            // registration rather than the board, and a unit half-overwritten by someone else must not leave
+            // a slice of permanent phantom threat behind.
+            this.stampAggrRing(vacatedCells, -1, aggrGrid);
         }
 
         const processed: Set<number> = new Set();
-        let xMin = Number.MAX_SAFE_INTEGER;
-        let xMax = Number.MIN_SAFE_INTEGER;
-        let yMin = Number.MAX_SAFE_INTEGER;
-        let yMax = Number.MIN_SAFE_INTEGER;
+        const occupiedNow: XY[] = [];
         for (const c of cells) {
             if (
                 c.x < 0 ||
@@ -576,30 +552,17 @@ export class Grid {
                 continue;
             }
             this.boardCoord[c.x][c.y] = unitId;
-            // Update aggregation grid for each cell that is being occupied
-            if (aggrGrid && cells.length === 1) {
-                this.updateAggrGrid(c, attackRange, 1, aggrGrid);
-            }
-            xMin = Math.min(xMin, c.x);
-            xMax = Math.max(xMax, c.x);
-            yMin = Math.min(yMin, c.y);
-            yMax = Math.max(yMax, c.y);
+            occupiedNow.push(c);
             processed.add(key);
         }
-        // Still update corners for large units with proper mask if needed for other logic
-        if (xMin !== xMax && yMin !== yMax && aggrGrid) {
-            this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_LEFT);
-            this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_LEFT);
-            this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_RIGHT);
-            this.updateAggrGrid({ x: xMax, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_RIGHT);
-        }
+        this.stampAggrRing(occupiedNow, 1, aggrGrid);
         this.cellsByUnitId[unitId] = cells;
 
         return true;
     }
     /**
      * Recompute every team's AGGRO board from the grid's CURRENT occupancy, without touching occupancy itself.
-     * Mirrors the aggro-add path in occupyCells (small unit: per-cell; large unit: four corner masks). Used to
+     * Mirrors the aggro-add path in occupyCells — one ring around each unit's whole footprint. Used to
      * repair a stale aggro board (ranked skip-rebuild snapshots move units without re-stamping aggro) so the
      * AI's pathfinding sees the same enemy threat zones the server enforces — WITHOUT the ghost-occupancy risk
      * of a cleanupAll/occupyCells re-stamp (occupyCells silently drops a unit whose cells are momentarily
@@ -627,26 +590,7 @@ export class Grid {
             if (!aggrGrid) {
                 continue;
             }
-            if (cells.length === 1) {
-                this.updateAggrGrid(cells[0], attackRange, 1, aggrGrid);
-                continue;
-            }
-            let xMin = Number.MAX_SAFE_INTEGER;
-            let xMax = Number.MIN_SAFE_INTEGER;
-            let yMin = Number.MAX_SAFE_INTEGER;
-            let yMax = Number.MIN_SAFE_INTEGER;
-            for (const c of cells) {
-                xMin = Math.min(xMin, c.x);
-                xMax = Math.max(xMax, c.x);
-                yMin = Math.min(yMin, c.y);
-                yMax = Math.max(yMax, c.y);
-            }
-            if (xMin !== xMax && yMin !== yMax) {
-                this.updateAggrGrid({ x: xMin, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_LEFT);
-                this.updateAggrGrid({ x: xMin, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_LEFT);
-                this.updateAggrGrid({ x: xMax, y: yMin }, attackRange, 1, aggrGrid, UPDATE_DOWN_RIGHT);
-                this.updateAggrGrid({ x: xMax, y: yMax }, attackRange, 1, aggrGrid, UPDATE_UP_RIGHT);
-            }
+            this.stampAggrRing(cells, 1, aggrGrid);
         }
     }
     public getOccupantUnitId(cell: XY): string | undefined {
@@ -865,6 +809,34 @@ export class Grid {
             column < this.availableCenterEnd
         );
     }
+    /**
+     * Add (or lift) a unit's zone of control: `updBy` on every cell touching its whole FOOTPRINT, once each.
+     *
+     * One ring around the whole body is the only rule that survives a non-square footprint. What it replaces
+     * was three different rules — an unmasked per-cell ring for a 1x1 and four masked corner rings for a
+     * 2x2, the latter fired only when the body was wider than one cell in BOTH axes. A 1x2 or 2x1 satisfies
+     * neither branch, so a rectangular unit used to stamp NO aggro at all and pathfinding read the ground
+     * around it as unthreatened. For the two shipped shapes this is the same board to the cell: the four
+     * corner masks of a 2x2 emit exactly its 12-cell ring, and an unmasked call emits exactly the 8-cell
+     * ring of a 1x1 (test/grid/footprint_occupancy.test.ts pins both against the mask machinery itself).
+     *
+     * The aggro board is indexed [x][y] while updateMatrixElementIfExists is `(m, x, y, v) => m[y][x] += v`,
+     * so the arguments go in swapped — as they always have.
+     */
+    private stampAggrRing(footprint: readonly XY[], updBy: number, aggrGrid?: number[][]): void {
+        if (!aggrGrid || !updBy || !footprint.length) {
+            return;
+        }
+
+        for (const ringCell of getCellsAroundFootprint(this.gridSettings, footprint)) {
+            updateMatrixElementIfExists(aggrGrid, ringCell.y, ringCell.x, updBy);
+        }
+    }
+    /**
+     * The single-cell zone of control, optionally narrowed to one quadrant of the ring by an UPDATE_* mask.
+     * Occupancy no longer needs the masked form now that stampAggrRing lays a whole footprint's ring down in
+     * one pass, but occupyCell — which is single-cell by definition — still stamps through here.
+     */
     private updateAggrGrid(
         cell: XY,
         range: number,

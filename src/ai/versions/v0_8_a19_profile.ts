@@ -28,10 +28,11 @@ export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SOURCE = "src/simu
 export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SHA256 =
     "9c1d70f719c8f6db786a0d00b04a40e4bfa9b90b22c0f22d1ae4374905faf134" as const;
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simulation/battle_engine.ts" as const;
-// Re-pinned with the aura-refresh/battle-engine working-tree batch (2026-08-14): only the source
-// bytes moved with that edit; the routing decision itself is unchanged.
+// Re-pinned for rectangular unit footprints (2026-08-24): placeArmy now records a stack's width/height when
+// it is not square, and the three hand-written 2x2 expansions were routed through simulation/footprint.ts.
+// Both shipped shapes keep their exact cells, so the routing decision and every 1x1/2x2 rollout are unchanged.
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "28a263a4df97a55e4f03021ed17ffd98510bdef20c51ab48b7b9da5b888a9ea5" as const;
+    "d327547196cc9c876a91a2effeb6aa48c338e1b304c0b8ed09fe5ed4e291e421" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
     "afc6df1b4ca82e16a43ebc5bf2cce37ab0c761bec81f8ef5714c3d80c8b2d294" as const;

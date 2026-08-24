@@ -15,6 +15,7 @@ import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
+import { normalizeFootprintSide } from "../grid/grid_math";
 import { getDistance, type XY } from "../utils/math";
 import { Ability } from "./ability";
 import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "./double_shot_names";
@@ -25,11 +26,21 @@ export function getAbilitiesWithPosisionCoefficient(
     toCell?: XY,
     toUnitSmallSize?: boolean,
     fromUnitTeam?: TeamType,
+    toFootprintHeight?: number,
 ): Ability[] {
     const abilities: Ability[] = [];
     if (!unitAbilities?.length || !fromCell || !toCell) {
         return abilities;
     }
+
+    // Both arguments are ANCHOR cells — the top-right corner of a footprint — so `toCell.y` names the
+    // target's TOP row while its body reaches down to `toCell.y - (height - 1)`. An UPPER-team attacker
+    // stabs from below, so it has to clear the whole body rather than a single cell of it: the margin is
+    // the target's footprint HEIGHT minus one. `toUnitSmallSize` could only ever say 1 or 2, which is why
+    // the shipped code spelled that margin as a literal 0-or-1; callers that still pass only the boolean
+    // get exactly the same number back. The LOWER-team test has no margin at all and gains none here —
+    // its `aY > tY` already compares against the target's topmost row.
+    const targetHeight = normalizeFootprintSide(toFootprintHeight, toUnitSmallSize ? 1 : 2);
 
     for (const a of unitAbilities) {
         if (a.getName() === "Backstab") {
@@ -40,7 +51,7 @@ export function getAbilitiesWithPosisionCoefficient(
                 abilities.push(a);
             }
 
-            if (fromUnitTeam === PBTypes.TeamVals.UPPER && aY < tY - (toUnitSmallSize ? 0 : 1)) {
+            if (fromUnitTeam === PBTypes.TeamVals.UPPER && aY < tY - (targetHeight - 1)) {
                 abilities.push(a);
             }
         }

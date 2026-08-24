@@ -93,6 +93,7 @@ import {
 } from "./search_driver";
 import { createV08A13SearchDriver, shouldUseDefaultV08A13Search, withScopedAIEnvironment } from "./v0_8_a13_search";
 import { createV08A19SearchDriver, shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
+import { footprintCellsForAnchor, footprintLabel } from "./footprint";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { extractValueFeatures, extractValueFeaturesV2Raw } from "./value_features";
 
@@ -434,6 +435,14 @@ export interface IPlacementRecord {
     size: number;
     amount: number;
     cell: XY;
+    /**
+     * The stack's footprint, present ONLY when it is not the square `size x size` block the `size` field
+     * already describes. A harness that rebuilds a board from these records must reconstruct the exact shape
+     * that was played, and a 1x2 recorded as `size: 2` would come back as a 2x2. Omitted for the two shipped
+     * shapes so every existing recorded match stays byte-identical.
+     */
+    footprintWidth?: number;
+    footprintHeight?: number;
 }
 
 export interface IRecordedAction {
@@ -569,15 +578,10 @@ const publicCreatureIdsFromRoster = (roster: readonly IArmyUnitSpec[]): number[]
     return [...ids];
 };
 
-const footprintCells = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+// The unit's real footprint, anchored on `base`. Delegated to the shared simulation helper so the sim, the
+// recovery net and the lookahead can never disagree about a stack's shape; the helper reproduces the legacy
+// 1x1 and 2x2 expansions (cell order included) verbatim.
+const footprintCells = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
 // --- Skip audit -------------------------------------------------------------
 // Env/flag-gated instrumentation to answer "why do units skip turns". Every acting turn is bucketed into
@@ -1484,9 +1488,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 } else if (action.type === "melee_attack") {
                     const tgt = unitsHolder.getAllUnits().get(action.targetId);
                     const af = action.attackFrom ?? unit.getBaseCell();
-                    const afCells = unit.isSmallSize()
-                        ? [af]
-                        : [af, { x: af.x, y: af.y - 1 }, { x: af.x - 1, y: af.y }, { x: af.x - 1, y: af.y - 1 }];
+                    const afCells = footprintCells(unit, af);
                     const bc = unit.getBaseCell();
                     const stationary = af.x === bc.x && af.y === bc.y;
                     const sel = unit.getAttackTypeSelection();
@@ -1676,7 +1678,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     // (client would skip, sim moves) or only defend (truly stuck), unit size, and re-up state.
                     const proposed = auditProposedAttack ? "atkrej" : auditProposedMove ? "movrej" : "idle";
                     const recovery = advanced ? "advance" : "defend";
-                    const size = unit.isSmallSize() ? "small" : "large";
+                    const size = footprintLabel(unit);
                     const reup = fightProperties.hasAlreadyHourglass(unit.getId()) ? "_reup" : "";
                     auditTurn(`skip_${proposed}_${recovery}_${size}${reup}`, unit.getName());
                 }
@@ -1843,6 +1845,8 @@ function placeArmy(
         }
         if (placed) {
             const spec = roster[units.indexOf(unit)];
+            const footprintWidth = unit.getFootprintWidth();
+            const footprintHeight = unit.getFootprintHeight();
             records.push({
                 unitId: unit.getId(),
                 creatureName: unit.getName(),
@@ -1850,6 +1854,8 @@ function placeArmy(
                 size: spec?.size ?? (unit.isSmallSize() ? 1 : 2),
                 amount: unit.getAmountAlive(),
                 cell: { ...unit.getBaseCell() },
+                // Only a rectangle needs its dimensions spelled out; see IPlacementRecord.
+                ...(footprintWidth === footprintHeight ? {} : { footprintWidth, footprintHeight }),
             });
         }
     }

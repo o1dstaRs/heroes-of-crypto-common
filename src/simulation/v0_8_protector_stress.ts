@@ -50,6 +50,7 @@ import {
     type ITurnExecutionObservation,
     type Side,
 } from "./battle_engine";
+import { footprintCellsForRecord } from "./footprint";
 import { liveTwinSetup } from "./livetwin";
 import { SearchDriver } from "./search_driver";
 
@@ -327,10 +328,10 @@ const footprintDistance = (left: readonly XY[], right: readonly XY[]): number =>
     return closest;
 };
 
-const placementCells = (cell: XY, size: number): XY[] =>
-    size === 1
-        ? [{ ...cell }]
-        : [{ ...cell }, { x: cell.x - 1, y: cell.y }, { x: cell.x, y: cell.y - 1 }, { x: cell.x - 1, y: cell.y - 1 }];
+// Rectangular stacks carry their own width/height on the placement record; `size` alone would rebuild them
+// as squares and mis-measure every coverage distance below.
+const placementCells = (cell: XY, size: number, footprintWidth?: number, footprintHeight?: number): XY[] =>
+    footprintCellsForRecord(cell, size, footprintWidth, footprintHeight);
 
 interface IPendingProtectorTurn {
     unit: Unit;
@@ -690,8 +691,18 @@ export function runV08ProtectorStressGame(
         if (protectorPlacement && wardPlacement) {
             metrics.initialExactCoverage = Number(
                 footprintDistance(
-                    placementCells(protectorPlacement.cell, protectorPlacement.size),
-                    placementCells(wardPlacement.cell, wardPlacement.size),
+                    placementCells(
+                        protectorPlacement.cell,
+                        protectorPlacement.size,
+                        protectorPlacement.footprintWidth,
+                        protectorPlacement.footprintHeight,
+                    ),
+                    placementCells(
+                        wardPlacement.cell,
+                        wardPlacement.size,
+                        wardPlacement.footprintWidth,
+                        wardPlacement.footprintHeight,
+                    ),
                 ) <= 1,
             );
         }

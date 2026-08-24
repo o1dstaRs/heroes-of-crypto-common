@@ -15,6 +15,7 @@ import { DOUBLE_SHOT_ABILITY_NAMES } from "../../abilities/double_shot_names";
 import { getAbilityConfig, getSpellConfig } from "../../configuration/config_provider";
 import { CreatureFactions, CreatureLevels } from "../../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import { normalizeFootprintSide } from "../../grid/grid_math";
 import { isOffensiveSpellMultiplier } from "../../spells/spell_damage";
 import { SpellPowerType } from "../../spells/spell_properties";
 
@@ -74,6 +75,20 @@ export interface ICreatureInfo {
     castsAmplifiableBuff: boolean;
     /** Buffs allied magic damage through Nightmare's Empower or an ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE aura. */
     magicDamageAmplifier: boolean;
+    /**
+     * The board rectangle this creature's stack occupies, in cells: `footprintWidth` columns (x) by
+     * `footprintHeight` rows (y). Draft and the reveal-conditioned placement policies only ever hold a
+     * creature ID — there is no Unit to ask before the army exists — so shape has to travel with the
+     * identity, or a policy that reserves zone depth, screens a firing line or measures a gap has to guess.
+     * Derived exactly the way UnitProperties derives it (footprint_width/height falling back to `size`), so
+     * the shipped square shapes report 1x1 and 2x2 and no consumer can drift from the engine.
+     *
+     * Descriptive ONLY. These are deliberately absent from DRAFT_FEATURE_NAMES: the baked DRAFT_ANCHOR_W /
+     * DEFAULT_DRAFT_W vectors are fit on that fixed basis, and pricing a footprint as cost or value is a
+     * balance decision rather than a geometry fix.
+     */
+    footprintWidth: number;
+    footprintHeight: number;
 }
 
 const CreatureJsonShape = CREATURES_JSON as unknown as Record<
@@ -93,6 +108,9 @@ const CreatureJsonShape = CREATURES_JSON as unknown as Record<
             spells?: string[];
             abilities?: string[];
             movement_type?: string;
+            size?: number;
+            footprint_width?: number;
+            footprint_height?: number;
         }
     >
 >;
@@ -220,6 +238,11 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 magicDamageAmplifier:
                     spellList.some(isMagicDamageAmplifyingSpellbookEntry) ||
                     abilityList.some(isMagicDamageAmplifyingAbility),
+                // Same fallback chain as UnitProperties: an explicit rectangle wins, otherwise the legacy
+                // square `size`, otherwise 1x1. Going through the engine's own normalizer keeps a malformed
+                // or fractional catalog entry from becoming a footprint the grid cannot represent.
+                footprintWidth: normalizeFootprintSide(cfg.footprint_width, cfg.size ?? 1),
+                footprintHeight: normalizeFootprintSide(cfg.footprint_height, cfg.size ?? 1),
             });
         }
     }

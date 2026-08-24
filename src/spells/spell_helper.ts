@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { isCellWithinGrid } from "../grid/grid_math";
+import { getFootprintCellsForAnchor, isCellWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { MAGIC_REFLECTION_ABILITY_NAME, magicReflectionPercent } from "../abilities/magic_reflection_ability";
 import { Unit } from "../units/unit";
@@ -36,6 +36,27 @@ const verifyEmptyCell = (gridMatrix: number[][], emptyGridCell?: XY): boolean =>
     }
 
     return !gridMatrix[emptyGridCell.y][emptyGridCell.x];
+};
+
+/**
+ * The same question asked of a whole BLOCK of cells: every one of them free, or the block does not fit.
+ *
+ * A body is placed whole or not at all — half a footprint standing on open ground is not a placement, it is
+ * a creature hanging off the edge of another one. The board test comes for free: the matrix is exactly the
+ * grid, so verifyEmptyCell already answers false for a cell that is not on it.
+ */
+const verifyEmptyCells = (gridMatrix: number[][], cells: readonly XY[]): boolean => {
+    if (!cells.length) {
+        return false;
+    }
+
+    for (const cell of cells) {
+        if (!verifyEmptyCell(gridMatrix, cell)) {
+            return false;
+        }
+    }
+
+    return true;
 };
 
 export function canMassCastSpell(
@@ -500,12 +521,83 @@ export function thrownSpellReachesAimedTarget(
     return !impact.blockedByTerrain && !impact.interceptedBy;
 }
 
-export function canCastSummon(spell: Spell, gridMatrix: number[][], emptyGridCell?: XY): boolean {
-    if (spell.isSummon() && spell.getSpellTargetType() === SpellTargetType.RANDOM_CLOSE_TO_CASTER) {
+/**
+ * The cells a summoned creature stands on when it appears anchored at `anchor`.
+ *
+ * A summon lands as a whole BODY: `anchor` is its base cell — the footprint's top-right, the same cell
+ * Unit.getBaseCell reports — and the block extends towards -x and -y, exactly as the creature's own body
+ * does once it is on the board. Exported beside cellTargetedSpellBlockCells and for the same reason: the
+ * engine's cast, the AI's candidate enumeration, the server's fallback anchor pick and the client's preview
+ * must all derive the SAME block, or three of them promise a summon the fourth refuses.
+ *
+ * The 1x1 default is what a caller that has not been told the creature's shape has always assumed.
+ */
+export function summonBlockCells(anchor: XY, summonFootprintWidth = 1, summonFootprintHeight = 1): XY[] {
+    return getFootprintCellsForAnchor(anchor, summonFootprintWidth, summonFootprintHeight);
+}
+
+/**
+ * The authoritative summon gate: can `spell` place its creature with its base cell on `emptyGridCell`?
+ *
+ * The creature's WHOLE footprint has to fit — every cell on the board and unoccupied. Proving only the
+ * anchor is proving nothing for anything bigger than a 1x1: the cast is then rejected a step later by the
+ * grid, after the AI has already scored the candidate and the client has already drawn the preview, and for
+ * a shape whose remaining cells were never looked at it could equally well land on top of another stack.
+ *
+ * Callers that know the summoned creature pass its width and height. The 1x1 default is precisely the
+ * single-cell check this gate has always performed, so a caller that has not been taught the shape yet
+ * behaves exactly as before.
+ */
+export function canCastSummon(
+    spell: Spell,
+    gridMatrix: number[][],
+    emptyGridCell?: XY,
+    summonFootprintWidth = 1,
+    summonFootprintHeight = 1,
+): boolean {
+    if (!spell.isSummon() || spell.getSpellTargetType() !== SpellTargetType.RANDOM_CLOSE_TO_CASTER) {
+        return false;
+    }
+    if (!emptyGridCell) {
+        return false;
+    }
+    // Kept as one lookup for the shipped 1x1 summons rather than an allocated block: this runs once per
+    // candidate cell in the AI's summon enumeration, for every summoner, every turn.
+    if (summonFootprintWidth === 1 && summonFootprintHeight === 1) {
         return verifyEmptyCell(gridMatrix, emptyGridCell);
     }
 
-    return false;
+    return verifyEmptyCells(gridMatrix, summonBlockCells(emptyGridCell, summonFootprintWidth, summonFootprintHeight));
+}
+
+/**
+ * The first of `candidateAnchors` the summoned creature actually FITS on, or undefined when none of them
+ * holds it.
+ *
+ * Every surface that picks a summon spot — the engine's hook, both AIs, the sandbox and the server's
+ * fallback — takes the first free cell around the caster and hands it over as an anchor. For anything
+ * bigger than a 1x1 that is a coin flip: the cell is free, the body does not fit, and the cast is refused
+ * with no attempt at the next candidate. Walking the candidates through the real gate means the anchor that
+ * comes back is one the engine will accept.
+ *
+ * The candidates themselves stay with the caller, which is the side that knows the caster: ring its whole
+ * footprint (GridMath.getCellsAroundFootprint over Unit.getCells), not just its base cell, or the offered
+ * spots hug one end of a rectangular summoner.
+ */
+export function firstSummonableAnchor(
+    spell: Spell,
+    gridMatrix: number[][],
+    candidateAnchors: readonly XY[],
+    summonFootprintWidth = 1,
+    summonFootprintHeight = 1,
+): XY | undefined {
+    for (const anchor of candidateAnchors) {
+        if (canCastSummon(spell, gridMatrix, anchor, summonFootprintWidth, summonFootprintHeight)) {
+            return anchor;
+        }
+    }
+
+    return undefined;
 }
 
 /**

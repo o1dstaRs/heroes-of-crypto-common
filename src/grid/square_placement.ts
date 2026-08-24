@@ -10,6 +10,7 @@
  */
 
 import type { XY } from "../utils/math";
+import { normalizeFootprintSide } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { type IPlacement, PlacementPositionType, PlacementType } from "./placement_properties";
 
@@ -81,57 +82,76 @@ export class SquarePlacement implements IPlacement {
     public possibleCellHashes(): Set<number> {
         return this.possibleCellHashesSet;
     }
-    public possibleCellPositions(isSmallUnit = true): XY[] {
+    public possibleCellPositions(
+        isSmallUnit = true,
+        footprintWidth = isSmallUnit ? 1 : 2,
+        footprintHeight = isSmallUnit ? 1 : 2,
+    ): XY[] {
         let x;
         let y;
         let sx;
         let sy;
         let borderX;
         let borderY;
-        const diff = isSmallUnit ? 0 : 1;
+        // The anchor is the TOP-RIGHT cell of the footprint, so it has to leave W-1 columns to its left and
+        // H-1 rows below it inside the zone. The legacy single `diff = isSmallUnit ? 0 : 1` was the W === H
+        // instance of that rule; the two axes only coincide for square bodies, so they are insetted apart.
+        const width = normalizeFootprintSide(footprintWidth, isSmallUnit ? 1 : 2);
+        const height = normalizeFootprintSide(footprintHeight, isSmallUnit ? 1 : 2);
+        const diffX = width - 1;
+        const diffY = height - 1;
+        // LOWER_RIGHT walks leftwards and has always SUBTRACTED the inset from its far border instead of
+        // adding it, so the shipped 2x2 anchor list overshoots the zone by two columns. Every baked placement
+        // policy and replay was produced against that exact list, so the 2x2 body keeps it; any other
+        // footprint gets the correct border. See test/grid/footprint_placement.test.ts, which pins both.
+        const keepsLegacyLargeOvershoot = width === 2 && height === 2;
 
         switch (this.placementPositionType) {
             case PlacementPositionType.LOWER_LEFT:
-                x = 1 + diff;
-                y = 1 + diff;
+                x = 1 + diffX;
+                y = 1 + diffY;
                 sx = 1;
                 sy = 1;
-                borderX = x + this.size - diff;
-                borderY = borderX;
+                borderX = x + this.size - diffX;
+                borderY = y + this.size - diffY;
                 break;
             case PlacementPositionType.UPPER_LEFT:
-                x = 1 + diff;
+                x = 1 + diffX;
                 y = this.gridSettings.getGridSize() - 2;
                 sx = 1;
                 sy = -1;
-                borderX = x + this.size - diff;
-                borderY = y - this.size + diff;
+                borderX = x + this.size - diffX;
+                // This walk runs DOWNWARDS from the zone's top row, so the body's height is paid for at the
+                // far end instead: it stops H-1 rows above the zone's bottom row.
+                borderY = y - this.size + diffY;
                 break;
             case PlacementPositionType.LOWER_RIGHT:
                 x = this.gridSettings.getGridSize() - 2;
-                y = 1 + diff;
+                y = 1 + diffY;
                 sx = -1;
                 sy = 1;
-                borderX = x - this.size - diff;
-                borderY = sy + this.size;
+                borderX = keepsLegacyLargeOvershoot ? x - this.size - diffX : x - this.size + diffX;
+                borderY = y + this.size - diffY;
                 break;
             case PlacementPositionType.UPPER_RIGHT:
                 sx = -1;
                 sy = -1;
                 x = this.gridSettings.getGridSize() + sx - 1;
                 y = this.gridSettings.getGridSize() + sy - 1;
-                borderX = x - this.size + diff;
-                borderY = borderX;
+                borderX = x - this.size + diffX;
+                borderY = y - this.size + diffY;
                 break;
             default:
                 throw new Error("Invalid placement position type.");
         }
 
-        const possiblePositions: XY[] = new Array((this.size - diff) * (this.size - diff));
+        const possiblePositions: XY[] = [];
         let possiblePositionsIndex = 0;
 
-        for (let px = x; px !== borderX; px += sx) {
-            for (let py = y; py !== borderY; py += sy) {
+        // A body wider or taller than the zone leaves no legal anchor at all, which the legacy `px !== borderX`
+        // walk could only express by running past the border forever, so the bounds are compared by direction.
+        for (let px = x; sx > 0 ? px < borderX : px > borderX; px += sx) {
+            for (let py = y; sy > 0 ? py < borderY : py > borderY; py += sy) {
                 possiblePositions[possiblePositionsIndex++] = { x: px, y: py };
             }
         }

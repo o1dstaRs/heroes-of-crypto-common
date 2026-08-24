@@ -226,6 +226,38 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
     );
 };
 
+/**
+ * The optional rectangular footprint of a creature. `size` stays the LEGACY SQUARE size: it picks the
+ * texture (_128 vs _256) and feeds every non-geometry consumer, so a creature that occupies a WxH block
+ * declares that block here and leaves `size` alone. The two are therefore allowed to disagree — a 1x2
+ * creature is `size: 1` with `footprint_height: 2` — and nothing derives one from the other.
+ */
+interface ICreatureFootprintConfig {
+    footprint_width?: unknown;
+    footprint_height?: unknown;
+}
+
+/**
+ * Read one declared footprint side. A side is a count of whole cells, so anything that is not a positive
+ * integer is a configuration bug and throws like every other malformed field in this file — silently
+ * flooring it would hand the engine a unit whose body is a different shape than the board reserved for it.
+ */
+const getCreatureFootprintSide = (
+    creatureName: string,
+    key: "footprint_width" | "footprint_height",
+    value: unknown,
+): number | undefined => {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+
+    if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+        throw new TypeError(`Invalid ${key} for creature ${creatureName} = ${value}`);
+    }
+
+    return value;
+};
+
 export const getCreatureConfig = (
     team: TeamType,
     factionName: string,
@@ -260,6 +292,14 @@ export const getCreatureConfig = (
     if (movementType === undefined || movementType === PBTypes.MovementVals.NO_MOVEMENT) {
         throw new TypeError(`Invalid movement type for creature ${creatureName} = ${movementType}`);
     }
+
+    const creatureFootprint = creatureConfig as ICreatureFootprintConfig;
+    const footprintWidth = getCreatureFootprintSide(creatureName, "footprint_width", creatureFootprint.footprint_width);
+    const footprintHeight = getCreatureFootprintSide(
+        creatureName,
+        "footprint_height",
+        creatureFootprint.footprint_height,
+    );
 
     const luck = DEFAULT_LUCK_PER_FACTION[factionName] ?? 0;
     const morale = DEFAULT_MORALE_PER_FACTION[factionName] ?? 0;
@@ -390,8 +430,8 @@ export const getCreatureConfig = (
         "",
         [],
         false,
-        (creatureConfig as { footprint_width?: number }).footprint_width,
-        (creatureConfig as { footprint_height?: number }).footprint_height,
+        footprintWidth,
+        footprintHeight,
     );
 };
 

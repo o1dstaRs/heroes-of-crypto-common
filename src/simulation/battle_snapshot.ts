@@ -84,6 +84,12 @@ export function deepClone<T>(value: T): T {
 
 /** The mutable Unit fields captured by the snapshot. Shared/immutable refs are intentionally excluded. */
 const UNIT_FIELDS = [
+    // Captured wholesale, so every DATA field on UnitProperties rides along — the unit's GEOMETRY
+    // (footprint_width / footprint_height, and the `size` they default from) included. That is what makes a
+    // rectangular stack survive capture -> restore -> capture with its shape intact: a rollout that rebuilt
+    // the unit from a bag missing its width would resume the fight with a differently-shaped body on the
+    // board than the grid is registered for. It also means the footprint must STAY inside unitProperties:
+    // caching it as an own field on Unit would trip assertFieldCoverage below and break every AI search.
     "unitProperties",
     "initialUnitProperties",
     "buffs",

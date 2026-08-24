@@ -10,6 +10,7 @@
  */
 
 import { getSpellConfig } from "../configuration/config_provider";
+import { getFootprintCellsForAnchor, normalizeFootprintSide } from "../grid/grid_math";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { fireWallBurnDamage, FireWalls } from "../spells/fire_walls";
 import { madeOfFireBoostedMaxHp } from "../units/movement_stat_modifiers";
@@ -67,11 +68,19 @@ export function moveCellsMatchAsSet(left: readonly XY[], right: readonly XY[]): 
     return left.every((cell) => rightCells.has(moveCellKey(cell)));
 }
 
-/** Resolve the occupied destination exactly as GameActionEngine.moveUnit does. */
+/**
+ * Resolve the occupied destination exactly as GameActionEngine.moveUnit does.
+ *
+ * `footprintWidth` / `footprintHeight` describe the mover's body. They default to the square shape the
+ * boolean has always implied, so a caller that still passes only `isSmallSize` gets the legacy answer for
+ * both shipped shapes and nothing about an existing move changes.
+ */
 export function resolveMoveTargetCells(
     isSmallSize: boolean,
     path: readonly XY[],
     suppliedTargetCells?: readonly XY[],
+    footprintWidth: number = isSmallSize ? 1 : 2,
+    footprintHeight: number = isSmallSize ? 1 : 2,
 ): XY[] {
     if (suppliedTargetCells?.length) {
         return suppliedTargetCells.map((cell) => ({ ...cell }));
@@ -80,24 +89,51 @@ export function resolveMoveTargetCells(
     if (!destination) {
         return [];
     }
-    if (isSmallSize) {
+    const width = normalizeFootprintSide(footprintWidth);
+    const height = normalizeFootprintSide(footprintHeight);
+    if (width === 1 && height === 1) {
         return [{ ...destination }];
     }
-    return [
-        { x: destination.x, y: destination.y },
-        { x: destination.x + 1, y: destination.y },
-        { x: destination.x, y: destination.y + 1 },
-        { x: destination.x + 1, y: destination.y + 1 },
-    ];
+    if (width === 2 && height === 2) {
+        // Kept verbatim, and deliberately so: this fallback reads `destination` as the block's BOTTOM-LEFT
+        // cell, which is the opposite anchor from the top-right one PathHelper and Unit.getBaseCell use.
+        // For a 2x2 both readings name a legal square and every large unit that has ever moved through this
+        // branch landed on this one, so re-anchoring it here would shift them all by a cell — a live and
+        // AI-weight change that has to be decided on its own, not smuggled in with rectangles.
+        return [
+            { x: destination.x, y: destination.y },
+            { x: destination.x + 1, y: destination.y },
+            { x: destination.x, y: destination.y + 1 },
+            { x: destination.x + 1, y: destination.y + 1 },
+        ];
+    }
+    // Every other shape is anchored the way the rest of the engine anchors a body. The route's last cell IS
+    // the anchor the pather produced, so the footprint hangs off it towards -x / -y.
+    return getFootprintCellsForAnchor(destination, width, height);
 }
 
-/** Large legacy moves may encode only their final 2x2 footprint rather than an ordered route. */
+/**
+ * Large legacy moves may encode only their final footprint rather than an ordered route.
+ *
+ * The dimensions are taken so "is this body more than one cell" is asked of the real footprint instead of a
+ * boolean; they default to the square shape `isSmallSize` implies, so the verdict is unchanged for every
+ * existing caller.
+ *
+ * A two-cell body makes the encoding genuinely ambiguous: a 1x2's ONE-STEP route is itself two cells and can
+ * be the same SET as its destination footprint. Both readings resolve to the same destination cells, so the
+ * only thing that differs is whether route modifiers are applied, and the wire carries nothing that could
+ * separate them — so this keeps the legacy reading rather than inventing a tie-break the client cannot know.
+ */
 export function isMovePathFootprintOnly(
     isSmallSize: boolean,
     path: readonly XY[],
     suppliedTargetCells?: readonly XY[],
+    footprintWidth: number = isSmallSize ? 1 : 2,
+    footprintHeight: number = isSmallSize ? 1 : 2,
 ): boolean {
-    return !isSmallSize && !!suppliedTargetCells?.length && moveCellsMatchAsSet(path, suppliedTargetCells);
+    const occupiesOneCell =
+        normalizeFootprintSide(footprintWidth) === 1 && normalizeFootprintSide(footprintHeight) === 1;
+    return !occupiesOneCell && !!suppliedTargetCells?.length && moveCellsMatchAsSet(path, suppliedTargetCells);
 }
 
 /** The route's initial base cell is an origin, not a cell the mover entered. No cell objects are copied. */
@@ -112,12 +148,22 @@ export function travelledMovePath(currentCell: Readonly<XY>, path: readonly Read
 }
 
 export function resolveMoveTraversal(
-    unit: Pick<Unit, "getBaseCell" | "isSmallSize">,
+    unit: Pick<Unit, "getBaseCell" | "isSmallSize" | "getFootprintWidth" | "getFootprintHeight">,
     action: MoveUnitAction,
     resolvedRoute?: IResolvedMoveRoute,
 ): IMoveTraversal {
-    const targetCells = resolveMoveTargetCells(unit.isSmallSize(), action.path, action.targetCells);
-    const pathIsFootprintOnly = isMovePathFootprintOnly(unit.isSmallSize(), action.path, action.targetCells);
+    // The mover's own dimensions, not a size bit: this projection has to land on exactly the cells the
+    // action engine will occupy, or the AI plans a follow-up attack from a body position that never happens.
+    const width = unit.getFootprintWidth();
+    const height = unit.getFootprintHeight();
+    const targetCells = resolveMoveTargetCells(unit.isSmallSize(), action.path, action.targetCells, width, height);
+    const pathIsFootprintOnly = isMovePathFootprintOnly(
+        unit.isSmallSize(),
+        action.path,
+        action.targetCells,
+        width,
+        height,
+    );
     const travelledPath = pathIsFootprintOnly
         ? action.path
         : travelledMovePath(unit.getBaseCell(), resolvedRoute?.route ?? action.path);

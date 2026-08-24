@@ -10,6 +10,7 @@
  */
 
 import type { XY } from "../utils/math";
+import { normalizeFootprintSide } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { type IPlacement, PlacementPositionType, PlacementType } from "./placement_properties";
 
@@ -89,8 +90,8 @@ export class RectanglePlacement implements IPlacement {
     }
     public possibleCellPositions(
         isSmallUnit = true,
-        _footprintWidth = isSmallUnit ? 1 : 2,
-        _footprintHeight = isSmallUnit ? 1 : 2,
+        footprintWidth = isSmallUnit ? 1 : 2,
+        footprintHeight = isSmallUnit ? 1 : 2,
     ): XY[] {
         let x;
         let y;
@@ -98,42 +99,50 @@ export class RectanglePlacement implements IPlacement {
         let sy;
         let borderX;
         let borderY;
-        const diff = isSmallUnit ? 0 : 1;
+        // The anchor is the TOP-RIGHT cell of the footprint, so it has to leave W-1 columns to its left and
+        // H-1 rows below it inside the zone. The legacy single `diff = isSmallUnit ? 0 : 1` was the W === H
+        // instance of that rule; the two axes only coincide for square bodies, so they are insetted apart.
+        const diffX = normalizeFootprintSide(footprintWidth, isSmallUnit ? 1 : 2) - 1;
+        const diffY = normalizeFootprintSide(footprintHeight, isSmallUnit ? 1 : 2) - 1;
         const isSmallestPlacement = this.size === 3;
         const edgeRowInset = this.size >= 6 ? 0 : 1;
 
         switch (this.placementPositionType) {
             case PlacementPositionType.LOWER_LEFT:
-                x = (isSmallestPlacement ? 1 : 0) + diff;
-                y = edgeRowInset + diff;
+                x = (isSmallestPlacement ? 1 : 0) + diffX;
+                y = edgeRowInset + diffY;
                 sx = 1;
                 sy = 1;
-                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
-                borderY = y + this.size - diff;
+                // Both walks start at the zone's low corner, so the inset is spent on the start and the far
+                // border stays where the zone ends: the `- diff` below cancels the one folded into x / y.
+                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diffX;
+                borderY = y + this.size - diffY;
                 break;
             case PlacementPositionType.UPPER_LEFT:
-                x = (isSmallestPlacement ? 1 : 0) + diff;
+                x = (isSmallestPlacement ? 1 : 0) + diffX;
                 y = this.gridSettings.getGridSize() - 1 - edgeRowInset;
                 sx = 1;
                 sy = -1;
-                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
-                borderY = y - this.size + diff;
+                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diffX;
+                // This walk runs DOWNWARDS from the zone's top row, so the body's height is paid for at the
+                // far end instead: it stops H-1 rows above the zone's bottom row.
+                borderY = y - this.size + diffY;
                 break;
             case PlacementPositionType.LOWER_RIGHT:
-                x = (isSmallestPlacement ? 1 : 0) + diff;
-                y = edgeRowInset + diff;
+                x = (isSmallestPlacement ? 1 : 0) + diffX;
+                y = edgeRowInset + diffY;
                 sx = 1;
                 sy = 1;
-                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
-                borderY = y + this.size - diff;
+                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diffX;
+                borderY = y + this.size - diffY;
                 break;
             case PlacementPositionType.UPPER_RIGHT:
-                x = (isSmallestPlacement ? 1 : 0) + diff;
+                x = (isSmallestPlacement ? 1 : 0) + diffX;
                 y = this.gridSettings.getGridSize() - 1 - edgeRowInset;
                 sx = 1;
                 sy = -1;
-                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diff;
-                borderY = y - this.size + diff;
+                borderX = x + this.gridSettings.getGridSize() - (isSmallestPlacement ? 2 : 0) - diffX;
+                borderY = y - this.size + diffY;
                 break;
             default:
                 throw new Error("Invalid placement position type.");
@@ -142,8 +151,10 @@ export class RectanglePlacement implements IPlacement {
         const possiblePositions: XY[] = [];
         let possiblePositionsIndex = 0;
 
-        for (let px = x; px !== borderX; px += sx) {
-            for (let py = y; py !== borderY; py += sy) {
+        // A body wider or taller than the zone leaves no legal anchor at all, which the legacy `px !== borderX`
+        // walk could only express by running past the border forever, so the bounds are compared by direction.
+        for (let px = x; sx > 0 ? px < borderX : px > borderX; px += sx) {
+            for (let py = y; sy > 0 ? py < borderY : py > borderY; py += sy) {
                 possiblePositions[possiblePositionsIndex++] = { x: px, y: py };
             }
         }

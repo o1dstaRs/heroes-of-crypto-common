@@ -80,6 +80,7 @@ import {
     type ITurnExecutionObservation,
     type Side,
 } from "./battle_engine";
+import { footprintCellsForAnchor } from "./footprint";
 import { liveTwinSetup } from "./livetwin";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
 
@@ -585,15 +586,10 @@ export function v08BlockCenterActionSignature(actions: readonly GameAction[]): s
         .join("|");
 }
 
-const footprintForBase = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+// The panel keys its oscillation history on the footprints it projects, so those footprints must be the
+// unit's real shape — a rectangle projected as a 2x2 block would make every A-B-A verdict describe a body
+// that never lands.
+const footprintForBase = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
 const routeMoveAction = (unit: Unit, route: IReadonlyWeightedRoute): Extract<GameAction, { type: "move_unit" }> => ({
     type: "move_unit",
@@ -629,6 +625,10 @@ const routesForUnit = (unit: Unit, context: IDecisionContext): IReadonlyWeighted
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        // NOTE: the footprint dimensions cannot be forwarded here yet — this call goes through
+        // IDecisionPathSource (ai/decision_path_catalog.ts), whose signature stops at hasVineStride and whose
+        // cache key does not include the shape. Until that interface carries width/height, a rectangular unit
+        // is pathed as a square on this panel only; every other simulation caller passes the real dimensions.
     );
     const routes: IReadonlyWeightedRoute[] = [];
     const seen = new Set<string>();

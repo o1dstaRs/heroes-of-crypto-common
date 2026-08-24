@@ -10,6 +10,7 @@
  */
 
 import { PBTypes } from "../generated/protobuf/v1/types";
+import { normalizeFootprintSide } from "../grid/grid_math";
 import type { TeamType, UnitType, AttackType, MovementType, FactionType } from "../generated/protobuf/v1/types_gen";
 import {
     CreatureLevels as GenCreatureLevels,
@@ -81,7 +82,15 @@ export class UnitProperties {
     public can_cast_spells: boolean;
     public movement_type: MovementType;
     public exp: number;
+    /** The creature's legacy SQUARE size (1 or 2). Picks the texture; never read as board geometry. */
     public readonly size: number;
+    /**
+     * The board footprint, in cells: `footprint_width` across x, `footprint_height` up y, anchored on the
+     * unit's top-right cell. Defaults to the square `size x size`, which is what makes every shipped 1x1
+     * and 2x2 creature an instance of the same rule. Kept as its own pair of fields rather than derived
+     * from `size` so a rectangle can differ from the square size the texture and the card still use — and
+     * so both sides survive every structuredClone of these properties (snapshots, stack splits, rollouts).
+     */
     public readonly footprint_width: number;
     public readonly footprint_height: number;
     public readonly level: number;
@@ -277,8 +286,8 @@ export class UnitProperties {
         this.movement_type = movement_type;
         this.exp = exp;
         this.size = size;
-        this.footprint_width = Math.max(1, Math.floor(footprintWidth ?? size));
-        this.footprint_height = Math.max(1, Math.floor(footprintHeight ?? size));
+        this.footprint_width = normalizeFootprintSide(footprintWidth, size);
+        this.footprint_height = normalizeFootprintSide(footprintHeight, size);
         this.level = level;
         this.spells = structuredClone(spells);
         this.abilities = structuredClone(abilities);

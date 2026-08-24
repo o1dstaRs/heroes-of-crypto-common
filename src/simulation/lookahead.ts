@@ -33,6 +33,7 @@ import {
 import type { XY } from "../utils/math";
 import { makeRng } from "./army";
 import { restoreBattle, snapshotBattle } from "./battle_snapshot";
+import { footprintCellsForAnchor } from "./footprint";
 import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
 
 const LOWER = PBTypes.TeamVals.LOWER;
@@ -84,15 +85,13 @@ const LEARNED_VALUE: { b: number; w: number[] } | null = (() => {
 const otherTeam = (team: TeamType): TeamType => (team === LOWER ? UPPER : LOWER);
 const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbilityActive("Hidden");
 
-const footprintForBase = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+/**
+ * The footprint the acting unit would stand on after moving to `base`. This drives the move-and-strike
+ * adjacency test below, so it has to be the unit's REAL shape: measuring a 1x2 attacker as a 2x2 block makes
+ * the search score — and pick — strikes the engine then refuses, which is a rollout/live divergence rather
+ * than a visible failure.
+ */
+const footprintForBase = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
 /** Everything the driver needs from the (closure-heavy) battle_engine loop it plugs into. */
 export interface ILookaheadDeps {
@@ -279,6 +278,10 @@ export class LookaheadDriver {
                 unit.isSmallSize(),
                 unit.canTraverseLava(),
                 unit.hasAbilityActive("In Its Own World"),
+                // Search the board with the body that will actually move: a rectangle pathed as a square
+                // explores destinations the engine refuses and skips ones it would allow.
+                unit.getFootprintWidth(),
+                unit.getFootprintHeight(),
             );
             for (const e of enemies) {
                 if (usedTargets.has(e.getId())) {

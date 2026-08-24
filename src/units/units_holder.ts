@@ -86,6 +86,21 @@ export class UnitsHolder {
 
         return allies;
     }
+    /**
+     * Whether `cells` is the unit's WHOLE footprint. getCells() CLIPS to the board, so a stack parked off
+     * the grid (an unplaced one on the bench, one dragged past the edge) reports fewer cells than it
+     * occupies — and every "are all of my cells legal?" loop then answers yes for a unit that is not
+     * really placed at all, an empty list being vacuously fine.
+     *
+     * Only rectangles are judged. A 1x1 never clips (its single cell is returned even off-board, so the
+     * per-cell checks catch it), and a 2x2 has always been allowed to answer from whichever of its four
+     * cells survived clipping; both shapes are shipped and must stay bit-identical.
+     */
+    private isWholeFootprintOnBoard(unit: Unit, cells: readonly XY[]): boolean {
+        const width = unit.getFootprintWidth();
+        const height = unit.getFootprintHeight();
+        return width === height || cells.length === width * height;
+    }
     public getAllAlliesPlaced(
         teamType: TeamType,
         lowerLeftPlacement: IPlacement,
@@ -98,6 +113,9 @@ export class UnitsHolder {
         for (const unit of this.allUnits.values()) {
             if (unit.getTeam() === teamType) {
                 const unitCells = unit.getCells();
+                if (!this.isWholeFootprintOnBoard(unit, unitCells)) {
+                    continue;
+                }
                 let allCellsAllowed = true;
 
                 for (const c of unitCells) {
@@ -840,9 +858,15 @@ export class UnitsHolder {
             // depending on the action type (attack vs response)
             checkCells = getCellsAroundCell(this.gridSettings, firstCheckCell);
         } else {
+            // firstCheckCell is the footprint's ANCHOR (its top-right cell), so the body covers
+            // [x-W+1..x] x [y-H+1..y] and the cells that touch it run one further out in each direction:
+            // [x-W..x+1] x [y-H..y+1]. For a 2x2 that is verbatim the -2..1 box this has always walked,
+            // in the same order; for a 1x2 it is the 3x4 box, where the old constants would have missed
+            // a whole rank of neighbours on the long side.
+            const { width, height } = this.footprintSidesOf(attacker);
             checkCells = [];
-            for (let i = -2; i <= 1; i++) {
-                for (let j = -2; j <= 1; j++) {
+            for (let i = -width; i <= 1; i++) {
+                for (let j = -height; j <= 1; j++) {
                     checkCells.push({ x: firstCheckCell.x + i, y: firstCheckCell.y + j });
                 }
             }
@@ -864,6 +888,21 @@ export class UnitsHolder {
         }
 
         return enemyList;
+    }
+    /**
+     * The footprint of an AI-facing unit view, in cells.
+     *
+     * IUnitAIRepr gained its footprint accessors along with rectangular bodies. The narrower stand-ins
+     * that implement the interface by hand — AI test doubles, tooling that only ever described squares —
+     * still know nothing but getSize(), and for every one of those W == H == size by construction.
+     * Reading an absent accessor would collapse the body to nothing, so fall back to the square size.
+     */
+    private footprintSidesOf(unit: IUnitAIRepr): { width: number; height: number } {
+        const size = Math.max(1, Math.floor(unit.getSize()));
+        return {
+            width: typeof unit.getFootprintWidth === "function" ? unit.getFootprintWidth() : size,
+            height: typeof unit.getFootprintHeight === "function" ? unit.getFootprintHeight() : size,
+        };
     }
     private refreshAngelicHostForAllUnits(): void {
         const powerPerTeam: Map<TeamType, number> = new Map();
@@ -1472,6 +1511,13 @@ export class UnitsHolder {
         const unitCells = unit.getCells();
         const teamType = unit.getTeam();
         const enemyTeamType = unit.getOppositeTeam();
+
+        // A footprint that came back clipped is hanging off the board, which is exactly what
+        // verifyWithinGridPosition rejects below — but the per-cell loop can no longer see it, because
+        // the offending cells were the ones dropped.
+        if (verifyWithinGridPosition && !this.isWholeFootprintOnBoard(unit, unitCells)) {
+            return this.deleteUnitById(unitId);
+        }
 
         for (const c of unitCells) {
             const cellPosition = getPositionForCell(

@@ -40,9 +40,11 @@ import { EffectFactory } from "../effects/effect_factory";
 import {
     getCellForPosition,
     getCellsAroundCell,
+    getFootprintCellsForAnchor,
     getFootprintCellsForPosition,
     getLargeUnitAttackCells,
     isPositionWithinGrid,
+    normalizeFootprintSide,
     getDistanceToFurthestCorner,
 } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
@@ -1452,13 +1454,21 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public getPosition(): XY {
         return this.position;
     }
+    /** The footprint's ANCHOR: its top-right cell, from which the body extends towards -x and -y. */
     public getBaseCell(): XY {
         return getCellForPosition(this.gridSettings, this.getPosition());
     }
+    /**
+     * Centre of the ANCHOR CELL, which is what this has always returned: `position` is already the centre of
+     * the whole footprint, so the offset here is the distance from that centre out to the anchor cell —
+     * (W-1)/2 and (H-1)/2 cells. For the shipped shapes that is verbatim the legacy result (nothing for a
+     * 1x1, half a cell each way for a 2x2), and for a rectangle it leans only along the long side.
+     */
     public getCenter(): XY {
+        const halfStep = this.gridSettings.getHalfStep();
         return {
-            x: this.getPosition().x + (this.getFootprintWidth() > 1 ? this.gridSettings.getHalfStep() : 0),
-            y: this.getPosition().y + (this.getFootprintHeight() > 1 ? this.gridSettings.getHalfStep() : 0),
+            x: this.getPosition().x + (this.getFootprintWidth() - 1) * halfStep,
+            y: this.getPosition().y + (this.getFootprintHeight() - 1) * halfStep,
         };
     }
     public getCells(): XY[] {
@@ -1469,26 +1479,41 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.getFootprintHeight(),
         );
     }
-    public getFootprintCellsForBase(baseCell: XY): XY[] {
-        const cells: XY[] = [];
-        for (let dx = 0; dx < this.getFootprintWidth(); dx++) {
-            for (let dy = 0; dy < this.getFootprintHeight(); dy++) {
-                cells.push({ x: baseCell.x - dx, y: baseCell.y - dy });
-            }
-        }
-        return cells;
+    /** The cells this unit would occupy if its anchor stood on `anchor`. Not clipped to the board. */
+    public getFootprintCellsForAnchor(anchor: XY): XY[] {
+        return getFootprintCellsForAnchor(anchor, this.getFootprintWidth(), this.getFootprintHeight());
     }
+    /** Legacy name for {@link getFootprintCellsForAnchor} — `baseCell` IS the anchor. */
+    public getFootprintCellsForBase(baseCell: XY): XY[] {
+        return this.getFootprintCellsForAnchor(baseCell);
+    }
+    /**
+     * The creature's square SIZE from its configuration (1 = small, 2 = large). It still picks the texture
+     * and feeds every non-geometry consumer, but it is NOT the board footprint: a rectangular creature
+     * declares footprint_width/height separately and the two are allowed to disagree. Geometry must ask
+     * getFootprintWidth/getFootprintHeight (or getCells) instead.
+     */
     public getSize(): number {
         return this.unitProperties.size;
     }
+    /** True only for a unit that occupies exactly ONE cell — a 1x2 is not small. */
     public isSmallSize(): boolean {
         return this.getFootprintWidth() === 1 && this.getFootprintHeight() === 1;
     }
     public getFootprintWidth(): number {
-        return this.unitProperties.footprint_width ?? this.unitProperties.size;
+        // A snapshot or wire payload predating footprints carries no side at all, and `size` is then the
+        // square fallback. Normalizing both keeps a corrupt value (0, NaN, a fraction) from producing a
+        // footprint with no cells rather than failing loudly at the source.
+        return normalizeFootprintSide(
+            this.unitProperties.footprint_width,
+            normalizeFootprintSide(this.unitProperties.size),
+        );
     }
     public getFootprintHeight(): number {
-        return this.unitProperties.footprint_height ?? this.unitProperties.size;
+        return normalizeFootprintSide(
+            this.unitProperties.footprint_height,
+            normalizeFootprintSide(this.unitProperties.size),
+        );
     }
     public isSummoned(): boolean {
         return this.summoned;
@@ -3722,6 +3747,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         let fromPathHashes: Set<number> | undefined;
         let currentCells: XY[];
+        // The question here is "does this unit occupy exactly one cell", not "how big is it": a one-cell
+        // unit attacks from the cell it stands on, so there is no body to fit and no anchor to enumerate.
+        // Everything with a real footprint - 2x2 and every rectangle alike - needs fromPathHashes below,
+        // because getLargeUnitAttackCells rejects an anchor whose body does not fit inside the walked path.
         if (this.isSmallSize()) {
             const currentCell = this.getBaseCell();
             if (currentCell) {
@@ -3794,6 +3823,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                                     bodyCell,
                                     currentActiveKnownPaths,
                                     fromPathHashes,
+                                    this.getFootprintWidth(),
+                                    this.getFootprintHeight(),
                                 );
 
                                 if (largeUnitAttackCells?.length) {
@@ -3817,14 +3848,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 }
             }
         } else {
-            const baseCell = this.getBaseCell();
-
             // Immobilized (this branch runs only when !canMove(), i.e. Paralysis / Whirlpool): the unit cannot
             // step anywhere, so the ONLY valid cell to strike from is where it currently stands. The
             // valid attack-from anchors are therefore the unit's own current cells — not the ring of
             // cells around it. (Previously small units used getCellsAroundCell + an unconditional
             // addPos=true, which lit up every adjacent cell as a phantom attack position.)
-            const checkCells: XY[] = this.isSmallSize() ? [baseCell] : this.getCells();
+            const checkCells: XY[] = this.getCells();
             const surroundingCellHashes: number[] = [];
             for (const c of checkCells) {
                 surroundingCellHashes.push((c.x << 4) | c.y);
@@ -3880,7 +3909,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                         let addPos = false;
                         if (this.isSmallSize()) {
                             // Only the cell the paralyzed unit actually stands on is a valid attack
-                            // position (checkCells == [baseCell] here).
+                            // position (checkCells is its single cell here).
                             addPos = surroundingCellHashes.includes(posHash);
                         } else if (surroundingCellHashes.includes((c.x << 4) | c.y)) {
                             const largeUnitAttackCells = getLargeUnitAttackCells(
@@ -3890,6 +3919,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                                 bodyCell,
                                 currentActiveKnownPaths,
                                 fromPathHashes,
+                                this.getFootprintWidth(),
+                                this.getFootprintHeight(),
                             );
 
                             if (largeUnitAttackCells?.length) {

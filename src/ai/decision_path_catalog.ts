@@ -36,10 +36,18 @@ const BASE_UNIT_GET_TEAM = Unit.prototype.getTeam;
 const BASE_UNIT_CAN_FLY = Unit.prototype.canFly;
 const BASE_UNIT_CAN_TRAVERSE_LAVA = Unit.prototype.canTraverseLava;
 const BASE_UNIT_HAS_ABILITY_ACTIVE = Unit.prototype.hasAbilityActive;
+const BASE_UNIT_GET_FOOTPRINT_WIDTH = Unit.prototype.getFootprintWidth;
+const BASE_UNIT_GET_FOOTPRINT_HEIGHT = Unit.prototype.getFootprintHeight;
 const BASE_GRID_GET_AGGR_MATRIX_BY_TEAM = Grid.prototype.getAggrMatrixByTeam;
 
 export type { IReadonlyKnownPaths, IReadonlyMovePath, IReadonlyWeightedRoute } from "../grid/path_definitions";
 
+/**
+ * The path surface every AI strategy sees. It mirrors PathHelper.getMovePath argument for argument,
+ * footprint included: a caller that cannot express WxH cannot ask for a rectangle's reachable set, and
+ * would silently be pathed — and then cached — as a square. `isSmallUnit` is kept because PathHelper still
+ * takes it, and the width/height defaults below reproduce it exactly for the two shipped shapes.
+ */
 export interface IDecisionPathSource {
     getMovePath(
         currentCell: XY,
@@ -50,6 +58,8 @@ export interface IDecisionPathSource {
         isSmallUnit?: boolean,
         isMadeOfFire?: boolean,
         hasVineStride?: boolean,
+        footprintWidth?: number,
+        footprintHeight?: number,
     ): IReadonlyMovePath;
 }
 
@@ -71,6 +81,11 @@ interface ICanonicalMovePathInput {
     // Part of the cache key: a vine strider walks the same board at different prices, so it must not be
     // served a path canonicalised for a unit without the passive.
     hasVineStride: boolean;
+    // Also part of the cache key. Reachability is a property of the BODY, not just the anchor: a 1x2 and a
+    // 2x1 standing on the same cell fit through different gaps and have different in-grid anchor bounds, so
+    // without the shape here the second shape would be served the first one's path.
+    footprintWidth: number;
+    footprintHeight: number;
 }
 
 /**
@@ -99,7 +114,11 @@ export class DecisionPathCatalog implements IDecisionPathSource {
         collectStats: boolean,
     ) {
         this.stats = collectStats ? { requests: 0, hits: 0, misses: 0, bypasses: 0 } : undefined;
-        const minimumAnchor = canonical.isSmallUnit ? 0 : 1;
+        // The anchor is the footprint's TOP-RIGHT cell, so the body needs W-1 columns to its left and H-1
+        // rows below it to stay on the board. For the shipped shapes that is verbatim the old scalar
+        // `isSmallUnit ? 0 : 1`; a rectangle is the only case where the two axes differ.
+        const minimumAnchorX = canonical.footprintWidth - 1;
+        const minimumAnchorY = canonical.footprintHeight - 1;
         this.cacheSafe =
             Object.getPrototypeOf(delegate) === PathHelper.prototype &&
             delegate.getMovePath === BASE_GET_MOVE_PATH &&
@@ -116,9 +135,9 @@ export class DecisionPathCatalog implements IDecisionPathSource {
             Number.isInteger(canonical.currentCell.y) &&
             !Object.is(canonical.currentCell.x, -0) &&
             !Object.is(canonical.currentCell.y, -0) &&
-            canonical.currentCell.x >= minimumAnchor &&
+            canonical.currentCell.x >= minimumAnchorX &&
             canonical.currentCell.x < 16 &&
-            canonical.currentCell.y >= minimumAnchor &&
+            canonical.currentCell.y >= minimumAnchorY &&
             canonical.currentCell.y < 16 &&
             Number.isFinite(canonical.maxSteps) &&
             canonical.maxSteps >= 0 &&
@@ -156,6 +175,8 @@ export class DecisionPathCatalog implements IDecisionPathSource {
             source.canonical.matrix === matrix &&
             unit.getCells === BASE_UNIT_GET_CELLS &&
             unit.isSmallSize === BASE_UNIT_IS_SMALL_SIZE &&
+            unit.getFootprintWidth === BASE_UNIT_GET_FOOTPRINT_WIDTH &&
+            unit.getFootprintHeight === BASE_UNIT_GET_FOOTPRINT_HEIGHT &&
             (unit as IUnitAIRepr & Pick<Unit, "getPosition">).getPosition === BASE_UNIT_GET_POSITION
         );
     }
@@ -212,6 +233,10 @@ export class DecisionPathCatalog implements IDecisionPathSource {
         isSmallUnit = true,
         isMadeOfFire = false,
         hasVineStride = false,
+        // The same defaults PathHelper.getMovePath uses, so a caller that has not been taught about
+        // footprints yet keeps asking for exactly the square it asked for before.
+        footprintWidth = isSmallUnit ? 1 : 2,
+        footprintHeight = isSmallUnit ? 1 : 2,
     ): IReadonlyMovePath {
         if (this.stats) this.stats.requests++;
         if (
@@ -226,6 +251,8 @@ export class DecisionPathCatalog implements IDecisionPathSource {
                 isSmallUnit,
                 isMadeOfFire,
                 hasVineStride,
+                footprintWidth,
+                footprintHeight,
             )
         ) {
             if (this.stats) this.stats.bypasses++;
@@ -238,6 +265,8 @@ export class DecisionPathCatalog implements IDecisionPathSource {
                 isSmallUnit,
                 isMadeOfFire,
                 hasVineStride,
+                footprintWidth,
+                footprintHeight,
             );
         }
         if (this.cached !== undefined) {
@@ -256,6 +285,8 @@ export class DecisionPathCatalog implements IDecisionPathSource {
             isSmallUnit,
             isMadeOfFire,
             hasVineStride,
+            footprintWidth,
+            footprintHeight,
         );
         return this.cached;
     }
@@ -289,6 +320,8 @@ function canonicalInput(grid: Grid, unit: Unit, matrix: number[][]): ICanonicalM
         isSmallUnit: unit.isSmallSize(),
         isMadeOfFire: unit.canTraverseLava(),
         hasVineStride: unit.hasAbilityActive("In Its Own World"),
+        footprintWidth: unit.getFootprintWidth(),
+        footprintHeight: unit.getFootprintHeight(),
     };
 }
 
@@ -324,6 +357,8 @@ function matchesCanonicalRequest(
     isSmallUnit: boolean,
     isMadeOfFire: boolean,
     hasVineStride: boolean,
+    footprintWidth: number,
+    footprintHeight: number,
 ): boolean {
     return (
         canonical.matrix === matrix &&
@@ -334,6 +369,11 @@ function matchesCanonicalRequest(
         canonical.canFly === canFly &&
         canonical.isSmallUnit === isSmallUnit &&
         canonical.isMadeOfFire === isMadeOfFire &&
-        canonical.hasVineStride === hasVineStride
+        canonical.hasVineStride === hasVineStride &&
+        // The footprint belongs in the key, not just in the delegated call: two units of different shapes can
+        // stand on the same anchor with everything else identical, and a cache that ignored W/H would hand the
+        // second one the first one's reachable set.
+        canonical.footprintWidth === footprintWidth &&
+        canonical.footprintHeight === footprintHeight
     );
 }
