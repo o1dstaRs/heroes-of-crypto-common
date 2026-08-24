@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, type ExecFileSyncOptionsWithStringEncoding } from "node:child_process";
 
 export interface IGitSourceStatus {
     commit: string;
@@ -85,12 +85,12 @@ export function parseGitSourceStatus(output: string): IGitSourceStatus {
 // the daemon and optional locks per call, never allow a terminal prompt, and cap the wall time; every
 // failure path below already degrades to "unknown and dirty".
 const GIT_SAFE_ARGS = ["-c", "core.fsmonitor=false"] as const;
-const GIT_SAFE_OPTIONS = {
+const GIT_SAFE_OPTIONS: ExecFileSyncOptionsWithStringEncoding = {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
     timeout: 15_000,
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" },
-} as const;
+};
 
 /** Capture HEAD and working-tree status in one Git process. */
 export function captureGitSourceStatus(cwd: string = process.cwd()): IGitSourceStatus {
