@@ -18,6 +18,7 @@ import effectsJson from "../../src/configuration/effects.json";
 import spellsJson from "../../src/configuration/spells.json";
 import { AbilityPowerType } from "../../src/abilities/ability_properties";
 import {
+    MAX_VERIFIED_FOOTPRINT_SIDE,
     getAbilityConfig,
     getAuraEffectConfig,
     getCreatureConfig,
@@ -286,3 +287,48 @@ function objectEntries(value: unknown): [string, unknown][] {
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
+
+/**
+ * The engine generalises to an arbitrary W x H, but only sides up to 2 are PROVEN: whole matches with a 2x1
+ * or 1x2 on the board produce zero engine-rejected actions, while the same clash with a 3x1 measures dozens
+ * of declined melee strikes. The bound is therefore enforced where a footprint is declared, so an
+ * unsupported shape fails at configuration time instead of becoming an AI that proposes refused moves all
+ * match.
+ */
+describe("footprint sides are bounded to what the engine is verified for", () => {
+    const FOOTPRINT_OVERRIDE_ENV = "HOC_FOOTPRINT_OVERRIDES";
+
+    const withOverrides = <T>(value: string, body: () => T): T => {
+        const previous = process.env[FOOTPRINT_OVERRIDE_ENV];
+        process.env[FOOTPRINT_OVERRIDE_ENV] = value;
+        try {
+            return body();
+        } finally {
+            if (previous === undefined) {
+                delete process.env[FOOTPRINT_OVERRIDE_ENV];
+            } else {
+                process.env[FOOTPRINT_OVERRIDE_ENV] = previous;
+            }
+        }
+    };
+
+    const tiger = () => getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "White Tiger", "white_tiger_512", 1);
+
+    it("accepts the shapes the clash proves — 1x1, 2x1, 1x2, 2x2", () => {
+        expect(MAX_VERIFIED_FOOTPRINT_SIDE).toBe(2);
+        for (const [width, height] of [
+            [1, 1],
+            [2, 1],
+            [1, 2],
+            [2, 2],
+        ] as const) {
+            const properties = withOverrides(`White Tiger=${width}x${height}`, tiger);
+            expect([properties.footprint_width, properties.footprint_height]).toEqual([width, height]);
+        }
+    });
+
+    it("ignores a QA override the engine cannot honour rather than building a broken unit", () => {
+        const properties = withOverrides("White Tiger=3x1", tiger);
+        expect([properties.footprint_width, properties.footprint_height]).toEqual([1, 1]);
+    });
+});

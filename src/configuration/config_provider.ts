@@ -247,6 +247,21 @@ interface ICreatureFootprintConfig {
  * integer is a configuration bug and throws like every other malformed field in this file — silently
  * flooring it would hand the engine a unit whose body is a different shape than the board reserved for it.
  */
+/**
+ * The largest footprint side the engine is VERIFIED for.
+ *
+ * Every geometry path here generalises to an arbitrary W x H, and the shipped 1x1 / 2x2 and the new 2x1 /
+ * 1x2 are all proven — whole matches under every AI version produce zero engine-rejected actions. A side of
+ * 3 is NOT proven and does not behave: the same clash harness measures ~64 rejected melee actions across 8
+ * matches with a 3x1 (`attack_not_available`), against exactly 0 for a 2x1 on the identical board and seed.
+ *
+ * So the bound is enforced rather than assumed. A configuration the engine cannot honour should fail loudly
+ * where it is declared, not degrade into an AI that proposes moves the engine refuses all match. Raising
+ * this means making the melee stand-cell enumeration correct for deeper bodies first, then re-running the
+ * clash to zero.
+ */
+export const MAX_VERIFIED_FOOTPRINT_SIDE = 2;
+
 const getCreatureFootprintSide = (
     creatureName: string,
     key: "footprint_width" | "footprint_height",
@@ -258,6 +273,13 @@ const getCreatureFootprintSide = (
 
     if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
         throw new TypeError(`Invalid ${key} for creature ${creatureName} = ${value}`);
+    }
+
+    if (value > MAX_VERIFIED_FOOTPRINT_SIDE) {
+        throw new TypeError(
+            `Unsupported ${key} for creature ${creatureName} = ${value}: ` +
+                `footprint sides above ${MAX_VERIFIED_FOOTPRINT_SIDE} are not supported by the engine yet`,
+        );
     }
 
     return value;
@@ -308,7 +330,9 @@ const getCreatureFootprintOverride = (creatureName: string): { width: number; he
         }
         const width = Number(shape[1]);
         const height = Number(shape[2]);
-        if (width > 0 && height > 0) {
+        // Same bound as the JSON path. This lever exists to exercise shapes the engine can actually honour;
+        // letting it conjure an unsupported one would only manufacture a broken match to debug.
+        if (width > 0 && height > 0 && width <= MAX_VERIFIED_FOOTPRINT_SIDE && height <= MAX_VERIFIED_FOOTPRINT_SIDE) {
             return { width, height };
         }
     }
