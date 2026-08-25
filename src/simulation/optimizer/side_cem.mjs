@@ -72,6 +72,7 @@ let state = existsSync(statePath)
           mean: { b: shipped.b, w: [...shipped.w] },
           sigma: { b: initialSigmaB, w: initialSigma },
           globalBest: null, // {leaf, screenRate, valRate}
+          shippedVal: null, // shipped leaf's rate on the held-out panel — the crowning anchor
           evaluations: 0,
       };
 
@@ -101,6 +102,16 @@ function evaluateLeaf(leaf, pairs, seed, label) {
 
 const persist = () => writeFileSync(statePath, JSON.stringify(state, null, 2));
 
+// The null anchor: the SHIPPED leaf on the held-out panel. Winner's-curse discipline — a
+// generation winner is only crowned when its held-out rate beats what the shipped leaf scores on
+// the very same panel, not merely the best-so-far (which starts at nothing).
+if (state.shippedVal === null) {
+    const anchor = evaluateLeaf({ b: shipped.b, w: [...shipped.w] }, VAL_PAIRS, VAL_SEED, "shipped_val");
+    state.shippedVal = anchor.rate;
+    log(`shipped-leaf VAL anchor: ${(anchor.rate * 100).toFixed(2)}% (lo=${(anchor.lo * 100).toFixed(2)}%)`);
+    persist();
+}
+
 while (Date.now() < deadline) {
     const generation = state.generation;
     // Fresh screening seed base per generation — never the validation base.
@@ -127,7 +138,18 @@ while (Date.now() < deadline) {
     }
     if (!scored.length) break;
     scored.sort((left, right) => right.rate - left.rate);
-    const elites = scored.slice(0, Math.min(ELITE, scored.length));
+    // Winner's-curse guard: re-screen the top slice on a SECOND fresh panel and rank by the
+    // average, so one lucky panel cannot pick the elites or the generation winner.
+    const rescreenSeed = (SCREEN_SEED + generation * 7919 + 3571) >>> 0;
+    const topSlice = scored.slice(0, Math.min(ELITE, scored.length));
+    for (let index = 0; index < topSlice.length; index += 1) {
+        if (Date.now() > deadline) break;
+        const second = evaluateLeaf(topSlice[index].leaf, SCREEN_PAIRS, rescreenSeed, `g${generation}_r${index}`);
+        topSlice[index].rate = (topSlice[index].rate + second.rate) / 2;
+        log(`g${generation} r${index}: rescreen -> avg ${(topSlice[index].rate * 100).toFixed(2)}%`);
+    }
+    topSlice.sort((left, right) => right.rate - left.rate);
+    const elites = topSlice;
     // Elite mean/sigma update.
     state.mean = {
         b: elites.reduce((sum, elite) => sum + elite.leaf.b, 0) / elites.length,
@@ -138,13 +160,14 @@ while (Date.now() < deadline) {
         w: state.sigma.w.map((sigma) => Math.max(SIGMA_FLOOR, sigma * SIGMA_DECAY)),
     };
     // Held-out validation for the generation winner before it may take the crown.
-    const genBest = scored[0];
+    const genBest = topSlice[0];
     const validation = evaluateLeaf(genBest.leaf, VAL_PAIRS, VAL_SEED, `g${generation}_val`);
     log(
         `g${generation} BEST screen=${(genBest.rate * 100).toFixed(2)}% ` +
             `val=${(validation.rate * 100).toFixed(2)}% (lo=${(validation.lo * 100).toFixed(2)}%)`,
     );
-    if (!state.globalBest || validation.rate > state.globalBest.valRate) {
+    const beatsShipped = state.shippedVal === null || validation.rate > state.shippedVal;
+    if (beatsShipped && (!state.globalBest || validation.rate > state.globalBest.valRate)) {
         state.globalBest = { leaf: genBest.leaf, screenRate: genBest.rate, valRate: validation.rate, valLo: validation.lo, generation };
         writeFileSync(bestPath, JSON.stringify(state.globalBest, null, 2));
         log(`NEW GLOBAL BEST: val ${(validation.rate * 100).toFixed(2)}%`);

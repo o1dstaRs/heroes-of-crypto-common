@@ -14,11 +14,28 @@ import { FightProperties } from "./fight_properties";
 export class FightStateManager {
     private static instance: FightStateManager;
     private fightProperties: FightProperties;
+    /**
+     * Process-wide board-orientation default, applied to every FightProperties this manager creates
+     * (constructor AND reset). The CLIENT sets this true once at boot — every fight it hosts
+     * (sandbox, vs-AI, previews) plays the side-oriented board (owner call 2026-08-25: everything
+     * fights left-to-right now). The server and the sim never touch it: they stamp orientation
+     * explicitly per fight, and a fresh default FightProperties stays classic for tests.
+     */
+    private static defaultSideOrientedPlacement = false;
+    public static setDefaultSideOrientedPlacement(sideOriented: boolean): void {
+        FightStateManager.defaultSideOrientedPlacement = sideOriented;
+    }
+    private static applyDefaults(fightProperties: FightProperties): FightProperties {
+        if (FightStateManager.defaultSideOrientedPlacement) {
+            fightProperties.setSideOrientedPlacement(true);
+        }
+        return fightProperties;
+    }
     private constructor() {
-        this.fightProperties = new FightProperties();
+        this.fightProperties = FightStateManager.applyDefaults(new FightProperties());
     }
     public reset(): void {
-        this.fightProperties = new FightProperties();
+        this.fightProperties = FightStateManager.applyDefaults(new FightProperties());
     }
     // Point the process-global FightProperties at a specific instance. The server runs MANY concurrent
     // PlaySessions, each with its OWN FightProperties — but the combat/ability handlers read synergy data
