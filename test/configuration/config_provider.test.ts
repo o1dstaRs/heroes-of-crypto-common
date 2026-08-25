@@ -9,6 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
 
 import abilitiesJson from "../../src/configuration/abilities.json";
@@ -340,9 +342,75 @@ describe("footprint sides are bounded to what the engine is verified for", () =>
 
     it("ignores a QA override the engine cannot honour rather than building a broken unit", () => {
         // One past the bound, whatever the bound currently is — the point of the test is that an
-        // unverified shape is refused, not that any particular number is refused.
+        // unverified shape is refused, not that any particular number is refused. Refusing it falls back
+        // to the SHIPPED shape, which for White Tiger is its declared 2x1.
         const beyond = MAX_VERIFIED_FOOTPRINT_SIDE + 1;
         const properties = withOverrides(`White Tiger=${beyond}x1`, tiger);
-        expect([properties.footprint_width, properties.footprint_height]).toEqual([1, 1]);
+        expect([properties.footprint_width, properties.footprint_height]).toEqual([2, 1]);
+    });
+});
+
+/**
+ * The mounted class ships 2x1 — two cells long, one tall (Point X3). This pin is the catalog's source of
+ * truth for WHICH creatures are rectangular; the engine-side behavior is proven by the clash harness and
+ * the footprint suites.
+ *
+ * If this test is failing because the declarations were removed from creatures.json to quiet the
+ * size === max(width, height) validator: the correct fix is `size: 2` alongside the footprint (size is the
+ * legacy ART tier and must read as the bigger square), NOT deleting the footprint. That deletion already
+ * happened once (common 1696372) and silently turned the whole mounted class back into squares.
+ */
+describe("the mounted class ships 2x1", () => {
+    const MOUNTED_2X1: ReadonlyArray<readonly [string, string]> = [
+        ["Life", "Griffin"],
+        ["Nature", "Wolf"],
+        ["Nature", "White Tiger"],
+        ["Nature", "Unicorn"],
+        ["Nature", "Mantis"],
+        ["Nature", "Pegasus"],
+        ["Chaos", "Manticore"],
+        ["Chaos", "Nightmare"],
+        ["Might", "Centaur"],
+        ["Might", "Wolf Rider"],
+        ["Might", "Nomad"],
+        ["Might", "Hyena"],
+        ["Might", "Wyvern"],
+    ];
+
+    it("every mounted creature declares 2x1 with the size-2 art tier", () => {
+        for (const [factionName, creatureName] of MOUNTED_2X1) {
+            const properties = getCreatureConfig(
+                PBTypes.TeamVals.LOWER,
+                factionName,
+                creatureName,
+                `${creatureName.toLowerCase().replace(/ /g, "_")}_512`,
+                1,
+            );
+            expect({
+                creatureName,
+                width: properties.footprint_width,
+                height: properties.footprint_height,
+                size: properties.size,
+            }).toEqual({ creatureName, width: 2, height: 1, size: 2 });
+        }
+    });
+
+    it("and no other creature declares a rectangle", () => {
+        const declared = new Set(MOUNTED_2X1.map(([, creatureName]) => creatureName));
+        const catalog = JSON.parse(
+            readFileSync(join(import.meta.dir, "..", "..", "src", "configuration", "creatures.json"), "utf8"),
+        ) as Record<string, Record<string, { footprint_width?: number; footprint_height?: number }>>;
+        for (const creatures of Object.values(catalog)) {
+            if (typeof creatures !== "object") continue;
+            for (const [creatureName, config] of Object.entries(creatures)) {
+                if (!config || typeof config !== "object") continue;
+                if (config.footprint_width !== undefined || config.footprint_height !== undefined) {
+                    expect({ creatureName, declared: declared.has(creatureName) }).toEqual({
+                        creatureName,
+                        declared: true,
+                    });
+                }
+            }
+        }
     });
 });

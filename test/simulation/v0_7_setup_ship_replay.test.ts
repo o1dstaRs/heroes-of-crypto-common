@@ -29,7 +29,14 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // fielded across the seeded draws and the Wyvern's aura prices real damage, so any trace holding
 // either diverges from that point on. Two isolated runs reproduced this value byte-identically.
 // Previous approved digest: 2d3e9727f3c79de48196b3d48a35c7855dab172406739a942c9afdc2d69ec2ed
-const EXPECTED_REPLAY_SHA256 = "5d5b7a69138fa716091e005b8850228e1118adbcc7264742a8a72b20bfa11a47";
+// Re-pinned 2026-08-25 for the mounted class shipping 2x1 (Point X3): Griffin, Wolf, White Tiger,
+// Unicorn, Mantis, Pegasus, Manticore, Nightmare, Centaur, Wolf Rider, Nomad, Hyena and Wyvern now
+// declare footprint 2x1 with the size-2 art tier in creatures.json. Mounted stacks are fielded across
+// the seeded draws, and a two-cell body changes placement, pathing and adjacency from the first lap, so
+// every trace holding one diverges from its placement on. Two isolated runs reproduced this value
+// byte-identically.
+// Previous approved digest: 5d5b7a69138fa716091e005b8850228e1118adbcc7264742a8a72b20bfa11a47
+const EXPECTED_REPLAY_SHA256 = "3735bb4d7dd68666c98600f0d569dc2b9c8de1845cdfc54244b094d352b1ba50";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

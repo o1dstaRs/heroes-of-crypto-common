@@ -98,17 +98,23 @@ describe("draft-time creature footprint", () => {
         withFootprintOverrides("White Tiger=2x1,Hyena=1x2", expectCatalogWideParity);
     });
 
-    // Today's roster is entirely square, so this doubles as the "no behaviour moved" guard: if a rectangle
-    // ever lands in creatures.json this test is the intended place to notice it, not a live ranked match.
-    test("reports the legacy square shapes as exactly size x size", () => {
+    // The mounted class ships 2x1 (Point X3), so draft-time shapes must track the DECLARED footprint and
+    // fall back to size x size only where nothing is declared. This is the guard that noticed the first
+    // shipped rectangles, exactly as its previous wording promised.
+    test("reports the declared shapes: rectangles from creatures.json, squares from size", () => {
         withFootprintOverrides("", () => {
             for (const { factionName, creatureName, creatureId } of indexedCreatures()) {
-                const size = catalog[factionName][creatureName].size ?? 1;
+                const config = catalog[factionName][creatureName] as {
+                    size?: number;
+                    footprint_width?: number;
+                    footprint_height?: number;
+                };
+                const size = config.size ?? 1;
                 const info = creatureInfo(creatureId)!;
                 expect({ creatureName, width: info.footprintWidth, height: info.footprintHeight }).toEqual({
                     creatureName,
-                    width: size,
-                    height: size,
+                    width: config.footprint_width ?? size,
+                    height: config.footprint_height ?? size,
                 });
                 expect(size === 1 || size === 2).toBeTrue();
             }
@@ -121,26 +127,29 @@ describe("draft-time creature footprint", () => {
     // places as a 2x1 — the anchor is then chosen for a body one column too narrow, and the engine rejects it.
     test("follows a QA footprint override, in both axes, and reverts when it is removed", () => {
         const whiteTiger = creatureIdForName("White Tiger")!;
-        const hyena = creatureIdForName("Hyena")!;
+        const berserker = creatureIdForName("Berserker")!;
         const peasant = creatureIdForName("Peasant")!;
 
-        withFootprintOverrides("White Tiger=2x1,Hyena=1x2", () => {
-            const tiger = creatureInfo(whiteTiger)!;
-            expect([tiger.footprintWidth, tiger.footprintHeight]).toEqual([2, 1]);
+        withFootprintOverrides("Peasant=2x1,Berserker=1x2,White Tiger=1x1", () => {
+            const peasantInfo = creatureInfo(peasant)!;
+            expect([peasantInfo.footprintWidth, peasantInfo.footprintHeight]).toEqual([2, 1]);
             // The transpose is asserted separately: an axis swap is the single most likely bug here, and one
             // orientation on its own cannot see it.
-            const hyenaInfo = creatureInfo(hyena)!;
-            expect([hyenaInfo.footprintWidth, hyenaInfo.footprintHeight]).toEqual([1, 2]);
-            // A creature the override does not name must be untouched.
-            const peasantInfo = creatureInfo(peasant)!;
-            expect([peasantInfo.footprintWidth, peasantInfo.footprintHeight]).toEqual([1, 1]);
-        });
-
-        // The index is cached for the process, so a stale entry would keep reporting the rectangle after the
-        // override is gone — which in a multi-file test run means one harness reshaping another's board.
-        withFootprintOverrides("", () => {
+            const berserkerInfo = creatureInfo(berserker)!;
+            expect([berserkerInfo.footprintWidth, berserkerInfo.footprintHeight]).toEqual([1, 2]);
+            // An override also RESHAPES a shipped rectangle, not only a square.
             const tiger = creatureInfo(whiteTiger)!;
             expect([tiger.footprintWidth, tiger.footprintHeight]).toEqual([1, 1]);
+        });
+
+        // The index is cached for the process, so a stale entry would keep reporting the override after it
+        // is gone — which in a multi-file test run means one harness reshaping another's board. Reverting
+        // must restore the SHIPPED shapes: White Tiger's declared 2x1, Peasant's square.
+        withFootprintOverrides("", () => {
+            const tiger = creatureInfo(whiteTiger)!;
+            expect([tiger.footprintWidth, tiger.footprintHeight]).toEqual([2, 1]);
+            const peasantInfo = creatureInfo(peasant)!;
+            expect([peasantInfo.footprintWidth, peasantInfo.footprintHeight]).toEqual([1, 1]);
         });
     });
 

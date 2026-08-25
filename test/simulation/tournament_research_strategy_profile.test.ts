@@ -74,11 +74,14 @@ describe("tournament entrant-A research strategy profile", () => {
         ]);
 
         // Game 0: entrant A owns GREEN and receives the scoped compact placement; B remains native v0.8.
+        // Entrant A's compact cells are unchanged by the 2026-08-25 mounted-class 2x1 catalog change; the
+        // NATIVE seat's layout re-packs around the wider bodies (and the size-2 stat feeds the seeded
+        // draw), so only B's cells were re-pinned. Two isolated runs reproduced all four.
         expect(cellFor(records[0], "green", "Arbalester")).toEqual({ x: 1, y: 1 });
-        expect(cellFor(records[0], "red", "Arbalester")).toEqual({ x: 14, y: 12 });
+        expect(cellFor(records[0], "red", "Arbalester")).toEqual({ x: 8, y: 14 });
 
         // Game 1: the same fresh composite follows entrant A to RED; GREEN is now the unchanged B entrant.
-        expect(cellFor(records[1], "green", "Arbalester")).toEqual({ x: 14, y: 1 });
+        expect(cellFor(records[1], "green", "Arbalester")).toEqual({ x: 8, y: 2 });
         expect(cellFor(records[1], "red", "Arbalester")).toEqual({ x: 1, y: 14 });
     });
 

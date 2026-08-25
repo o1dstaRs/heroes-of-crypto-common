@@ -240,7 +240,7 @@ describe("rectangular footprints end to end", () => {
         }
     });
 
-    test("without the override the same rosters stay square, so nothing shipped moved", () => {
+    test("without the override the shapes are the SHIPPED ones: mounted 2x1, everything else square", () => {
         const result = runMatch({
             roster: MIXED_ROSTER,
             greenVersion: "v0.4",
@@ -249,9 +249,21 @@ describe("rectangular footprints end to end", () => {
             maxLaps: 1,
         });
 
+        // White Tiger and Hyena are mounted-class and ship 2x1 from creatures.json — the override in the
+        // tests above merely restates their shipped shape (and reshapes the squares). The rest of the
+        // roster records no footprint at all.
+        const mounted = new Set(["White Tiger", "Hyena"]);
         for (const record of [...result.placements.green, ...result.placements.red]) {
-            expect(record.footprintWidth).toBeUndefined();
-            expect(record.footprintHeight).toBeUndefined();
+            if (mounted.has(record.creatureName)) {
+                expect([record.creatureName, record.footprintWidth, record.footprintHeight]).toEqual([
+                    record.creatureName,
+                    2,
+                    1,
+                ]);
+            } else {
+                expect(record.footprintWidth).toBeUndefined();
+                expect(record.footprintHeight).toBeUndefined();
+            }
         }
     });
 });

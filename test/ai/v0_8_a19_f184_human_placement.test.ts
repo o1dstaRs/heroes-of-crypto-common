@@ -13,6 +13,7 @@ import { layoutRevealPlacement } from "../../src/ai/versions/v0_7_placement_reve
 import type { GameAction } from "../../src/engine/actions";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { GridType, TeamType } from "../../src/generated/protobuf/v1/types_gen";
+import { getFootprintCellsForAnchor } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
 import type { IPlacement } from "../../src/grid/placement_properties";
 import { PlacementPositionType } from "../../src/grid/placement_properties";
@@ -70,8 +71,8 @@ const scenario = (
     scenarioId += 1;
     const combat = createCombatTestContext(gridType);
     const factories = createCombatFactories();
-    const units = specs.map((spec, index) =>
-        createUnitFromSpec(
+    const units = specs.map((spec, index) => {
+        const unit = createUnitFromSpec(
             spec,
             team,
             testGridSettings,
@@ -79,8 +80,22 @@ const scenario = (
             factories.effectFactory,
             false,
             `f184-policy-${scenarioId}-${index}`,
-        ),
-    );
+        );
+        // The fixture describes the RECORDED world: fight 184 was played before the mounted class shipped
+        // 2x1, so its Griffin and Mantis were 1x1 size-1 stacks. The catalog has since reshaped them, and
+        // the policy's own-unit shape gate would (correctly) disable the treatment for every live roster —
+        // which the dedicated live-catalog test below pins. Here the recorded shapes are restored so the
+        // exact-template machinery stays genuinely exercised.
+        const recordedProperties = (
+            unit as unknown as {
+                unitProperties: { size: number; footprint_width: number; footprint_height: number };
+            }
+        ).unitProperties;
+        recordedProperties.size = spec.size;
+        recordedProperties.footprint_width = spec.footprintWidth ?? spec.size;
+        recordedProperties.footprint_height = spec.footprintHeight ?? spec.size;
+        return unit;
+    });
     units.forEach((unit) => combat.unitsHolder.addUnit(unit));
     const context: IPlacementContext = {
         team,
@@ -119,9 +134,7 @@ const decoratedFor = (
 };
 
 const footprint = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [base]
-        : [base, { x: base.x - 1, y: base.y }, { x: base.x, y: base.y - 1 }, { x: base.x - 1, y: base.y - 1 }];
+    getFootprintCellsForAnchor(base, unit.getFootprintWidth(), unit.getFootprintHeight());
 
 const assertLegalCompletePlacement = (fixture: IScenario, placement: ReadonlyMap<string, XY>): void => {
     expect(placement.size).toBe(fixture.units.length);
@@ -315,6 +328,31 @@ describe("v0.8 A19 exact f184 human-opening placement policy", () => {
             placementChanged: false,
             fallbackReason: "unchanged",
         });
+    });
+
+    test("today's shipped catalog reshapes the mounted class, so every live f184 roster falls back", () => {
+        // Griffin (lower roster) and Mantis (upper roster) now ship 2x1 size-2; the recorded fight-184
+        // stacks were 1x1 size-1. The shape gate exists precisely so the exact opening is never faked
+        // onto differently-shaped pieces — the treatment must disable, not repair.
+        for (const [specs, opponentIds] of [
+            [LOWER_ROSTER, UPPER_IDS],
+            [UPPER_ROSTER, LOWER_IDS],
+        ] as const) {
+            const fixture = scenario(specs, opponentIds);
+            const mounted = new Set(["Griffin", "Mantis"]);
+            for (const unit of fixture.units) {
+                if (!mounted.has(unit.getName())) continue;
+                const liveShape = (
+                    unit as unknown as {
+                        unitProperties: { size: number; footprint_width: number; footprint_height: number };
+                    }
+                ).unitProperties;
+                liveShape.size = 2;
+                liveShape.footprint_width = 2;
+                liveShape.footprint_height = 1;
+            }
+            assertFallback(fixture, "own-unit-shape-mismatch");
+        }
     });
 
     test("delegates combat decisions unchanged", () => {

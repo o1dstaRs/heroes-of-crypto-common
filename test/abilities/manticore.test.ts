@@ -49,10 +49,13 @@ const wardingMane = () =>
     );
 
 describe("Manticore", () => {
-    it("is configured as a Chaos level 2 small flyer with its three abilities", () => {
+    it("is configured as a Chaos level 2 mounted (2x1) flyer with its three abilities", () => {
         const config = getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Manticore", "manticore_512", 1);
         expect(config.level).toBe(PBTypes.UnitLevelVals.SECOND);
-        expect(config.size).toBe(PBTypes.UnitSizeVals.SMALL);
+        // Mounted class: the body is 2 cells long and 1 tall; `size` is the legacy art tier and must read
+        // as the bigger square (size === max(width, height)).
+        expect(config.size).toBe(PBTypes.UnitSizeVals.LARGE);
+        expect([config.footprint_width, config.footprint_height]).toEqual([2, 1]);
         expect(config.movement_type).toBe(PBTypes.MovementVals.FLY);
         expect(config.attack_type).toBe(PBTypes.AttackVals.MELEE);
         expect(config.abilities).toEqual(["Warding Mane Aura", "Terrifying Gaze", "Deep Wounds Level 2"]);
