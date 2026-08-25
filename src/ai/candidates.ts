@@ -29,10 +29,12 @@ import {
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../grid/grid_math";
+import { getCreatureFootprint } from "../configuration/config_provider";
+import { ToFactionName } from "../factions/faction_type";
 import { AttackHandler, type IPreparedRangeAttackEvaluation } from "../handlers/attack_handler";
 import {
     canCastSpell,
-    canCastSummon,
+    firstSummonableAnchor,
     canMassCastSpell,
     thrownSpellReachesAimedTarget,
     isSpellUsableByCaster,
@@ -2931,10 +2933,23 @@ class CandidateGenerator {
                 if (amount <= 0) {
                     continue;
                 }
-                // Deterministic (RNG-free) summon cell: the first empty cell around the caster in
-                // getCellsAroundCell order. The engine only validates emptiness (canCastSummon).
-                const cell = getCellsAroundCell(gs, this.unit.getBaseCell()).find((c) =>
-                    canCastSummon(spell, matrix, c),
+                // Deterministic (RNG-free) summon cell: the first anchor around the caster that the
+                // summoned creature actually FITS on. Asking only whether ONE cell is empty was right
+                // while every summon was a 1x1; now that the mounted class ships 2x1, a free cell is a
+                // coin flip on whether the body fits — and the engine refuses an EXPLICIT cell outright
+                // rather than re-routing it (only its own fallback retries), so the cast was simply lost.
+                // Ring the caster's whole FOOTPRINT too: from the base cell alone, a rectangular
+                // summoner offers spots that hug one end of its body.
+                const summonFootprint = getCreatureFootprint(
+                    ToFactionName[spell.getSummonUnitRace()],
+                    spell.getSummonUnitName(),
+                );
+                const cell = firstSummonableAnchor(
+                    spell,
+                    matrix,
+                    getCellsAroundFootprint(gs, this.unit.getCells()),
+                    summonFootprint.width,
+                    summonFootprint.height,
                 );
                 if (cell) {
                     this.pushSpell(spell, undefined, { x: cell.x, y: cell.y });

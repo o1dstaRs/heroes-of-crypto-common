@@ -21,10 +21,13 @@ import {
     isRangeAttackSideObservable,
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
+    getCellsAroundFootprint,
 } from "../../grid/grid_math";
 import type { AttackHandler } from "../../handlers/attack_handler";
 import { footprintCellsForAnchor } from "../../simulation/footprint";
-import { canCastSpell, canCastSummon, canMassCastSpell } from "../../spells/spell_helper";
+import { getCreatureFootprint } from "../../configuration/config_provider";
+import { ToFactionName } from "../../factions/faction_type";
+import { canCastSpell, canCastSummon, canMassCastSpell, firstSummonableAnchor } from "../../spells/spell_helper";
 import type { Spell } from "../../spells/spell";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
@@ -326,8 +329,31 @@ export class StrategyV0_2 extends StrategyV0_1 {
             // Summon Wolves: strongly preferred when our ranged army is stronger (stand and shoot), else low.
             if (spell.isSummon() && targetType === SpellTargetType.RANDOM_CLOSE_TO_CASTER) {
                 const amount = Math.floor(unit.getAmountAlive() * spell.getPower());
-                const cell = getRandomGridCellAroundPosition(gridSettings, matrix, team, unit.getPosition());
-                if (amount > 0 && cell && canCastSummon(spell, matrix, cell)) {
+                // Ask whether the summoned BODY fits, not just whether one cell is free: now that the
+                // mounted class ships 2x1, a free cell is a coin flip on whether the summon seats there,
+                // and the engine refuses an EXPLICIT cell outright instead of re-routing it.
+                //
+                // The RNG cell is still tried FIRST, so every 1x1 summon keeps the exact spot — and
+                // therefore the exact decision — it always had. Only when that spot cannot hold the body
+                // does this walk the ring around the caster's footprint for one that can, which keeps the
+                // summon available rather than silently dropping it.
+                const summonFootprint = getCreatureFootprint(
+                    ToFactionName[spell.getSummonUnitRace()],
+                    spell.getSummonUnitName(),
+                );
+                const randomCell = getRandomGridCellAroundPosition(gridSettings, matrix, team, unit.getPosition());
+                const cell =
+                    randomCell &&
+                    canCastSummon(spell, matrix, randomCell, summonFootprint.width, summonFootprint.height)
+                        ? randomCell
+                        : firstSummonableAnchor(
+                              spell,
+                              matrix,
+                              getCellsAroundFootprint(gridSettings, unit.getCells()),
+                              summonFootprint.width,
+                              summonFootprint.height,
+                          );
+                if (amount > 0 && cell) {
                     consider(amount * (rangedSuperior ? 60 : 3), spell, undefined, cell);
                 }
                 continue;

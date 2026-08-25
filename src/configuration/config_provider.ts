@@ -30,6 +30,7 @@ import {
     ToSpellPowerType,
     ToSpellTargetType,
 } from "../spells/spell_properties";
+import { normalizeFootprintSide } from "../grid/grid_math";
 import { ToAttackType, ToMovementType, UnitProperties } from "../units/unit_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
@@ -345,6 +346,38 @@ const getCreatureFootprintOverride = (creatureName: string): { width: number; he
         }
     }
     return undefined;
+};
+
+const creatureFootprintCache = new Map<string, { width: number; height: number }>();
+
+/**
+ * A creature's board footprint WITHOUT building its full UnitProperties.
+ *
+ * The AI has to know how big a summon is before it decides where to put it, and it asks once per candidate
+ * cell per summoner per turn — far too hot for `getCreatureConfig`, which parses abilities, spells and
+ * effects to answer. This reads the two keys that matter (honouring the QA override, so an overridden shape
+ * is seated the same way it is played) and memoises per creature, since creatures.json does not change
+ * within a process.
+ *
+ * Returns 1x1 for an unknown creature rather than throwing: the caller is choosing a hypothetical spot, and
+ * a bad name is the summon path's problem to report, not this lookup's.
+ */
+export const getCreatureFootprint = (factionName: string, creatureName: string): { width: number; height: number } => {
+    const key = `${factionName}/${creatureName}`;
+    const cached = creatureFootprintCache.get(key);
+    if (cached) {
+        return cached;
+    }
+    // @ts-ignore: the JSON shape is not typed here, exactly as in getCreatureConfig below
+    const creatureConfig = creaturesJson[factionName]?.[creatureName];
+    const override = getCreatureFootprintOverride(creatureName);
+    const size = normalizeFootprintSide(creatureConfig?.size, 1);
+    const resolved = override ?? {
+        width: normalizeFootprintSide(creatureConfig?.footprint_width, size),
+        height: normalizeFootprintSide(creatureConfig?.footprint_height, size),
+    };
+    creatureFootprintCache.set(key, resolved);
+    return resolved;
 };
 
 export const getCreatureConfig = (
