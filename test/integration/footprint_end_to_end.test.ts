@@ -166,10 +166,16 @@ describe("rectangular footprints end to end", () => {
     });
 
     /**
-     * The same three-deep bodies under the A19 SEARCH driver — the production configuration, and the
-     * one that runs the candidate enumerator's hypothetical-destination pin check. That check used the
-     * legacy boolean canBeAttackedByMelee overload (a 2x2 window), which missed a 1x3's far cell: the
-     * AI proposed a shot the engine refused. Zero rejections here pins the unit-shaped form.
+     * The same three-deep bodies under the A19 SEARCH driver — the production configuration, and a
+     * different code path from the plain versions above.
+     *
+     * What this pins is what it says: the whole a19 configuration plays a match with a 3-deep body and the
+     * engine refuses nothing. It does NOT pin the shape-aware canBeAttackedByMelee conversion, though an
+     * earlier version of this comment claimed it did. That was checked rather than argued: reverting both
+     * candidates.ts call sites to the legacy boolean leaves every test in this file green, because the two
+     * gated sites (enrichIncumbentMetadata, and the move-shot enumerator's maxMoveShotComposites) are not
+     * opened by this harness. The boolean-vs-object divergence is pinned directly, at the unit level, in
+     * test/handlers/footprint_attacks.test.ts — that is the test to break if you want to know.
      */
     test("a body three cells deep survives the A19 search driver with no illegal action", () => {
         const previous = process.env[FOOTPRINT_OVERRIDE_ENV];

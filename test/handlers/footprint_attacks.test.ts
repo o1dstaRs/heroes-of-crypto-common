@@ -214,6 +214,35 @@ describe("AttackHandler.canBeAttackedByMelee with a real footprint", () => {
         expect(attackHandler.canBeAttackedByMelee(shooter.getPosition(), false, enemyAggr)).toBe(true);
     });
 
+    /**
+     * The three-deep case, which fails in the OTHER direction. For a 1x2 the legacy 2x2 window is a strict
+     * superset of the real body, so it can only invent a pin. A 1x3 is TALLER than the window, so the
+     * window also MISSES the body's far cell: a threat that really touches the shooter goes unseen and the
+     * AI proposes a shot the engine then refuses. Both directions matter, and only the unit-shaped form
+     * gets either right.
+     */
+    it("reads a 1x3's far cell, which the legacy window cannot even see", () => {
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const shooter = createFootprintUnit({
+            name: "Very Tall Shooter",
+            team: PBTypes.TeamVals.LOWER,
+            width: 1,
+            height: 3,
+        });
+        // Body = column x=5, rows 4..6. The legacy window covers rows 6..7, so row 4 is outside it.
+        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.UPPER, width: 1, height: 1 });
+
+        place(grid, unitsHolder, shooter, { x: 5, y: 6 });
+        place(grid, unitsHolder, enemy, { x: 6, y: 3 });
+
+        const enemyAggr = grid.getEnemyAggrMatrixByUnitId(shooter.getId());
+
+        // The enemy rings rows 2..4 of columns 5..7, which really does touch the shooter's cell (5,4).
+        expect(attackHandler.canBeAttackedByMelee(shooter.getPosition(), shooter, enemyAggr)).toBe(true);
+        // The legacy boolean never looks that far down the body, so it reports the shooter free.
+        expect(attackHandler.canBeAttackedByMelee(shooter.getPosition(), false, enemyAggr)).toBe(false);
+    });
+
     it("reads a 2x1 as one row", () => {
         const { grid, unitsHolder, attackHandler } = createCombatTestContext();
         // Body = row y=6, columns 4..5. The mirrored story: y is the cell centre here, so the legacy reading
