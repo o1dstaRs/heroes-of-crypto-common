@@ -28,20 +28,27 @@ export function getAbilitiesWithPosisionCoefficient(
     fromUnitTeam?: TeamType,
     toFootprintHeight?: number,
     sideOrientedBoard = false,
+    toFootprintWidth?: number,
 ): Ability[] {
     const abilities: Ability[] = [];
     if (!unitAbilities?.length || !fromCell || !toCell) {
         return abilities;
     }
 
-    // Both arguments are ANCHOR cells — the top-right corner of a footprint — so `toCell.y` names the
-    // target's TOP row while its body reaches down to `toCell.y - (height - 1)`. An UPPER-team attacker
+    // Both arguments are ANCHOR cells — the top-right corner of a footprint — so the anchor names the FAR
+    // edge along each axis while the body reaches back to `anchor - (extent - 1)`. An UPPER-team attacker
     // stabs from below, so it has to clear the whole body rather than a single cell of it: the margin is
-    // the target's footprint HEIGHT minus one. `toUnitSmallSize` could only ever say 1 or 2, which is why
-    // the shipped code spelled that margin as a literal 0-or-1; callers that still pass only the boolean
-    // get exactly the same number back. The LOWER-team test has no margin at all and gains none here —
-    // its `aY > tY` already compares against the target's topmost row.
-    const targetHeight = normalizeFootprintSide(toFootprintHeight, toUnitSmallSize ? 1 : 2);
+    // the target's extent, minus one, ALONG THE AXIS OF ADVANCE. That axis is Y on the classic board and X
+    // on the side-oriented ranked board, so the margin has to switch with it — reading the height on a side
+    // board measures the body across the advance instead of along it, and a rectangle then earns or loses
+    // Backstab a cell early. `toUnitSmallSize` could only ever say 1 or 2, which is why the shipped code
+    // spelled the margin as a literal 0-or-1; callers that still pass only the boolean get the same number
+    // back, and a square target is unaffected by the axis choice. The LOWER-team test has no margin at all
+    // and gains none here — its comparison already reads the target's near edge.
+    const targetAlongExtent = normalizeFootprintSide(
+        sideOrientedBoard ? toFootprintWidth : toFootprintHeight,
+        toUnitSmallSize ? 1 : 2,
+    );
 
     for (const a of unitAbilities) {
         if (a.getName() === "Backstab") {
@@ -59,7 +66,7 @@ export function getAbilitiesWithPosisionCoefficient(
 
             // The footprint margin follows the axis too: along the advance axis the anchor names the
             // FAR edge, so the UPPER attacker must clear the body's full extent along that axis.
-            if (fromUnitTeam === PBTypes.TeamVals.UPPER && along < targetAlong - (targetHeight - 1)) {
+            if (fromUnitTeam === PBTypes.TeamVals.UPPER && along < targetAlong - (targetAlongExtent - 1)) {
                 abilities.push(a);
             }
         }

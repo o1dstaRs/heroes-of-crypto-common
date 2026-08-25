@@ -634,7 +634,12 @@ class ReplayAbPlacementStrategy implements IAIStrategy {
         if (!this.splitRoles.length) return incumbent;
         return applyTacticalSplitPlacement(
             incumbent,
-            units.map((unit) => ({ id: unit.getId(), small: unit.isSmallSize() })),
+            units.map((unit) => ({
+                id: unit.getId(),
+                small: unit.isSmallSize(),
+                footprintWidth: unit.getFootprintWidth(),
+                footprintHeight: unit.getFootprintHeight(),
+            })),
             {
                 team: context.team,
                 gridType: context.grid.getGridType(),

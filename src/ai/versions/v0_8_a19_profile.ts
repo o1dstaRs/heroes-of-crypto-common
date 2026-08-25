@@ -29,10 +29,12 @@ export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SHA256 =
     "9c1d70f719c8f6db786a0d00b04a40e4bfa9b90b22c0f22d1ae4374905faf134" as const;
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simulation/battle_engine.ts" as const;
 // Re-pinned for rectangular unit footprints (2026-08-24): placeArmy now records a stack's width/height when
-// it is not square, and the three hand-written 2x2 expansions were routed through simulation/footprint.ts.
-// Both shipped shapes keep their exact cells, so the routing decision and every 1x1/2x2 rollout are unchanged.
+// it is not square, the three hand-written 2x2 expansions were routed through simulation/footprint.ts, and
+// the tactical-split placement payload now carries the real footprint instead of only a small/large boolean.
+// Both shipped shapes keep their exact cells, so the routing decision and every 1x1/2x2 rollout are unchanged
+// — held to the square-only outcome fingerprint across v0.1..v0.8 and all four grid types.
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "5ee6b67d59cd94f6daa121e062dca910e2871765ccd09f586cb1bd4927a4bbb6" as const;
+    "c3bc26bcb4b88e94bae45296586a9e01b6e107ec4cf502455b31e744fbac0d43" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
     "afc6df1b4ca82e16a43ebc5bf2cce37ab0c761bec81f8ef5714c3d80c8b2d294" as const;

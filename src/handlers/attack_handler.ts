@@ -182,7 +182,8 @@ export class AttackHandler {
                 let cellsAway = GridMath.getShotCellDistance(
                     this.gridSettings,
                     attackerPosition,
-                    attackerUnit.getSize(),
+                    attackerUnit.getFootprintWidth(),
+                    attackerUnit.getFootprintHeight(),
                     attackPosition,
                 );
                 // The band's LAST cell is still full strength — it is the edge of the square the player sees.
@@ -1889,11 +1890,12 @@ export class AttackHandler {
             return { completed: false, unitIdsDied, animationData };
         }
 
-        const currentCell = GridMath.getCellForPosition(this.gridSettings, attackerUnit.getPosition());
-
-        if (!currentCell) {
-            return { completed: false, unitIdsDied, animationData };
-        }
+        // The attacker's ANCHOR, not "the cell under its centre". `position` is the footprint's centre, and
+        // the two coincide for every side up to 2 — for a 2x1 / 1x2 only because the centre lands exactly on
+        // a cell boundary and `floor` breaks the tie towards the anchor. A body 3 deep centres on its MIDDLE
+        // cell, and `stationaryAttack` below compares this against an anchor, so a stand-still strike stopped
+        // being recognised as one and was refused as attack_not_available.
+        const currentCell = attackerUnit.getBaseCell();
 
         // Every cell the attacker's body would cover if it struck from `attackFromCell`. That cell is the
         // footprint's ANCHOR — its top-right corner — so the body reaches back towards -x and -y, which is
@@ -2076,11 +2078,12 @@ export class AttackHandler {
         const abilitiesWithPositionCoeff = AbilityHelper.getAbilitiesWithPosisionCoefficient(
             attackerUnit.getAbilities(),
             attackFromCell,
-            GridMath.getCellForPosition(this.gridSettings, targetUnit.getPosition()),
+            targetUnit.getBaseCell(),
             targetUnit.isSmallSize(),
             attackerUnit.getTeam(),
             targetUnit.getFootprintHeight(),
             FightStateManager.getInstance().getFightProperties().isSideOrientedPlacement(),
+            targetUnit.getFootprintWidth(),
         );
 
         if (abilitiesWithPositionCoeff.length) {
@@ -2268,7 +2271,7 @@ export class AttackHandler {
                     this.grid,
                     "resp",
                     this.damageStatisticHolder,
-                    GridMath.getCellForPosition(this.gridSettings, targetUnit.getPosition()),
+                    targetUnit.getBaseCell(),
                     (damageForAnimation.secondary ??= []),
                 );
                 updateUnitsDied(fireBreathResponseResult.unitIdsDied);
@@ -2285,7 +2288,7 @@ export class AttackHandler {
                     unitsHolder,
                     this.grid,
                     this.damageStatisticHolder,
-                    GridMath.getCellForPosition(this.gridSettings, targetUnit.getPosition()),
+                    targetUnit.getBaseCell(),
                     false,
                     (damageForAnimation.secondary ??= []),
                 );
@@ -2332,12 +2335,13 @@ export class AttackHandler {
                     // victim, so its footprint height is the one Backstab has to clear.
                     const abilitiesWithPositionCoeffResp = AbilityHelper.getAbilitiesWithPosisionCoefficient(
                         targetUnit.getAbilities(),
-                        GridMath.getCellForPosition(this.gridSettings, targetUnit.getPosition()),
+                        targetUnit.getBaseCell(),
                         attackFromCell,
                         attackerUnit.isSmallSize(),
                         targetUnit.getTeam(),
                         attackerUnit.getFootprintHeight(),
                         FightStateManager.getInstance().getFightProperties().isSideOrientedPlacement(),
+                        attackerUnit.getFootprintWidth(),
                     );
 
                     if (abilitiesWithPositionCoeffResp.length) {
@@ -2969,11 +2973,9 @@ export class AttackHandler {
         if (!rangeLanded && attackFromCell) {
             let isAdjacentToCenter = false;
 
-            const currentCell = GridMath.getCellForPosition(this.gridSettings, attackerUnit.getPosition());
-
-            if (!currentCell) {
-                return { completed: rangeLanded, unitIdsDied: [], animationData };
-            }
+            // Same anchor rule as handleMeleeAttack above: read the body's anchor rather than the cell its
+            // centre happens to fall in, which stops agreeing once a side is 3.
+            const currentCell = attackerUnit.getBaseCell();
 
             // The attacker's whole body at the attack-from ANCHOR, exactly as in handleMeleeAttack above —
             // this was an independent copy of the same hardcoded 2x2 expansion. Every cell of it is then

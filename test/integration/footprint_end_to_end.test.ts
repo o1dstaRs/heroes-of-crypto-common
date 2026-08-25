@@ -133,6 +133,38 @@ describe("rectangular footprints end to end", () => {
         expect(result.rejectedRed ?? 0).toBe(0);
     });
 
+    /**
+     * The deepest shape the engine is verified for. This case is the one that found the whole
+     * anchor-from-position family: before it was fixed, a 1x3 stack refused roughly 64 melee actions per 8
+     * matches, because `getCellForPosition(unit.getPosition())` returned the body's MIDDLE cell and the
+     * stand-still check compared that against an anchor. Zero here is what raised
+     * MAX_VERIFIED_FOOTPRINT_SIDE from 2 to 3, so it belongs in the gate rather than in a one-off script.
+     */
+    test("a body three cells deep is played out with no illegal action either", () => {
+        const previous = process.env[FOOTPRINT_OVERRIDE_ENV];
+        process.env[FOOTPRINT_OVERRIDE_ENV] = "White Tiger=3x1,Hyena=1x3";
+        try {
+            for (const version of ["v0.4", "v0.8"] as const) {
+                const result = runMatch({
+                    roster: MIXED_ROSTER,
+                    greenVersion: version,
+                    redVersion: version,
+                    seed: 4_120_077,
+                    maxLaps: 24,
+                });
+                expect(result.totalActions).toBeGreaterThan(0);
+                expect(describeRejections(result)).toBe("");
+                expect((result.rejectedGreen ?? 0) + (result.rejectedRed ?? 0)).toBe(0);
+            }
+        } finally {
+            if (previous === undefined) {
+                delete process.env[FOOTPRINT_OVERRIDE_ENV];
+            } else {
+                process.env[FOOTPRINT_OVERRIDE_ENV] = previous;
+            }
+        }
+    });
+
     test("without the override the same rosters stay square, so nothing shipped moved", () => {
         const result = runMatch({
             roster: MIXED_ROSTER,

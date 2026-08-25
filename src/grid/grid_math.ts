@@ -792,13 +792,14 @@ export function getWholeCellShotDistance(shotDistance: number): number {
  *
  * The target is snapped to its cell first, so an aim point nudged onto a cell EDGE (the side centers
  * a real shot resolves to - see getRangeAttackSideCenter) measures the same as that cell's center.
- * The attacker keeps its raw position because large units are centered on a grid intersection; their
- * half-footprint is subtracted instead, which is what makes the square hug the unit's own cells.
+ * The attacker keeps its raw position because a multi-cell body is centred between cells; its own
+ * half-footprint is subtracted per axis instead, which is what makes the square hug the unit's cells.
  */
 export function getShotCellDistance(
     gridSettings: GridSettings,
     attackerPosition: XY,
-    attackerSize: number,
+    attackerFootprintWidth: number,
+    attackerFootprintHeight: number,
     targetPosition: XY,
 ): number {
     const step = gridSettings.getStep();
@@ -808,11 +809,15 @@ export function getShotCellDistance(
         step,
         gridSettings.getHalfStep(),
     );
-    // Half the attacker's own footprint, in pixels: 0 for a 1x1 (centered on its cell), half a cell
-    // for a 2x2 (centered on the intersection of its four cells).
-    const halfFootprint = ((Math.max(1, attackerSize) - 1) / 2) * step;
-    const dx = Math.abs(targetCellPosition.x - attackerPosition.x) - halfFootprint;
-    const dy = Math.abs(targetCellPosition.y - attackerPosition.y) - halfFootprint;
+    // Half the attacker's own footprint, in pixels, PER AXIS: 0 for a side of 1 (centered on its cell),
+    // half a cell for a side of 2 (centered on a grid line), a whole cell for a side of 3. One scalar
+    // cannot describe a rectangle, and the shipped `size` is the square ART tier, not board geometry —
+    // it survived only because Math.round rounds a half up, which cancels the 0.5 error a 2x1 introduces
+    // on its 1-cell axis. This is bit-identical for 1x1, 2x2, 2x1 and 1x2, and right for the rest.
+    const halfFootprintX = ((normalizeFootprintSide(attackerFootprintWidth) - 1) / 2) * step;
+    const halfFootprintY = ((normalizeFootprintSide(attackerFootprintHeight) - 1) / 2) * step;
+    const dx = Math.abs(targetCellPosition.x - attackerPosition.x) - halfFootprintX;
+    const dy = Math.abs(targetCellPosition.y - attackerPosition.y) - halfFootprintY;
 
     return Math.max(0, Math.round(Math.max(dx, dy) / step));
 }

@@ -250,17 +250,25 @@ interface ICreatureFootprintConfig {
 /**
  * The largest footprint side the engine is VERIFIED for.
  *
- * Every geometry path here generalises to an arbitrary W x H, and the shipped 1x1 / 2x2 and the new 2x1 /
- * 1x2 are all proven — whole matches under every AI version produce zero engine-rejected actions. A side of
- * 3 is NOT proven and does not behave: the same clash harness measures ~64 rejected melee actions across 8
- * matches with a 3x1 (`attack_not_available`), against exactly 0 for a 2x1 on the identical board and seed.
+ * This is a claim about what has been MEASURED, not about what the geometry can express — the helpers in
+ * grid_math generalise to any W x H, and the anchor round trip is exact well past this number. What bounds
+ * it is the clash: 1x1, 2x2, 2x1, 1x2, 3x1, 1x3, 3x2, 2x3 and 3x3 all play whole matches under every AI
+ * version with zero engine-rejected actions, across all four boards. Side 4 has simply never been run.
  *
- * So the bound is enforced rather than assumed. A configuration the engine cannot honour should fail loudly
- * where it is declared, not degrade into an AI that proposes moves the engine refuses all match. Raising
- * this means making the melee stand-cell enumeration correct for deeper bodies first, then re-running the
- * clash to zero.
+ * Side 3 used to be genuinely broken — ~64 refused melee actions per 8 matches — and the cause was not the
+ * geometry but a family of call sites that read `getCellForPosition(unit.getPosition())` as "the unit's
+ * anchor". `position` is the body's CENTRE, and the two coincide only up to side 2 (for a 2x1 / 1x2 merely
+ * because the centre lands on a cell boundary and `floor` breaks the tie towards the anchor). Those sites
+ * now ask for the anchor, and the shapes above measure clean.
+ *
+ * The bound stays enforced rather than assumed: a configuration the engine has not been shown to honour
+ * should fail loudly where it is declared, not degrade into an AI that proposes moves the engine refuses
+ * all match. Raising it further means running the clash for that side first.
+ *
+ * Note this is not permission to ship a 3-cell creature. Art is authored per size tier and stops at two
+ * cells, and the deployment strips are shallow; a creature that ships deeper than 2 needs both addressed.
  */
-export const MAX_VERIFIED_FOOTPRINT_SIDE = 2;
+export const MAX_VERIFIED_FOOTPRINT_SIDE = 3;
 
 const getCreatureFootprintSide = (
     creatureName: string,

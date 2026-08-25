@@ -1828,7 +1828,12 @@ function placeArmy(
     const desired = splitStacks.length
         ? applyTacticalSplitPlacement(
               incumbent,
-              units.map((unit) => ({ id: unit.getId(), small: unit.isSmallSize() })),
+              units.map((unit) => ({
+                  id: unit.getId(),
+                  small: unit.isSmallSize(),
+                  footprintWidth: unit.getFootprintWidth(),
+                  footprintHeight: unit.getFootprintHeight(),
+              })),
               {
                   team,
                   gridType: grid.getGridType(),

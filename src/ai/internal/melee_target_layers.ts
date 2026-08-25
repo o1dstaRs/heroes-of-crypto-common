@@ -214,11 +214,13 @@ export function buildMeleeTargetLayers(
     isTargetUnitSmall = true,
 ): XY[][] {
     const result: XY[][] = [];
-    // A square body keeps the legacy dispatch untouched, on the flag rather than on the measured shape, so
-    // 1x1 and 2x2 cannot drift even if a caller ever disagrees with the unit about which of the two it is.
+    // The two SHIPPED squares keep the legacy dispatch untouched, on the flag rather than on the measured
+    // shape, so 1x1 and 2x2 cannot drift even if a caller ever disagrees with the unit about which of the
+    // two it is. Everything else goes through the shape-aware layer — asking only `width !== height` sent a
+    // SQUARE body of side 3 into appendBigLayer, which is 2x2 geometry written out longhand.
     const { height, width } = attackerFootprint(attacker, isCurrentUnitSmall);
-    const isRectangularBody = width !== height;
-    if (isCurrentUnitSmall && !isRectangularBody) {
+    const usesLegacySquareLayer = (width === 1 && height === 1) || (width === 2 && height === 2);
+    if (isCurrentUnitSmall && usesLegacySquareLayer) {
         for (let distance = 1; distance < matrix.length / 2; distance++) {
             const layer: XY[] = [];
             const centerX = cellToAttack.x;
@@ -226,7 +228,7 @@ export function buildMeleeTargetLayers(
             appendSmallLayer(layer, centerX, centerY, distance, matrix, attacker);
             result[distance - 1] = layer;
         }
-    } else if (!isRectangularBody) {
+    } else if (usesLegacySquareLayer) {
         for (let distance = 1; distance < matrix.length / 2; distance++) {
             const layer: XY[] = [];
             const centerX = cellToAttack.x;
@@ -269,7 +271,8 @@ export function buildFirstMeleeTargetLayers(
     }
     const layer: XY[] = [];
     const { height, width } = attackerFootprint(attacker, isCurrentUnitSmall);
-    if (width !== height) {
+    // Same dispatch as buildMeleeTargetLayers — only 1x1 and 2x2 have a hand-written layer.
+    if (!((width === 1 && height === 1) || (width === 2 && height === 2))) {
         appendFootprintLayer(layer, cellToAttack.x, cellToAttack.y, 1, width, height, matrix, attacker);
     } else if (isCurrentUnitSmall) {
         appendSmallLayer(layer, cellToAttack.x, cellToAttack.y, 1, matrix, attacker);

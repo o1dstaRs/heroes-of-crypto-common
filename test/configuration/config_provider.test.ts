@@ -314,13 +314,18 @@ describe("footprint sides are bounded to what the engine is verified for", () =>
 
     const tiger = () => getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "White Tiger", "white_tiger_512", 1);
 
-    it("accepts the shapes the clash proves — 1x1, 2x1, 1x2, 2x2", () => {
-        expect(MAX_VERIFIED_FOOTPRINT_SIDE).toBe(2);
+    it("accepts the shapes the clash proves — every side up to the verified bound", () => {
+        expect(MAX_VERIFIED_FOOTPRINT_SIDE).toBe(3);
         for (const [width, height] of [
             [1, 1],
             [2, 1],
             [1, 2],
             [2, 2],
+            [3, 1],
+            [1, 3],
+            [3, 2],
+            [2, 3],
+            [3, 3],
         ] as const) {
             const properties = withOverrides(`White Tiger=${width}x${height}`, tiger);
             expect([properties.footprint_width, properties.footprint_height]).toEqual([width, height]);
@@ -328,7 +333,10 @@ describe("footprint sides are bounded to what the engine is verified for", () =>
     });
 
     it("ignores a QA override the engine cannot honour rather than building a broken unit", () => {
-        const properties = withOverrides("White Tiger=3x1", tiger);
+        // One past the bound, whatever the bound currently is — the point of the test is that an
+        // unverified shape is refused, not that any particular number is refused.
+        const beyond = MAX_VERIFIED_FOOTPRINT_SIDE + 1;
+        const properties = withOverrides(`White Tiger=${beyond}x1`, tiger);
         expect([properties.footprint_width, properties.footprint_height]).toEqual([1, 1]);
     });
 });

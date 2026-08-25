@@ -246,7 +246,7 @@ describe("grid_math", () => {
             );
         const smallAt = { x: 5, y: 5 };
         const cellsAway = (cell: { x: number; y: number }) =>
-            getShotCellDistance(testGridSettings, center(smallAt), 1, center(cell));
+            getShotCellDistance(testGridSettings, center(smallAt), 1, 1, center(cell));
 
         expect(cellsAway(smallAt)).toBe(0);
         expect(cellsAway({ x: 8, y: 5 })).toBe(3);
@@ -263,13 +263,13 @@ describe("grid_math", () => {
             RangeAttackCellSide.LEFT,
             center(smallAt),
         );
-        expect(getShotCellDistance(testGridSettings, center(smallAt), 1, edge)).toBe(3);
+        expect(getShotCellDistance(testGridSettings, center(smallAt), 1, 1, edge)).toBe(3);
 
         // A 2x2 measures from its footprint: its own cells are 0 away, the next ring is 1.
         const largeCenter = center({ x: 4.5, y: 4.5 });
-        expect(getShotCellDistance(testGridSettings, largeCenter, 2, center({ x: 5, y: 5 }))).toBe(0);
-        expect(getShotCellDistance(testGridSettings, largeCenter, 2, center({ x: 6, y: 6 }))).toBe(1);
-        expect(getShotCellDistance(testGridSettings, largeCenter, 2, center({ x: 3, y: 4 }))).toBe(1);
+        expect(getShotCellDistance(testGridSettings, largeCenter, 2, 2, center({ x: 5, y: 5 }))).toBe(0);
+        expect(getShotCellDistance(testGridSettings, largeCenter, 2, 2, center({ x: 6, y: 6 }))).toBe(1);
+        expect(getShotCellDistance(testGridSettings, largeCenter, 2, 2, center({ x: 3, y: 4 }))).toBe(1);
 
         // The drawn square hugs whole cells: half a cell for a 1x1, a full cell for a 2x2.
         const step = testGridSettings.getStep();

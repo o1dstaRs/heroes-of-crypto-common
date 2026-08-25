@@ -13,6 +13,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import { PlacementAugment } from "../augments/augment_properties";
 import { MAX_UNITS_PER_TEAM } from "../constants";
 import { SpellPowerType, SpellTargetType } from "../spells/spell_properties";
+import { getFootprintCellsForAnchor } from "../grid/grid_math";
 import type { XY } from "../utils/math";
 
 export type TacticalSplitRole = "aura" | "support" | "shield" | "cover" | "bait";
@@ -43,6 +44,14 @@ export interface ITacticalSplitPlan {
 export interface ITacticalSplitPlacementUnit {
     readonly id: string;
     readonly small: boolean;
+    /**
+     * The real body, when the caller knows it. `small` can only ever say 1x1 or 2x2, so a rectangle read as
+     * a square here reserved cells the incumbent does not hold and left the ones it does hold free — the
+     * split then stacked a new unit onto an occupied cell. Optional so a caller that genuinely has only the
+     * boolean still describes both shipped squares exactly.
+     */
+    readonly footprintWidth?: number;
+    readonly footprintHeight?: number;
 }
 
 export interface ITacticalSplitStack {
@@ -235,15 +244,13 @@ export function tacticalSplitUnitFromUnit(unit: ITacticalSplitUnitSource): ITact
     };
 }
 
-const footprintFor = (unit: ITacticalSplitPlacementUnit, base: XY): XY[] =>
-    unit.small
-        ? [base]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+const footprintFor = (unit: ITacticalSplitPlacementUnit, base: XY): XY[] => {
+    const width = unit.footprintWidth ?? (unit.small ? 1 : 2);
+    const height = unit.footprintHeight ?? (unit.small ? 1 : 2);
+    // The 1x1 and 2x2 cases keep their exact cells and ORDER: the shared expansion walks -x then -y from
+    // the anchor, which is the order the two hand-written lists spelled out.
+    return getFootprintCellsForAnchor(base, width, height);
+};
 
 const chebyshev = (left: XY, right: XY): number => Math.max(Math.abs(left.x - right.x), Math.abs(left.y - right.y));
 

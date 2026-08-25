@@ -128,10 +128,11 @@ export function estimatePrimaryMeleeDamage(
     if (paralysis) {
         handlerMultiplier *= (100 - paralysis.getPower()) / 100;
     }
-    // Backstab's trigger is measured against the victim's footprint HEIGHT (an UPPER-team attacker has to
-    // clear the whole body, not one cell of it). The boolean can only ever say 1 or 2, so passing the real
-    // height leaves both shipped shapes at exactly the margin they had and stops a 2x1 target from being
-    // priced as if it had a second row.
+    // Backstab's trigger is measured against the victim's extent ALONG THE AXIS OF ADVANCE (an UPPER-team
+    // attacker has to clear the whole body, not one cell of it) — height on the classic board, width on the
+    // side-oriented one. The boolean can only ever say 1 or 2, so passing the real sides leaves both shipped
+    // shapes at exactly the margin they had and stops a 2x1 target from being priced as if it had a second
+    // row. Both sides go in because this must price what the engine will actually do.
     for (const ability of getAbilitiesWithPosisionCoefficient(
         unit.getAbilities(),
         standCell,
@@ -140,6 +141,7 @@ export function estimatePrimaryMeleeDamage(
         unit.getTeam(),
         target.getFootprintHeight(),
         fightProperties.isSideAxisPolicyTeam(unit.getTeam()),
+        target.getFootprintWidth(),
     )) {
         handlerMultiplier *= unit.calculateAbilityMultiplier(ability, attackerAbilityPower);
     }
