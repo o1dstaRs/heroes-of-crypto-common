@@ -13,6 +13,7 @@ import type { GameAction } from "../../engine/actions";
 import { canWaitOnHourglass } from "../../engine/hourglass";
 import type { FightProperties } from "../../fights/fight_properties";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import type { TeamType } from "../../generated/protobuf/v1/types_gen";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import { extractValueFeatures, VALUE_FEATURE_NAMES } from "../../simulation/value_features";
 import type { Unit } from "../../units/unit";
@@ -506,6 +507,25 @@ export function v07BakedWaitWeights(): IWaitWeights | null {
         }
     }
     return bakedSlot.weights;
+}
+
+/**
+ * Per-TEAM wait-weight override (battery/refit seam, mirrors the SearchDriver's per-team V2 leaf):
+ * `V07_WAIT_WEIGHTS_LOWER` / `V07_WAIT_WEIGHTS_UPPER`. Returns undefined when the seat has no
+ * override (caller falls through to the shared resolution), null for an explicit all-zero vector
+ * (scorer disabled for that seat), or the parsed weights. Read per call — the battery flips these
+ * between games in the same worker process.
+ */
+export function v07WaitWeightsForTeam(team: TeamType): IWaitWeights | null | undefined {
+    const raw = process.env[team === PBTypes.TeamVals.LOWER ? "V07_WAIT_WEIGHTS_LOWER" : "V07_WAIT_WEIGHTS_UPPER"];
+    if (raw === undefined) {
+        return undefined;
+    }
+    const parsed = parseWaitWeights(raw);
+    if (!parsed) {
+        return undefined;
+    }
+    return parsed.b === 0 && parsed.w.every((x) => x === 0) ? null : parsed;
 }
 
 /** Parse {b, w[WAIT_FEATURE_NAMES_V2.length]} — malformed/absent ⇒ null. */

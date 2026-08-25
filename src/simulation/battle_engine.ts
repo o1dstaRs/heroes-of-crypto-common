@@ -47,6 +47,7 @@ import {
 } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { PathHelper } from "../grid/path_helper";
+import { scatteredMountainsForSeed } from "../grid/scattered_mountains";
 import { PlacementPositionType } from "../grid/placement_properties";
 import { RectanglePlacement } from "../grid/rectangle_placement";
 import { AttackHandler } from "../handlers/attack_handler";
@@ -689,6 +690,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // Explicit simulation maps then replace that roll in both state holders so combat map checks agree.
     fightProperties.setGridType(effectiveGridType);
     const grid = new Grid(gridSettings, effectiveGridType);
+    // Live ranked BLOCK_CENTER on the side-oriented board plays SEEDED scattered stones (middle
+    // columns, scatteredMountainsForSeed) — not the classic central 2x2 pair. Mirror it here so
+    // training and measurement happen on the terrain the AI will actually face. Classic boards keep
+    // the classic pair: the seeded band is derived from the ranked side zones.
+    if (config.sideOrientedPlacement === true && effectiveGridType === PBTypes.GridVals.BLOCK_CENTER) {
+        grid.setScatteredMountains(scatteredMountainsForSeed(`sim-${config.seed}`).map((stone) => stone.cell));
+    }
     const unitsHolder = new UnitsHolder(grid);
     clearAITargetMemory(unitsHolder);
     const sceneLog = new SceneLogMock();

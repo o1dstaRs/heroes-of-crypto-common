@@ -43,6 +43,8 @@ interface ISideAbGameSpec {
     candidateTeam: number;
     /** Candidate 60-dim leaf ({b, w}) or null = candidate runs the shipped leaf too. */
     candidateLeaf: { b: number; w: number[] } | null;
+    /** Candidate wait-scorer weights or null = shipped DISTILLED_WAIT_WEIGHTS. */
+    candidateWait: { b: number; w: number[] } | null;
     /** Classic bottom/top board instead of the side board (sanity baseline). */
     classic: boolean;
 }
@@ -78,10 +80,14 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
     // Per-team candidate leaf (per-game env; the SearchDriver is constructed per match).
     delete process.env.V07_VALUE_WEIGHTS_V2_LOWER;
     delete process.env.V07_VALUE_WEIGHTS_V2_UPPER;
+    delete process.env.V07_WAIT_WEIGHTS_LOWER;
+    delete process.env.V07_WAIT_WEIGHTS_UPPER;
+    const candidateSeatKey = spec.candidateTeam === PBTypes.TeamVals.LOWER ? "LOWER" : "UPPER";
     if (spec.candidateLeaf) {
-        const key =
-            spec.candidateTeam === PBTypes.TeamVals.LOWER ? "V07_VALUE_WEIGHTS_V2_LOWER" : "V07_VALUE_WEIGHTS_V2_UPPER";
-        process.env[key] = JSON.stringify(spec.candidateLeaf);
+        process.env[`V07_VALUE_WEIGHTS_V2_${candidateSeatKey}`] = JSON.stringify(spec.candidateLeaf);
+    }
+    if (spec.candidateWait) {
+        process.env[`V07_WAIT_WEIGHTS_${candidateSeatKey}`] = JSON.stringify(spec.candidateWait);
     }
     const roster = buildRoster(mulberry(spec.seed ^ 0x5f356495), undefined, undefined, undefined, "expBudget");
     const setup = { doctrine: Doctrine.SEE_NONE, augments: SETUP_POLICY_V0.pickAugments(7) };
@@ -155,8 +161,10 @@ async function main(): Promise<void> {
     const concurrency = Number(readArg("--concurrency") ?? 8);
     const output = readArg("--output") ?? `sim-out/side_ab/side_ab_seed${baseSeed}_p${pairs}.json`;
     const leafFile = readArg("--leaf-file");
+    const waitFile = readArg("--wait-file");
     const classic = args.includes("--classic");
     const candidateLeaf = leafFile ? (JSON.parse(readFileSync(leafFile, "utf8")) as { b: number; w: number[] }) : null;
+    const candidateWait = waitFile ? (JSON.parse(readFileSync(waitFile, "utf8")) as { b: number; w: number[] }) : null;
 
     const specs: ISideAbGameSpec[] = [];
     for (let pair = 0; pair < pairs; pair += 1) {
@@ -170,6 +178,7 @@ async function main(): Promise<void> {
                 gridType,
                 candidateTeam,
                 candidateLeaf,
+                candidateWait,
                 classic,
             });
         }
@@ -267,6 +276,7 @@ async function main(): Promise<void> {
         perMap,
         rejected,
         candidateLeaf: candidateLeaf ? "injected" : "shipped",
+        candidateWait: candidateWait ? "injected" : "shipped",
         wallSeconds: Math.round((Date.now() - startedAt) / 1000),
         errorSamples: errors.slice(0, 5),
     };
