@@ -202,6 +202,38 @@ describe("rectangular footprints end to end", () => {
         }
     });
 
+    /**
+     * The two new systems together: rectangular bodies on the SIDE-oriented board, across every live
+     * grid type. The side board turns the axis of advance to X, which is exactly the axis a 2x1 body
+     * spans — the pairing where anchor/edge mistakes surface that neither feature shows alone.
+     */
+    test("rectangles on the side-oriented board play every live map with no illegal action", () => {
+        const previous = process.env[FOOTPRINT_OVERRIDE_ENV];
+        process.env[FOOTPRINT_OVERRIDE_ENV] = "White Tiger=2x1,Hyena=1x2";
+        try {
+            for (const gridType of [1, 3, 4]) {
+                const result = runMatch({
+                    roster: MIXED_ROSTER,
+                    greenVersion: "v0.8",
+                    redVersion: "v0.8",
+                    seed: 4_120_090 + gridType,
+                    maxLaps: 24,
+                    gridType,
+                    sideOrientedPlacement: true,
+                });
+                expect(result.totalActions).toBeGreaterThan(0);
+                expect(describeRejections(result)).toBe("");
+                expect((result.rejectedGreen ?? 0) + (result.rejectedRed ?? 0)).toBe(0);
+            }
+        } finally {
+            if (previous === undefined) {
+                delete process.env[FOOTPRINT_OVERRIDE_ENV];
+            } else {
+                process.env[FOOTPRINT_OVERRIDE_ENV] = previous;
+            }
+        }
+    });
+
     test("without the override the same rosters stay square, so nothing shipped moved", () => {
         const result = runMatch({
             roster: MIXED_ROSTER,

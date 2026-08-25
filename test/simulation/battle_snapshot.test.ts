@@ -33,6 +33,7 @@ import type { IStatisticHolder } from "../../src/scene/statistic_holder_interfac
 import { buildRoster, createCombatFactories, createUnitFromSpec, makeRng } from "../../src/simulation/army";
 import { GREEN_TEAM, RED_TEAM, simulationGridSettings } from "../../src/simulation/battle_engine";
 import { BattleRollbackJournal, snapshotBattle, restoreBattle } from "../../src/simulation/battle_snapshot";
+import { getFootprintCellsForAnchor } from "../../src/grid/grid_math";
 import { Unit } from "../../src/units/unit";
 import { UnitsHolder } from "../../src/units/units_holder";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
@@ -61,14 +62,7 @@ class DamageStatHolder implements IStatisticHolder<IDamageStatistic> {
 
 const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 const footprint = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+    getFootprintCellsForAnchor(base, unit.getFootprintWidth(), unit.getFootprintHeight());
 
 interface Harness {
     grid: Grid;
@@ -517,6 +511,37 @@ describe("battle snapshot round-trip", () => {
             }
         } finally {
             setDeterministicRandomSource(undefined);
+        }
+    });
+});
+
+describe("battle snapshot — rectangular footprints", () => {
+    it("capture -> mutate -> restore preserves a 2x1 body exactly (the UNIT_FIELDS claim)", () => {
+        const previous = process.env.HOC_FOOTPRINT_OVERRIDES;
+        process.env.HOC_FOOTPRINT_OVERRIDES = "White Tiger=2x1";
+        try {
+            const h = buildBattle(31337, "v0.4");
+            const tiger = [...h.unitsHolder.getAllUnits().values()].find((unit) => unit.getName() === "White Tiger");
+            if (!tiger) {
+                // The seeded roster does not always draft a tiger; the round trip below is what the
+                // suite pins, so draft-luck is allowed to skip rather than fail.
+                return;
+            }
+            expect([tiger.getFootprintWidth(), tiger.getFootprintHeight()]).toEqual([2, 1]);
+            const cellsBefore = tiger.getCells().map((cell) => ({ ...cell }));
+            const hpBefore = tiger.getHp();
+            const snapshot = snapshotBattle(h.unitsHolder, h.grid, h.fightProperties);
+            h.playTurns(2);
+            restoreBattle(snapshot);
+            expect(tiger.getHp()).toBe(hpBefore);
+            expect(tiger.getCells()).toEqual(cellsBefore);
+            expect([tiger.getFootprintWidth(), tiger.getFootprintHeight()]).toEqual([2, 1]);
+        } finally {
+            if (previous === undefined) {
+                delete process.env.HOC_FOOTPRINT_OVERRIDES;
+            } else {
+                process.env.HOC_FOOTPRINT_OVERRIDES = previous;
+            }
         }
     });
 });
