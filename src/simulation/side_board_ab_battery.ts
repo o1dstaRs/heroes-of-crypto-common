@@ -163,13 +163,25 @@ async function main(): Promise<void> {
     const leafFile = readArg("--leaf-file");
     const waitFile = readArg("--wait-file");
     const classic = args.includes("--classic");
+    // --maps 4 or --maps 3,4 focuses the rotation on a subset of the live maps (grid type ints),
+    // for per-map diagnostics; the default stays the full live rotation.
+    const mapsArg = readArg("--maps");
+    const maps = mapsArg
+        ? mapsArg
+              .split(",")
+              .map((raw) => Number(raw.trim()))
+              .filter((gridType) => (LIVE_MAPS as readonly number[]).includes(gridType))
+        : [...LIVE_MAPS];
+    if (!maps.length) {
+        throw new Error(`--maps matched none of the live maps (${LIVE_MAPS.join(",")}): ${mapsArg}`);
+    }
     const candidateLeaf = leafFile ? (JSON.parse(readFileSync(leafFile, "utf8")) as { b: number; w: number[] }) : null;
     const candidateWait = waitFile ? (JSON.parse(readFileSync(waitFile, "utf8")) as { b: number; w: number[] }) : null;
 
     const specs: ISideAbGameSpec[] = [];
     for (let pair = 0; pair < pairs; pair += 1) {
         const seed = (baseSeed + pair * 0x9e3779b1) >>> 0;
-        const gridType = LIVE_MAPS[pair % LIVE_MAPS.length];
+        const gridType = maps[pair % maps.length];
         for (const candidateTeam of [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER]) {
             specs.push({
                 game: specs.length,
@@ -257,7 +269,7 @@ async function main(): Promise<void> {
         }),
         { candidate: 0, control: 0 },
     );
-    const perMap = LIVE_MAPS.map((gridType) => {
+    const perMap = maps.map((gridType) => {
         const games = decisive.filter((game) => game.gridType === gridType);
         const wins = games.filter((game) => game.candidateWon).length;
         return { gridType, games: games.length, candidateWins: wins, ...wilson95(wins, games.length) };
