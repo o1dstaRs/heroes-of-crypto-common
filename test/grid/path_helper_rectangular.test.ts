@@ -201,8 +201,11 @@ describe("PathHelper rectangular getMovePath", () => {
                             expect(bodyLegal(cell)).toBe(true);
                             priced += stepX !== 0 && stepY !== 0 ? DIAG : 1;
                             if (stepX !== 0 && stepY !== 0 && !canFly) {
-                                // A walking body cannot shear across the diagonal: one of the two L routes
-                                // must sweep only free cells (ignoring cells the body starts or ends on).
+                                // A walking body cannot shear across the diagonal, and the implemented rule
+                                // is the strict 2x2 one: NEITHER L route may sweep a blocked cell (ignoring
+                                // cells the body starts or ends on). Asserting only that they are not BOTH
+                                // blocked is the weaker 1x1 rule, and would accept routes the pather
+                                // refuses to emit.
                                 const shears = (viaX: number, viaY: number): boolean =>
                                     getFootprintCellsForAnchor({ x: viaX, y: viaY }, width, height).some(
                                         (swept) =>
@@ -210,7 +213,7 @@ describe("PathHelper rectangular getMovePath", () => {
                                             !covered(cell, swept.x, swept.y) &&
                                             !!(matrix[swept.y] ?? [])[swept.x],
                                     );
-                                expect(shears(cell.x, previous.y) && shears(previous.x, cell.y)).toBe(false);
+                                expect(shears(cell.x, previous.y) || shears(previous.x, cell.y)).toBe(false);
                             }
                         }
                         expect(priced).toBeCloseTo(weightedRoute.weight, 9);
@@ -294,6 +297,38 @@ describe("PathHelper rectangular getMovePath", () => {
                     );
                 }
             }
+        }
+    });
+
+    /**
+     * The randomized sweep above checks that every route the pather DOES emit is body-legal, which cannot
+     * tell a strict rule from a lax one — a lax pather would simply emit more routes, all of them legal by
+     * the lax reading. This is the other half: a hand-built board where exactly ONE of the two L detours is
+     * blocked, so the strict rule (neither detour may be swept) forbids the diagonal and the lax rule
+     * (not both) allows it.
+     *
+     * A 2x1 anchored at (8,8) covers (7,8) and (8,8); stepping to anchor (7,7) would cover (6,7) and (7,7).
+     * The x-first detour sweeps (6,8) and the y-first detour sweeps (8,7) — one cell each, neither of them
+     * a cell the body starts or ends on. Blocking either alone must remove (7,7) from the reachable set.
+     */
+    test("a rectangular body will not cut a corner when only ONE of the two detours is blocked", () => {
+        const gridSettings = makeGridSettings();
+        const pathHelper = new PathHelper(gridSettings);
+        const start = { x: 8, y: 8 };
+        const diagonalAnchor = (7 << 4) | 7;
+
+        const clear = pathHelper.getMovePath(start, emptyMatrix(), 1.5, undefined, false, false, false, false, 2, 1);
+        expect(clear.knownPaths.has(diagonalAnchor)).toBe(true);
+
+        // matrix is indexed [y][x].
+        for (const [blockedX, blockedY] of [
+            [6, 8],
+            [8, 7],
+        ] as const) {
+            const matrix = emptyMatrix();
+            matrix[blockedY][blockedX] = ObstacleType.BLOCK;
+            const blocked = pathHelper.getMovePath(start, matrix, 1.5, undefined, false, false, false, false, 2, 1);
+            expect(blocked.knownPaths.has(diagonalAnchor)).toBe(false);
         }
     });
 });
