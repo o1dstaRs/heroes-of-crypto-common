@@ -40,12 +40,10 @@ const log = (line) => {
     writeFileSync(logPath, `${stamped}\n`, { flag: "a" });
 };
 
-// The shipped leaf = the CEM mean seed. Read it from the profile source so the anchor can never
-// drift from what production actually runs.
-const profileSource = readFileSync(join(repoRoot, "src", "ai", "versions", "v0_8_a13_profile.ts"), "utf8");
-const leafMatch = profileSource.match(/V08_A13_VALUE_LEAF[^{]*\{\s*b:\s*(-?[0-9.e-]+),\s*w:\s*\[([^\]]+)\]/s);
-if (!leafMatch) throw new Error("Could not parse V08_A13_VALUE_LEAF from v0_8_a13_profile.ts");
-const shipped = { b: Number(leafMatch[1]), w: leafMatch[2].split(",").map((value) => Number(value.trim())) };
+// The shipped leaf = the CEM mean seed. Imported straight from the profile module so the anchor
+// can never drift from what production actually runs (bun loads the TS module from .mjs directly).
+const { V08_A13_VALUE_LEAF } = await import(join(repoRoot, "src", "ai", "versions", "v0_8_a13_profile.ts"));
+const shipped = { b: V08_A13_VALUE_LEAF.b, w: [...V08_A13_VALUE_LEAF.w] };
 if (shipped.w.length !== 60 || shipped.w.some((weight) => !Number.isFinite(weight))) {
     throw new Error(`Parsed leaf malformed: ${shipped.w.length} dims`);
 }
