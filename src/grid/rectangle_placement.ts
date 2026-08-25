@@ -153,7 +153,7 @@ export class RectanglePlacement implements IPlacement {
         footprintHeight = isSmallUnit ? 1 : 2,
     ): XY[] {
         if (this.sideOriented) {
-            return this.sideCellPositions(_footprintWidth, _footprintHeight);
+            return this.sideCellPositions(footprintWidth, footprintHeight);
         }
         let x;
         let y;

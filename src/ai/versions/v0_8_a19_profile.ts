@@ -32,7 +32,7 @@ export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simul
 // it is not square, and the three hand-written 2x2 expansions were routed through simulation/footprint.ts.
 // Both shipped shapes keep their exact cells, so the routing decision and every 1x1/2x2 rollout are unchanged.
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "d327547196cc9c876a91a2effeb6aa48c338e1b304c0b8ed09fe5ed4e291e421" as const;
+    "5ee6b67d59cd94f6daa121e062dca910e2871765ccd09f586cb1bd4927a4bbb6" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
     "afc6df1b4ca82e16a43ebc5bf2cce37ab0c761bec81f8ef5714c3d80c8b2d294" as const;

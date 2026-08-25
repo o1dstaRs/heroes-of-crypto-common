@@ -473,7 +473,7 @@ export const V08_A19_H64_FINALIST_V6_TOURNAMENT_ROUTING_IMPLEMENTATION_SHA256 =
 export const V08_A19_H64_FINALIST_V6_BATTLE_ENGINE_ROUTING_IMPLEMENTATION_SOURCE =
     "src/simulation/battle_engine.ts" as const;
 export const V08_A19_H64_FINALIST_V6_BATTLE_ENGINE_ROUTING_IMPLEMENTATION_SHA256 =
-    "099e9dadfc5bb15bd0efa51c49db45a1a89ad393ed5659c83bbb01777df38528" as const;
+    "5ee6b67d59cd94f6daa121e062dca910e2871765ccd09f586cb1bd4927a4bbb6" as const;
 
 /** Complete source-byte ledger for the v6 runtime delta, including entrant-A-only routing. */
 export const V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER = Object.freeze([

@@ -296,7 +296,7 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             "3711c6671beb1e0f0bf3198d1e37596d3c2731814c260026352745b620bbfe24",
         );
         expect(serializedSha256(V08_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK_PROFILE)).toBe(
-            "524708fe5b3ea2a0eadc75293efd4704b40e151765e1fdcb5a16bf35d31cac5b",
+            "d7dd4660c78d2bd5ac60b6d1b6544dd162dede3f47cc1a5c851ad96ab3958cb0",
         );
     });
 
@@ -363,7 +363,7 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             placementComposition: ["exact-f184-lower", "generic-ranked-placement", "plain-v0.8"],
         });
         expect(fingerprintV08AlignedV1(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_PROFILE)).toBe(
-            "60e1a901f89205bef928d9ce3a63e36fff79b1e0f891d5ea19c59e572769abff",
+            "869198db8b58a642c4f7fa8aafa21dc97002c0aa94da911edd2a95bdf43f52a8",
         );
         expect(Object.isFrozen(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_PROFILE)).toBe(true);
         expect(Object.isFrozen(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_SEARCH)).toBe(true);
