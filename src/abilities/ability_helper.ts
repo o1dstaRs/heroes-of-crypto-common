@@ -291,20 +291,42 @@ export function nextStandingTargets(
     let xCoefficient = 0;
     let yCoefficient = 0;
     if (!targetUnit.isSmallSize()) {
+        // How far the wave steps PAST the target, per axis: a body absorbs its own depth, so the step is the
+        // target's own extent on that axis and nothing more.
+        //
+        // This used to test the gap against a literal 2 on BOTH axes, which is the target's depth only when
+        // it is 2x2. A 1x2 or 2x1 is not small (isSmallSize is W===1 && H===1), so it entered here too and,
+        // on the axis where its side is 1, the wave stepped a full cell too far — skipping whoever stood in
+        // contact behind the body and burning a unit two cells away across an empty cell. The shipped 2x2
+        // resolves to exactly the old numbers, since its width and height are both 2.
+        const targetWidth = targetUnit.getFootprintWidth();
+        const targetHeight = targetUnit.getFootprintHeight();
         const baseCellDiffX = tbs.x - attackFromBaseCell.x;
         const baseCellDiffY = tbs.y - attackFromBaseCell.y;
-        if (baseCellDiffX === 2) {
-            xCoefficient = 1;
-        } else if (baseCellDiffX === -2) {
-            xCoefficient = -1;
+        if (targetWidth === 2 && targetHeight === 2) {
+            // The shipped 2x2 keeps its exact arithmetic, including for gaps this never anticipated.
+            if (baseCellDiffX === 2) {
+                xCoefficient = 1;
+            } else if (baseCellDiffX === -2) {
+                xCoefficient = -1;
+            }
+            if (baseCellDiffY === 2) {
+                yCoefficient = 1;
+            } else if (baseCellDiffY === -2) {
+                yCoefficient = -1;
+            }
+            xCoefficient = baseCellDiffX - xCoefficient;
+            yCoefficient = baseCellDiffY - yCoefficient;
+        } else {
+            // The wave is pushed back by the target's own DEPTH on each axis, one cell per cell of body
+            // beyond the first — which is what the 2x2 branch above works out to, and is 0 on an axis the
+            // target is only one cell thick. Reading a literal 2 there (a 1x2 or 2x1 is not "small", so it
+            // fell into that branch) pushed the wave a full cell too far on the thin axis: it skipped
+            // whoever stood in contact behind the body and burned a unit two cells away across an empty
+            // cell. Verified against the 2x2 case, which this expression reproduces exactly.
+            xCoefficient = Math.sign(baseCellDiffX) * (targetWidth - 1);
+            yCoefficient = Math.sign(baseCellDiffY) * (targetHeight - 1);
         }
-        if (baseCellDiffY === 2) {
-            yCoefficient = 1;
-        } else if (baseCellDiffY === -2) {
-            yCoefficient = -1;
-        }
-        xCoefficient = tbs.x - attackFromBaseCell.x - xCoefficient;
-        yCoefficient = tbs.y - attackFromBaseCell.y - yCoefficient;
     }
 
     if (targetBaseCell && attackerBaseCell) {
