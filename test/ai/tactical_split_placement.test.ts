@@ -255,3 +255,113 @@ describe("tactical stack splitting", () => {
         expect(placed.get("cover")).toEqual({ x: 0, y: 0 });
     });
 });
+
+describe("tactical split placement with rectangular incumbents", () => {
+    const hash = (x: number, y: number): number => (x << 4) | y;
+    // Three legal cells only: the 1x2 incumbent's two body cells at the side-board FRONT, and one rear
+    // fallback. Correct occupancy leaves exactly the fallback; the small?1:2 fallback used to leave the
+    // incumbent's second body cell free — and frontness then picked it, stacking two units on one cell.
+    it("a decoy never lands inside a 1x2 incumbent's body once the real sides are supplied", () => {
+        const legal = new Set([hash(3, 7), hash(3, 8), hash(1, 1)]);
+        const run = (describeRealBody: boolean) =>
+            applyTacticalSplitPlacement(
+                new Map([
+                    ["tower", { x: 3, y: 8 }],
+                    ["decoy", { x: 1, y: 1 }],
+                ]),
+                [
+                    describeRealBody
+                        ? { id: "tower", small: true, footprintWidth: 1, footprintHeight: 2 }
+                        : { id: "tower", small: true },
+                    { id: "decoy", small: true },
+                ],
+                {
+                    team: PBTypes.TeamVals.LOWER,
+                    gridType: PBTypes.GridVals.NORMAL,
+                    legalCellHashes: legal,
+                    splitStacks: [{ unitId: "decoy", role: "bait" }],
+                    sideOrientedPlacement: true,
+                },
+            );
+        // With the real body both front cells are occupied, so the decoy has to stay on the rear cell.
+        expect(run(true).get("decoy")).toEqual({ x: 1, y: 1 });
+        // And the test has teeth: the boolean-only description resurrects the collision it pins against.
+        expect(run(false).get("decoy")).toEqual({ x: 3, y: 7 });
+    });
+
+    it("a cover split respects a 2x1 incumbent's body on the classic axis for the UPPER team", () => {
+        // Classic orientation, UPPER: back = high y. The 2x1 incumbent anchored at (8, 14) covers
+        // (7, 14) and (8, 14); the only other legal cell is deeper into the board.
+        const legal = new Set([hash(7, 14), hash(8, 14), hash(8, 10)]);
+        const placed = applyTacticalSplitPlacement(
+            new Map([
+                ["wagon", { x: 8, y: 14 }],
+                ["cover", { x: 8, y: 10 }],
+            ]),
+            [
+                { id: "wagon", small: false, footprintWidth: 2, footprintHeight: 1 },
+                { id: "cover", small: true },
+            ],
+            {
+                team: PBTypes.TeamVals.UPPER,
+                gridType: PBTypes.GridVals.NORMAL,
+                legalCellHashes: legal,
+                splitStacks: [{ unitId: "cover", role: "cover" }],
+            },
+        );
+        expect(placed.get("cover")).toEqual({ x: 8, y: 10 });
+    });
+
+    it("every placement it returns is overlap-free across mixed rectangular bodies", () => {
+        // A denser board: 1x2 + 2x1 + 2x2 incumbents and two split stacks over a full side zone.
+        const legal = new Set<number>();
+        for (let x = 1; x <= 3; x++) {
+            for (let y = 1; y <= 14; y++) {
+                legal.add(hash(x, y));
+            }
+        }
+        const units = [
+            { id: "tower", small: true, footprintWidth: 1, footprintHeight: 2 },
+            { id: "wagon", small: false, footprintWidth: 2, footprintHeight: 1 },
+            { id: "giant", small: false, footprintWidth: 2, footprintHeight: 2 },
+            { id: "decoy", small: true, footprintWidth: 1, footprintHeight: 1 },
+            { id: "cover", small: true },
+        ];
+        const placed = applyTacticalSplitPlacement(
+            new Map([
+                ["tower", { x: 3, y: 8 }],
+                ["wagon", { x: 2, y: 4 }],
+                ["giant", { x: 2, y: 11 }],
+                ["decoy", { x: 1, y: 1 }],
+                ["cover", { x: 1, y: 14 }],
+            ]),
+            units,
+            {
+                team: PBTypes.TeamVals.LOWER,
+                gridType: PBTypes.GridVals.NORMAL,
+                legalCellHashes: legal,
+                splitStacks: [
+                    { unitId: "decoy", role: "bait" },
+                    { unitId: "cover", role: "cover" },
+                ],
+                sideOrientedPlacement: true,
+            },
+        );
+        const seen = new Set<number>();
+        for (const placementUnit of units) {
+            const base = placed.get(placementUnit.id)!;
+            const width = placementUnit.footprintWidth ?? (placementUnit.small ? 1 : 2);
+            const height = placementUnit.footprintHeight ?? (placementUnit.small ? 1 : 2);
+            for (let dx = 0; dx < width; dx++) {
+                for (let dy = 0; dy < height; dy++) {
+                    const key = hash(base.x - dx, base.y - dy);
+                    expect(seen.has(key)).toBe(false);
+                    seen.add(key);
+                }
+            }
+        }
+        // The moved stacks must also have stayed inside the legal zone.
+        expect(legal.has(hash(placed.get("decoy")!.x, placed.get("decoy")!.y))).toBe(true);
+        expect(legal.has(hash(placed.get("cover")!.x, placed.get("cover")!.y))).toBe(true);
+    });
+});
