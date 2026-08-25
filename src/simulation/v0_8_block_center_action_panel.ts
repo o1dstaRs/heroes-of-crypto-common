@@ -625,10 +625,8 @@ const routesForUnit = (unit: Unit, context: IDecisionContext): IReadonlyWeighted
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
-        // NOTE: the footprint dimensions cannot be forwarded here yet — this call goes through
-        // IDecisionPathSource (ai/decision_path_catalog.ts), whose signature stops at hasVineStride and whose
-        // cache key does not include the shape. Until that interface carries width/height, a rectangular unit
-        // is pathed as a square on this panel only; every other simulation caller passes the real dimensions.
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     );
     const routes: IReadonlyWeightedRoute[] = [];
     const seen = new Set<string>();

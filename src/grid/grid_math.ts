@@ -805,6 +805,27 @@ export function getFullDamageSquareHalfExtent(shotDistance: number, unitSize: nu
 }
 
 /**
+ * The same half-extents, per axis.
+ *
+ * The band reaches the same number of whole cells out from the BODY on both axes, so a body that is not
+ * square does not cover a square: a 2x1 shooter reaches half a cell further on x than on y. Collapsing that
+ * to one number (which is all the scalar form above can express) paints the overlay half a cell past the
+ * band the engine actually enforces on the thin axis. Identical to the scalar form whenever W === H.
+ */
+export function getFullDamageHalfExtents(
+    shotDistance: number,
+    footprintWidth: number,
+    footprintHeight: number,
+    step: number,
+): XY {
+    const wholeCells = getWholeCellShotDistance(shotDistance);
+    return {
+        x: (wholeCells + normalizeFootprintSide(footprintWidth) / 2) * step,
+        y: (wholeCells + normalizeFootprintSide(footprintHeight) / 2) * step,
+    };
+}
+
+/**
  * Sides of a grid cell a ranged shot can be aimed at. The numeric values are part of the ranked
  * wire protocol (range_attack carries the chosen side as an int) and are persisted in replays, so
  * they MUST stay stable. Order matches the legacy push order in getClosestSideCenter.
