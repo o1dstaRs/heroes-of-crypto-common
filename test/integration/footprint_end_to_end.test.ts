@@ -165,6 +165,43 @@ describe("rectangular footprints end to end", () => {
         }
     });
 
+    /**
+     * The same three-deep bodies under the A19 SEARCH driver — the production configuration, and the
+     * one that runs the candidate enumerator's hypothetical-destination pin check. That check used the
+     * legacy boolean canBeAttackedByMelee overload (a 2x2 window), which missed a 1x3's far cell: the
+     * AI proposed a shot the engine refused. Zero rejections here pins the unit-shaped form.
+     */
+    test("a body three cells deep survives the A19 search driver with no illegal action", () => {
+        const previous = process.env[FOOTPRINT_OVERRIDE_ENV];
+        const previousSearch = process.env.V08_A19_SEARCH;
+        process.env[FOOTPRINT_OVERRIDE_ENV] = "White Tiger=3x1,Hyena=1x3";
+        process.env.V08_A19_SEARCH = "1";
+        try {
+            const result = runMatch({
+                roster: MIXED_ROSTER,
+                greenVersion: "v0.8",
+                redVersion: "v0.8",
+                seed: 4_120_078,
+                maxLaps: 24,
+                searchOfflineDeterministicWork: true,
+            });
+            expect(result.totalActions).toBeGreaterThan(0);
+            expect(describeRejections(result)).toBe("");
+            expect((result.rejectedGreen ?? 0) + (result.rejectedRed ?? 0)).toBe(0);
+        } finally {
+            if (previous === undefined) {
+                delete process.env[FOOTPRINT_OVERRIDE_ENV];
+            } else {
+                process.env[FOOTPRINT_OVERRIDE_ENV] = previous;
+            }
+            if (previousSearch === undefined) {
+                delete process.env.V08_A19_SEARCH;
+            } else {
+                process.env.V08_A19_SEARCH = previousSearch;
+            }
+        }
+    });
+
     test("without the override the same rosters stay square, so nothing shipped moved", () => {
         const result = runMatch({
             roster: MIXED_ROSTER,

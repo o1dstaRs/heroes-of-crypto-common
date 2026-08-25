@@ -215,6 +215,29 @@ describe("getCellsForAttacker", () => {
         }
     });
 
+    it("routes a SQUARE body of side 3 through real geometry, not the frozen 2x2 table", () => {
+        // width === height must not be mistaken for "shipped square": the legacy quadrant table and
+        // clearance probes are 1x1/2x2 geometry written out, one cell short per side for a 3x3.
+        for (const [targetWidth, targetHeight] of [
+            [1, 1],
+            [2, 2],
+            [2, 1],
+        ] as const) {
+            const cells = getCellsForAttacker(
+                target,
+                emptyMatrix(),
+                shapedUnit(3, 3),
+                false,
+                targetWidth === 1 && targetHeight === 1,
+                targetWidth,
+                targetHeight,
+            );
+            expect([...new Set(cells.map(key))].sort()).toEqual(
+                [...legalStandAnchors(target, targetWidth, targetHeight, 3, 3)].sort(),
+            );
+        }
+    });
+
     it("leaves the shipped square shapes on their frozen ring", () => {
         const small = getCellsForAttacker(target, emptyMatrix(), shapedUnit(1, 1), true, true);
         expect(small).toHaveLength(8);

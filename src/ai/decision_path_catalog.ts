@@ -343,7 +343,12 @@ function sameCanonicalInput(left: ICanonicalMovePathInput, right: ICanonicalMove
         left.canFly === right.canFly &&
         left.isSmallUnit === right.isSmallUnit &&
         left.isMadeOfFire === right.isMadeOfFire &&
-        left.hasVineStride === right.hasVineStride
+        left.hasVineStride === right.hasVineStride &&
+        // The footprint is part of the cache identity everywhere else in this file
+        // (matchesCanonicalRequest explains why); the claim path must not be the one
+        // seam that can hand one shape another shape's reachable set.
+        left.footprintWidth === right.footprintWidth &&
+        left.footprintHeight === right.footprintHeight
     );
 }
 

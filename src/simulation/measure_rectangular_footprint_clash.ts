@@ -150,3 +150,9 @@ console.log("end reasons:", JSON.stringify(Object.fromEntries(endReasons)));
 console.log("grid types:", JSON.stringify(Object.fromEntries(gridTypes)));
 console.log("version pairs:", JSON.stringify(versionPairs));
 if (reasons.size) console.log("rejection kinds:", JSON.stringify(Object.fromEntries(reasons), null, 1));
+// The header says the only acceptable answer is zero — enforce it. Without a non-zero exit this
+// harness could only regress-gate if somebody happened to read stdout.
+if (rejected > 0) {
+    console.error(`FAIL: ${rejected} engine rejections — a footprint seam regressed.`);
+    process.exitCode = 1;
+}

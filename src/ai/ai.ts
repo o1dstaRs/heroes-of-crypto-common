@@ -2139,7 +2139,13 @@ export function getCellsForAttacker(
     // As soon as either body is a rectangle it stops meaning anything, so both shapes are read for real and
     // the whole question is asked again as geometry.
     const { width: attackerWidth, height: attackerHeight } = footprintOf(attacker);
-    if (attackerWidth !== attackerHeight || targetWidth !== targetHeight) {
+    // The legacy quadrant table is 1x1/2x2 geometry written out longhand. Dispatching on
+    // width !== height sent a SQUARE body of side 3 into it (same bug melee_target_layers fixed);
+    // only the two shipped squares may keep the hand-written path. NOTE: a caller that describes a
+    // rectangular TARGET with only `isTargetUnitSmall` gets the 2x2 default — pass real target dims.
+    const legacySquare = (width: number, height: number): boolean =>
+        (width === 1 && height === 1) || (width === 2 && height === 2);
+    if (!legacySquare(attackerWidth, attackerHeight) || !legacySquare(targetWidth, targetHeight)) {
         return getFootprintCellsForAttacker(
             cellToAttack,
             matrix,
@@ -2271,10 +2277,12 @@ function getBorderCells(
     width = isSmallUnit ? 1 : 2,
     height = isSmallUnit ? 1 : 2,
 ): HoCMath.XY[] {
-    // Only a genuinely rectangular body takes the per-axis path. Both squares keep their hand-written ring,
-    // which decides not just WHICH anchors are offered but in which ORDER — and that order picks the winner
-    // among equal-cost stand cells further down.
-    if (width !== height) {
+    // Only the two shipped squares keep their hand-written ring, which decides not just WHICH
+    // anchors are offered but in which ORDER — and that order picks the winner among equal-cost
+    // stand cells further down. Every other shape (rectangles AND larger squares such as 3x3)
+    // takes the per-axis path: the literal ring is 2x2 geometry and comes up one cell short per
+    // side for a side-3 body.
+    if (!((width === 1 && height === 1) || (width === 2 && height === 2))) {
         return getFootprintBorderCells(currentCell, distance, width, height);
     }
     const borderCells = [];
@@ -2317,10 +2325,11 @@ function filterCells(
     height = isAttackerSmall ? 1 : 2,
 ): HoCMath.XY[] {
     const filtered = [];
-    // As above, the two squares keep their literal clearance probes. The three extra cells they test are the
-    // 2x2 body written out; a rectangle has to be asked about its own, or a 1x2 anchor is refused because the
-    // column to its left — which it never occupies — happens to be taken.
-    const isRectangularBody = width !== height;
+    // As above, the two shipped squares keep their literal clearance probes. The three extra cells
+    // they test are the 2x2 body written out; every other shape — rectangles and larger squares —
+    // has to be asked about its own body, or a 1x2 anchor is refused because the column to its left
+    // (which it never occupies) happens to be taken, and a 3x3 is cleared on 4 of its 9 cells.
+    const isRectangularBody = !((width === 1 && height === 1) || (width === 2 && height === 2));
     for (const cell of cells) {
         if (isFree(cell, matrix, attacker)) {
             if (isRectangularBody) {

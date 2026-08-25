@@ -1807,9 +1807,12 @@ class CandidateGenerator {
         // lands inside an enemy melee-aggression cell.
         if (
             !this.unit.isRangeCapable() ||
+            // The unit itself, not the legacy boolean: a rectangle's pin test must run on its REAL
+            // body — the 2x2 window read a 2x1 as pinned where it is safe, and missed a 1x3's far
+            // cell entirely (AI proposes, engine rejects).
             attackHandler.canBeAttackedByMelee(
                 origin,
-                this.unit.isSmallSize(),
+                this.unit,
                 this.context.grid.getEnemyAggrMatrixByUnitId(this.unit.getId()),
             ) ||
             this.unit.getRangeShots() <= 0 ||
@@ -2162,7 +2165,7 @@ class CandidateGenerator {
                 !origin ||
                 attackHandler.canBeAttackedByMelee(
                     origin,
-                    this.unit.isSmallSize(),
+                    this.unit,
                     grid.getEnemyAggrMatrixByUnitId(this.unit.getId()),
                 )
             ) {
