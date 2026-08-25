@@ -518,29 +518,35 @@ describe("battle snapshot round-trip", () => {
 describe("battle snapshot — rectangular footprints", () => {
     it("capture -> mutate -> restore preserves a 2x1 body exactly (the UNIT_FIELDS claim)", () => {
         const previous = process.env.HOC_FOOTPRINT_OVERRIDES;
+        const previousForced = process.env.FORCE_CREATURES;
         process.env.HOC_FOOTPRINT_OVERRIDES = "White Tiger=2x1";
+        // Seed 31337 does not draft a White Tiger, so this whole body used to return before its first
+        // assertion — a green test pinning nothing. FORCE_CREATURES overrides the level-2 pick AFTER it is
+        // rolled, so the rng sequence and therefore the rest of the battle stay exactly as they were.
+        process.env.FORCE_CREATURES = "2:White Tiger";
         try {
             const h = buildBattle(31337, "v0.4");
             const tiger = [...h.unitsHolder.getAllUnits().values()].find((unit) => unit.getName() === "White Tiger");
-            if (!tiger) {
-                // The seeded roster does not always draft a tiger; the round trip below is what the
-                // suite pins, so draft-luck is allowed to skip rather than fail.
-                return;
-            }
-            expect([tiger.getFootprintWidth(), tiger.getFootprintHeight()]).toEqual([2, 1]);
-            const cellsBefore = tiger.getCells().map((cell) => ({ ...cell }));
-            const hpBefore = tiger.getHp();
+            expect(tiger).toBeDefined();
+            expect([tiger!.getFootprintWidth(), tiger!.getFootprintHeight()]).toEqual([2, 1]);
+            const cellsBefore = tiger!.getCells().map((cell) => ({ ...cell }));
+            const hpBefore = tiger!.getHp();
             const snapshot = snapshotBattle(h.unitsHolder, h.grid, h.fightProperties);
             h.playTurns(2);
-            restoreBattle(snapshot);
-            expect(tiger.getHp()).toBe(hpBefore);
-            expect(tiger.getCells()).toEqual(cellsBefore);
-            expect([tiger.getFootprintWidth(), tiger.getFootprintHeight()]).toEqual([2, 1]);
+            restoreBattle(snapshot, h.unitsHolder, h.grid, h.fightProperties);
+            expect(tiger!.getHp()).toBe(hpBefore);
+            expect(tiger!.getCells()).toEqual(cellsBefore);
+            expect([tiger!.getFootprintWidth(), tiger!.getFootprintHeight()]).toEqual([2, 1]);
         } finally {
             if (previous === undefined) {
                 delete process.env.HOC_FOOTPRINT_OVERRIDES;
             } else {
                 process.env.HOC_FOOTPRINT_OVERRIDES = previous;
+            }
+            if (previousForced === undefined) {
+                delete process.env.FORCE_CREATURES;
+            } else {
+                process.env.FORCE_CREATURES = previousForced;
             }
         }
     });
