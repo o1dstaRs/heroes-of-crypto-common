@@ -526,6 +526,83 @@ describe("action engine footprints — movement", () => {
         expect(isMovePathFootprintOnly(false, line, line, 1, 2, current)).toBe(false);
     });
 
+    /**
+     * `resolveMoveTraversal` is where the separator actually reaches production: it holds the mover, so it
+     * hands `isMovePathFootprintOnly` the current anchor. Nothing pinned that wiring — deleting the
+     * argument left all 3,428 tests green, because the argument is an optional trailing parameter and the
+     * suites that DRIVE this path only assert that the engine refused nothing.
+     *
+     * It is not a cosmetic wire. For a line body a one-step move along its own axis produces a payload
+     * whose route and destination footprint are the same SET, and without the anchor that reads as
+     * footprint-only: `crossedCells` becomes the whole destination body instead of the travelled tail, so
+     * the AI's Fire Wall projection charges a burn for the cell the body never left. Nothing is rejected —
+     * the AI just quietly drops a legal move it priced as lethal, which no rejection-counting clash can see.
+     *
+     * Asserting only that the projection agrees with the engine would NOT pin it: revert both sides and
+     * they agree again, on the wrong answer. So this asserts the absolute reading.
+     */
+    it("a line body's one-step move is read as a route, so only the cell it entered counts as crossed", () => {
+        for (const [width, height, from, to, entered] of [
+            [1, 2, { x: 5, y: 5 }, { x: 5, y: 6 }, { x: 5, y: 6 }],
+            [2, 1, { x: 5, y: 5 }, { x: 6, y: 5 }, { x: 6, y: 5 }],
+        ] as const) {
+            const { grid, unitsHolder } = createCombatTestContext(PBTypes.GridVals.NORMAL);
+            const mover = createFootprintUnit(width, height);
+            standAt(grid, unitsHolder, mover, from);
+
+            const path = [from, to];
+            const targetCells = getFootprintCellsForAnchor(to, width, height);
+            // The ambiguity this exists to resolve: the route and the destination body are the same SET.
+            expect(new Set(path.map((cell) => `${cell.x},${cell.y}`))).toEqual(
+                new Set(targetCells.map((cell) => `${cell.x},${cell.y}`)),
+            );
+
+            const traversal = resolveMoveTraversal(mover, {
+                type: "move_unit",
+                unitId: mover.getId(),
+                path,
+                targetCells,
+            } as MoveUnitAction);
+
+            expect(traversal.pathIsFootprintOnly).toBe(false);
+            // The tail only — NOT the cell the body was already standing on and never left.
+            expect(traversal.crossedCells).toEqual([entered]);
+        }
+    });
+
+    /**
+     * The one-step case above cannot pin `routeModifierPath`: it is `[]` under BOTH readings, because
+     * `travelledMovePath(destination, [destination])` strips the only cell. So it leaves the half of the
+     * traversal that drives lava/water route modifiers unpinned. A 3x1's TWO-step move along its own axis
+     * is the shortest payload that separates them — same ambiguity, but a tail long enough to observe.
+     */
+    it("a line body's two-step move keeps the ordered route its modifiers are applied over", () => {
+        const { grid, unitsHolder } = createCombatTestContext(PBTypes.GridVals.NORMAL);
+        const mover = createFootprintUnit(3, 1);
+        standAt(grid, unitsHolder, mover, { x: 5, y: 5 });
+
+        const path = [
+            { x: 5, y: 5 },
+            { x: 6, y: 5 },
+            { x: 7, y: 5 },
+        ];
+        // Anchor-first, which is what candidates.ts `moveAction` really emits for targetCells.
+        const targetCells = getFootprintCellsForAnchor({ x: 7, y: 5 }, 3, 1);
+
+        const traversal = resolveMoveTraversal(mover, {
+            type: "move_unit",
+            unitId: mover.getId(),
+            path,
+            targetCells,
+        } as MoveUnitAction);
+
+        expect(traversal.pathIsFootprintOnly).toBe(false);
+        expect(traversal.routeModifierPath).toEqual([
+            { x: 6, y: 5 },
+            { x: 7, y: 5 },
+        ]);
+    });
+
     it("the move set comparison separates cells a packed 4-bit key would have merged", () => {
         // Footprint lists are UNCLIPPED, so an edge-anchored body reports off-board cells and a set keyed by
         // `(x << 4) | y` stops being one-to-one: (0, 16) and (1, 0) pack to the same number, and (-1, 15)

@@ -289,11 +289,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * The engine generalises to an arbitrary W x H, but only sides up to 2 are PROVEN: whole matches with a 2x1
- * or 1x2 on the board produce zero engine-rejected actions, while the same clash with a 3x1 measures dozens
- * of declined melee strikes. The bound is therefore enforced where a footprint is declared, so an
- * unsupported shape fails at configuration time instead of becoming an AI that proposes refused moves all
- * match.
+ * The engine generalises to an arbitrary W x H, but the bound states what has been MEASURED. Whole matches
+ * with 1x1, 2x2, 2x1, 1x2, 3x1, 1x3, 3x2, 2x3 and 3x3 stacks on the board produce zero engine-rejected
+ * actions across all four boards; side 4 has simply never been clashed.
+ *
+ * A 3x1 used to measure dozens of declined melee strikes — an earlier version of this comment said so in
+ * the present tense and was left behind when the bound moved from 2 to 3. The cause was never the side
+ * length: it was a family of call sites reading `getCellForPosition(unit.getPosition())` as the body's
+ * ANCHOR, which is only true while both sides are at most 2.
+ *
+ * The bound is enforced where a footprint is DECLARED, so an unsupported shape fails at configuration time
+ * instead of becoming an AI that proposes refused moves all match.
  */
 describe("footprint sides are bounded to what the engine is verified for", () => {
     const FOOTPRINT_OVERRIDE_ENV = "HOC_FOOTPRINT_OVERRIDES";
