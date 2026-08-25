@@ -1,13 +1,16 @@
-// CEM refit of the A19 v0.8 60-dim value leaf FOR THE SIDE-ORIENTED BOARD.
+// CEM refit of an A19 v0.8 linear vector FOR THE SIDE-ORIENTED BOARD.
 //
-//   CEM_HOURS=10 bun src/simulation/optimizer/side_cem.mjs
+//   CEM_HOURS=10 bun src/simulation/optimizer/side_cem.mjs                      # value leaf (60d)
+//   CEM_TARGET=wait CEM_BASE_LEAF=path/to/leaf.json bun ...side_cem.mjs         # wait scorer (42d)
 //
-// Mean starts at the SHIPPED V08_A13_VALUE_LEAF; each candidate leaf is evaluated by
-// side_board_ab_battery.ts (candidate seat runs the leaf via the per-team seam, the control seat is
-// the shipped axis-blind v0.8), so fitness IS the deployment metric: decisive win rate vs the
-// previous v0.8 on the new board. Generation bests are re-scored on a held-out seed panel before
-// they can become the global best (anti-overfit, same discipline as cem.mjs). State persists under
-// sim-out/side_cem/ for resume.
+// CEM_TARGET picks what evolves: "leaf" (default) perturbs the SHIPPED V08_A13_VALUE_LEAF;
+// "wait" perturbs the SHIPPED DISTILLED_WAIT_WEIGHTS_2026_07_10 and, when CEM_BASE_LEAF is set,
+// rides every evaluation (anchor included) on that frozen leaf so the fitness is the DEPLOYMENT
+// BUNDLE's rate. Candidates are evaluated by side_board_ab_battery.ts (candidate seat runs the
+// vector(s) via the per-team seams, the control seat is the shipped axis-blind v0.8), so fitness IS
+// the deployment metric: decisive win rate vs the previous v0.8 on the new board. Generation bests
+// are re-scored on a held-out seed panel before they can become the global best (anti-overfit, same
+// discipline as cem.mjs). State persists under sim-out/side_cem[_wait]/ for resume.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -15,7 +18,10 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..", "..");
-const outDir = join(repoRoot, "sim-out", "side_cem");
+const TARGET = process.env.CEM_TARGET === "wait" ? "wait" : "leaf";
+// The frozen value leaf every WAIT evaluation rides on (absent = shipped leaf both seats).
+const BASE_LEAF = process.env.CEM_BASE_LEAF ?? "";
+const outDir = join(repoRoot, "sim-out", TARGET === "wait" ? "side_cem_wait" : "side_cem");
 mkdirSync(outDir, { recursive: true });
 const statePath = join(outDir, "state.json");
 const bestPath = join(outDir, "best.json");
@@ -40,14 +46,18 @@ const log = (line) => {
     writeFileSync(logPath, `${stamped}\n`, { flag: "a" });
 };
 
-// The shipped leaf = the CEM mean seed. Imported straight from the profile module so the anchor
+// The shipped vector = the CEM mean seed. Imported straight from the source module so the anchor
 // can never drift from what production actually runs (bun loads the TS module from .mjs directly).
-const { V08_A13_VALUE_LEAF } = await import(join(repoRoot, "src", "ai", "versions", "v0_8_a13_profile.ts"));
-const shipped = { b: V08_A13_VALUE_LEAF.b, w: [...V08_A13_VALUE_LEAF.w] };
-if (shipped.w.length !== 60 || shipped.w.some((weight) => !Number.isFinite(weight))) {
-    throw new Error(`Parsed leaf malformed: ${shipped.w.length} dims`);
+const EXPECTED_DIMS = TARGET === "wait" ? 41 : 60;
+const shippedSource =
+    TARGET === "wait"
+        ? (await import(join(repoRoot, "src", "ai", "versions", "wait_scorer.ts"))).DISTILLED_WAIT_WEIGHTS_2026_07_10
+        : (await import(join(repoRoot, "src", "ai", "versions", "v0_8_a13_profile.ts"))).V08_A13_VALUE_LEAF;
+const shipped = { b: shippedSource.b, w: [...shippedSource.w] };
+if (shipped.w.length !== EXPECTED_DIMS || shipped.w.some((weight) => !Number.isFinite(weight))) {
+    throw new Error(`Parsed ${TARGET} vector malformed: ${shipped.w.length} dims`);
 }
-log(`shipped leaf parsed: b=${shipped.b}, dims=${shipped.w.length}`);
+log(`shipped ${TARGET} vector parsed: b=${shipped.b}, dims=${shipped.w.length}${BASE_LEAF ? `, base leaf ${BASE_LEAF}` : ""}`);
 
 let rngState = Number(process.env.CEM_SEED ?? 1234567) >>> 0;
 const rand = () => {
@@ -80,6 +90,10 @@ function evaluateLeaf(leaf, pairs, seed, label) {
     const leafFile = join(outDir, `cand_${label}.json`);
     const reportFile = join(outDir, `report_${label}.json`);
     writeFileSync(leafFile, JSON.stringify(leaf));
+    const vectorArgs =
+        TARGET === "wait"
+            ? [...(BASE_LEAF ? ["--leaf-file", BASE_LEAF] : []), "--wait-file", leafFile]
+            : ["--leaf-file", leafFile];
     execFileSync(
         "bun",
         [
@@ -88,7 +102,7 @@ function evaluateLeaf(leaf, pairs, seed, label) {
             "--seed", String(seed),
             "--concurrency", String(CONC),
             "--output", reportFile,
-            "--leaf-file", leafFile,
+            ...vectorArgs,
         ],
         { cwd: repoRoot, stdio: ["ignore", "ignore", "inherit"], timeout: 3 * 3600 * 1000 },
     );
