@@ -472,6 +472,9 @@ export class GameActionEngine {
             action.targetCells,
             footprintWidth,
             footprintHeight,
+            // The mover's current anchor separates a genuine route from a footprint payload when the
+            // two are the same SET (a rectangle's one-step move along its anchor axis).
+            unit.getBaseCell(),
         );
         const knownMoveRoute = this.resolveKnownMoveRoute(unit, action.path, targetCells, pathIsFootprintOnly);
         if (knownMoveRoute instanceof Error) {
@@ -2236,7 +2239,35 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const cells = this.resolveSummonCells(summoned, targetCell);
+        // The FALLBACK target (no explicit cell on the action) was chosen before the creature existed,
+        // so it could only be vetted as a 1x1. Now that the body's true shape is known, a fallback cell
+        // that cannot seat it retries the ring around the caster's whole footprint for the first anchor
+        // that can — the seam firstSummonableAnchor was written for. An explicit player-chosen cell is
+        // never re-routed: refusing it is the correct answer.
+        let seatCell = targetCell;
+        if (
+            action.targetCell === undefined &&
+            seatCell &&
+            !SpellHelper.canCastSummon(
+                spell,
+                this.context.grid.getMatrix(),
+                seatCell,
+                summoned.getFootprintWidth(),
+                summoned.getFootprintHeight(),
+            )
+        ) {
+            seatCell = SpellHelper.firstSummonableAnchor(
+                spell,
+                this.context.grid.getMatrix(),
+                getCellsAroundFootprint(this.context.grid.getSettings(), caster.getCells()),
+                summoned.getFootprintWidth(),
+                summoned.getFootprintHeight(),
+            );
+            if (!seatCell) {
+                return this.reject("spell_not_available");
+            }
+        }
+        const cells = this.resolveSummonCells(summoned, seatCell);
         if (!cells.length) {
             return this.reject("spell_not_available");
         }
@@ -2249,7 +2280,7 @@ export class GameActionEngine {
             !SpellHelper.canCastSummon(
                 spell,
                 this.context.grid.getMatrix(),
-                targetCell,
+                seatCell,
                 summoned.getFootprintWidth(),
                 summoned.getFootprintHeight(),
             )

@@ -370,42 +370,25 @@ export function getPositionForCells(gridSettings: GridSettings, cells: XY[]): XY
         return undefined;
     }
 
-    if (cells.length !== 4) {
-        let rxMin = Number.MAX_SAFE_INTEGER;
-        let rxMax = Number.MIN_SAFE_INTEGER;
-        let ryMin = Number.MAX_SAFE_INTEGER;
-        let ryMax = Number.MIN_SAFE_INTEGER;
-        for (const c of cells) {
-            rxMin = Math.min(rxMin, c.x);
-            rxMax = Math.max(rxMax, c.x);
-            ryMin = Math.min(ryMin, c.y);
-            ryMax = Math.max(ryMax, c.y);
-        }
-        if ((rxMax - rxMin + 1) * (ryMax - ryMin + 1) !== cells.length) {
-            return undefined;
-        }
-        return getPositionForCell(
-            { x: rxMin + (rxMax - rxMin) / 2, y: ryMin + (ryMax - ryMin) / 2 },
-            gridSettings.getMinX(),
-            gridSettings.getStep(),
-            gridSettings.getHalfStep(),
-        );
-    }
-
-    let xMin = Number.MAX_SAFE_INTEGER;
-    let xMax = Number.MIN_SAFE_INTEGER;
-    let yMin = Number.MAX_SAFE_INTEGER;
-    let yMax = Number.MIN_SAFE_INTEGER;
-
+    // ONE branch for every count. The 4-cell case used to skip the tiling check and return a
+    // bounding-box centre for ANY four cells — the last shape-validation hole in the position round
+    // trip. A 2x2 block and a 1x4 line both tile their box and pass; an L/T tetromino now fails
+    // closed instead of centring somewhere its body is not.
+    let rxMin = Number.MAX_SAFE_INTEGER;
+    let rxMax = Number.MIN_SAFE_INTEGER;
+    let ryMin = Number.MAX_SAFE_INTEGER;
+    let ryMax = Number.MIN_SAFE_INTEGER;
     for (const c of cells) {
-        xMin = Math.min(xMin, c.x);
-        xMax = Math.max(xMax, c.x);
-        yMin = Math.min(yMin, c.y);
-        yMax = Math.max(yMax, c.y);
+        rxMin = Math.min(rxMin, c.x);
+        rxMax = Math.max(rxMax, c.x);
+        ryMin = Math.min(ryMin, c.y);
+        ryMax = Math.max(ryMax, c.y);
     }
-
+    if ((rxMax - rxMin + 1) * (ryMax - ryMin + 1) !== cells.length) {
+        return undefined;
+    }
     return getPositionForCell(
-        { x: xMin + (xMax - xMin) / 2, y: yMin + (yMax - yMin) / 2 },
+        { x: rxMin + (rxMax - rxMin) / 2, y: ryMin + (ryMax - ryMin) / 2 },
         gridSettings.getMinX(),
         gridSettings.getStep(),
         gridSettings.getHalfStep(),

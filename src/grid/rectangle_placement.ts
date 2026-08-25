@@ -44,8 +44,10 @@ export class RectanglePlacement implements IPlacement {
         const startY = yInset + footprintYInset;
         const endY = startY + this.gridSettings.getGridSize() - yInset * 2 - footprintYInset;
         const possiblePositions: XY[] = [];
-        for (let x = startX; x !== endX; x += stepX) {
-            for (let y = startY; y !== endY; y += 1) {
+        // Bounded comparisons, not `!==`: a footprint side larger than the zone depth makes the
+        // start overshoot the end, and `!==` would then never terminate.
+        for (let x = startX; stepX > 0 ? x < endX : x > endX; x += stepX) {
+            for (let y = startY; y < endY; y += 1) {
                 possiblePositions.push({ x, y });
             }
         }

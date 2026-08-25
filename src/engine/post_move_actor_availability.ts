@@ -124,10 +124,14 @@ export function resolveMoveTargetCells(
  * boolean; they default to the square shape `isSmallSize` implies, so the verdict is unchanged for every
  * existing caller.
  *
- * A two-cell body makes the encoding genuinely ambiguous: a 1x2's ONE-STEP route is itself two cells and can
- * be the same SET as its destination footprint. Both readings resolve to the same destination cells, so the
- * only thing that differs is whether route modifiers are applied, and the wire carries nothing that could
- * separate them — so this keeps the legacy reading rather than inventing a tie-break the client cannot know.
+ * A two-cell body makes the encoding ambiguous by SET alone: a 1x2's ONE-STEP route is itself two
+ * cells and can be the same set as its destination footprint. The wire does carry the separator,
+ * though: a ROUTE begins at the mover's current anchor (the pather's contract), while a
+ * footprint-only payload begins at the DESTINATION anchor (getFootprintCellsForAnchor puts the
+ * anchor first) — and for any real move those differ. Callers that know the mover pass its current
+ * anchor; without it the legacy set reading is kept, which misread a rectangle's one-step move as
+ * footprint-only and skipped its route modifiers (and charged Fire Wall for the cell it was already
+ * standing on).
  */
 export function isMovePathFootprintOnly(
     isSmallSize: boolean,
@@ -135,10 +139,17 @@ export function isMovePathFootprintOnly(
     suppliedTargetCells?: readonly XY[],
     footprintWidth: number = isSmallSize ? 1 : 2,
     footprintHeight: number = isSmallSize ? 1 : 2,
+    currentAnchor?: Readonly<XY>,
 ): boolean {
     const occupiesOneCell =
         normalizeFootprintSide(footprintWidth) === 1 && normalizeFootprintSide(footprintHeight) === 1;
-    return !occupiesOneCell && !!suppliedTargetCells?.length && moveCellsMatchAsSet(path, suppliedTargetCells);
+    if (occupiesOneCell || !suppliedTargetCells?.length || !moveCellsMatchAsSet(path, suppliedTargetCells)) {
+        return !occupiesOneCell && !!suppliedTargetCells?.length && moveCellsMatchAsSet(path, suppliedTargetCells);
+    }
+    if (currentAnchor && path.length > 1 && path[0].x === currentAnchor.x && path[0].y === currentAnchor.y) {
+        return false;
+    }
+    return true;
 }
 
 /** The route's initial base cell is an origin, not a cell the mover entered. No cell objects are copied. */

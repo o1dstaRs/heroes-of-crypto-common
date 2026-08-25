@@ -779,3 +779,31 @@ describe("action engine footprints — infested spawn on a corpse", () => {
         expect(setup.grid.getOccupantUnitId(corpseAnchor)).toBe(spawned.getId());
     });
 });
+
+describe("route-vs-footprint tie-break (the one ambiguous wire encoding)", () => {
+    // A 2x1 stepping one cell along its anchor axis: the route [(current),(dest)] and the destination
+    // footprint [(dest),(current)] are the same SET. The current anchor separates them — a route begins
+    // at the mover's anchor, a footprint payload at the destination's — so route modifiers must run and
+    // Fire Wall must charge only the ENTERED cell, never the one the body already stood on.
+    it("classifies a 2x1's one-step anchor-axis move as a ROUTE, not a footprint payload", () => {
+        const currentAnchor = { x: 5, y: 5 };
+        const destination = { x: 6, y: 5 };
+        const route = [currentAnchor, destination];
+        const footprintPayload = getFootprintCellsForAnchor(destination, 2, 1);
+        // Same set, different first element — precondition of the ambiguity.
+        expect([...route].sort((a, b) => a.x - b.x)).toEqual([...footprintPayload].sort((a, b) => a.x - b.x));
+        expect(isMovePathFootprintOnly(false, route, footprintPayload, 2, 1, currentAnchor)).toBe(false);
+        // The genuine footprint-only encoding (payload used AS the path) keeps its legacy reading.
+        expect(isMovePathFootprintOnly(false, footprintPayload, footprintPayload, 2, 1, currentAnchor)).toBe(true);
+        // Without the anchor the legacy set reading is preserved for wire compatibility.
+        expect(isMovePathFootprintOnly(false, route, footprintPayload, 2, 1)).toBe(true);
+    });
+
+    it("classifies a 1x2's one-step anchor-axis move as a ROUTE symmetrically", () => {
+        const currentAnchor = { x: 5, y: 5 };
+        const destination = { x: 5, y: 6 };
+        const route = [currentAnchor, destination];
+        const footprintPayload = getFootprintCellsForAnchor(destination, 1, 2);
+        expect(isMovePathFootprintOnly(false, route, footprintPayload, 1, 2, currentAnchor)).toBe(false);
+    });
+});

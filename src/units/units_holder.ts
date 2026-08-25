@@ -33,7 +33,13 @@ import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effec
 import type { FightProperties } from "../fights/fight_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
-import { getCellsAroundCell, getPositionForCell, isCellWithinGrid, isPositionWithinGrid } from "../grid/grid_math";
+import {
+    getCellsAroundCell,
+    getPositionForCell,
+    isCellWithinGrid,
+    isFootprintWithinGrid,
+    isPositionWithinGrid,
+} from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
 import { getDistance, type XY } from "../utils/math";
@@ -1331,7 +1337,17 @@ export class UnitsHolder {
         // produces the same final arrays as the old append-everything-then-squash pass without allocating and
         // walking the duplicate AppliedAuraEffectProperties entries created by overlapping source footprints.
         for (const u of this.getAllUnitsIterator()) {
-            if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
+            // The WHOLE body must be on the board, not just the anchor: a 2x1 dragged half off the
+            // edge still radiated an aura from ground nobody can stand on, and its negative-x cell
+            // keys de-optimised the aura index into string properties.
+            if (
+                !isFootprintWithinGrid(
+                    this.gridSettings,
+                    u.getBaseCell(),
+                    u.getFootprintWidth(),
+                    u.getFootprintHeight(),
+                )
+            ) {
                 continue;
             }
 
