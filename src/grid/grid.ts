@@ -556,7 +556,10 @@ export class Grid {
             processed.add(key);
         }
         this.stampAggrRing(occupiedNow, 1, aggrGrid);
-        this.cellsByUnitId[unitId] = cells;
+        // A copy, not the caller's array. The registry is read back by cleanupAll and by the aggro rebuild
+        // long after the write, and a caller that reuses or mutates its cell buffer would silently rewrite
+        // where the grid thinks a unit stands.
+        this.cellsByUnitId[unitId] = cells.map((cell) => ({ x: cell.x, y: cell.y }));
 
         return true;
     }

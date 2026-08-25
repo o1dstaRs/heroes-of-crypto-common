@@ -40,6 +40,7 @@ import { EffectFactory } from "../effects/effect_factory";
 import {
     getCellForPosition,
     getCellsAroundCell,
+    getFootprintAnchorForPosition,
     getFootprintCellsForAnchor,
     getFootprintCellsForPosition,
     getLargeUnitAttackCells,
@@ -1455,8 +1456,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return this.position;
     }
     /** The footprint's ANCHOR: its top-right cell, from which the body extends towards -x and -y. */
+    /**
+     * The footprint's ANCHOR: its top-right cell.
+     *
+     * `getCellForPosition` alone answers this only while both sides are 1 or 2, because that is exactly the
+     * range where the block's centre still falls inside the anchor cell (or on the grid line `floor` rounds
+     * up to it). At side 3 the centre falls back into the MIDDLE cell and the plain lookup names the wrong
+     * one, so the derivation goes through the shared helper, which subtracts the half-extent instead of
+     * relying on where the centre happens to land. Identical for every shipped shape.
+     */
     public getBaseCell(): XY {
-        return getCellForPosition(this.gridSettings, this.getPosition());
+        return getFootprintAnchorForPosition(
+            this.gridSettings,
+            this.getPosition(),
+            this.getFootprintWidth(),
+            this.getFootprintHeight(),
+        );
     }
     /**
      * Centre of the ANCHOR CELL, which is what this has always returned: `position` is already the centre of

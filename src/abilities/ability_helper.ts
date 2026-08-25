@@ -15,7 +15,7 @@ import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
-import { normalizeFootprintSide } from "../grid/grid_math";
+import { getFootprintCellsForAnchor, normalizeFootprintSide } from "../grid/grid_math";
 import { getDistance, type XY } from "../utils/math";
 import { Ability } from "./ability";
 import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "./double_shot_names";
@@ -241,12 +241,22 @@ export function nextStandingTargets(
     let attackerBaseCell = attackFromBaseCell;
 
     if (!attackerUnit.isSmallSize()) {
-        const attackerCells = [
-            attackerBaseCell,
-            { x: attackerBaseCell.x - 1, y: attackerBaseCell.y },
-            { x: attackerBaseCell.x, y: attackerBaseCell.y - 1 },
-            { x: attackerBaseCell.x - 1, y: attackerBaseCell.y - 1 },
-        ];
+        // The attacker's REAL body. The hand-written 2x2 list below is kept verbatim for that shape because
+        // the search seeds its tie-break with `attackerCells[0]` and then takes the first strictly-closer
+        // cell, so the ORDER decides which cell wins when two are equidistant. Any other shape takes the
+        // shared expansion; the old list gave a 2x1 two cells it does not stand on, which could pick a
+        // phantom cell as the attack origin and aim the whole chain from the wrong place.
+        const width = attackerUnit.getFootprintWidth();
+        const height = attackerUnit.getFootprintHeight();
+        const attackerCells =
+            width === 2 && height === 2
+                ? [
+                      attackerBaseCell,
+                      { x: attackerBaseCell.x - 1, y: attackerBaseCell.y },
+                      { x: attackerBaseCell.x, y: attackerBaseCell.y - 1 },
+                      { x: attackerBaseCell.x - 1, y: attackerBaseCell.y - 1 },
+                  ]
+                : getFootprintCellsForAnchor(attackerBaseCell, width, height);
         let closestCell = attackerCells[0];
         let minDistance = getDistance(closestCell, targetBaseCell);
 

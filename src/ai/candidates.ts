@@ -840,6 +840,8 @@ export function getEnemiesCellsWithinMovementRange(unit: Unit, context: IDecisio
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     ).cells;
     const out: XY[] = [];
     for (const c of moveCells) {

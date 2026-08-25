@@ -99,7 +99,16 @@ export class UnitsHolder {
     private isWholeFootprintOnBoard(unit: Unit, cells: readonly XY[]): boolean {
         const width = unit.getFootprintWidth();
         const height = unit.getFootprintHeight();
-        return width === height || cells.length === width * height;
+        if (width === height) {
+            // Both shipped shapes answer from whatever survived clipping, and must keep doing so.
+            return true;
+        }
+        // A rectangle's cell list is built unclipped, so a short list means the caller assembled it by hand
+        // from something other than getCells() — treat that as not-really-placed rather than letting an
+        // "are all of my cells legal?" loop pass vacuously on a partial body.
+        return (
+            cells.length === width * height && cells.every((cell) => isCellWithinGrid(this.grid.getSettings(), cell))
+        );
     }
     public getAllAlliesPlaced(
         teamType: TeamType,
