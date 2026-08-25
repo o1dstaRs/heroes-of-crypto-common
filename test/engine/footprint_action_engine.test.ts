@@ -496,6 +496,36 @@ describe("action engine footprints — movement", () => {
         expect(isMovePathFootprintOnly(false, [{ x: 4, y: 5 }], [{ x: 4, y: 5 }], 1, 1)).toBe(false);
     });
 
+    /**
+     * The current-anchor separator exists because a LINE body's destination footprint is also a legal route
+     * along its axis. A body with both sides greater than one has no such ambiguity — its footprint is a
+     * BLOCK, and a block is not a walked route — so the separator must not fire on it.
+     *
+     * It nearly did. The engine's own expansion puts the anchor first, but the client's hover candidate
+     * builds the same list ascending from the MINIMUM corner and hands that one array in as both `path` and
+     * `targetCells`. For a 2x2 the minimum corner is anchor-(1,1), so a glide to anchor+(1,1) — an ordinary
+     * move for a 2x2 flyer — put the mover's own current anchor at path[0] by coincidence. Reading that as a
+     * route invents three steps for a one-cell diagonal: the stack crossed a Fire Wall cell without burning,
+     * lost its distance-morale tick, and priced its follow-up strike at a Rapid Charge distance of 2.
+     */
+    it("a block body keeps the footprint reading even when its payload starts on the mover's own anchor", () => {
+        const current = { x: 5, y: 5 };
+        // Exactly what HoverManager.findLargeUnitMoveCandidate emits for a 2x2 gliding to (6,6).
+        const minCornerFirst = [
+            { x: 5, y: 5 },
+            { x: 5, y: 6 },
+            { x: 6, y: 5 },
+            { x: 6, y: 6 },
+        ];
+        expect(isMovePathFootprintOnly(false, minCornerFirst, minCornerFirst, 2, 2, current)).toBe(true);
+        // …and a line body still gets the separator it was added for: this really is a one-step route.
+        const line = [
+            { x: 5, y: 5 },
+            { x: 5, y: 6 },
+        ];
+        expect(isMovePathFootprintOnly(false, line, line, 1, 2, current)).toBe(false);
+    });
+
     it("the move set comparison separates cells a packed 4-bit key would have merged", () => {
         // Footprint lists are UNCLIPPED, so an edge-anchored body reports off-board cells and a set keyed by
         // `(x << 4) | y` stops being one-to-one: (0, 16) and (1, 0) pack to the same number, and (-1, 15)

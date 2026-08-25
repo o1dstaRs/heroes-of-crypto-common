@@ -124,14 +124,24 @@ export function resolveMoveTargetCells(
  * boolean; they default to the square shape `isSmallSize` implies, so the verdict is unchanged for every
  * existing caller.
  *
- * A two-cell body makes the encoding ambiguous by SET alone: a 1x2's ONE-STEP route is itself two
- * cells and can be the same set as its destination footprint. The wire does carry the separator,
- * though: a ROUTE begins at the mover's current anchor (the pather's contract), while a
- * footprint-only payload begins at the DESTINATION anchor (getFootprintCellsForAnchor puts the
- * anchor first) — and for any real move those differ. Callers that know the mover pass its current
- * anchor; without it the legacy set reading is kept, which misread a rectangle's one-step move as
- * footprint-only and skipped its route modifiers (and charged Fire Wall for the cell it was already
+ * A LINE body (1xN or Nx1) makes the encoding genuinely ambiguous by SET alone: its destination footprint
+ * is a straight run of cells, which is also exactly what its N-1 step route along that axis looks like. The
+ * mover's current anchor separates them — a ROUTE starts there, a destination footprint does not — so
+ * callers that know the mover pass it, and a rectangle's one-step move stops being misread as
+ * footprint-only (which skipped its route modifiers and charged Fire Wall for the cell it was already
  * standing on).
+ *
+ * That test is deliberately NOT applied to a body with both sides greater than one, and the reason is not
+ * caution — it is that such a body has no ambiguity to resolve. A 2x2's footprint is a BLOCK, and a block is
+ * not a walked route: reading one as a route invents three steps for a one-cell diagonal glide. The test
+ * would still fire on it, because the payload's first cell is not reliably the anchor. The engine's own
+ * expansion puts the anchor first, but the client's hover candidate builds the same list ascending from the
+ * MINIMUM corner (HoverManager.findLargeUnitMoveCandidate, whose comment says so, and Sandbox hands that one
+ * array in as both `path` and `targetCells`). For a 2x2 the minimum corner is anchor-(1,1), so a glide to
+ * anchor+(1,1) — one of the eight neighbours a 2x2 flyer picks constantly — put the mover's own current
+ * anchor at path[0] by coincidence and flipped the reading. Measured on that move: the stack passed through
+ * a Fire Wall cell without burning, lost its distance-morale tick, and priced its follow-up strike with a
+ * Rapid Charge distance of 2 instead of 1.
  */
 export function isMovePathFootprintOnly(
     isSmallSize: boolean,
@@ -141,12 +151,22 @@ export function isMovePathFootprintOnly(
     footprintHeight: number = isSmallSize ? 1 : 2,
     currentAnchor?: Readonly<XY>,
 ): boolean {
-    const occupiesOneCell =
-        normalizeFootprintSide(footprintWidth) === 1 && normalizeFootprintSide(footprintHeight) === 1;
+    const width = normalizeFootprintSide(footprintWidth);
+    const height = normalizeFootprintSide(footprintHeight);
+    const occupiesOneCell = width === 1 && height === 1;
     if (occupiesOneCell || !suppliedTargetCells?.length || !moveCellsMatchAsSet(path, suppliedTargetCells)) {
         return !occupiesOneCell && !!suppliedTargetCells?.length && moveCellsMatchAsSet(path, suppliedTargetCells);
     }
-    if (currentAnchor && path.length > 1 && path[0].x === currentAnchor.x && path[0].y === currentAnchor.y) {
+    // Only a LINE body can have a destination footprint that is also a legal route, so only a line body has
+    // anything to disambiguate. A block keeps the legacy set reading whatever order its payload arrives in.
+    const isLineBody = width === 1 || height === 1;
+    if (
+        isLineBody &&
+        currentAnchor &&
+        path.length > 1 &&
+        path[0].x === currentAnchor.x &&
+        path[0].y === currentAnchor.y
+    ) {
         return false;
     }
     return true;
@@ -179,6 +199,9 @@ export function resolveMoveTraversal(
         action.targetCells,
         width,
         height,
+        // The mover is right here, so hand over its anchor: without it this — the path every real move
+        // takes — silently fell back to the legacy set reading, and the separator above never ran.
+        unit.getBaseCell(),
     );
     const travelledPath = pathIsFootprintOnly
         ? action.path
