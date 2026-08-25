@@ -111,8 +111,11 @@ const footprintFor = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(uni
 // and row: unchanged for a 1x1 and a 2x2, and a rectangle now leans only along its long side.
 const centerFor = footprintCenterForAnchor;
 
-const frontness = (team: IPlacementContext["team"], cell: XY): number =>
-    team === PBTypes.TeamVals.LOWER ? cell.y : GRID_SIZE - 1 - cell.y;
+const frontness = (team: IPlacementContext["team"], cell: XY, sideOriented = false): number => {
+    // Depth toward the enemy along the axis of advance (X when this seat plays side-oriented).
+    const along = sideOriented ? cell.x : cell.y;
+    return team === PBTypes.TeamVals.LOWER ? along : GRID_SIZE - 1 - along;
+};
 
 const placementIsCompleteAndLegal = (
     units: readonly Unit[],
@@ -306,7 +309,8 @@ const evaluateV08A19RankedPlacement = (
         return (
             !!before &&
             !!after &&
-            frontness(context.team, centerFor(unit, after)) > frontness(context.team, centerFor(unit, before))
+            frontness(context.team, centerFor(unit, after), context.sideOrientedPlacement === true) >
+                frontness(context.team, centerFor(unit, before), context.sideOrientedPlacement === true)
         );
     }).length;
     const correctedGroundScreens = correctedPhysical.filter((unit) => {

@@ -246,6 +246,35 @@ export class FightProperties {
     public getPlacementType(): PlacementType {
         return this.placementType;
     }
+    /**
+     * SIDE-oriented boards (the ranked Point-X layout) deploy the armies on the LEFT/RIGHT flanks:
+     * the axis of advance is X, not the classic Y. Every direction-sensitive engine/AI rule
+     * (Backstab geometry, advance/depth features, forward-looking routers, placement frontness)
+     * must read this instead of assuming ±Y. Not serialized: the server and the sim each stamp it
+     * on the FightProperties they construct.
+     */
+    private sideOrientedPlacement = false;
+    public isSideOrientedPlacement(): boolean {
+        return this.sideOrientedPlacement;
+    }
+    public setSideOrientedPlacement(sideOriented: boolean): void {
+        this.sideOrientedPlacement = sideOriented;
+    }
+    /**
+     * A/B seam for the side-board migration. The BOARD RULES (zones, Backstab geometry) are the
+     * environment and always follow sideOrientedPlacement — but a POLICY (features, routers,
+     * placement heuristics) only reads the new axis for teams NOT in this set. Batteries put the
+     * "previous v0.8" control seat here to reproduce today's shipped behavior (raw-Y heuristics on
+     * a side board) faithfully inside one process. Empty in production: every seat is axis-aware.
+     */
+    private legacyAxisPolicyTeams: Set<TeamType> = new Set();
+    public setLegacyAxisPolicyTeams(teams: readonly TeamType[]): void {
+        this.legacyAxisPolicyTeams = new Set(teams);
+    }
+    /** True when `team`'s POLICY should reason along the side-board advance axis. */
+    public isSideAxisPolicyTeam(team: TeamType): boolean {
+        return this.sideOrientedPlacement && !this.legacyAxisPolicyTeams.has(team);
+    }
     public getFirstTurnMade(): boolean {
         return this.firstTurnMade;
     }

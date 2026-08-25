@@ -723,10 +723,16 @@ const optimizeAbominationPlacement = (
     const legal = context.placement.possibleCellHashes();
     if (!legal.size || !wards.length) return placements;
     const legalCells = [...legal].map((hash) => ({ x: hash >> 4, y: hash & 0xf }));
-    const xs = legalCells.map((cell) => cell.x);
-    const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const frontness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cell.y : GRID_SIZE - 1 - cell.y);
-    const edgeness = (cell: XY): number => Math.abs(cell.x - centreX);
+    // Frontness runs along the axis of advance (X when this seat is side-oriented), edgeness along
+    // the LATERAL axis — the pair swaps together with the board orientation.
+    const sideOriented = context.sideOrientedPlacement === true;
+    const along = (cell: XY): number => (sideOriented ? cell.x : cell.y);
+    const lateral = (cell: XY): number => (sideOriented ? cell.y : cell.x);
+    const lats = legalCells.map(lateral);
+    const centreLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const frontness = (cell: XY): number =>
+        context.team === PBTypes.TeamVals.LOWER ? along(cell) : GRID_SIZE - 1 - along(cell);
+    const edgeness = (cell: XY): number => Math.abs(lateral(cell) - centreLat);
 
     for (const protector of units.filter((unit) => v08BacklineProtectorKind(unit) === "abomination")) {
         const current = placements.get(protector.getId());
@@ -880,10 +886,16 @@ const optimizeAngelPlacement = (
     const legal = context.placement.possibleCellHashes();
     if (!legal.size) return placements;
     const legalCells = [...legal].map((hash) => ({ x: hash >> 4, y: hash & 0xf }));
-    const xs = legalCells.map((cell) => cell.x);
-    const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const frontness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cell.y : GRID_SIZE - 1 - cell.y);
-    const edgeness = (cell: XY): number => Math.abs(cell.x - centreX);
+    // Frontness runs along the axis of advance (X when this seat is side-oriented), edgeness along
+    // the LATERAL axis — the pair swaps together with the board orientation.
+    const sideOriented = context.sideOrientedPlacement === true;
+    const along = (cell: XY): number => (sideOriented ? cell.x : cell.y);
+    const lateral = (cell: XY): number => (sideOriented ? cell.y : cell.x);
+    const lats = legalCells.map(lateral);
+    const centreLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const frontness = (cell: XY): number =>
+        context.team === PBTypes.TeamVals.LOWER ? along(cell) : GRID_SIZE - 1 - along(cell);
+    const edgeness = (cell: XY): number => Math.abs(lateral(cell) - centreLat);
 
     for (const angel of units.filter((unit) => v08BacklineProtectorKind(unit) === "angel")) {
         if (!placements.has(angel.getId())) continue;

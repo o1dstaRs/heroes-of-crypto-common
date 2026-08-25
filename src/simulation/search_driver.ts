@@ -1331,6 +1331,8 @@ export class SearchDriver {
     /** V07_VALUE_WEIGHTS_V2 (Phase-B env candidate): leaf over the deployed VALUE_FEATURE_NAMES_V2 basis
      * (raw 30 + rangedness-interaction block); a valid vector wins over the v1/default 20-dim leaf. */
     private readonly learnedV2: ILearnedValue | null;
+    /** Per-team V2 leaf overrides (battery seam) — resolved before learnedV2 at scoring time. */
+    private readonly learnedV2ByTeam = new Map<TeamType, ILearnedValue | null>();
     private readonly rollbackStrategy: SearchRollbackStrategy;
     private readonly leafFeatureScratch = createValueFeatureScratch();
     private readonly leafFeatures = new Array<number>(VALUE_FEATURE_NAMES_V2.length);
@@ -1840,6 +1842,16 @@ export class SearchDriver {
         if (this.learnedV2 && rawValueWeights !== undefined) {
             throw new Error("V07_VALUE_WEIGHTS_V2 cannot be combined with explicit V07_VALUE_WEIGHTS");
         }
+        // Per-TEAM V2 leaf overrides — the weight-refit battery seam. A candidate leaf and the shipped
+        // control leaf must coexist inside ONE game (the two seats fight each other), and env weights
+        // are process-global, so the per-seat resolution happens here at scoring time instead. Absent =
+        // the shared V2/20-dim resolution above, byte-identical behavior.
+        const parseTeamLeaf = (raw: string | undefined): ILearnedValue | null => {
+            const parsed = parseLearnedValueWidth(raw, VALUE_FEATURE_NAMES_V2.length);
+            return parsed && (parsed.b !== 0 || parsed.w.some((weight) => weight !== 0)) ? parsed : null;
+        };
+        this.learnedV2ByTeam.set(PBTypes.TeamVals.LOWER, parseTeamLeaf(process.env.V07_VALUE_WEIGHTS_V2_LOWER));
+        this.learnedV2ByTeam.set(PBTypes.TeamVals.UPPER, parseTeamLeaf(process.env.V07_VALUE_WEIGHTS_V2_UPPER));
         const rawOppModel = this.enabled ? process.env.SEARCH_OPP_MODEL?.trim() : undefined;
         this.oppModel = rawOppModel ? getAIStrategy(rawOppModel) : null; // throws on an unknown version
         const rawAudit = process.env.SEARCH_AUDIT;
@@ -4836,9 +4848,11 @@ export class SearchDriver {
             if (this.finishedWinningTeam === PBTypes.TeamVals.NO_TEAM) return 0.5;
             return this.finishedWinningTeam === team ? 1 : 0;
         }
-        const model = this.learnedV2 ?? this.learned;
+        const teamV2 = this.learnedV2ByTeam.get(team) ?? null;
+        const effectiveV2 = teamV2 ?? this.learnedV2;
+        const model = effectiveV2 ?? this.learned;
         if (model) {
-            const f = this.learnedV2
+            const f = effectiveV2
                 ? fillValueFeaturesV2(
                       this.leafFeatures,
                       this.deps.unitsHolder,

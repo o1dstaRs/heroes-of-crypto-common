@@ -27,6 +27,7 @@ export function getAbilitiesWithPosisionCoefficient(
     toUnitSmallSize?: boolean,
     fromUnitTeam?: TeamType,
     toFootprintHeight?: number,
+    sideOrientedBoard = false,
 ): Ability[] {
     const abilities: Ability[] = [];
     if (!unitAbilities?.length || !fromCell || !toCell) {
@@ -44,14 +45,21 @@ export function getAbilitiesWithPosisionCoefficient(
 
     for (const a of unitAbilities) {
         if (a.getName() === "Backstab") {
-            const aY = fromCell.y;
-            const tY = toCell.y;
+            // "Behind" is measured along the axis of ADVANCE: Y on the classic bottom/top board,
+            // X on the side-oriented ranked board. The large-target adjustment mirrors the 2x2
+            // anchor convention (base cell = far corner along the axis) exactly as it always did
+            // for Y — comparing raw Y on a side board awarded Backstab for standing BESIDE the
+            // victim and never for standing behind it.
+            const along = sideOrientedBoard ? fromCell.x : fromCell.y;
+            const targetAlong = sideOrientedBoard ? toCell.x : toCell.y;
 
-            if (fromUnitTeam === PBTypes.TeamVals.LOWER && aY > tY) {
+            if (fromUnitTeam === PBTypes.TeamVals.LOWER && along > targetAlong) {
                 abilities.push(a);
             }
 
-            if (fromUnitTeam === PBTypes.TeamVals.UPPER && aY < tY - (targetHeight - 1)) {
+            // The footprint margin follows the axis too: along the advance axis the anchor names the
+            // FAR edge, so the UPPER attacker must clear the body's full extent along that axis.
+            if (fromUnitTeam === PBTypes.TeamVals.UPPER && along < targetAlong - (targetHeight - 1)) {
                 abilities.push(a);
             }
         }

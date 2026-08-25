@@ -2080,6 +2080,7 @@ export class AttackHandler {
             targetUnit.isSmallSize(),
             attackerUnit.getTeam(),
             targetUnit.getFootprintHeight(),
+            FightStateManager.getInstance().getFightProperties().isSideOrientedPlacement(),
         );
 
         if (abilitiesWithPositionCoeff.length) {
@@ -2336,6 +2337,7 @@ export class AttackHandler {
                         attackerUnit.isSmallSize(),
                         targetUnit.getTeam(),
                         attackerUnit.getFootprintHeight(),
+                        FightStateManager.getInstance().getFightProperties().isSideOrientedPlacement(),
                     );
 
                     if (abilitiesWithPositionCoeffResp.length) {

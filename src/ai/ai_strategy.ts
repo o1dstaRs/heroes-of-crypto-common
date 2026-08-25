@@ -55,6 +55,12 @@ export interface IPlacementContext {
     revealedOpponentCreatures?: readonly number[];
     /** Explicit setup-policy placement mode. When present it overrides the legacy process env gate. */
     setupPlacementPolicy?: PlacementPolicyVariant;
+    /**
+     * This team's POLICY reasons along the side-board advance axis (X). Set by the engine from
+     * FightProperties.isSideAxisPolicyTeam — a battery's legacy control seat keeps it false even on
+     * a side board, faithfully reproducing the shipped raw-Y placement heuristics. Absent = classic.
+     */
+    sideOrientedPlacement?: boolean;
 }
 
 export type AIPolicyEventKind =

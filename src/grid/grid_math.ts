@@ -412,6 +412,28 @@ export function getPositionForCells(gridSettings: GridSettings, cells: XY[]): XY
     );
 }
 
+// ---------------------------------------------------------------------------------------------
+// Axis of advance. Classic boards deploy bottom/top (LOWER advances +y); SIDE-oriented boards
+// (the ranked Point-X layout) deploy left/right (LOWER advances +x). These two helpers are THE
+// switch every direction-sensitive rule routes through — Backstab geometry, advance/depth
+// features, forward-looking routers, placement frontness. Never compare raw .y by team again.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * How deep into the board a cell sits for `team`, in cells: 0 = the team's own back edge,
+ * gridSize-1 = the enemy's back edge.
+ */
+export function advanceDepthOfCell(team: TeamType, cell: XY, sideOriented: boolean, gridSize = 16): number {
+    const along = sideOriented ? cell.x : cell.y;
+    return team === PBTypes.TeamVals.LOWER ? along : gridSize - 1 - along;
+}
+
+/** Signed advance from `from` to `to` for `team`, in cells: positive = toward the enemy. */
+export function advanceDeltaBetween(team: TeamType, from: XY, to: XY, sideOriented: boolean): number {
+    const delta = sideOriented ? to.x - from.x : to.y - from.y;
+    return team === PBTypes.TeamVals.LOWER ? delta : -delta;
+}
+
 export function getRandomGridCellAroundPosition(
     gridSettings: GridSettings,
     gridMatrix: number[][],

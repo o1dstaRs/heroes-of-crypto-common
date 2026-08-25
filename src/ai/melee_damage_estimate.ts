@@ -139,6 +139,7 @@ export function estimatePrimaryMeleeDamage(
         target.isSmallSize(),
         unit.getTeam(),
         target.getFootprintHeight(),
+        fightProperties.isSideAxisPolicyTeam(unit.getTeam()),
     )) {
         handlerMultiplier *= unit.calculateAbilityMultiplier(ability, attackerAbilityPower);
     }

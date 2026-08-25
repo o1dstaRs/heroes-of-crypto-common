@@ -153,6 +153,11 @@ const FIGHT_FIELDS = [
     "currentLap",
     "gridType",
     "placementType",
+    // Board orientation (side-oriented ranked layout) + the battery's legacy-policy seat set.
+    // Both are immutable once the engine stamps them, but captured like every other field so the
+    // fail-closed census stays airtight.
+    "sideOrientedPlacement",
+    "legacyAxisPolicyTeams",
     "firstTurnMade",
     "fightStarted",
     "fightFinished",

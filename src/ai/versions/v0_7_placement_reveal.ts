@@ -196,12 +196,21 @@ export function layoutRevealPlacement(
         return placements;
     }
     const key = (c: XY): number => (c.x << 4) | c.y;
-    const frontness = (c: XY): number => (context.team === PBTypes.TeamVals.LOWER ? c.y : GRID_SIZE - 1 - c.y);
-    const xs = baseCells.map((c) => c.x);
-    const minX = Math.min(...xs);
-    const centreX = (minX + Math.max(...xs)) / 2;
-    /** Default: distance from the zone's x-centre (corner-ness); cornerShift: distance from the low-x edge. */
-    const edgeness = options.cornerShift ? (c: XY): number => c.x - minX : (c: XY): number => Math.abs(c.x - centreX);
+    // Axis of advance: Y on the classic bottom/top board, X when this seat plays side-oriented
+    // (context.sideOrientedPlacement). Frontness = depth toward the enemy; edgeness = LATERAL
+    // offset within the zone — the two swap axes together or the layout collapses to one row.
+    const sideOriented = context.sideOrientedPlacement === true;
+    const along = (c: XY): number => (sideOriented ? c.x : c.y);
+    const lateral = (c: XY): number => (sideOriented ? c.y : c.x);
+    const frontness = (c: XY): number =>
+        context.team === PBTypes.TeamVals.LOWER ? along(c) : GRID_SIZE - 1 - along(c);
+    const lats = baseCells.map(lateral);
+    const minLat = Math.min(...lats);
+    const centreLat = (minLat + Math.max(...lats)) / 2;
+    /** Default: distance from the zone's lateral centre (corner-ness); cornerShift: distance from the low edge. */
+    const edgeness = options.cornerShift
+        ? (c: XY): number => lateral(c) - minLat
+        : (c: XY): number => Math.abs(lateral(c) - centreLat);
     // The unit's real body. This one helper backs the gap ring, the shooter screen and the corner shift, so a
     // presumed 2x2 corrupts all three at once — most visibly the screen, whose entire purpose is the
     // `areCellsAdjacent(wardFootprint, guardFootprint)` test a few lines down.

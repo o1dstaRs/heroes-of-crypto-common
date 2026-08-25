@@ -24,13 +24,50 @@ export class RectanglePlacement implements IPlacement {
     protected readonly yLower: number;
     protected readonly yUpper: number;
     private readonly possibleCellHashesSet: Set<number>;
-    public constructor(gridSettings: GridSettings, placementPositionType: PlacementPositionType, size = 3) {
+    protected readonly sideOriented: boolean;
+    // The side-oriented cell enumeration, ported verbatim from the server's SideRectanglePlacement:
+    // full-height x-band (LOWER = left columns, UPPER = right columns), size-3 zones inset one cell
+    // from the top/bottom edges, size-6 opening the outermost column.
+    private sideCellPositions(footprintWidth: number, footprintHeight: number): XY[] {
+        const footprintXInset = Math.max(0, Math.floor(footprintWidth) - 1);
+        const footprintYInset = Math.max(0, Math.floor(footprintHeight) - 1);
+        const edgeColumnInset = this.size >= 6 ? 0 : 1;
+        const yInset = this.size === 3 ? 1 : 0;
+        const isLower =
+            this.placementPositionType === PlacementPositionType.LOWER_LEFT ||
+            this.placementPositionType === PlacementPositionType.LOWER_RIGHT;
+        const startX = isLower
+            ? edgeColumnInset + footprintXInset
+            : this.gridSettings.getGridSize() - 1 - edgeColumnInset;
+        const endX = isLower ? startX + this.size - footprintXInset : startX - this.size + footprintXInset;
+        const stepX = isLower ? 1 : -1;
+        const startY = yInset + footprintYInset;
+        const endY = startY + this.gridSettings.getGridSize() - yInset * 2 - footprintYInset;
+        const possiblePositions: XY[] = [];
+        for (let x = startX; x !== endX; x += stepX) {
+            for (let y = startY; y !== endY; y += 1) {
+                possiblePositions.push({ x, y });
+            }
+        }
+        return possiblePositions;
+    }
+    public constructor(
+        gridSettings: GridSettings,
+        placementPositionType: PlacementPositionType,
+        size = 3,
+        // SIDE-oriented boards (the ranked Point-X layout) deploy the armies on the LEFT/RIGHT
+        // flanks: the zone becomes an x-band over the full board height (LOWER = left, UPPER =
+        // right), mirroring the server's authoritative SideRectanglePlacement geometry exactly.
+        // Default false keeps the classic bottom/top y-bands byte-for-byte.
+        sideOriented = false,
+    ) {
         if (![3, 4, 5, 6].includes(size)) {
             throw new Error("Only the following placements heights are supported: 3, 4, 5, 6.");
         }
         this.gridSettings = gridSettings;
         this.placementPositionType = placementPositionType;
         this.size = size;
+        this.sideOriented = sideOriented;
         this.possibleCellHashesSet = new Set();
 
         const sizeShift = size * gridSettings.getStep();
@@ -38,6 +75,28 @@ export class RectanglePlacement implements IPlacement {
         // Heights 3-5 stop one row short of the board edge; height 6 (Placement augment LEVEL_3) opens
         // the edge line itself, so the zone starts at the very first/last row.
         const edgeInset = size >= 6 ? 0 : gridSettings.getStep();
+
+        if (sideOriented) {
+            const isLower =
+                placementPositionType === PlacementPositionType.LOWER_LEFT ||
+                placementPositionType === PlacementPositionType.LOWER_RIGHT;
+            const yInset = isSmallestPlacement ? gridSettings.getStep() : 0;
+            if (isLower) {
+                this.xLeft = gridSettings.getMinX() + edgeInset;
+                this.xRight = gridSettings.getMinX() + edgeInset + sizeShift;
+            } else {
+                this.xLeft = gridSettings.getMaxX() - edgeInset - sizeShift;
+                this.xRight = gridSettings.getMaxX() - edgeInset;
+            }
+            this.yLower = gridSettings.getMinY() + yInset;
+            this.yUpper = gridSettings.getMaxY() - yInset;
+            for (const c of this.possibleCellPositions()) {
+                if (c) {
+                    this.possibleCellHashesSet.add((c.x << 4) | c.y);
+                }
+            }
+            return;
+        }
 
         switch (placementPositionType) {
             case PlacementPositionType.LOWER_LEFT:
@@ -93,6 +152,9 @@ export class RectanglePlacement implements IPlacement {
         footprintWidth = isSmallUnit ? 1 : 2,
         footprintHeight = isSmallUnit ? 1 : 2,
     ): XY[] {
+        if (this.sideOriented) {
+            return this.sideCellPositions(_footprintWidth, _footprintHeight);
+        }
         let x;
         let y;
         let sx;

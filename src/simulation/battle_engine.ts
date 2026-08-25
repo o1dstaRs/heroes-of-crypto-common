@@ -328,6 +328,19 @@ export interface IMatchConfig {
      * fight state is retained here, seeding accepted setup before the final strategy placement is equivalent.
      */
     placementAugmentTiming?: "current-live" | "setup-before-placement";
+    /**
+     * SIDE-oriented deployment (the ranked Point-X layout): armies deploy on the LEFT/RIGHT flanks
+     * (GREEN x-band on the left, RED on the right, full board height) and the axis of advance is X.
+     * Stamped onto fightProperties so every direction-sensitive engine/AI rule reads the same truth.
+     * Absent = the classic bottom/top board.
+     */
+    sideOrientedPlacement?: boolean;
+    /**
+     * Battery seam: teams whose POLICY must keep the shipped raw-Y heuristics even on a side board
+     * (the "previous v0.8" control seat). Board RULES still apply to them. Empty/absent = every
+     * seat is axis-aware.
+     */
+    legacyAxisPolicyTeams?: readonly TeamType[];
     /** Synergies per team ({faction, synergy, level}) — recorded on fightProperties; combat + adjustBaseStats
      * read them live. Effective level is composition-gated (needs enough units of the faction). */
     greenSynergies?: ISetupSynergy[];
@@ -691,15 +704,22 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         seedAcceptedSetupForPlacement(fightProperties, GREEN_TEAM, config.greenDoctrine, config.greenAugments);
         seedAcceptedSetupForPlacement(fightProperties, RED_TEAM, config.redDoctrine, config.redAugments);
     }
+    const sideOriented = config.sideOrientedPlacement === true;
+    fightProperties.setSideOrientedPlacement(sideOriented);
+    if (config.legacyAxisPolicyTeams?.length) {
+        fightProperties.setLegacyAxisPolicyTeams(config.legacyAxisPolicyTeams);
+    }
     const greenZone = new RectanglePlacement(
         gridSettings,
         PlacementPositionType.LOWER_LEFT,
         setupBeforePlacement ? fightProperties.getAugmentPlacement(GREEN_TEAM)[0] : 3,
+        sideOriented,
     );
     const redZone = new RectanglePlacement(
         gridSettings,
         PlacementPositionType.UPPER_RIGHT,
         setupBeforePlacement ? fightProperties.getAugmentPlacement(RED_TEAM)[0] : 3,
+        sideOriented,
     );
     const zoneHashesFor = (team: TeamType): Set<number> =>
         team === GREEN_TEAM ? greenZone.possibleCellHashes() : redZone.possibleCellHashes();
@@ -1787,6 +1807,7 @@ function placeArmy(
         unitsHolder,
         pathHelper,
         placement: zone,
+        sideOrientedPlacement: FightStateManager.getInstance().getFightProperties().isSideAxisPolicyTeam(team),
         ...(revealedOpponentCreatures?.length ? { revealedOpponentCreatures } : {}),
         ...(publicOpponentCreatureIds ? { publicOpponentCreatureIds } : {}),
         ...(setupPlacementPolicy ? { setupPlacementPolicy } : {}),
@@ -1804,6 +1825,9 @@ function placeArmy(
                   team,
                   gridType: grid.getGridType(),
                   legalCellHashes: legal,
+                  sideOrientedPlacement: FightStateManager.getInstance()
+                      .getFightProperties()
+                      .isSideAxisPolicyTeam(team),
                   splitStacks,
               },
           )
