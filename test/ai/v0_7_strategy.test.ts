@@ -32,6 +32,7 @@ import {
     canWaitOnHourglassMirror,
     DISTILLED_WAIT_WEIGHTS_2026_07_10,
     extractWaitFeatures,
+    SIDE_2X1_WAIT_WEIGHTS_2026_08_26,
     v07BakedWaitWeights,
     WAIT_FEATURE_NAMES_V3,
     waitScore,
@@ -181,6 +182,30 @@ describe("v0.7 baked weight resolution", () => {
         // The env-gated pattern's gate is NOT consulted — v0.7's scorer is always armed.
         process.env.V07_WAIT_SCORER = "off";
         expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+    });
+
+    it("V08_SIDE_WAIT_2X1=1 resolves the baked slot to the side-board 2x1 candidate", () => {
+        process.env.V08_SIDE_WAIT_2X1 = "1";
+        expect(v07BakedWaitWeights()).toEqual(SIDE_2X1_WAIT_WEIGHTS_2026_08_26);
+        // Only the exact "1" arms it; anything else keeps the shipped default byte-for-byte.
+        process.env.V08_SIDE_WAIT_2X1 = "true";
+        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+        delete process.env.V08_SIDE_WAIT_2X1;
+        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+        // An explicit raw override still beats the gate, and all-zero still disables the stage.
+        process.env.V08_SIDE_WAIT_2X1 = "1";
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 3, w: zeroWeights() });
+        expect(v07BakedWaitWeights()).toEqual({ b: 3, w: zeroWeights() });
+        process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 0, w: zeroWeights() });
+        expect(v07BakedWaitWeights()).toBeNull();
+        delete process.env.V07_WAIT_WEIGHTS;
+        delete process.env.V08_SIDE_WAIT_2X1;
+    });
+
+    it("the 2x1 candidate itself is a well-formed, distinct 41-dim vector", () => {
+        expect(SIDE_2X1_WAIT_WEIGHTS_2026_08_26.w).toHaveLength(DISTILLED_WAIT_WEIGHTS_2026_07_10.w.length);
+        expect(SIDE_2X1_WAIT_WEIGHTS_2026_08_26.w.every((x) => Number.isFinite(x))).toBe(true);
+        expect(SIDE_2X1_WAIT_WEIGHTS_2026_08_26).not.toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
     });
 
     it("honors a valid V07_WAIT_WEIGHTS override", () => {

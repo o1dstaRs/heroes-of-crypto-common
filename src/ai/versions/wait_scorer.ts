@@ -482,6 +482,26 @@ function loadWaitWeightsFrom(envVar: string): IWaitWeights | null {
 }
 
 /**
+ * The side-board 2x1-world wait refit (CEM on the hft node, 2026-08-26): the shipped distilled vector's
+ * TEMPO terms sharpened against the mounted-class catalog (initiative-hold and react-last deepened).
+ * CONFIRMED on 1,500 fresh-seed paired-seat pairs (seed 99000001, 2,892 decisive, both seats swapped,
+ * axis-aware candidate on the SHIPPED leaf vs shipped axis-blind v0.8): pooled 58.30% [56.49-60.08] —
+ * the Wilson floor clears the 55% ship bar; per map normal 59.2 / lava 61.2 / block 54.4. SHIP
+ * CANDIDATE, default OFF: `V08_SIDE_WAIT_2X1=1` resolves the baked slot to this vector; absent, live
+ * play keeps DISTILLED_WAIT_WEIGHTS_2026_07_10 byte-for-byte. An explicit V07_WAIT_WEIGHTS env still
+ * overrides both, and all-zero still disables the stage.
+ */
+export const SIDE_2X1_WAIT_WEIGHTS_2026_08_26: IWaitWeights = {
+    b: -0.66108,
+    w: [
+        -1.64024, -0.17362, 0.02142, 0.03505, -0.03155, -0.96937, -0.45262, -0.02098, 0.0029, -0.09882, -0.36499,
+        -0.17593, -0.01016, -0.32484, 0.41075, -0.06387, 0.85298, 0.74225, -0.18453, -0.29022, 1.45056, 2.0495, 0.04285,
+        -0.07706, -0.11349, 0.04071, -0.13763, 0.60739, -0.52451, 0.03304, -0.1691, 0.01468, 0.04242, -0.33417, 1.32892,
+        -0.01798, 0.21997, -0.11288, -0.49562, 0.01737, -0.12885,
+    ],
+};
+
+/**
  * v0.7 BAKED weight resolution (S1 sign-off): the committed DISTILLED_WAIT_WEIGHTS_2026_07_10 are the
  * BUILT-IN DEFAULT — no V07_WAIT_SCORER gate, no version scope: v0.7's scorer is always armed. An explicit
  * V07_WAIT_WEIGHTS env still overrides for experiments, and the scorer anchor is preserved: an ALL-ZERO
@@ -489,17 +509,22 @@ function loadWaitWeightsFrom(envVar: string): IWaitWeights | null {
  * or MALFORMED env falls back to the committed defaults — a bad env can never crash or silently de-bake live
  * play (loadV06Weights lineage). v0.6/v0.6s keep the env-gated waitWeightsForVersion path below untouched.
  */
-const bakedSlot: { raw: string | undefined | null; weights: IWaitWeights | null } = {
-    raw: null,
+const bakedSlot: { key: string | null; weights: IWaitWeights | null } = {
+    key: null,
     weights: DISTILLED_WAIT_WEIGHTS_2026_07_10,
 };
 export function v07BakedWaitWeights(): IWaitWeights | null {
     const raw = process.env.V07_WAIT_WEIGHTS;
-    if (raw !== bakedSlot.raw) {
-        bakedSlot.raw = raw;
+    const side2x1 = process.env.V08_SIDE_WAIT_2X1;
+    // Both envs key the cache: flipping either mid-process must re-resolve, exactly like the raw
+    // override always has.
+    const key = `${raw ?? "\u0000absent"}\u0001${side2x1 ?? ""}`;
+    if (key !== bakedSlot.key) {
+        bakedSlot.key = key;
+        const bakedDefault = side2x1 === "1" ? SIDE_2X1_WAIT_WEIGHTS_2026_08_26 : DISTILLED_WAIT_WEIGHTS_2026_07_10;
         const parsed = parseWaitWeights(raw);
         if (!parsed) {
-            bakedSlot.weights = DISTILLED_WAIT_WEIGHTS_2026_07_10;
+            bakedSlot.weights = bakedDefault;
         } else if (parsed.b === 0 && parsed.w.every((x) => x === 0)) {
             bakedSlot.weights = null;
         } else {
