@@ -412,6 +412,8 @@ export interface ISetupConditionalOptions {
     baseSeed: number;
     fightVersion: string;
     leagueGenomeSpec: string;
+    /** Play the LIVE side-oriented board (left/right deployment) instead of the classic top/bottom one. */
+    sideOriented?: boolean;
 }
 
 export interface ISetupConditionalRecord {
@@ -535,6 +537,7 @@ export function playSetupConditionalGame(
         redArtifactT2: upper.tier2Artifact,
         greenSynergies: lower.synergies,
         redSynergies: upper.synergies,
+        sideOrientedPlacement: options.sideOriented === true,
     });
     const a = aIsLower ? lower : upper;
     const b = aIsLower ? upper : lower;
@@ -1141,6 +1144,7 @@ async function runJobsConcurrent(
         gamesPerCell: options.gamesPerCell,
         baseSeed: options.baseSeed,
         fightVersion: options.fightVersion,
+        sideOriented: options.sideOriented,
         leagueGenomeSpec: options.leagueGenomeSpec,
     };
     await new Promise<void>((resolvePromise, rejectPromise) => {
@@ -1244,6 +1248,8 @@ export interface IMeasureSetupConditionalSummary {
         baseSeed: number;
         /** Stable identity used to prove that separately persisted panels are independent replications. */
         replicationId: string;
+        /** Present (true) when the battery ran the LIVE side-oriented board rather than the classic one. */
+        sideOriented?: boolean;
         concurrency: number;
         totalGames: number;
         pairing: {
@@ -1347,6 +1353,7 @@ export async function runMeasureSetupConditional(
             gamesPerCell: options.gamesPerCell,
             baseSeed: options.baseSeed,
             replicationId,
+            ...(options.sideOriented === true ? { sideOriented: true as const } : {}),
             concurrency: options.concurrency,
             totalGames: jobs.length,
             pairing: {
@@ -1379,6 +1386,7 @@ function printUsage(): void {
     console.log("  --replication-id stable independent-panel identity (default base-seed-<seed>)");
     console.log("  --concurrency    worker threads (default min(8, cores))");
     console.log("  --fight          fight AI version on BOTH sides (default v0.7, the live default)");
+    console.log("  --side           play the LIVE side-oriented board (left/right deployment zones)");
     console.log("  --league-genome  draft genome spec/path for the league cells (draft_ship.parseDraftGenome)");
     console.log("  --output         summary JSON path; use '-' for stdout");
 }
@@ -1392,6 +1400,7 @@ export async function main(): Promise<void> {
             "replication-id": { type: "string" },
             concurrency: { type: "string", default: String(Math.min(8, Math.max(1, availableParallelism()))) },
             fight: { type: "string", default: "v0.7" },
+            side: { type: "boolean", default: false },
             "league-genome": { type: "string", default: LEAGUE_ROUND3_DRAFT_SPEC },
             output: { type: "string" },
             help: { type: "boolean", short: "h", default: false },
@@ -1427,7 +1436,7 @@ export async function main(): Promise<void> {
     console.error(
         `CONDITIONAL_SETUP_V1 A/B: ${cells.length} cells x ${gamesPerCell} = ${total} games (seed ${baseSeed}, ` +
             `replication ${replicationId ?? `base-seed-${baseSeed >>> 0}`}, concurrency ${concurrency}, LIVETWIN=1, ` +
-            `fight ${values.fight} both sides, league ${leagueGenomeSpec})`,
+            `fight ${values.fight} both sides, board ${values.side ? "SIDE" : "classic"}, league ${leagueGenomeSpec})`,
     );
     const started = Date.now();
     let lastLogged = 0;
@@ -1437,6 +1446,7 @@ export async function main(): Promise<void> {
         replicationId,
         concurrency,
         fightVersion: values.fight,
+        sideOriented: values.side === true,
         leagueGenomeSpec,
         onProgress: (completed, totalJobs) => {
             if (completed - lastLogged >= Math.max(500, Math.floor(totalJobs / 25)) || completed === totalJobs) {
