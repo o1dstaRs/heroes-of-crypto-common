@@ -46,6 +46,8 @@ interface ISideAbGameSpec {
     candidateLeaf: { b: number; w: number[] } | null;
     /** Candidate wait-scorer weights or null = the current baked default. */
     candidateWait: { b: number; w: number[] } | null;
+    /** Candidate-seat B2 cancellation gate ({b, w, t}) or null = no veto stage. */
+    candidateCancel: { b: number; w: number[]; t: number } | null;
     /**
      * CONTROL-seat wait-scorer pin, or null = the current baked default. The deployed default moved to
      * the 2x1 refit, so measuring against the PREVIOUS v0.8 requires pinning its 2026-07-10 vector here.
@@ -95,6 +97,8 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
     delete process.env.V07_VALUE_WEIGHTS_V2_UPPER;
     delete process.env.V07_WAIT_WEIGHTS_LOWER;
     delete process.env.V07_WAIT_WEIGHTS_UPPER;
+    delete process.env.V08_WAIT_CANCEL_LOWER;
+    delete process.env.V08_WAIT_CANCEL_UPPER;
     const candidateSeatKey = spec.candidateTeam === PBTypes.TeamVals.LOWER ? "LOWER" : "UPPER";
     const controlSeatKey = spec.candidateTeam === PBTypes.TeamVals.LOWER ? "UPPER" : "LOWER";
     if (spec.candidateLeaf) {
@@ -105,6 +109,9 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
     }
     if (spec.controlWait) {
         process.env[`V07_WAIT_WEIGHTS_${controlSeatKey}`] = JSON.stringify(spec.controlWait);
+    }
+    if (spec.candidateCancel) {
+        process.env[`V08_WAIT_CANCEL_${candidateSeatKey}`] = JSON.stringify(spec.candidateCancel);
     }
     const roster = buildRoster(mulberry(spec.seed ^ 0x5f356495), undefined, undefined, undefined, "expBudget");
     const setup = { doctrine: Doctrine.SEE_NONE, augments: SETUP_POLICY_V0.pickAugments(7) };
@@ -185,6 +192,7 @@ async function main(): Promise<void> {
     const leafFile = readArg("--leaf-file");
     const waitFile = readArg("--wait-file");
     const controlWaitFile = readArg("--control-wait-file");
+    const cancelFile = readArg("--cancel-file");
     const candidatePolicy = readArg("--candidate-policy") ?? null;
     // The candidate seat's strategy version. NOTE: "v0.8s" is NOT policy-identical to v0.8 — it arms
     // the SEARCH measurement machinery, and a paired parity cell measured it at 27% under battery CPU
@@ -210,6 +218,9 @@ async function main(): Promise<void> {
     const controlWait = controlWaitFile
         ? (JSON.parse(readFileSync(controlWaitFile, "utf8")) as { b: number; w: number[] })
         : null;
+    const candidateCancel = cancelFile
+        ? (JSON.parse(readFileSync(cancelFile, "utf8")) as { b: number; w: number[]; t: number })
+        : null;
 
     const specs: ISideAbGameSpec[] = [];
     for (let pair = 0; pair < pairs; pair += 1) {
@@ -224,6 +235,7 @@ async function main(): Promise<void> {
                 candidateTeam,
                 candidateLeaf,
                 controlWait,
+                candidateCancel,
                 candidatePolicy,
                 candidateVersion,
                 candidateWait,
@@ -326,6 +338,7 @@ async function main(): Promise<void> {
         candidateLeaf: candidateLeaf ? "injected" : "shipped",
         candidateWait: candidateWait ? "injected" : "baked-default",
         controlWait: controlWait ? "pinned" : "baked-default",
+        candidateCancel: candidateCancel ? "injected" : "none",
         candidatePolicy: candidatePolicy ?? "none",
         candidateVersion,
         wallSeconds: Math.round((Date.now() - startedAt) / 1000),

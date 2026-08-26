@@ -835,6 +835,45 @@ export function consumeWaitReplacement(unitId: string): GameAction[] | undefined
     return replaced;
 }
 
+/**
+ * B2 CANCELLATION GATE (env candidate, default absent = inert): a second linear model over the SAME
+ * 41-dim basis, fit on the B2 oracle's counterfactual-labeled scorer-wait points, that vetoes a
+ * scorer wait when its cancel score clears the fitted threshold. Scoped EXACTLY to scorer-created
+ * waits (the fit's support); the strategic-rule's own waits are untouched. JSON {b, w[41], t} via
+ * `V08_WAIT_CANCEL`, with per-team `V08_WAIT_CANCEL_LOWER`/`_UPPER` taking precedence so the A/B
+ * battery can arm one seat (the process-global-env lesson from the router ladder).
+ */
+export interface IWaitCancelWeights extends IWaitWeights {
+    t: number;
+}
+
+export function parseWaitCancelWeights(raw: string | undefined): IWaitCancelWeights | null {
+    if (!raw) return null;
+    try {
+        const m = JSON.parse(raw);
+        if (
+            m &&
+            typeof m.b === "number" &&
+            Number.isFinite(m.b) &&
+            typeof m.t === "number" &&
+            Number.isFinite(m.t) &&
+            Array.isArray(m.w) &&
+            m.w.length === WAIT_FEATURE_NAMES.length &&
+            m.w.every((x: unknown) => typeof x === "number" && Number.isFinite(x))
+        ) {
+            return { b: m.b, w: m.w as number[], t: m.t };
+        }
+    } catch {
+        /* malformed -> null */
+    }
+    return null;
+}
+
+function waitCancelWeightsForTeam(team: TeamType): IWaitCancelWeights | null {
+    const perTeam = process.env[team === PBTypes.TeamVals.LOWER ? "V08_WAIT_CANCEL_LOWER" : "V08_WAIT_CANCEL_UPPER"];
+    return parseWaitCancelWeights(perTeam) ?? parseWaitCancelWeights(process.env.V08_WAIT_CANCEL);
+}
+
 export function applyWaitScorerWeights(
     unit: Unit,
     context: IDecisionContext,
@@ -858,6 +897,10 @@ export function applyWaitScorerWeights(
     const score = waitScore(weights, features);
     if (!Number.isFinite(score) || score <= 0) {
         return incumbent;
+    }
+    const cancel = waitCancelWeightsForTeam(unit.getTeam());
+    if (cancel && waitScore(cancel, features) >= cancel.t) {
+        return incumbent; // B2 veto: this scorer wait profiles as a labeled mistake — act instead.
     }
     if (process.env.B2_ORACLE === "1") {
         waitReplacementByUnit.set(unit.getId(), incumbent);
