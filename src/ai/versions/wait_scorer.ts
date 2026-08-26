@@ -486,10 +486,10 @@ function loadWaitWeightsFrom(envVar: string): IWaitWeights | null {
  * TEMPO terms sharpened against the mounted-class catalog (initiative-hold and react-last deepened).
  * CONFIRMED on 1,500 fresh-seed paired-seat pairs (seed 99000001, 2,892 decisive, both seats swapped,
  * axis-aware candidate on the SHIPPED leaf vs shipped axis-blind v0.8): pooled 58.30% [56.49-60.08] —
- * the Wilson floor clears the 55% ship bar; per map normal 59.2 / lava 61.2 / block 54.4. SHIP
- * CANDIDATE, default OFF: `V08_SIDE_WAIT_2X1=1` resolves the baked slot to this vector; absent, live
- * play keeps DISTILLED_WAIT_WEIGHTS_2026_07_10 byte-for-byte. An explicit V07_WAIT_WEIGHTS env still
- * overrides both, and all-zero still disables the stage.
+ * the Wilson floor clears the 55% ship bar; per map normal 59.2 / lava 61.2 / block 54.4. DEPLOYED
+ * (owner sign-off 2026-08-26): this vector IS the baked default. `V08_SIDE_WAIT_2X1=0` is the kill
+ * switch back to DISTILLED_WAIT_WEIGHTS_2026_07_10; an explicit V07_WAIT_WEIGHTS env still overrides
+ * both, and all-zero still disables the stage.
  */
 export const SIDE_2X1_WAIT_WEIGHTS_2026_08_26: IWaitWeights = {
     b: -0.66108,
@@ -521,7 +521,9 @@ export function v07BakedWaitWeights(): IWaitWeights | null {
     const key = `${raw ?? "\u0000absent"}\u0001${side2x1 ?? ""}`;
     if (key !== bakedSlot.key) {
         bakedSlot.key = key;
-        const bakedDefault = side2x1 === "1" ? SIDE_2X1_WAIT_WEIGHTS_2026_08_26 : DISTILLED_WAIT_WEIGHTS_2026_07_10;
+        // Deployed default (owner sign-off 2026-08-26): the 2x1-world refit, with "0" as the explicit
+        // kill switch back to the 2026-07-10 distillation.
+        const bakedDefault = side2x1 === "0" ? DISTILLED_WAIT_WEIGHTS_2026_07_10 : SIDE_2X1_WAIT_WEIGHTS_2026_08_26;
         const parsed = parseWaitWeights(raw);
         if (!parsed) {
             bakedSlot.weights = bakedDefault;

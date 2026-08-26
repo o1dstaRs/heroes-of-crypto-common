@@ -177,29 +177,28 @@ describe("v0.7 baked weight resolution", () => {
         expect(v07WaitWeightsV2SupportsInitialRangedCount(0)).toBe(false);
     });
 
-    it("defaults to the committed DISTILLED_WAIT_WEIGHTS_2026_07_10 with no env and no gate", () => {
-        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+    it("defaults to the DEPLOYED side-2x1 refit with no env and no gate", () => {
+        expect(v07BakedWaitWeights()).toEqual(SIDE_2X1_WAIT_WEIGHTS_2026_08_26);
         // The env-gated pattern's gate is NOT consulted — v0.7's scorer is always armed.
         process.env.V07_WAIT_SCORER = "off";
-        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+        expect(v07BakedWaitWeights()).toEqual(SIDE_2X1_WAIT_WEIGHTS_2026_08_26);
     });
 
-    it("V08_SIDE_WAIT_2X1=1 resolves the baked slot to the side-board 2x1 candidate", () => {
-        process.env.V08_SIDE_WAIT_2X1 = "1";
+    it("the 2x1-world refit IS the baked default, with V08_SIDE_WAIT_2X1=0 as the kill switch", () => {
         expect(v07BakedWaitWeights()).toEqual(SIDE_2X1_WAIT_WEIGHTS_2026_08_26);
-        // Only the exact "1" arms it; anything else keeps the shipped default byte-for-byte.
-        process.env.V08_SIDE_WAIT_2X1 = "true";
+        // Only the exact "0" reverts; any other value keeps the deployed default.
+        process.env.V08_SIDE_WAIT_2X1 = "0";
         expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+        process.env.V08_SIDE_WAIT_2X1 = "off";
+        expect(v07BakedWaitWeights()).toEqual(SIDE_2X1_WAIT_WEIGHTS_2026_08_26);
         delete process.env.V08_SIDE_WAIT_2X1;
-        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
-        // An explicit raw override still beats the gate, and all-zero still disables the stage.
-        process.env.V08_SIDE_WAIT_2X1 = "1";
+        expect(v07BakedWaitWeights()).toEqual(SIDE_2X1_WAIT_WEIGHTS_2026_08_26);
+        // An explicit raw override still beats the default, and all-zero still disables the stage.
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 3, w: zeroWeights() });
         expect(v07BakedWaitWeights()).toEqual({ b: 3, w: zeroWeights() });
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 0, w: zeroWeights() });
         expect(v07BakedWaitWeights()).toBeNull();
         delete process.env.V07_WAIT_WEIGHTS;
-        delete process.env.V08_SIDE_WAIT_2X1;
     });
 
     it("the 2x1 candidate itself is a well-formed, distinct 41-dim vector", () => {
@@ -218,11 +217,11 @@ describe("v0.7 baked weight resolution", () => {
         expect(v07BakedWaitWeights()).toBeNull();
     });
 
-    it("falls back to the committed defaults on malformed env — a bad env never de-bakes live play", () => {
+    it("falls back to the DEPLOYED defaults on malformed env — a bad env never de-bakes live play", () => {
         process.env.V07_WAIT_WEIGHTS = "{not json";
-        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+        expect(v07BakedWaitWeights()).toEqual(SIDE_2X1_WAIT_WEIGHTS_2026_08_26);
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1, w: [1, 2, 3] });
-        expect(v07BakedWaitWeights()).toEqual(DISTILLED_WAIT_WEIGHTS_2026_07_10);
+        expect(v07BakedWaitWeights()).toEqual(SIDE_2X1_WAIT_WEIGHTS_2026_08_26);
     });
 });
 
@@ -446,13 +445,12 @@ describe("v0.7 strategy — baked wait scorer", () => {
         const fightProperties = context.fightProperties!;
         expect(canWaitOnHourglassMirror(actor, fightProperties, context.unitsHolder.getAllUnits())).toBe(true);
         const score = waitScore(
-            DISTILLED_WAIT_WEIGHTS_2026_07_10,
+            SIDE_2X1_WAIT_WEIGHTS_2026_08_26,
             extractWaitFeatures(actor, context.unitsHolder, fightProperties, incumbent),
         );
         const actual = applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights());
         expect(actual).toEqual(score > 0 ? [{ type: "wait_turn", unitId: actor.getId() }] : incumbent);
         expect(score).not.toBe(0);
-        expect(score).toBeLessThan(0);
     });
 
     it("replaces an eligible action when the committed scorer is positive", () => {
@@ -506,7 +504,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
     it("applies the baked scorer after the full inherited v0.6 decision chain", () => {
         const { actor, context } = buildBoard();
         const incumbent = getAIStrategy("v0.6").decideTurn(actor, context);
-        const expected = applyWaitScorerWeights(actor, context, incumbent, DISTILLED_WAIT_WEIGHTS_2026_07_10);
+        const expected = applyWaitScorerWeights(actor, context, incumbent, SIDE_2X1_WAIT_WEIGHTS_2026_08_26);
         const strategy = getAIStrategy("v0.7");
         primeArmyProfile(strategy, context);
         expect(strategy.decideTurn(actor, context)).toEqual(expected);

@@ -36,7 +36,12 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // every trace holding one diverges from its placement on. Two isolated runs reproduced this value
 // byte-identically.
 // Previous approved digest: 5d5b7a69138fa716091e005b8850228e1118adbcc7264742a8a72b20bfa11a47
-const EXPECTED_REPLAY_SHA256 = "3735bb4d7dd68666c98600f0d569dc2b9c8de1845cdfc54244b094d352b1ba50";
+// Re-pinned 2026-08-26 for the DEPLOYED wait-scorer default: v07BakedWaitWeights now resolves to
+// SIDE_2X1_WAIT_WEIGHTS_2026_08_26 (owner sign-off; confirmed 58.30% vs shipped on 1,500 fresh-seed
+// pairs), so every v0.7-lineage seeded trace re-times its waits. Two isolated runs reproduced this
+// value byte-identically.
+// Previous approved digest: 3735bb4d7dd68666c98600f0d569dc2b9c8de1845cdfc54244b094d352b1ba50
+const EXPECTED_REPLAY_SHA256 = "16bdeb8e89b6705d7c08f18bc7c7fde614f47be7c57e3c64591571b8f07e8f7f";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
