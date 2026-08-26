@@ -44,6 +44,39 @@ describe("config_provider", () => {
         }
     });
 
+    /**
+     * A creature's catalog KEY and its `name` field are the same string, and the config layer relies on it:
+     * callers look a creature up by key and then read `name` back off the built properties.
+     *
+     * This is pinned because the invariant used to be patched around rather than held. A rename that landed
+     * in the code before the data (Ash Moth -> Wandering Mage) left `getCreatureConfig` carrying
+     * `creatureName === "Wandering Mage" ? creatureName : creatureConfig.name` — a branch that silently
+     * preferred the key for exactly one creature. The data was fixed later and the branch outlived it as a
+     * no-op, reading as though that creature were special when it was not.
+     *
+     * If this fails, the fix is the DATA: make the entry's `name` match its key. Do not reintroduce a
+     * per-creature branch — a mismatch is a catalog bug and should say so here rather than be absorbed
+     * silently at every call site.
+     */
+    it("names every creature exactly as its catalog key", () => {
+        const mismatches: string[] = [];
+        for (const [factionName, creatures] of objectEntries(creaturesJson)) {
+            if (factionName === "version" || !isRecord(creatures)) {
+                continue;
+            }
+
+            for (const [creatureName, creatureConfig] of Object.entries(creatures)) {
+                if (!isRecord(creatureConfig)) {
+                    continue;
+                }
+                if (creatureConfig.name !== creatureName) {
+                    mismatches.push(`${factionName}/${creatureName}: name=${String(creatureConfig.name)}`);
+                }
+            }
+        }
+        expect(mismatches).toEqual([]);
+    });
+
     it("builds creature configs for every creature catalog entry", () => {
         for (const [factionName, creatures] of objectEntries(creaturesJson)) {
             if (factionName === "version" || !isRecord(creatures)) {

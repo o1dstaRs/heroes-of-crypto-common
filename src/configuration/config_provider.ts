@@ -513,7 +513,7 @@ export const getCreatureConfig = (
 
     return new UnitProperties(
         ToFactionType[factionName],
-        creatureName === "Wandering Mage" ? creatureName : creatureConfig.name,
+        creatureConfig.name,
         creatureConfig.hp,
         creatureConfig.steps,
         morale,
