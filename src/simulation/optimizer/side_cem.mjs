@@ -18,10 +18,15 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..", "..");
-const TARGET = process.env.CEM_TARGET === "wait" ? "wait" : "leaf";
+const TARGET =
+    process.env.CEM_TARGET === "wait" ? "wait" : process.env.CEM_TARGET === "joint" ? "joint" : "leaf";
 // The frozen value leaf every WAIT evaluation rides on (absent = shipped leaf both seats).
 const BASE_LEAF = process.env.CEM_BASE_LEAF ?? "";
-const outDir = join(repoRoot, "sim-out", TARGET === "wait" ? "side_cem_wait" : "side_cem");
+const outDir = join(
+    repoRoot,
+    "sim-out",
+    TARGET === "wait" ? "side_cem_wait" : TARGET === "joint" ? "side_cem_joint" : "side_cem",
+);
 mkdirSync(outDir, { recursive: true });
 const statePath = join(outDir, "state.json");
 const bestPath = join(outDir, "best.json");
@@ -48,13 +53,22 @@ const log = (line) => {
 
 // The shipped vector = the CEM mean seed. Imported straight from the source module so the anchor
 // can never drift from what production actually runs (bun loads the TS module from .mjs directly).
-const EXPECTED_DIMS = TARGET === "wait" ? 41 : 60;
-// Wait mode seeds from the DEPLOYED default (the 2x1 refit), not the retired 2026-07-10 distillation:
-// the point of a further refit is to climb from what live play already runs.
+const EXPECTED_DIMS = TARGET === "wait" ? 41 : TARGET === "joint" ? 103 : 60;
+// Wait/joint modes seed from the DEPLOYED wait default (the 2x1 refit), not the retired 2026-07-10
+// distillation: the point of a further refit is to climb from what live play already runs.
+const waitModule = await import(join(repoRoot, "src", "ai", "versions", "wait_scorer.ts"));
+const leafModule = await import(join(repoRoot, "src", "ai", "versions", "v0_8_a13_profile.ts"));
+const deployedWait = waitModule.SIDE_2X1_WAIT_WEIGHTS_2026_08_26;
+const shippedLeaf = leafModule.V08_A13_VALUE_LEAF;
+// JOINT layout: [leaf.b, ...leaf.w(60), wait.b, ...wait.w(41)] — one flat 103-dim vector so the CEM
+// machinery stays untouched; evaluateLeaf splits it back into the two battery files. The top-level
+// b is unused ballast (kept zero-mean) so the shape matches the other modes.
 const shippedSource =
     TARGET === "wait"
-        ? (await import(join(repoRoot, "src", "ai", "versions", "wait_scorer.ts"))).SIDE_2X1_WAIT_WEIGHTS_2026_08_26
-        : (await import(join(repoRoot, "src", "ai", "versions", "v0_8_a13_profile.ts"))).V08_A13_VALUE_LEAF;
+        ? deployedWait
+        : TARGET === "joint"
+          ? { b: 0, w: [shippedLeaf.b, ...shippedLeaf.w, deployedWait.b, ...deployedWait.w] }
+          : shippedLeaf;
 const shipped = { b: shippedSource.b, w: [...shippedSource.w] };
 if (shipped.w.length !== EXPECTED_DIMS || shipped.w.some((weight) => !Number.isFinite(weight))) {
     throw new Error(`Parsed ${TARGET} vector malformed: ${shipped.w.length} dims`);
@@ -92,10 +106,20 @@ function evaluateLeaf(leaf, pairs, seed, label) {
     const leafFile = join(outDir, `cand_${label}.json`);
     const reportFile = join(outDir, `report_${label}.json`);
     writeFileSync(leafFile, JSON.stringify(leaf));
-    const vectorArgs =
-        TARGET === "wait"
-            ? [...(BASE_LEAF ? ["--leaf-file", BASE_LEAF] : []), "--wait-file", leafFile]
-            : ["--leaf-file", leafFile];
+    let vectorArgs;
+    if (TARGET === "joint") {
+        const leafPart = { b: leaf.w[0], w: leaf.w.slice(1, 61) };
+        const waitPart = { b: leaf.w[61], w: leaf.w.slice(62) };
+        const leafPartFile = join(outDir, `cand_${label}_leaf.json`);
+        const waitPartFile = join(outDir, `cand_${label}_wait.json`);
+        writeFileSync(leafPartFile, JSON.stringify(leafPart));
+        writeFileSync(waitPartFile, JSON.stringify(waitPart));
+        vectorArgs = ["--leaf-file", leafPartFile, "--wait-file", waitPartFile];
+    } else if (TARGET === "wait") {
+        vectorArgs = [...(BASE_LEAF ? ["--leaf-file", BASE_LEAF] : []), "--wait-file", leafFile];
+    } else {
+        vectorArgs = ["--leaf-file", leafFile];
+    }
     // Free-form battery args (e.g. "--candidate-policy public-roster --control-wait-file pin.json") so a
     // refit can run inside a COMPOSED candidate environment and against a pinned control.
     const extraArgs = (process.env.CEM_EXTRA_BATTERY_ARGS ?? "").split(" ").filter(Boolean);
