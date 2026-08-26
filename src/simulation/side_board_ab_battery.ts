@@ -56,6 +56,8 @@ interface ISideAbGameSpec {
      * placement, policy-armed exactly like the server's placementContextForTeam). Control never gets one.
      */
     candidatePolicy: string | null;
+    /** Candidate seat's strategy version (default v0.8; "v0.8s" = the measurement alias for scoped envs). */
+    candidateVersion: string;
     /** Classic bottom/top board instead of the side board (sanity baseline). */
     classic: boolean;
 }
@@ -107,8 +109,8 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
     const roster = buildRoster(mulberry(spec.seed ^ 0x5f356495), undefined, undefined, undefined, "expBudget");
     const setup = { doctrine: Doctrine.SEE_NONE, augments: SETUP_POLICY_V0.pickAugments(7) };
     const result = runMatch({
-        greenVersion: "v0.8",
-        redVersion: "v0.8",
+        greenVersion: spec.candidateTeam === PBTypes.TeamVals.LOWER ? spec.candidateVersion : "v0.8",
+        redVersion: spec.candidateTeam === PBTypes.TeamVals.LOWER ? "v0.8" : spec.candidateVersion,
         roster,
         seed: spec.seed,
         gridType: spec.gridType,
@@ -184,6 +186,11 @@ async function main(): Promise<void> {
     const waitFile = readArg("--wait-file");
     const controlWaitFile = readArg("--control-wait-file");
     const candidatePolicy = readArg("--candidate-policy") ?? null;
+    // The candidate seat's strategy version. "v0.8s" is the byte-identical measurement ALIAS of v0.8:
+    // running the candidate under it lets any VERSION-SCOPED env lever (V06_RIDER_EV_VERSIONS,
+    // V06_AREA_THROW_VERSIONS, ...) arm on the candidate seat only, while the control's "v0.8" stays
+    // out of scope — per-seat A/B for levers whose env is otherwise process-global.
+    const candidateVersion = readArg("--candidate-version") ?? "v0.8";
     const classic = args.includes("--classic");
     // --maps 4 or --maps 3,4 focuses the rotation on a subset of the live maps (grid type ints),
     // for per-map diagnostics; the default stays the full live rotation.
@@ -217,6 +224,7 @@ async function main(): Promise<void> {
                 candidateLeaf,
                 controlWait,
                 candidatePolicy,
+                candidateVersion,
                 candidateWait,
                 classic,
             });
@@ -318,6 +326,7 @@ async function main(): Promise<void> {
         candidateWait: candidateWait ? "injected" : "baked-default",
         controlWait: controlWait ? "pinned" : "baked-default",
         candidatePolicy: candidatePolicy ?? "none",
+        candidateVersion,
         wallSeconds: Math.round((Date.now() - startedAt) / 1000),
         errorSamples: errors.slice(0, 5),
     };
