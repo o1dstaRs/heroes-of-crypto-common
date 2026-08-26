@@ -49,9 +49,11 @@ const log = (line) => {
 // The shipped vector = the CEM mean seed. Imported straight from the source module so the anchor
 // can never drift from what production actually runs (bun loads the TS module from .mjs directly).
 const EXPECTED_DIMS = TARGET === "wait" ? 41 : 60;
+// Wait mode seeds from the DEPLOYED default (the 2x1 refit), not the retired 2026-07-10 distillation:
+// the point of a further refit is to climb from what live play already runs.
 const shippedSource =
     TARGET === "wait"
-        ? (await import(join(repoRoot, "src", "ai", "versions", "wait_scorer.ts"))).DISTILLED_WAIT_WEIGHTS_2026_07_10
+        ? (await import(join(repoRoot, "src", "ai", "versions", "wait_scorer.ts"))).SIDE_2X1_WAIT_WEIGHTS_2026_08_26
         : (await import(join(repoRoot, "src", "ai", "versions", "v0_8_a13_profile.ts"))).V08_A13_VALUE_LEAF;
 const shipped = { b: shippedSource.b, w: [...shippedSource.w] };
 if (shipped.w.length !== EXPECTED_DIMS || shipped.w.some((weight) => !Number.isFinite(weight))) {
@@ -94,6 +96,9 @@ function evaluateLeaf(leaf, pairs, seed, label) {
         TARGET === "wait"
             ? [...(BASE_LEAF ? ["--leaf-file", BASE_LEAF] : []), "--wait-file", leafFile]
             : ["--leaf-file", leafFile];
+    // Free-form battery args (e.g. "--candidate-policy public-roster --control-wait-file pin.json") so a
+    // refit can run inside a COMPOSED candidate environment and against a pinned control.
+    const extraArgs = (process.env.CEM_EXTRA_BATTERY_ARGS ?? "").split(" ").filter(Boolean);
     execFileSync(
         "bun",
         [
@@ -103,6 +108,7 @@ function evaluateLeaf(leaf, pairs, seed, label) {
             "--concurrency", String(CONC),
             "--output", reportFile,
             ...vectorArgs,
+            ...extraArgs,
         ],
         { cwd: repoRoot, stdio: ["ignore", "ignore", "inherit"], timeout: 3 * 3600 * 1000 },
     );

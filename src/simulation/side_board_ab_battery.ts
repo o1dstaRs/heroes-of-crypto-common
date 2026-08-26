@@ -26,6 +26,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { Worker, isMainThread, parentPort } from "node:worker_threads";
 
+import type { PlacementPolicyVariant } from "../ai/setup/setup_ship";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { Doctrine } from "../doctrines/doctrine_properties";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
@@ -43,8 +44,18 @@ interface ISideAbGameSpec {
     candidateTeam: number;
     /** Candidate 60-dim leaf ({b, w}) or null = candidate runs the shipped leaf too. */
     candidateLeaf: { b: number; w: number[] } | null;
-    /** Candidate wait-scorer weights or null = shipped DISTILLED_WAIT_WEIGHTS. */
+    /** Candidate wait-scorer weights or null = the current baked default. */
     candidateWait: { b: number; w: number[] } | null;
+    /**
+     * CONTROL-seat wait-scorer pin, or null = the current baked default. The deployed default moved to
+     * the 2x1 refit, so measuring against the PREVIOUS v0.8 requires pinning its 2026-07-10 vector here.
+     */
+    controlWait: { b: number; w: number[] } | null;
+    /**
+     * Candidate-seat placement policy (e.g. "public-roster" = the live ranked reveal-conditioned
+     * placement, policy-armed exactly like the server's placementContextForTeam). Control never gets one.
+     */
+    candidatePolicy: string | null;
     /** Classic bottom/top board instead of the side board (sanity baseline). */
     classic: boolean;
 }
@@ -83,11 +94,15 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
     delete process.env.V07_WAIT_WEIGHTS_LOWER;
     delete process.env.V07_WAIT_WEIGHTS_UPPER;
     const candidateSeatKey = spec.candidateTeam === PBTypes.TeamVals.LOWER ? "LOWER" : "UPPER";
+    const controlSeatKey = spec.candidateTeam === PBTypes.TeamVals.LOWER ? "UPPER" : "LOWER";
     if (spec.candidateLeaf) {
         process.env[`V07_VALUE_WEIGHTS_V2_${candidateSeatKey}`] = JSON.stringify(spec.candidateLeaf);
     }
     if (spec.candidateWait) {
         process.env[`V07_WAIT_WEIGHTS_${candidateSeatKey}`] = JSON.stringify(spec.candidateWait);
+    }
+    if (spec.controlWait) {
+        process.env[`V07_WAIT_WEIGHTS_${controlSeatKey}`] = JSON.stringify(spec.controlWait);
     }
     const roster = buildRoster(mulberry(spec.seed ^ 0x5f356495), undefined, undefined, undefined, "expBudget");
     const setup = { doctrine: Doctrine.SEE_NONE, augments: SETUP_POLICY_V0.pickAugments(7) };
@@ -104,6 +119,11 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
         redDoctrine: setup.doctrine,
         greenAugments: setup.augments,
         redAugments: setup.augments,
+        ...(spec.candidatePolicy
+            ? spec.candidateTeam === PBTypes.TeamVals.LOWER
+                ? { greenSetupPlacementPolicy: spec.candidatePolicy as PlacementPolicyVariant }
+                : { redSetupPlacementPolicy: spec.candidatePolicy as PlacementPolicyVariant }
+            : {}),
     });
     const candidateSide = spec.candidateTeam === PBTypes.TeamVals.LOWER ? "green" : "red";
     return {
@@ -162,6 +182,8 @@ async function main(): Promise<void> {
     const output = readArg("--output") ?? `sim-out/side_ab/side_ab_seed${baseSeed}_p${pairs}.json`;
     const leafFile = readArg("--leaf-file");
     const waitFile = readArg("--wait-file");
+    const controlWaitFile = readArg("--control-wait-file");
+    const candidatePolicy = readArg("--candidate-policy") ?? null;
     const classic = args.includes("--classic");
     // --maps 4 or --maps 3,4 focuses the rotation on a subset of the live maps (grid type ints),
     // for per-map diagnostics; the default stays the full live rotation.
@@ -177,6 +199,9 @@ async function main(): Promise<void> {
     }
     const candidateLeaf = leafFile ? (JSON.parse(readFileSync(leafFile, "utf8")) as { b: number; w: number[] }) : null;
     const candidateWait = waitFile ? (JSON.parse(readFileSync(waitFile, "utf8")) as { b: number; w: number[] }) : null;
+    const controlWait = controlWaitFile
+        ? (JSON.parse(readFileSync(controlWaitFile, "utf8")) as { b: number; w: number[] })
+        : null;
 
     const specs: ISideAbGameSpec[] = [];
     for (let pair = 0; pair < pairs; pair += 1) {
@@ -190,6 +215,8 @@ async function main(): Promise<void> {
                 gridType,
                 candidateTeam,
                 candidateLeaf,
+                controlWait,
+                candidatePolicy,
                 candidateWait,
                 classic,
             });
@@ -288,7 +315,9 @@ async function main(): Promise<void> {
         perMap,
         rejected,
         candidateLeaf: candidateLeaf ? "injected" : "shipped",
-        candidateWait: candidateWait ? "injected" : "shipped",
+        candidateWait: candidateWait ? "injected" : "baked-default",
+        controlWait: controlWait ? "pinned" : "baked-default",
+        candidatePolicy: candidatePolicy ?? "none",
         wallSeconds: Math.round((Date.now() - startedAt) / 1000),
         errorSamples: errors.slice(0, 5),
     };
