@@ -819,6 +819,22 @@ export function applyWaitScorer(
  * stage (versions/v0_7.ts finalizeDecision with v07BakedWaitWeights()). `weights` null is the anchor: the
  * exact `incumbent` reference is returned, byte-identical incumbent hourglass behavior.
  */
+/**
+ * B2 side channel (collection-only, armed by B2_ORACLE=1): when the scorer REPLACES an action with a
+ * wait, remember exactly what it replaced, keyed by unit id and consumed once. The Gate-1 oracle's
+ * degenerate {wait, wait} points then become scoreable {wait, replaced-action} pairs precisely where
+ * the deployed scorer created the wait — the labeled half of the wait-cancellation (B2) question that
+ * Gate-1 deliberately left to "B2's job". In-process only; never serialized; inert unless the env is
+ * armed, so live play and every existing pin stay byte-identical.
+ */
+const waitReplacementByUnit = new Map<string, GameAction[]>();
+
+export function consumeWaitReplacement(unitId: string): GameAction[] | undefined {
+    const replaced = waitReplacementByUnit.get(unitId);
+    waitReplacementByUnit.delete(unitId);
+    return replaced;
+}
+
 export function applyWaitScorerWeights(
     unit: Unit,
     context: IDecisionContext,
@@ -842,6 +858,9 @@ export function applyWaitScorerWeights(
     const score = waitScore(weights, features);
     if (!Number.isFinite(score) || score <= 0) {
         return incumbent;
+    }
+    if (process.env.B2_ORACLE === "1") {
+        waitReplacementByUnit.set(unit.getId(), incumbent);
     }
     return [{ type: "wait_turn", unitId: unit.getId() }];
 }

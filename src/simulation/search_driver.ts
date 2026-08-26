@@ -22,6 +22,7 @@ import {
 } from "../ai";
 import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import {
+    consumeWaitReplacement,
     canWaitOnHourglassMirror,
     extractWaitFeatures,
     extractWaitFeaturesV2Raw,
@@ -4533,7 +4534,7 @@ export class SearchDriver {
         unit: Unit,
         incumbent: readonly GameAction[],
         features: number[],
-        row: { iw: 0 | 1; ii: 0 | 1; rej: 0 | 1; y: 0 | 1; d: number | null },
+        row: { iw: 0 | 1; ii: 0 | 1; rej: 0 | 1; y: 0 | 1; d: number | null; cf?: 0 | 1 },
     ): void {
         if (this.datasetV2) {
             this.datasetRows.push(
@@ -4548,6 +4549,7 @@ export class SearchDriver {
                     unit: unit.getName(),
                     incumbentKind: waitIncumbentKindOf(incumbent),
                     incumbentWait: row.iw,
+                    counterfactualWait: row.cf ?? 0,
                     incumbentIllegal: row.ii,
                     waitRejected: row.rej,
                     label: row.y,
@@ -4574,6 +4576,7 @@ export class SearchDriver {
                 u: unit.getName(),
                 k: classifyActions(incumbent),
                 iw: row.iw,
+                cf: row.cf ?? 0,
                 rej: row.rej,
                 y: row.y,
                 d: row.d === null ? null : Number(row.d.toFixed(5)),
@@ -4592,6 +4595,43 @@ export class SearchDriver {
     private oracle(unit: Unit, incumbent: GameAction[], seedBase: number, t0: number): GameAction[] {
         const c = this.counters;
         if (incumbent.some((a) => a.type === "wait_turn")) {
+            // B2 (armed by B2_ORACLE=1): where the deployed wait SCORER created this wait, its side
+            // channel carries the exact action it replaced — score {wait, replaced} to the same
+            // end-of-lap horizon and label whether keeping the wait was right. Collection-only: the
+            // live decision is never changed here, so trajectories stay on-policy.
+            const replaced = process.env.B2_ORACLE === "1" ? consumeWaitReplacement(unit.getId()) : undefined;
+            if (replaced && !replaced.some((a) => a.type === "wait_turn")) {
+                c.q2oPoints += 1;
+                c.q2oIncumbentWait += 1;
+                const datasetFeatures = this.datasetPath ? this.datasetFeaturesOf(unit, incumbent) : undefined;
+                const means = this.scoreCandidates(
+                    unit,
+                    [
+                        // Order fixed: [0] = the standing wait, [1] = the action the scorer replaced.
+                        { kind: "wait", actions: incumbent },
+                        { kind: "incumbent", actions: replaced },
+                    ],
+                    seedBase,
+                    "lap",
+                );
+                const waitIllegal = means[0] === -Infinity;
+                const replacedIllegal = means[1] === -Infinity;
+                if (datasetFeatures) {
+                    // d keeps the file's wait-minus-act semantics; y = 1 iff the wait STANDS.
+                    const delta = waitIllegal || replacedIllegal ? null : means[0] - means[1];
+                    this.pushDatasetRow(unit, incumbent, datasetFeatures, {
+                        iw: 1,
+                        cf: 1,
+                        ii: replacedIllegal ? 1 : 0,
+                        rej: waitIllegal ? 1 : 0,
+                        y: delta !== null && delta < -this.gate ? 0 : 1,
+                        d: delta,
+                    });
+                }
+                const ms = performance.now() - t0;
+                c.msTotal += ms;
+                return incumbent;
+            }
             // Degenerate {wait, wait} point: the policy already waits; there is no "act" branch to score.
             c.q2oPoints += 1;
             c.q2oIncumbentWait += 1;
