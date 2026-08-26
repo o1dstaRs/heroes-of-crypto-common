@@ -186,10 +186,11 @@ async function main(): Promise<void> {
     const waitFile = readArg("--wait-file");
     const controlWaitFile = readArg("--control-wait-file");
     const candidatePolicy = readArg("--candidate-policy") ?? null;
-    // The candidate seat's strategy version. "v0.8s" is the byte-identical measurement ALIAS of v0.8:
-    // running the candidate under it lets any VERSION-SCOPED env lever (V06_RIDER_EV_VERSIONS,
-    // V06_AREA_THROW_VERSIONS, ...) arm on the candidate seat only, while the control's "v0.8" stays
-    // out of scope — per-seat A/B for levers whose env is otherwise process-global.
+    // The candidate seat's strategy version. NOTE: "v0.8s" is NOT policy-identical to v0.8 — it arms
+    // the SEARCH measurement machinery, and a paired parity cell measured it at 27% under battery CPU
+    // contention (wall-clock search deadlines starve). Use it only to A/B search itself on an
+    // otherwise-idle host; per-seat testing of version-scoped env levers needs a per-team env seam
+    // instead (the wait/leaf seam pattern).
     const candidateVersion = readArg("--candidate-version") ?? "v0.8";
     const classic = args.includes("--classic");
     // --maps 4 or --maps 3,4 focuses the rotation on a subset of the live maps (grid type ints),
