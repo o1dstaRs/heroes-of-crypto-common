@@ -206,22 +206,31 @@ describe("rectangular footprints end to end", () => {
                 process.env.V08_A19_SEARCH = previousSearch;
             }
         }
-    });
+    }, 120_000);
 
     /**
      * The two new systems together: rectangular bodies on the SIDE-oriented board, across every live
      * grid type. The side board turns the axis of advance to X, which is exactly the axis a 2x1 body
      * spans — the pairing where anchor/edge mistakes surface that neither feature shows alone.
      */
-    test("rectangles on the side-oriented board play every live map with no illegal action", () => {
-        const previous = process.env[FOOTPRINT_OVERRIDE_ENV];
-        process.env[FOOTPRINT_OVERRIDE_ENV] = "White Tiger=2x1,Hyena=1x2";
-        try {
-            for (const gridType of [1, 3, 4]) {
+    /**
+     * The side board turns the axis of advance to X — exactly the axis a 2x1 spans — so it is where anchor
+     * and edge mistakes surface that neither feature shows alone. One test PER MAP rather than a loop: as a
+     * single case the three matches ran ~44s on CI's slower runner and blew the 30s per-test budget, while
+     * each map on its own sits well inside it. Same maps, same seeds, same laps, same assertions.
+     */
+    for (const [gridType, mapName] of [
+        [1, "normal"],
+        [3, "water centre"],
+        [4, "block centre"],
+    ] as const) {
+        test(`rectangles on the side-oriented ${mapName} map play with no illegal action`, () => {
+            withRectangularFootprints(() => {
                 const result = runMatch({
                     roster: MIXED_ROSTER,
                     greenVersion: "v0.8",
                     redVersion: "v0.8",
+                    // Unchanged from when the three maps shared one test, so each keeps its exact match.
                     seed: 4_120_090 + gridType,
                     maxLaps: 24,
                     gridType,
@@ -230,15 +239,12 @@ describe("rectangular footprints end to end", () => {
                 expect(result.totalActions).toBeGreaterThan(0);
                 expect(describeRejections(result)).toBe("");
                 expect((result.rejectedGreen ?? 0) + (result.rejectedRed ?? 0)).toBe(0);
-            }
-        } finally {
-            if (previous === undefined) {
-                delete process.env[FOOTPRINT_OVERRIDE_ENV];
-            } else {
-                process.env[FOOTPRINT_OVERRIDE_ENV] = previous;
-            }
-        }
-    });
+            });
+            // A real v0.8-vs-v0.8 match, per the preload's rule that genuine multi-game simulations carry
+            // their own budget. The heaviest map projects to ~22s on CI's runner, which is too little
+            // headroom under the 30s default when a load spike lands on it.
+        }, 60_000);
+    }
 
     test("without the override the shapes are the SHIPPED ones: mounted 2x1, everything else square", () => {
         const result = runMatch({
