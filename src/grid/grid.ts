@@ -24,6 +24,12 @@ export class Grid {
     private cellsByUnitId: { [unitId: string]: XY[] } = {};
     private unitIdToTeam: { [unitId: string]: number } = {};
     private boardAggrPerTeam: Map<number, number[][]> = new Map();
+    /**
+     * Canonical numeric board for the current grid epoch. getMatrix retains its historical fresh-result
+     * contract by cloning this value; every operation that can change occupancy or terrain invalidates it.
+     * Battle rollback treats it as derived state and clears it after restoring the authoritative fields.
+     */
+    private matrixCache: number[][] | undefined;
     private gridType: GridType;
     private readonly boardCoord: string[][];
     private readonly gridSettings: GridSettings;
@@ -114,6 +120,7 @@ export class Grid {
                 }
             }
             this.cleanedUpCenter = true;
+            this.invalidateMatrixCache();
         }
     }
     // Clear ONE of the two BLOCK_CENTER mountains (left/right) to walkable once its hit points run out.
@@ -139,6 +146,7 @@ export class Grid {
                 this.boardCoord[row][column] = NO_UNIT;
             }
         }
+        this.invalidateMatrixCache();
         return true;
     }
     /** Packed cell key. GRID_SIZE is 16, so a byte per axis is ample and the key stays a small int. */
@@ -183,6 +191,7 @@ export class Grid {
         for (const cell of this.scatteredMountainLayout) {
             this.boardCoord[cell.x][cell.y] = "B";
         }
+        this.invalidateMatrixCache();
     }
     public hasScatteredMountains(): boolean {
         return this.scatteredMountainLayout.length > 0;
@@ -203,6 +212,7 @@ export class Grid {
         if (this.boardCoord[x]?.[y] === "B") {
             this.boardCoord[x][y] = NO_UNIT;
         }
+        this.invalidateMatrixCache();
         return true;
     }
     /** Destroy every standing scattered mountain contained in the supplied cells. */
@@ -252,6 +262,7 @@ export class Grid {
         this.cleanedUpCenter = false;
         this.leftMountainCleared = false;
         this.rightMountainCleared = false;
+        this.invalidateMatrixCache();
     }
     public areCellsAdjacent(cells1: XY[], cells2: XY[]): boolean {
         if (!cells1.length || !cells2.length) {
@@ -279,6 +290,7 @@ export class Grid {
         return this.cellsByUnitId[unitId] ? this.cellsByUnitId[unitId].map((cell) => ({ ...cell })) : [];
     }
     public cleanupAll(unitId: string, attackRange: number, isSmallUnit: boolean) {
+        this.invalidateMatrixCache();
         const occupiedCells = this.cellsByUnitId[unitId];
         const team = this.unitIdToTeam[unitId];
         // delete this.unitIdToTeam[unitId];
@@ -345,6 +357,7 @@ export class Grid {
         }
 
         this.unitIdToTeam[unitId] = team;
+        this.invalidateMatrixCache();
 
         // console.log(`${unitId} TRY OCCUPY ${cell.x} ${cell.y}`);
 
@@ -452,6 +465,7 @@ export class Grid {
     public occupyByHole(cell: XY) {
         if (isCellWithinGrid(this.gridSettings, cell)) {
             this.boardCoord[cell.x][cell.y] = "H";
+            this.invalidateMatrixCache();
         }
     }
     public getAggrMatrixByTeam(team: number): number[][] | undefined {
@@ -480,6 +494,7 @@ export class Grid {
         }
 
         this.unitIdToTeam[unitId] = team;
+        this.invalidateMatrixCache();
 
         for (const c of cells) {
             if (!isCellWithinGrid(this.gridSettings, c)) {
@@ -707,17 +722,46 @@ export class Grid {
             }
         }
     }
+    /** @internal Clear the derived numeric board after authoritative state is restored out-of-band. */
+    public invalidateMatrixCache(): void {
+        this.matrixCache = undefined;
+    }
     /**
-     * Always generates a new two-dimensional array
+     * Always returns a fresh two-dimensional array. Offline simulations may opt into retaining one canonical
+     * matrix for the current grid epoch because a single AI decision reads the unchanged board several times.
+     * Live matches keep the historical rebuild path so a benchmark-only speedup cannot alter wall-clock search.
      */
     public getMatrix(): number[][] {
-        const matrix: number[][] = new Array(this.gridSettings.getGridSize());
-        for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
-            const rowNumbers: number[] = new Array(this.gridSettings.getGridSize());
-            for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
-                rowNumbers[row] = this.getOccupantNumeric(row, column);
+        const cacheEnabled = process.env.SIM_GRID_MATRIX_CACHE === "1" || process.env.GRID_MATRIX_CACHE_VERIFY === "1";
+        if (!cacheEnabled) {
+            // Keep the production path structurally identical to the historical implementation: the live A19
+            // deadline is wall-clock bounded, so even an otherwise-safe loop optimization can alter decisions.
+            const matrix: number[][] = new Array(this.gridSettings.getGridSize());
+            for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
+                const rowNumbers: number[] = new Array(this.gridSettings.getGridSize());
+                for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
+                    rowNumbers[row] = this.getOccupantNumeric(row, column);
+                }
+                matrix[column] = rowNumbers;
             }
-            matrix[column] = rowNumbers;
+            return matrix;
+        }
+        const gridSize = this.gridSettings.getGridSize();
+        if (!this.matrixCache) {
+            const canonical: number[][] = new Array(gridSize);
+            for (let column = gridSize - 1; column >= 0; column--) {
+                const rowNumbers: number[] = new Array(gridSize);
+                for (let row = 0; row < gridSize; row++) {
+                    rowNumbers[row] = this.getOccupantNumeric(row, column);
+                }
+                canonical[column] = rowNumbers;
+            }
+            this.matrixCache = canonical;
+        }
+
+        const matrix: number[][] = new Array(gridSize);
+        for (let column = gridSize - 1; column >= 0; column--) {
+            matrix[column] = this.matrixCache[column].slice();
         }
         return matrix;
     }

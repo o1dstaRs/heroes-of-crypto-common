@@ -235,4 +235,51 @@ describe("Grid Aggregation Matrix Tests", () => {
         expect(logs[0]).toContain("x");
         expect(logs[0]).toContain("H");
     });
+
+    test("numeric matrix caching preserves fresh results and invalidates on occupancy and terrain changes", () => {
+        const previousCacheFlag = process.env.SIM_GRID_MATRIX_CACHE;
+        process.env.SIM_GRID_MATRIX_CACHE = "1";
+        const cached = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
+        const first = cached.getMatrix();
+        const second = cached.getMatrix();
+
+        expect(second).toEqual(first);
+        expect(second).not.toBe(first);
+        expect(second[0]).not.toBe(first[0]);
+        first[0][0] = 999;
+        expect(cached.getMatrix()[0][0]).toBe(0);
+
+        expect(cached.occupyCell({ x: 2, y: 3 }, "small", PBTypes.TeamVals.LOWER, 1, false, false)).toBe(true);
+        expect(cached.getMatrix()[3][2]).toBe(PBTypes.TeamVals.LOWER);
+        expect(cached.occupyCell({ x: 4, y: 5 }, "small", PBTypes.TeamVals.LOWER, 1, false, false)).toBe(true);
+        expect(cached.getMatrix()[3][2]).toBe(0);
+        expect(cached.getMatrix()[5][4]).toBe(PBTypes.TeamVals.LOWER);
+        cached.cleanupAll("small", 1, true);
+        expect(cached.getMatrix()[5][4]).toBe(0);
+
+        cached.occupyByHole({ x: 1, y: 1 });
+        expect(cached.getMatrix()[1][1]).toBe(ObstacleType.HOLE);
+
+        cached.refreshWithNewType(PBTypes.GridVals.LAVA_CENTER);
+        const lavaCell = { x: 6, y: 7 };
+        expect(cached.getMatrix()[lavaCell.y][lavaCell.x]).toBe(ObstacleType.LAVA);
+        cached.cleanupCenterObstacle();
+        expect(cached.getMatrix()[lavaCell.y][lavaCell.x]).toBe(0);
+
+        cached.refreshWithNewType(PBTypes.GridVals.BLOCK_CENTER);
+        const leftMountain = { x: 5, y: 7 };
+        expect(cached.getMatrix()[leftMountain.y][leftMountain.x]).toBe(ObstacleType.BLOCK);
+        expect(cached.clearMountainSide(false)).toBe(true);
+        expect(cached.getMatrix()[leftMountain.y][leftMountain.x]).toBe(0);
+
+        const scattered = { x: 3, y: 7 };
+        cached.refreshWithNewType(PBTypes.GridVals.BLOCK_CENTER);
+        cached.setScatteredMountains([scattered]);
+        expect(cached.getMatrix()[scattered.y][scattered.x]).toBe(ObstacleType.BLOCK);
+        expect(cached.clearScatteredMountainAt(scattered.x, scattered.y)).toBe(true);
+        expect(cached.getMatrix()[scattered.y][scattered.x]).toBe(0);
+
+        if (previousCacheFlag === undefined) delete process.env.SIM_GRID_MATRIX_CACHE;
+        else process.env.SIM_GRID_MATRIX_CACHE = previousCacheFlag;
+    });
 });
