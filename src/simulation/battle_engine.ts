@@ -301,6 +301,13 @@ export interface IMatchConfig {
      * routing; research tournaments use a one-team scope when entrant and control share the same version label.
      */
     searchTeamScope?: readonly TeamType[];
+    /**
+     * Research: physical teams whose promoted-search decisions run through a SECOND A19 driver built
+     * with `V08_A19_SEARCH_ENV_OVERRIDES` merged into the hermetic profile; every other seat keeps the
+     * exact stock driver (constructed with the override withheld). Inert without both the teams and the
+     * env being set.
+     */
+    searchEnvOverrideTeams?: readonly TeamType[];
     /** Emit only lifecycle/destruction events required to drive an in-process simulation. */
     headlessEvents?: boolean;
     /** Board layout for this match. Defaults to NORMAL (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER). */
@@ -959,6 +966,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // select rollout profiles and V07_SEARCH/Q2_* retain their isolated research modes. All paths share the
     // lookahead dependency seam; candidate enumeration, paired-seed rollouts, override gate and SEARCH_AUDIT
     // live in ./search_driver.ts.
+    // The STOCK driver must never absorb a research override aimed at the override arm below: withhold
+    // the env during its construction and restore it after, so the two arms differ by exactly the
+    // overridden knobs.
+    const withheldSearchEnvOverrides = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+    if (withheldSearchEnvOverrides !== undefined) {
+        delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+    }
     const search = config.searchScoredDecisionObserver
         ? new SearchDriver(
               driverDeps,
@@ -971,6 +985,18 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
           : shouldUseDefaultV08A19Search(searchMatch)
             ? createV08A19SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver)
             : new SearchDriver(driverDeps, searchMatch, undefined, config.searchPassiveProductiveProbeObserver);
+    if (withheldSearchEnvOverrides !== undefined) {
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = withheldSearchEnvOverrides;
+    }
+    const searchEnvOverrideTeams = new Set(config.searchEnvOverrideTeams ?? []);
+    const searchEnvOverrideSearch =
+        searchEnvOverrideTeams.size &&
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES &&
+        !config.searchScoredDecisionObserver &&
+        !a13Rollback &&
+        shouldUseDefaultV08A19Search(searchMatch)
+            ? createV08A19SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver)
+            : undefined;
     const v08A13TrajectoryTeams = new Set(config.searchV08A13TrajectoryTeams ?? []);
     const v08A13TrajectorySearch =
         config.searchScoredDecisionObserver && v08A13TrajectoryTeams.size
@@ -1323,13 +1349,18 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // The per-unit pin is an authoritative control invariant, not merely a version default. An
         // experimental `SEARCH_VERSIONS=v0.1` must not put a mindless live turn back through a generic
         // selector, and the separate trajectory driver must obey the same boundary.
-        const searchApplies = !mindlessUnit && search.appliesTo(strategy.version, unit.getTeam());
+        const envOverrideSearchApplies =
+            !mindlessUnit &&
+            searchEnvOverrideTeams.has(unit.getTeam()) &&
+            searchEnvOverrideSearch?.appliesTo(strategy.version, unit.getTeam()) === true;
+        const searchApplies =
+            !mindlessUnit && !envOverrideSearchApplies && search.appliesTo(strategy.version, unit.getTeam());
         const trajectorySearchApplies =
             !mindlessUnit &&
             v08A13TrajectoryTeams.has(unit.getTeam()) &&
             v08A13TrajectorySearch?.appliesTo(strategy.version, unit.getTeam()) === true;
         const decisionPathCatalog =
-            searchApplies || trajectorySearchApplies
+            searchApplies || envOverrideSearchApplies || trajectorySearchApplies
                 ? createDecisionPathCatalog(grid, pathHelper, unit, matrix, config.decisionObserver !== undefined)
                 : undefined;
         // Strategy policy events describe the incumbent before SearchDriver arbitration. Buffer them until
@@ -1357,7 +1388,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         };
         const lookaheadApplies = !mindlessUnit && lookahead.enabled && strategy.version === "v0.5";
         const targetMemoryBeforeDecision =
-            searchApplies || trajectorySearchApplies || lookaheadApplies
+            searchApplies || envOverrideSearchApplies || trajectorySearchApplies || lookaheadApplies
                 ? captureAITargetMemory(unitsHolder)
                 : undefined;
         const v09ServerPreflightStartedAt =
@@ -1365,7 +1396,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const decided0 = strategy.decideTurn(unit, decisionContext);
         let v09ServerPreflightObservation: IV09ServerPreflightTimingObservation | undefined;
         if (v09ServerPreflightStartedAt !== undefined) {
-            if (searchApplies || trajectorySearchApplies || lookaheadApplies) {
+            if (searchApplies || envOverrideSearchApplies || trajectorySearchApplies || lookaheadApplies) {
                 throw new Error("v0.9 server preflight timing requires a native policy decision without search");
             }
             const decisionCompletedAt = performance.now();
@@ -1391,11 +1422,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // policy inside the simulation, but plays its real turns un-searched). Default OFF -> decided0.
         // The v0.7 SearchDriver gates by SEARCH_VERSIONS (default "v0.6s") the same way, so a
         // `v0.6s vs v0.6` mirror measures exactly "v0.6 + rollout search vs plain v0.6".
-        const shadowDecision = searchApplies
-            ? search.chooseDecision(unit, strategy.version, decided0, decisionContext)
-            : lookaheadApplies
-              ? lookahead.chooseDecision(unit, decided0)
-              : decided0;
+        const shadowDecision = envOverrideSearchApplies
+            ? searchEnvOverrideSearch!.chooseDecision(unit, strategy.version, decided0, decisionContext)
+            : searchApplies
+              ? search.chooseDecision(unit, strategy.version, decided0, decisionContext)
+              : lookaheadApplies
+                ? lookahead.chooseDecision(unit, decided0)
+                : decided0;
         if (config.searchShadowOnly && shadowDecision !== decided0) {
             throw new Error("offline v0.9 teacher SearchDriver escaped SEARCH_OBSERVE_ONLY shadow mode");
         }
@@ -1428,7 +1461,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 config.policyEventObserver(event);
             }
         }
-        if ((searchApplies || trajectorySearchApplies || lookaheadApplies) && decided !== decided0) {
+        if (
+            (searchApplies || envOverrideSearchApplies || trajectorySearchApplies || lookaheadApplies) &&
+            decided !== decided0
+        ) {
             restoreAITargetMemory(unitsHolder, targetMemoryBeforeDecision!);
             const executedAttack = [...decided]
                 .reverse()

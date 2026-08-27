@@ -48,6 +48,10 @@ interface ISideAbGameSpec {
     candidateWait: { b: number; w: number[] } | null;
     /** Candidate-seat B2 cancellation gate ({b, w, t}) or null = no veto stage. */
     candidateCancel: { b: number; w: number[]; t: number } | null;
+    /** Arm the candidate seat's promoted-search env-override driver (V08_A19_SEARCH_ENV_OVERRIDES). */
+    candidateSearchOverrides: boolean;
+    /** Run BOTH seats on deterministic search work budgets (machine-independent knob A/Bs). */
+    deterministicSearch: boolean;
     /**
      * CONTROL-seat wait-scorer pin, or null = the current baked default. The deployed default moved to
      * the 2x1 refit, so measuring against the PREVIOUS v0.8 requires pinning its 2026-07-10 vector here.
@@ -133,6 +137,8 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
                 ? { greenSetupPlacementPolicy: spec.candidatePolicy as PlacementPolicyVariant }
                 : { redSetupPlacementPolicy: spec.candidatePolicy as PlacementPolicyVariant }
             : {}),
+        ...(spec.candidateSearchOverrides ? { searchEnvOverrideTeams: [spec.candidateTeam] } : {}),
+        ...(spec.deterministicSearch ? { searchOfflineDeterministicWork: true } : {}),
     });
     const candidateSide = spec.candidateTeam === PBTypes.TeamVals.LOWER ? "green" : "red";
     return {
@@ -193,6 +199,16 @@ async function main(): Promise<void> {
     const waitFile = readArg("--wait-file");
     const controlWaitFile = readArg("--control-wait-file");
     const cancelFile = readArg("--cancel-file");
+    // Promoted-search knob A/B: --search-overrides '{"SEARCH_ROLLOUTS":"4",...}' arms the candidate
+    // seat's decisions with a SECOND A19 driver whose hermetic env has these keys merged last; the
+    // control seat keeps the exact stock driver. --deterministic-search puts BOTH seats on the
+    // work-budget deadline semantics so knob deltas are machine/load-independent.
+    const searchOverrides = readArg("--search-overrides") ?? null;
+    if (searchOverrides) {
+        JSON.parse(searchOverrides); // fail fast on malformed input before any games run
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = searchOverrides;
+    }
+    const deterministicSearch = args.includes("--deterministic-search");
     const candidatePolicy = readArg("--candidate-policy") ?? null;
     // The candidate seat's strategy version. NOTE: "v0.8s" is NOT policy-identical to v0.8 — it arms
     // the SEARCH measurement machinery, and a paired parity cell measured it at 27% under battery CPU
@@ -236,6 +252,8 @@ async function main(): Promise<void> {
                 candidateLeaf,
                 controlWait,
                 candidateCancel,
+                candidateSearchOverrides: !!searchOverrides,
+                deterministicSearch,
                 candidatePolicy,
                 candidateVersion,
                 candidateWait,
@@ -339,6 +357,8 @@ async function main(): Promise<void> {
         candidateWait: candidateWait ? "injected" : "baked-default",
         controlWait: controlWait ? "pinned" : "baked-default",
         candidateCancel: candidateCancel ? "injected" : "none",
+        candidateSearchOverrides: searchOverrides ?? "none",
+        deterministicSearch,
         candidatePolicy: candidatePolicy ?? "none",
         candidateVersion,
         wallSeconds: Math.round((Date.now() - startedAt) / 1000),

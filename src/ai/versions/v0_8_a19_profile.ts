@@ -84,8 +84,34 @@ export const V08_A19_PROFILE = Object.freeze({
 });
 
 /** Build the complete sealed A19 environment used by default v0.8 rollout-search runtimes. */
+/**
+ * Research override seam for the hermetic promoted-search environment. `V08_A19_SEARCH_ENV_OVERRIDES`
+ * (a JSON object of env-key -> string) merges LAST, so a measurement can vary individual knobs
+ * (SEARCH_ROLLOUTS, SEARCH_SHORTLIST, SEARCH_MAX_MELEE, ...) while everything else stays the exact
+ * promoted profile. Absent (production) the environment is byte-identical; a malformed value THROWS —
+ * a silently ignored override would fake the A/B (SEARCH_OPP_MODEL precedent).
+ */
 export function buildV08A19SearchEnvironment(): Readonly<Record<string, string | undefined>> {
-    return buildV08A19H64FinalistV6SearchEnvironment();
+    const base = buildV08A19H64FinalistV6SearchEnvironment();
+    const raw = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+    if (!raw) {
+        return base;
+    }
+    let overrides: unknown;
+    try {
+        overrides = JSON.parse(raw);
+    } catch {
+        throw new Error(`V08_A19_SEARCH_ENV_OVERRIDES is not valid JSON: ${raw}`);
+    }
+    if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
+        throw new Error("V08_A19_SEARCH_ENV_OVERRIDES must be a JSON object of env-key -> string");
+    }
+    for (const [key, value] of Object.entries(overrides)) {
+        if (typeof value !== "string") {
+            throw new Error(`V08_A19_SEARCH_ENV_OVERRIDES.${key} must be a string`);
+        }
+    }
+    return Object.freeze({ ...base, ...(overrides as Record<string, string>) });
 }
 
 /** Create fresh match-local placement state around the native v0.8 combat strategy. */
