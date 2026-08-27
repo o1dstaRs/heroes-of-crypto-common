@@ -462,6 +462,9 @@ function findRangeAttackAction(
     const unitTeam = unit.getTeam();
     const enemyTeam = unitTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
 
+    // Hoisted: getCells() rebuilds the footprint array on every call, and the friendly-screen check
+    // below runs inside the full board scan.
+    const unitBodyCells = unit.getCells();
     const isAOEAttacker = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
     const isThroughShot = unit.hasAbilityActive("Through Shot");
     const isDoubleShot = hasDoubleShotAbility(unit);
@@ -511,7 +514,7 @@ function findRangeAttackAction(
             if (
                 !isAOEAttacker &&
                 !isThroughShot &&
-                isLineBlockedByFriendlyUnit(unitCell, targetCell, matrix, unitTeam, unit.getCells())
+                isLineBlockedByFriendlyUnit(unitCell, targetCell, matrix, unitTeam, unitBodyCells)
             ) {
                 continue;
             }
