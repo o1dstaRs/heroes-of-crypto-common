@@ -627,6 +627,12 @@ export interface ISetupConditionalCellSummary {
     winsB: number;
     decisive: number;
     draws: number;
+    /**
+     * Paired side-swap clusters whose two halves disagreed, on a CONTROL cell only — where the two arms
+     * are the same configuration, so a divergence is the harness reporting on itself rather than a real
+     * effect. Absent on non-control cells, where a disagreement is the signal being measured.
+     */
+    controlPairsDiverged?: number;
     winRateA: number;
     /** Actual paired side-swap cluster sandwich SE, in percentage points. */
     clusteredSePp: number | null;

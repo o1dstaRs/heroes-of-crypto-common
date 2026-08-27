@@ -9,6 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
+import { getCreatureFootprint } from "../configuration/config_provider";
+import { ToFactionName } from "../factions/faction_type";
 import { getFootprintCellsForAnchor, isCellWithinGrid } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { MAGIC_REFLECTION_ABILITY_NAME, magicReflectionPercent } from "../abilities/magic_reflection_ability";
@@ -584,6 +586,45 @@ export function canCastSummon(
  * footprint (GridMath.getCellsAroundFootprint over Unit.getCells), not just its base cell, or the offered
  * spots hug one end of a rectangular summoner.
  */
+/**
+ * The footprint the creature this spell summons will actually occupy.
+ *
+ * `canCastSummon` defaults to 1x1 because the summoned unit does not exist yet at the first gate. That
+ * default was the whole truth while every summon was a 1x1; Summon Wolves now spawns a Wolf, which ships
+ * 2x1, so a caller that takes the default asks whether ONE cell is free and then proposes a cell the
+ * engine refuses — `action_engine.summonSpell` re-checks with the real body and never re-routes an
+ * EXPLICIT cell.
+ */
+export function summonFootprintOf(spell: Spell): { width: number; height: number } {
+    return getCreatureFootprint(ToFactionName[spell.getSummonUnitRace()], spell.getSummonUnitName());
+}
+
+/**
+ * Where to seat a summon, honouring the summoned creature's real body.
+ *
+ * `preferredCell` is tried FIRST so a caller that picked a cell at random keeps its exact draw whenever
+ * that cell works — which is every 1x1 summon, i.e. unchanged behaviour for everything that shipped
+ * before the mounted class. Only when the preferred cell cannot seat the body does this fall back to the
+ * first anchor around the caster that can, so a rectangular summon is placed instead of lost.
+ *
+ * Every surface that offers a summon should route through here: the engine, the AI, the server's bot and
+ * the client's own cast path each used to spell this rule out separately, and three copies of a targeting
+ * rule is three chances to promise a cast the engine then refuses.
+ */
+export function resolveSummonAnchor(
+    spell: Spell,
+    gridMatrix: number[][],
+    casterRingCells: readonly XY[],
+    preferredCell?: XY,
+): XY | undefined {
+    const { width, height } = summonFootprintOf(spell);
+    if (preferredCell && canCastSummon(spell, gridMatrix, preferredCell, width, height)) {
+        return preferredCell;
+    }
+
+    return firstSummonableAnchor(spell, gridMatrix, casterRingCells, width, height);
+}
+
 export function firstSummonableAnchor(
     spell: Spell,
     gridMatrix: number[][],
