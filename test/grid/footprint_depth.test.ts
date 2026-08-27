@@ -122,4 +122,41 @@ describe("footprint geometry is general in the side length", () => {
         expect(MAX_VERIFIED_FOOTPRINT_SIDE).toBeGreaterThanOrEqual(2);
         expect(MAX_VERIFIED_FOOTPRINT_SIDE).toBeLessThanOrEqual(5);
     });
+
+    /**
+     * `isFootprintWithinGrid` decides whether a body fits on the board at all, and until this test it was
+     * only ever CONSUMED here — as the filter in `eachAnchor` — never asserted. A mutation sweep exposed
+     * that: dropping its height term entirely (so a 2-tall body could anchor on row 0, hanging one rank off
+     * the board) left the whole suite green apart from a registry byte-pin and an unrelated timeout, neither
+     * of which says anything about board bounds.
+     *
+     * The assertion deliberately does NOT restate the function's own inequality — that would agree with a
+     * transposed or dropped term just as happily. It checks the property the inequality exists to express:
+     * the answer is true exactly when every cell the body would occupy is on the board, decided
+     * independently by expanding the footprint and testing each cell.
+     */
+    test("a footprint is within the grid exactly when every cell it occupies is", () => {
+        const gridSize = gridSettings.getGridSize();
+        const cellOnBoard = (cell: { x: number; y: number }): boolean =>
+            cell.x >= 0 && cell.y >= 0 && cell.x < gridSize && cell.y < gridSize;
+
+        const disagreements: string[] = [];
+        for (let width = 1; width <= 5; width++) {
+            for (let height = 1; height <= 5; height++) {
+                // Sweep OUTSIDE the board too, so anchors that hang off any edge are exercised rather than
+                // skipped — those are precisely the ones a dropped or transposed term gets wrong.
+                for (let x = -1; x <= gridSize; x++) {
+                    for (let y = -1; y <= gridSize; y++) {
+                        const anchor = { x, y };
+                        const claimed = isFootprintWithinGrid(gridSettings, anchor, width, height);
+                        const actual = getFootprintCellsForAnchor(anchor, width, height).every(cellOnBoard);
+                        if (claimed !== actual) {
+                            disagreements.push(`${width}x${height}@(${x},${y}) claimed=${claimed} actual=${actual}`);
+                        }
+                    }
+                }
+            }
+        }
+        expect(disagreements.slice(0, 10)).toEqual([]);
+    });
 });
