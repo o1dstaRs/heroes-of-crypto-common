@@ -33,8 +33,13 @@ export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simul
 // the tactical-split placement payload now carries the real footprint instead of only a small/large boolean.
 // Both shipped shapes keep their exact cells, so the routing decision and every 1x1/2x2 rollout are unchanged
 // — held to the square-only outcome fingerprint across v0.1..v0.8 and all four grid types.
+// Re-pinned again for the promoted-search knob A/B (2026-08-27, 494a2e8): runMatchInner gained the
+// `searchEnvOverrideTeams` arm, which routes only the LISTED teams through a second A19 driver built with
+// V08_A19_SEARCH_ENV_OVERRIDES merged in. Production routing is untouched — the seam is inert unless both
+// the teams and the env are set, and the stock driver is deliberately constructed with that env withheld
+// and restored afterwards, so an override aimed at the research arm cannot leak into it.
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "c3bc26bcb4b88e94bae45296586a9e01b6e107ec4cf502455b31e744fbac0d43" as const;
+    "a99ab2b77ae9367850f2a855e9d0799848fa26ee8b39ff0ec12662637e7ba4fa" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
     "afc6df1b4ca82e16a43ebc5bf2cce37ab0c761bec81f8ef5714c3d80c8b2d294" as const;
