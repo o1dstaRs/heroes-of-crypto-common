@@ -11,7 +11,12 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { getAuraCellKeyMembershipView, getAuraCellKeys, getAuraCellKeysView } from "../../src/effects/effect_helper";
+import {
+    getAuraCellKeyMembershipView,
+    getAuraCellKeys,
+    getAuraCellKeysView,
+    getAuraCells,
+} from "../../src/effects/effect_helper";
 import { getCellsAroundCell } from "../../src/grid/grid_math";
 import { GridSettings } from "../../src/grid/grid_settings";
 import type { XY } from "../../src/utils/math";
@@ -56,6 +61,55 @@ function legacyGetAuraCellKeys(gridSettings: GridSettings, cell: XY, auraRange: 
     return ret;
 }
 
+function legacyGetAuraCells(gridSettings: GridSettings, cell: XY, auraRange: number): XY[] {
+    const ret: XY[] = [];
+    const cellKeys: number[] = [];
+    let cellsPool: XY[] = [cell];
+    const cellsCheckedAura: number[] = [];
+
+    if (auraRange >= 0) {
+        ret.push(cell);
+        cellKeys.push((cell.x << 4) | cell.y);
+    }
+
+    while (auraRange > 0) {
+        let nextPool: XY[] = [];
+        while (cellsPool.length) {
+            const cellToCheck = cellsPool.pop();
+            if (!cellToCheck) continue;
+
+            const cellToCheckKey = (cellToCheck.x << 4) | cellToCheck.y;
+            if (cellsCheckedAura.includes(cellToCheckKey)) continue;
+
+            for (const neighboringCell of getCellsAroundCell(gridSettings, cellToCheck)) {
+                nextPool.push(neighboringCell);
+                const cellKey = (neighboringCell.x << 4) | neighboringCell.y;
+                if (!cellKeys.includes(cellKey)) {
+                    ret.push(neighboringCell);
+                    cellKeys.push(cellKey);
+                }
+            }
+
+            cellsCheckedAura.push(cellToCheckKey);
+        }
+        cellsPool = nextPool;
+        auraRange--;
+    }
+
+    return ret;
+}
+
+function withAuraCellCache<T>(callback: () => T): T {
+    const previous = process.env.GRID_MATRIX_CACHE_VERIFY;
+    process.env.GRID_MATRIX_CACHE_VERIFY = "1";
+    try {
+        return callback();
+    } finally {
+        if (previous === undefined) delete process.env.GRID_MATRIX_CACHE_VERIFY;
+        else process.env.GRID_MATRIX_CACHE_VERIFY = previous;
+    }
+}
+
 describe("aura geometry compatibility oracle", () => {
     it("preserves exact ordered keys for every legal 16x16 source through range four", () => {
         for (let x = 0; x < testGridSettings.getGridSize(); x++) {
@@ -68,6 +122,22 @@ describe("aura geometry compatibility oracle", () => {
                 }
             }
         }
+    });
+
+    it("preserves exact ordered cells for every legal 16x16 source through range four", () => {
+        withAuraCellCache(() => {
+            for (let x = 0; x < testGridSettings.getGridSize(); x++) {
+                for (let y = 0; y < testGridSettings.getGridSize(); y++) {
+                    for (const range of [0, 1, 2, 3, 4]) {
+                        const cell = { x, y };
+                        const actual = getAuraCells(testGridSettings, cell, range);
+
+                        expect(actual).toEqual(legacyGetAuraCells(testGridSettings, cell, range));
+                        expect(actual[0]).toBe(cell);
+                    }
+                }
+            }
+        });
     });
 
     it("preserves custom-grid, boundary, fractional, and non-finite finite-loop behavior", () => {
@@ -110,6 +180,39 @@ describe("aura geometry compatibility oracle", () => {
         expect(second).toEqual(expected);
         expect(second).not.toBe(first);
         expect(source).toEqual(sourceBefore);
+    });
+
+    it("returns caller-owned cell geometry while sharing only immutable packed keys", () => {
+        withAuraCellCache(() => {
+            const source = { x: 5, y: 6 };
+            const expected = legacyGetAuraCells(testGridSettings, source, 3);
+            const first = getAuraCells(testGridSettings, source, 3);
+
+            first.reverse();
+            first[0].x = -1;
+
+            const second = getAuraCells(testGridSettings, source, 3);
+            expect(second).toEqual(expected);
+            expect(second).not.toBe(first);
+            expect(second[1]).not.toBe(expected[1]);
+        });
+    });
+
+    it("keeps the coordinate oracle for non-reversible and non-integral geometry", () => {
+        withAuraCellCache(() => {
+            const wideSettings = new GridSettings(17, 1700, 0, 1700, -1700, 0, 0);
+            for (const [settings, cell, range] of [
+                [wideSettings, { x: 16, y: 16 }, 2],
+                [testGridSettings, { x: 5, y: 6 }, 1.5],
+                [testGridSettings, { x: -1, y: 6 }, 2],
+            ] as const) {
+                expect(getAuraCells(settings, cell, range)).toEqual(legacyGetAuraCells(settings, cell, range));
+            }
+
+            const missingCell = undefined as unknown as XY;
+            expect(() => getAuraCells(testGridSettings, missingCell, 1)).toThrow();
+            expect(() => legacyGetAuraCells(testGridSettings, missingCell, 1)).toThrow();
+        });
     });
 
     it("exposes one immutable production view without leaking it through the public mutable result", () => {

@@ -208,7 +208,7 @@ export function getAuraCellKeys(gridSettings: GridSettings, cell: XY, auraRange:
     return Array.from(getAuraCellKeysView(gridSettings, cell, auraRange));
 }
 
-export function getAuraCells(gridSettings: GridSettings, cell: XY, auraRange: number): XY[] {
+function calculateAuraCells(gridSettings: GridSettings, cell: XY, auraRange: number): XY[] {
     const ret: XY[] = [];
     const cellKeys: number[] = [];
     let cellsPool: XY[] = [cell];
@@ -251,6 +251,42 @@ export function getAuraCells(gridSettings: GridSettings, cell: XY, auraRange: nu
     }
 
     return ret;
+}
+
+export function getAuraCells(gridSettings: GridSettings, cell: XY, auraRange: number): XY[] {
+    const gridSize = gridSettings.getGridSize();
+    if (
+        (process.env.SIM_GRID_MATRIX_CACHE === "1" || process.env.GRID_MATRIX_CACHE_VERIFY === "1") &&
+        Number.isSafeInteger(gridSize) &&
+        gridSize > 0 &&
+        gridSize <= 16 &&
+        cell !== null &&
+        cell !== undefined &&
+        Number.isSafeInteger(cell.x) &&
+        Number.isSafeInteger(cell.y) &&
+        cell.x >= 0 &&
+        cell.y >= 0 &&
+        cell.x < gridSize &&
+        cell.y < gridSize &&
+        Number.isSafeInteger(auraRange) &&
+        auraRange >= 0
+    ) {
+        // The live board is 16x16, so its historical (x << 4) | y key is reversible. Simulation workers already
+        // opt into derived-grid caching; reuse the same immutable geometry cache there while production stays on
+        // the compatibility oracle. Retain getAuraCells' caller-owned array/cell contract and historical identity
+        // for the source cell at index zero. Custom or malformed grids take the oracle path below because their
+        // packed keys are not necessarily reversible.
+        const keys = getAuraCellKeysView(gridSettings, cell, auraRange);
+        const cells: XY[] = new Array(keys.length);
+        if (keys.length) cells[0] = cell;
+        for (let index = 1; index < keys.length; index++) {
+            const key = keys[index];
+            cells[index] = { x: key >>> 4, y: key & 0xf };
+        }
+        return cells;
+    }
+
+    return calculateAuraCells(gridSettings, cell, auraRange);
 }
 
 /**

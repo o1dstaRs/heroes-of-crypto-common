@@ -142,7 +142,9 @@ const GRID_FIELDS = [
     "scatteredMountainsStanding",
 ] as const;
 
-const GRID_SHARED_FIELDS = ["gridSettings"] as const;
+// matrixCache is derived exclusively from the captured authoritative fields. Copying it would add a full
+// 16x16 matrix to every search checkpoint, so rollback clears it and lets the next reader rebuild lazily.
+const GRID_SHARED_FIELDS = ["gridSettings", "matrixCache"] as const;
 
 /**
  * All mutable FightProperties fields. `gridSettings`-like shared refs don't exist here — every field
@@ -602,6 +604,7 @@ export class BattleRollbackCheckpoint {
         }
         if (this.gridSnapshot) {
             writeFields(this.grid, GRID_FIELDS, this.gridSnapshot, false);
+            this.grid.invalidateMatrixCache();
         }
         if (this.fightSnapshot) {
             writeFields(this.fightProperties, FIGHT_FIELDS, this.fightSnapshot, false);
@@ -700,6 +703,7 @@ function restoreBattleSnapshot(
     }
 
     writeFields(grid, GRID_FIELDS, snapshot.grid, cloneValues);
+    grid.invalidateMatrixCache();
     writeFields(fightProperties, FIGHT_FIELDS, snapshot.fight, cloneValues);
     writeFields(unitsHolder, HOLDER_FIELDS, snapshot.holder, cloneValues);
     restoreAITargetMemory(unitsHolder, snapshot.aiTargetMemory);
