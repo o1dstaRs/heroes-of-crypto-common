@@ -656,6 +656,15 @@ export interface ICellTally {
     recordsByGame: Map<number, ISetupConditionalRecord>;
     pairMoments: ISetupConditionalPairMoments;
     controlPairsAudited: number;
+    /**
+     * Whether a control pair must be an EXACT seat-swap mirror. True on the classic board. The SIDE
+     * board cannot promise it: the engine's lexicographic x tie-breaks are lateral (mirror-neutral)
+     * under the classic y-mirror but flip meaning under the side board's x-mirror, so rare tie states
+     * legitimately diverge between the two seat-swapped games. In that mode divergences are COUNTED and
+     * the control cell is judged on a fail-closed aggregate band instead.
+     */
+    exactControlMirror: boolean;
+    controlPairsDiverged: number;
     games: number;
     winsA: number;
     winsB: number;
@@ -673,7 +682,12 @@ export interface ICellTally {
     augmentsOverrides: number;
 }
 
-export function emptyTally(cell: ISetupConditionalCell, baseSeed: number, expectedGames?: number): ICellTally {
+export function emptyTally(
+    cell: ISetupConditionalCell,
+    baseSeed: number,
+    expectedGames?: number,
+    exactControlMirror = true,
+): ICellTally {
     return {
         cell,
         baseSeed,
@@ -681,6 +695,8 @@ export function emptyTally(cell: ISetupConditionalCell, baseSeed: number, expect
         recordsByGame: new Map(),
         pairMoments: { clusters: 0, sumWinSquared: 0, sumWinDecisive: 0, sumDecisiveSquared: 0 },
         controlPairsAudited: 0,
+        exactControlMirror,
+        controlPairsDiverged: 0,
         games: 0,
         winsA: 0,
         winsB: 0,
@@ -755,18 +771,21 @@ export function tallyRecord(tally: ICellTally, record: ISetupConditionalRecord):
                 odd.rejectedA === undefined ||
                 odd.rejectedB === undefined ||
                 (even.rejectedA === odd.rejectedB && even.rejectedB === odd.rejectedA);
-            if (
-                !winnerSymmetric ||
-                even.laps !== odd.laps ||
-                even.endReason !== odd.endReason ||
-                even.decidedByArmageddon !== odd.decidedByArmageddon ||
-                even.aRangedStacks !== odd.bRangedStacks ||
-                even.bRangedStacks !== odd.aRangedStacks ||
-                !rejectionSymmetric
-            ) {
-                throw new Error(
-                    `${tally.cell.id}: control pair ${Math.floor(record.game / 2)} is not an exact seat swap`,
-                );
+            const mirrored =
+                winnerSymmetric &&
+                even.laps === odd.laps &&
+                even.endReason === odd.endReason &&
+                even.decidedByArmageddon === odd.decidedByArmageddon &&
+                even.aRangedStacks === odd.bRangedStacks &&
+                even.bRangedStacks === odd.aRangedStacks &&
+                rejectionSymmetric;
+            if (!mirrored) {
+                if (tally.exactControlMirror) {
+                    throw new Error(
+                        `${tally.cell.id}: control pair ${Math.floor(record.game / 2)} is not an exact seat swap`,
+                    );
+                }
+                tally.controlPairsDiverged += 1;
             }
             tally.controlPairsAudited += 1;
         }
@@ -807,10 +826,18 @@ export function summarizeTally(tally: ICellTally): ISetupConditionalCellSummary 
     const decisive = tally.winsA + tally.winsB;
     const estimate = pairedClusterEstimate(tally.winsA, tally.winsB, tally.pairMoments);
     const games = tally.games;
+    // Classic: static-vs-static seat swaps must land EXACTLY even. Side: chirality (x tie-breaks flip
+    // under the x-mirror) makes exact evenness impossible, so the fail-closed bound is a 99% binomial
+    // band around even plus a cap on how many pairs may diverge at all.
+    const controlBandZ = 2.576;
+    const controlEven = tally.exactControlMirror
+        ? tally.winsA === tally.winsB
+        : Math.abs(tally.winsA - tally.winsB) <= controlBandZ * Math.sqrt(Math.max(1, decisive)) &&
+          tally.controlPairsDiverged <= Math.max(4, Math.ceil(0.02 * tally.pairMoments.clusters));
     const controlInvariantPassed =
         !tally.cell.control ||
         (decisive > 0 &&
-            tally.winsA === tally.winsB &&
+            controlEven &&
             tally.t2Overrides === 0 &&
             tally.augmentsOverrides === 0 &&
             tally.controlPairsAudited === expectedGames / SETUP_CONDITIONAL_PAIR_CLUSTER_SIZE);
@@ -1330,7 +1357,7 @@ export async function runMeasureSetupConditional(
     const jobs: IJob[] = [];
     cells.forEach((cell) => {
         const seed = seedStreamByCell.get(cell.id)!.baseSeed;
-        tallies.set(cell.id, emptyTally(cell, seed, options.gamesPerCell));
+        tallies.set(cell.id, emptyTally(cell, seed, options.gamesPerCell, options.sideOriented !== true));
         for (let game = 0; game < options.gamesPerCell; game += 1) {
             jobs.push({ cell, baseSeed: seed, game });
         }
