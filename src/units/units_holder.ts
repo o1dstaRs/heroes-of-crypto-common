@@ -1439,7 +1439,28 @@ export class UnitsHolder {
                 continue;
             }
 
-            const unitAuraNamesToApply: string[] = [];
+            // One entry per aura NAME for the WHOLE body, strongest wins.
+            //
+            // The emission loop above deliberately keeps the strongest source per aura name PER CELL, and a
+            // body wider than one cell can straddle two rims — so its cells can legitimately hold
+            // different-strength copies of the same aura. Nothing reconciled them: the guard here compared
+            // the BARE effect name against a list it filled with the SUFFIXED one (`${name} Aura`), and no
+            // aura effect is named with that suffix, so the test was never true. Every covering cell applied
+            // the aura again, and `Unit.applyAuraEffect` deletes-then-pushes, so the value that survived was
+            // whichever cell came LAST in getCells() — the left cell of a 2x1, the lower cell of a 1x2.
+            //
+            // Measured before this change: a 2x1 standing in one aura received `applyAuraEffect` TWICE for
+            // the same aura. That made the outcome positional rather than strongest-wins, and it is why the
+            // choice below is a MAX rather than a first-seen guard — simply comparing the same string would
+            // restore "apply once" while leaving the winner just as arbitrary.
+            //
+            // The whole AppliedAuraEffectProperties is carried, never a power lifted off one entry and a
+            // source off another: the source cell rides out in the buff description and consumers resolve
+            // the aura's owner from it.
+            //
+            // NOTE this also changes 2x2 creatures, which had the same positional behaviour long before any
+            // rectangle shipped. That is the correct direction, and deliberate.
+            const strongestAuraPerName = new Map<string, AppliedAuraEffectProperties>();
             for (const c of u.getCells()) {
                 const cellKey = (c.x << 4) | c.y;
                 const appliedAuraEffects = teamAuraEffects.get(cellKey);
@@ -1449,11 +1470,16 @@ export class UnitsHolder {
 
                 for (const aae of appliedAuraEffects) {
                     const auraEffectProperties = aae.getAuraEffectProperties();
-                    if (!unitAuraNamesToApply.includes(auraEffectProperties.name)) {
-                        unitAuraNamesToApply.push(`${auraEffectProperties.name} Aura`);
-                        this.applyAuraEffectToUnit(u, aae);
+                    const strongest = strongestAuraPerName.get(auraEffectProperties.name);
+                    // Strictly greater, so equal powers keep the first cell's entry and the order stays
+                    // deterministic for the zero-power auras (Luck, Disguise, Web) that always tie.
+                    if (!strongest || auraEffectProperties.power > strongest.getAuraEffectProperties().power) {
+                        strongestAuraPerName.set(auraEffectProperties.name, aae);
                     }
                 }
+            }
+            for (const aae of strongestAuraPerName.values()) {
+                this.applyAuraEffectToUnit(u, aae);
             }
         }
         this.auraRefreshKnownEmpty = this.isAuraStateProvablyEmpty();
