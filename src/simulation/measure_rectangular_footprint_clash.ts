@@ -89,6 +89,30 @@ const COHORTS: Record<string, IArmyUnitSpec[]> = {
         u("Might", "Harpy", 2, 1, 10),
     ],
     rect_only: [WHITE_TIGER, HYENA],
+    // The creatures that ACTUALLY ship rectangular (commit a9a5e98 made the mounted class 2x1). Until this
+    // cohort existed the clash proved rectangles through an override on two arbitrary creatures, and 8 of
+    // the 13 real ones — including the only RANGED rectangle — never appeared in a single match. These
+    // carry the abilities the shape can interact with: auras, flight, Rapid Charge, Piercing Spear.
+    shipped_rect_melee: [
+        u("Nature", "Wolf", 1, 2, 8),
+        u("Nature", "Unicorn", 3, 2, 4),
+        u("Might", "Wolf Rider", 1, 2, 8),
+        u("Might", "Nomad", 2, 2, 6),
+        u("Life", "Squire", 1, 1, 16),
+    ],
+    shipped_rect_flyers: [
+        u("Life", "Griffin", 3, 2, 4),
+        u("Nature", "Mantis", 3, 2, 4),
+        u("Chaos", "Manticore", 2, 2, 5),
+        u("Might", "Wyvern", 2, 2, 5),
+        u("Life", "Peasant", 1, 1, 20),
+    ],
+    shipped_rect_ranged: [
+        u("Might", "Centaur", 1, 2, 8),
+        u("Nature", "White Tiger", 2, 2, 6),
+        u("Chaos", "Nightmare", 3, 2, 4),
+        u("Life", "Pikeman", 2, 1, 14),
+    ],
     rect_plus_summoner: [
         WHITE_TIGER,
         HYENA,
