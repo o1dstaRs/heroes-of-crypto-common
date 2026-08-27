@@ -511,7 +511,7 @@ function findRangeAttackAction(
             if (
                 !isAOEAttacker &&
                 !isThroughShot &&
-                isLineBlockedByFriendlyUnit(unitCell, targetCell, matrix, unitTeam)
+                isLineBlockedByFriendlyUnit(unitCell, targetCell, matrix, unitTeam, unit.getCells())
             ) {
                 continue;
             }
@@ -791,12 +791,18 @@ export function isLineBlockedByObstacle(fromCell: HoCMath.XY, toCell: HoCMath.XY
  * team the shot deals no damage and the engine rejects it. An enemy first means the shot still strikes
  * an enemy (just a nearer one), so that is not "blocked". Terrain/obstacles are flown over here — the
  * mountain block is handled separately by isLineBlockedByObstacle.
+ *
+ * `ownCells` is the shooter's OWN body. The matrix stamps every footprint cell with the owner's team, so
+ * without this a multi-cell shooter screens itself: a 2x1 Centaur firing west walks straight through its
+ * own second cell and reads it as a friendly wall. Those cells are stepped OVER rather than treated as
+ * clear, so a genuine ally further down the same line still blocks.
  */
 export function isLineBlockedByFriendlyUnit(
     fromCell: HoCMath.XY,
     toCell: HoCMath.XY,
     matrix: number[][],
     friendlyTeam: number,
+    ownCells?: readonly HoCMath.XY[],
 ): boolean {
     const numRows = matrix.length;
     const numCols = matrix[0].length;
@@ -817,7 +823,18 @@ export function isLineBlockedByFriendlyUnit(
         if (cx >= 0 && cy >= 0 && cx < numCols && cy < numRows) {
             const v = matrix[cy][cx];
             if (v === friendlyTeam) {
-                return true;
+                let isOwnBody = false;
+                if (ownCells) {
+                    for (const oc of ownCells) {
+                        if (oc.x === cx && oc.y === cy) {
+                            isOwnBody = true;
+                            break;
+                        }
+                    }
+                }
+                if (!isOwnBody) {
+                    return true;
+                }
             }
             if (v === enemyTeam) {
                 return false;
