@@ -40,14 +40,20 @@ export class Grid {
     private leftMountainCleared = false;
     private rightMountainCleared = false;
     /**
-     * SCATTERED MOUNTAINS — the newer BLOCK_CENTER shape: single-cell mountains dropped at random over the
-     * neutral band instead of two fixed 2x2 blocks.
+     * SCATTERED MOUNTAINS — the newer BLOCK_CENTER shape ("barrels" on the Cemetery board): single-cell
+     * mountains scattered over the neutral band instead of two fixed 2x2 blocks.
      *
-     * It is OPT-IN, and that is deliberate rather than timid. The two-mountain layout is derived from pure
-     * geometry, so client and server reach it independently without exchanging anything; a random layout is
-     * not reproducible that way. Until the server is taught to agree on one, only the sandbox (which is
-     * authoritative over its own fight) may switch this on — a ranked fight left on the classic path can
-     * never disagree with the server about where the rock is.
+     * It is still OPT-IN at this layer, but the reasoning has moved on: the layout is no longer "random" in
+     * the irreproducible sense that once confined it to the sandbox. `scatteredMountainsForSeed` makes both
+     * the cells AND the barrel count (rolled 9-12) a pure function of the game id, so the server, both
+     * seats, replays and the headless sim reach the same board independently — which is exactly what let
+     * RANKED start playing it. Ranked installs it from the game id, the sandbox from its fight id, and the
+     * sim for side-oriented boards.
+     *
+     * What still does NOT travel is the layout itself; a snapshot carries only which stones still stand
+     * (play.proto 58/59). The client must therefore install the SERVER's stone list rather than filtering
+     * its own derivation by it — see planScatteredMountainSync — or a version skew in the rolled count
+     * turns the difference into invisible walls.
      *
      * Empty layout = classic behaviour, unchanged down to the last cell.
      */
