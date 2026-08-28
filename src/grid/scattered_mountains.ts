@@ -14,12 +14,13 @@ import type { XY } from "../utils/math";
 /**
  * How many single-cell mountains ("barrels" on the Cemetery board) a scattered BLOCK_CENTER layout drops.
  *
- * The count is ROLLED per game rather than fixed, the same way the map itself is rolled: a cemetery board
- * carries somewhere between MIN and MAX barrels inclusive. It is derived from the game's own seed, so no
- * wire field is needed and the server, both seats, every replay and the headless sim all land on the same
- * number without being told.
+ * OWNER CALL (2026-08-28): every cemetery board carries TWELVE barrels. The count briefly rolled per
+ * game in [MIN, MAX] like the map itself; the owner asked for the fixed twelve back, so MIN is pinned to
+ * MAX. The roll plumbing is deliberately kept — the count still rides the game's own seed, so no wire
+ * field is needed and server, both seats, replays and the headless sim all agree by derivation — which
+ * means restoring the variety later is a one-constant change (drop MIN back to 9) rather than a rewrite.
  */
-export const SCATTERED_MOUNTAIN_MIN_COUNT = 9;
+export const SCATTERED_MOUNTAIN_MIN_COUNT = 12;
 export const SCATTERED_MOUNTAIN_MAX_COUNT = 12;
 /** The neutral middle band the rocks land in: this many full-HEIGHT columns, centred horizontally.
  *  Every surface is SIDE-oriented now (owner call 2026-08-25: everything fights left-to-right) —

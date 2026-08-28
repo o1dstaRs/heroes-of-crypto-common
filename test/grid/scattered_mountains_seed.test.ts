@@ -21,10 +21,11 @@ describe("scatteredMountainsForSeed", () => {
         expect(JSON.stringify(a1)).not.toBe(JSON.stringify(b));
     });
 
-    // The barrel COUNT is rolled per game like the map itself, not fixed. It rides the game's own seed so
-    // no wire field is needed — every seat, the server, replays and the headless sim agree by derivation.
+    // The barrel count still rides the game's own seed (no wire field; every seat, the server, replays
+    // and the headless sim agree by derivation) — but the OWNER pinned it at twelve on 2026-08-28, so
+    // the roll's range is a single value.
     it("rolls a barrel count inside [MIN, MAX] that the band can hold", () => {
-        expect(SCATTERED_MOUNTAIN_MIN_COUNT).toBe(9);
+        expect(SCATTERED_MOUNTAIN_MIN_COUNT).toBe(12);
         expect(SCATTERED_MOUNTAIN_MAX_COUNT).toBe(12);
         expect(SCATTERED_MOUNTAIN_MAX_COUNT).toBeLessThanOrEqual(16 * SCATTERED_MOUNTAIN_BAND_ROWS);
         for (let i = 0; i < 400; i++) {
@@ -38,16 +39,18 @@ describe("scatteredMountainsForSeed", () => {
         }
     });
 
-    // Not a cosmetic property: a count stuck at one end would quietly turn "9-12 barrels" back into a
-    // fixed board, and nothing else in the suite would notice.
-    it("actually varies the count across seeds, spanning both ends of the range", () => {
+    // The mirror of the old variety guard: that test existed so a count stuck at one end could not
+    // quietly turn "9-12 barrels" into a fixed board. The owner asked for the fixed board, so the
+    // property is inverted — every seed must carry the SAME twelve, and a stray re-widening of the
+    // range (or a drift between the count and the layout) fails here rather than reaching players.
+    it("carries exactly twelve barrels on every seed — the owner's fixed count", () => {
         const seen = new Set<number>();
         for (let i = 0; i < 400; i++) {
-            seen.add(scatteredMountainCountForSeed(`spread-${i}`));
+            const seed = `spread-${i}`;
+            seen.add(scatteredMountainCountForSeed(seed));
+            expect(scatteredMountainsForSeed(seed).length).toBe(12);
         }
-        expect(seen.has(SCATTERED_MOUNTAIN_MIN_COUNT)).toBe(true);
-        expect(seen.has(SCATTERED_MOUNTAIN_MAX_COUNT)).toBe(true);
-        expect(seen.size).toBe(SCATTERED_MOUNTAIN_MAX_COUNT - SCATTERED_MOUNTAIN_MIN_COUNT + 1);
+        expect([...seen]).toEqual([12]);
     });
 
     /**
