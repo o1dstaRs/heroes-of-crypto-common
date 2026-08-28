@@ -1379,6 +1379,20 @@ export const auraRelevanceWeight: AuraWeightFn = (target, aura) => {
     return 1;
 };
 
+/**
+ * Price an aura the way the ENGINE stamps it, rather than as one ball at the emitter's anchor.
+ *
+ * `UnitsHolder.refreshAuraEffectsForAllUnits` unions the per-cell ball over the emitter's whole body and
+ * applies the aura when ANY cell of the recipient's body is covered. The scoring below asks a single ball
+ * at the anchor and tests only the recipient's anchor, which is a strict under-count for every multi-cell
+ * emitter — 5 of a 2x1's 30 cells at range 2, 11 of a 2x2's 36.
+ *
+ * Default OFF. This is not a rectangle repair: 2x2 emitters have been priced this way since long before
+ * the mounted class, so turning it on moves decisions for shipped squares too and the learned weights
+ * above it were fitted against the current answer. It ships measurable, not flipped.
+ */
+const useExactAuraZone = (): boolean => process.env.AI_AURA_ZONE_EXACT === "1";
+
 export function auraCoverageScore(
     unit: Unit,
     fromCell: HoCMath.XY,
@@ -1404,9 +1418,33 @@ export function auraCoverageScore(
         }
         // Geometry and membership are cached together. Candidate scoring revisits the same cell/range pairs many
         // times during rollouts, so it pays the Set construction once instead of once per scoring call.
-        const cellKeys = EffectHelper.getAuraCellKeyMembershipView(gridSettings, fromCell, range);
+        const exact = useExactAuraZone();
+        const body = exact ? footprintOf(unit) : undefined;
+        const cellKeys =
+            exact && body
+                ? EffectHelper.getAuraCellKeyMembershipForBody(
+                      gridSettings,
+                      GridMath.getFootprintCellsForAnchor(fromCell, body.width, body.height),
+                      range,
+                  )
+                : EffectHelper.getAuraCellKeyMembershipView(gridSettings, fromCell, range);
         const targets = aura.getProperties().is_buff ? allies : enemies;
         for (const t of targets) {
+            if (exact) {
+                // The engine applies an aura when ANY cell of the recipient's body is covered, so a 2x1
+                // whose far cell is inside the zone counts — its anchor alone does not decide.
+                let covered = false;
+                for (const c of t.getCells()) {
+                    if (cellKeys.has((c.x << 4) | c.y)) {
+                        covered = true;
+                        break;
+                    }
+                }
+                if (covered) {
+                    score += weight(t, aura);
+                }
+                continue;
+            }
             const bc = t.getBaseCell();
             if (cellKeys.has((bc.x << 4) | bc.y)) {
                 score += weight(t, aura);

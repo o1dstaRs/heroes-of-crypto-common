@@ -204,6 +204,37 @@ export function getAuraCellKeyMembershipView(
     return membership;
 }
 
+/**
+ * The aura zone a MULTI-CELL emitter actually projects: the union of the per-cell balls over its whole
+ * body, which is exactly what `UnitsHolder.refreshAuraEffectsForAllUnits` stamps.
+ *
+ * The AI's scoring asks the single-cell view at the emitter's ANCHOR instead. For a 1x1 the two agree; for
+ * anything larger the anchor ball is a strict subset — at range 2 it misses 5 of a 2x1's 30 cells and 11
+ * of a 2x2's 36. Nothing here is rectangle-specific: 2x2 emitters have been mispriced by the same margin
+ * since long before the mounted class shipped.
+ *
+ * Not cached the way the single-cell views are: the key would have to cover an arbitrary cell LIST, and
+ * the AI asks this per candidate anchor rather than per unit, so the cache would churn. The body is at
+ * most a handful of cells and the per-cell views underneath are still shared.
+ */
+export function getAuraCellKeyMembershipForBody(
+    gridSettings: GridSettings,
+    bodyCells: readonly XY[],
+    auraRange: number,
+): IAuraCellKeyMembershipView {
+    if (bodyCells.length <= 1) {
+        return getAuraCellKeyMembershipView(gridSettings, bodyCells[0], auraRange);
+    }
+    const set = new Set<number>();
+    for (const cell of bodyCells) {
+        for (const key of getAuraCellKeysView(gridSettings, cell, auraRange)) {
+            set.add(key);
+        }
+    }
+
+    return Object.freeze({ has: (cellKey: number): boolean => set.has(cellKey) });
+}
+
 export function getAuraCellKeys(gridSettings: GridSettings, cell: XY, auraRange: number): number[] {
     return Array.from(getAuraCellKeysView(gridSettings, cell, auraRange));
 }
