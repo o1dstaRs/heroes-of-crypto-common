@@ -2,7 +2,8 @@ import { describe, expect, it } from "bun:test";
 
 import {
     SCATTERED_MOUNTAIN_BAND_ROWS,
-    SCATTERED_MOUNTAIN_COUNT,
+    SCATTERED_MOUNTAIN_MAX_COUNT,
+    SCATTERED_MOUNTAIN_MIN_COUNT,
     SCATTERED_MOUNTAIN_VARIANTS,
     scatteredMountainsForSeed,
 } from "../../src/grid/scattered_mountains";
@@ -19,17 +20,22 @@ describe("scatteredMountainsForSeed", () => {
         expect(JSON.stringify(a1)).not.toBe(JSON.stringify(b));
     });
 
-    // The Cemetery board's stone count is a design number, so pin it here: it drives both the ranked seeded
-    // layout and the sandbox roll, and a silent change to either would alter every BLOCK_CENTER board.
-    it("scatters nine barrels, and the band has room for them", () => {
-        expect(SCATTERED_MOUNTAIN_COUNT).toBe(9);
-        expect(SCATTERED_MOUNTAIN_COUNT).toBeLessThanOrEqual(16 * SCATTERED_MOUNTAIN_BAND_ROWS);
-        expect(scatteredMountainsForSeed("count-pin").length).toBe(9);
+    it("scatters an inclusive 9–12 barrels, and the band has room for the maximum", () => {
+        const observed = new Set<number>();
+        for (let i = 0; i < 256; i++) {
+            const count = scatteredMountainsForSeed(`count-range-${i}`).length;
+            expect(count).toBeGreaterThanOrEqual(SCATTERED_MOUNTAIN_MIN_COUNT);
+            expect(count).toBeLessThanOrEqual(SCATTERED_MOUNTAIN_MAX_COUNT);
+            observed.add(count);
+        }
+        expect([...observed].sort((a, b) => a - b)).toEqual([9, 10, 11, 12]);
+        expect(SCATTERED_MOUNTAIN_MAX_COUNT).toBeLessThanOrEqual(16 * SCATTERED_MOUNTAIN_BAND_ROWS);
     });
 
     it("drops the full count of distinct cells inside the neutral band", () => {
         const layout = scatteredMountainsForSeed("any-game");
-        expect(layout.length).toBe(SCATTERED_MOUNTAIN_COUNT);
+        expect(layout.length).toBeGreaterThanOrEqual(SCATTERED_MOUNTAIN_MIN_COUNT);
+        expect(layout.length).toBeLessThanOrEqual(SCATTERED_MOUNTAIN_MAX_COUNT);
         const bandStart = 8 - (SCATTERED_MOUNTAIN_BAND_ROWS >> 1);
         const seen = new Set<string>();
         for (const rock of layout) {
@@ -43,13 +49,13 @@ describe("scatteredMountainsForSeed", () => {
             expect(rock.variant).toBeLessThan(SCATTERED_MOUNTAIN_VARIANTS);
             seen.add(`${rock.cell.x},${rock.cell.y}`);
         }
-        expect(seen.size).toBe(SCATTERED_MOUNTAIN_COUNT);
+        expect(seen.size).toBe(layout.length);
     });
 
     it("deals every art variant before repeating any", () => {
         const layout = scatteredMountainsForSeed("variant-spread-check");
         const variants = new Set(layout.map((rock) => rock.variant));
-        // Count and variants match, so the full authored set appears exactly once.
+        // The minimum count matches the art deck, so the full authored set always appears before repeats.
         expect(variants.size).toBe(SCATTERED_MOUNTAIN_VARIANTS);
     });
 });

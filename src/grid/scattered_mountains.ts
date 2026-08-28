@@ -11,8 +11,11 @@
 
 import type { XY } from "../utils/math";
 
-/** How many single-cell mountains a scattered BLOCK_CENTER layout drops. */
-export const SCATTERED_MOUNTAIN_COUNT = 9;
+/** Inclusive barrel-count range for a scattered BLOCK_CENTER layout. */
+export const SCATTERED_MOUNTAIN_MIN_COUNT = 9;
+export const SCATTERED_MOUNTAIN_MAX_COUNT = 12;
+/** @deprecated Use the explicit min/max constants; kept as the capacity upper bound for older consumers. */
+export const SCATTERED_MOUNTAIN_COUNT = SCATTERED_MOUNTAIN_MAX_COUNT;
 /** The neutral middle band the rocks land in: this many full-HEIGHT columns, centred horizontally.
  *  Every surface is SIDE-oriented now (owner call 2026-08-25: everything fights left-to-right) —
  *  deployment carves x 1-3 and x 12-14 over the full board height, so the vertical mid-board strip
@@ -21,8 +24,8 @@ export const SCATTERED_MOUNTAIN_COUNT = 9;
 export const SCATTERED_MOUNTAIN_BAND_ROWS = 4;
 /**
  * Distinct obstacle art variants the client can draw (variant indices are 0..VARIANTS-1) — the nine-barrel
- * cemetery_obstacles_9x_256 atlas. COUNT and VARIANTS match, so every board receives all nine authored
- * barrels exactly once in a freshly shuffled order.
+ * cemetery_obstacles_9x_256 atlas. Every board receives all nine authored variants once before the random
+ * surplus slots repeat variants.
  */
 export const SCATTERED_MOUNTAIN_VARIANTS = 9;
 
@@ -31,6 +34,11 @@ export interface ISeededScatteredMountain {
     /** Art variant for the client renderer; the engine ignores it. */
     variant: number;
 }
+
+/** Draw an inclusive 9..12 barrel count from any [0, 1) random source. */
+export const randomScatteredMountainCount = (random: () => number = Math.random): number =>
+    SCATTERED_MOUNTAIN_MIN_COUNT +
+    Math.floor(random() * (SCATTERED_MOUNTAIN_MAX_COUNT - SCATTERED_MOUNTAIN_MIN_COUNT + 1));
 
 /**
  * The scattered-mountain layout for one game, derived from its id.
@@ -71,7 +79,9 @@ export const scatteredMountainsForSeed = (seed: string, gridSize = 16): ISeededS
             free.push({ x, y });
         }
     }
-    const wanted = Math.min(SCATTERED_MOUNTAIN_COUNT, free.length);
+    // Count is part of the seeded stream so the server, both seats and replays agree on the same 9..12
+    // barrels without another protocol field.
+    const wanted = Math.min(randomScatteredMountainCount(next), free.length);
     for (let i = 0; i < wanted; i++) {
         const j = i + Math.floor(next() * (free.length - i));
         const swap = free[i];
