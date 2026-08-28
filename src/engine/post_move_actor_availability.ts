@@ -223,6 +223,45 @@ export function resolveMoveTraversal(
 }
 
 /** Ordered, de-duplicated Fire Wall cells entered by the move. */
+/**
+ * Every cell a unit's BODY newly occupies along a walk — the cells a Fire Wall may charge it for.
+ *
+ * A large unit is not a point. The travelled route is a list of ANCHOR cells, and for anything bigger than
+ * 1x1 the anchor is only one corner of the block: a 2x2 Angel gliding onto a wall that sits under any of
+ * its other three cells crossed real fire and was charged nothing, because only the anchor cells were ever
+ * offered to the wall. (The footprint-only branch already passes the whole destination block, which is why
+ * a rectangle's one-step slide burned correctly and a walking Angel did not.)
+ *
+ * `startCells` are excluded, keeping the standing rule intact: a unit that BEGAN its turn in the flames is
+ * not charged for staying put, only for what it moves INTO. For a 1x1 this returns exactly the travelled
+ * anchors minus the start, i.e. the previous behaviour unchanged.
+ */
+export function bodyCellsEnteredAlongPath(
+    startCells: readonly XY[],
+    travelledAnchors: readonly XY[],
+    width: number,
+    height: number,
+): XY[] {
+    const started = new Set<number>();
+    for (const cell of startCells) {
+        started.add(FireWalls.key(cell));
+    }
+    const seen = new Set<number>();
+    const entered: XY[] = [];
+    for (const anchor of travelledAnchors) {
+        for (const cell of getFootprintCellsForAnchor(anchor, width, height)) {
+            const key = FireWalls.key(cell);
+            if (started.has(key) || seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            entered.push(cell);
+        }
+    }
+
+    return entered;
+}
+
 export function enteredFireWallCells(fireWalls: FireWalls | undefined, crossedCells: readonly XY[]): XY[] {
     if (!fireWalls?.size() || !crossedCells.length) {
         return [];

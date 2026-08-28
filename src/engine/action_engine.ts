@@ -64,6 +64,7 @@ import type { GameAction } from "./actions";
 import { isHeadlessSimulationEvent, type GameEvent, type IGameAnimationEvent } from "./events";
 import { canWaitOnHourglass } from "./hourglass";
 import {
+    bodyCellsEnteredAlongPath,
     burnUnitOnFireWallCells,
     isMovePathFootprintOnly,
     moveCellsMatchAsSet,
@@ -480,6 +481,9 @@ export class GameActionEngine {
         if (knownMoveRoute instanceof Error) {
             return this.reject("invalid_move");
         }
+        // Captured BEFORE the move resolves: the Fire Wall burn below needs the body the unit LEFT, so it
+        // can charge only for what the walk moved into. After the move `getCells()` is the destination.
+        const startCells = unit.getCells();
         const travelledPath = pathIsFootprintOnly
             ? action.path
             : travelledMovePath(unit.getBaseCell(), knownMoveRoute?.route ?? action.path);
@@ -595,7 +599,18 @@ export class GameActionEngine {
         }
         // Fire Wall: sear the mover for every burning cell the walk entered. A footprint-only large-unit
         // move has no ordered step route, so its final footprint stands in for the cells it crossed.
-        events.push(...this.applyFireWallBurn(unit, pathIsFootprintOnly ? targetCells : travelledPath));
+        // The walk is a route of ANCHOR cells, and an anchor is only one corner of a large body — so a 2x2
+        // Angel gliding onto a wall that sits under any of its other three cells crossed real fire and was
+        // charged nothing. Expand each travelled anchor to the block it actually occupied, minus the body
+        // the unit started on (staying put is still free). A 1x1 is unaffected: its body IS its anchor.
+        events.push(
+            ...this.applyFireWallBurn(
+                unit,
+                pathIsFootprintOnly
+                    ? targetCells
+                    : bodyCellsEnteredAlongPath(startCells, travelledPath, footprintWidth, footprintHeight),
+            ),
+        );
         return { completed: true, events };
     }
     /**

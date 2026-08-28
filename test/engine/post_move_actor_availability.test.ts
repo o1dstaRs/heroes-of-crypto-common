@@ -12,8 +12,11 @@
 import { describe, expect, it } from "bun:test";
 
 import { GameActionEngine } from "../../src/engine/action_engine";
+import { getFootprintCellsForAnchor } from "../../src/grid/grid_math";
+import { FireWalls } from "../../src/spells/fire_walls";
 import type { GameAction } from "../../src/engine/actions";
 import {
+    bodyCellsEnteredAlongPath,
     enteredFireWallCells,
     projectPostMoveActorAvailability,
     resolveMoveTraversal,
@@ -397,5 +400,76 @@ describe("post-move actor availability projection", () => {
         expect(projected.madeOfFireApplied).toBe(false);
         expect(projected.stack.maxHp).toBe(20);
         expect(setup.unit.hasBuffActive("Made of Fire")).toBe(false);
+    });
+});
+
+/**
+ * Live report (test server, game 40a72b86): an Angel stood on a Fire Wall and took nothing.
+ *
+ * A walk is a route of ANCHOR cells, and for anything bigger than 1x1 the anchor is one CORNER of the
+ * block. The move-path burn was handed those anchors, so a 2x2 gliding onto a wall that sits under any of
+ * its other three cells crossed real fire and was charged nothing. The footprint-only branch always passed
+ * the whole destination block, which is why a rectangle's one-step slide burned correctly and a walking
+ * Angel did not — the two paths disagreed about what a large unit occupies.
+ */
+describe("bodyCellsEnteredAlongPath", () => {
+    const cellNames = (cells: { x: number; y: number }[]) => cells.map((c) => `${c.x},${c.y}`).sort();
+
+    it("reports the whole block a large unit walks into, not just its anchor", () => {
+        const start = getFootprintCellsForAnchor({ x: 9, y: 8 }, 2, 2);
+        const entered = bodyCellsEnteredAlongPath(start, [{ x: 8, y: 8 }], 2, 2);
+        // The Angel's new block is {(8,8),(8,7),(7,8),(7,7)}; the two cells it already stood on are free.
+        expect(cellNames(entered)).toEqual(["7,7", "7,8"]);
+    });
+
+    it("burns a wall under a NON-anchor part of the body — the reported case", () => {
+        const walls = new FireWalls();
+        walls.add({ x: 7, y: 7 }, 3, 20);
+        const start = getFootprintCellsForAnchor({ x: 9, y: 8 }, 2, 2);
+
+        // What the engine used to pass: the anchor route alone. It misses the wall entirely.
+        expect(enteredFireWallCells(walls, [{ x: 8, y: 8 }])).toEqual([]);
+        // What it passes now.
+        const entered = bodyCellsEnteredAlongPath(start, [{ x: 8, y: 8 }], 2, 2);
+        expect(enteredFireWallCells(walls, entered)).toEqual([{ x: 7, y: 7 }]);
+    });
+
+    it("still never charges a unit for the body it started on", () => {
+        // Standing in the flames is free; only cells the walk moves INTO are charged.
+        const start = getFootprintCellsForAnchor({ x: 8, y: 8 }, 2, 2);
+        expect(bodyCellsEnteredAlongPath(start, [{ x: 8, y: 8 }], 2, 2)).toEqual([]);
+    });
+
+    it("is unchanged for a 1x1, whose body IS its anchor", () => {
+        expect(
+            bodyCellsEnteredAlongPath(
+                [{ x: 5, y: 5 }],
+                [
+                    { x: 6, y: 5 },
+                    { x: 7, y: 5 },
+                ],
+                1,
+                1,
+            ),
+        ).toEqual([
+            { x: 6, y: 5 },
+            { x: 7, y: 5 },
+        ]);
+    });
+
+    it("de-duplicates cells the body re-occupies across consecutive steps", () => {
+        // A 2x2 stepping one cell keeps half its block; the wall charges per cell entered, once.
+        const start = getFootprintCellsForAnchor({ x: 9, y: 8 }, 2, 2);
+        const entered = bodyCellsEnteredAlongPath(
+            start,
+            [
+                { x: 8, y: 8 },
+                { x: 7, y: 8 },
+            ],
+            2,
+            2,
+        );
+        expect(new Set(cellNames(entered)).size).toBe(entered.length);
+        expect(cellNames(entered)).toEqual(["6,7", "6,8", "7,7", "7,8"]);
     });
 });
