@@ -52,6 +52,7 @@ import { GridSettings } from "../grid/grid_settings";
 import type { IWeightedRoute } from "../grid/path_definitions";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
+import { fillEffectPowerPlaceholders, positionalPropertyCount } from "../spells/effect_description";
 import { Spell } from "../spells/spell";
 import { recordEffectApplication, recordWaterShieldAbsorb } from "./effect_application_capture";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
@@ -2739,10 +2740,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.applied_buffs.push(buff.getName());
         this.unitProperties.applied_buffs_laps.push(lapsTotal);
         this.unitProperties.applied_buffs_descriptions.push(
-            `${buff
-                .getDesc()
-                .slice(0, buff.getDesc().length - 1)
-                .join(" ")};${firstBuffPropertyString};${secondBuffPropertyString}`,
+            `${fillEffectPowerPlaceholders(
+                buff
+                    .getDesc()
+                    .slice(0, buff.getDesc().length - 1)
+                    .join(" "),
+                buff.getPower(),
+                positionalPropertyCount(firstBuffProperty, secondBuffProperty),
+            )};${firstBuffPropertyString};${secondBuffPropertyString}`,
         );
         // Keep the wire/snapshot representation aligned with the AppliedSpell. This matters for buffs whose
         // cast-time power differs from configuration (for example, Tome-amplified castable buffs).
@@ -2858,10 +2863,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.applied_debuffs.push(debuff.getName());
         this.unitProperties.applied_debuffs_laps.push(lapsTotal);
         this.unitProperties.applied_debuffs_descriptions.push(
-            `${debuff
-                .getDesc()
-                .slice(0, debuff.getDesc().length - 1)
-                .join(" ")};${firstDebuffPropertyString};${secondDebuffPropertyString}`,
+            `${fillEffectPowerPlaceholders(
+                debuff
+                    .getDesc()
+                    .slice(0, debuff.getDesc().length - 1)
+                    .join(" "),
+                debuff.getPower(),
+                positionalPropertyCount(firstDebuffProperty, secondDebuffProperty),
+            )};${firstDebuffPropertyString};${secondDebuffPropertyString}`,
         );
         this.unitProperties.applied_debuffs_powers.push(0);
     }
