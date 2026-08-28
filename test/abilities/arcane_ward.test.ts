@@ -94,7 +94,7 @@ describe("Arcane Ward Blessing", () => {
         expect(distantAlly.getMagicResist()).toBe(20);
     });
 
-    it("prints the live projection on runtime-granted cards and reuses the existing icon", () => {
+    it("prints the live projection on runtime-granted cards and uses the renamed icon key", () => {
         const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LOWER, stackPower: 2 });
         bearer.grantAbility("Arcane Ward Blessing");
 
@@ -103,6 +103,6 @@ describe("Arcane Ward Blessing", () => {
 
         expect(description).toContain("4%");
         expect(description).not.toContain("10%");
-        expect(abilityToTextureName("Arcane Ward Blessing")).toBe("arcane_ward_aura_256");
+        expect(abilityToTextureName("Arcane Ward Blessing")).toBe("arcane_ward_blessing_256");
     });
 });
