@@ -697,7 +697,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (
             ability.getName() === "Stun Aura" ||
             ability.getName() === "Warding Mane Aura" ||
-            ability.getName() === "Arcane Ward Aura" ||
             ability.getName() === "Guiding Winds Aura" ||
             ability.getName() === "Sylvan Focus Aura"
         ) {
@@ -711,6 +710,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     .join("\n")
                     .replace(/\{\}/g, Number(this.calculateAuraPower(projectedAura, 0).toFixed(2)).toString());
             }
+        }
+        if (ability.getName() === "Arcane Ward Blessing") {
+            return ability.getDesc().join("\n").replace(/\{\}/g, this.calculateArcaneWardBlessingPower(0).toString());
         }
         if (ability.getName() === "Magic Reflection") {
             // The Magic Dragon's passive: stack-scaled 15/30/45/60/75 at power 75, shifted by luck — the exact
@@ -2031,6 +2033,23 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         return Number((calculatedCoeff * 100).toFixed(2)) - 100;
+    }
+    /** The board-wide Squire projection, preserving the former aura's stack/luck/synergy scaling exactly. */
+    public calculateArcaneWardBlessingPower(synergyAbilityPowerIncrease: number): number {
+        const ability = this.getAbility("Arcane Ward Blessing");
+        if (!ability) {
+            return 0;
+        }
+
+        const madeOfFireBuff = this.getBuff("Made of Fire");
+        return Number(
+            (
+                (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                this.getLuck() +
+                synergyAbilityPowerIncrease +
+                (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0)
+            ).toFixed(2),
+        );
     }
     public calculateEffectMultiplier(effect: Effect, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;
@@ -3496,11 +3515,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 magicResists.push(Math.max(0, wardingManeAura.getPower()) / 100);
             }
 
-            // AURA Arcane Ward (Squire): magic defence for every ally within 2 cells, folded in as one more
-            // INDEPENDENT resistance roll exactly like Warding Mane above (already stack-powered as a percentage).
-            const arcaneWardAura = this.getAppliedAuraEffect("Arcane Ward Aura");
-            if (arcaneWardAura) {
-                magicResists.push(Math.max(0, arcaneWardAura.getPower()) / 100);
+            // Arcane Ward Blessing (Squire): the strongest living allied Squire projects this board-wide.
+            // Its marker carries the source's already-scaled percentage and composes as an independent roll.
+            const arcaneWardBlessing = statBuffs["Arcane Ward Blessing"];
+            if (arcaneWardBlessing) {
+                magicResists.push(Math.max(0, arcaneWardBlessing.getPower()) / 100);
             }
 
             this.unitProperties.magic_resist = roundUnitStat(winningAtLeastOneEventProbability(magicResists) * 100, 2);

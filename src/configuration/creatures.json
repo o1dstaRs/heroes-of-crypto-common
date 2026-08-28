@@ -53,7 +53,7 @@
             "size": 1,
             "level": 1,
             "spells": [],
-            "abilities": ["Stun", "Arcane Ward Aura"]
+            "abilities": ["Stun", "Arcane Ward Blessing"]
         },
         "Peasant": {
             "name": "Peasant",

@@ -286,12 +286,12 @@ describe("placement opponent-information source", () => {
                 ),
             ).toBe(publicRoster);
         }
-        // Scavenger, not Squire: Squire gained Arcane Ward Aura and so no longer reads as exact melee-other,
-        // which is the cohort this case needs in order to assert the reveal stays restricted.
+        // Arcane Ward Blessing is board-wide but not an aura, so Squire belongs to the exact melee-other cohort
+        // this case needs in order to assert the reveal stays restricted.
         expect(
             selectOpponentCreatureIdsForPlacement(
                 COHORT_SAFE_PUBLIC_ROSTER_PLACEMENT,
-                [CREATURES.SCAVENGER],
+                [CREATURES.SQUIRE],
                 revealed,
                 publicRoster,
             ),
@@ -310,9 +310,8 @@ describe("placement opponent-information source", () => {
     });
 
     it("keeps exact melee-other placement decision-identical to legitimate-reveal", () => {
-        // Scavenger replaces Squire, which gained Arcane Ward Aura and so is no longer exact melee-other —
-        // the precondition this case needs before it can assert the two paths decide identically.
-        const scenario = { groundMelee: 2, ownNames: ["Scavenger", "Pikeman"] };
+        // Squire is exact melee-other now that Arcane Ward Blessing is no longer classified as an aura.
+        const scenario = { groundMelee: 2, ownNames: ["Squire", "Pikeman"] };
         const revealed = [CREATURES.PEASANT];
         const publicRoster = [CREATURES.NOMAD];
         const incumbent = place(scenario, revealed, "legitimate-reveal", publicRoster);

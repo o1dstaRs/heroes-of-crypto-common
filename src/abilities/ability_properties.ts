@@ -71,8 +71,8 @@ export enum AbilityPowerType {
     ABSORB_FIRST_HIT = 58,
     ADDITIONAL_RANGE_SHOTS = 59,
     VINE_STRIDE = 60,
-    // Aura-only magic armor. Unlike the fixed MAGIC_RESIST_25/50/100 abilities, this is a stack-powered
-    // percentage folded into the holder's own magic resist as an independent resistance roll.
+    // Projected magic armor from an aura or army passive. Unlike the fixed MAGIC_RESIST_25/50/100 abilities,
+    // this is a stack-powered percentage folded into the holder's own magic resist as an independent roll.
     ADDITIONAL_MAGIC_RESIST_PERCENTAGE = 61,
     // Takes an active (spell-cast) buff off the unit that was just shot and wears it for the rest of its
     // duration. Auras, artifacts and augments are not takeable — see borrowed_grace_ability.ts.

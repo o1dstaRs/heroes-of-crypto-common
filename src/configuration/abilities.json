@@ -1402,16 +1402,16 @@
         "aura_effect": "Warding Mane",
         "can_be_cast": false
     },
-    "Arcane Ward Aura": {
-        "name": "Arcane Ward Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allies within 2 cells gain {}% magic defence"],
+    "Arcane Ward Blessing": {
+        "name": "Arcane Ward Blessing",
+        "type": "MASS_BUFF",
+        "desc": ["While this unit is alive, all allies on the board gain {}% magic defence"],
         "power": 10,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,
-        "aura_effect": "Arcane Ward",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Terrifying Gaze": {

@@ -904,6 +904,42 @@ export class UnitsHolder {
             unit.applyBuff(buff, power);
         }
     }
+    private refreshArcaneWardBlessingForAllUnits(): void {
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        const powerPerTeam: Map<TeamType, number> = new Map();
+
+        for (const unit of this.getAllUnitsIterator()) {
+            if (
+                unit.isDead() ||
+                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
+                !unit.getAbility("Arcane Ward Blessing")
+            ) {
+                continue;
+            }
+
+            const power = unit.calculateArcaneWardBlessingPower(
+                fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam()),
+            );
+            powerPerTeam.set(unit.getTeam(), Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, power));
+        }
+
+        for (const unit of this.getAllUnitsIterator()) {
+            unit.deleteBuff("Arcane Ward Blessing");
+
+            const power = powerPerTeam.get(unit.getTeam()) ?? 0;
+            if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
+                continue;
+            }
+
+            const buff = new Spell({
+                spellProperties: getSpellConfig("System", "Arcane Ward Blessing", NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            });
+            buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
+            buff.setPower(power);
+            unit.applyBuff(buff, power);
+        }
+    }
     public refreshWaterShieldForAllUnits(): void {
         // Seed the innate one-per-battle Water Shield buff for any unit that owns the ability. trySeedWaterShield
         // is idempotent and refuses to re-grant a shield that has already been consumed, so it is safe to call on
@@ -926,6 +962,7 @@ export class UnitsHolder {
         // whose refreshUnits() has always run both. cleanAuraEffects() makes this idempotent.
         this.refreshAuraEffectsIfNeeded();
         this.refreshAngelicHostForAllUnits();
+        this.refreshArcaneWardBlessingForAllUnits();
         this.refreshWaterShieldForAllUnits();
         for (const u of this.getAllUnitsIterator()) {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
