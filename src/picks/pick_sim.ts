@@ -68,8 +68,8 @@ export const LIVE_PICK_PHASES: readonly ILivePickPhase[] = [
         actors: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
         creatureLevel: 0,
     },
-    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.UPPER], creatureLevel: 4 },
     { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.LOWER], creatureLevel: 4 },
+    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.UPPER], creatureLevel: 4 },
     {
         phase: PBTypes.PickPhaseVals.AUGMENTS,
         actors: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],

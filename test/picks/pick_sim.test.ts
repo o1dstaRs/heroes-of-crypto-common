@@ -201,8 +201,8 @@ describe("pick_sim", () => {
         expect(state.phaseSequence).toBe(9);
 
         // Angel (40) rather than Pegasus (30) for the last L4 slot — Pegasus dropped to L3.
-        state = accept(state, { type: "pick_creature", team: UPPER, creatureId: 40 });
         state = accept(state, { type: "pick_creature", team: LOWER, creatureId: 39 });
+        state = accept(state, { type: "pick_creature", team: UPPER, creatureId: 40 });
 
         expect(isPickSimComplete(state)).toBe(true);
         expect(state.phaseSequence).toBe(11);
