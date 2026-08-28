@@ -21,10 +21,10 @@ describe("scatteredMountainsForSeed", () => {
 
     // The Cemetery board's stone count is a design number, so pin it here: it drives both the ranked seeded
     // layout and the sandbox roll, and a silent change to either would alter every BLOCK_CENTER board.
-    it("scatters twelve stones, and the band has room for them", () => {
-        expect(SCATTERED_MOUNTAIN_COUNT).toBe(12);
+    it("scatters nine barrels, and the band has room for them", () => {
+        expect(SCATTERED_MOUNTAIN_COUNT).toBe(9);
         expect(SCATTERED_MOUNTAIN_COUNT).toBeLessThanOrEqual(16 * SCATTERED_MOUNTAIN_BAND_ROWS);
-        expect(scatteredMountainsForSeed("count-pin").length).toBe(12);
+        expect(scatteredMountainsForSeed("count-pin").length).toBe(9);
     });
 
     it("drops the full count of distinct cells inside the neutral band", () => {
@@ -49,7 +49,7 @@ describe("scatteredMountainsForSeed", () => {
     it("deals every art variant before repeating any", () => {
         const layout = scatteredMountainsForSeed("variant-spread-check");
         const variants = new Set(layout.map((rock) => rock.variant));
-        // More rocks than variants, so at least the full set must appear.
+        // Count and variants match, so the full authored set appears exactly once.
         expect(variants.size).toBe(SCATTERED_MOUNTAIN_VARIANTS);
     });
 });

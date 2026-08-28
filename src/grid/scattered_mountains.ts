@@ -12,7 +12,7 @@
 import type { XY } from "../utils/math";
 
 /** How many single-cell mountains a scattered BLOCK_CENTER layout drops. */
-export const SCATTERED_MOUNTAIN_COUNT = 12;
+export const SCATTERED_MOUNTAIN_COUNT = 9;
 /** The neutral middle band the rocks land in: this many full-HEIGHT columns, centred horizontally.
  *  Every surface is SIDE-oriented now (owner call 2026-08-25: everything fights left-to-right) —
  *  deployment carves x 1-3 and x 12-14 over the full board height, so the vertical mid-board strip
@@ -21,9 +21,8 @@ export const SCATTERED_MOUNTAIN_COUNT = 12;
 export const SCATTERED_MOUNTAIN_BAND_ROWS = 4;
 /**
  * Distinct obstacle art variants the client can draw (variant indices are 0..VARIANTS-1) — the nine-barrel
- * cemetery_obstacles_9x_256 atlas. Fewer variants than COUNT, so the deal below hands out the full set
- * first and only then repeats — at 12 slots from 9 variants exactly three barrels repeat, spread by the
- * shuffle rather than clustered.
+ * cemetery_obstacles_9x_256 atlas. COUNT and VARIANTS match, so every board receives all nine authored
+ * barrels exactly once in a freshly shuffled order.
  */
 export const SCATTERED_MOUNTAIN_VARIANTS = 9;
 
@@ -66,8 +65,7 @@ export const scatteredMountainsForSeed = (seed: string, gridSize = 16): ISeededS
     const bandStart = (gridSize >> 1) - (SCATTERED_MOUNTAIN_BAND_ROWS >> 1);
     // Middle COLUMNS, full height: deployment is side-oriented everywhere (left/right x-bands), so
     // the vertical mid-board strip is the one band that collides with neither army. A horizontal
-    // band would cross both side zones and drop stones into the armies' laps. (The "12 barrels read
-    // as ~9" complaint itself was variant indices past the nine-art atlas, fixed by the deck deal.)
+    // band would cross both side zones and drop stones into the armies' laps.
     for (let x = bandStart; x < bandStart + SCATTERED_MOUNTAIN_BAND_ROWS; x++) {
         for (let y = 0; y < gridSize; y++) {
             free.push({ x, y });
