@@ -35,7 +35,7 @@ import { createLeagueGenome, createMeleeLeagueGenome, LEAGUE_ANCHOR_GENOME, type
  *   1. "untrained-heuristic" — the setup-v0 scoreCreature draft (the server's no-config fallback);
  *   2. "shipped-default-draft" — DEFAULT_DRAFT_W, the baked melee co-evolution champion.
  *
- * GATES (on the cluster-robust decisive-win-rate LOWER BOUND per opponent):
+ * GATES (on the cluster-robust decisive-win-rate LEFT BOUND per opponent):
  *   - vs untrained-heuristic  >= 0.55 (a shippable champion must clearly beat the untrained fallback);
  *   - vs shipped-default-draft >= 0.47 (non-inferiority: no more than ~3pp regression at 95% confidence
  *     against the incumbent — a candidate equal to the incumbent measures ~0.48-0.49 here, so it passes).

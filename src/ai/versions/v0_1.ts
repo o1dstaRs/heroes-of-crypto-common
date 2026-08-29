@@ -79,7 +79,7 @@ export class StrategyV0_1 implements IAIStrategy {
         const occupied = new Set<number>();
         const legal = context.placement.possibleCellHashes();
 
-        // "Frontness" grows toward the enemy: LOWER deploys on the low-Y rows and faces up, UPPER
+        // "Frontness" grows toward the enemy: LEFT deploys on the low-Y rows and faces up, RIGHT
         // deploys on the high-Y rows and faces down. Melee wants the highest frontness, ranged the
         // lowest, so the squishy shooters sit behind the wall.
         const frontness = (cell: XY): number =>

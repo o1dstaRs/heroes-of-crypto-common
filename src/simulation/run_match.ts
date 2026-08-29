@@ -24,7 +24,7 @@ import { runMatch } from "./battle_engine";
  *   bun src/simulation/run_match.ts v0.1 v0.2 7     # specific seed (same seed -> same roster)
  *   bun src/simulation/run_match.ts v0.1 v0.1 123   # self-play
  *
- * GREEN plays the LOWER team, RED plays UPPER. Both sides get the SAME 6-unit army (2xL1, 2xL2, 1xL3,
+ * GREEN plays the LEFT team, RED plays RIGHT. Both sides get the SAME 6-unit army (2xL1, 2xL2, 1xL3,
  * 1xL4), so the only difference is the AI. NOTE: the fight uses global RNG, so the same seed gives the
  * same ROSTER but not necessarily the same outcome run-to-run.
  */

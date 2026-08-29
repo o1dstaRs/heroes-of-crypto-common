@@ -343,7 +343,7 @@ describe("utility functions", () => {
         // Regression: the seeded mulberry32 source yields 32-bit floats; nextRaw53 must spread those into a
         // full 53-bit value with random LOW bits. A prior `floor(r * 2^53)` left the low 21 bits always 0, so
         // getRandomInt(0, 2) returned the low bit -> ALWAYS 0. That silently rigged every coin flip in the
-        // sim (e.g. the turn-order morale-tie, making LOWER/green always move first -> a spurious ~57/43 side
+        // sim (e.g. the turn-order morale-tie, making LEFT/green always move first -> a spurious ~57/43 side
         // bias). Production (crypto path) was never affected. Guard small-range uniformity here.
         try {
             let s = 0xc0ffee >>> 0;

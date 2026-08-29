@@ -23,9 +23,9 @@ const MELEE = PBTypes.AttackVals.MELEE;
 const pathHelper = new PathHelper(testGridSettings);
 
 describe("Backstab (Scavenger) AI positioning", () => {
-    it("reroutes a LOWER-team Scavenger to strike from below the target (higher y)", () => {
+    it("reroutes a LEFT-team Scavenger to strike from below the target (higher y)", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        // Scavenger is adjacent to the enemy on the NON-backstab side (above it, lower y). For a LOWER
+        // Scavenger is adjacent to the enemy on the NON-backstab side (above it, lower y). For a LEFT
         // attacker the bonus needs y > target.y, so it should circle to a cell below the enemy.
         const scavenger = createTestUnit({
             name: "Scavenger",
@@ -45,7 +45,7 @@ describe("Backstab (Scavenger) AI positioning", () => {
         expect(action!.cellToMove()!.y).toBeGreaterThan(5);
     });
 
-    it("reroutes an UPPER-team Scavenger to strike from above the target (lower y)", () => {
+    it("reroutes a RIGHT-team Scavenger to strike from above the target (lower y)", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const scavenger = createTestUnit({
             name: "Scavenger",
@@ -54,7 +54,7 @@ describe("Backstab (Scavenger) AI positioning", () => {
             abilities: ["Backstab"],
         });
         const enemy = createTestUnit({ name: "Prey", team: LEFT, attackType: MELEE });
-        // Adjacent on the non-backstab side (below the enemy). UPPER needs y < target.y → circle above.
+        // Adjacent on the non-backstab side (below the enemy). RIGHT needs y < target.y → circle above.
         placeUnit(grid, unitsHolder, scavenger, { x: 6, y: 6 });
         placeUnit(grid, unitsHolder, enemy, { x: 5, y: 5 });
 

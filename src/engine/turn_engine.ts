@@ -530,7 +530,7 @@ export class TurnEngine {
         }
 
         // Both sides can be wiped out on the same lap (e.g. armageddon kills everyone at once) — that's
-        // a draw, NOT an UPPER win. Only award a team the win when it's the sole side with units left.
+        // a draw, NOT a RIGHT win. Only award a team the win when it's the sole side with units left.
         let winningTeam: TeamType;
         if (unitsLeft.length) {
             winningTeam = PBTypes.TeamVals.LEFT;

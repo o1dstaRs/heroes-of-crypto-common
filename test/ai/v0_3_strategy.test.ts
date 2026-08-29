@@ -122,10 +122,10 @@ describe("v0.3 placeArmy — corner shooters, flyer wing, centred wall", () => {
         for (const u of units) {
             expect(placed.has(u.getId())).toBe(true);
         }
-        // LOWER team: frontness == y (higher y = closer to the enemy / "forward").
+        // LEFT team: frontness == y (higher y = closer to the enemy / "forward").
         const y = (u: Unit) => placed.get(u.getId())!.y;
         const x = (u: Unit) => placed.get(u.getId())!.x;
-        const centreX = 7.5; // size-3 LOWER_LEFT zone spans x≈1..14
+        const centreX = 7.5; // size-3 LEFT_BOTTOM zone spans x≈1..14
 
         // Ground melee form the wall ahead of every ranged shooter.
         const meleeFront = Math.min(y(m1), y(m2));

@@ -105,7 +105,7 @@ interface Board {
     charge: GameAction[];
 }
 
-/** 2v2 board with hourglass-eligible LOWER actor and a melee-CHARGE incumbent (path present). */
+/** 2v2 board with hourglass-eligible LEFT actor and a melee-CHARGE incumbent (path present). */
 function buildBoard(
     actorOptions: Parameters<typeof createTestUnit>[0] = {},
     allyOptions: Parameters<typeof createTestUnit>[0] = {},

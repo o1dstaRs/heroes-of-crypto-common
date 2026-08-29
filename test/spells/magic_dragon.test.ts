@@ -66,7 +66,7 @@ const alwaysRoll = (value: number): void => {
 afterEach(() => setDeterministicRandomSource(undefined));
 
 /**
- * A fight with the Magic Dragon on the LOWER team. Local rather than shared because these tests need control
+ * A fight with the Magic Dragon on the LEFT team. Local rather than shared because these tests need control
  * of the caster's head-count and stack power (the damage formula reads both) and of exactly who stands beside
  * whom (Ring of Fire splashes onto neighbours, Meteor Shower covers a 3x3).
  *
@@ -936,7 +936,7 @@ describe("Magic Reflection (passive)", () => {
             casterAmountAlive: 1,
             casterStackPower: 5,
             // The aimed target is spared. Its mirror-bearing neighbour burns and rebounds while the friendly
-            // neighbour supplies the direct hit; both lower-team impacts are in Abomination range.
+            // neighbour supplies the direct hit; both left-team impacts are in Abomination range.
             // Keep the mirror off the caster-to-target diagonal; Ring of Fire is thrown and checks LOS.
             enemies: [
                 { cell: { x: 5, y: 1 } },

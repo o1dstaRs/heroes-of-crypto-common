@@ -179,7 +179,7 @@ export interface IV08A19F184CanonicalPlacementRow {
     readonly size: number;
     readonly amount: number;
     readonly x: number;
-    /** Base-cell Y normalized to LOWER. */
+    /** Base-cell Y normalized to LEFT. */
     readonly y: number;
 }
 

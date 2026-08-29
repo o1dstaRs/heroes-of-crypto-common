@@ -73,8 +73,8 @@ import {
  * Frozen, composed-ranked v0.7s qualification battery.
  *
  * This is measurement-only: v0.7s is a byte-policy alias for v0.7 whose version string lets SearchDriver
- * target only the candidate seat. One pick is generated per pair. Even games put the candidate on LOWER /
- * green and odd games put it on UPPER / red; the physical armies are never swapped or re-drafted.
+ * target only the candidate seat. One pick is generated per pair. Even games put the candidate on LEFT /
+ * green and odd games put it on RIGHT / red; the physical armies are never swapped or re-drafted.
  */
 
 export type V07ComposedProfileId = "off" | "uncapped" | "server_300" | "conservative_200_275";

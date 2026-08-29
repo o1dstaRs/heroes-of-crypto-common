@@ -46,7 +46,7 @@ const battleMage = (creaturesJson as unknown as Record<string, Record<string, Re
 const chaosSpells = (spellsJson as unknown as Record<string, Record<string, { power: number }>>).Chaos;
 
 /**
- * A fight with the Battle Mage on the LOWER team and whatever enemies a test asks for. Deliberately local
+ * A fight with the Battle Mage on the LEFT team and whatever enemies a test asks for. Deliberately local
  * rather than reusing action_engine.test.ts's harness: these tests need control of the caster's head-count
  * (the damage formula reads it) and more than one enemy on the board (Meteorite hits a 2x2).
  *

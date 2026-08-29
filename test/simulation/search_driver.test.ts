@@ -3921,7 +3921,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(scoped.appliesTo("v0.8", RED_TEAM)).toBe(false);
 
         expect(() => h.makeDriver(undefined, undefined, { searchTeamScope: [PBTypes.TeamVals.NO_TEAM] })).toThrow(
-            "Search team scope may contain only LOWER and UPPER",
+            "Search team scope may contain only LEFT and RIGHT",
         );
     });
 

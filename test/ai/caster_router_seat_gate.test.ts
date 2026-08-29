@@ -47,8 +47,8 @@ afterEach(() => {
 
 /**
  * A/B seat scoping (Q1 LiveTwin A/B): both seats of a sim game share process env, so the paired
- * routed-vs-unrouted measurement needs the gate to address ONE team. `green` must route only LOWER,
- * `red` only UPPER, `both` == `on`, anything else = off — and the un-routed seat must get its incumbent
+ * routed-vs-unrouted measurement needs the gate to address ONE team. `green` must route only LEFT,
+ * `red` only RIGHT, `both` == `on`, anything else = off — and the un-routed seat must get its incumbent
  * array back by REFERENCE (no enumeration side effects).
  */
 describe("v0.6 caster router A/B seat gate", () => {
@@ -80,7 +80,7 @@ describe("v0.6 caster router A/B seat gate", () => {
             return { candidates: [], truncated: [] };
         };
 
-    it("green routes only the LOWER seat; the UPPER seat keeps its incumbent untouched", () => {
+    it("green routes only the LEFT seat; the RIGHT seat keeps its incumbent untouched", () => {
         const { greenCaster, redCaster, context, enumerated } = seatProbe();
         process.env.V06_CASTER_ROUTER = "green";
         const greenIncumbent = fallback(greenCaster);
@@ -92,7 +92,7 @@ describe("v0.6 caster router A/B seat gate", () => {
         expect(enumerated.map((u) => u.getId())).toEqual([greenCaster.getId()]);
     });
 
-    it("red routes only the UPPER seat", () => {
+    it("red routes only the RIGHT seat", () => {
         const { greenCaster, redCaster, context, enumerated } = seatProbe();
         process.env.V06_CASTER_ROUTER = "red";
         expect(routeUniversalCaster(greenCaster, context, fallback(greenCaster), spyEnumerator(enumerated))).toEqual(

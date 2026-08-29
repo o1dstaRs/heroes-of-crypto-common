@@ -54,7 +54,7 @@ describe("AI landing legality", () => {
         const lava = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER).grid;
         const largeFlyer = createTestUnit({ team: LEFT, movementType: FLY, size: PBTypes.UnitSizeVals.LARGE });
 
-        // The anchor is clear, but the lower half of the 2x2 footprint clips the lava square.
+        // The anchor is clear, but the left half of the 2x2 footprint clips the lava square.
         expect(lava.getOccupantUnitId({ x: 7, y: 10 })).toBe("");
         expect(lava.getOccupantUnitId({ x: 7, y: 9 })).toBe("L");
         expect(canUnitLandAt(largeFlyer, lava, { x: 7, y: 10 })).toBe(false);

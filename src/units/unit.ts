@@ -65,7 +65,7 @@ import { UnitProperties } from "./unit_properties";
 import type { AttackType, MovementType, TeamType, UnitType, FactionType } from "../generated/protobuf/v1/types_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
 
-// Mechanism constructs have this much LOWER effective status resist vs physical AOE damage (see
+// Mechanism constructs have this much LEFT effective status resist vs physical AOE damage (see
 // getPhysicalAoeDamageMultiplier): a flat -50, so with no other status resist they take ~50% more.
 const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
 

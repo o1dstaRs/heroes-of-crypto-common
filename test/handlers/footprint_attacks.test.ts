@@ -554,7 +554,7 @@ describe("Splash damage against a rectangular body", () => {
         place(grid, unitsHolder, shooter, { x: 5, y: 1 });
         place(grid, unitsHolder, victim, { x: 5, y: 8 });
 
-        // Straight up the column, so the ray walks the victim's lower cell and then its upper one.
+        // Straight up the column, so the ray walks the victim's lower cell and then its right one.
         const evaluation = attackHandler.evaluateRangeAttack(
             unitsHolder.getAllUnits(),
             shooter,

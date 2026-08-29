@@ -592,7 +592,7 @@ describe("grid_math", () => {
     });
 
     it("resolves the aim by the immediate-neighbour rule only — a unit further along the line does NOT hide the edge (the engine owns trajectory occlusion)", () => {
-        // Attacker (UPPER) at the far left, target at x=4 on the same row. An enemy (LOWER) sits at
+        // Attacker (RIGHT) at the far left, target at x=4 on the same row. An enemy (LEFT) sits at
         // (2,1) — between them, but NOT the target's immediate LEFT neighbour (3,1), which stays empty.
         // The "visible edge" rule is deliberately LOCAL: the LEFT edge is observable, so it is offered as
         // the aim. Whether the shot actually threads past the unit at (2,1) is decided by the engine's

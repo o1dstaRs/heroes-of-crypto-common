@@ -31,7 +31,7 @@ export const V08_A19_H18_F184_HUMAN_PLACEMENT_IMPLEMENTATION_SOURCE =
 // replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
 // qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H18_F184_HUMAN_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "2a85b4b0e51bd0e2bdad4052fb2aafee644cab05ca1921515c22277f954d0f6d" as const;
+    "88e0f5c0b381402248d472799fbf0ce108e32acc66ff1bce77dd5444dc0e8075" as const;
 
 /**
  * Browser-safe identity for the exact production-replay opening. The source digest is

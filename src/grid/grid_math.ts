@@ -396,8 +396,8 @@ export function getPositionForCells(gridSettings: GridSettings, cells: XY[]): XY
 }
 
 // ---------------------------------------------------------------------------------------------
-// Axis of advance. Classic boards deploy bottom/top (LOWER advances +y); SIDE-oriented boards
-// (the ranked Point-X layout) deploy left/right (LOWER advances +x). These two helpers are THE
+// Axis of advance. Classic boards deploy bottom/top (LEFT advances +y); SIDE-oriented boards
+// (the ranked Point-X layout) deploy left/right (LEFT advances +x). These two helpers are THE
 // switch every direction-sensitive rule routes through — Backstab geometry, advance/depth
 // features, forward-looking routers, placement frontness. Never compare raw .y by team again.
 // ---------------------------------------------------------------------------------------------
@@ -1027,7 +1027,7 @@ export function resolveRangeAttackAimEdge(
         };
     }
 
-    // Clamp: nearest observable edge to the attacker. Deterministic — ties keep the lower side index, and
+    // Clamp: nearest observable edge to the attacker. Deterministic — ties keep the left side index, and
     // cells are walked in the target's own stable order.
     let best = edges[0];
     let bestPosition = getRangeAttackSideCenter(gridSettings, best.cell, best.side, attackerPosition);
@@ -1180,7 +1180,7 @@ export function getClosestSideCenterDetailed(
     if (twoClosestPoints.length > 1 && mousePosition) {
         const distanceA = getDistance(twoClosestPoints[0].xy, mousePosition);
         const distanceB = getDistance(twoClosestPoints[1].xy, mousePosition);
-        // Cursor picks between the two; ties keep the lower side index (deterministic).
+        // Cursor picks between the two; ties keep the left side index (deterministic).
         if (distanceB < distanceA) {
             chosen = twoClosestPoints[1];
         }

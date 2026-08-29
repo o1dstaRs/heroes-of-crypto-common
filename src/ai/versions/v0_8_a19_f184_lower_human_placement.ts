@@ -83,7 +83,7 @@ const normalizedPlacementFingerprint = (
 };
 
 /**
- * Apply the exact f184 opening only to LOWER. The wrapped v10 policy remains the single implementation of
+ * Apply the exact f184 opening only to LEFT. The wrapped v10 policy remains the single implementation of
  * the roster, metadata, placement-geometry, public-information, overlap, and legality gates.
  */
 export class V08A19F184LowerHumanPlacementStrategy implements IAIStrategy {

@@ -516,7 +516,7 @@ describe("UnitsHolder.getDistanceToEnemyCentroid", () => {
         const ally = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, ally, { x: 3, y: 3 });
 
-        // No UPPER units exist, so there is no enemy centroid.
+        // No RIGHT units exist, so there is no enemy centroid.
         expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.RIGHT, positionForCell({ x: 3, y: 3 }))).toBe(
             Number.MAX_SAFE_INTEGER,
         );
@@ -562,7 +562,7 @@ describe("UnitsHolder.getDistanceToEnemyCentroid", () => {
         placeUnit(grid, unitsHolder, ally, { x: 1, y: 1 });
 
         const from = positionForCell({ x: 4, y: 4 });
-        // Only the UPPER enemy counts; the LOWER ally must not move the centroid.
+        // Only the RIGHT enemy counts; the LEFT ally must not move the centroid.
         expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.RIGHT, from)).toBeCloseTo(
             getDistance(from, enemy.getPosition()),
         );
@@ -586,7 +586,7 @@ describe("UnitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam", () => {
         placeUnit(grid, unitsHolder, archer, { x: 3, y: 3 });
         placeUnit(grid, unitsHolder, enemyKnight, { x: 8, y: 8 });
 
-        // A LOWER Knight fell: same-name + same-team allies lose MORALE_CHANGE_FOR_KILL (4) each.
+        // A LEFT Knight fell: same-name + same-team allies lose MORALE_CHANGE_FOR_KILL (4) each.
         unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam({ [`Knight:${PBTypes.TeamVals.LEFT}`]: 4 });
 
         expect(sync(knightA)).toBe(6);

@@ -100,7 +100,7 @@ export class SquarePlacement implements IPlacement {
         const height = normalizeFootprintSide(footprintHeight, isSmallUnit ? 1 : 2);
         const diffX = width - 1;
         const diffY = height - 1;
-        // LOWER_RIGHT walks leftwards and has always SUBTRACTED the inset from its far border instead of
+        // LEFT_TOP walks leftwards and has always SUBTRACTED the inset from its far border instead of
         // adding it, so the shipped 2x2 anchor list overshoots the zone by two columns. Every baked placement
         // policy and replay was produced against that exact list, so the 2x2 body keeps it; any other
         // footprint gets the correct border. See test/grid/footprint_placement.test.ts, which pins both.

@@ -181,7 +181,7 @@ describe("tactical stack splitting", () => {
         expect(placed.get("decoy")).toEqual({ x: 0, y: 2 });
     });
 
-    it("mirrors forward placement for the upper army toward decreasing board Y", () => {
+    it("mirrors forward placement for the right army toward decreasing board Y", () => {
         const legal = new Set<number>();
         for (let x = 0; x < 16; x += 1) {
             for (let y = 13; y < 16; y += 1) legal.add((x << 4) | y);
@@ -289,8 +289,8 @@ describe("tactical split placement with rectangular incumbents", () => {
         expect(run(false).get("decoy")).toEqual({ x: 3, y: 7 });
     });
 
-    it("a cover split respects a 2x1 incumbent's body on the classic axis for the UPPER team", () => {
-        // Classic orientation, UPPER: back = high y. The 2x1 incumbent anchored at (8, 14) covers
+    it("a cover split respects a 2x1 incumbent's body on the classic axis for the RIGHT team", () => {
+        // Classic orientation, RIGHT: back = high y. The 2x1 incumbent anchored at (8, 14) covers
         // (7, 14) and (8, 14); the only other legal cell is deeper into the board.
         const legal = new Set([hash(7, 14), hash(8, 14), hash(8, 10)]);
         const placed = applyTacticalSplitPlacement(

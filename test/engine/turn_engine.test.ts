@@ -428,8 +428,8 @@ describe("TurnEngine", () => {
     it("declares a draw (NO_TEAM) when BOTH teams are wiped out on the same lap", () => {
         const setup = setupStartedFight();
         // Armageddon (and other simultaneous wipes) can empty both teams at once. That is a draw, not
-        // an automatic UPPER win. Regression guard for finishFightIfNeeded, whose ternary used to fall
-        // through to UPPER whenever the LOWER list was empty — including when UPPER was empty too.
+        // an automatic RIGHT win. Regression guard for finishFightIfNeeded, whose ternary used to fall
+        // through to RIGHT whenever the LEFT list was empty — including when RIGHT was empty too.
         setup.unitsHolder.deleteUnitById(setup.left.getId(), true);
         setup.unitsHolder.deleteUnitById(setup.right.getId(), true);
 

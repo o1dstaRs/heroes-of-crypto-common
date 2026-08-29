@@ -16,11 +16,11 @@
 //       [--output sim-out/side_ab/report.json] [--leaf-file candidate_leaf.json] [--classic]
 //
 // One PAIR = the same seed/roster/map played twice with the seats swapped (even game: candidate is
-// GREEN/LOWER, odd: candidate is RED/UPPER), so seat luck cancels exactly. The control seat is put on
+// GREEN/LEFT, odd: candidate is RED/RIGHT), so seat luck cancels exactly. The control seat is put on
 // FightProperties.legacyAxisPolicyTeams, which keeps every shipped raw-Y heuristic (value features,
 // Backstab preference, Castling gate, placement frontness) byte-faithful for that seat while the
 // BOARD RULES (zones, engine Backstab geometry) stay side-oriented for both. --leaf-file injects a
-// refit 60-dim value leaf for the CANDIDATE seat only (per-team seam V07_VALUE_WEIGHTS_V2_LOWER/_UPPER);
+// refit 60-dim value leaf for the CANDIDATE seat only (per-team seam V07_VALUE_WEIGHTS_V2_LOWER/_RIGHT);
 // the control always runs the shipped V08_A13_VALUE_LEAF.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -103,8 +103,8 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
     delete process.env.V07_WAIT_WEIGHTS_UPPER;
     delete process.env.V08_WAIT_CANCEL_LOWER;
     delete process.env.V08_WAIT_CANCEL_UPPER;
-    const candidateSeatKey = spec.candidateTeam === PBTypes.TeamVals.LEFT ? "LOWER" : "UPPER";
-    const controlSeatKey = spec.candidateTeam === PBTypes.TeamVals.LEFT ? "UPPER" : "LOWER";
+    const candidateSeatKey = spec.candidateTeam === PBTypes.TeamVals.LEFT ? "LEFT" : "RIGHT";
+    const controlSeatKey = spec.candidateTeam === PBTypes.TeamVals.LEFT ? "RIGHT" : "LEFT";
     if (spec.candidateLeaf) {
         process.env[`V07_VALUE_WEIGHTS_V2_${candidateSeatKey}`] = JSON.stringify(spec.candidateLeaf);
     }

@@ -1407,7 +1407,7 @@ export class SearchDriver {
         } else {
             const validTeams = new Set<TeamType>([PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]);
             if (match.searchTeamScope.some((team) => !validTeams.has(team))) {
-                throw new Error("Search team scope may contain only LOWER and UPPER");
+                throw new Error("Search team scope may contain only LEFT and RIGHT");
             }
             this.teamScope = new Set(match.searchTeamScope);
         }

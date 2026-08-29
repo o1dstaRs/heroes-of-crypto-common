@@ -128,7 +128,7 @@ export function estimatePrimaryMeleeDamage(
     if (paralysis) {
         handlerMultiplier *= (100 - paralysis.getPower()) / 100;
     }
-    // Backstab's trigger is measured against the victim's extent ALONG THE AXIS OF ADVANCE (an UPPER-team
+    // Backstab's trigger is measured against the victim's extent ALONG THE AXIS OF ADVANCE (a RIGHT-team
     // attacker has to clear the whole body, not one cell of it) — height on the classic board, width on the
     // side-oriented one. The boolean can only ever say 1 or 2, so passing the real sides leaves both shipped
     // shapes at exactly the margin they had and stops a 2x1 target from being priced as if it had a second

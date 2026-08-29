@@ -216,9 +216,9 @@ interface IConditionalPickDriverOptions {
 }
 
 export interface IRankedConditionalPickOverrides {
-    /** Optional lower-seat draft policy. The positional genome remains the backward-compatible default. */
+    /** Optional left-seat draft policy. The positional genome remains the backward-compatible default. */
     leftGenome?: ILeagueGenome;
-    /** Optional upper-seat draft policy. The positional genome remains the backward-compatible default. */
+    /** Optional right-seat draft policy. The positional genome remains the backward-compatible default. */
     rightGenome?: ILeagueGenome;
     /** Return undefined to retain CONDITIONAL_SETUP_V1 for this seat. */
     pickArtifactT2?: IConditionalPickDriverOptions["pickArtifactT2"];
@@ -517,7 +517,7 @@ export function playSetupConditionalGame(
     const conditionalTeam = cell.control ? undefined : aIsLeft ? LEFT : RIGHT;
     const genome = cell.draft === "league" ? shippedLeagueGenome(options.leagueGenomeSpec) : undefined;
     const { left, right } = runConditionalPickGame(seed, cell.draft, conditionalTeam, rules, genome);
-    // LOWER is the green team (battle_engine GREEN_TEAM = TeamVals.LOWER), matching the live seat mapping.
+    // LEFT is the green team (battle_engine GREEN_TEAM = TeamVals.LEFT), matching the live seat mapping.
     FightStateManager.getInstance();
     const result = runMatch({
         greenVersion: options.fightVersion,

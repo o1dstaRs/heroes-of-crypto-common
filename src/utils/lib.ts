@@ -109,7 +109,7 @@ function nextRaw53(): bigint {
         // The seeded source (mulberry32) yields only 32 bits of precision, so `floor(r * 2^53)` would push
         // those bits into the HIGH end and leave the LOW 21 bits always zero. That biases small-range
         // getRandomInt — e.g. randomInt(0, 2) returned the low bit, hence ALWAYS 0, which made the
-        // morale-tie turn-order coin flip never random (LOWER/green always went first in sims -> a spurious
+        // morale-tie turn-order coin flip never random (LEFT/green always went first in sims -> a spurious
         // ~57/43 side bias that does NOT exist in production). Combine TWO draws for a full 53-bit value with
         // random LOW bits, matching the crypto branch's distribution. Production (crypto) is unaffected.
         const clamp = (r: number): number => (r < 0 ? 0 : r >= 1 ? 0.9999999999999999 : r);

@@ -212,7 +212,7 @@ const canonicalAimSide = (side: number | null, perspectiveTeam: TeamType): numbe
 
 export function ilActionFeatureVector(metadata: IIlCandidateActionMetadata, perspectiveTeam: TeamType): number[] {
     if (perspectiveTeam !== LEFT && perspectiveTeam !== RIGHT) {
-        throw new Error("IL action features require a LOWER or UPPER acting-team perspective");
+        throw new Error("IL action features require a LEFT or RIGHT acting-team perspective");
     }
     const move = metadata.move;
     const [hasTargetCell, targetCellX, targetCellY] = cellFeatures(metadata.targetCell, perspectiveTeam);

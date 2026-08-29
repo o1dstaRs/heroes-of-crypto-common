@@ -174,7 +174,7 @@ describe("v0.7 public-roster setup search", () => {
             naturalBoards: 3,
             stratumBoards: 1,
             // 5_000 -> the runner's own production default. Adding Magic Dragon to the level-4 pool made the
-            // rarest stratum — lower seat / LAVA_CENTER / "mage" own-tag — rarer still, and 5_000 draws stopped
+            // rarest stratum — left seat / LAVA_CENTER / "mage" own-tag — rarer still, and 5_000 draws stopped
             // reaching it. A hand-picked larger throttle is the wrong fix: how many draws that stratum needs
             // depends on where in the RNG stream the scan starts, which differs between running this file
             // alone and running the whole suite. Scanning exactly as far as production does removes the

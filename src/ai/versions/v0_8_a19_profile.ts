@@ -39,7 +39,7 @@ export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simul
 // the teams and the env are set, and the stock driver is deliberately constructed with that env withheld
 // and restored afterwards, so an override aimed at the research arm cannot leak into it.
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "d408c4f30ed86d9b152c7bbf07220713c8a37645ec761003f946825a922c460c" as const;
+    "4dbc116a4812d2a5df5277bc5270b74302675a44f9f2975c0557bf4e1396fb55" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
     "330fcb06556c354310d76eb08faab4928bb8833434999fbc9cc6d37649f04014" as const;

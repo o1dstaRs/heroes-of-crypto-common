@@ -124,7 +124,7 @@ describe("v0.8 A19 Ogre Mage and Behemoth ranged-corner placement", () => {
         });
     });
 
-    test("mirrors the formation for the upper seat", () => {
+    test("mirrors the formation for the right seat", () => {
         const fixture = scenario(RIGHT);
         const placed = candidate(fixture).placeArmy(fixture.units, fixture.context);
         assertLegalCompletePlacement(fixture, placed);

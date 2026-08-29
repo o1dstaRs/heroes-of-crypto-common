@@ -36,14 +36,14 @@ export function getAbilitiesWithPosisionCoefficient(
     }
 
     // Both arguments are ANCHOR cells — the top-right corner of a footprint — so the anchor names the FAR
-    // edge along each axis while the body reaches back to `anchor - (extent - 1)`. An UPPER-team attacker
+    // edge along each axis while the body reaches back to `anchor - (extent - 1)`. A RIGHT-team attacker
     // stabs from below, so it has to clear the whole body rather than a single cell of it: the margin is
     // the target's extent, minus one, ALONG THE AXIS OF ADVANCE. That axis is Y on the classic board and X
     // on the side-oriented ranked board, so the margin has to switch with it — reading the height on a side
     // board measures the body across the advance instead of along it, and a rectangle then earns or loses
     // Backstab a cell early. `toUnitSmallSize` could only ever say 1 or 2, which is why the shipped code
     // spelled the margin as a literal 0-or-1; callers that still pass only the boolean get the same number
-    // back, and a square target is unaffected by the axis choice. The LOWER-team test has no margin at all
+    // back, and a square target is unaffected by the axis choice. The LEFT-team test has no margin at all
     // and gains none here — its comparison already reads the target's near edge.
     const targetAlongExtent = normalizeFootprintSide(
         sideOrientedBoard ? toFootprintWidth : toFootprintHeight,
@@ -65,7 +65,7 @@ export function getAbilitiesWithPosisionCoefficient(
             }
 
             // The footprint margin follows the axis too: along the advance axis the anchor names the
-            // FAR edge, so the UPPER attacker must clear the body's full extent along that axis.
+            // FAR edge, so the RIGHT attacker must clear the body's full extent along that axis.
             if (fromUnitTeam === PBTypes.TeamVals.RIGHT && along < targetAlong - (targetAlongExtent - 1)) {
                 abilities.push(a);
             }

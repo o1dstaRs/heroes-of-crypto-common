@@ -120,7 +120,7 @@ const implementationUrl = new URL(
     import.meta.url,
 );
 
-describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => {
+describe("v0.8 A19-H18 f184 LEFT-only human-placement research profile", () => {
     it("derives explicitly from the unchanged frozen A19-H18 profile", () => {
         expect(V08_A19_H18_PROFILE).toMatchObject({
             schema: V08_A19_H18_PROFILE_SCHEMA,
@@ -146,14 +146,14 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
         expect(V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_PROFILE.policy).toBe(V08_A19_H18_PROFILE.policy);
     });
 
-    it("pins the exact LOWER-only implementation source bytes", () => {
+    it("pins the exact LEFT-only implementation source bytes", () => {
         const bytes = readFileSync(implementationUrl);
         expect(createHash("sha256").update(bytes).digest("hex")).toBe(
             V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_IMPLEMENTATION_SHA256,
         );
     });
 
-    it("binds the frozen v10 gates, production fixture, and LOWER-only scope", () => {
+    it("binds the frozen v10 gates, production fixture, and LEFT-only scope", () => {
         expect(V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_POLICY_BINDING).toMatchObject({
             schema: V08_A19_F184_LOWER_HUMAN_PLACEMENT_POLICY.schema,
             policyId: V08_A19_F184_LOWER_HUMAN_PLACEMENT_POLICY.policyId,
@@ -178,7 +178,7 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
                 placementDepth: 3,
                 legalZoneCellCount: 42,
                 exactPublicMatchup: true,
-                supportedTeam: "LOWER",
+                supportedTeam: "LEFT",
                 unsupportedTeamFallback: "exact-incumbent",
                 openingIds: ["prod-f184-lower-roster", "prod-f184-upper-roster"],
                 rosterCreatureIds: {
@@ -296,7 +296,7 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             "3711c6671beb1e0f0bf3198d1e37596d3c2731814c260026352745b620bbfe24",
         );
         expect(serializedSha256(V08_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK_PROFILE)).toBe(
-            "accc304bc99c55dfabbb442966fca1219eb23aa6913aac3a35b68fdd43bb97f6",
+            "16d2b3b7339bd8276aa7ff4d259e0322c2dd5da0530f1259659e9e17e187ce2c",
         );
     });
 
@@ -363,7 +363,7 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             placementComposition: ["exact-f184-lower", "generic-ranked-placement", "plain-v0.8"],
         });
         expect(fingerprintV08AlignedV1(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_PROFILE)).toBe(
-            "599b3cdcf9e432d15c18fbe81300733dd0a69a684867a112499cd6679813bc7f",
+            "b40d0e3646d2b66fffb9611f57378ffcacd5a1fb40db284c20c0ef5568705a1d",
         );
         expect(Object.isFrozen(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_PROFILE)).toBe(true);
         expect(Object.isFrozen(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_SEARCH)).toBe(true);

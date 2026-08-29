@@ -168,7 +168,7 @@ const assertFallback = (
     });
 };
 
-describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => {
+describe("v0.8 A19 exact f184 LEFT-only human-opening placement policy", () => {
     test("has a distinct production-fixture-bound v11 lower-only-v1 identity", () => {
         expect(V08_A19_F184_LOWER_HUMAN_PLACEMENT_POLICY).toMatchObject({
             schema: "hoc.v0_8_a19_f184_human_placement.v11.lower-only-v1",
@@ -192,7 +192,7 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
         readonly number[],
         Readonly<Record<string, XY>>,
     ][]) {
-        test(`places ${openingId} exactly when the candidate owns LOWER`, () => {
+        test(`places ${openingId} exactly when the candidate owns LEFT`, () => {
             const fixture = scenario([...specs].reverse(), [...opponentIds].reverse());
             const { strategy, calls } = decoratedFor(fixture);
             const selected = strategy.placeArmy(fixture.units, fixture.context);
@@ -213,7 +213,7 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
         });
     }
 
-    test("returns the exact incumbent with explicit unsupported-team fallback for UPPER", () => {
+    test("returns the exact incumbent with explicit unsupported-team fallback for RIGHT", () => {
         for (const [specs, opponentIds] of [
             [LEFT_ROSTER, RIGHT_IDS],
             [RIGHT_ROSTER, LEFT_IDS],
@@ -262,7 +262,7 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
         });
     });
 
-    test("uses the generic correction when a LOWER public roster does not match f184", () => {
+    test("uses the generic correction when a LEFT public roster does not match f184", () => {
         const fixture = scenario(RIGHT_ROSTER, [PBTypes.CreatureVals.BLACK_DRAGON, PBTypes.CreatureVals.GRIFFIN]);
         const strategy = createV08A19H18F184LowerHumanRankedFallbackStrategy();
         const generic = (strategy as unknown as { base: V08A19RankedPlacementStrategy }).base;
@@ -286,7 +286,7 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
         });
     });
 
-    test("retains the v10 lower-side fail-closed gates", () => {
+    test("retains the v10 left-side fail-closed gates", () => {
         assertFallback(scenario(RIGHT_ROSTER, LEFT_IDS, LEFT, PBTypes.GridVals.BLOCK_CENTER), "unsupported-map");
         assertFallback(scenario(RIGHT_ROSTER, LEFT_IDS, LEFT, NORMAL, 4), "unsupported-placement-geometry");
         assertFallback(

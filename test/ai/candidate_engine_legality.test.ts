@@ -370,28 +370,28 @@ describe("enumerated candidate engine legality", () => {
             side: "left" | "right";
         }> = [
             {
-                name: "LOWER right-side reported base",
+                name: "LEFT right-side reported base",
                 team: LEFT,
                 base: { x: 12, y: 8 },
                 targetCell: { x: 10, y: 7 },
                 side: "right",
             },
             {
-                name: "UPPER right-mountain high-Y edge",
+                name: "RIGHT right-mountain high-Y edge",
                 team: RIGHT,
                 base: { x: 10, y: 10 },
                 targetCell: { x: 9, y: 8 },
                 side: "right",
             },
             {
-                name: "LOWER left-mountain corridor edge",
+                name: "LEFT left-mountain corridor edge",
                 team: LEFT,
                 base: { x: 8, y: 8 },
                 targetCell: { x: 6, y: 7 },
                 side: "left",
             },
             {
-                name: "UPPER left-mountain high-Y edge",
+                name: "RIGHT left-mountain high-Y edge",
                 team: RIGHT,
                 base: { x: 6, y: 10 },
                 targetCell: { x: 5, y: 8 },

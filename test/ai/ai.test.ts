@@ -247,8 +247,8 @@ describe("SmallUnit", () => {
     //         [2, 0, 0, 0],
     //     ];
     //      */
-    //     const unit = new UnitRepr(TeamType.UPPER, 2, 1, 1, false, true, { x: 3, y: 1 },
-    //         getUnitConfig(TeamType.UPPER, "Life", "Peasant", 2)
+    //     const unit = new UnitRepr(TeamType.RIGHT, 2, 1, 1, false, true, { x: 3, y: 1 },
+    //         getUnitConfig(TeamType.RIGHT, "Life", "Peasant", 2)
     //     );
     //     const closestTarget = findTarget(unit, new Grid(4), matrix, pathHelper);
     //     expect(closestTarget?.cellToMove()).toEqual({ x: 2, y: 2 });
@@ -265,14 +265,14 @@ describe("SmallUnit", () => {
     //     ];
     //     const unit = new UnitRepr(
     //         "id",
-    //         TeamType.UPPER,
+    //         TeamType.RIGHT,
     //         2,
     //         1,
     //         1,
     //         false,
     //         true,
     //         { x: 2, y: 0 },
-    //         getUnitConfig(TeamType.UPPER, "Life", "Arbalester", 2),
+    //         getUnitConfig(TeamType.RIGHT, "Life", "Arbalester", 2),
     //     );
     //     const closestTarget = findTarget(unit, new Grid(4), matrix, pathHelper);
     //     expect(closestTarget?.cellToAttack()).toEqual({ x: 1, y: 3 });
@@ -285,7 +285,7 @@ describe("SmallUnit", () => {
     //             [1, 1, 1],
     //             [1, 1, 1],
     //         ];
-    //         const unit = new UnitRepr("id", TeamType.UPPER, 1, 1, 1, false, true, { x: 1, y: 0 });
+    //         const unit = new UnitRepr("id", TeamType.RIGHT, 1, 1, 1, false, true, { x: 1, y: 0 });
     //         const closestTarget = findTarget(unit, new Grid(3), matrix, pathHelper);
     //         expect(closestTarget?.cellToMove()).toBeUndefined();
     //     });

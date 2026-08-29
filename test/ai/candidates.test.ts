@@ -2581,7 +2581,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const c = createCombatTestContext();
         const trent = makeReal(LEFT, "Nature", "Trent");
         trent.setStackPower(5);
-        // An ENEMY screen: friendly bodies are transparent to a throw, so a LOWER blocker would prove nothing.
+        // An ENEMY screen: friendly bodies are transparent to a throw, so a LEFT blocker would prove nothing.
         const blocker = createTestUnit({ team: RIGHT, name: "Blocker", attackType: MELEE });
         const blocked = createTestUnit({ team: RIGHT, name: "Blocked target", attackType: MELEE });
         const clear = createTestUnit({ team: RIGHT, name: "Clear target", attackType: MELEE });

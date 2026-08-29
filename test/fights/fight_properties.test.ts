@@ -519,7 +519,7 @@ describe("FightProperties", () => {
             expect(fresh.getSynergiesPerTeam(team)).toEqual([]);
             expect(fresh.getAdditionalAuraRangePerTeam(team)).toBe(0);
 
-            // Isolation: restoring LOWER's synergies must not leak into UPPER.
+            // Isolation: restoring LEFT's synergies must not leak into RIGHT.
             expect(prior.getAdditionalAuraRangePerTeam(PBTypes.TeamVals.RIGHT)).toBe(0);
         });
 
@@ -627,12 +627,12 @@ describe("FightProperties", () => {
         it("roundtrips already-made-turn team buckets", () => {
             const fightProperties = new FightProperties();
 
-            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LEFT, "lower-one");
+            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LEFT, "left-one");
             fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LEFT, "lower-two");
 
             const restored = FightProperties.deserialize(fightProperties.serialize());
 
-            expect(restored.hasAlreadyMadeTurn("lower-one")).toBe(true);
+            expect(restored.hasAlreadyMadeTurn("left-one")).toBe(true);
             expect(restored.hasAlreadyMadeTurn("lower-two")).toBe(true);
             expect(restored.getAlreadyMadeTurnSize()).toBe(2);
         });

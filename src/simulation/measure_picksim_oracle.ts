@@ -585,7 +585,7 @@ const mergeOverrides = (
 
 /**
  * Play one independently addressable game: full pick phase + LIVETWIN fight. Games 2k/2k+1 share the offer
- * board RNG and combat seed, with slot A assigned to opposite LOWER/UPPER pick seats. Both policies re-draft in
+ * board RNG and combat seed, with slot A assigned to opposite LEFT/RIGHT pick seats. Both policies re-draft in
  * the second game, so this is not a fixed-army battle side swap and pick-seat luck need not cancel exactly.
  * The shared seed makes the two games a statistical cluster, which the reported conservative uncertainty
  * accounts for.
@@ -608,7 +608,7 @@ export function playPickSimGame(
     const outcome = runPickPhase(seed, leftPolicy, rightPolicy, payoff);
     const leftArmy = buildArmyFromPick(outcome.state.left);
     const rightArmy = buildArmyFromPick(outcome.state.right);
-    // LOWER is the green team (battle_engine GREEN_TEAM = TeamVals.LOWER), matching the live seat mapping.
+    // LEFT is the green team (battle_engine GREEN_TEAM = TeamVals.LEFT), matching the live seat mapping.
     const matchRunner =
         dependencies.matchRunner ??
         ((config: IMatchConfig): IPickMatchOutcome => {

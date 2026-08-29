@@ -287,10 +287,10 @@ describe("GameActionEngine", () => {
     });
 
     it("grants additional turn time to the active team once per lap and refuses off-turn / repeat requests", () => {
-        const setup = setupActionFight(); // active unit belongs to LOWER
+        const setup = setupActionFight(); // active unit belongs to LEFT
         const before = setup.fightProperties.getCurrentTurnEnd();
 
-        // Off-turn: UPPER cannot extend the clock while a LOWER unit is active.
+        // Off-turn: RIGHT cannot extend the clock while a LEFT unit is active.
         expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.RIGHT })).toMatchObject({
             completed: false,
             rejectionReason: "additional_time_not_available",

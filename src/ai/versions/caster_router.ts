@@ -272,8 +272,8 @@ function bestWildRegeneration(
  * F4 candidate, so spell target and engine legality remain centralized in candidates.ts.
  *
  * A/B seat scoping: both seats of a sim game share process env, so a plain on/off can never produce the
- * routed-vs-unrouted pairing the LiveTwin A/B needs. `V06_CASTER_ROUTER=green` routes ONLY the LOWER
- * team's casters and `=red` only the UPPER team's ("both" == "on"); the paired runner flips the value
+ * routed-vs-unrouted pairing the LiveTwin A/B needs. `V06_CASTER_ROUTER=green` routes ONLY the LEFT
+ * team's casters and `=red` only the RIGHT team's ("both" == "on"); the paired runner flips the value
  * between the two side-swapped games of a seed so seat luck cancels. Any other value keeps the gate off.
  */
 function casterRouterGateOn(unit: Unit): boolean {

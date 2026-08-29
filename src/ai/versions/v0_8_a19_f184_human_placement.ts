@@ -88,7 +88,7 @@ interface IOpeningUnit {
     readonly footprintWidth?: number;
     readonly footprintHeight?: number;
     readonly faction: number;
-    /** Base cell normalized to LOWER. Large units use the engine's upper-right footprint anchor. */
+    /** Base cell normalized to LEFT. Large units use the engine's upper-right footprint anchor. */
     readonly leftBase: Readonly<XY>;
 }
 
@@ -210,8 +210,8 @@ const RIGHT_ROSTER: readonly IOpeningUnit[] = Object.freeze([
 const idsFor = (units: readonly IOpeningUnit[]): readonly number[] => units.map(({ creatureId }) => creatureId);
 
 /**
- * Canonical LOWER templates recovered from production match f1841493-c0bd-41e8-9281-27ce531ece8b.
- * The recorded UPPER template is reflected into LOWER here and reflected back at runtime by footprint size.
+ * Canonical LEFT templates recovered from production match f1841493-c0bd-41e8-9281-27ce531ece8b.
+ * The recorded RIGHT template is reflected into LEFT here and reflected back at runtime by footprint size.
  */
 const OPENINGS: readonly IOpeningRecipe[] = Object.freeze([
     Object.freeze({
@@ -302,7 +302,7 @@ const normalizedPlacementFingerprint = (
 };
 
 /**
- * Mirror a template anchor recorded for LOWER onto UPPER.
+ * Mirror a template anchor recorded for LEFT onto RIGHT.
  *
  * A row `r` mirrors to `GRID_SIZE - 1 - r`, which reverses the body's rows — so the anchor, being the body's
  * MAX row, moves to what used to be its minimum: hence the `+ (H - 1)` correction. The old form spelled that

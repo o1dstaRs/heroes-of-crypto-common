@@ -265,7 +265,7 @@ function validArtifacts(runId: string) {
 }
 
 describe("ranked conditional dual-genome compatibility", () => {
-    test("retains the positional genome default while allowing independent lower and upper policies", () => {
+    test("retains the positional genome default while allowing independent left and right policies", () => {
         const rules = parseConditionalRules("all");
         const round1 = projectDraftGenomeForShipping(parseDraftGenome(LEAGUE_ROUND1_DRAFT_SPEC));
         const round3 = projectDraftGenomeForShipping(parseDraftGenome(LEAGUE_ROUND3_DRAFT_SPEC));

@@ -136,7 +136,7 @@ const record = (
 const NO_EFFECT_A_ALWAYS_WINS = ["green", "green", "red", "red"] as const;
 const POSITIVE_DRAW_BASELINES = ["draw", "green", "draw", "green"] as const;
 
-describe("v0.8+A19 f184 LOWER-only causal placement A/B", () => {
+describe("v0.8+A19 f184 LEFT-only causal placement A/B", () => {
     test("pins the v15 stage geometry, fresh seeds, and deterministic A19/H18 efficacy environment", () => {
         expect(V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_SCHEMA).toBe(
             "hoc.v0_8_a19_f184_lower_human_placement_deterministic_causal_ab.v15",
@@ -199,7 +199,7 @@ describe("v0.8+A19 f184 LOWER-only causal placement A/B", () => {
         );
         expect(V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_CANDIDATE_IDENTITY).toMatchObject({
             candidateId: "a19-h18-prod-f184-opening-lower-only-v1-research",
-            implementationSha256: "25a195624d401fdd429722bdb209e0aff7b274576d5392c5944130cb1c94e37c",
+            implementationSha256: "24e88df821d1cdbc1897bffd2d1f1c6df53ed5f2338f3e97b238b53efb792650",
         });
         expect(V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_SOURCE_FILES).toContain(
             "src/simulation/v0_8_a19_f184_lower_human_placement_ab_worker.ts",
@@ -226,7 +226,7 @@ describe("v0.8+A19 f184 LOWER-only causal placement A/B", () => {
         ).toThrow("requires concurrency 12");
     });
 
-    test("runs exactly two same-orientation LOWER causal pairs", () => {
+    test("runs exactly two same-orientation LEFT causal pairs", () => {
         expect(V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_SCHEDULE).toEqual([
             {
                 id: "ab-control",
@@ -359,14 +359,14 @@ describe("v0.8+A19 f184 LOWER-only causal placement A/B", () => {
         expect(summary.rosters.b.meanDelta).toBe(0);
     });
 
-    test("scores draws as one half and clusters the two LOWER effects", () => {
+    test("scores draws as one half and clusters the two LEFT effects", () => {
         const records = [record(0, POSITIVE_DRAW_BASELINES), record(1, POSITIVE_DRAW_BASELINES)];
         const effects = causalV08A19F184LowerHumanPlacementEffects(records[0]);
         expect(effects["a-green"]).toMatchObject({ baselineScore: 0.5, candidateScore: 1, delta: 0.5 });
         expect(effects["b-green"]).toMatchObject({ baselineScore: 0.5, candidateScore: 1, delta: 0.5 });
         const summary = summarizeV08A19F184LowerHumanPlacementAbRecords(records, 200);
         expect(summary).toMatchObject({
-            estimand: "mean direct draw-aware LOWER score delta across the two exact production rosters",
+            estimand: "mean direct draw-aware LEFT score delta across the two exact production rosters",
             clusters: 2,
             games: 8,
             primary: {

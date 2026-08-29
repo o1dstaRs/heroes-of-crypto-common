@@ -99,8 +99,8 @@ export interface IV08A19F184LowerHumanPlacementAbScheduleEntry {
 }
 
 /**
- * Four unique fights identify both LOWER-side direct effects. Each production roster is treated once while
- * LOWER, against the same-orientation plain-v0.8 control; UPPER is never decorated.
+ * Four unique fights identify both LEFT-side direct effects. Each production roster is treated once while
+ * LEFT, against the same-orientation plain-v0.8 control; RIGHT is never decorated.
  */
 export const V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_SCHEDULE = Object.freeze([
     {
@@ -197,7 +197,7 @@ export interface IV08A19F184CanonicalPlacementRow {
     readonly size: number;
     readonly amount: number;
     readonly x: number;
-    /** Base-cell Y normalized to LOWER. */
+    /** Base-cell Y normalized to LEFT. */
     readonly y: number;
 }
 
@@ -264,7 +264,7 @@ export interface IV08A19F184LowerHumanPlacementAbMetric {
 }
 
 export interface IV08A19F184LowerHumanPlacementAbSummaryRows {
-    readonly estimand: "mean direct draw-aware LOWER score delta across the two exact production rosters";
+    readonly estimand: "mean direct draw-aware LEFT score delta across the two exact production rosters";
     readonly clusters: number;
     readonly games: number;
     readonly bootstrapIterations: number;
@@ -543,7 +543,7 @@ const playScheduledGame = (
     let redStrategy: IAIStrategy = strategyForControl();
     let candidateStrategy: V08A19F184LowerHumanPlacementStrategy | undefined;
     if (entry.treatedSide !== null) {
-        if (entry.treatedSide !== "green") throw new Error("lower-only f184 treatment must be green/LOWER");
+        if (entry.treatedSide !== "green") throw new Error("lower-only f184 treatment must be green/LEFT");
         candidateStrategy = createV08A19H18F184LowerHumanPlacementStrategy();
         greenStrategy = candidateStrategy;
     }
@@ -873,7 +873,7 @@ export function summarizeV08A19F184LowerHumanPlacementAbRecords(
         ]),
     ) as unknown as Readonly<Record<V08A19F184LowerHumanPlacementAbCell, IV08A19F184LowerHumanPlacementAbMetric>>;
     return {
-        estimand: "mean direct draw-aware LOWER score delta across the two exact production rosters",
+        estimand: "mean direct draw-aware LEFT score delta across the two exact production rosters",
         clusters: records.length,
         games: records.length * V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_CLUSTER_SIZE,
         bootstrapIterations,
@@ -1314,7 +1314,7 @@ export async function runV08A19F184LowerHumanPlacementAb(
             treatment: V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_PROFILE.candidateId,
             control: `${V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_PROFILE.derivesFrom.candidateId} with plain StrategyV0_8 placement`,
             pairing: "same exact setup and combat seed; opposing army remains plain v0.8 in each direct contrast",
-            weighting: "the two LOWER roster effects weighted equally within combat-seed cluster",
+            weighting: "the two LEFT roster effects weighted equally within combat-seed cluster",
             draws: "0.5 score",
             inference:
                 "normal cluster interval plus deterministic percentile bootstrap resampled by combat-seed cluster",

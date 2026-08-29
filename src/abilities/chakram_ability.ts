@@ -153,7 +153,7 @@ const chakramBearing = (from: XY, to: XY): number => Math.atan2(to.y - from.y, t
 /**
  * How far CLOCKWISE you must turn from `heading` to be looking at `bearing`, in [0, 2π).
  *
- * The grid is y-UP — the LOWER team sits at low y and the UPPER team at high y — so atan2 grows
+ * The grid is y-UP — the LEFT team sits at low y and the RIGHT team at high y — so atan2 grows
  * counter-clockwise and turning clockwise means SUBTRACTING angle. Straight ahead is 0, so a target
  * directly in the disc's path is taken before it sweeps anywhere.
  */

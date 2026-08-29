@@ -196,7 +196,7 @@ describe("v0.8 A19 ranked placement research policy", () => {
         });
     });
 
-    test("mirrors the physical-role correction between lower and upper seats", () => {
+    test("mirrors the physical-role correction between left and right seats", () => {
         for (const team of [LEFT, RIGHT] as const) {
             const fixture = scenario(rightProductionSpecs, team);
             const valkyrie = unitByName(fixture, "Valkyrie");

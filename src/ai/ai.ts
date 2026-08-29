@@ -1170,8 +1170,8 @@ function evaluateMountainStrategy(
 // ──────────────────────────────── Backstab positioning ────────────────────────────────
 // Backstab (Scavenger) deals bonus damage only when the attacker strikes from the target's far side.
 // Mirror the engine's trigger (getAbilitiesWithPosisionCoefficient) ALONG THE AXIS OF ADVANCE: Y on
-// the classic bottom/top board, X on the side-oriented ranked board. A LOWER-team attacker must
-// stand deeper along its advance than the target, an UPPER-team attacker shallower. (Small targets
+// the classic bottom/top board, X on the side-oriented ranked board. A LEFT-team attacker must
+// stand deeper along its advance than the target, a RIGHT-team attacker shallower. (Small targets
 // only here, so no large-unit margin.)
 function isBackstabCell(team: number, fromCell: HoCMath.XY, targetCell: HoCMath.XY, sideOriented: boolean): boolean {
     const along = sideOriented ? fromCell.x : fromCell.y;

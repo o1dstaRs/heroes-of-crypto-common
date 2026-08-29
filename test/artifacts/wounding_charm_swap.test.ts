@@ -19,7 +19,7 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 const LEFT = PBTypes.TeamVals.LEFT;
 const DEEP_WOUNDS_1 = "Deep Wounds Level 1";
 
-/** Equip a Tier 1 artifact for LOWER and run the recompute the sandbox runs on every pick. */
+/** Equip a Tier 1 artifact for LEFT and run the recompute the sandbox runs on every pick. */
 const equipTier1 = (context: ReturnType<typeof createCombatTestContext>, artifact: Tier1Artifact) => {
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setArtifactPerTeam(LEFT, ArtifactTier.TIER_1, artifact);

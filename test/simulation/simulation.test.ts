@@ -228,7 +228,7 @@ describe("AI v0.2 out-of-ammo handling", () => {
             placement: zone,
         });
 
-        // LOWER team: frontness == y (higher = closer to the enemy).
+        // LEFT team: frontness == y (higher = closer to the enemy).
         const cellOf = (u: typeof arbalester) => placed.get(u.getId())!;
         const front = (u: typeof arbalester) => cellOf(u).y;
         for (const u of units) {

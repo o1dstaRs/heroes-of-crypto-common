@@ -51,10 +51,10 @@ export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_IMPLEMENTATION_SOURCE =
 // replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
 // qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "25a195624d401fdd429722bdb209e0aff7b274576d5392c5944130cb1c94e37c" as const;
+    "24e88df821d1cdbc1897bffd2d1f1c6df53ed5f2338f3e97b238b53efb792650" as const;
 
 /**
- * Browser-safe identity for the development-selected LOWER-only f184 opening. The profile pins both this
+ * Browser-safe identity for the development-selected LEFT-only f184 opening. The profile pins both this
  * seat gate and the frozen v10 implementation that supplies its exact roster and legality checks.
  */
 export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_POLICY_BINDING = Object.freeze({
@@ -82,7 +82,7 @@ export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_POLICY_BINDING = Object.free
         placementDepth: 3 as const,
         legalZoneCellCount: 42 as const,
         exactPublicMatchup: true as const,
-        supportedTeam: "LOWER" as const,
+        supportedTeam: "LEFT" as const,
         unsupportedTeamFallback: "exact-incumbent" as const,
         openingIds: Object.freeze(["prod-f184-lower-roster", "prod-f184-upper-roster"] as const),
         rosterCreatureIds: Object.freeze({
@@ -94,7 +94,7 @@ export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_POLICY_BINDING = Object.free
 
 /**
  * A composite research identity. It keeps the frozen A19-H18 search/genome identity byte-for-byte and adds
- * only the independently pinned LOWER-side placement policy. It does not replace or mutate the base profile.
+ * only the independently pinned LEFT-side placement policy. It does not replace or mutate the base profile.
  */
 export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_PROFILE = Object.freeze({
     schema: V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_PROFILE_SCHEMA,
@@ -110,12 +110,12 @@ export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_PROFILE = Object.freeze({
     placementPolicy: V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_POLICY_BINDING,
 });
 
-/** Create a fresh LOWER-only placement decorator over the exact v0.8 combat strategy. */
+/** Create a fresh LEFT-only placement decorator over the exact v0.8 combat strategy. */
 export function createV08A19H18F184LowerHumanPlacementStrategy(): V08A19F184LowerHumanPlacementStrategy {
     const base = new StrategyV0_8();
     if (base.version !== V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_BASE_VERSION) {
         throw new Error(
-            `v0.8 A19-H18 LOWER-only placement requires ${V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_BASE_VERSION}, got ${base.version}`,
+            `v0.8 A19-H18 LEFT-only placement requires ${V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_BASE_VERSION}, got ${base.version}`,
         );
     }
     return new V08A19F184LowerHumanPlacementStrategy(base);

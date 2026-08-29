@@ -331,7 +331,7 @@ describe("v0.8 A19 exact f184 human-opening placement policy", () => {
     });
 
     test("today's shipped catalog reshapes the mounted class, so every live f184 roster falls back", () => {
-        // Griffin (lower roster) and Mantis (upper roster) now ship 2x1 size-2; the recorded fight-184
+        // Griffin (left roster) and Mantis (right roster) now ship 2x1 size-2; the recorded fight-184
         // stacks were 1x1 size-1. The shape gate exists precisely so the exact opening is never faked
         // onto differently-shaped pieces — the treatment must disable, not repair.
         for (const [specs, opponentIds] of [

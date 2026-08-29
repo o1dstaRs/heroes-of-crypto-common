@@ -26,7 +26,7 @@ export class RectanglePlacement implements IPlacement {
     private readonly possibleCellHashesSet: Set<number>;
     protected readonly sideOriented: boolean;
     // The side-oriented cell enumeration, ported verbatim from the server's SideRectanglePlacement:
-    // full-height x-band (LOWER = left columns, UPPER = right columns), size-3 zones inset one cell
+    // full-height x-band (LEFT = left columns, RIGHT = right columns), size-3 zones inset one cell
     // from the top/bottom edges, size-6 opening the outermost column.
     private sideCellPositions(footprintWidth: number, footprintHeight: number): XY[] {
         const footprintXInset = Math.max(0, Math.floor(footprintWidth) - 1);
@@ -58,7 +58,7 @@ export class RectanglePlacement implements IPlacement {
         placementPositionType: PlacementPositionType,
         size = 3,
         // SIDE-oriented boards (the ranked Point-X layout) deploy the armies on the LEFT/RIGHT
-        // flanks: the zone becomes an x-band over the full board height (LOWER = left, UPPER =
+        // flanks: the zone becomes an x-band over the full board height (LEFT = left, RIGHT =
         // right), mirroring the server's authoritative SideRectanglePlacement geometry exactly.
         // Default false keeps the classic bottom/top y-bands byte-for-byte.
         sideOriented = false,

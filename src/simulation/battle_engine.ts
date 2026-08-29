@@ -124,7 +124,7 @@ function valueDataCapture(config: IMatchConfig): IValueDataCapture | null {
     };
 }
 
-/** Green plays the LOWER team, red plays UPPER — matching the e2e/ranked convention. */
+/** Green plays the LEFT team, red plays RIGHT — matching the e2e/ranked convention. */
 export type Side = "green" | "red";
 export const GREEN_TEAM: TeamType = PBTypes.TeamVals.LEFT;
 export const RED_TEAM: TeamType = PBTypes.TeamVals.RIGHT;

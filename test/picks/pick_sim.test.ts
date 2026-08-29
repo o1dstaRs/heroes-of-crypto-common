@@ -84,9 +84,9 @@ describe("pick_sim", () => {
             14,
             13, // four globally distinct L2 offers (16-creature pool: Battle Mage in, Zena out to L3)
             12,
-            11, // lower's distinct T1 pair (12-artifact live pool: the arcane ring is in)
+            11, // left's distinct T1 pair (12-artifact live pool: the arcane ring is in)
             12,
-            11, // upper's distinct T1 pair
+            11, // right's distinct T1 pair
             12,
             11,
             10, // lower T2 offer (12-artifact live pool)

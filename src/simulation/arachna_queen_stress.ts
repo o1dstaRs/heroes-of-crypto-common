@@ -72,7 +72,7 @@ const VICTIM_FILLERS: readonly ICreatureRef[] = [
 
 /**
  * Focused real-creature boards. Each side has at most one LARGE stack, so normal 3x3 deployment remains
- * legal. Every pair plays the same board twice with the armies swapped between LOWER and UPPER.
+ * legal. Every pair plays the same board twice with the armies swapped between LEFT and RIGHT.
  */
 export const ARACHNA_QUEEN_STRESS_SCENARIOS: readonly IArachnaQueenStressScenario[] = [
     {
