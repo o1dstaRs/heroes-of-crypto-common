@@ -13,11 +13,7 @@ import type { GameAction } from "../../engine/actions";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import {
-    getPositionForCell,
-    getRangeAttackSideCenter,
-    isRangeAttackSideObservable,
-    RANGE_ATTACK_CELL_SIDES,
-    type RangeAttackCellSide,
+    resolveRangeAttackAimEdge,
 } from "../../grid/grid_math";
 import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { canCastSpell, canMassCastSpell } from "../../spells/spell_helper";
@@ -212,51 +208,31 @@ export class StrategyV0_4 extends StrategyV0_3 {
         const fromTeam = unit.getTeam();
         const through = unit.hasAbilityActive("Through Shot");
         const isAOE = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
-        // Replicate resolveRangeTargetPosition EXACTLY so our verdict matches the engine's handler.
-        const closestCell = (cells: XY[]): XY | undefined => {
-            let best: XY | undefined;
-            let bestD = Number.MAX_VALUE;
-            for (const c of cells) {
-                const d = getDistance(from, getPositionForCell(c, gs.getMinX(), gs.getStep(), gs.getHalfStep()));
-                if (d < bestD) {
-                    bestD = d;
-                    best = c;
-                }
-            }
-            return best;
-        };
-        const closestSide = (cell: XY, sides: RangeAttackCellSide[]): RangeAttackCellSide => {
-            let best = sides[0];
-            let bestD = Number.MAX_VALUE;
-            for (const s of sides) {
-                const d = getDistance(from, getRangeAttackSideCenter(gs, cell, s, from));
-                if (d < bestD) {
-                    bestD = d;
-                    best = s;
-                }
-            }
-            return best;
-        };
-        const cells = target.getCells();
-        const cell =
-            (action.aimCell && cells.find((c) => c.x === action.aimCell?.x && c.y === action.aimCell?.y)) ??
-            closestCell(cells);
-        if (!cell) {
+        // Ask the engine's own resolver where the shot lands, rather than replicating it.
+        //
+        // This block used to open by claiming it replicated resolveRangeTargetPosition EXACTLY. It did,
+        // until 2d28761 changed the engine to scan every observable edge across the WHOLE target body and
+        // to refuse a shot outright when the body shows none — where this copy still picked the nearest
+        // target CELL, took a side of that one cell, and fell back to the body's centre. The two agree for
+        // a 1x1 target and diverge for multi-cell ones, whose own cells screen the sides facing their
+        // siblings. Dormant here in practice, because every shot v0.3+ proposes arrives from candidates.ts
+        // carrying an explicit aimCell/aimSide that the engine honours — but it is the same landmine that
+        // did go off in v0.1 (see the note there), so it is defused the same way instead of being left to
+        // wait for the first caller that omits an aim.
+        const aimEdge = resolveRangeAttackAimEdge(
+            matrix,
+            gs,
+            target.getCells(),
+            from,
+            fromTeam,
+            through,
+            action.aimCell,
+            action.aimSide,
+        );
+        if (!aimEdge) {
             return false;
         }
-        const observableSides = RANGE_ATTACK_CELL_SIDES.filter((s) =>
-            isRangeAttackSideObservable(matrix, cell, s, fromTeam, through),
-        );
-        const to = !observableSides.length
-            ? target.getPosition()
-            : getRangeAttackSideCenter(
-                  gs,
-                  cell,
-                  action.aimSide !== undefined && observableSides.includes(action.aimSide as RangeAttackCellSide)
-                      ? (action.aimSide as RangeAttackCellSide)
-                      : closestSide(cell, observableSides),
-                  from,
-              );
+        const to = aimEdge.position;
         const evaluation = ah.evaluateRangeAttack(uh.getAllUnits(), unit, from, to, through, false, isAOE);
         const groups = evaluation.affectedUnits;
         // The engine keys off the FIRST group (targetUnits[0]); a later non-empty group can't save an empty

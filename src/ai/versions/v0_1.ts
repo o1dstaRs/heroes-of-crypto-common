@@ -17,16 +17,15 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import {
     getPositionForCell,
-    getRangeAttackSideCenter,
     isCellWithinGrid,
     isRangeAttackSideObservable,
     RANGE_ATTACK_CELL_SIDES,
-    type RangeAttackCellSide,
+    resolveRangeAttackAimEdge,
 } from "../../grid/grid_math";
 import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { VINE_STRIDE_COST_MULTIPLIER } from "../../spells/vines";
 import type { Unit } from "../../units/unit";
-import { getDistance, type XY } from "../../utils/math";
+import type { XY } from "../../utils/math";
 import { AIActionType, canUnitLandAt, findTarget, type IAIAction } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { decisionFireWalls } from "../decision_fight_state";
@@ -373,60 +372,32 @@ export class StrategyV0_1 implements IAIStrategy {
         const from = unit.getPosition();
         const through = unit.hasAbilityActive("Through Shot");
         const isAOE = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
-        const closestCell = (cells: XY[]): XY | undefined => {
-            let best: XY | undefined;
-            let bestDistance = Number.MAX_VALUE;
-            for (const cell of cells) {
-                const distance = getDistance(
-                    from,
-                    getPositionForCell(
-                        cell,
-                        gridSettings.getMinX(),
-                        gridSettings.getStep(),
-                        gridSettings.getHalfStep(),
-                    ),
-                );
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    best = cell;
-                }
-            }
-            return best;
-        };
-        const closestSide = (cell: XY, sides: readonly RangeAttackCellSide[]): RangeAttackCellSide => {
-            let best = sides[0];
-            let bestDistance = Number.MAX_VALUE;
-            for (const side of sides) {
-                const distance = getDistance(from, getRangeAttackSideCenter(gridSettings, cell, side, from));
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    best = side;
-                }
-            }
-            return best;
-        };
-
-        const targetCells = target.getCells();
-        const aimCell =
-            (action.aimCell &&
-                targetCells.find((cell) => cell.x === action.aimCell?.x && cell.y === action.aimCell?.y)) ??
-            closestCell(targetCells);
-        if (!aimCell) {
+        // Ask the ENGINE where this shot lands rather than re-deriving it.
+        //
+        // This used to compute the aim point itself: the target CELL nearest the shooter, then the nearest
+        // observable side OF THAT ONE CELL, and — when that cell had no observable side — the target's
+        // centre. That was the engine's rule until 2d28761 replaced it with resolveRangeAttackAimEdge,
+        // which scans every observable edge across the WHOLE body and refuses the shot outright when none
+        // exists. The two agree for a 1x1 target and diverge for every multi-cell one, because the chosen
+        // cell's own body screens the sides facing its siblings: v0.1 would validate one trajectory and
+        // then emit an aimless action the engine resolved onto a different, blocked one — an
+        // `attack_not_available` rejection, which a player sees as a shooter that skips its turn. The
+        // centre fallback was the same bug in its worst form; the engine's docstring calls it out as the
+        // one case where a fully screened unit could be shot straight through the middle.
+        const aimEdge = resolveRangeAttackAimEdge(
+            matrix,
+            gridSettings,
+            target.getCells(),
+            from,
+            unit.getTeam(),
+            through,
+            action.aimCell,
+            action.aimSide,
+        );
+        if (!aimEdge) {
             return false;
         }
-        const observableSides = RANGE_ATTACK_CELL_SIDES.filter((side) =>
-            isRangeAttackSideObservable(matrix, aimCell, side, unit.getTeam(), through),
-        );
-        const to = !observableSides.length
-            ? target.getPosition()
-            : getRangeAttackSideCenter(
-                  gridSettings,
-                  aimCell,
-                  action.aimSide !== undefined && observableSides.includes(action.aimSide as RangeAttackCellSide)
-                      ? (action.aimSide as RangeAttackCellSide)
-                      : closestSide(aimCell, observableSides),
-                  from,
-              );
+        const to = aimEdge.position;
         const evaluation = attackHandler.evaluateRangeAttack(
             context.unitsHolder.getAllUnits(),
             unit,

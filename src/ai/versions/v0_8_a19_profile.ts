@@ -38,8 +38,17 @@ export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simul
 // V08_A19_SEARCH_ENV_OVERRIDES merged in. Production routing is untouched — the seam is inert unless both
 // the teams and the env are set, and the stock driver is deliberately constructed with that env withheld
 // and restored afterwards, so an override aimed at the research arm cannot leak into it.
+// Re-pinned again for the ranged-aim diagnostic (2026-08-29): resolveRangeAttackPrimary now calls the
+// engine's own resolveRangeAttackAimEdge instead of carrying a hand copy of it. The copy had gone stale
+// when 2d28761 moved the engine to "nearest observable edge across the whole body, and no visible edge
+// means the shot is refused", so for a multi-cell target it reported the hit for a DIFFERENT trajectory
+// than the engine fired — which is why a real v0.1 aim divergence surfaced under the generic
+// `shot_no_hit_noaim` label rather than naming itself. Routing is untouched: the helper's only caller
+// assigns to `cause`, the rejection LABEL, and cannot reach a match outcome. Held to the square-only
+// outcome fingerprint, which is byte-identical either side of this change
+// (0ff4bfbb75cdc34b14c20d7cb51088054a00e812ae98384627e06b82d721f1f4, 128 matches, v0.1..v0.8, all grids).
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "a99ab2b77ae9367850f2a855e9d0799848fa26ee8b39ff0ec12662637e7ba4fa" as const;
+    "7e6de3592b33c6014f81b6cebabc2c1ce2789221837c96aaf6f2da60a28e1877" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
     "afc6df1b4ca82e16a43ebc5bf2cce37ab0c761bec81f8ef5714c3d80c8b2d294" as const;

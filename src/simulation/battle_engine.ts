@@ -38,13 +38,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { Grid } from "../grid/grid";
 import { GRID_SIZE, MAX_X, MAX_Y, MIN_X, MIN_Y, MOVEMENT_DELTA, UNIT_SIZE_DELTA } from "../grid/grid_constants";
-import {
-    getPositionForCell,
-    getRangeAttackSideCenter,
-    isRangeAttackSideObservable,
-    RANGE_ATTACK_CELL_SIDES,
-    type RangeAttackCellSide,
-} from "../grid/grid_math";
+import { resolveRangeAttackAimEdge } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { PathHelper } from "../grid/path_helper";
 import { scatteredMountainsForSeed } from "../grid/scattered_mountains";
@@ -62,7 +56,7 @@ import { ArtifactTier } from "../artifacts/artifact_properties";
 import { DefaultPlacementLevel1, type AugmentType } from "../augments/augment_properties";
 import type { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
-import { getDistance, type XY } from "../utils/math";
+import type { XY } from "../utils/math";
 import { ToFactionName } from "../factions/faction_type";
 import {
     captureDeterministicRandomState,
@@ -130,7 +124,16 @@ export const GREEN_TEAM: TeamType = PBTypes.TeamVals.LOWER;
 export const RED_TEAM: TeamType = PBTypes.TeamVals.UPPER;
 const sideForTeam = (team: TeamType): Side => (team === GREEN_TEAM ? "green" : "red");
 
-/** Mirrors GameActionEngine.resolveRangeTargetPosition for rejected-shot diagnostics. */
+/**
+ * The unit a rejected shot would actually have hit, for diagnostics.
+ *
+ * Calls the engine's own resolver rather than mirroring it. It used to carry a hand copy of
+ * resolveRangeTargetPosition, and that copy went stale when 2d28761 moved the engine to "nearest observable
+ * edge across the WHOLE body, and no visible edge means the shot is illegal" — so for a multi-cell target
+ * this diagnostic reported the hit for a DIFFERENT trajectory than the one the engine fired. That is why a
+ * v0.1 aim divergence surfaced under the generic `shot_no_hit_noaim` label instead of naming itself; the
+ * label was computed from the stale rule. Delegating makes this class of failure self-describing.
+ */
 function resolveRangeAttackPrimary(
     attacker: Unit,
     target: Unit,
@@ -139,64 +142,27 @@ function resolveRangeAttackPrimary(
     attackHandler: AttackHandler,
     unitsHolder: UnitsHolder,
 ): Unit | undefined {
-    const gridSettings = grid.getSettings();
     const attackerPosition = attacker.getPosition();
-    const targetCells = target.getCells();
-    let cell = action.aimCell
-        ? targetCells.find((candidate) => candidate.x === action.aimCell?.x && candidate.y === action.aimCell?.y)
-        : undefined;
-    if (!cell) {
-        let closestDistance = Number.MAX_VALUE;
-        for (const candidate of targetCells) {
-            const candidatePosition = getPositionForCell(
-                candidate,
-                gridSettings.getMinX(),
-                gridSettings.getStep(),
-                gridSettings.getHalfStep(),
-            );
-            const distance = getDistance(attackerPosition, candidatePosition);
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                cell = candidate;
-            }
-        }
-    }
-    if (!cell) {
-        return undefined;
-    }
-
     const throughShot = attacker.hasAbilityActive("Through Shot");
-    const observableSides = RANGE_ATTACK_CELL_SIDES.filter((side) =>
-        isRangeAttackSideObservable(grid.getMatrix(), cell, side, attacker.getTeam(), throughShot),
+    const aimEdge = resolveRangeAttackAimEdge(
+        grid.getMatrix(),
+        grid.getSettings(),
+        target.getCells(),
+        attackerPosition,
+        attacker.getTeam(),
+        throughShot,
+        action.aimCell,
+        action.aimSide,
     );
-    let targetPosition = target.getPosition();
-    if (observableSides.length) {
-        let side =
-            action.aimSide !== undefined && observableSides.includes(action.aimSide as RangeAttackCellSide)
-                ? (action.aimSide as RangeAttackCellSide)
-                : undefined;
-        if (side === undefined) {
-            let closestDistance = Number.MAX_VALUE;
-            for (const candidate of observableSides) {
-                const candidatePosition = getRangeAttackSideCenter(gridSettings, cell, candidate, attackerPosition);
-                const distance = getDistance(attackerPosition, candidatePosition);
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                    side = candidate;
-                }
-            }
-        }
-        if (side === undefined) {
-            return undefined;
-        }
-        targetPosition = getRangeAttackSideCenter(gridSettings, cell, side, attackerPosition);
+    if (!aimEdge) {
+        return undefined;
     }
 
     return attackHandler.evaluateRangeAttack(
         unitsHolder.getAllUnits(),
         attacker,
         attackerPosition,
-        targetPosition,
+        aimEdge.position,
         throughShot,
         false,
         attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
