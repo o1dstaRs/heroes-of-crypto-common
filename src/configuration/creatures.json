@@ -981,7 +981,7 @@
             "footprint_height": 1,
             "level": 2,
             "spells": [],
-            "abilities": ["Warding Mane Aura", "Terrifying Gaze", "Deep Wounds Level 2"]
+            "abilities": ["Warding Mane Blessing", "Terrifying Gaze", "Deep Wounds Level 2"]
         },
         "Nightmare": {
             "name": "Nightmare",

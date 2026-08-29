@@ -706,11 +706,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         if (
             ability.getName() === "Stun Aura" ||
-            ability.getName() === "Warding Mane Aura" ||
             ability.getName() === "Guiding Winds Aura" ||
             ability.getName() === "Sylvan Focus Aura"
         ) {
-            // These aura cards print their owner's live projection. The first three scale with stack and luck;
+            // These aura cards print their owner's live projection. The first two scale with stack and luck;
             // Sylvan Focus is flat plus the Satyr's luck. Routing runtime-granted cards through the same owner
             // calculation keeps their text aligned with the value allies actually receive.
             const projectedAura = ability.getAuraEffect();
@@ -720,6 +719,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     .join("\n")
                     .replace(/\{\}/g, Number(this.calculateAuraPower(projectedAura, 0).toFixed(2)).toString());
             }
+        }
+        if (ability.getName() === "Warding Mane Blessing") {
+            return ability.getDesc().join("\n").replace(/\{\}/g, this.calculateWardingManeBlessingPower().toString());
         }
         if (ability.getName() === "Arcane Ward Blessing") {
             return ability.getDesc().join("\n").replace(/\{\}/g, this.calculateArcaneWardBlessingPower().toString());
@@ -2096,6 +2098,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         return Number((ability.getPower() + this.getLuck()).toFixed(2));
+    }
+    /** Board-wide Manticore projection: 5/10/15/20/25 by stack, plus the living source's luck. */
+    public calculateWardingManeBlessingPower(): number {
+        const ability = this.getAbility("Warding Mane Blessing");
+        if (!ability) {
+            return 0;
+        }
+
+        const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, this.getStackPower()));
+        return Number(
+            Math.max(0, (ability.getPower() / MAX_UNIT_STACK_POWER) * stackPower + this.getLuck()).toFixed(2),
+        );
     }
     public calculateEffectMultiplier(effect: Effect, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;
@@ -3537,7 +3551,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // own magic armor the way the physical half works: base magic armor is 0/5/10/15 by creature level,
         // so a percentage gave a level 1 unit 21% of nothing and a level 2 unit barely one point. Applied to
         // the base here, BEFORE the independent ability rolls below, so Magic Shield / Wardguard / Warding
-        // Mane still compose on top of the raised figure.
+        // Mane Blessing still compose on top of the raised figure.
         const armorAugmentMagicBuff = statBuffs["Armor Augment"];
         if (armorAugmentMagicBuff) {
             this.unitProperties.magic_resist = roundUnitStat(
@@ -3560,13 +3574,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 magicResists.push(this.calculateAbilityMultiplier(wardguardAbility, synergyAbilityPowerIncrease));
             }
 
-            // AURA Warding Mane (Manticore): magic armor for every ally within 2 cells. Folded in as one more
-            // INDEPENDENT resistance roll rather than added to magic_resist, so it composes with Magic Shield
-            // and Wardguard the same way those compose with each other and can never push the unit to a flat
-            // 100% immunity. calculateAuraPower already returned it stack-powered, as a percentage.
-            const wardingManeAura = this.getAppliedAuraEffect("Warding Mane Aura");
-            if (wardingManeAura) {
-                magicResists.push(Math.max(0, wardingManeAura.getPower()) / 100);
+            // Warding Mane Blessing (Manticore): the strongest living allied source projects this board-wide.
+            // It composes as an independent resistance roll, just like Magic Shield and Arcane Ward Blessing.
+            const wardingManeBlessing = statBuffs["Warding Mane Blessing"];
+            if (wardingManeBlessing) {
+                magicResists.push(Math.max(0, wardingManeBlessing.getPower()) / 100);
             }
 
             // Arcane Ward Blessing (Squire): the strongest living allied Squire projects this board-wide.

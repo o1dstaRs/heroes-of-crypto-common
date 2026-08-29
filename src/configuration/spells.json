@@ -436,6 +436,27 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Warding Mane Blessing": {
+            "name": "Warding Mane Blessing",
+            "level": 0,
+            "desc": [
+                "Warding Mane Blessing grants {}% magic defence.",
+                "Active while an allied unit with Warding Mane Blessing is alive."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 25,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Cursed Ward": {
             "name": "Cursed Ward",
             "level": 0,

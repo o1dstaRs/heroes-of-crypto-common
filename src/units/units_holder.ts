@@ -991,6 +991,39 @@ export class UnitsHolder {
             unit.applyBuff(buff, power);
         }
     }
+    private refreshWardingManeBlessingForAllUnits(): void {
+        const powerPerTeam: Map<TeamType, number> = new Map();
+
+        for (const unit of this.getAllUnitsIterator()) {
+            if (
+                unit.isDead() ||
+                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
+                !unit.getAbility("Warding Mane Blessing")
+            ) {
+                continue;
+            }
+
+            const power = unit.calculateWardingManeBlessingPower();
+            powerPerTeam.set(unit.getTeam(), Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, power));
+        }
+
+        for (const unit of this.getAllUnitsIterator()) {
+            unit.deleteBuff("Warding Mane Blessing");
+
+            const power = powerPerTeam.get(unit.getTeam()) ?? 0;
+            if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
+                continue;
+            }
+
+            const buff = new Spell({
+                spellProperties: getSpellConfig("System", "Warding Mane Blessing", NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            });
+            buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
+            buff.setPower(power);
+            unit.applyBuff(buff, power);
+        }
+    }
     public refreshWaterShieldForAllUnits(): void {
         // Seed the innate one-per-battle Water Shield buff for any unit that owns the ability. trySeedWaterShield
         // is idempotent and refuses to re-grant a shield that has already been consumed, so it is safe to call on
@@ -1014,6 +1047,7 @@ export class UnitsHolder {
         this.refreshAuraEffectsIfNeeded();
         this.refreshAngelicHostForAllUnits();
         this.refreshArcaneWardBlessingForAllUnits();
+        this.refreshWardingManeBlessingForAllUnits();
         this.refreshWaterShieldForAllUnits();
         for (const u of this.getAllUnitsIterator()) {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {

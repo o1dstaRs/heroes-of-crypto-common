@@ -1390,16 +1390,19 @@
         "aura_effect": null,
         "can_be_cast": false
     },
-    "Warding Mane Aura": {
-        "name": "Warding Mane Aura",
-        "type": "BUFF_AURA",
-        "desc": ["Allies within 2 cells gain {}% resistance to all magical attacks and debuffs"],
-        "power": 30,
+    "Warding Mane Blessing": {
+        "name": "Warding Mane Blessing",
+        "type": "MASS_BUFF",
+        "desc": [
+            "While this unit is alive, all allies on the board gain {}% magic defence.",
+            "Power scales 5/10/15/20/25 with stack size, plus this unit's Luck."
+        ],
+        "power": 25,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,
-        "aura_effect": "Warding Mane",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Arcane Ward Blessing": {

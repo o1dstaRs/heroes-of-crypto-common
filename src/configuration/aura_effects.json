@@ -135,13 +135,5 @@
         "power": 20,
         "is_buff": true,
         "power_type": "POISON_ON_HIT"
-    },
-    "Warding Mane": {
-        "name": "Warding Mane",
-        "range": 2,
-        "desc": "Affected allies gain {}% resistance to all magical attacks and debuffs.",
-        "power": 30,
-        "is_buff": true,
-        "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE"
     }
 }

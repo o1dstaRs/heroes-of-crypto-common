@@ -199,7 +199,9 @@ describe("v0.8 search measurement alias", () => {
         // the seeded rosters field mounted stacks, and a two-cell body changes placement, pathing and
         // adjacency from the first lap, so both traces diverge from placement on. Two isolated runs
         // reproduced this digest byte-identically.
-        expect(digest("v0.7")).toBe("925cb9623ec6ce7b78bbb50da749ae455e12bf6e65899808eff2a68dc274b137");
+        // Re-pinned 2026-08-29 after Warding Mane became a board-wide living-source Blessing: seeded
+        // Manticore fights no longer depend on a two-cell radius. Two isolated runs reproduced this digest.
+        expect(digest("v0.7")).toBe("be69b96d69ae1f4f7d1b10ff0700bda817cd0982a7ff5f94427b3760494bff48");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -223,7 +225,9 @@ describe("v0.8 search measurement alias", () => {
         // ranged pricing mirrors the engine bands, so its trace moves too. Two isolated runs reproduced it.
         // Re-pinned 2026-08-25 with the same mounted-class 2x1 catalog change as the v0.7 control above.
         // Two isolated runs reproduced it.
-        expect(digest("v0.8")).toBe("2dbda8a1af70c3aca424c75476cd4660bf2d2bc83d2941dfc04be961b1f716a7");
+        // Re-pinned 2026-08-29 with the same Warding Mane Blessing change as the v0.7 control above.
+        // Two isolated runs reproduced it.
+        expect(digest("v0.8")).toBe("df27e9e232957eadeedcc54bdec2be538fcc79dc5d124573a394c646bfc77ae5");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

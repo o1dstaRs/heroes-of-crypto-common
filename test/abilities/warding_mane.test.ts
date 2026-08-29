@@ -1,65 +1,109 @@
 /*
  * -----------------------------------------------------------------------------
- * Warding Mane Aura (Manticore): magic resistance for nearby allies, scaled by the
- * Manticore's stack and moved by its luck — 6/12/18/24/30 at the card's power of 30.
- *
- * Also pins that the CARD prints the projected figure rather than the raw power:
- * a runtime grant used to fall through to the raw-power default, so every stack
- * read the same number.
+ * Warding Mane Blessing (Manticore): board-wide magic defence while a source is
+ * alive, scaled 5/10/15/20/25 by stack and then shifted by that source's Luck.
  * -----------------------------------------------------------------------------
  */
 
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 
-import { getAbilityConfig, getAuraEffectConfig } from "../../src/configuration/config_provider";
+import { abilityToTextureName, isEquipmentOrMarkerSpellName } from "../../src/abilities/ability_helper";
+import { AbilityPowerType, AbilityType } from "../../src/abilities/ability_properties";
+import { getAbilityConfig, getAuraEffectConfig, getCreatureConfig } from "../../src/configuration/config_provider";
+import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { createTestUnit } from "../helpers/combat";
+import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
+
+beforeEach(() => FightStateManager.getInstance().reset());
 
 const manticore = (stackPower: number, luck = 0) =>
     createTestUnit({
         name: "Manticore",
         team: PBTypes.TeamVals.LOWER,
-        abilities: ["Warding Mane Aura"],
-        auraEffects: ["Warding Mane"],
-        auraRanges: [2],
-        auraIsBuff: [true],
+        abilities: ["Warding Mane Blessing"],
         stackPower,
         luck,
     });
 
-const projected = (stackPower: number, luck = 0, synergy = 0) => {
-    const unit = manticore(stackPower, luck);
-    return unit.calculateAuraPower(unit.getAuraEffects()[0], synergy);
-};
+describe("Warding Mane Blessing", () => {
+    it("is a stack-powered mass buff with no aura effect or radius", () => {
+        const ability = getAbilityConfig("Warding Mane Blessing");
+        const creature = getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Manticore", "manticore_512", 1);
+        const abilityIndex = creature.abilities.indexOf("Warding Mane Blessing");
 
-describe("Warding Mane Aura", () => {
-    it("is configured at 30 power on both the ability and its aura effect", () => {
-        // The ladder below is (power / MAX_UNIT_STACK_POWER) * stack, so the two must agree or the card
-        // would advertise a different number than the aura projects.
-        expect(getAbilityConfig("Warding Mane Aura").power).toBe(30);
-        expect(getAuraEffectConfig("Warding Mane")?.power).toBe(30);
+        expect(ability.type).toBe(AbilityType.MASS_BUFF);
+        expect(ability.power).toBe(25);
+        expect(ability.power_type).toBe(AbilityPowerType.ADDITIONAL_MAGIC_RESIST_PERCENTAGE);
+        expect(ability.stack_powered).toBe(true);
+        expect(ability.aura_effect).toBeNull();
+        expect(getAuraEffectConfig("Warding Mane")).toBeUndefined();
+        expect(abilityIndex).toBeGreaterThanOrEqual(0);
+        expect(creature.abilities_stack_powered[abilityIndex]).toBe(true);
+        expect(creature.abilities_auras[abilityIndex]).toBe(false);
+        expect(creature.aura_ranges[abilityIndex]).toBe(0);
     });
 
-    it("runs 6/12/18/24/30 across the stack", () => {
-        expect([1, 2, 3, 4, 5].map((stack) => projected(stack))).toEqual([6, 12, 18, 24, 30]);
+    it("runs 5/10/15/20/25 across the stack and adds the source's luck", () => {
+        expect([1, 2, 3, 4, 5].map((stack) => manticore(stack).calculateWardingManeBlessingPower())).toEqual([
+            5, 10, 15, 20, 25,
+        ]);
+        expect(manticore(3, 10).calculateWardingManeBlessingPower()).toBe(25);
+        expect(manticore(3, -10).calculateWardingManeBlessingPower()).toBe(5);
+        expect(manticore(1, -10).calculateWardingManeBlessingPower()).toBe(0);
     });
 
-    it("moves with the Manticore's luck and the team's synergy bonus", () => {
-        // getLuck caps the roll at +-10, so luck shifts the projection by at most ten points either way.
-        expect(projected(3, 10)).toBe(28);
-        expect(projected(3, -10)).toBe(8);
-        expect(projected(3, 10, 5)).toBe(33);
+    it("affects every living ally, uses the strongest source and ends when the last source dies", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const luckyCarrier = manticore(5, 10);
+        const fullStackCarrier = manticore(5);
+        const distantAlly = createTestUnit({
+            name: "Distant Ally",
+            team: PBTypes.TeamVals.LOWER,
+            magicResist: 20,
+        });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, magicResist: 20 });
+
+        placeUnit(grid, unitsHolder, luckyCarrier, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, fullStackCarrier, { x: 2, y: 1 });
+        placeUnit(grid, unitsHolder, distantAlly, { x: 10, y: 8 });
+        placeUnit(grid, unitsHolder, enemy, { x: 9, y: 7 });
+
+        unitsHolder.refreshStackPowerForAllUnits();
+        unitsHolder.refreshStackPowerForAllUnits();
+
+        for (const ally of [luckyCarrier, fullStackCarrier, distantAlly]) {
+            expect(ally.getBuff("Warding Mane Blessing")?.getPower()).toBe(35);
+            expect(
+                ally.getAllProperties().applied_buffs.filter((name) => name === "Warding Mane Blessing"),
+            ).toHaveLength(1);
+        }
+        expect(distantAlly.getMagicResist()).toBe(48);
+        expect(enemy.hasBuffActive("Warding Mane Blessing")).toBe(false);
+        expect(enemy.getMagicResist()).toBe(20);
+
+        luckyCarrier.applyDamage(1_000, 0, new SceneLogMock());
+        unitsHolder.refreshStackPowerForAllUnits();
+
+        expect(distantAlly.getBuff("Warding Mane Blessing")?.getPower()).toBe(25);
+        expect(distantAlly.getMagicResist()).toBe(40);
+
+        fullStackCarrier.applyDamage(1_000, 0, new SceneLogMock());
+        unitsHolder.refreshStackPowerForAllUnits();
+        expect(distantAlly.hasBuffActive("Warding Mane Blessing")).toBe(false);
+        expect(distantAlly.getMagicResist()).toBe(20);
     });
 
-    it("prints the projected figure on the card, not the raw power", () => {
-        const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LOWER, stackPower: 2 });
-        bearer.grantAbility("Warding Mane Aura");
+    it("prints the live projection and reuses the existing Warding Mane icon", () => {
+        const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LOWER, stackPower: 2, luck: 5 });
+        bearer.grantAbility("Warding Mane Blessing");
 
-        const index = bearer.getUnitProperties().abilities.indexOf("Warding Mane Aura");
+        const index = bearer.getUnitProperties().abilities.indexOf("Warding Mane Blessing");
         const description = bearer.getUnitProperties().abilities_descriptions[index];
 
-        // Two stacks projects 12, while the card's raw power is 30.
-        expect(description).toContain("12%");
-        expect(description).not.toContain("30%");
+        expect(description).toContain("15%");
+        expect(description).toContain("all allies on the board");
+        expect(abilityToTextureName("Warding Mane Blessing")).toBe("warding_mane_aura_256");
+        expect(isEquipmentOrMarkerSpellName("Warding Mane Blessing")).toBe(true);
     });
 });

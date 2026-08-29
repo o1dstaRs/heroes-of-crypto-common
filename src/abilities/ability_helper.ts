@@ -144,7 +144,9 @@ export function dualStrikeCharmPercent(unit: Unit): number {
 }
 
 export const abilityToTextureName = (abilityName: string): string =>
-    `${abilityName.toLowerCase().replace(/ /g, "_")}_256`;
+    abilityName === "Warding Mane Blessing"
+        ? "warding_mane_aura_256"
+        : `${abilityName.toLowerCase().replace(/ /g, "_")}_256`;
 
 /**
  * Buffs and debuffs that are NOT a cast blessing or a landed curse: army equipment (artifacts, augments)
@@ -178,6 +180,7 @@ const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
     "Visible",
     "Angelic Host",
     "Arcane Ward Blessing",
+    "Warding Mane Blessing",
     "Water Shield",
 ]);
 
