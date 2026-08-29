@@ -1,7 +1,7 @@
 /*
  * -----------------------------------------------------------------------------
- * Arcane Ward Blessing (Squire): board-wide magic defence for every living ally,
- * scaled by the strongest living source's stack, luck and team ability synergy.
+ * Arcane Ward Blessing (Squire): flat board-wide magic defence for every living ally,
+ * equal to 10 plus the strongest living source's Luck until that source dies.
  * -----------------------------------------------------------------------------
  */
 
@@ -27,7 +27,7 @@ const squire = (stackPower: number, luck = 0) =>
     });
 
 describe("Arcane Ward Blessing", () => {
-    it("is a stack-powered mass buff with no aura effect or radius", () => {
+    it("is a non-stack-powered mass buff with no aura effect or radius", () => {
         const ability = getAbilityConfig("Arcane Ward Blessing");
         const creature = getCreatureConfig(PBTypes.TeamVals.LOWER, "Life", "Squire", "squire_512", 1);
         const abilityIndex = creature.abilities.indexOf("Arcane Ward Blessing");
@@ -35,27 +35,26 @@ describe("Arcane Ward Blessing", () => {
         expect(ability.type).toBe(AbilityType.MASS_BUFF);
         expect(ability.power).toBe(10);
         expect(ability.power_type).toBe(AbilityPowerType.ADDITIONAL_MAGIC_RESIST_PERCENTAGE);
-        expect(ability.stack_powered).toBe(true);
+        expect(ability.stack_powered).toBe(false);
         expect(ability.aura_effect).toBeNull();
         expect(getAuraEffectConfig("Arcane Ward")).toBeUndefined();
         expect(abilityIndex).toBeGreaterThanOrEqual(0);
-        expect(creature.abilities_stack_powered[abilityIndex]).toBe(true);
+        expect(creature.abilities_stack_powered[abilityIndex]).toBe(false);
         expect(creature.abilities_auras[abilityIndex]).toBe(false);
         expect(creature.aura_ranges[abilityIndex]).toBe(0);
     });
 
-    it("keeps the 2/4/6/8/10 stack ladder and luck/synergy scaling", () => {
-        expect([1, 2, 3, 4, 5].map((stack) => squire(stack).calculateArcaneWardBlessingPower(0))).toEqual([
-            2, 4, 6, 8, 10,
+    it("always grants 10 plus luck regardless of stack size", () => {
+        expect([1, 2, 3, 4, 5].map((stack) => squire(stack).calculateArcaneWardBlessingPower())).toEqual([
+            10, 10, 10, 10, 10,
         ]);
-        expect(squire(5, 10).calculateArcaneWardBlessingPower(0)).toBe(20);
-        expect(squire(5, -10).calculateArcaneWardBlessingPower(0)).toBe(0);
-        expect(squire(3, 10).calculateArcaneWardBlessingPower(5)).toBe(21);
+        expect(squire(1, 10).calculateArcaneWardBlessingPower()).toBe(20);
+        expect(squire(5, -10).calculateArcaneWardBlessingPower()).toBe(0);
     });
 
     it("affects every living ally on the board, uses the strongest source and never affects enemies", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const strongerCarrier = squire(5, 5);
+        const strongerCarrier = squire(1, 5);
         const weakerCarrier = squire(5);
         const distantAlly = createTestUnit({
             name: "Distant Ally",
@@ -95,14 +94,14 @@ describe("Arcane Ward Blessing", () => {
     });
 
     it("prints the live projection on runtime-granted cards and uses the renamed icon key", () => {
-        const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LOWER, stackPower: 2 });
+        const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LOWER, stackPower: 2, luck: 5 });
         bearer.grantAbility("Arcane Ward Blessing");
 
         const index = bearer.getUnitProperties().abilities.indexOf("Arcane Ward Blessing");
         const description = bearer.getUnitProperties().abilities_descriptions[index];
 
-        expect(description).toContain("4%");
-        expect(description).not.toContain("10%");
+        expect(description).toContain("15%");
+        expect(description).toContain("does not scale with stack size");
         expect(abilityToTextureName("Arcane Ward Blessing")).toBe("arcane_ward_blessing_256");
     });
 });

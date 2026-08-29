@@ -959,7 +959,6 @@ export class UnitsHolder {
         }
     }
     private refreshArcaneWardBlessingForAllUnits(): void {
-        const fightProperties = FightStateManager.getInstance().getFightProperties();
         const powerPerTeam: Map<TeamType, number> = new Map();
 
         for (const unit of this.getAllUnitsIterator()) {
@@ -971,9 +970,7 @@ export class UnitsHolder {
                 continue;
             }
 
-            const power = unit.calculateArcaneWardBlessingPower(
-                fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam()),
-            );
+            const power = unit.calculateArcaneWardBlessingPower();
             powerPerTeam.set(unit.getTeam(), Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, power));
         }
 

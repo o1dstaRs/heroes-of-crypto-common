@@ -722,7 +722,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
         if (ability.getName() === "Arcane Ward Blessing") {
-            return ability.getDesc().join("\n").replace(/\{\}/g, this.calculateArcaneWardBlessingPower(0).toString());
+            return ability.getDesc().join("\n").replace(/\{\}/g, this.calculateArcaneWardBlessingPower().toString());
         }
         if (ability.getName() === "Magic Reflection") {
             // The Magic Dragon's passive: stack-scaled 15/30/45/60/75 at power 75, shifted by luck — the exact
@@ -2088,22 +2088,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return Number((calculatedCoeff * 100).toFixed(2)) - 100;
     }
-    /** The board-wide Squire projection, preserving the former aura's stack/luck/synergy scaling exactly. */
-    public calculateArcaneWardBlessingPower(synergyAbilityPowerIncrease: number): number {
+    /** Flat board-wide Squire projection: base power plus the source's luck, never stack/team scaled. */
+    public calculateArcaneWardBlessingPower(): number {
         const ability = this.getAbility("Arcane Ward Blessing");
         if (!ability) {
             return 0;
         }
 
-        const madeOfFireBuff = this.getBuff("Made of Fire");
-        return Number(
-            (
-                (ability.getPower() / MAX_UNIT_STACK_POWER) * this.getStackPower() +
-                this.getLuck() +
-                synergyAbilityPowerIncrease +
-                (madeOfFireBuff ? (ability.getPower() / 100) * madeOfFireBuff.getPower() : 0)
-            ).toFixed(2),
-        );
+        return Number((ability.getPower() + this.getLuck()).toFixed(2));
     }
     public calculateEffectMultiplier(effect: Effect, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;

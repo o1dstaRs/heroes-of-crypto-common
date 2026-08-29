@@ -1405,11 +1405,14 @@
     "Arcane Ward Blessing": {
         "name": "Arcane Ward Blessing",
         "type": "MASS_BUFF",
-        "desc": ["While this unit is alive, all allies on the board gain {}% magic defence"],
+        "desc": [
+            "While this unit is alive, all allies on the board gain {}% magic defence.",
+            "Power is always 10 + this unit's Luck and does not scale with stack size."
+        ],
         "power": 10,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE",
         "skip_reponse": false,
-        "stack_powered": true,
+        "stack_powered": false,
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false
