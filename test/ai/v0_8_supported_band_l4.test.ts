@@ -28,8 +28,8 @@ import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, testGridSettings, type CombatTestContext } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 
@@ -75,7 +75,7 @@ interface IBandHarness {
     destination: XY;
 }
 
-function configuredUnit(spec: Level4Spec, team: typeof LOWER | typeof UPPER): Unit {
+function configuredUnit(spec: Level4Spec, team: typeof LEFT | typeof RIGHT): Unit {
     const effectFactory = new EffectFactory();
     return Unit.createUnit(
         getCreatureConfig(team, spec.faction, spec.name, "", 1),
@@ -183,7 +183,7 @@ function observeDecision(harness: IBandHarness): {
 function setupLevel4Guard(spec: Level4Spec, stolenQuiver = false): IBandHarness & { guard: Unit } {
     const combat = createCombatTestContext();
     const shooter = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Level-4 guarded archer",
         attackType: RANGE,
         initiative: 1,
@@ -193,7 +193,7 @@ function setupLevel4Guard(spec: Level4Spec, stolenQuiver = false): IBandHarness 
         damageMax: 10,
     });
     const target = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Ranged band target",
         attackType: RANGE,
         initiative: 0,
@@ -204,7 +204,7 @@ function setupLevel4Guard(spec: Level4Spec, stolenQuiver = false): IBandHarness 
         amountAlive: 20,
         maxHp: 20,
     });
-    const guard = configuredUnit(spec, LOWER);
+    const guard = configuredUnit(spec, LEFT);
     const destination = { x: 7, y: 7 };
     placeAtAnchor(combat, shooter, { x: 7, y: 8 });
     placeAtAnchor(combat, target, { x: 7, y: 2 });
@@ -236,7 +236,7 @@ function setupLevel4Target(
     },
 ): IBandHarness {
     const combat = createCombatTestContext();
-    const target = configuredUnit(spec, UPPER);
+    const target = configuredUnit(spec, RIGHT);
     if (options.stolenQuiver) {
         target.grantStolenAbility("Endless Quiver");
         target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
@@ -247,7 +247,7 @@ function setupLevel4Target(
     const destinationDistance = options.safe ? meleeHorizon + 1 : meleeHorizon;
     const destination = { x: 7, y: targetTopY + destinationDistance };
     const shooter = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Level-4 target archer",
         attackType: RANGE,
         initiative: 1,
@@ -256,7 +256,7 @@ function setupLevel4Target(
         damageMin: 10,
         damageMax: 10,
     });
-    const guard = createTestUnit({ team: LOWER, name: "Target-horizon guard", attackType: MELEE, initiative: 1 });
+    const guard = createTestUnit({ team: LEFT, name: "Target-horizon guard", attackType: MELEE, initiative: 1 });
     placeAtAnchor(combat, target, targetAnchor);
     placeAtAnchor(combat, shooter, { x: destination.x, y: destination.y + 1 });
     placeAtAnchor(combat, guard, { x: destination.x + 2, y: destination.y - 2 });
@@ -359,9 +359,9 @@ describe("v0.8 supported-band level-4 promotion coverage", () => {
         enableSupportedBand();
         const combat = createCombatTestContext();
         const queenSpec = LEVEL4_UNITS[1];
-        const queen = configuredUnit(queenSpec, LOWER);
+        const queen = configuredUnit(queenSpec, LEFT);
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Assimilated shot target",
             maxHp: 1_000,
             amountAlive: 10,
@@ -439,9 +439,9 @@ describe("v0.8 supported-band level-4 promotion coverage", () => {
 
         const fightProperties = harness.context.fightProperties!;
         fightProperties.startFight();
-        fightProperties.setTeamUnitsAlive(LOWER, harness.combat.unitsHolder.getAllAllies(LOWER).length);
-        fightProperties.setTeamUnitsAlive(UPPER, harness.combat.unitsHolder.getAllAllies(UPPER).length);
-        fightProperties.startTurn(LOWER, 1_000);
+        fightProperties.setTeamUnitsAlive(LEFT, harness.combat.unitsHolder.getAllAllies(LEFT).length);
+        fightProperties.setTeamUnitsAlive(RIGHT, harness.combat.unitsHolder.getAllAllies(RIGHT).length);
+        fightProperties.startTurn(LEFT, 1_000);
         const engine = new GameActionEngine({
             fightProperties,
             grid: harness.combat.grid,

@@ -54,8 +54,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 
@@ -112,16 +112,16 @@ function buildBoard(
 ): Board {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    const actor = createTestUnit({ name: "Actor", team: LOWER, initiative: 4, ...actorOptions });
-    const ally = createTestUnit({ name: "Ally", team: LOWER, initiative: 2, ...allyOptions });
-    const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, initiative: 3 });
-    const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, initiative: 5 });
+    const actor = createTestUnit({ name: "Actor", team: LEFT, initiative: 4, ...actorOptions });
+    const ally = createTestUnit({ name: "Ally", team: LEFT, initiative: 2, ...allyOptions });
+    const enemyA = createTestUnit({ name: "Enemy A", team: RIGHT, initiative: 3 });
+    const enemyB = createTestUnit({ name: "Enemy B", team: RIGHT, initiative: 5 });
     placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, ally, { x: 5, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 3, y: 10 });
     placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 5, y: 10 });
-    fightProperties.setTeamUnitsAlive(LOWER, 2);
-    fightProperties.setTeamUnitsAlive(UPPER, 2);
+    fightProperties.setTeamUnitsAlive(LEFT, 2);
+    fightProperties.setTeamUnitsAlive(RIGHT, 2);
     const context: IDecisionContext = {
         grid: combat.grid,
         matrix: combat.grid.getMatrix(),
@@ -190,7 +190,7 @@ describe("wait scorer — features", () => {
         const { context, actor, enemyA, charge } = buildBoard();
         const fmIdx = WAIT_FEATURE_NAMES.indexOf("fmExposure");
         expect(extractWaitFeatures(actor, context.unitsHolder, fp(), charge)[fmIdx]).toBe(1);
-        fp().addAlreadyMadeTurn(UPPER, enemyA.getId());
+        fp().addAlreadyMadeTurn(RIGHT, enemyA.getId());
         expect(extractWaitFeatures(actor, context.unitsHolder, fp(), charge)[fmIdx]).toBe(0.5);
     });
 
@@ -204,9 +204,9 @@ describe("wait scorer — features", () => {
         ];
         expect(incumbentRuleWaits(actor, context.unitsHolder, fp(), inPlace)).toBe(false);
         // fm below 0.67 -> act
-        fp().addAlreadyMadeTurn(UPPER, enemyA.getId());
+        fp().addAlreadyMadeTurn(RIGHT, enemyA.getId());
         expect(incumbentRuleWaits(actor, context.unitsHolder, fp(), charge)).toBe(false);
-        fp().addAlreadyMadeTurn(UPPER, enemyB.getId());
+        fp().addAlreadyMadeTurn(RIGHT, enemyB.getId());
         expect(incumbentRuleWaits(actor, context.unitsHolder, fp(), charge)).toBe(false);
         // ranged units are excluded from the incumbent rule
         const ranged = buildBoard({ attackType: RANGE, rangeShots: 5 });
@@ -216,7 +216,7 @@ describe("wait scorer — features", () => {
     it("canWaitOnHourglassMirror matches the oracle's eligibility predicate", () => {
         const { actor, context } = buildBoard();
         expect(canWaitOnHourglassMirror(actor, fp(), context.unitsHolder.getAllUnits())).toBe(true);
-        fp().addAlreadyMadeTurn(LOWER, actor.getId());
+        fp().addAlreadyMadeTurn(LEFT, actor.getId());
         expect(canWaitOnHourglassMirror(actor, fp(), context.unitsHolder.getAllUnits())).toBe(false);
     });
 });
@@ -314,13 +314,13 @@ describe("wait scorer — anchored gate (byte-identical incumbent behavior unles
     it("armed: never fires at a wait-ineligible point (made turn / already hourglassed / last stack)", () => {
         setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: biasOnly(5) });
         const made = buildBoard();
-        fp().addAlreadyMadeTurn(LOWER, made.actor.getId());
+        fp().addAlreadyMadeTurn(LEFT, made.actor.getId());
         expect(applyWaitScorer(made.actor, made.context, made.charge, "v0.6s")).toBe(made.charge);
         const parked = buildBoard();
         fp().enqueueHourglass(parked.actor.getId());
         expect(applyWaitScorer(parked.actor, parked.context, parked.charge, "v0.6s")).toBe(parked.charge);
         const lone = buildBoard();
-        fp().setTeamUnitsAlive(LOWER, 1);
+        fp().setTeamUnitsAlive(LEFT, 1);
         expect(applyWaitScorer(lone.actor, lone.context, lone.charge, "v0.6s")).toBe(lone.charge);
     });
 
@@ -492,7 +492,7 @@ describe("wait scorer V2 (Phase-B multi-cohort env candidate)", () => {
         const policyWait: GameAction[] = [{ type: "wait_turn", unitId: board.actor.getId() }];
         expect(applyWaitScorerWeightsV2(board.actor, board.context, policyWait, weights)).toBe(policyWait);
         expect(applyWaitScorerWeightsV2(board.actor, board.context, board.charge, null)).toBe(board.charge);
-        fp().addAlreadyMadeTurn(LOWER, board.actor.getId());
+        fp().addAlreadyMadeTurn(LEFT, board.actor.getId());
         expect(applyWaitScorerWeightsV2(board.actor, board.context, board.charge, weights)).toBe(board.charge);
     });
 });
@@ -611,7 +611,7 @@ describe("wait scorer V3 (action-aware RANGE-only research candidate)", () => {
         }
 
         const shot: GameAction[] = [{ type: "range_attack", attackerId: id, targetId: ranged.enemyA.getId() }];
-        fp().addAlreadyMadeTurn(LOWER, id);
+        fp().addAlreadyMadeTurn(LEFT, id);
         expect(applyWaitScorerWeightsV3(ranged.actor, ranged.context, shot, positive)).toBe(shot);
     });
 });

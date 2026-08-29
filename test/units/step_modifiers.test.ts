@@ -10,7 +10,7 @@ import { describe, expect, it } from "bun:test";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { createTestUnit } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
+const LEFT = PBTypes.TeamVals.LEFT;
 const RANGE = PBTypes.AttackVals.RANGE;
 
 // adjustBaseStats(hasFightStarted, lap, synAbilityPower, synMovementSteps, synFlyArmor, synMorale, synLuck, stepsMoraleMult)
@@ -18,7 +18,7 @@ const adjust = (u: ReturnType<typeof createTestUnit>, synMove: number, stepsMora
     u.adjustBaseStats(true, 1, 0, synMove, 0, 0, 0, stepsMoraleMult);
 
 describe("step modifiers fold into getSteps (ranked adjustBaseStats path)", () => {
-    const mk = () => createTestUnit({ name: "Beholder", team: LOWER, attackType: RANGE, initiative: 4, morale: 0 });
+    const mk = () => createTestUnit({ name: "Beholder", team: LEFT, attackType: RANGE, initiative: 4, morale: 0 });
 
     it("Chaos MOVEMENT synergy adds its steps to getSteps()", () => {
         const u = mk();
@@ -29,7 +29,7 @@ describe("step modifiers fold into getSteps (ranked adjustBaseStats path)", () =
     });
 
     it("morale × multiplier adds steps (Crown of Command morale, high-morale units)", () => {
-        const u = createTestUnit({ name: "Mover", team: LOWER, attackType: RANGE, initiative: 4, morale: 10 });
+        const u = createTestUnit({ name: "Mover", team: LEFT, attackType: RANGE, initiative: 4, morale: 10 });
         adjust(u, 0, 0);
         const noMorale = u.getSteps();
         adjust(u, 0, 0.2); // +0.2 step per morale point → +2 at morale 10
@@ -37,7 +37,7 @@ describe("step modifiers fold into getSteps (ranked adjustBaseStats path)", () =
     });
 
     it("synergy and morale stack", () => {
-        const u = createTestUnit({ name: "Mover2", team: LOWER, attackType: RANGE, initiative: 4, morale: 5 });
+        const u = createTestUnit({ name: "Mover2", team: LEFT, attackType: RANGE, initiative: 4, morale: 5 });
         adjust(u, 0, 0);
         const base = u.getSteps();
         adjust(u, 1, 0.2); // +1 synergy, +1 morale (0.2*5)

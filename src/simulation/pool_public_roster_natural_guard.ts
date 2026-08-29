@@ -394,8 +394,8 @@ function loadShard(path: string, shardIndex: number, originalBaseSeed: number, g
             const control = controlByKey.get(key);
             if (!candidate || !control) throw new Error(`${path} omitted paired game ${key}`);
             validateArmPair(candidate, control, `${path} game ${key}`);
-            const seat = game < 2 ? draft.lower : draft.upper;
-            const opponent = game < 2 ? draft.upper : draft.lower;
+            const seat = game < 2 ? draft.left : draft.right;
+            const opponent = game < 2 ? draft.right : draft.left;
             if (
                 candidate.candidateCohort !== seat.cohort ||
                 control.candidateCohort !== seat.cohort ||

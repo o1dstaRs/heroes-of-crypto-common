@@ -24,8 +24,8 @@ import { createCombatTestContext, createTestUnit, DamageStatisticHolder, placeUn
  *   - everyone else takes it straight.
  */
 
-const ENEMY = PBTypes.TeamVals.LOWER;
-const OURS = PBTypes.TeamVals.UPPER;
+const ENEMY = PBTypes.TeamVals.LEFT;
+const OURS = PBTypes.TeamVals.RIGHT;
 const SWING = 40;
 
 /** Thunderbird itself: a Wind Element that carries the ability. */

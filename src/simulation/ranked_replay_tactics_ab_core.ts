@@ -217,8 +217,8 @@ export interface IRankedReplayAbSummaryRows {
     combatEligibility: IRankedReplayAbMetricRow[];
 }
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const CONTROL_SETUP_POLICY = resolveSetupPolicy(V07_NONFIGHT_SETUP_SPEC);
 const CANDIDATE_SETUP_POLICY = resolveSetupPolicy(RANKED_REPLAY_TACTICS_SETUP_SPEC);
 const RANKED_GENOME = projectDraftGenomeForShipping(parseDraftGenome(LEAGUE_ROUND1_DRAFT_SPEC));
@@ -361,8 +361,7 @@ const applyAccepted = (state: IPickSimState, action: PickAction, rng: PickRandom
     return result.state;
 };
 
-const teamState = (state: IPickSimState, team: PickTeam): IPickTeamState =>
-    team === LOWER ? state.lower : state.upper;
+const teamState = (state: IPickSimState, team: PickTeam): IPickTeamState => (team === LEFT ? state.left : state.right);
 
 const setupPolicyForTeam = (
     team: PickTeam,
@@ -379,25 +378,25 @@ export function resolveRankedReplayAbPick(
 ): IPickSimState {
     const rng = randomInt(seed);
     let state = createPickSimState(rng);
-    state = applyAccepted(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.SEE_NONE }, rng);
-    state = applyAccepted(state, { type: "select_doctrine", team: UPPER, doctrine: Doctrine.SEE_NONE }, rng);
+    state = applyAccepted(state, { type: "select_doctrine", team: LEFT, doctrine: Doctrine.SEE_NONE }, rng);
+    state = applyAccepted(state, { type: "select_doctrine", team: RIGHT, doctrine: Doctrine.SEE_NONE }, rng);
 
     // Simultaneous choices consume the same pre-commit offer board.
-    const lowerBundles = state.lower.bundles;
-    const upperBundles = state.upper.bundles;
+    const leftBundles = state.left.bundles;
+    const rightBundles = state.right.bundles;
     const bundleFor = (team: PickTeam, bundles: readonly (readonly [number, number, number])[]): number =>
         team === candidateTeam && components.draft ? coherentBundle(bundles) : preCoherenceBundle(bundles);
-    const lowerBundle = bundleFor(LOWER, lowerBundles);
-    const upperBundle = bundleFor(UPPER, upperBundles);
-    state = applyAccepted(state, { type: "select_bundle", team: LOWER, bundleIndex: lowerBundle }, rng);
-    state = applyAccepted(state, { type: "select_bundle", team: UPPER, bundleIndex: upperBundle }, rng);
+    const leftBundle = bundleFor(LEFT, leftBundles);
+    const rightBundle = bundleFor(RIGHT, rightBundles);
+    state = applyAccepted(state, { type: "select_bundle", team: LEFT, bundleIndex: leftBundle }, rng);
+    state = applyAccepted(state, { type: "select_bundle", team: RIGHT, bundleIndex: rightBundle }, rng);
 
     let guard = 0;
     while (!isPickSimComplete(state)) {
         if ((guard += 1) > 60) throw new Error("Replay A/B ranked pick exceeded collision guard");
         const phase = getCurrentPickPhase(state);
         if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 const own = teamState(state, team);
                 const policy = setupPolicyForTeam(team, candidateTeam, components);
                 const artifactId = policy.pickArtifactT2(
@@ -516,7 +515,7 @@ export function materializeReplayAbSplits(
     const units = roster.map((spec, index) =>
         createUnitFromSpec(
             spec,
-            LOWER,
+            LEFT,
             gridSettings,
             factories.abilityFactory,
             factories.effectFactory,
@@ -888,19 +887,19 @@ const rankedAssignments = (
     map: number,
     components: RankedReplayAbComponents,
 ): [IAssignment, IAssignment] =>
-    ([LOWER, UPPER] as const).map((candidateTeam): IAssignment => {
+    ([LEFT, RIGHT] as const).map((candidateTeam): IAssignment => {
         const pick = resolveRankedReplayAbPick(pickSeed, map, candidateTeam, components);
-        const lower = rankedBaseArmy(pick.lower, getKnownOpponentCreatures(pick, LOWER));
-        const upper = rankedBaseArmy(pick.upper, getKnownOpponentCreatures(pick, UPPER));
-        const candidateBase = candidateTeam === LOWER ? lower : upper;
-        const controlBase = candidateTeam === LOWER ? upper : lower;
+        const left = rankedBaseArmy(pick.left, getKnownOpponentCreatures(pick, LEFT));
+        const right = rankedBaseArmy(pick.right, getKnownOpponentCreatures(pick, RIGHT));
+        const candidateBase = candidateTeam === LEFT ? left : right;
+        const controlBase = candidateTeam === LEFT ? right : left;
         if (!rostersAreStrictlyDistinct(candidateBase.roster, controlBase.roster)) {
             throw new Error("Replay A/B ranked assignment produced overlapping rosters");
         }
         return {
             candidate: materializeReplayAbArmy(candidateBase, controlBase.creatureIds, map, "candidate", components),
             control: materializeReplayAbArmy(controlBase, candidateBase.creatureIds, map, "control", components),
-            draftSeat: candidateTeam === LOWER ? "candidate-lower" : "candidate-upper",
+            draftSeat: candidateTeam === LEFT ? "candidate-lower" : "candidate-upper",
         };
     }) as [IAssignment, IAssignment];
 

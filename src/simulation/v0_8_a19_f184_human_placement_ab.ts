@@ -403,11 +403,11 @@ const canonicalPlacementRows = (
 export function expectedV08A19F184CanonicalPlacement(
     roster: V08A19F184HumanPlacementAbRoster,
 ): IV08A19F184CanonicalPlacementRow[] {
-    const setup = roster === "a" ? V08_A19_PROD_F184_ANCHOR.lower : V08_A19_PROD_F184_ANCHOR.upper;
+    const setup = roster === "a" ? V08_A19_PROD_F184_ANCHOR.left : V08_A19_PROD_F184_ANCHOR.right;
     const observed =
         roster === "a"
-            ? V08_A19_PROD_F184_ANCHOR.observedPlacement.lower
-            : V08_A19_PROD_F184_ANCHOR.observedPlacement.upper;
+            ? V08_A19_PROD_F184_ANCHOR.observedPlacement.left
+            : V08_A19_PROD_F184_ANCHOR.observedPlacement.right;
     const sourceSide = sourceSideForRoster(roster);
     return setup.roster
         .map((unit) => {

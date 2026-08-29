@@ -1405,7 +1405,7 @@ export class SearchDriver {
         if (match.searchTeamScope === undefined) {
             this.teamScope = null;
         } else {
-            const validTeams = new Set<TeamType>([PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER]);
+            const validTeams = new Set<TeamType>([PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]);
             if (match.searchTeamScope.some((team) => !validTeams.has(team))) {
                 throw new Error("Search team scope may contain only LOWER and UPPER");
             }
@@ -1851,8 +1851,8 @@ export class SearchDriver {
             const parsed = parseLearnedValueWidth(raw, VALUE_FEATURE_NAMES_V2.length);
             return parsed && (parsed.b !== 0 || parsed.w.some((weight) => weight !== 0)) ? parsed : null;
         };
-        this.learnedV2ByTeam.set(PBTypes.TeamVals.LOWER, parseTeamLeaf(process.env.V07_VALUE_WEIGHTS_V2_LOWER));
-        this.learnedV2ByTeam.set(PBTypes.TeamVals.UPPER, parseTeamLeaf(process.env.V07_VALUE_WEIGHTS_V2_UPPER));
+        this.learnedV2ByTeam.set(PBTypes.TeamVals.LEFT, parseTeamLeaf(process.env.V07_VALUE_WEIGHTS_V2_LOWER));
+        this.learnedV2ByTeam.set(PBTypes.TeamVals.RIGHT, parseTeamLeaf(process.env.V07_VALUE_WEIGHTS_V2_UPPER));
         const rawOppModel = this.enabled ? process.env.SEARCH_OPP_MODEL?.trim() : undefined;
         this.oppModel = rawOppModel ? getAIStrategy(rawOppModel) : null; // throws on an unknown version
         const rawAudit = process.env.SEARCH_AUDIT;
@@ -2814,7 +2814,7 @@ export class SearchDriver {
                             seed: this.match.seed,
                             green: this.match.greenVersion,
                             red: this.match.redVersion,
-                            side: unit.getTeam() === PBTypes.TeamVals.LOWER ? "green" : "red",
+                            side: unit.getTeam() === PBTypes.TeamVals.LEFT ? "green" : "red",
                             unitId: unit.getId(),
                             decisionOrdinal: proposalDecisionOrdinal,
                             lap: currentLap,
@@ -3417,7 +3417,7 @@ export class SearchDriver {
             throw new Error("Search audit turn identity requires an active decision");
         }
         return {
-            side: unit.getTeam() === PBTypes.TeamVals.LOWER ? "green" : "red",
+            side: unit.getTeam() === PBTypes.TeamVals.LEFT ? "green" : "red",
             unitId: unit.getId(),
             decisionOrdinal,
         };
@@ -3982,7 +3982,7 @@ export class SearchDriver {
                     seed: this.match.seed!,
                     green: this.match.greenVersion!,
                     red: this.match.redVersion!,
-                    side: unit.getTeam() === PBTypes.TeamVals.LOWER ? "green" : "red",
+                    side: unit.getTeam() === PBTypes.TeamVals.LEFT ? "green" : "red",
                     lap: this.deps.fightProperties.getCurrentLap(),
                     unit: unit.getName(),
                     k: incumbentKind,
@@ -5150,4 +5150,4 @@ export class SearchDriver {
 }
 
 const otherTeam = (team: TeamType): TeamType =>
-    team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    team === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;

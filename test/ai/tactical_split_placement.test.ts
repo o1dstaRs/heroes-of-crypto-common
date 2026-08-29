@@ -165,7 +165,7 @@ describe("tactical stack splitting", () => {
             incumbent,
             ["tank", "shooter", "decoy", "other-split"].map((id) => ({ id, small: true })),
             {
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 gridType: PBTypes.GridVals.NORMAL,
                 legalCellHashes: legal,
                 splitStacks: [
@@ -194,7 +194,7 @@ describe("tactical stack splitting", () => {
             ]),
             ["tank", "shooter", "decoy"].map((id) => ({ id, small: true })),
             {
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 gridType: PBTypes.GridVals.NORMAL,
                 legalCellHashes: legal,
                 splitStacks: [{ unitId: "decoy", role: "bait" }],
@@ -219,7 +219,7 @@ describe("tactical stack splitting", () => {
                 { id: "decoy", small: true },
             ],
             {
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 gridType: PBTypes.GridVals.BLOCK_CENTER,
                 legalCellHashes: legal,
                 splitStacks: [{ unitId: "decoy", role: "aura" }],
@@ -245,7 +245,7 @@ describe("tactical stack splitting", () => {
                 { id: "cover", small: true },
             ],
             {
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 gridType: PBTypes.GridVals.NORMAL,
                 legalCellHashes: legal,
                 splitStacks: [{ unitId: "cover", role: "cover" }],
@@ -276,7 +276,7 @@ describe("tactical split placement with rectangular incumbents", () => {
                     { id: "decoy", small: true },
                 ],
                 {
-                    team: PBTypes.TeamVals.LOWER,
+                    team: PBTypes.TeamVals.LEFT,
                     gridType: PBTypes.GridVals.NORMAL,
                     legalCellHashes: legal,
                     splitStacks: [{ unitId: "decoy", role: "bait" }],
@@ -303,7 +303,7 @@ describe("tactical split placement with rectangular incumbents", () => {
                 { id: "cover", small: true },
             ],
             {
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 gridType: PBTypes.GridVals.NORMAL,
                 legalCellHashes: legal,
                 splitStacks: [{ unitId: "cover", role: "cover" }],
@@ -337,7 +337,7 @@ describe("tactical split placement with rectangular incumbents", () => {
             ]),
             units,
             {
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 gridType: PBTypes.GridVals.NORMAL,
                 legalCellHashes: legal,
                 splitStacks: [

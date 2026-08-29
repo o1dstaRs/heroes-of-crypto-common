@@ -16,8 +16,8 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 const pathHelper = new PathHelper(testGridSettings);
@@ -29,11 +29,11 @@ describe("Backstab (Scavenger) AI positioning", () => {
         // attacker the bonus needs y > target.y, so it should circle to a cell below the enemy.
         const scavenger = createTestUnit({
             name: "Scavenger",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             abilities: ["Backstab"],
         });
-        const enemy = createTestUnit({ name: "Prey", team: UPPER, attackType: MELEE });
+        const enemy = createTestUnit({ name: "Prey", team: RIGHT, attackType: MELEE });
         placeUnit(grid, unitsHolder, scavenger, { x: 6, y: 4 });
         placeUnit(grid, unitsHolder, enemy, { x: 5, y: 5 });
 
@@ -49,11 +49,11 @@ describe("Backstab (Scavenger) AI positioning", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const scavenger = createTestUnit({
             name: "Scavenger",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             abilities: ["Backstab"],
         });
-        const enemy = createTestUnit({ name: "Prey", team: LOWER, attackType: MELEE });
+        const enemy = createTestUnit({ name: "Prey", team: LEFT, attackType: MELEE });
         // Adjacent on the non-backstab side (below the enemy). UPPER needs y < target.y → circle above.
         placeUnit(grid, unitsHolder, scavenger, { x: 6, y: 6 });
         placeUnit(grid, unitsHolder, enemy, { x: 5, y: 5 });
@@ -65,8 +65,8 @@ describe("Backstab (Scavenger) AI positioning", () => {
 
     it("does not reroute a unit without Backstab", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const plain = createTestUnit({ name: "Grunt", team: LOWER, attackType: MELEE });
-        const enemy = createTestUnit({ name: "Prey", team: UPPER, attackType: MELEE });
+        const plain = createTestUnit({ name: "Grunt", team: LEFT, attackType: MELEE });
+        const enemy = createTestUnit({ name: "Prey", team: RIGHT, attackType: MELEE });
         placeUnit(grid, unitsHolder, plain, { x: 6, y: 4 });
         placeUnit(grid, unitsHolder, enemy, { x: 5, y: 5 });
 
@@ -80,11 +80,11 @@ describe("Backstab (Scavenger) AI positioning", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const scavenger = createTestUnit({
             name: "Scavenger",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             abilities: ["Backstab"],
         });
-        const enemy = createTestUnit({ name: "Prey", team: UPPER, attackType: MELEE });
+        const enemy = createTestUnit({ name: "Prey", team: RIGHT, attackType: MELEE });
         // Already below the enemy (y=6 > 5) → backstab already satisfied, no repositioning.
         placeUnit(grid, unitsHolder, scavenger, { x: 5, y: 6 });
         placeUnit(grid, unitsHolder, enemy, { x: 5, y: 5 });

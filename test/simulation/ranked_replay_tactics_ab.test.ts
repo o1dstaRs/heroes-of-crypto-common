@@ -104,14 +104,14 @@ describe("ranked replay tactics full-pipeline A/B", () => {
     it("changes the assigned candidate policy while preserving the opponent's simultaneous bundle decision", () => {
         const control = noRankedReplayAbComponents();
         const candidate = { ...control, draft: true };
-        const baseline = resolveRankedReplayAbPick(1, PBTypes.GridVals.NORMAL, PBTypes.TeamVals.LOWER, control);
-        const replay = resolveRankedReplayAbPick(1, PBTypes.GridVals.NORMAL, PBTypes.TeamVals.LOWER, candidate);
+        const baseline = resolveRankedReplayAbPick(1, PBTypes.GridVals.NORMAL, PBTypes.TeamVals.LEFT, control);
+        const replay = resolveRankedReplayAbPick(1, PBTypes.GridVals.NORMAL, PBTypes.TeamVals.LEFT, candidate);
 
-        expect(replay.lower.creatures).not.toEqual(baseline.lower.creatures);
-        expect(replay.upper.selectedBundleIndex).toBe(baseline.upper.selectedBundleIndex);
-        expect(replay.upper.tier1Artifact).toBe(baseline.upper.tier1Artifact);
+        expect(replay.left.creatures).not.toEqual(baseline.left.creatures);
+        expect(replay.right.selectedBundleIndex).toBe(baseline.right.selectedBundleIndex);
+        expect(replay.right.tier1Artifact).toBe(baseline.right.tier1Artifact);
         // Later control picks may still change legitimately because the candidate changed collisions/global availability.
-        expect(replay.lower.creatures.every((creatureId) => !replay.upper.creatures.includes(creatureId))).toBe(true);
+        expect(replay.left.creatures.every((creatureId) => !replay.right.creatures.includes(creatureId))).toBe(true);
         expect(replay.transcript.every((entry, index) => entry.index === index)).toBe(true);
     });
 

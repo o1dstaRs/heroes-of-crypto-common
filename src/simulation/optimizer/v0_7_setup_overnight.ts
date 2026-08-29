@@ -57,8 +57,8 @@ import {
     type SetupSeedPanel,
 } from "./v0_7_setup_overnight_core";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const CONDITIONAL_ALL = parseConditionalRules(V07_SETUP_CONDITIONAL_SPEC);
 const CONTROL_SYMMETRY_PAIRS = 4;
 const LIVE_GRID_LABELS: Record<SetupLiveGridType, "NORMAL" | "LAVA_CENTER" | "BLOCK_CENTER"> = {
@@ -194,7 +194,7 @@ function seedMatchesSetupSurface(
               }
             : {},
     );
-    const armies = [pick.lower, pick.upper];
+    const armies = [pick.left, pick.right];
     if (
         cohort &&
         (cohortTiming === "artifact-2"
@@ -267,7 +267,7 @@ function playCandidateSide(
     candidateSide: Side,
     gridType: SetupLiveGridType,
 ): ISetupEvaluatedGame {
-    const candidateTeam = candidateSide === "green" ? LOWER : UPPER;
+    const candidateTeam = candidateSide === "green" ? LEFT : RIGHT;
     const resolved = compileNonFightSetupPolicy(policy, policy.id);
     const pick = runRankedConditionalPickGame(seed, CONDITIONAL_ALL, shippedGenome, {
         pickArtifactT2: (team, offered, ownCreatureIdsAtTier2) => {
@@ -275,41 +275,41 @@ function playCandidateSide(
             return resolved.pickArtifactT2(offered, ownCreatureIdsAtTier2);
         },
     });
-    const candidateArmy = candidateTeam === LOWER ? pick.lower : pick.upper;
-    const opponentArmy = candidateTeam === LOWER ? pick.upper : pick.lower;
+    const candidateArmy = candidateTeam === LEFT ? pick.left : pick.right;
+    const opponentArmy = candidateTeam === LEFT ? pick.right : pick.left;
     const setup = candidateArmySetup(policy, candidateArmy);
     const placementVisibility = placementOpponentVisibility(policy.placement, candidateArmy.creatureIds);
     const candidateReveals = placementVisibility === "none" ? [] : candidateArmy.revealedOpponentCreatures;
     const candidatePublicOpponentCreatures =
         placementVisibility === "public-roster" ? [...new Set(opponentArmy.creatureIds)] : undefined;
-    const candidateIsLower = candidateTeam === LOWER;
+    const candidateIsLeft = candidateTeam === LEFT;
     const config: IMatchConfig = {
         greenVersion: V07_SETUP_FIGHT_VERSION,
         redVersion: V07_SETUP_FIGHT_VERSION,
-        roster: pick.lower.roster,
-        redRoster: pick.upper.roster,
+        roster: pick.left.roster,
+        redRoster: pick.right.roster,
         seed,
         gridType,
-        greenDoctrine: pick.lower.doctrine,
-        redDoctrine: pick.upper.doctrine,
-        greenAugments: candidateIsLower ? setup.augments : pick.lower.augments,
-        redAugments: candidateIsLower ? pick.upper.augments : setup.augments,
-        greenArtifactT1: pick.lower.tier1Artifact,
-        redArtifactT1: pick.upper.tier1Artifact,
-        greenArtifactT2: pick.lower.tier2Artifact,
-        redArtifactT2: pick.upper.tier2Artifact,
-        greenSynergies: candidateIsLower ? setup.synergies : pick.lower.synergies,
-        redSynergies: candidateIsLower ? pick.upper.synergies : setup.synergies,
-        greenRevealedCreatures: candidateIsLower ? candidateReveals : undefined,
-        redRevealedCreatures: candidateIsLower ? undefined : candidateReveals,
-        ...(candidateIsLower && candidatePublicOpponentCreatures
+        greenDoctrine: pick.left.doctrine,
+        redDoctrine: pick.right.doctrine,
+        greenAugments: candidateIsLeft ? setup.augments : pick.left.augments,
+        redAugments: candidateIsLeft ? pick.right.augments : setup.augments,
+        greenArtifactT1: pick.left.tier1Artifact,
+        redArtifactT1: pick.right.tier1Artifact,
+        greenArtifactT2: pick.left.tier2Artifact,
+        redArtifactT2: pick.right.tier2Artifact,
+        greenSynergies: candidateIsLeft ? setup.synergies : pick.left.synergies,
+        redSynergies: candidateIsLeft ? pick.right.synergies : setup.synergies,
+        greenRevealedCreatures: candidateIsLeft ? candidateReveals : undefined,
+        redRevealedCreatures: candidateIsLeft ? undefined : candidateReveals,
+        ...(candidateIsLeft && candidatePublicOpponentCreatures
             ? { greenPublicOpponentCreatures: candidatePublicOpponentCreatures }
             : {}),
-        ...(!candidateIsLower && candidatePublicOpponentCreatures
+        ...(!candidateIsLeft && candidatePublicOpponentCreatures
             ? { redPublicOpponentCreatures: candidatePublicOpponentCreatures }
             : {}),
-        greenSetupPlacementPolicy: candidateIsLower ? setup.placement : "baseline",
-        redSetupPlacementPolicy: candidateIsLower ? "baseline" : setup.placement,
+        greenSetupPlacementPolicy: candidateIsLeft ? setup.placement : "baseline",
+        redSetupPlacementPolicy: candidateIsLeft ? "baseline" : setup.placement,
         placementAugmentTiming: policy.placementAugmentTiming,
     };
     FightStateManager.getInstance();
@@ -317,8 +317,8 @@ function playCandidateSide(
     if (result.gridType !== gridType) {
         throw new Error(`match grid mismatch for seed ${seed}: expected ${gridType}, received ${result.gridType}`);
     }
-    const candidateRejections = candidateIsLower ? result.rejectedGreen : result.rejectedRed;
-    const baselineRejections = candidateIsLower ? result.rejectedRed : result.rejectedGreen;
+    const candidateRejections = candidateIsLeft ? result.rejectedGreen : result.rejectedRed;
+    const baselineRejections = candidateIsLeft ? result.rejectedRed : result.rejectedGreen;
     if (candidateRejections === undefined || baselineRejections === undefined) {
         throw new Error(`missing setup rejection telemetry for seed ${seed} candidateSide=${candidateSide}`);
     }

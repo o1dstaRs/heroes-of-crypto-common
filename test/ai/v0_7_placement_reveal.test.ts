@@ -26,8 +26,8 @@ import { PlacementPositionType } from "../../src/grid/placement_properties";
 import { RectanglePlacement } from "../../src/grid/rectangle_placement";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const CREATURES = PBTypes.CreatureVals;
@@ -63,7 +63,7 @@ function buildScenario(scenario: IPlacementScenario): {
 } {
     const c = createCombatTestContext();
     const enemy = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Threat",
         attackType: RANGE,
         abilities: scenario.enemyAbilities ?? [],
@@ -77,7 +77,7 @@ function buildScenario(scenario: IPlacementScenario): {
     for (let i = 0; i < (scenario.shooters ?? 0); i += 1) {
         units.push(
             createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: scenario.ownNames?.[ownNameIndex++] ?? `S${i}`,
                 attackType: RANGE,
                 rangeShots: 5,
@@ -88,7 +88,7 @@ function buildScenario(scenario: IPlacementScenario): {
     for (let i = 0; i < (scenario.groundMelee ?? 3); i += 1) {
         units.push(
             createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: scenario.ownNames?.[ownNameIndex++] ?? `M${i}`,
                 attackType: MELEE,
                 amountAlive: 20,
@@ -98,12 +98,12 @@ function buildScenario(scenario: IPlacementScenario): {
     for (const u of units) {
         c.unitsHolder.addUnit(u);
     }
-    const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5);
+    const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5);
     return {
         units,
         enemy,
         context: {
-            team: LOWER,
+            team: LEFT,
             grid: c.grid,
             unitsHolder: c.unitsHolder,
             pathHelper: undefined as never,

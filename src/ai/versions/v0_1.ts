@@ -37,7 +37,7 @@ import { meleeAttackTypeSelectionPrefix } from "../melee_attack_type";
 export const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
 
 export const otherTeam = (team: number): number =>
-    team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    team === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
 
 /** How many cells a unit's body covers. The packing difficulty every deployment layout orders by. */
 export const footprintArea = (unit: Unit): number => unit.getFootprintWidth() * unit.getFootprintHeight();
@@ -83,7 +83,7 @@ export class StrategyV0_1 implements IAIStrategy {
         // deploys on the high-Y rows and faces down. Melee wants the highest frontness, ranged the
         // lowest, so the squishy shooters sit behind the wall.
         const frontness = (cell: XY): number =>
-            context.team === PBTypes.TeamVals.LOWER ? cell.y : GRID_SIZE - 1 - cell.y;
+            context.team === PBTypes.TeamVals.LEFT ? cell.y : GRID_SIZE - 1 - cell.y;
 
         const baseCells: XY[] = [];
         for (const hash of legal) {

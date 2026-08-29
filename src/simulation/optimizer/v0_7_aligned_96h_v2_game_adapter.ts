@@ -68,8 +68,8 @@ export interface IV07AlignedV2BattleRecord {
     greenVersion: "v0.7s" | "v0.6";
     redVersion: "v0.7s" | "v0.6";
     physicalSetupSha256: string;
-    lowerRoster: string;
-    upperRoster: string;
+    leftRoster: string;
+    rightRoster: string;
     winner: "green" | "red" | "draw";
     winnerSlot: "candidate" | "opponent" | "draw";
     laps: number;
@@ -91,7 +91,7 @@ export type IAligned96hBattleRecord<Binding extends IAligned96hCandidateBinding>
 
 export interface IV07AlignedV2GameDependencies {
     matchRunner?: (config: IMatchConfig) => IMatchResult;
-    pickRunner?: (seed: number) => { lower: IConditionalArmy; upper: IConditionalArmy };
+    pickRunner?: (seed: number) => { left: IConditionalArmy; right: IConditionalArmy };
     /** Optional instrumentation/configuration hook for versioned wrappers. Unset preserves v0.7 exactly. */
     gridType?: number;
     decisionObserver?: (observation: IDecisionObservation) => void;
@@ -154,15 +154,15 @@ function taxonomyMembers(
 function selectSetup(
     task: IV07AlignedV2ExecutionTask,
     dependencies: IV07AlignedV2GameDependencies,
-): { lower: IV07AlignedV2ArmySetup; upper: IV07AlignedV2ArmySetup; setupSeed: number; setupAttempt: number } {
+): { left: IV07AlignedV2ArmySetup; right: IV07AlignedV2ArmySetup; setupSeed: number; setupAttempt: number } {
     const cell = evaluatorCellV07AlignedV2(task.cellId);
     if (cell.distribution === "fixed_template") {
         if (!cell.template || task.setupSeeds.length !== 1) {
             throw new Error(`${cell.id}: fixed-template execution requires one setup seed and a template`);
         }
-        const lower = fixedArmy(cell.template);
-        const upper = fixedArmy(cell.template);
-        return { lower, upper, setupSeed: task.setupSeeds[0], setupAttempt: 0 };
+        const left = fixedArmy(cell.template);
+        const right = fixedArmy(cell.template);
+        return { left, right, setupSeed: task.setupSeeds[0], setupAttempt: 0 };
     }
     if (task.setupSeeds.length !== V07_ALIGNED_V2_TAXONOMY_SETUP_ATTEMPTS) {
         throw new Error(`${cell.id}: taxonomy execution requires 128 preregistered setup proposals`);
@@ -178,11 +178,11 @@ function selectSetup(
     const candidateIsGreen = task.candidateSeat === "candidate_green";
     for (const [setupAttempt, setupSeed] of task.setupSeeds.entries()) {
         const pick = pickRunner(setupSeed);
-        const lower = rankedArmy(pick.lower);
-        const upper = rankedArmy(pick.upper);
-        const candidate = candidateIsGreen ? lower : upper;
+        const left = rankedArmy(pick.left);
+        const right = rankedArmy(pick.right);
+        const candidate = candidateIsGreen ? left : right;
         if (taxonomyMembers(cell.archetype, candidate).length > 0) {
-            return { lower, upper, setupSeed, setupAttempt };
+            return { left, right, setupSeed, setupAttempt };
         }
     }
     throw new Error(`${cell.id}/${task.scenarioId}/${task.candidateSeat}: no candidate-side taxonomy first hit`);
@@ -289,22 +289,22 @@ export function playV07AlignedV2Task<Binding extends IAligned96hCandidateBinding
     const result = matchRunner({
         greenVersion,
         redVersion,
-        roster: selected.lower.roster,
-        redRoster: selected.upper.roster,
+        roster: selected.left.roster,
+        redRoster: selected.right.roster,
         seed: task.combatSeed,
         gridType,
-        greenDoctrine: selected.lower.doctrine,
-        redDoctrine: selected.upper.doctrine,
-        greenAugments: selected.lower.augments,
-        redAugments: selected.upper.augments,
-        greenArtifactT1: selected.lower.tier1Artifact,
-        redArtifactT1: selected.upper.tier1Artifact,
-        greenArtifactT2: selected.lower.tier2Artifact,
-        redArtifactT2: selected.upper.tier2Artifact,
-        greenSynergies: selected.lower.synergies,
-        redSynergies: selected.upper.synergies,
-        greenRevealedCreatures: selected.lower.revealedOpponentCreatures,
-        redRevealedCreatures: selected.upper.revealedOpponentCreatures,
+        greenDoctrine: selected.left.doctrine,
+        redDoctrine: selected.right.doctrine,
+        greenAugments: selected.left.augments,
+        redAugments: selected.right.augments,
+        greenArtifactT1: selected.left.tier1Artifact,
+        redArtifactT1: selected.right.tier1Artifact,
+        greenArtifactT2: selected.left.tier2Artifact,
+        redArtifactT2: selected.right.tier2Artifact,
+        greenSynergies: selected.left.synergies,
+        redSynergies: selected.right.synergies,
+        greenRevealedCreatures: selected.left.revealedOpponentCreatures,
+        redRevealedCreatures: selected.right.revealedOpponentCreatures,
         ...(dependencies.decisionObserver === undefined ? {} : { decisionObserver: dependencies.decisionObserver }),
         ...(dependencies.turnExecutionObserver === undefined
             ? {}
@@ -334,12 +334,12 @@ export function playV07AlignedV2Task<Binding extends IAligned96hCandidateBinding
         greenVersion,
         redVersion,
         physicalSetupSha256: fingerprintV07AlignedV2({
-            lower: selected.lower,
-            upper: selected.upper,
+            left: selected.left,
+            right: selected.right,
             map: gridType,
         }),
-        lowerRoster: rosterSignature(selected.lower.roster),
-        upperRoster: rosterSignature(selected.upper.roster),
+        leftRoster: rosterSignature(selected.left.roster),
+        rightRoster: rosterSignature(selected.right.roster),
         winner: result.winner,
         winnerSlot: result.winner === "draw" ? "draw" : result.winner === candidateSide ? "candidate" : "opponent",
         laps: result.laps,

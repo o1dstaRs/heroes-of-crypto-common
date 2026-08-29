@@ -62,7 +62,7 @@ describe("status resist reduces physical AOE damage (and never magic AOE)", () =
         const abilities = variant === "mechanism" ? [...extraAbilities, "Mechanism"] : extraAbilities;
         const u = createTestUnit({
             name,
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 20,
             maxHp: 1000,
             armor: 10,
@@ -80,7 +80,7 @@ describe("status resist reduces physical AOE damage (and never magic AOE)", () =
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Thrower",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             abilities: [abilityName],
             attack: 40,
@@ -112,7 +112,7 @@ describe("status resist reduces physical AOE damage (and never magic AOE)", () =
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Spinner",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Lightning Spin"],
             attack: 40,
             damageMin: 100,
@@ -140,7 +140,7 @@ describe("status resist reduces physical AOE damage (and never magic AOE)", () =
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Skewer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Skewer Strike"],
             attack: 40,
             damageMin: 100,
@@ -167,7 +167,7 @@ describe("status resist reduces physical AOE damage (and never magic AOE)", () =
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Piercer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             abilities: ["Through Shot"],
             attack: 40,
@@ -201,7 +201,7 @@ describe("status resist reduces physical AOE damage (and never magic AOE)", () =
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Dragon",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Fire Breath"],
             attack: 40,
             damageMin: 100,
@@ -229,7 +229,7 @@ describe("status resist reduces physical AOE damage (and never magic AOE)", () =
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Storm",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Chain Lightning"],
             attack: 40,
             damageMin: 100,

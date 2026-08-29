@@ -299,22 +299,22 @@ export class GameActionEngine {
             return this.reject("start_not_available");
         }
 
-        const lowerUnitsAlive = this.context.unitsHolder
-            .getAllAllies(PBTypes.TeamVals.LOWER)
+        const leftUnitsAlive = this.context.unitsHolder
+            .getAllAllies(PBTypes.TeamVals.LEFT)
             .filter((unit) => !unit.isDead()).length;
-        const upperUnitsAlive = this.context.unitsHolder
-            .getAllAllies(PBTypes.TeamVals.UPPER)
+        const rightUnitsAlive = this.context.unitsHolder
+            .getAllAllies(PBTypes.TeamVals.RIGHT)
             .filter((unit) => !unit.isDead()).length;
-        if (!lowerUnitsAlive || !upperUnitsAlive) {
+        if (!leftUnitsAlive || !rightUnitsAlive) {
             return this.reject("start_not_available");
         }
 
-        this.context.unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.LOWER);
-        this.context.unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.UPPER);
+        this.context.unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.LEFT);
+        this.context.unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.RIGHT);
         this.context.unitsHolder.haveDistancesToClosestEnemiesDecreased();
         this.context.fightProperties.startFight();
-        this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, lowerUnitsAlive);
-        this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, upperUnitsAlive);
+        this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, leftUnitsAlive);
+        this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, rightUnitsAlive);
         this.context.unitsHolder.refreshStackPowerForAllUnits();
 
         // Record each unit's starting cell so the fight log preserves the initial deployment.
@@ -328,7 +328,7 @@ export class GameActionEngine {
 
         return {
             completed: true,
-            events: [{ type: "fight_started", lowerUnitsAlive, upperUnitsAlive }],
+            events: [{ type: "fight_started", leftUnitsAlive, rightUnitsAlive }],
         };
     }
     private endTurn(action: Extract<GameAction, { type: "end_turn" }>): IGameActionResult {

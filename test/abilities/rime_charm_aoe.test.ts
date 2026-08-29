@@ -39,7 +39,7 @@ function giveRimeCharm(unit: Unit): void {
 }
 
 function tank(name: string): Unit {
-    return createTestUnit({ name, team: PBTypes.TeamVals.LOWER, amountAlive: 20, maxHp: 1000, armor: 10 });
+    return createTestUnit({ name, team: PBTypes.TeamVals.LEFT, amountAlive: 20, maxHp: 1000, armor: 10 });
 }
 
 function installMinimumRandom(): () => void {
@@ -86,7 +86,7 @@ describe("Rime Charm procs its slow from physical AOE", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Cannon",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             abilities: ["Large Caliber"],
             attack: 40,
@@ -122,7 +122,7 @@ describe("Rime Charm procs its slow from physical AOE", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Hydra",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Lightning Spin"],
             attack: 40,
             damageMin: 100,
@@ -154,7 +154,7 @@ describe("Rime Charm procs its slow from physical AOE", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Pikeman",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Skewer Strike"],
             attack: 40,
             damageMin: 100,
@@ -184,7 +184,7 @@ describe("Rime Charm procs its slow from physical AOE", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Piercer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             abilities: ["Through Shot"],
             attack: 40,

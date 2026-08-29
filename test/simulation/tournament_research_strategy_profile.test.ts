@@ -18,7 +18,7 @@ import {
     playGame,
     TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID,
     TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6,
-    TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED,
+    TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED,
     type IGameRecord,
     type ITournamentOptions,
 } from "../../src/simulation/tournament";
@@ -100,12 +100,12 @@ describe("tournament entrant-A research strategy profile", () => {
             };
             playGame(options, 0);
             expect(searchedTeams.length).toBeGreaterThan(0);
-            expect(new Set(searchedTeams)).toEqual(new Set([PBTypes.TeamVals.LOWER]));
+            expect(new Set(searchedTeams)).toEqual(new Set([PBTypes.TeamVals.LEFT]));
 
             searchedTeams.length = 0;
             playGame(options, 1);
             expect(searchedTeams.length).toBeGreaterThan(0);
-            expect(new Set(searchedTeams)).toEqual(new Set([PBTypes.TeamVals.UPPER]));
+            expect(new Set(searchedTeams)).toEqual(new Set([PBTypes.TeamVals.RIGHT]));
         } finally {
             SearchDriver.prototype.chooseDecision = originalChooseDecision;
         }
@@ -142,7 +142,7 @@ describe("tournament entrant-A research strategy profile", () => {
             {
                 ...baseOptions(),
                 researchEntrantAStrategyProfile:
-                    TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED,
+                    TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED,
             },
             0,
         );

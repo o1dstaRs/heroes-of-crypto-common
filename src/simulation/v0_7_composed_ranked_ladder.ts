@@ -462,19 +462,19 @@ export interface IV07ComposedGameRecord {
     setupAttempt: number;
     combatSeed: number;
     taxonomyTraitCounts?: {
-        lower: number;
-        upper: number;
+        left: number;
+        right: number;
         candidate: number;
         opponent: number;
-        lowerMembers: string[];
-        upperMembers: string[];
+        leftMembers: string[];
+        rightMembers: string[];
     };
     candidateIsGreen: boolean;
     greenVersion: string;
     redVersion: string;
     physicalSetupSha256: string;
-    lowerRoster: string;
-    upperRoster: string;
+    leftRoster: string;
+    rightRoster: string;
     winner: Side | "draw";
     winnerSlot: "candidate" | "opponent" | "draw";
     laps: number;
@@ -2258,8 +2258,8 @@ function fixedArmy(templateName: V07ArchetypeTemplateName): IArmySetup {
     };
 }
 
-function physicalSetupFingerprint(lower: IArmySetup, upper: IArmySetup): string {
-    return sha256(JSON.stringify({ lower, upper, map: PBTypes.GridVals.NORMAL }));
+function physicalSetupFingerprint(left: IArmySetup, right: IArmySetup): string {
+    return sha256(JSON.stringify({ left, right, map: PBTypes.GridVals.NORMAL }));
 }
 
 function telemetry(actions: readonly IRecordedAction[], side: Side): IV07ComposedActionTelemetry {
@@ -2307,12 +2307,12 @@ function normalizedResultFingerprint(result: IMatchResult): string {
 
 export interface IV07ComposedGameDependencies {
     matchRunner?: (config: IMatchConfig) => IMatchResult;
-    pickRunner?: (seed: number) => { lower: IConditionalArmy; upper: IConditionalArmy };
+    pickRunner?: (seed: number) => { left: IConditionalArmy; right: IConditionalArmy };
 }
 
 interface IV07ComposedSelectedSetup {
-    lower: IArmySetup;
-    upper: IArmySetup;
+    left: IArmySetup;
+    right: IArmySetup;
     setupSeed: number;
     setupAttempt: number;
     taxonomyTraitCounts?: NonNullable<IV07ComposedGameRecord["taxonomyTraitCounts"]>;
@@ -2320,20 +2320,20 @@ interface IV07ComposedSelectedSetup {
 
 function taxonomyTraitCounts(
     archetype: V07Archetype,
-    lower: IArmySetup,
-    upper: IArmySetup,
+    left: IArmySetup,
+    right: IArmySetup,
     candidateIsGreen: boolean,
 ): NonNullable<IV07ComposedGameRecord["taxonomyTraitCounts"]> {
     const taxonomy = new Set(V07_ARCHETYPE_TAXONOMY[archetype]);
-    const lowerMembers = lower.roster.map((unit) => unit.creatureName).filter((name) => taxonomy.has(name));
-    const upperMembers = upper.roster.map((unit) => unit.creatureName).filter((name) => taxonomy.has(name));
+    const leftMembers = left.roster.map((unit) => unit.creatureName).filter((name) => taxonomy.has(name));
+    const rightMembers = right.roster.map((unit) => unit.creatureName).filter((name) => taxonomy.has(name));
     return {
-        lower: lowerMembers.length,
-        upper: upperMembers.length,
-        candidate: candidateIsGreen ? lowerMembers.length : upperMembers.length,
-        opponent: candidateIsGreen ? upperMembers.length : lowerMembers.length,
-        lowerMembers,
-        upperMembers,
+        left: leftMembers.length,
+        right: rightMembers.length,
+        candidate: candidateIsGreen ? leftMembers.length : rightMembers.length,
+        opponent: candidateIsGreen ? rightMembers.length : leftMembers.length,
+        leftMembers,
+        rightMembers,
     };
 }
 
@@ -2341,15 +2341,15 @@ function selectV07ComposedSetup(
     cell: IV07ComposedCell,
     pair: number,
     seat: V07ComposedCandidateSeat,
-    pickRunner: (seed: number) => { lower: IConditionalArmy; upper: IConditionalArmy },
+    pickRunner: (seed: number) => { left: IConditionalArmy; right: IConditionalArmy },
 ): IV07ComposedSelectedSetup {
     const candidateIsGreen = seat === "candidate_green";
     if (cell.distribution === "fixed_template") {
         if (!cell.template) throw new Error(`${cell.id}: fixed-template cell omitted its template`);
         const setupSeed = v07ComposedSetupSeed(cell, pair, seat, 0);
         return {
-            lower: fixedArmy(cell.template),
-            upper: fixedArmy(cell.template),
+            left: fixedArmy(cell.template),
+            right: fixedArmy(cell.template),
             setupSeed,
             setupAttempt: 0,
         };
@@ -2358,8 +2358,8 @@ function selectV07ComposedSetup(
         const setupSeed = v07ComposedSetupSeed(cell, pair, seat, 0);
         const pick = pickRunner(setupSeed);
         return {
-            lower: rankedArmy(pick.lower),
-            upper: rankedArmy(pick.upper),
+            left: rankedArmy(pick.left),
+            right: rankedArmy(pick.right),
             setupSeed,
             setupAttempt: 0,
         };
@@ -2370,18 +2370,18 @@ function selectV07ComposedSetup(
     for (let attempt = 0; attempt < V07_COMPOSED_TAXONOMY_MAX_ATTEMPTS; attempt += 1) {
         const setupSeed = v07ComposedSetupSeed(cell, pair, seat, attempt);
         const pick = pickRunner(setupSeed);
-        const lower = rankedArmy(pick.lower);
-        const upper = rankedArmy(pick.upper);
-        const counts = taxonomyTraitCounts(cell.archetype, lower, upper, candidateIsGreen);
+        const left = rankedArmy(pick.left);
+        const right = rankedArmy(pick.right);
+        const counts = taxonomyTraitCounts(cell.archetype, left, right, candidateIsGreen);
         if (counts.candidate < 1) continue;
-        return { lower, upper, setupSeed, setupAttempt: attempt, taxonomyTraitCounts: counts };
+        return { left, right, setupSeed, setupAttempt: attempt, taxonomyTraitCounts: counts };
     }
     throw new Error(
         `${cell.id}/${pair}/${seat}: no candidate-side ${cell.archetype} setup within ${V07_COMPOSED_TAXONOMY_MAX_ATTEMPTS} attempts`,
     );
 }
 
-const defaultV07ComposedPickRunner = (): ((seed: number) => { lower: IConditionalArmy; upper: IConditionalArmy }) => {
+const defaultV07ComposedPickRunner = (): ((seed: number) => { left: IConditionalArmy; right: IConditionalArmy }) => {
     const rules = parseConditionalRules("all");
     const genome = shippedLeagueGenome(LEAGUE_ROUND1_DRAFT_SPEC);
     return (seed: number) => runRankedConditionalPickGame(seed, rules, genome);
@@ -2392,8 +2392,8 @@ interface IV07ComposedTaxonomyPlanAttempt {
     setupSeed: number;
     traitCounts: NonNullable<IV07ComposedGameRecord["taxonomyTraitCounts"]>;
     physicalSetupSha256: string;
-    lowerRoster: string;
-    upperRoster: string;
+    leftRoster: string;
+    rightRoster: string;
 }
 
 function v07ComposedTaxonomyAttempt(
@@ -2401,23 +2401,23 @@ function v07ComposedTaxonomyAttempt(
     pair: number,
     seat: V07ComposedCandidateSeat,
     attempt: number,
-    pickRunner: (seed: number) => { lower: IConditionalArmy; upper: IConditionalArmy },
-): { lower: IArmySetup; upper: IArmySetup; evidence: IV07ComposedTaxonomyPlanAttempt } {
+    pickRunner: (seed: number) => { left: IConditionalArmy; right: IConditionalArmy },
+): { left: IArmySetup; right: IArmySetup; evidence: IV07ComposedTaxonomyPlanAttempt } {
     if (!cell.archetype) throw new Error(`${cell.id}: taxonomy plan omitted its archetype`);
     const setupSeed = v07ComposedSetupSeed(cell, pair, seat, attempt);
     const pick = pickRunner(setupSeed);
-    const lower = rankedArmy(pick.lower);
-    const upper = rankedArmy(pick.upper);
+    const left = rankedArmy(pick.left);
+    const right = rankedArmy(pick.right);
     return {
-        lower,
-        upper,
+        left,
+        right,
         evidence: {
             attempt,
             setupSeed,
-            traitCounts: taxonomyTraitCounts(cell.archetype, lower, upper, seat === "candidate_green"),
-            physicalSetupSha256: physicalSetupFingerprint(lower, upper),
-            lowerRoster: rosterSignature(lower.roster),
-            upperRoster: rosterSignature(upper.roster),
+            traitCounts: taxonomyTraitCounts(cell.archetype, left, right, seat === "candidate_green"),
+            physicalSetupSha256: physicalSetupFingerprint(left, right),
+            leftRoster: rosterSignature(left.roster),
+            rightRoster: rosterSignature(right.roster),
         },
     };
 }
@@ -2540,9 +2540,9 @@ export function replayV07ComposedTaxonomyRecords(
             record.setupAttempt !== selected.setupAttempt ||
             record.setupSeed !== selected.setupSeed ||
             JSON.stringify(record.taxonomyTraitCounts) !== JSON.stringify(selected.taxonomyTraitCounts) ||
-            record.physicalSetupSha256 !== physicalSetupFingerprint(selected.lower, selected.upper) ||
-            record.lowerRoster !== rosterSignature(selected.lower.roster) ||
-            record.upperRoster !== rosterSignature(selected.upper.roster)
+            record.physicalSetupSha256 !== physicalSetupFingerprint(selected.left, selected.right) ||
+            record.leftRoster !== rosterSignature(selected.left.roster) ||
+            record.rightRoster !== rosterSignature(selected.right.roster)
         ) {
             throw new Error(`${cell.id}/${record.game}: persisted taxonomy row differs from first-hit setup replay`);
         }
@@ -2571,7 +2571,7 @@ export function playV07ComposedGame(
                 shippedLeagueGenome(LEAGUE_ROUND1_DRAFT_SPEC),
             ));
     const selected = selectV07ComposedSetup(cell, pair, candidateSeatStream, pickRunner);
-    const { lower, upper } = selected;
+    const { left, right } = selected;
     const combatSeed = v07ComposedCombatSeed(cell, pair, candidateSeatStream);
     const greenVersion = candidateIsGreen ? cell.candidate : cell.opponent;
     const redVersion = candidateIsGreen ? cell.opponent : cell.candidate;
@@ -2584,22 +2584,22 @@ export function playV07ComposedGame(
     const result = matchRunner({
         greenVersion,
         redVersion,
-        roster: lower.roster,
-        redRoster: upper.roster,
+        roster: left.roster,
+        redRoster: right.roster,
         seed: combatSeed,
         gridType: PBTypes.GridVals.NORMAL,
-        greenDoctrine: lower.doctrine,
-        redDoctrine: upper.doctrine,
-        greenAugments: lower.augments,
-        redAugments: upper.augments,
-        greenArtifactT1: lower.tier1Artifact,
-        redArtifactT1: upper.tier1Artifact,
-        greenArtifactT2: lower.tier2Artifact,
-        redArtifactT2: upper.tier2Artifact,
-        greenSynergies: lower.synergies,
-        redSynergies: upper.synergies,
-        greenRevealedCreatures: lower.revealedOpponentCreatures,
-        redRevealedCreatures: upper.revealedOpponentCreatures,
+        greenDoctrine: left.doctrine,
+        redDoctrine: right.doctrine,
+        greenAugments: left.augments,
+        redAugments: right.augments,
+        greenArtifactT1: left.tier1Artifact,
+        redArtifactT1: right.tier1Artifact,
+        greenArtifactT2: left.tier2Artifact,
+        redArtifactT2: right.tier2Artifact,
+        greenSynergies: left.synergies,
+        redSynergies: right.synergies,
+        greenRevealedCreatures: left.revealedOpponentCreatures,
+        redRevealedCreatures: right.revealedOpponentCreatures,
     });
     const candidateSide: Side = candidateIsGreen ? "green" : "red";
     const opponentSide: Side = candidateIsGreen ? "red" : "green";
@@ -2623,9 +2623,9 @@ export function playV07ComposedGame(
         candidateIsGreen,
         greenVersion,
         redVersion,
-        physicalSetupSha256: physicalSetupFingerprint(lower, upper),
-        lowerRoster: rosterSignature(lower.roster),
-        upperRoster: rosterSignature(upper.roster),
+        physicalSetupSha256: physicalSetupFingerprint(left, right),
+        leftRoster: rosterSignature(left.roster),
+        rightRoster: rosterSignature(right.roster),
         winner: result.winner,
         winnerSlot: result.winner === "draw" ? "draw" : result.winner === candidateSide ? "candidate" : "opponent",
         laps: result.laps,
@@ -2871,13 +2871,13 @@ export function summarizeV07ComposedCell(
                 const taxonomy = new Set(V07_ARCHETYPE_TAXONOMY[cell.archetype!]);
                 if (
                     !counts ||
-                    counts.lower !== counts.lowerMembers.length ||
-                    counts.upper !== counts.upperMembers.length ||
-                    counts.candidate !== (expectedCandidateGreen ? counts.lower : counts.upper) ||
-                    counts.opponent !== (expectedCandidateGreen ? counts.upper : counts.lower) ||
+                    counts.left !== counts.leftMembers.length ||
+                    counts.right !== counts.rightMembers.length ||
+                    counts.candidate !== (expectedCandidateGreen ? counts.left : counts.right) ||
+                    counts.opponent !== (expectedCandidateGreen ? counts.right : counts.left) ||
                     counts.candidate < 1 ||
-                    counts.lowerMembers.some((name) => !taxonomy.has(name)) ||
-                    counts.upperMembers.some((name) => !taxonomy.has(name))
+                    counts.leftMembers.some((name) => !taxonomy.has(name)) ||
+                    counts.rightMembers.some((name) => !taxonomy.has(name))
                 ) {
                     throw new Error(`${cell.id}/${record.game}: candidate-side taxonomy conditioning is invalid`);
                 }
@@ -2887,8 +2887,8 @@ export function summarizeV07ComposedCell(
             if (
                 !/^[0-9a-f]{64}$/.test(record.physicalSetupSha256) ||
                 !/^[0-9a-f]{64}$/.test(record.resultFingerprint) ||
-                !record.lowerRoster ||
-                !record.upperRoster ||
+                !record.leftRoster ||
+                !record.rightRoster ||
                 !Number.isSafeInteger(record.laps) ||
                 record.laps < 0 ||
                 !["green", "red", "draw"].includes(record.winner) ||
@@ -2962,8 +2962,8 @@ export function summarizeV07ComposedCell(
                 even.setupSeed !== odd.setupSeed ||
                 even.combatSeed !== odd.combatSeed ||
                 even.physicalSetupSha256 !== odd.physicalSetupSha256 ||
-                even.lowerRoster !== odd.lowerRoster ||
-                even.upperRoster !== odd.upperRoster
+                even.leftRoster !== odd.leftRoster ||
+                even.rightRoster !== odd.rightRoster
             ) {
                 throw new Error(`${cell.id}/${pair}: physical setup/combat changed within the side swap`);
             }

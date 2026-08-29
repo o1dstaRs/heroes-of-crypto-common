@@ -253,14 +253,14 @@ describe("spell_helper", () => {
     it("validates direct spell casts across main target types", () => {
         const caster = createTestUnit({
             name: "Caster",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             spells: ["Life:Heal", "System:Resurrection", "Death:Weakness", "System:Castling"],
             stackPower: 4,
         });
-        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.UPPER, amountAlive: 2 });
-        const resurrectAlly = createTestUnit({ name: "Resurrect Ally", team: PBTypes.TeamVals.UPPER, amountAlive: 2 });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LOWER });
-        const otherEnemy = createTestUnit({ name: "Other Enemy", team: PBTypes.TeamVals.LOWER });
+        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.RIGHT, amountAlive: 2 });
+        const resurrectAlly = createTestUnit({ name: "Resurrect Ally", team: PBTypes.TeamVals.RIGHT, amountAlive: 2 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LEFT });
+        const otherEnemy = createTestUnit({ name: "Other Enemy", team: PBTypes.TeamVals.LEFT });
 
         ally.applyDamage(5, 0, new SceneLogMock());
         resurrectAlly.applyDamage(10, 0, new SceneLogMock());
@@ -386,12 +386,12 @@ describe("spell_helper", () => {
     it("rejects Castling inherited by a large caster", () => {
         const caster = createTestUnit({
             name: "Arachna Queen",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             size: PBTypes.UnitSizeVals.LARGE,
             spells: ["System:Castling"],
             stackPower: 5,
         });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LOWER });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LEFT });
         const castling = caster.getSpells().find((candidate) => candidate.getName() === "Castling");
 
         expect(
@@ -414,7 +414,7 @@ describe("spell_helper", () => {
     it("rejects direct spell casts for missing spells, immunity, and already-applied effects", () => {
         const caster = createTestUnit({
             name: "Caster",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             spells: [
                 "System:Castling",
                 "System:Wild Regeneration",
@@ -426,10 +426,10 @@ describe("spell_helper", () => {
         });
         const ally = createTestUnit({
             name: "Ally",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             level: PBTypes.UnitLevelVals.SECOND,
         });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LOWER });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LEFT });
 
         const castling = caster.getSpells().find((candidate) => candidate.getName() === "Castling");
         const wildRegeneration = caster.getSpells().find((candidate) => candidate.getName() === "Wild Regeneration");
@@ -564,7 +564,7 @@ describe("spell_helper", () => {
     it("calculates mirror power and detects already applied spells", () => {
         // Full stack: Magic Mirror is stack-powered (15/30/45/60/75 at power 75), so the 0..100 clamp this
         // test exists to pin is only reachable from a full stack.
-        const target = createTestUnit({ team: PBTypes.TeamVals.LOWER, stackPower: 5 });
+        const target = createTestUnit({ team: PBTypes.TeamVals.LEFT, stackPower: 5 });
         const mirror = spell("Chaos", "Magic Mirror");
 
         mirror.setPower(150);
@@ -579,7 +579,7 @@ describe("spell_helper", () => {
         massMirror.setPower(70);
         // Full stack again: this asserts the stronger of the two mirrors wins (70 over 20), which is about
         // the max() selection, not about stack scaling.
-        const massMirrorTarget = createTestUnit({ team: PBTypes.TeamVals.LOWER, stackPower: 5 });
+        const massMirrorTarget = createTestUnit({ team: PBTypes.TeamVals.LEFT, stackPower: 5 });
         massMirrorTarget.applyBuff(mirror);
         massMirrorTarget.applyBuff(massMirror);
         expect(getMagicMirrorPower(massMirrorTarget)).toBe(70);
@@ -587,7 +587,7 @@ describe("spell_helper", () => {
         // Ranked hydration carries active buffs in the authoritative parallel arrays without rebuilding
         // AppliedSpell objects. The combat preview must read the same power instead of silently showing no
         // return damage after every snapshot refresh.
-        const snapshotMirrorTarget = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const snapshotMirrorTarget = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         const snapshotProperties = snapshotMirrorTarget.getUnitProperties();
         snapshotProperties.applied_buffs.push("Magic Mirror");
         snapshotProperties.applied_buffs_laps.push(2);
@@ -596,7 +596,7 @@ describe("spell_helper", () => {
         expect(snapshotMirrorTarget.getBuff("Magic Mirror")).toBeUndefined();
         expect(getMagicMirrorPower(snapshotMirrorTarget)).toBe(30);
 
-        const noMirrorTarget = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const noMirrorTarget = createTestUnit({ team: PBTypes.TeamVals.LEFT });
 
         expect(getMagicMirrorPower(noMirrorTarget)).toBe(0);
         expect(isMirrored(noMirrorTarget)).toBe(false);

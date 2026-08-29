@@ -50,7 +50,7 @@ const capturingSceneLog = () => {
 const makeWyvern = () =>
     createTestUnit({
         name: "Wyvern",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         movementType: PBTypes.MovementVals.FLY,
         abilities: ["Venom Cloud Aura"],
         auraEffects: ["Venom Cloud"],
@@ -58,7 +58,7 @@ const makeWyvern = () =>
         auraIsBuff: [true],
     });
 
-const makeAlly = (name: string) => createTestUnit({ name, team: PBTypes.TeamVals.LOWER, attack: 10 });
+const makeAlly = (name: string) => createTestUnit({ name, team: PBTypes.TeamVals.LEFT, attack: 10 });
 
 describe("Venom Cloud Aura", () => {
     it("is a 2-cell buff aura with its own poison and stack damage", () => {
@@ -97,7 +97,7 @@ describe("Venom Cloud Aura", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const wyvern = makeWyvern();
         const ally = makeAlly("Ally");
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, maxHp: 200 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, maxHp: 200 });
 
         placeUnit(grid, unitsHolder, wyvern, { x: 3, y: 3 });
         placeUnit(grid, unitsHolder, ally, { x: 4, y: 3 });
@@ -117,7 +117,7 @@ describe("Venom Cloud Aura", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const wyvern = makeWyvern();
         const ally = makeAlly("Ally");
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, maxHp: 2000 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, maxHp: 2000 });
 
         placeUnit(grid, unitsHolder, wyvern, { x: 3, y: 3 });
         placeUnit(grid, unitsHolder, ally, { x: 4, y: 3 });
@@ -156,7 +156,7 @@ describe("Venom Cloud Aura", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const wyvern = makeWyvern();
         const weakAlly = makeAlly("Weak Ally");
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, maxHp: 2000 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, maxHp: 2000 });
 
         placeUnit(grid, unitsHolder, wyvern, { x: 3, y: 3 });
         placeUnit(grid, unitsHolder, weakAlly, { x: 4, y: 3 });
@@ -178,7 +178,7 @@ describe("Venom Cloud Aura", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const wyvern = makeWyvern();
         const farAlly = makeAlly("Far Ally");
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, maxHp: 200 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, maxHp: 200 });
 
         placeUnit(grid, unitsHolder, wyvern, { x: 3, y: 3 });
         placeUnit(grid, unitsHolder, farAlly, { x: 9, y: 9 });
@@ -198,7 +198,7 @@ describe("Venom Cloud Aura on a response", () => {
     const makeDefender = (name: string, attackType: number, extra: Record<string, unknown> = {}) =>
         createTestUnit({
             name,
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType,
             attack: 10,
             armor: 30,
@@ -215,7 +215,7 @@ describe("Venom Cloud Aura on a response", () => {
         const defender = makeDefender("Aura'd Defender", PBTypes.AttackVals.MELEE);
         const attacker = createTestUnit({
             name: "Melee Attacker",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             attack: 10,
             armor: 30,
@@ -253,7 +253,7 @@ describe("Venom Cloud Aura on a response", () => {
         const archer = makeDefender("Aura'd Archer", PBTypes.AttackVals.RANGE, { rangeShots: 5 });
         const shooter = createTestUnit({
             name: "Enemy Shooter",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             attack: 10,
             armor: 30,
@@ -288,7 +288,7 @@ describe("Venom Cloud Aura on a response", () => {
 describe("Wyvern", () => {
     it("is a Might level 2 flying melee unit with the poison aura and Wardguard", () => {
         const config = (faction: string, name: string) =>
-            getCreatureConfig(PBTypes.TeamVals.LOWER, faction, name, `${name.toLowerCase()}_512`, 1, 0);
+            getCreatureConfig(PBTypes.TeamVals.LEFT, faction, name, `${name.toLowerCase()}_512`, 1, 0);
         const wyvern = config("Might", "Wyvern");
 
         expect(wyvern.level).toBe(PBTypes.UnitLevelVals.SECOND);

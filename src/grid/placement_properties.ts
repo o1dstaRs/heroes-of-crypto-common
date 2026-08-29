@@ -28,10 +28,10 @@ export interface IPlacement {
 
 export enum PlacementPositionType {
     NO_TYPE = 0,
-    UPPER_RIGHT = 1,
-    LOWER_LEFT = 2,
-    UPPER_LEFT = 3,
-    LOWER_RIGHT = 4,
+    RIGHT_TOP = 1,
+    LEFT_BOTTOM = 2,
+    RIGHT_BOTTOM = 3,
+    LEFT_TOP = 4,
 }
 
 export enum PlacementType {

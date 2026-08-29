@@ -11,8 +11,8 @@ import { createCombatTestContext, createTestUnit, createVisibleDamage, placeUnit
 // deterministic source is installed or the forced roll below lands on the wrong call.
 FightStateManager.getInstance();
 
-const GREEN = PBTypes.TeamVals.LOWER;
-const RED = PBTypes.TeamVals.UPPER;
+const GREEN = PBTypes.TeamVals.LEFT;
+const RED = PBTypes.TeamVals.RIGHT;
 
 /**
  * The second volley of a Double Shot (and the Blacksmith-granted Crafted Double Shot) must ANIMATE

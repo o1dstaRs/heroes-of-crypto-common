@@ -25,8 +25,8 @@ import {
 } from "../../src/picks/pick_sim";
 import { CreatureLevelMap } from "../../src/units/unit_properties";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const first: PickRandomInt = () => 0;
 
 const accept = (state: IPickSimState, action: PickAction, rng: PickRandomInt = first): IPickSimState => {
@@ -40,8 +40,8 @@ const accept = (state: IPickSimState, action: PickAction, rng: PickRandomInt = f
 
 /** Close the doctrine step, which is where the nominations resolve. */
 const finishDoctrines = (state: IPickSimState, rng: PickRandomInt = first): IPickSimState => {
-    let next = accept(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.SEE_NONE }, rng);
-    return accept(next, { type: "select_doctrine", team: UPPER, doctrine: Doctrine.SEE_NONE }, rng);
+    let next = accept(state, { type: "select_doctrine", team: LEFT, doctrine: Doctrine.SEE_NONE }, rng);
+    return accept(next, { type: "select_doctrine", team: RIGHT, doctrine: Doctrine.SEE_NONE }, rng);
 };
 
 const bansPerLevel = (state: IPickSimState): number[] => {
@@ -59,7 +59,7 @@ describe("pre-game unit ban", () => {
     it("offers only creatures that are neither auto-banned nor sitting in a bundle offer", () => {
         const state = createPickSimState(first);
         const bannable = getBannableCreatures(state);
-        const offered = [...state.lower.bundles, ...state.upper.bundles].flatMap(([l1, l2]) => [l1, l2]);
+        const offered = [...state.left.bundles, ...state.right.bundles].flatMap(([l1, l2]) => [l1, l2]);
 
         expect(bannable.length).toBeGreaterThan(0);
         for (const creatureId of bannable) {
@@ -79,8 +79,8 @@ describe("pre-game unit ban", () => {
     it("bans the agreed unit outright when both players nominate the same one", () => {
         let state = createPickSimState(first);
         const target = getBannableCreatures(state)[0];
-        state = accept(state, { type: "propose_ban", team: LOWER, creatureId: target });
-        state = accept(state, { type: "propose_ban", team: UPPER, creatureId: target });
+        state = accept(state, { type: "propose_ban", team: LEFT, creatureId: target });
+        state = accept(state, { type: "propose_ban", team: RIGHT, creatureId: target });
 
         // rng that would pick either side still has to land on the agreed unit — there is nothing to roll.
         for (const rng of [() => 0, () => 1] as PickRandomInt[]) {
@@ -93,23 +93,23 @@ describe("pre-game unit ban", () => {
     it("takes one of the two nominations, chosen by the roll", () => {
         let state = createPickSimState(first);
         const bannable = getBannableCreatures(state);
-        const lowerPick = bannable[0];
-        const upperPick = bannable.find((id) => id !== lowerPick)!;
-        state = accept(state, { type: "propose_ban", team: LOWER, creatureId: lowerPick });
-        state = accept(state, { type: "propose_ban", team: UPPER, creatureId: upperPick });
+        const leftPick = bannable[0];
+        const rightPick = bannable.find((id) => id !== leftPick)!;
+        state = accept(state, { type: "propose_ban", team: LEFT, creatureId: leftPick });
+        state = accept(state, { type: "propose_ban", team: RIGHT, creatureId: rightPick });
 
-        expect(finishDoctrines(state, () => 0).extraBan).toBe(lowerPick);
-        expect(finishDoctrines(state, () => 1).extraBan).toBe(upperPick);
+        expect(finishDoctrines(state, () => 0).extraBan).toBe(leftPick);
+        expect(finishDoctrines(state, () => 1).extraBan).toBe(rightPick);
         // Only ONE of them is ever banned.
         const resolved = finishDoctrines(state, () => 0);
-        expect(resolved.creaturesBanned).toContain(lowerPick);
-        expect(resolved.creaturesBanned).not.toContain(upperPick);
+        expect(resolved.creaturesBanned).toContain(leftPick);
+        expect(resolved.creaturesBanned).not.toContain(rightPick);
     });
 
     it("bans a lone nomination, with no competing ban to roll against", () => {
         let state = createPickSimState(first);
         const target = getBannableCreatures(state)[0];
-        state = accept(state, { type: "propose_ban", team: UPPER, creatureId: target });
+        state = accept(state, { type: "propose_ban", team: RIGHT, creatureId: target });
 
         const resolved = finishDoctrines(state);
         expect(resolved.extraBan).toBe(target);
@@ -122,7 +122,7 @@ describe("pre-game unit ban", () => {
 
         let state = createPickSimState(first);
         const target = getBannableCreatures(state)[0];
-        state = accept(state, { type: "propose_ban", team: LOWER, creatureId: target });
+        state = accept(state, { type: "propose_ban", team: LEFT, creatureId: target });
         const resolved = finishDoctrines(state);
 
         // The player steered one of that level's bans rather than adding one on top.
@@ -134,29 +134,29 @@ describe("pre-game unit ban", () => {
     it("refuses a second nomination, an unbannable creature, and anything after the doctrine step", () => {
         let state = createPickSimState(first);
         const bannable = getBannableCreatures(state);
-        state = accept(state, { type: "propose_ban", team: LOWER, creatureId: bannable[0] });
+        state = accept(state, { type: "propose_ban", team: LEFT, creatureId: bannable[0] });
 
         expect(
-            transitionPickSim(state, { type: "propose_ban", team: LOWER, creatureId: bannable[1] }, first),
+            transitionPickSim(state, { type: "propose_ban", team: LEFT, creatureId: bannable[1] }, first),
         ).toMatchObject({ status: "rejected", reason: "ban_already_proposed" });
         expect(
-            transitionPickSim(state, { type: "propose_ban", team: UPPER, creatureId: state.creaturesBanned[0] }, first),
+            transitionPickSim(state, { type: "propose_ban", team: RIGHT, creatureId: state.creaturesBanned[0] }, first),
         ).toMatchObject({ status: "rejected", reason: "creature_not_bannable" });
 
         const afterDoctrines = finishDoctrines(state);
         expect(
-            transitionPickSim(afterDoctrines, { type: "propose_ban", team: UPPER, creatureId: bannable[1] }, first),
+            transitionPickSim(afterDoctrines, { type: "propose_ban", team: RIGHT, creatureId: bannable[1] }, first),
         ).toMatchObject({ status: "rejected", reason: "wrong_phase" });
     });
 
     it("keeps a nomination out of the opponent's view until it resolves", () => {
         let state = createPickSimState(first);
         const target = getBannableCreatures(state)[0];
-        state = accept(state, { type: "propose_ban", team: LOWER, creatureId: target });
+        state = accept(state, { type: "propose_ban", team: LEFT, creatureId: target });
 
         // Nothing the opponent can read has changed: the ban list is untouched until the step closes.
         expect(state.creaturesBanned).not.toContain(target);
         expect(state.extraBan).toBeUndefined();
-        expect(state.upper.proposedBan).toBeUndefined();
+        expect(state.right.proposedBan).toBeUndefined();
     });
 });

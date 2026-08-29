@@ -60,19 +60,19 @@ import { creatureIdForName, DEFAULT_OFFER_K, draftRoster } from "./draft";
 import { isLiveTwin, LIVETWIN_PRESET, liveTwinMeleeFraction, liveTwinSetup } from "./livetwin";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
 
-export const TOURNAMENT_RESEARCH_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK =
+export const TOURNAMENT_RESEARCH_A19_H18_F184_LEFT_HUMAN_RANKED_FALLBACK =
     "v0.8-a19-h18-f184-lower-human-ranked-fallback" as const;
-export const TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT =
+export const TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT =
     "v0.8-a19-h64-f184-lower-human-ranked-fallback-score-safe-compact" as const;
-export const TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED =
+export const TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED =
     "v0.8-a19-h64-f184-lower-human-ranked-fallback-score-safe-compact-validated" as const;
 export const TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6 = "v0.8-a19-h64-finalist-v6" as const;
 export const TOURNAMENT_RESEARCH_ENTRANT_A_SEARCH_TEAM_SCOPE_POLICY_ID =
     "entrant-a-physical-team-search-scope-v1" as const;
 export type TournamentResearchEntrantAStrategyProfile =
-    | typeof TOURNAMENT_RESEARCH_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK
-    | typeof TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT
-    | typeof TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED
+    | typeof TOURNAMENT_RESEARCH_A19_H18_F184_LEFT_HUMAN_RANKED_FALLBACK
+    | typeof TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT
+    | typeof TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED
     | typeof TOURNAMENT_RESEARCH_A19_H64_FINALIST_V6;
 
 export interface ITournamentOptions {
@@ -442,7 +442,7 @@ interface IResolvedTournamentResearchProfile {
 const resolveTournamentResearchProfile = (
     selector: TournamentResearchEntrantAStrategyProfile,
 ): IResolvedTournamentResearchProfile => {
-    if (selector === TOURNAMENT_RESEARCH_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK) {
+    if (selector === TOURNAMENT_RESEARCH_A19_H18_F184_LEFT_HUMAN_RANKED_FALLBACK) {
         const profile = V08_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK_PROFILE;
         return {
             createStrategy: createV08A19H18F184LowerHumanRankedFallbackStrategy,
@@ -458,7 +458,7 @@ const resolveTournamentResearchProfile = (
             }),
         };
     }
-    if (selector === TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT) {
+    if (selector === TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT) {
         const profile = V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_PROFILE;
         return {
             createStrategy: createV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactStrategy,
@@ -476,7 +476,7 @@ const resolveTournamentResearchProfile = (
             }),
         };
     }
-    if (selector === TOURNAMENT_RESEARCH_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED) {
+    if (selector === TOURNAMENT_RESEARCH_A19_H64_F184_LEFT_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED) {
         const profile = V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_PROFILE;
         return {
             createStrategy: createV08A19H64F184LowerHumanRankedFallbackScoreSafeCompactValidatedStrategy,

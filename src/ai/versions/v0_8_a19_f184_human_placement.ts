@@ -23,7 +23,7 @@ import { footprintCenterForAnchor } from "./v0_1";
 // Re-pinned for the perk -> doctrine rename; same anchor bytes as V08_A19_PROD_F184_FIXTURE_SHA256,
 // whose values did not move — only the field name did.
 export const V08_A19_F184_HUMAN_PLACEMENT_FIXTURE_SHA256 =
-    "6649cc5a3fe134f0289c1d6ffb8a056cf25e1a56d6c45f5a34f53354b1cdc0a1" as const;
+    "b55e8b7d0b7038416e1821dc93b8d1488473bb3ff6a133adb1a3555865e48a94" as const;
 
 export const V08_A19_F184_HUMAN_PLACEMENT_POLICY = Object.freeze({
     schema: "hoc.v0_8_a19_f184_human_placement.v10" as const,
@@ -89,7 +89,7 @@ interface IOpeningUnit {
     readonly footprintHeight?: number;
     readonly faction: number;
     /** Base cell normalized to LOWER. Large units use the engine's upper-right footprint anchor. */
-    readonly lowerBase: Readonly<XY>;
+    readonly leftBase: Readonly<XY>;
 }
 
 interface IOpeningRecipe {
@@ -105,14 +105,14 @@ const LEVEL_2 = PBTypes.UnitLevelVals.SECOND;
 const LEVEL_3 = PBTypes.UnitLevelVals.THIRD;
 const LEVEL_4 = PBTypes.UnitLevelVals.FOURTH;
 
-const LOWER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
+const LEFT_ROSTER: readonly IOpeningUnit[] = Object.freeze([
     Object.freeze({
         creatureId: PBTypes.CreatureVals.TROGLODYTE,
         name: "Troglodyte",
         level: LEVEL_1,
         size: SMALL,
         faction: PBTypes.FactionVals.CHAOS,
-        lowerBase: Object.freeze({ x: 13, y: 2 }),
+        leftBase: Object.freeze({ x: 13, y: 2 }),
     }),
     Object.freeze({
         creatureId: PBTypes.CreatureVals.ARBALESTER,
@@ -120,7 +120,7 @@ const LOWER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
         level: LEVEL_1,
         size: SMALL,
         faction: PBTypes.FactionVals.LIFE,
-        lowerBase: Object.freeze({ x: 14, y: 1 }),
+        leftBase: Object.freeze({ x: 14, y: 1 }),
     }),
     Object.freeze({
         creatureId: PBTypes.CreatureVals.BEHOLDER,
@@ -128,7 +128,7 @@ const LOWER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
         level: LEVEL_2,
         size: SMALL,
         faction: PBTypes.FactionVals.CHAOS,
-        lowerBase: Object.freeze({ x: 13, y: 1 }),
+        leftBase: Object.freeze({ x: 13, y: 1 }),
     }),
     Object.freeze({
         creatureId: PBTypes.CreatureVals.TROLL,
@@ -136,7 +136,7 @@ const LOWER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
         level: LEVEL_2,
         size: SMALL,
         faction: PBTypes.FactionVals.CHAOS,
-        lowerBase: Object.freeze({ x: 14, y: 2 }),
+        leftBase: Object.freeze({ x: 14, y: 2 }),
     }),
     Object.freeze({
         creatureId: PBTypes.CreatureVals.GRIFFIN,
@@ -144,7 +144,7 @@ const LOWER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
         level: LEVEL_3,
         size: SMALL,
         faction: PBTypes.FactionVals.LIFE,
-        lowerBase: Object.freeze({ x: 10, y: 3 }),
+        leftBase: Object.freeze({ x: 10, y: 3 }),
     }),
     Object.freeze({
         creatureId: PBTypes.CreatureVals.BLACK_DRAGON,
@@ -152,18 +152,18 @@ const LOWER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
         level: LEVEL_4,
         size: LARGE,
         faction: PBTypes.FactionVals.CHAOS,
-        lowerBase: Object.freeze({ x: 9, y: 3 }),
+        leftBase: Object.freeze({ x: 9, y: 3 }),
     }),
 ]);
 
-const UPPER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
+const RIGHT_ROSTER: readonly IOpeningUnit[] = Object.freeze([
     Object.freeze({
         creatureId: PBTypes.CreatureVals.DRYAD,
         name: "Dryad",
         level: LEVEL_1,
         size: SMALL,
         faction: PBTypes.FactionVals.NATURE,
-        lowerBase: Object.freeze({ x: 6, y: 1 }),
+        leftBase: Object.freeze({ x: 6, y: 1 }),
     }),
     Object.freeze({
         creatureId: PBTypes.CreatureVals.BERSERKER,
@@ -171,7 +171,7 @@ const UPPER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
         level: LEVEL_1,
         size: SMALL,
         faction: PBTypes.FactionVals.MIGHT,
-        lowerBase: Object.freeze({ x: 2, y: 2 }),
+        leftBase: Object.freeze({ x: 2, y: 2 }),
     }),
     Object.freeze({
         creatureId: PBTypes.CreatureVals.BATTLE_MAGE,
@@ -179,7 +179,7 @@ const UPPER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
         level: LEVEL_2,
         size: SMALL,
         faction: PBTypes.FactionVals.LIFE,
-        lowerBase: Object.freeze({ x: 4, y: 1 }),
+        leftBase: Object.freeze({ x: 4, y: 1 }),
     }),
     Object.freeze({
         creatureId: PBTypes.CreatureVals.VALKYRIE,
@@ -187,7 +187,7 @@ const UPPER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
         level: LEVEL_2,
         size: SMALL,
         faction: PBTypes.FactionVals.LIFE,
-        lowerBase: Object.freeze({ x: 6, y: 3 }),
+        leftBase: Object.freeze({ x: 6, y: 3 }),
     }),
     Object.freeze({
         creatureId: PBTypes.CreatureVals.MANTIS,
@@ -195,7 +195,7 @@ const UPPER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
         level: LEVEL_3,
         size: SMALL,
         faction: PBTypes.FactionVals.NATURE,
-        lowerBase: Object.freeze({ x: 4, y: 3 }),
+        leftBase: Object.freeze({ x: 4, y: 3 }),
     }),
     Object.freeze({
         creatureId: PBTypes.CreatureVals.FRENZIED_BOAR,
@@ -203,7 +203,7 @@ const UPPER_ROSTER: readonly IOpeningUnit[] = Object.freeze([
         level: LEVEL_4,
         size: LARGE,
         faction: PBTypes.FactionVals.MIGHT,
-        lowerBase: Object.freeze({ x: 9, y: 3 }),
+        leftBase: Object.freeze({ x: 9, y: 3 }),
     }),
 ]);
 
@@ -216,13 +216,13 @@ const idsFor = (units: readonly IOpeningUnit[]): readonly number[] => units.map(
 const OPENINGS: readonly IOpeningRecipe[] = Object.freeze([
     Object.freeze({
         id: "prod-f184-lower-roster" as const,
-        ownUnits: LOWER_ROSTER,
-        opponentCreatureIds: Object.freeze(idsFor(UPPER_ROSTER)),
+        ownUnits: LEFT_ROSTER,
+        opponentCreatureIds: Object.freeze(idsFor(RIGHT_ROSTER)),
     }),
     Object.freeze({
         id: "prod-f184-upper-roster" as const,
-        ownUnits: UPPER_ROSTER,
-        opponentCreatureIds: Object.freeze(idsFor(LOWER_ROSTER)),
+        ownUnits: RIGHT_ROSTER,
+        opponentCreatureIds: Object.freeze(idsFor(LEFT_ROSTER)),
     }),
 ]);
 
@@ -244,7 +244,7 @@ const centerFor = footprintCenterForAnchor;
 
 const exactLegalZoneForTeam = (team: IPlacementContext["team"]): Set<number> => {
     const legal = new Set<number>();
-    const yStart = team === PBTypes.TeamVals.LOWER ? 1 : GRID_SIZE - 4;
+    const yStart = team === PBTypes.TeamVals.LEFT ? 1 : GRID_SIZE - 4;
     for (let x = 1; x < GRID_SIZE - 1; x += 1) {
         for (let y = yStart; y < yStart + 3; y += 1) {
             legal.add(cellKey({ x, y }));
@@ -294,7 +294,7 @@ const normalizedPlacementFingerprint = (
             unit.getAmountAlive(),
             unit.getSize(),
             center?.x ?? null,
-            center === undefined ? null : team === PBTypes.TeamVals.LOWER ? center.y : GRID_SIZE - 1 - center.y,
+            center === undefined ? null : team === PBTypes.TeamVals.LEFT ? center.y : GRID_SIZE - 1 - center.y,
         ];
     });
     rows.sort((left, right) => JSON.stringify(left.slice(0, 4)).localeCompare(JSON.stringify(right.slice(0, 4))));
@@ -309,11 +309,11 @@ const normalizedPlacementFingerprint = (
  * as `+ (isSmallSize() ? 1 : 2) - 2`, i.e. `+H - 2`, which is the same expression only for a square. There
  * is no x term because these templates are never mirrored horizontally; a rectangle's width would need one.
  */
-const baseForTeam = (unit: Unit, lowerBase: XY, team: IPlacementContext["team"]): XY => {
-    if (team === PBTypes.TeamVals.LOWER) return { ...lowerBase };
+const baseForTeam = (unit: Unit, leftBase: XY, team: IPlacementContext["team"]): XY => {
+    if (team === PBTypes.TeamVals.LEFT) return { ...leftBase };
     return {
-        x: lowerBase.x,
-        y: GRID_SIZE - 1 - lowerBase.y + (unit.getFootprintHeight() - 1),
+        x: leftBase.x,
+        y: GRID_SIZE - 1 - leftBase.y + (unit.getFootprintHeight() - 1),
     };
 };
 
@@ -332,7 +332,7 @@ const evaluateV08A19F184HumanPlacement = (
     });
 
     if (context.grid.getGridType() !== PBTypes.GridVals.NORMAL) return fallback("unsupported-map");
-    if (context.team !== PBTypes.TeamVals.LOWER && context.team !== PBTypes.TeamVals.UPPER) {
+    if (context.team !== PBTypes.TeamVals.LEFT && context.team !== PBTypes.TeamVals.RIGHT) {
         return fallback("unsupported-team");
     }
     if (!placementGeometryIsExact(context)) return fallback("unsupported-placement-geometry");
@@ -394,7 +394,7 @@ const evaluateV08A19F184HumanPlacement = (
         const creatureId = creatureIdForName(unit.getName());
         const expected = creatureId === undefined ? undefined : expectedByCreatureId.get(creatureId);
         if (!expected) return fallback("own-unit-shape-mismatch");
-        selected.set(unit.getId(), baseForTeam(unit, expected.lowerBase, context.team));
+        selected.set(unit.getId(), baseForTeam(unit, expected.leftBase, context.team));
     }
     if (!placementIsCompleteAndLegal(units, selected, context)) return fallback("candidate-incomplete-or-illegal");
 

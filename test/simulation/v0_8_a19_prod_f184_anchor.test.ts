@@ -21,8 +21,8 @@ import {
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
 describe("v0.8 A19 production f184 placement anchor", () => {
     test("pins the decoded complete production setup and its canonical digest", () => {
@@ -37,19 +37,17 @@ describe("v0.8 A19 production f184 placement anchor", () => {
         });
         expect(V08_A19_PROD_F184_ANCHOR.map).toBe(PBTypes.GridVals.NORMAL);
         expect(V08_A19_PROD_F184_ANCHOR.defaultPlacementDepth).toBe(3);
-        expect(V08_A19_PROD_F184_ANCHOR.lower.creatureIds).toEqual([3, 33, 6, 4, 37, 9]);
-        expect(V08_A19_PROD_F184_ANCHOR.upper.creatureIds).toEqual([47, 12, 55, 34, 27, 43]);
-        expect(V08_A19_PROD_F184_ANCHOR.lower.roster.map(({ creatureName, amount }) => [creatureName, amount])).toEqual(
-            [
-                ["Troglodyte", 125],
-                ["Arbalester", 124],
-                ["Beholder", 22],
-                ["Troll", 25],
-                ["Griffin", 9],
-                ["Black Dragon", 1],
-            ],
-        );
-        expect(V08_A19_PROD_F184_ANCHOR.upper.roster.map(({ creatureName, amount }) => [creatureName, amount])).toEqual(
+        expect(V08_A19_PROD_F184_ANCHOR.left.creatureIds).toEqual([3, 33, 6, 4, 37, 9]);
+        expect(V08_A19_PROD_F184_ANCHOR.right.creatureIds).toEqual([47, 12, 55, 34, 27, 43]);
+        expect(V08_A19_PROD_F184_ANCHOR.left.roster.map(({ creatureName, amount }) => [creatureName, amount])).toEqual([
+            ["Troglodyte", 125],
+            ["Arbalester", 124],
+            ["Beholder", 22],
+            ["Troll", 25],
+            ["Griffin", 9],
+            ["Black Dragon", 1],
+        ]);
+        expect(V08_A19_PROD_F184_ANCHOR.right.roster.map(({ creatureName, amount }) => [creatureName, amount])).toEqual(
             [
                 ["Dryad", 100],
                 ["Berserker", 109],
@@ -59,25 +57,25 @@ describe("v0.8 A19 production f184 placement anchor", () => {
                 ["Frenzied Boar", 2],
             ],
         );
-        expect(V08_A19_PROD_F184_ANCHOR.lower).toMatchObject({
+        expect(V08_A19_PROD_F184_ANCHOR.left).toMatchObject({
             artifactT1: 10,
             artifactT2: 4,
             doctrine: Doctrine.SEE_NONE,
             empower: 0,
             augmentPlan: { placement: 0, armor: 3, might: 3, sniper: 1, movement: 0 },
         });
-        expect(V08_A19_PROD_F184_ANCHOR.upper).toMatchObject({
+        expect(V08_A19_PROD_F184_ANCHOR.right).toMatchObject({
             artifactT1: 8,
             artifactT2: 9,
             doctrine: Doctrine.SEE_NONE,
             empower: 0,
             augmentPlan: { placement: 0, armor: 3, might: 3, sniper: 0, movement: 1 },
         });
-        expect(V08_A19_PROD_F184_ANCHOR.lower.synergies).toEqual([
+        expect(V08_A19_PROD_F184_ANCHOR.left.synergies).toEqual([
             { faction: PBTypes.FactionVals.LIFE, synergy: 2, level: 1 },
             { faction: PBTypes.FactionVals.CHAOS, synergy: 1, level: 2 },
         ]);
-        expect(V08_A19_PROD_F184_ANCHOR.upper.synergies).toEqual([
+        expect(V08_A19_PROD_F184_ANCHOR.right.synergies).toEqual([
             { faction: PBTypes.FactionVals.LIFE, synergy: 2, level: 1 },
             { faction: PBTypes.FactionVals.MIGHT, synergy: 2, level: 1 },
             { faction: PBTypes.FactionVals.NATURE, synergy: 2, level: 1 },
@@ -119,9 +117,9 @@ describe("v0.8 A19 production f184 placement anchor", () => {
                     `${prefix}-${index}`,
                 ),
             );
-        const lower = build(LOWER, "prod-lower", prepared.armyA.roster);
-        const upper = build(UPPER, "prod-upper", prepared.armyB.roster);
-        [...lower, ...upper].forEach((unit) => combat.unitsHolder.addUnit(unit));
+        const left = build(LEFT, "prod-lower", prepared.armyA.roster);
+        const right = build(RIGHT, "prod-upper", prepared.armyB.roster);
+        [...left, ...right].forEach((unit) => combat.unitsHolder.addUnit(unit));
 
         const context = (team: TeamType, opponentIds: readonly number[]): IPlacementContext => ({
             team,
@@ -130,7 +128,7 @@ describe("v0.8 A19 production f184 placement anchor", () => {
             pathHelper: new PathHelper(testGridSettings),
             placement: new RectanglePlacement(
                 testGridSettings,
-                team === LOWER ? PlacementPositionType.LOWER_LEFT : PlacementPositionType.UPPER_RIGHT,
+                team === LEFT ? PlacementPositionType.LEFT_BOTTOM : PlacementPositionType.RIGHT_TOP,
                 V08_A19_PROD_F184_ANCHOR.defaultPlacementDepth,
             ),
             setupPlacementPolicy: "public-roster",
@@ -139,12 +137,12 @@ describe("v0.8 A19 production f184 placement anchor", () => {
         const frontness = (team: TeamType, unit: Unit, placement: ReadonlyMap<string, { x: number; y: number }>) => {
             const base = placement.get(unit.getId())!;
             const y = unit.isSmallSize() ? base.y : base.y - 0.5;
-            return team === LOWER ? y : 15 - y;
+            return team === LEFT ? y : 15 - y;
         };
 
         for (const [team, units, opponentIds, correctedName] of [
-            [LOWER, lower, prepared.armyB.creatureIds, "Troll"],
-            [UPPER, upper, prepared.armyA.creatureIds, "Valkyrie"],
+            [LEFT, left, prepared.armyB.creatureIds, "Troll"],
+            [RIGHT, right, prepared.armyA.creatureIds, "Valkyrie"],
         ] as const) {
             const placementContext = context(team, opponentIds);
             const incumbent = new StrategyV0_8().placeArmy(units, placementContext);
@@ -156,8 +154,8 @@ describe("v0.8 A19 production f184 placement anchor", () => {
                 treatmentApplied: true,
                 placementChanged: true,
                 correctedPhysicalUnits: 1,
-                correctedForwardPhysicals: team === UPPER ? 1 : 0,
-                correctedGroundScreens: team === LOWER ? 1 : 0,
+                correctedForwardPhysicals: team === RIGHT ? 1 : 0,
+                correctedGroundScreens: team === LEFT ? 1 : 0,
                 fallbackReason: null,
             });
             expect(frontness(team, corrected, selected)).toBeGreaterThan(frontness(team, corrected, incumbent));

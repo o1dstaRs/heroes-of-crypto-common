@@ -28,8 +28,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
 const decisionContext = (combat: CombatTestContext): IDecisionContext => ({
     grid: combat.grid,
@@ -119,10 +119,10 @@ describe("v0.5 — reinforcement-learned strategy", () => {
 
     it("aims Lightning Spin at a Cowardice-legal primary without giving up the legal surround", () => {
         const combat = createCombatTestContext();
-        const spinner = createTestUnit({ team: LOWER, abilities: ["Lightning Spin"], maxHp: 10, initiative: 3 });
-        const blocked = createTestUnit({ team: UPPER, name: "Blocked", amountAlive: 2, maxHp: 10 });
-        const primary = createTestUnit({ team: UPPER, name: "Primary", maxHp: 10 });
-        const splash = createTestUnit({ team: UPPER, name: "Splash", maxHp: 10 });
+        const spinner = createTestUnit({ team: LEFT, abilities: ["Lightning Spin"], maxHp: 10, initiative: 3 });
+        const blocked = createTestUnit({ team: RIGHT, name: "Blocked", amountAlive: 2, maxHp: 10 });
+        const primary = createTestUnit({ team: RIGHT, name: "Primary", maxHp: 10 });
+        const splash = createTestUnit({ team: RIGHT, name: "Splash", maxHp: 10 });
         placeUnit(combat.grid, combat.unitsHolder, spinner, { x: 6, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, blocked, { x: 6, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, primary, { x: 7, y: 6 });
@@ -141,11 +141,11 @@ describe("v0.5 — reinforcement-learned strategy", () => {
 
     it("aims Skewer through a Cowardice-legal primary while retaining its legal line splash", () => {
         const combat = createCombatTestContext();
-        const pikeman = createTestUnit({ team: LOWER, abilities: ["Skewer Strike"], maxHp: 10, initiative: 3 });
-        const blocked = createTestUnit({ team: UPPER, name: "Blocked", amountAlive: 2, maxHp: 10 });
-        const blockedSplash = createTestUnit({ team: UPPER, name: "Blocked Splash", amountAlive: 2, maxHp: 10 });
-        const primary = createTestUnit({ team: UPPER, name: "Primary", maxHp: 10 });
-        const splash = createTestUnit({ team: UPPER, name: "Splash", maxHp: 10 });
+        const pikeman = createTestUnit({ team: LEFT, abilities: ["Skewer Strike"], maxHp: 10, initiative: 3 });
+        const blocked = createTestUnit({ team: RIGHT, name: "Blocked", amountAlive: 2, maxHp: 10 });
+        const blockedSplash = createTestUnit({ team: RIGHT, name: "Blocked Splash", amountAlive: 2, maxHp: 10 });
+        const primary = createTestUnit({ team: RIGHT, name: "Primary", maxHp: 10 });
+        const splash = createTestUnit({ team: RIGHT, name: "Splash", maxHp: 10 });
         placeUnit(combat.grid, combat.unitsHolder, pikeman, { x: 6, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, blocked, { x: 7, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, blockedSplash, { x: 8, y: 6 });
@@ -167,16 +167,16 @@ describe("v0.5 — reinforcement-learned strategy", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
         const dragon = createTestUnit({
             name: "Black Dragon",
-            team: LOWER,
+            team: LEFT,
             abilities: ["Fire Breath"],
             movementType: PBTypes.MovementVals.FLY,
             size: PBTypes.UnitSizeVals.LARGE,
             initiative: 4,
         });
-        const incumbentTarget = createTestUnit({ team: UPPER, name: "Incumbent Target" });
-        const lavaTarget = createTestUnit({ team: UPPER, name: "Lava Target" });
-        const lavaSplash1 = createTestUnit({ team: UPPER, name: "Lava Splash 1" });
-        const lavaSplash2 = createTestUnit({ team: UPPER, name: "Lava Splash 2" });
+        const incumbentTarget = createTestUnit({ team: RIGHT, name: "Incumbent Target" });
+        const lavaTarget = createTestUnit({ team: RIGHT, name: "Lava Target" });
+        const lavaSplash1 = createTestUnit({ team: RIGHT, name: "Lava Splash 1" });
+        const lavaSplash2 = createTestUnit({ team: RIGHT, name: "Lava Splash 2" });
         placeUnit(combat.grid, combat.unitsHolder, dragon, { x: 9, y: 11 });
         placeUnit(combat.grid, combat.unitsHolder, incumbentTarget, { x: 8, y: 9 });
         placeUnit(combat.grid, combat.unitsHolder, lavaTarget, { x: 8, y: 5 });

@@ -1539,17 +1539,17 @@ function adaptiveProposals(
     const requiredFinish = V08_CAMPAIGN_EXACT_ANCHOR_REQUIRED_FINISH_MUTATIONS.map(({ field, to }) =>
         proposals.find((proposal) => proposal.mutation.field === field && proposal.mutation.to === to),
     );
-    const lowerGate = proposals.find(
+    const leftGate = proposals.find(
         (proposal) =>
             proposal.mutation.field === "search.gate" && Number(proposal.mutation.to) < Number(proposal.mutation.from),
     );
     const usefulLeaf = leafProposals.filter(
         ({ mutation }) => mutation.field === "search.leaf" && mutation.from !== mutation.to,
     );
-    if (requiredFinish.some((proposal) => proposal === undefined) || !lowerGate || !usefulLeaf.length) {
+    if (requiredFinish.some((proposal) => proposal === undefined) || !leftGate || !usefulLeaf.length) {
         throw new Error("Exact c48 adaptive plan cannot cover finish, gate, and leaf mutations");
     }
-    const priority = [...requiredFinish, lowerGate, ...usefulLeaf] as IV08CampaignAdaptiveProposal[];
+    const priority = [...requiredFinish, leftGate, ...usefulLeaf] as IV08CampaignAdaptiveProposal[];
     const prioritized = new Set(priority);
     return [...priority, ...defaultOrder.filter((proposal) => !prioritized.has(proposal))];
 }

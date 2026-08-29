@@ -14,8 +14,8 @@ import { PlacementPositionType } from "../../src/grid/placement_properties";
 import { RectanglePlacement } from "../../src/grid/rectangle_placement";
 import { createCombatTestContext, createTestUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const v06 = getAIStrategy("v0.6");
@@ -37,7 +37,7 @@ function anyAdjacent(cells: XY[]): boolean {
 function placeVsEnemy(enemyAbilities: string[]): XY[] {
     const c = createCombatTestContext();
     const enemy = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Threat",
         attackType: RANGE,
         abilities: enemyAbilities,
@@ -45,11 +45,11 @@ function placeVsEnemy(enemyAbilities: string[]): XY[] {
     });
     c.unitsHolder.addUnit(enemy);
     const myUnits = [1, 2, 3].map((i) =>
-        createTestUnit({ team: LOWER, name: `M${i}`, attackType: MELEE, amountAlive: 20 }),
+        createTestUnit({ team: LEFT, name: `M${i}`, attackType: MELEE, amountAlive: 20 }),
     );
-    const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5);
+    const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5);
     const placed = v06.placeArmy(myUnits, {
-        team: LOWER,
+        team: LEFT,
         grid: c.grid,
         unitsHolder: c.unitsHolder,
         pathHelper: undefined as never,

@@ -167,7 +167,7 @@ function bindArmySetup(army: IConditionalArmy): IConditionalArmy {
 }
 
 /** Full ranked pick path: shipped draft plus deployed doctrine/T1/T2/augment/synergy behavior. */
-export function runV08AlignedV1BoundRankedPick(seed: number): { lower: IConditionalArmy; upper: IConditionalArmy } {
+export function runV08AlignedV1BoundRankedPick(seed: number): { left: IConditionalArmy; right: IConditionalArmy } {
     const picked = runRankedConditionalPickGame(
         seed,
         CONDITIONAL_RULES,
@@ -178,7 +178,7 @@ export function runV08AlignedV1BoundRankedPick(seed: number): { lower: IConditio
             rankedCreatureOrder: SERVER_PERSISTED_CREATURE_ORDER,
         },
     );
-    return { lower: bindArmySetup(picked.lower), upper: bindArmySetup(picked.upper) };
+    return { left: bindArmySetup(picked.left), right: bindArmySetup(picked.right) };
 }
 
 export interface IV08AlignedV1MatchBindingOptions {
@@ -243,5 +243,5 @@ export function v08AlignedV1PhysicalSetup(config: IMatchConfig): unknown {
             tier2Artifact: (green ? config.greenArtifactT2 : config.redArtifactT2) ?? 0,
         };
     };
-    return { lower: army("green"), upper: army("red"), map: config.gridType };
+    return { left: army("green"), right: army("red"), map: config.gridType };
 }

@@ -79,66 +79,66 @@ describe("Empower augment — fight properties", () => {
     // Spymaster grants 5 upgrade points — enough to show Empower both fitting and running the team out.
     const seedTeam = (doctrine: Doctrine = Doctrine.SEE_ALL) => {
         const fightProperties = new FightProperties();
-        fightProperties.setDoctrinePerTeam(PBTypes.TeamVals.LOWER, doctrine);
-        fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LOWER, DefaultPlacementLevel1.THREE_BY_THREE);
+        fightProperties.setDoctrinePerTeam(PBTypes.TeamVals.LEFT, doctrine);
+        fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LEFT, DefaultPlacementLevel1.THREE_BY_THREE);
         return fightProperties;
     };
 
     it("defaults to NO_AUGMENT and stores what a team buys", () => {
         const fightProperties = seedTeam();
-        expect(fightProperties.getAugmentEmpower(PBTypes.TeamVals.LOWER)).toBe(EmpowerAugment.NO_AUGMENT);
+        expect(fightProperties.getAugmentEmpower(PBTypes.TeamVals.LEFT)).toBe(EmpowerAugment.NO_AUGMENT);
 
         expect(
-            fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+            fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
                 type: "Empower",
                 value: EmpowerAugment.LEVEL_2,
             }),
         ).toBe(true);
-        expect(fightProperties.getAugmentEmpower(PBTypes.TeamVals.LOWER)).toBe(EmpowerAugment.LEVEL_2);
+        expect(fightProperties.getAugmentEmpower(PBTypes.TeamVals.LEFT)).toBe(EmpowerAugment.LEVEL_2);
     });
 
     it("spends from the same upgrade budget as every other augment", () => {
         const fightProperties = seedTeam();
         // 3 of the 5 points go to Empower, 2 to Might — that fits...
         expect(
-            fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+            fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
                 type: "Empower",
                 value: EmpowerAugment.LEVEL_3,
             }),
         ).toBe(true);
         expect(
-            fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, { type: "Might", value: MightAugment.LEVEL_2 }),
+            fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, { type: "Might", value: MightAugment.LEVEL_2 }),
         ).toBe(true);
         // ...and there is nothing left over for armour.
         expect(
-            fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, { type: "Armor", value: ArmorAugment.LEVEL_1 }),
+            fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, { type: "Armor", value: ArmorAugment.LEVEL_1 }),
         ).toBe(false);
-        expect(fightProperties.getAugmentArmor(PBTypes.TeamVals.LOWER)).toBe(ArmorAugment.NO_AUGMENT);
+        expect(fightProperties.getAugmentArmor(PBTypes.TeamVals.LEFT)).toBe(ArmorAugment.NO_AUGMENT);
     });
 
     it("is counted when another augment checks what is left", () => {
         const fightProperties = seedTeam();
         expect(
-            fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+            fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
                 type: "Empower",
                 value: EmpowerAugment.LEVEL_3,
             }),
         ).toBe(true);
         // 3 spent of 5: another 2 fit, a third does not.
-        expect(fightProperties.canAugment(PBTypes.TeamVals.LOWER, { type: "Armor", value: ArmorAugment.LEVEL_2 })).toBe(
+        expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Armor", value: ArmorAugment.LEVEL_2 })).toBe(
             true,
         );
-        expect(fightProperties.canAugment(PBTypes.TeamVals.LOWER, { type: "Armor", value: ArmorAugment.LEVEL_3 })).toBe(
+        expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Armor", value: ArmorAugment.LEVEL_3 })).toBe(
             false,
         );
         expect(
-            fightProperties.canAugment(PBTypes.TeamVals.LOWER, { type: "Sniper", value: SniperAugment.LEVEL_3 }),
+            fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Sniper", value: SniperAugment.LEVEL_3 }),
         ).toBe(false);
         expect(
-            fightProperties.canAugment(PBTypes.TeamVals.LOWER, { type: "Movement", value: MovementAugment.LEVEL_2 }),
+            fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Movement", value: MovementAugment.LEVEL_2 }),
         ).toBe(true);
         expect(
-            fightProperties.canAugment(PBTypes.TeamVals.LOWER, { type: "Placement", value: PlacementAugment.LEVEL_1 }),
+            fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Placement", value: PlacementAugment.LEVEL_1 }),
         ).toBe(true);
     });
 });

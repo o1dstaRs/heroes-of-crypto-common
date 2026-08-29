@@ -32,9 +32,9 @@ const gridSettings = new GridSettings(
 const createMagicDragon = (): Unit => {
     const effectFactory = new EffectFactory();
     return Unit.createUnit(
-        HoCConfig.getCreatureConfig(TeamVals.LOWER, "Nature", "Magic Dragon", "magic_dragon_512", 1),
+        HoCConfig.getCreatureConfig(TeamVals.LEFT, "Nature", "Magic Dragon", "magic_dragon_512", 1),
         gridSettings,
-        TeamVals.LOWER,
+        TeamVals.LEFT,
         UnitVals.CREATURE,
         new AbilityFactory(effectFactory),
         effectFactory,

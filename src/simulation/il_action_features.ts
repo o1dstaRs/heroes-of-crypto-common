@@ -20,8 +20,8 @@ import type { XY } from "../utils/math";
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const RANGE = PBTypes.AttackVals.RANGE;
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const GRID_SPAN = Math.max(1, GRID_SIZE - 1);
 
 export const IL_ACTION_FAMILIES = [
@@ -200,18 +200,18 @@ export function ilCandidateActionMetadata(candidate: IEnumeratedCandidate): IIlC
 
 const normalized = (value: number): number => value / GRID_SPAN;
 const canonicalY = (value: number, perspectiveTeam: TeamType): number =>
-    normalized(perspectiveTeam === UPPER ? GRID_SPAN - value : value);
+    normalized(perspectiveTeam === RIGHT ? GRID_SPAN - value : value);
 const cellFeatures = (cell: XY | null, perspectiveTeam: TeamType): [number, number, number] =>
     cell ? [1, normalized(cell.x), canonicalY(cell.y, perspectiveTeam)] : [0, 0, 0];
 const canonicalAimSide = (side: number | null, perspectiveTeam: TeamType): number | null => {
-    if (perspectiveTeam !== UPPER) return side;
+    if (perspectiveTeam !== RIGHT) return side;
     if (side === RangeAttackCellSide.DOWN) return RangeAttackCellSide.UP;
     if (side === RangeAttackCellSide.UP) return RangeAttackCellSide.DOWN;
     return side;
 };
 
 export function ilActionFeatureVector(metadata: IIlCandidateActionMetadata, perspectiveTeam: TeamType): number[] {
-    if (perspectiveTeam !== LOWER && perspectiveTeam !== UPPER) {
+    if (perspectiveTeam !== LEFT && perspectiveTeam !== RIGHT) {
         throw new Error("IL action features require a LOWER or UPPER acting-team perspective");
     }
     const move = metadata.move;

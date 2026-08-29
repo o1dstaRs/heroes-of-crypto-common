@@ -19,7 +19,7 @@ import { createTestUnit } from "../helpers/combat";
 
 describe("Manticore", () => {
     it("is configured as a Chaos level 2 mounted (2x1) flyer with its three abilities", () => {
-        const config = getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Manticore", "manticore_512", 1);
+        const config = getCreatureConfig(PBTypes.TeamVals.LEFT, "Chaos", "Manticore", "manticore_512", 1);
         expect(config.level).toBe(PBTypes.UnitLevelVals.SECOND);
         // Mounted class: the body is 2 cells long and 1 tall; `size` is the legacy art tier and must read
         // as the bigger square (size === max(width, height)).
@@ -34,15 +34,15 @@ describe("Manticore", () => {
         const gazer = () =>
             createTestUnit({
                 name: "Manticore",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 abilities: ["Terrifying Gaze"],
                 stackPower: 5,
             });
 
         it("bars the frightened unit from the gazer alone, and only for that one enemy", () => {
             const manticore = gazer();
-            const bystander = createTestUnit({ name: "Bystander", team: PBTypes.TeamVals.UPPER });
-            const victim = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.LOWER });
+            const bystander = createTestUnit({ name: "Bystander", team: PBTypes.TeamVals.RIGHT });
+            const victim = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.LEFT });
 
             // Stack power 5 => 60% per hit; a handful of attempts makes a miss vanishingly unlikely.
             const sceneLog = new SceneLogMock();
@@ -63,7 +63,7 @@ describe("Manticore", () => {
             const manticore = gazer();
             const resistant = createTestUnit({
                 name: "Mechanism",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 abilities: ["Mechanism"],
             });
             const sceneLog = new SceneLogMock();
@@ -78,7 +78,7 @@ describe("Manticore", () => {
 
         it("releases the victim once the effect expires", () => {
             const manticore = gazer();
-            const victim = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.LOWER });
+            const victim = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.LEFT });
             const sceneLog = new SceneLogMock();
 
             for (let attempt = 0; attempt < 40 && !victim.hasEffectActive("Terrifying Gaze"); attempt++) {
@@ -95,7 +95,7 @@ describe("Manticore", () => {
 
         it("preserves the forbidden target through a ranked display-only status refresh", () => {
             const manticore = gazer();
-            const victim = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.LOWER });
+            const victim = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.LEFT });
 
             // Ranked reconstructs combat effects as display entries and keeps the server authoritative for
             // mechanics; it deliberately does not create Effect objects that could double-apply stats.

@@ -210,13 +210,13 @@ function audit(record: IV07ComposedGameRecord): IV07ComposedAuditRow {
     };
 }
 
-function pickWithMage(base: { lower: IConditionalArmy; upper: IConditionalArmy }, lower: boolean, upper: boolean) {
+function pickWithMage(base: { left: IConditionalArmy; right: IConditionalArmy }, left: boolean, right: boolean) {
     const pick = structuredClone(base);
-    for (const unit of [...pick.lower.roster, ...pick.upper.roster]) {
+    for (const unit of [...pick.left.roster, ...pick.right.roster]) {
         if (V07_ARCHETYPE_TAXONOMY.mage.includes(unit.creatureName)) unit.creatureName = "Peasant";
     }
-    pick.lower.roster[0].creatureName = lower ? V07_ARCHETYPE_TAXONOMY.mage[0] : "Peasant";
-    pick.upper.roster[0].creatureName = upper ? V07_ARCHETYPE_TAXONOMY.mage[0] : "Peasant";
+    pick.left.roster[0].creatureName = left ? V07_ARCHETYPE_TAXONOMY.mage[0] : "Peasant";
+    pick.right.roster[0].creatureName = right ? V07_ARCHETYPE_TAXONOMY.mage[0] : "Peasant";
     return pick;
 }
 
@@ -890,11 +890,9 @@ describe("composed-ranked setup semantics", () => {
         const rules = parseConditionalRules("all");
         const historical = runConditionalPickGame(0x12345678, "league", undefined, rules, genome);
         const ranked = runRankedConditionalPickGame(0x12345678, rules, genome);
-        expect(ranked.lower.roster.map((unit) => creatureIdForName(unit.creatureName))).toEqual(
-            ranked.lower.creatureIds,
-        );
-        expect(historical.lower.roster.map((unit) => creatureIdForName(unit.creatureName))).not.toEqual(
-            historical.lower.creatureIds,
+        expect(ranked.left.roster.map((unit) => creatureIdForName(unit.creatureName))).toEqual(ranked.left.creatureIds);
+        expect(historical.left.roster.map((unit) => creatureIdForName(unit.creatureName))).not.toEqual(
+            historical.left.creatureIds,
         );
     });
 
@@ -948,7 +946,7 @@ describe("composed-ranked setup semantics", () => {
         for (const tampered of [
             { ...green, setupAttempt: green.setupAttempt + 1 },
             { ...green, setupSeed: green.setupSeed ^ 1 },
-            { ...green, lowerRoster: `${green.lowerRoster}-tampered` },
+            { ...green, leftRoster: `${green.leftRoster}-tampered` },
             { ...green, taxonomyTraitCounts: { ...green.taxonomyTraitCounts!, candidate: 99 } },
         ]) {
             expect(() => replayV07ComposedTaxonomyRecords(cell, [tampered], picker)).toThrow(

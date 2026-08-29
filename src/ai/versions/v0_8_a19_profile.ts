@@ -39,10 +39,10 @@ export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simul
 // the teams and the env are set, and the stock driver is deliberately constructed with that env withheld
 // and restored afterwards, so an override aimed at the research arm cannot leak into it.
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "a99ab2b77ae9367850f2a855e9d0799848fa26ee8b39ff0ec12662637e7ba4fa" as const;
+    "d408c4f30ed86d9b152c7bbf07220713c8a37645ec761003f946825a922c460c" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
-    "afc6df1b4ca82e16a43ebc5bf2cce37ab0c761bec81f8ef5714c3d80c8b2d294" as const;
+    "330fcb06556c354310d76eb08faab4928bb8833434999fbc9cc6d37649f04014" as const;
 
 /** Current-source routing added by promotion; the finalist's frozen qualification ledger remains immutable. */
 export const V08_A19_PRODUCTION_ROUTING_SOURCE_LEDGER = Object.freeze([

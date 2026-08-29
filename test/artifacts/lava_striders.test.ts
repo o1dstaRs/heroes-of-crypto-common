@@ -16,14 +16,14 @@ import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
+const LEFT = PBTypes.TeamVals.LEFT;
 
 /** One army carrying Lava Striders, refreshed the way both sandbox and ranked do. */
 const armyWithLavaStriders = () => {
     const { grid, unitsHolder } = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    fightProperties.setArtifactPerTeam(LOWER, 2, Tier2Artifact.LAVA_STRIDERS);
-    const unit = createTestUnit({ name: "Squire", team: LOWER });
+    fightProperties.setArtifactPerTeam(LEFT, 2, Tier2Artifact.LAVA_STRIDERS);
+    const unit = createTestUnit({ name: "Squire", team: LEFT });
     placeUnit(grid, unitsHolder, unit, { x: 2, y: 2 });
     unitsHolder.applyArtifacts(fightProperties);
     unitsHolder.refreshStackPowerForAllUnits();
@@ -63,7 +63,7 @@ describe("Lava Striders", () => {
 
     it("leaves a unit with neither the ability nor the artifact untouched by lava", () => {
         const { grid, unitsHolder } = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
-        const plain = createTestUnit({ name: "Squire", team: LOWER });
+        const plain = createTestUnit({ name: "Squire", team: LEFT });
         placeUnit(grid, unitsHolder, plain, { x: 2, y: 2 });
 
         plain.applyLavaWaterModifier(true, false);

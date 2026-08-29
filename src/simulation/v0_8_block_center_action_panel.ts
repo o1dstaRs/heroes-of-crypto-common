@@ -92,8 +92,8 @@ export const V08_BLOCK_CENTER_ACTION_PANEL_LATE_LAP = 9;
 export const V08_BLOCK_CENTER_ACTION_PANEL_MAX_SAMPLES_PER_GAME = 32;
 export const V08_BLOCK_CENTER_ACTION_PANEL_MAX_SUMMARY_SAMPLES = 100;
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const RANGE = PBTypes.AttackVals.RANGE;
@@ -448,7 +448,7 @@ const enemyStateKey = (enemies: readonly Unit[]): string =>
 const isAdjacent = (left: XY, right: XY): boolean =>
     Math.max(Math.abs(left.x - right.x), Math.abs(left.y - right.y)) <= 1;
 const sideForUnit = (unit: Unit): Side => (unit.getTeam() === GREEN_TEAM ? "green" : "red");
-const otherTeam = (team: number): number => (team === LOWER ? UPPER : LOWER);
+const otherTeam = (team: number): number => (team === LEFT ? RIGHT : LEFT);
 const isHidden = (unit: Unit): boolean => unit.hasBuffActive("Hidden") || unit.hasAbilityActive("Hidden");
 
 export function v08BlockCenterFootprintDistance(left: readonly XY[], right: readonly XY[]): number {
@@ -1097,7 +1097,7 @@ const ringOfFireNetDamage = (
         (victim) => !victim.isDead() && victim.getId() !== caster.getId() && victim.getId() !== target.getId(),
     );
     if (!caught.length) return undefined;
-    const enemyTeam = caster.getTeam() === LOWER ? UPPER : LOWER;
+    const enemyTeam = caster.getTeam() === LEFT ? RIGHT : LEFT;
     return caught.reduce((value, victim) => {
         const damage = Math.min(spellDamage(caster, spell, victim), victim.getCumulativeHp());
         return value + (victim.getTeam() === enemyTeam ? damage : -damage);

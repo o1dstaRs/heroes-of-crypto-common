@@ -35,8 +35,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 
@@ -74,8 +74,8 @@ function contextWithRoutes(combat: CombatTestContext, routes: IReadonlyWeightedR
 function activateEngine(combat: CombatTestContext, unit: Unit, context: IDecisionContext): GameActionEngine {
     const fightProperties = context.fightProperties!;
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.setTeamUnitsAlive(LEFT, combat.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, combat.unitsHolder.getAllAllies(RIGHT).length);
     fightProperties.startTurn(unit.getTeam(), 1_000);
     return new GameActionEngine({
         fightProperties,
@@ -104,7 +104,7 @@ function meleeFixture(resurrection = false): {
 } {
     const combat = createCombatTestContext();
     const actor = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: resurrection ? "Charged Angel" : "Fragile brawler",
         attackType: MELEE,
         initiative: 4,
@@ -115,7 +115,7 @@ function meleeFixture(resurrection = false): {
         abilities: resurrection ? ["Resurrection"] : [],
         spells: resurrection ? ["System:Resurrection"] : [],
     });
-    const target = createTestUnit({ team: UPPER, name: "Melee target", amountAlive: 10, maxHp: 20 });
+    const target = createTestUnit({ team: RIGHT, name: "Melee target", amountAlive: 10, maxHp: 20 });
     actor.applyDamage(9, 0, new SceneLogMock());
     placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 2 });
     placeUnit(combat.grid, combat.unitsHolder, target, { x: 5, y: 3 });
@@ -143,7 +143,7 @@ function cowardlyMeleeFixture(): {
 } {
     const combat = createCombatTestContext();
     const actor = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Cowardly brawler",
         attackType: MELEE,
         initiative: 4,
@@ -153,7 +153,7 @@ function cowardlyMeleeFixture(): {
         damageMax: 2,
     });
     const target = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Stronger after burn",
         attackType: MELEE,
         amountAlive: 6,
@@ -186,7 +186,7 @@ function moveShotFixture(): {
 } {
     const combat = createCombatTestContext();
     const shooter = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Fragile archer",
         attackType: RANGE,
         initiative: 4,
@@ -197,7 +197,7 @@ function moveShotFixture(): {
         damageMin: 10,
         damageMax: 10,
     });
-    const target = createTestUnit({ team: UPPER, name: "Distant target", amountAlive: 20, maxHp: 20 });
+    const target = createTestUnit({ team: RIGHT, name: "Distant target", amountAlive: 20, maxHp: 20 });
     shooter.applyDamage(9, 0, new SceneLogMock());
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, target, { x: 10, y: 7 });
@@ -411,7 +411,7 @@ describe("AI post-move actor availability", () => {
         const decide = (withLethalWall: boolean): GameAction[] => {
             const combat = createCombatTestContext();
             const shooter = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Protected fragile archer",
                 attackType: RANGE,
                 initiative: 4,
@@ -423,14 +423,14 @@ describe("AI post-move actor availability", () => {
                 damageMax: 10,
             });
             const target = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Protected target",
                 attackType: MELEE,
                 initiative: 1,
                 amountAlive: 10,
                 maxHp: 20,
             });
-            const guard = createTestUnit({ team: LOWER, name: "Frontline", attackType: MELEE, initiative: 1 });
+            const guard = createTestUnit({ team: LEFT, name: "Frontline", attackType: MELEE, initiative: 1 });
             shooter.applyDamage(9, 0, new SceneLogMock());
             placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 7 });
             placeUnit(combat.grid, combat.unitsHolder, guard, { x: 6, y: 7 });

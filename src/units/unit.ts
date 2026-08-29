@@ -1396,11 +1396,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return PBTypes.TeamVals.NO_TEAM;
         }
 
-        if (this.teamType === PBTypes.TeamVals.LOWER) {
-            return PBTypes.TeamVals.UPPER;
+        if (this.teamType === PBTypes.TeamVals.LEFT) {
+            return PBTypes.TeamVals.RIGHT;
         }
 
-        return PBTypes.TeamVals.LOWER;
+        return PBTypes.TeamVals.LEFT;
     }
     public getUnitType(): UnitType {
         return this.unitType;

@@ -34,16 +34,16 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 function makeTrent(): Unit {
     const effectFactory = new EffectFactory();
     const trent = Unit.createUnit(
-        getCreatureConfig(LOWER, "Nature", "Trent", "", 100),
+        getCreatureConfig(LEFT, "Nature", "Trent", "", 100),
         testGridSettings,
-        LOWER,
+        LEFT,
         PBTypes.UnitVals.CREATURE,
         new AbilityFactory(effectFactory),
         effectFactory,
@@ -73,8 +73,8 @@ function castAction(actions: readonly GameAction[]): Extract<GameAction, { type:
 function startEngine(combat: CombatTestContext, active: Unit, context: IDecisionContext): GameActionEngine {
     const fightProperties = context.fightProperties!;
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.setTeamUnitsAlive(LEFT, combat.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, combat.unitsHolder.getAllAllies(RIGHT).length);
     fightProperties.startTurn(active.getTeam(), 1_000);
     return new GameActionEngine({
         fightProperties,
@@ -93,7 +93,7 @@ describe("v0.8 Vine Throw policy", () => {
         const combat = createCombatTestContext();
         const trent = makeTrent();
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Distant threat",
             attackType: MELEE,
             initiative: 6,
@@ -124,7 +124,7 @@ describe("v0.8 Vine Throw policy", () => {
         const combat = createCombatTestContext();
         const trent = makeTrent();
         const weak = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Weak scout",
             attackType: MELEE,
             initiative: 1,
@@ -132,7 +132,7 @@ describe("v0.8 Vine Throw policy", () => {
             amountAlive: 1,
         });
         const dangerous = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Fast threat",
             attackType: MELEE,
             initiative: 7,
@@ -152,7 +152,7 @@ describe("v0.8 Vine Throw policy", () => {
     it("preserves immediate melee and never proposes a blocked throw", () => {
         const adjacentCombat = createCombatTestContext();
         const adjacentTrent = makeTrent();
-        const adjacent = createTestUnit({ team: UPPER, name: "Reachable enemy", attackType: MELEE });
+        const adjacent = createTestUnit({ team: RIGHT, name: "Reachable enemy", attackType: MELEE });
         placeUnit(adjacentCombat.grid, adjacentCombat.unitsHolder, adjacentTrent, { x: 7, y: 3 });
         // One cell closer than the original fixture: Trent's 3.9 steps no longer round up to 4 (the
         // pure-fractional owner call), and this test is about PREFERRING melee when it is genuinely
@@ -164,8 +164,8 @@ describe("v0.8 Vine Throw policy", () => {
 
         const blockedCombat = createCombatTestContext();
         const blockedTrent = makeTrent();
-        const blocker = createTestUnit({ team: LOWER, name: "Friendly blocker", attackType: MELEE });
-        const blockedTarget = createTestUnit({ team: UPPER, name: "Blocked enemy", attackType: MELEE });
+        const blocker = createTestUnit({ team: LEFT, name: "Friendly blocker", attackType: MELEE });
+        const blockedTarget = createTestUnit({ team: RIGHT, name: "Blocked enemy", attackType: MELEE });
         placeUnit(blockedCombat.grid, blockedCombat.unitsHolder, blockedTrent, { x: 7, y: 3 });
         placeUnit(blockedCombat.grid, blockedCombat.unitsHolder, blocker, { x: 7, y: 6 });
         placeUnit(blockedCombat.grid, blockedCombat.unitsHolder, blockedTarget, { x: 7, y: 12 });

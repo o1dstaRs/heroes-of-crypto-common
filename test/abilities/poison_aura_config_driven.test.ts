@@ -86,14 +86,14 @@ describe("poison-on-hit auras are discovered from the config", () => {
             const { grid, unitsHolder } = createCombatTestContext();
             const emitter = createTestUnit({
                 name: `${effectName} Emitter`,
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 abilities: [`${effectName} Aura`],
                 auraEffects: [effectName],
                 auraRanges: [range],
                 auraIsBuff: [true],
             });
-            const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LOWER, attack: 10 });
-            const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, maxHp: 2000 });
+            const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LEFT, attack: 10 });
+            const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, maxHp: 2000 });
 
             placeUnit(grid, unitsHolder, emitter, { x: 3, y: 3 });
             placeUnit(grid, unitsHolder, ally, { x: 4, y: 3 });

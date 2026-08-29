@@ -207,29 +207,29 @@ function armySetup(candidate: PublicSetupCandidate, own: IConditionalArmy, oppon
 function playPublicSetupGame(
     candidate: PublicSetupCandidate,
     board: IPublicSetupBoard,
-    lower: IConditionalArmy,
-    upper: IConditionalArmy,
-    candidatePickedLower: boolean,
+    left: IConditionalArmy,
+    right: IConditionalArmy,
+    candidatePickedLeft: boolean,
     battleMirror: 0 | 1,
     maxLaps: number,
 ): IPublicSetupRecord {
-    const lowerSetup = armySetup(
-        candidatePickedLower ? candidate : publicSetupCandidate("control/shipped-v07"),
-        lower,
-        upper,
+    const leftSetup = armySetup(
+        candidatePickedLeft ? candidate : publicSetupCandidate("control/shipped-v07"),
+        left,
+        right,
     );
-    const upperSetup = armySetup(
-        candidatePickedLower ? publicSetupCandidate("control/shipped-v07") : candidate,
-        upper,
-        lower,
+    const rightSetup = armySetup(
+        candidatePickedLeft ? publicSetupCandidate("control/shipped-v07") : candidate,
+        right,
+        left,
     );
-    const candidateArmy = candidatePickedLower ? lower : upper;
-    const candidateSetup = candidatePickedLower ? lowerSetup : upperSetup;
-    const greenArmy = battleMirror === 0 ? lower : upper;
-    const redArmy = battleMirror === 0 ? upper : lower;
-    const greenSetup = battleMirror === 0 ? lowerSetup : upperSetup;
-    const redSetup = battleMirror === 0 ? upperSetup : lowerSetup;
-    const candidateIsGreen = battleMirror === 0 ? candidatePickedLower : !candidatePickedLower;
+    const candidateArmy = candidatePickedLeft ? left : right;
+    const candidateSetup = candidatePickedLeft ? leftSetup : rightSetup;
+    const greenArmy = battleMirror === 0 ? left : right;
+    const redArmy = battleMirror === 0 ? right : left;
+    const greenSetup = battleMirror === 0 ? leftSetup : rightSetup;
+    const redSetup = battleMirror === 0 ? rightSetup : leftSetup;
+    const candidateIsGreen = battleMirror === 0 ? candidatePickedLeft : !candidatePickedLeft;
     const candidateSide: Side = candidateIsGreen ? "green" : "red";
     const config: IMatchConfig = {
         greenVersion: "v0.7",
@@ -269,12 +269,12 @@ function playPublicSetupGame(
         candidateId: candidate.id,
         candidateFamily: candidate.family,
         boardIndex: board.index,
-        game: (candidatePickedLower ? 0 : 2) + battleMirror,
+        game: (candidatePickedLeft ? 0 : 2) + battleMirror,
         pairSeed: board.pairSeed,
         pickSeed: board.pickSeed,
         battleSeed: board.battleSeed,
         gridType: board.gridType,
-        pickSeat: candidatePickedLower ? "candidate-lower" : "candidate-upper",
+        pickSeat: candidatePickedLeft ? "candidate-lower" : "candidate-upper",
         battleMirror,
         candidateSide,
         candidateResult: resultForCandidateSide(result, candidateSide),
@@ -294,12 +294,12 @@ function playPublicSetupGame(
         endReason: result.endReason,
         decidedByArmageddon: result.attrition.decidedByArmageddon,
         setupFingerprintSha256: sha256({
-            lowerCreatureIds: lower.creatureIds,
-            upperCreatureIds: upper.creatureIds,
-            lowerSetup,
-            upperSetup,
-            lowerReveals: lower.revealedOpponentCreatures,
-            upperReveals: upper.revealedOpponentCreatures,
+            lowerCreatureIds: left.creatureIds,
+            upperCreatureIds: right.creatureIds,
+            leftSetup,
+            rightSetup,
+            leftReveals: left.revealedOpponentCreatures,
+            rightReveals: right.revealedOpponentCreatures,
             gridType: board.gridType,
         }),
         behaviorTraceSha256: rankedDraftBehaviorTraceSha256(result),
@@ -313,15 +313,15 @@ export function evaluatePublicSetupCluster(
     maxLaps: number = 60,
 ): IPublicSetupCluster {
     const pick = rankedPickForBoard(board);
-    const records = ([true, false] as const).flatMap((candidatePickedLower) =>
+    const records = ([true, false] as const).flatMap((candidatePickedLeft) =>
         ([0, 1] as const).map((battleMirror) =>
-            playPublicSetupGame(candidate, board, pick.lower, pick.upper, candidatePickedLower, battleMirror, maxLaps),
+            playPublicSetupGame(candidate, board, pick.left, pick.right, candidatePickedLeft, battleMirror, maxLaps),
         ),
     ) as IPublicSetupCluster["records"];
     return { candidateId: candidate.id, board, records };
 }
 
-function rankedPickForBoard(board: IPublicSetupBoard): { lower: IConditionalArmy; upper: IConditionalArmy } {
+function rankedPickForBoard(board: IPublicSetupBoard): { left: IConditionalArmy; right: IConditionalArmy } {
     return runRankedConditionalPickGame(board.pickSeed, RULES, SHIPPED_DRAFT, {
         pickArtifactT2: (_team, offered, ownCreatureIds) => SHIPPED_SETUP.pickArtifactT2(offered, ownCreatureIds),
     });
@@ -367,8 +367,8 @@ export function buildPublicSetupBoardPlan(options: {
         const pick = rankedPickForBoard(board);
         for (const { candidate, strata, fills } of state.values()) {
             for (const pickSeat of ["lower", "upper"] as const) {
-                const own = pickSeat === "lower" ? pick.lower : pick.upper;
-                const opponent = pickSeat === "lower" ? pick.upper : pick.lower;
+                const own = pickSeat === "lower" ? pick.left : pick.right;
+                const opponent = pickSeat === "lower" ? pick.right : pick.left;
                 const choices = selectPublicSetupChoices(candidate, own.creatureIds, opponent.creatureIds);
                 if (!choices.actionApplied) continue;
                 const stratum = strata.find(

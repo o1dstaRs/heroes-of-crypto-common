@@ -30,8 +30,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const FLY = PBTypes.MovementVals.FLY;
@@ -66,14 +66,14 @@ describe("v0.4 (3) flyer-mute-siege is DISABLED (it over-extended the flyer and 
     it("does NOT dive a distant siege unit past a nearer enemy — engages normally instead", () => {
         const c = createCombatTestContext();
         const flyer = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Flyer",
             attackType: MELEE,
             movementType: FLY,
             initiative: 8,
         });
-        const tsar = makeReal(UPPER, "Life", "Tsar Cannon");
-        const frontMelee = createTestUnit({ team: UPPER, name: "Front", attackType: MELEE, amountAlive: 5 });
+        const tsar = makeReal(RIGHT, "Life", "Tsar Cannon");
+        const frontMelee = createTestUnit({ team: RIGHT, name: "Front", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, flyer, { x: 7, y: 7 });
         placeUnit(c.grid, c.unitsHolder, frontMelee, { x: 7, y: 8 });
         placeUnit(c.grid, c.unitsHolder, tsar, { x: 7, y: 12 });
@@ -91,13 +91,13 @@ describe("v0.4 (3) flyer-mute-siege is DISABLED (it over-extended the flyer and 
     it("ignores the siege rule when there is no siege unit (behaves as a normal flyer)", () => {
         const c = createCombatTestContext();
         const flyer = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Flyer",
             attackType: MELEE,
             movementType: FLY,
             initiative: 6,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Brute", attackType: MELEE, amountAlive: 5 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Brute", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, flyer, { x: 6, y: 6 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 6, y: 8 });
         const actions = v04.decideTurn(flyer, ctxFor(c));
@@ -111,13 +111,13 @@ describe("v0.4 (2) ranged-superiority patience", () => {
         const c = createCombatTestContext();
         // Our shooter has ammo; the enemy is a lone melee far away (no enemy ranged -> we out-gun them).
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Archer",
             attackType: RANGE,
             rangeShots: 5,
             initiative: 3,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Brute", attackType: MELEE, amountAlive: 5 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Brute", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 5, y: 3 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 5, y: 13 }); // far away, not in shot range
 
@@ -131,14 +131,14 @@ describe("v0.4 (2) ranged-superiority patience", () => {
     it("does not hold when it can actually take a shot (defers to the normal ranged turn)", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Archer",
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 30,
             initiative: 2,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Brute", attackType: MELEE, amountAlive: 5 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Brute", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 8, y: 8 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 11 });
         const actions = v04.decideTurn(shooter, ctxFor(c));
@@ -150,9 +150,9 @@ describe("v0.4 (2) ranged-superiority patience", () => {
 describe("v0.4 (7) Goblin Knight prefers low-level targets", () => {
     it("swaps an in-place strike onto the lower-level adjacent enemy", () => {
         const c = createCombatTestContext();
-        const gk = makeReal(LOWER, "Chaos", "Goblin Knight");
-        const hi = createTestUnit({ team: UPPER, name: "Hi", attackType: MELEE, level: 3, amountAlive: 5 });
-        const lo = createTestUnit({ team: UPPER, name: "Lo", attackType: MELEE, level: 1, amountAlive: 5 });
+        const gk = makeReal(LEFT, "Chaos", "Goblin Knight");
+        const hi = createTestUnit({ team: RIGHT, name: "Hi", attackType: MELEE, level: 3, amountAlive: 5 });
+        const lo = createTestUnit({ team: RIGHT, name: "Lo", attackType: MELEE, level: 1, amountAlive: 5 });
         // Place GK adjacent to both so an in-place strike can hit either.
         placeUnit(c.grid, c.unitsHolder, gk, { x: 6, y: 6 });
         placeUnit(c.grid, c.unitsHolder, hi, { x: 6, y: 7 });
@@ -167,8 +167,8 @@ describe("v0.4 (7) Goblin Knight prefers low-level targets", () => {
 describe("v0.4 (6) Ogre Mage single-Riot opener (small army, can't melee)", () => {
     it("a lone Ogre Mage that can't reach an enemy self-casts single Riot (not Mass Riot)", () => {
         const c = createCombatTestContext();
-        const ogre = makeReal(LOWER, "Might", "Ogre Mage");
-        const tiger = makeReal(UPPER, "Nature", "White Tiger");
+        const ogre = makeReal(LEFT, "Might", "Ogre Mage");
+        const tiger = makeReal(RIGHT, "Nature", "White Tiger");
         placeUnit(c.grid, c.unitsHolder, ogre, { x: 5, y: 3 });
         placeUnit(c.grid, c.unitsHolder, tiger, { x: 5, y: 12 });
         const cast = typeOf(v04.decideTurn(ogre, ctxFor(c)), "cast_spell");
@@ -176,11 +176,11 @@ describe("v0.4 (6) Ogre Mage single-Riot opener (small army, can't melee)", () =
     });
     it("with a big army it defers to v0.2 (Mass Riot), not single Riot", () => {
         const c = createCombatTestContext();
-        const ogre = makeReal(LOWER, "Might", "Ogre Mage");
-        const a1 = createTestUnit({ team: LOWER, name: "A1", attackType: MELEE });
-        const a2 = createTestUnit({ team: LOWER, name: "A2", attackType: MELEE });
-        const a3 = createTestUnit({ team: LOWER, name: "A3", attackType: MELEE });
-        const tiger = makeReal(UPPER, "Nature", "White Tiger");
+        const ogre = makeReal(LEFT, "Might", "Ogre Mage");
+        const a1 = createTestUnit({ team: LEFT, name: "A1", attackType: MELEE });
+        const a2 = createTestUnit({ team: LEFT, name: "A2", attackType: MELEE });
+        const a3 = createTestUnit({ team: LEFT, name: "A3", attackType: MELEE });
+        const tiger = makeReal(RIGHT, "Nature", "White Tiger");
         placeUnit(c.grid, c.unitsHolder, ogre, { x: 5, y: 3 });
         placeUnit(c.grid, c.unitsHolder, a1, { x: 6, y: 3 });
         placeUnit(c.grid, c.unitsHolder, a2, { x: 7, y: 3 });
@@ -203,9 +203,9 @@ describe("v0.4 (5) anti-AoE: spread deployment when an AoE unit is present", () 
         return m;
     };
     const place = (strat: ReturnType<typeof getAIStrategy>, units: Unit[]) => {
-        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 3);
+        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 3);
         return strat.placeArmy(units, {
-            team: LOWER,
+            team: LEFT,
             grid: undefined as never,
             unitsHolder: undefined as never,
             pathHelper: undefined as never,
@@ -214,10 +214,10 @@ describe("v0.4 (5) anti-AoE: spread deployment when an AoE unit is present", () 
     };
     it("spreads stacks farther apart than v0.3 clusters them when the roster has an AoE unit", () => {
         const roster = () => [
-            makeReal(LOWER, "Nature", "Gargantuan"), // AoE (Area Throw) -> triggers spread
-            createTestUnit({ team: LOWER, name: "M1", attackType: MELEE }),
-            createTestUnit({ team: LOWER, name: "M2", attackType: MELEE }),
-            createTestUnit({ team: LOWER, name: "S", attackType: RANGE, rangeShots: 5 }),
+            makeReal(LEFT, "Nature", "Gargantuan"), // AoE (Area Throw) -> triggers spread
+            createTestUnit({ team: LEFT, name: "M1", attackType: MELEE }),
+            createTestUnit({ team: LEFT, name: "M2", attackType: MELEE }),
+            createTestUnit({ team: LEFT, name: "S", attackType: RANGE, rangeShots: 5 }),
         ];
         const spread = minPairwise(place(v04, roster()));
         const clustered = minPairwise(place(v03, roster()));
@@ -225,9 +225,9 @@ describe("v0.4 (5) anti-AoE: spread deployment when an AoE unit is present", () 
     });
     it("defers to v0.3 deployment when no AoE unit is present", () => {
         const noAoe = () => [
-            createTestUnit({ team: LOWER, name: "M1", attackType: MELEE }),
-            createTestUnit({ team: LOWER, name: "M2", attackType: MELEE }),
-            createTestUnit({ team: LOWER, name: "S", attackType: RANGE, rangeShots: 5 }),
+            createTestUnit({ team: LEFT, name: "M1", attackType: MELEE }),
+            createTestUnit({ team: LEFT, name: "M2", attackType: MELEE }),
+            createTestUnit({ team: LEFT, name: "S", attackType: RANGE, rangeShots: 5 }),
         ];
         expect([...place(v04, noAoe()).values()]).toEqual([...place(v03, noAoe()).values()]);
     });
@@ -258,16 +258,16 @@ describe("v0.4 (4) melee strikes relocate into a friendly buff aura", () => {
 
     it("never strikes from a less-aura-covered cell than v0.3", () => {
         const c = createCombatTestContext();
-        const attacker = createTestUnit({ team: LOWER, name: "Striker", attackType: MELEE, initiative: 6 });
+        const attacker = createTestUnit({ team: LEFT, name: "Striker", attackType: MELEE, initiative: 6 });
         const emitter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Bard",
             attackType: MELEE,
             auraEffects: ["Luck"],
             auraRanges: [3],
             auraIsBuff: [true],
         });
-        const target = createTestUnit({ team: UPPER, name: "Victim", attackType: MELEE, amountAlive: 5 });
+        const target = createTestUnit({ team: RIGHT, name: "Victim", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, attacker, { x: 8, y: 4 });
         placeUnit(c.grid, c.unitsHolder, target, { x: 8, y: 8 });
         placeUnit(c.grid, c.unitsHolder, emitter, { x: 10, y: 10 }); // covers the upper-right side of target
@@ -286,15 +286,15 @@ describe("v0.4 (1) healer focuses the biggest sufficiently-wounded stack", () =>
     it("re-aims a single-target heal onto the biggest-HP ally that is down >25%", () => {
         const c = createCombatTestContext();
         const healer = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Healer",
             attackType: PBTypes.AttackVals.MAGIC,
             spells: ["Heal"],
         });
         // A small wounded stack (what v0.2 might pick by missing HP) and a BIG stack wounded >25%.
-        const smallHurt = createTestUnit({ team: LOWER, name: "Small", attackType: MELEE, maxHp: 20, amountAlive: 2 });
-        const bigHurt = createTestUnit({ team: LOWER, name: "Big", attackType: MELEE, maxHp: 100, amountAlive: 30 });
-        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE, amountAlive: 5 });
+        const smallHurt = createTestUnit({ team: LEFT, name: "Small", attackType: MELEE, maxHp: 20, amountAlive: 2 });
+        const bigHurt = createTestUnit({ team: LEFT, name: "Big", attackType: MELEE, maxHp: 100, amountAlive: 30 });
+        const enemy = createTestUnit({ team: RIGHT, name: "E", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, healer, { x: 6, y: 6 });
         placeUnit(c.grid, c.unitsHolder, smallHurt, { x: 5, y: 6 });
         placeUnit(c.grid, c.unitsHolder, bigHurt, { x: 7, y: 6 });

@@ -17,8 +17,8 @@ import type { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, testGridSettings, type TestUnitOptions } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const NORMAL = PBTypes.GridVals.NORMAL;
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -34,7 +34,7 @@ interface IScenario {
 
 const scenario = (
     specs: readonly TestUnitOptions[],
-    team: TeamType = LOWER,
+    team: TeamType = LEFT,
     gridType: GridType = NORMAL,
     publicOpponentCreatureIds: readonly number[] | undefined = DOUBLE_FLYER_ROSTER,
     setupPlacementPolicy: IPlacementContext["setupPlacementPolicy"] = "public-roster",
@@ -49,7 +49,7 @@ const scenario = (
         pathHelper: new PathHelper(testGridSettings),
         placement: new RectanglePlacement(
             testGridSettings,
-            team === LOWER ? PlacementPositionType.LOWER_LEFT : PlacementPositionType.UPPER_RIGHT,
+            team === LEFT ? PlacementPositionType.LEFT_BOTTOM : PlacementPositionType.RIGHT_TOP,
             5,
         ),
         ...(publicOpponentCreatureIds === undefined ? {} : { publicOpponentCreatureIds }),
@@ -63,7 +63,7 @@ const scenario = (
     return { units, context, incumbent };
 };
 
-const upperProductionSpecs: readonly TestUnitOptions[] = [
+const rightProductionSpecs: readonly TestUnitOptions[] = [
     { name: "Battle Mage", attackType: MELEE_MAGIC, spells: ["Life:Fire Strike"], amountAlive: 50 },
     { name: "Berserker", attackType: MELEE, amountAlive: 109 },
     { name: "Dryad", attackType: RANGE, rangeShots: 8, amountAlive: 100 },
@@ -78,7 +78,7 @@ const upperProductionSpecs: readonly TestUnitOptions[] = [
     },
 ];
 
-const lowerProductionSpecs: readonly TestUnitOptions[] = [
+const leftProductionSpecs: readonly TestUnitOptions[] = [
     { name: "Arbalester", attackType: RANGE, rangeShots: 8, amountAlive: 124 },
     { name: "Beholder", attackType: RANGE, rangeShots: 8, amountAlive: 22 },
     {
@@ -117,7 +117,7 @@ const assertLegalCompletePlacement = (fixture: IScenario, placement: ReadonlyMap
 const center = (unit: Unit, base: XY): XY => (unit.isSmallSize() ? base : { x: base.x - 0.5, y: base.y - 0.5 });
 const frontness = (team: TeamType, unit: Unit, base: XY): number => {
     const cell = center(unit, base);
-    return team === LOWER ? cell.y : 15 - cell.y;
+    return team === LEFT ? cell.y : 15 - cell.y;
 };
 const unitByName = (fixture: IScenario, name: string): Unit => fixture.units.find((unit) => unit.getName() === name)!;
 const decoratedFor = (fixture: IScenario): V08A19RankedPlacementStrategy =>
@@ -140,7 +140,7 @@ describe("v0.8 A19 ranked placement research policy", () => {
     });
 
     test("keeps the historical reveal layout byte-identical when the optional taxonomy is omitted", () => {
-        const fixture = scenario(upperProductionSpecs, UPPER);
+        const fixture = scenario(rightProductionSpecs, RIGHT);
         const explicitLegacy = layoutRevealPlacement(fixture.units, fixture.context, {
             gap: 0,
             screenShooters: true,
@@ -151,7 +151,7 @@ describe("v0.8 A19 ranked placement research policy", () => {
     });
 
     test("faithfully corrects the reviewed upper production roles inside the two-flyer screen", () => {
-        const fixture = scenario(upperProductionSpecs, UPPER);
+        const fixture = scenario(rightProductionSpecs, RIGHT);
         const valkyrie = unitByName(fixture, "Valkyrie");
         const battleMage = unitByName(fixture, "Battle Mage");
         const dryad = unitByName(fixture, "Dryad");
@@ -159,11 +159,11 @@ describe("v0.8 A19 ranked placement research policy", () => {
         const placed = decorated.placeArmy(fixture.units, fixture.context);
 
         assertLegalCompletePlacement(fixture, placed);
-        expect(frontness(UPPER, valkyrie, placed.get(valkyrie.getId())!)).toBeGreaterThan(
-            frontness(UPPER, valkyrie, fixture.incumbent.get(valkyrie.getId())!),
+        expect(frontness(RIGHT, valkyrie, placed.get(valkyrie.getId())!)).toBeGreaterThan(
+            frontness(RIGHT, valkyrie, fixture.incumbent.get(valkyrie.getId())!),
         );
-        expect(frontness(UPPER, battleMage, placed.get(battleMage.getId())!)).toBeLessThanOrEqual(2);
-        expect(frontness(UPPER, dryad, placed.get(dryad.getId())!)).toBeLessThanOrEqual(2);
+        expect(frontness(RIGHT, battleMage, placed.get(battleMage.getId())!)).toBeLessThanOrEqual(2);
+        expect(frontness(RIGHT, dryad, placed.get(dryad.getId())!)).toBeLessThanOrEqual(2);
         expect(decorated.getLastPlacementAudit()).toMatchObject({
             treatmentApplied: true,
             placementChanged: true,
@@ -176,14 +176,14 @@ describe("v0.8 A19 ranked placement research policy", () => {
     });
 
     test("moves Troll from generic rear support into the reviewed lower guard screen", () => {
-        const fixture = scenario(lowerProductionSpecs, LOWER);
+        const fixture = scenario(leftProductionSpecs, LEFT);
         const troll = unitByName(fixture, "Troll");
         const decorated = decoratedFor(fixture);
         const placed = decorated.placeArmy(fixture.units, fixture.context);
 
         assertLegalCompletePlacement(fixture, placed);
-        expect(frontness(LOWER, troll, placed.get(troll.getId())!)).toBeGreaterThan(
-            frontness(LOWER, troll, fixture.incumbent.get(troll.getId())!),
+        expect(frontness(LEFT, troll, placed.get(troll.getId())!)).toBeGreaterThan(
+            frontness(LEFT, troll, fixture.incumbent.get(troll.getId())!),
         );
         expect(decorated.getLastPlacementAudit()).toMatchObject({
             treatmentApplied: true,
@@ -197,8 +197,8 @@ describe("v0.8 A19 ranked placement research policy", () => {
     });
 
     test("mirrors the physical-role correction between lower and upper seats", () => {
-        for (const team of [LOWER, UPPER] as const) {
-            const fixture = scenario(upperProductionSpecs, team);
+        for (const team of [LEFT, RIGHT] as const) {
+            const fixture = scenario(rightProductionSpecs, team);
             const valkyrie = unitByName(fixture, "Valkyrie");
             const placed = applyV08A19RankedPlacement(fixture.units, fixture.context, fixture.incumbent);
             assertLegalCompletePlacement(fixture, placed);
@@ -209,17 +209,17 @@ describe("v0.8 A19 ranked placement research policy", () => {
     });
 
     test("fails closed outside the complete public double-flyer context", () => {
-        const missingPublicRoster = scenario(upperProductionSpecs);
+        const missingPublicRoster = scenario(rightProductionSpecs);
         delete missingPublicRoster.context.publicOpponentCreatureIds;
         const cases: Array<[IScenario, string]> = [
             [
-                scenario(upperProductionSpecs, LOWER, NORMAL, [PBTypes.CreatureVals.GRIFFIN]),
+                scenario(rightProductionSpecs, LEFT, NORMAL, [PBTypes.CreatureVals.GRIFFIN]),
                 "opponent-unknown-or-not-double-flyer",
             ],
-            [scenario(upperProductionSpecs, LOWER, PBTypes.GridVals.BLOCK_CENTER), "unsupported-map"],
+            [scenario(rightProductionSpecs, LEFT, PBTypes.GridVals.BLOCK_CENTER), "unsupported-map"],
             [missingPublicRoster, "unauthorized-or-missing-public-roster"],
             [
-                scenario(upperProductionSpecs, LOWER, NORMAL, DOUBLE_FLYER_ROSTER, "legitimate-reveal"),
+                scenario(rightProductionSpecs, LEFT, NORMAL, DOUBLE_FLYER_ROSTER, "legitimate-reveal"),
                 "unauthorized-or-missing-public-roster",
             ],
         ];
@@ -235,11 +235,11 @@ describe("v0.8 A19 ranked placement research policy", () => {
     });
 
     test("preserves splash precedence and unknown public identities", () => {
-        const splash = scenario(upperProductionSpecs, LOWER, NORMAL, [
+        const splash = scenario(rightProductionSpecs, LEFT, NORMAL, [
             ...DOUBLE_FLYER_ROSTER,
             PBTypes.CreatureVals.GARGANTUAN,
         ]);
-        const unknown = scenario(upperProductionSpecs, LOWER, NORMAL, [...DOUBLE_FLYER_ROSTER, 999_999]);
+        const unknown = scenario(rightProductionSpecs, LEFT, NORMAL, [...DOUBLE_FLYER_ROSTER, 999_999]);
         for (const [fixture, fallbackReason] of [
             [splash, "opponent-splash"],
             [unknown, "opponent-unknown-or-not-double-flyer"],
@@ -252,28 +252,28 @@ describe("v0.8 A19 ranked placement research policy", () => {
 
     test("does not invent a screen or touch specialist topology", () => {
         const noShooter = scenario(
-            upperProductionSpecs.filter((spec) => spec.name !== "Dryad"),
-            LOWER,
+            rightProductionSpecs.filter((spec) => spec.name !== "Dryad"),
+            LEFT,
         );
         const noHistoricalGuard = scenario(
-            upperProductionSpecs.filter((spec) => spec.name !== "Berserker" && spec.name !== "Frenzied Boar"),
-            LOWER,
+            rightProductionSpecs.filter((spec) => spec.name !== "Berserker" && spec.name !== "Frenzied Boar"),
+            LEFT,
         );
         const noCorrection = scenario(
-            upperProductionSpecs.filter((spec) => spec.name !== "Valkyrie"),
-            LOWER,
+            rightProductionSpecs.filter((spec) => spec.name !== "Valkyrie"),
+            LEFT,
         );
         const wrongRoleCounts = scenario(
-            upperProductionSpecs.map((spec) =>
+            rightProductionSpecs.map((spec) =>
                 spec.name === "Berserker"
                     ? { name: "Healer", attackType: PBTypes.AttackVals.MAGIC, spells: ["Life:Heal"], amountAlive: 20 }
                     : spec,
             ),
-            LOWER,
+            LEFT,
         );
         const specialist = scenario(
-            [...upperProductionSpecs, { name: "Angel", attackType: MELEE, amountAlive: 1 }],
-            LOWER,
+            [...rightProductionSpecs, { name: "Angel", attackType: MELEE, amountAlive: 1 }],
+            LEFT,
         );
         for (const [fixture, fallbackReason] of [
             [noShooter, "not-incumbent-shooter-screen"],
@@ -290,13 +290,13 @@ describe("v0.8 A19 ranked placement research policy", () => {
 
     test("fails closed for unknown, duplicate, and non-shooter-screen incumbents", () => {
         const unknown = scenario(
-            upperProductionSpecs.map((spec) =>
+            rightProductionSpecs.map((spec) =>
                 spec.name === "Valkyrie" ? { ...spec, name: "Unknown Physical Mage" } : spec,
             ),
-            LOWER,
+            LEFT,
         );
         const duplicate = scenario(
-            upperProductionSpecs.map((spec) =>
+            rightProductionSpecs.map((spec) =>
                 spec.name === "Mantis"
                     ? {
                           name: "Valkyrie",
@@ -306,9 +306,9 @@ describe("v0.8 A19 ranked placement research policy", () => {
                       }
                     : spec,
             ),
-            LOWER,
+            LEFT,
         );
-        const altered = scenario(upperProductionSpecs, LOWER);
+        const altered = scenario(rightProductionSpecs, LEFT);
         const mantis = unitByName(altered, "Mantis");
         const valkyrie = unitByName(altered, "Valkyrie");
         const mantisCell = altered.incumbent.get(mantis.getId())!;
@@ -328,14 +328,14 @@ describe("v0.8 A19 ranked placement research policy", () => {
     });
 
     test("rejects partial-army placement calls without changing the incumbent object", () => {
-        const fixture = scenario(upperProductionSpecs, LOWER);
+        const fixture = scenario(rightProductionSpecs, LEFT);
         const decorated = decoratedFor(fixture);
         expect(decorated.placeArmy(fixture.units.slice(1), fixture.context)).toBe(fixture.incumbent);
         expect(decorated.getLastPlacementAudit()?.fallbackReason).toBe("partial-army");
     });
 
     test("delegates combat decisions unchanged", () => {
-        const fixture = scenario(upperProductionSpecs, LOWER);
+        const fixture = scenario(rightProductionSpecs, LEFT);
         const unit = fixture.units[0];
         const decision: GameAction[] = [{ type: "defend_turn", unitId: unit.getId() }];
         const base: IAIStrategy = {

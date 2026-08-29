@@ -18,13 +18,13 @@ import type { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const NORMAL = PBTypes.GridVals.NORMAL;
 
 const scenario = (
     anchor: string,
-    team: TeamType = LOWER,
+    team: TeamType = LEFT,
     gridType: GridType = NORMAL,
     summoned = false,
 ): { units: Unit[]; context: IPlacementContext; incumbent: Map<string, XY> } => {
@@ -45,7 +45,7 @@ const scenario = (
         pathHelper: new PathHelper(testGridSettings),
         placement: new RectanglePlacement(
             testGridSettings,
-            team === LOWER ? PlacementPositionType.LOWER_LEFT : PlacementPositionType.UPPER_RIGHT,
+            team === LEFT ? PlacementPositionType.LEFT_BOTTOM : PlacementPositionType.RIGHT_TOP,
             5,
         ),
     };
@@ -86,7 +86,7 @@ describe("v0.8 A19 level-4-scoped compact placement", () => {
 
     test("preserves base placement initialization and then uses legal compact coordinates for every anchor", () => {
         for (const anchor of V08_A19_COMPACT_PLACEMENT_ANCHORS) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 const fixture = scenario(anchor, team);
                 const calls = { value: 0 };
                 const strategy = decoratedFor(fixture, calls);
@@ -107,8 +107,8 @@ describe("v0.8 A19 level-4-scoped compact placement", () => {
     test("fails closed for an unselected anchor, unsupported map, summoned army, or partial call", () => {
         const cases = [
             { fixture: scenario("Hydra"), reason: "unselected-anchor" },
-            { fixture: scenario("Angel", LOWER, PBTypes.GridVals.BLOCK_CENTER), reason: "unsupported-map" },
-            { fixture: scenario("Angel", LOWER, NORMAL, true), reason: "summoned-army" },
+            { fixture: scenario("Angel", LEFT, PBTypes.GridVals.BLOCK_CENTER), reason: "unsupported-map" },
+            { fixture: scenario("Angel", LEFT, NORMAL, true), reason: "summoned-army" },
         ] as const;
         for (const { fixture, reason } of cases) {
             const strategy = decoratedFor(fixture, { value: 0 });

@@ -22,7 +22,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 // ships, long before any Unit exists to re-render it.
 describe("Blacksmith Tools card", () => {
     it("prints the four Craft odds rather than the ability's power-0 default", () => {
-        const blacksmith = getCreatureConfig(PBTypes.TeamVals.LOWER, "Life", "Blacksmith", "blacksmith_512", 50, 0);
+        const blacksmith = getCreatureConfig(PBTypes.TeamVals.LEFT, "Life", "Blacksmith", "blacksmith_512", 50, 0);
         const index = blacksmith.abilities.indexOf("Blacksmith Tools");
         expect(index).toBeGreaterThanOrEqual(0);
 

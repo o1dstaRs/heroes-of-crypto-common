@@ -26,16 +26,16 @@ describe("Dense Flesh (ranged attacks cost extra shots)", () => {
     it("consumes two shots when the ranged target has Dense Flesh and one otherwise", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const shooter = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 5,
         });
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Dense Flesh"],
         });
-        const regularTarget = createTestUnit({ name: "Regular", team: PBTypes.TeamVals.LOWER });
+        const regularTarget = createTestUnit({ name: "Regular", team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, shooter, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, abomination, { x: 5, y: 1 });
         placeUnit(grid, unitsHolder, regularTarget, { x: 5, y: 3 });
@@ -50,13 +50,13 @@ describe("Dense Flesh (ranged attacks cost extra shots)", () => {
     it("clamps at zero when only one shot remains", () => {
         createCombatTestContext();
         const shooter = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 1,
         });
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Dense Flesh"],
         });
 
@@ -67,13 +67,13 @@ describe("Dense Flesh (ranged attacks cost extra shots)", () => {
     it("does not double-charge when the shot decrement is suppressed (pass-through paths)", () => {
         createCombatTestContext();
         const shooter = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
         });
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Dense Flesh"],
         });
 
@@ -95,7 +95,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         const context = createCombatTestContext();
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: options?.abominationMaxHp ?? 200,
             armor: options?.abominationArmor ?? 20,
             magicResist: options?.abominationMagicResist ?? 0,
@@ -108,14 +108,14 @@ describe("Flesh Shield aura (damage absorption)", () => {
         });
         const ally = createTestUnit({
             name: "Protected Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 100,
             armor: options?.allyArmor ?? 20,
             magicResist: options?.allyMagicResist ?? 0,
         });
         const attacker = createTestUnit({
             name: "Enemy",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 100,
         });
         placeUnit(context.grid, context.unitsHolder, abomination, { x: 2, y: 2 });
@@ -245,7 +245,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         expect(selfResult.remainingDamage).toBe(100);
         expect(selfResult.absorbedDamage).toBe(0);
 
-        const farAlly = createTestUnit({ name: "Far Ally", team: PBTypes.TeamVals.LOWER, maxHp: 100 });
+        const farAlly = createTestUnit({ name: "Far Ally", team: PBTypes.TeamVals.LEFT, maxHp: 100 });
         placeUnit(grid, unitsHolder, farAlly, { x: 7, y: 7 });
         unitsHolder.refreshAuraEffectsForAllUnits();
         const farResult = processFleshShieldAura(
@@ -339,7 +339,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         });
         const secondAlly = createTestUnit({
             name: "Second Protected Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 1000,
             armor: 20,
         });
@@ -391,7 +391,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         const { grid, unitsHolder, damageStatisticHolder } = createCombatTestContext();
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 500,
             armor: 20,
             luck: 10,
@@ -403,19 +403,19 @@ describe("Flesh Shield aura (damage absorption)", () => {
         });
         const firstAlly = createTestUnit({
             name: "First Protected Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 1000,
             armor: 20,
         });
         const secondAlly = createTestUnit({
             name: "Second Protected Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 1000,
             armor: 20,
         });
         const attacker = createTestUnit({
             name: "AOE Attacker",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 2,
             abilities: ["Area Throw"],
@@ -462,7 +462,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         const { grid, unitsHolder, damageStatisticHolder } = createCombatTestContext();
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 500,
             armor: 20,
             luck: 10,
@@ -474,19 +474,19 @@ describe("Flesh Shield aura (damage absorption)", () => {
         });
         const firstAlly = createTestUnit({
             name: "First Protected Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 1000,
             armor: 20,
         });
         const secondAlly = createTestUnit({
             name: "Second Protected Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 1000,
             armor: 20,
         });
         const attacker = createTestUnit({
             name: "AOE Attacker",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 2,
             abilities: ["Area Throw"],
@@ -541,7 +541,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         const { grid, unitsHolder, damageStatisticHolder } = createCombatTestContext();
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 500,
             armor: 20,
             luck: 10,
@@ -553,19 +553,19 @@ describe("Flesh Shield aura (damage absorption)", () => {
         });
         const firstAlly = createTestUnit({
             name: "First Protected Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 1000,
             armor: 20,
         });
         const secondAlly = createTestUnit({
             name: "Second Protected Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 1000,
             armor: 20,
         });
         const attacker = createTestUnit({
             name: "Spin Attacker",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Lightning Spin"],
         });
         attacker.calculateMissChance = () => 0;
@@ -625,7 +625,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         const { grid, unitsHolder, damageStatisticHolder } = createCombatTestContext();
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 100,
             armor: 20,
             luck: 10,
@@ -637,13 +637,13 @@ describe("Flesh Shield aura (damage absorption)", () => {
         });
         const protectedAlly = createTestUnit({
             name: "Protected Front Unit",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 1000,
             armor: 20,
         });
         const attacker = createTestUnit({
             name: "Through Shooter",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 2,
             abilities: ["Through Shot"],
@@ -696,15 +696,15 @@ describe("Stun Aura (ally buff, stun-on-hit)", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Stun Aura"],
             auraEffects: ["Stun"],
             auraRanges: [2],
             auraIsBuff: [true],
             stackPower: 5,
         });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, amountAlive: 5 });
-        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LOWER, amountAlive: 5 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, amountAlive: 5 });
+        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LEFT, amountAlive: 5 });
         placeUnit(grid, unitsHolder, abomination, { x: 4, y: 4 });
         placeUnit(grid, unitsHolder, enemy, { x: 6, y: 4 });
         placeUnit(grid, unitsHolder, ally, { x: 4, y: 6 });
@@ -751,7 +751,7 @@ describe("Stun Aura (ally buff, stun-on-hit)", () => {
         const log = new SceneLogMock();
 
         // An ally four cells away never received the buff.
-        const distantAlly = createTestUnit({ name: "Distant", team: PBTypes.TeamVals.LOWER, amountAlive: 5 });
+        const distantAlly = createTestUnit({ name: "Distant", team: PBTypes.TeamVals.LEFT, amountAlive: 5 });
         placeUnit(grid, unitsHolder, distantAlly, { x: 4, y: 8 });
         unitsHolder.refreshAuraEffectsForAllUnits();
         expect(distantAlly.hasBuffActive("Stun Aura")).toBe(false);
@@ -759,7 +759,7 @@ describe("Stun Aura (ally buff, stun-on-hit)", () => {
         expect(enemy.hasEffectActive("Stun")).toBe(false);
 
         // A dead target is left alone even for a buffed attacker.
-        const deadEnemy = createTestUnit({ name: "Corpse", team: PBTypes.TeamVals.UPPER, amountAlive: 0 });
+        const deadEnemy = createTestUnit({ name: "Corpse", team: PBTypes.TeamVals.RIGHT, amountAlive: 0 });
         expect(deadEnemy.isDead()).toBe(true);
         processStunAuraOnHit(ally, deadEnemy, ally, log, () => 0);
         expect(deadEnemy.hasEffectActive("Stun")).toBe(false);
@@ -772,7 +772,7 @@ describe("Stun Aura (ally buff, stun-on-hit)", () => {
         const { ally, abomination } = fieldContext();
         const luckyAbomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Stun Aura"],
             auraEffects: ["Stun"],
             auraRanges: [2],
@@ -803,7 +803,7 @@ describe("Stun Aura (ally buff, stun-on-hit)", () => {
     it("caps the displayed chance at the same 100% maximum as the projected aura", () => {
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Stun Aura"],
             auraEffects: ["Stun"],
             auraRanges: [2],
@@ -824,7 +824,7 @@ describe("Stun Aura (ally buff, stun-on-hit)", () => {
     });
 
     it("is carried by the real Abomination as a stack-powered range-2 BUFF aura card", () => {
-        const props = HoCConfig.getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Abomination", "abomination_512", 1);
+        const props = HoCConfig.getCreatureConfig(PBTypes.TeamVals.LEFT, "Chaos", "Abomination", "abomination_512", 1);
         const index = props.abilities.indexOf("Stun Aura");
         expect(index).toBeGreaterThanOrEqual(0);
         expect(props.abilities_stack_powered[index]).toBe(true);

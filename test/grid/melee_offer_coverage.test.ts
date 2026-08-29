@@ -51,15 +51,15 @@ const place = (unit: Unit, cell: { x: number; y: number }): void => {
 
 describe("melee offer coverage for rectangular attackers", () => {
     it("reports the footprint the side board actually ships", () => {
-        const wolf = makeUnit("Nature", "Wolf", PBTypes.TeamVals.UPPER);
+        const wolf = makeUnit("Nature", "Wolf", PBTypes.TeamVals.RIGHT);
         // Mounted creatures ship 2x1 with size 2 — this is the class the side-board work introduced.
         expect(wolf.isSmallSize()).toBe(false);
         expect([wolf.getFootprintWidth(), wolf.getFootprintHeight()].join("x")).toBe("2x1");
     });
 
     it("every attackCell a rectangular attacker reports also has a large-cell entry", () => {
-        const attacker = makeUnit("Nature", "Wolf", PBTypes.TeamVals.UPPER);
-        const target = makeUnit("Life", "Peasant", PBTypes.TeamVals.LOWER);
+        const attacker = makeUnit("Nature", "Wolf", PBTypes.TeamVals.RIGHT);
+        const target = makeUnit("Life", "Peasant", PBTypes.TeamVals.LEFT);
 
         const attackerCell = { x: 5, y: 5 };
         const targetCell = { x: 7, y: 5 };

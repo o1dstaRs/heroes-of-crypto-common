@@ -27,8 +27,8 @@ import {
     type PickTransition,
 } from "../../src/picks/pick_sim";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const first: PickRandomInt = () => 0;
 
 const apply = (state: IPickSimState, action: PickAction, rng: PickRandomInt = first): PickTransition =>
@@ -41,13 +41,13 @@ const accept = (state: IPickSimState, action: PickAction, rng: PickRandomInt = f
 };
 
 const finishDoctrinePhase = (state: IPickSimState): IPickSimState => {
-    state = accept(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.SEE_NONE });
-    return accept(state, { type: "select_doctrine", team: UPPER, doctrine: Doctrine.SEE_NONE });
+    state = accept(state, { type: "select_doctrine", team: LEFT, doctrine: Doctrine.SEE_NONE });
+    return accept(state, { type: "select_doctrine", team: RIGHT, doctrine: Doctrine.SEE_NONE });
 };
 
 const finishBundlePhase = (state: IPickSimState): IPickSimState => {
-    state = accept(state, { type: "select_bundle", team: LOWER, bundleIndex: 0 });
-    return accept(state, { type: "select_bundle", team: UPPER, bundleIndex: 0 });
+    state = accept(state, { type: "select_bundle", team: LEFT, bundleIndex: 0 });
+    return accept(state, { type: "select_bundle", team: RIGHT, bundleIndex: 0 });
 };
 
 describe("pick_sim", () => {
@@ -61,16 +61,16 @@ describe("pick_sim", () => {
         // The two bundles a team is offered carry DIFFERENT Tier-1 artifacts. Note what the old fixture
         // pinned here: with a constant RNG both bundles held artifact 1, which is precisely the bug --
         // the artifact stopped being part of the choice.
-        expect(state.lower.bundles).toEqual([
+        expect(state.left.bundles).toEqual([
             [1, 4, 1],
             [2, 5, 2],
         ]);
-        expect(state.upper.bundles).toEqual([
+        expect(state.right.bundles).toEqual([
             [3, 6, 1],
             [11, 14, 2],
         ]);
-        expect(state.lower.tier2Offers).toEqual([1, 2, 4]);
-        expect(state.upper.tier2Offers).toEqual([1, 2, 4]);
+        expect(state.left.tier2Offers).toEqual([1, 2, 4]);
+        expect(state.right.tier2Offers).toEqual([1, 2, 4]);
         expect(state.creaturesBanned).toEqual([
             12, 13, 21, 22, 23, 31, 15, 16, 24, 25, 26, 34, 7, 8, 17, 9, 10, 19, 20, 29,
         ]);
@@ -115,7 +115,7 @@ describe("pick_sim", () => {
             8, // L4 bans (12-creature pool: Arachna Queen and Magic Dragon in, Pegasus out to L3)
         ]);
 
-        const offered = [...state.lower.bundles, ...state.upper.bundles].flatMap(([l1, l2]) => [l1, l2]);
+        const offered = [...state.left.bundles, ...state.right.bundles].flatMap(([l1, l2]) => [l1, l2]);
         expect(state.creaturesBanned.some((creatureId) => offered.includes(creatureId))).toBe(false);
     });
 
@@ -124,48 +124,48 @@ describe("pick_sim", () => {
         const last: PickRandomInt = (maxExclusive) => maxExclusive - 1;
 
         // DOCTRINE phase (seq 0): doctrine only. Bundle selections are NOT accepted here.
-        const rejectedBundle = apply(state, { type: "select_bundle", team: LOWER, bundleIndex: 1 });
+        const rejectedBundle = apply(state, { type: "select_bundle", team: LEFT, bundleIndex: 1 });
         expect(rejectedBundle).toMatchObject({ status: "rejected", reason: "wrong_phase" });
-        state = accept(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.THREE_REVEALS }, last);
+        state = accept(state, { type: "select_doctrine", team: LEFT, doctrine: Doctrine.THREE_REVEALS }, last);
         // By-level reveal (server arango_hoc.ts): one L1 slot (rng(2)->1), one L2 slot (2+1=3),
         // and the L3 slot (rng(2)->1 truthy -> 4); sorted [1, 3, 4].
-        expect(state.lower.revealedOpponentSlots).toEqual([1, 3, 4]);
+        expect(state.left.revealedOpponentSlots).toEqual([1, 3, 4]);
         expect(state.phaseSequence).toBe(0);
-        state = accept(state, { type: "select_doctrine", team: UPPER, doctrine: Doctrine.SEE_ALL });
+        state = accept(state, { type: "select_doctrine", team: RIGHT, doctrine: Doctrine.SEE_ALL });
         // Both doctrines chosen -> DOCTRINE advances to the INITIAL_PICK (bundle) phase.
         expect(state.phaseSequence).toBe(1);
-        expect(state.upper.revealedOpponentSlots).toEqual([0, 1, 2, 3, 4, 5]);
+        expect(state.right.revealedOpponentSlots).toEqual([0, 1, 2, 3, 4, 5]);
 
         // INITIAL_PICK phase (seq 1): starting bundle only.
-        expect(getPickTeamView(state, LOWER).bundles).toEqual([
+        expect(getPickTeamView(state, LEFT).bundles).toEqual([
             [1, 4, 1],
             [2, 5, 2],
         ]);
-        const rejectedDoctrine = apply(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.SEE_NONE });
+        const rejectedDoctrine = apply(state, { type: "select_doctrine", team: LEFT, doctrine: Doctrine.SEE_NONE });
         expect(rejectedDoctrine).toMatchObject({ status: "rejected", reason: "wrong_phase" });
-        state = accept(state, { type: "select_bundle", team: UPPER, bundleIndex: 0 });
+        state = accept(state, { type: "select_bundle", team: RIGHT, bundleIndex: 0 });
         expect(state.phaseSequence).toBe(1);
-        state = accept(state, { type: "select_bundle", team: LOWER, bundleIndex: 1 });
+        state = accept(state, { type: "select_bundle", team: LEFT, bundleIndex: 1 });
         // Both bundles chosen -> INITIAL_PICK advances to the first PICK phase (seq 2).
         expect(state.phaseSequence).toBe(2);
-        expect(state.lower.creatures).toEqual([2, 5]);
-        expect(state.upper.creatures).toEqual([3, 6]);
-        expect(getPickTeamView(state, LOWER).bundles).toEqual([]);
+        expect(state.left.creatures).toEqual([2, 5]);
+        expect(state.right.creatures).toEqual([3, 6]);
+        expect(getPickTeamView(state, LEFT).bundles).toEqual([]);
     });
 
     it("reveals a hidden collision without advancing, then enforces the shared exclusive pool", () => {
         let state = finishBundlePhase(finishDoctrinePhase(createPickSimState(first)));
         const before = state;
-        const collision = apply(state, { type: "pick_creature", team: LOWER, creatureId: 3 });
+        const collision = apply(state, { type: "pick_creature", team: LEFT, creatureId: 3 });
 
         expect(collision.status).toBe("collision");
         state = collision.state;
-        expect(before.lower.revealedOpponentSlots).toEqual([]);
+        expect(before.left.revealedOpponentSlots).toEqual([]);
         expect(state.phaseSequence).toBe(2);
-        expect(state.lower.revealedOpponentSlots).toEqual([0]);
-        expect(getKnownOpponentCreatures(state, LOWER)).toEqual([3]);
-        expect(getVisibleCreatureChoices(state, LOWER)).not.toContain(3);
-        expect(getOmniscientCreatureChoices(before, LOWER)).not.toContain(3);
+        expect(state.left.revealedOpponentSlots).toEqual([0]);
+        expect(getKnownOpponentCreatures(state, LEFT)).toEqual([3]);
+        expect(getVisibleCreatureChoices(state, LEFT)).not.toContain(3);
+        expect(getOmniscientCreatureChoices(before, LEFT)).not.toContain(3);
         expect(state.transcript.at(-1)).toMatchObject({
             type: "creature_collision",
             creatureId: 3,
@@ -173,7 +173,7 @@ describe("pick_sim", () => {
             phaseAfter: 2,
         });
 
-        const repeated = apply(state, { type: "pick_creature", team: LOWER, creatureId: 3 });
+        const repeated = apply(state, { type: "pick_creature", team: LEFT, creatureId: 3 });
         expect(repeated).toMatchObject({ status: "rejected", reason: "creature_already_taken" });
         expect(repeated.state).toBe(state);
     });
@@ -181,35 +181,35 @@ describe("pick_sim", () => {
     it("runs the exact snake order through simultaneous Tier-2 picks to completion", () => {
         let state = finishBundlePhase(finishDoctrinePhase(createPickSimState(first)));
         const creatureActions: PickAction[] = [
-            { type: "pick_creature", team: LOWER, creatureId: 2 },
-            { type: "pick_creature", team: UPPER, creatureId: 11 },
-            { type: "pick_creature", team: UPPER, creatureId: 5 },
-            { type: "pick_creature", team: LOWER, creatureId: 14 },
-            { type: "pick_creature", team: LOWER, creatureId: 18 },
-            { type: "pick_creature", team: UPPER, creatureId: 27 },
+            { type: "pick_creature", team: LEFT, creatureId: 2 },
+            { type: "pick_creature", team: RIGHT, creatureId: 11 },
+            { type: "pick_creature", team: RIGHT, creatureId: 5 },
+            { type: "pick_creature", team: LEFT, creatureId: 14 },
+            { type: "pick_creature", team: LEFT, creatureId: 18 },
+            { type: "pick_creature", team: RIGHT, creatureId: 27 },
         ];
         for (const action of creatureActions) {
             state = accept(state, action);
         }
         expect(state.phaseSequence).toBe(8);
 
-        const outsideOffer = apply(state, { type: "select_tier2", team: LOWER, artifactId: 5 });
+        const outsideOffer = apply(state, { type: "select_tier2", team: LEFT, artifactId: 5 });
         expect(outsideOffer).toMatchObject({ status: "rejected", reason: "artifact_not_offered" });
-        state = accept(state, { type: "select_tier2", team: UPPER, artifactId: 1 });
+        state = accept(state, { type: "select_tier2", team: RIGHT, artifactId: 1 });
         expect(state.phaseSequence).toBe(8);
-        state = accept(state, { type: "select_tier2", team: LOWER, artifactId: 1 });
+        state = accept(state, { type: "select_tier2", team: LEFT, artifactId: 1 });
         expect(state.phaseSequence).toBe(9);
 
         // Angel (40) rather than Pegasus (30) for the last L4 slot — Pegasus dropped to L3.
-        state = accept(state, { type: "pick_creature", team: UPPER, creatureId: 40 });
-        state = accept(state, { type: "pick_creature", team: LOWER, creatureId: 39 });
+        state = accept(state, { type: "pick_creature", team: RIGHT, creatureId: 40 });
+        state = accept(state, { type: "pick_creature", team: LEFT, creatureId: 39 });
 
         expect(isPickSimComplete(state)).toBe(true);
         expect(state.phaseSequence).toBe(11);
-        expect(state.lower.creatures).toEqual([1, 4, 2, 14, 18, 39]);
-        expect(state.upper.creatures).toEqual([3, 6, 11, 5, 27, 40]);
-        expect(state.lower.remainingByLevel).toEqual([0, 0, 0, 0]);
-        expect(state.upper.remainingByLevel).toEqual([0, 0, 0, 0]);
+        expect(state.left.creatures).toEqual([1, 4, 2, 14, 18, 39]);
+        expect(state.right.creatures).toEqual([3, 6, 11, 5, 27, 40]);
+        expect(state.left.remainingByLevel).toEqual([0, 0, 0, 0]);
+        expect(state.right.remainingByLevel).toEqual([0, 0, 0, 0]);
         expect(state.transcript.map((event) => event.type)).toEqual([
             "doctrine_selected",
             "doctrine_selected",
@@ -235,7 +235,7 @@ describe("pick_sim", () => {
             draws += 1;
             return 0;
         };
-        const result = apply(state, { type: "pick_creature", team: UPPER, creatureId: 11 }, rng);
+        const result = apply(state, { type: "pick_creature", team: RIGHT, creatureId: 11 }, rng);
 
         expect(result).toMatchObject({ status: "rejected", reason: "not_actor" });
         expect(result.state).toBe(state);
@@ -244,12 +244,12 @@ describe("pick_sim", () => {
 
     it("does not expose future reveal slots or alias transcript entries through transition events", () => {
         let state = createPickSimState(first);
-        const result = apply(state, { type: "select_doctrine", team: LOWER, doctrine: Doctrine.SEE_ALL });
+        const result = apply(state, { type: "select_doctrine", team: LEFT, doctrine: Doctrine.SEE_ALL });
         expect(result.status).toBe("accepted");
         state = result.state;
 
-        expect(getPickTeamView(state, LOWER)).not.toHaveProperty("revealedOpponentSlots");
-        expect(getPickTeamView(state, LOWER).knownOpponentCreatures).toEqual([]);
+        expect(getPickTeamView(state, LEFT)).not.toHaveProperty("revealedOpponentSlots");
+        expect(getPickTeamView(state, LEFT).knownOpponentCreatures).toEqual([]);
         if (result.status === "accepted" && result.event.type === "doctrine_selected") {
             result.event.revealedOpponentSlots.length = 0;
         }
@@ -276,7 +276,7 @@ describe("the starting bundles", () => {
     it("never offers a team the same artifact in both bundles", () => {
         for (let seed = 1; seed <= 400; seed += 1) {
             const state = createPickSimState(lcg(seed));
-            for (const team of [state.lower, state.upper]) {
+            for (const team of [state.left, state.right]) {
                 const [first, second] = team.bundles;
                 expect(first[2]).not.toBe(second[2]);
             }
@@ -286,7 +286,7 @@ describe("the starting bundles", () => {
     it("still offers two genuinely different bundles either side of the artifact", () => {
         for (let seed = 1; seed <= 200; seed += 1) {
             const state = createPickSimState(lcg(seed));
-            const creatures = [...state.lower.bundles, ...state.upper.bundles].flatMap(([l1, l2]) => [l1, l2]);
+            const creatures = [...state.left.bundles, ...state.right.bundles].flatMap(([l1, l2]) => [l1, l2]);
             // All four bundles' creatures are distinct across BOTH teams, so no two bundles anywhere are alike.
             expect(new Set(creatures).size).toBe(creatures.length);
         }
@@ -295,7 +295,7 @@ describe("the starting bundles", () => {
     it("keeps the Tier-2 offers distinct too", () => {
         for (let seed = 1; seed <= 200; seed += 1) {
             const state = createPickSimState(lcg(seed));
-            for (const team of [state.lower, state.upper]) {
+            for (const team of [state.left, state.right]) {
                 expect(new Set(team.tier2Offers).size).toBe(team.tier2Offers.length);
             }
         }

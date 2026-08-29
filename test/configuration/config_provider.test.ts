@@ -33,10 +33,10 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 describe("config_provider", () => {
     it("builds hero configs for every supported faction", () => {
         for (const factionName of ["Might", "Chaos", "Nature", "Life", "Death", "Order"]) {
-            const hero = getHeroConfig(PBTypes.TeamVals.UPPER, factionName, `${factionName} Hero`, "hero_large_512");
+            const hero = getHeroConfig(PBTypes.TeamVals.RIGHT, factionName, `${factionName} Hero`, "hero_large_512");
 
             expect(hero.name).toBe(`${factionName} Hero`);
-            expect(hero.team).toBe(PBTypes.TeamVals.UPPER);
+            expect(hero.team).toBe(PBTypes.TeamVals.RIGHT);
             expect(hero.unit_type).toBe(PBTypes.UnitVals.HERO);
             expect(hero.faction).not.toBe(PBTypes.FactionVals.NO_FACTION);
             expect(hero.attack_type).not.toBe(PBTypes.AttackVals.NO_ATTACK);
@@ -85,7 +85,7 @@ describe("config_provider", () => {
 
             for (const creatureName of Object.keys(creatures)) {
                 const creature = getCreatureConfig(
-                    PBTypes.TeamVals.LOWER,
+                    PBTypes.TeamVals.LEFT,
                     factionName,
                     creatureName,
                     `${creatureName.replace(/\s+/g, "_")}_512`,
@@ -93,7 +93,7 @@ describe("config_provider", () => {
                 );
 
                 expect(creature.name.length).toBeGreaterThan(0);
-                expect(creature.team).toBe(PBTypes.TeamVals.LOWER);
+                expect(creature.team).toBe(PBTypes.TeamVals.LEFT);
                 expect(creature.unit_type).toBe(PBTypes.UnitVals.CREATURE);
                 expect(creature.amount_alive).toBe(2);
                 expect(creature.abilities_descriptions.length).toBe(creature.abilities.length);
@@ -106,7 +106,7 @@ describe("config_provider", () => {
     });
 
     it("gives Zena Handyman: her kit waives the ranged melee penalty (desc arrays aligned)", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Zena", "zena_512", 0, 141);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Zena", "zena_512", 0, 141);
 
         expect(creature.hp).toBe(55);
         expect(creature.base_armor).toBe(17);
@@ -125,27 +125,27 @@ describe("config_provider", () => {
     });
 
     it("loads Hydra's reduced durability", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Chaos", "Hydra", "hydra_512", 0, 500);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Hydra", "hydra_512", 0, 500);
 
         expect(creature.hp).toBe(185);
         expect(creature.base_armor).toBe(33);
     });
 
     it("loads Hyena's reduced attack", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Hyena", "hyena_512", 0, 40);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Hyena", "hyena_512", 0, 40);
 
         expect(creature.base_attack).toBe(21);
     });
 
     it("loads Ogre Mage's improved damage range", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Ogre Mage", "ogre_mage_512", 1);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Ogre Mage", "ogre_mage_512", 1);
 
         expect(creature.attack_damage_min).toBe(16);
         expect(creature.attack_damage_max).toBe(20);
     });
 
     it("loads Tsar Cannon's improved ranged profile", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Life", "Tsar Cannon", "tsar_cannon_512", 0, 500);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Life", "Tsar Cannon", "tsar_cannon_512", 0, 500);
 
         expect(creature.base_armor).toBe(32);
         expect(creature.base_attack).toBe(46);
@@ -155,7 +155,7 @@ describe("config_provider", () => {
     });
 
     it("loads Dryad's improved attack profile", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Dryad", "dryad_512", 1);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Nature", "Dryad", "dryad_512", 1);
 
         expect(creature.base_attack).toBe(11);
         expect(creature.attack_damage_min).toBe(3);
@@ -163,7 +163,7 @@ describe("config_provider", () => {
     });
 
     it("loads Beholder's improved ranged attack profile", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Chaos", "Beholder", "beholder_512", 1);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Beholder", "beholder_512", 1);
 
         expect(creature.base_attack).toBe(17);
         expect(creature.attack_damage_min).toBe(9);
@@ -171,7 +171,7 @@ describe("config_provider", () => {
     });
 
     it("loads Nightmare's improved durability and damage range", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Chaos", "Nightmare", "nightmare_512", 1);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Nightmare", "nightmare_512", 1);
 
         expect(creature.hp).toBe(65);
         expect(creature.base_armor).toBe(21);
@@ -180,21 +180,21 @@ describe("config_provider", () => {
     });
 
     it("loads the reduced caster initiatives without rounding away tenths", () => {
-        const battleMage = getCreatureConfig(PBTypes.TeamVals.UPPER, "Life", "Battle Mage", "battle_mage_512", 1);
-        const magicDragon = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Magic Dragon", "magic_dragon_512", 1);
+        const battleMage = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Life", "Battle Mage", "battle_mage_512", 1);
+        const magicDragon = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Nature", "Magic Dragon", "magic_dragon_512", 1);
 
         expect(battleMage.initiative).toBe(2.1);
         expect(magicDragon.initiative).toBe(2.4);
     });
 
     it("derives creature amount from total experience when amount is not positive", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Berserker", "berserker_512", 0, 1);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Berserker", "berserker_512", 0, 1);
 
         expect(creature.amount_alive).toBeGreaterThanOrEqual(1);
     });
 
     it("loads the one-unit Abomination balance and stack-powered Flesh Shield metadata", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Chaos", "Abomination", "abomination_512", 0, 1000);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Abomination", "abomination_512", 0, 1000);
 
         // The requested one-unit tank profile: a 1,000-XP stack is exactly one 550-HP creature.
         expect(creature.max_hp).toBe(550);
@@ -212,7 +212,7 @@ describe("config_provider", () => {
     });
 
     it("loads Frenzied Boar's reduced durability", () => {
-        const creature = getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Frenzied Boar", "frenzied_boar_512", 1);
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Frenzied Boar", "frenzied_boar_512", 1);
 
         expect(creature.max_hp).toBe(220);
         expect(creature.base_armor).toBe(40);
@@ -234,8 +234,8 @@ describe("config_provider", () => {
 
     it("makes Trent and Gargantuan Earth Elements", () => {
         const earthElement = getAbilityConfig("Earth Element");
-        const trent = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Trent", "trent_512", 1);
-        const gargantuan = getCreatureConfig(PBTypes.TeamVals.UPPER, "Nature", "Gargantuan", "gargantuan_512", 1);
+        const trent = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Nature", "Trent", "trent_512", 1);
+        const gargantuan = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Nature", "Gargantuan", "gargantuan_512", 1);
 
         expect(earthElement.power).toBe(50);
         expect(earthElement.power_type).toBe(AbilityPowerType.MAGIC_VULNERABILITY_WIND);
@@ -295,8 +295,8 @@ describe("config_provider", () => {
 
     it("throws for unknown required config names", () => {
         expect(() => getAbilityConfig("Missing Ability")).toThrow();
-        expect(() => getCreatureConfig(PBTypes.TeamVals.UPPER, "Missing", "Berserker", "berserker_512", 1)).toThrow();
-        expect(() => getCreatureConfig(PBTypes.TeamVals.UPPER, "Might", "Missing", "missing_512", 1)).toThrow();
+        expect(() => getCreatureConfig(PBTypes.TeamVals.RIGHT, "Missing", "Berserker", "berserker_512", 1)).toThrow();
+        expect(() => getCreatureConfig(PBTypes.TeamVals.RIGHT, "Might", "Missing", "missing_512", 1)).toThrow();
         expect(() => getSpellConfig("Might", "Missing")).toThrow();
         expect(getEffectConfig("Missing Effect")).toBeUndefined();
         expect(getAuraEffectConfig("Missing Aura")).toBeUndefined();
@@ -353,7 +353,7 @@ describe("footprint sides are bounded to what the engine is verified for", () =>
         }
     };
 
-    const tiger = () => getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "White Tiger", "white_tiger_512", 1);
+    const tiger = () => getCreatureConfig(PBTypes.TeamVals.LEFT, "Nature", "White Tiger", "white_tiger_512", 1);
 
     it("accepts the shapes the clash proves — every side up to the verified bound", () => {
         expect(MAX_VERIFIED_FOOTPRINT_SIDE).toBe(3);
@@ -413,7 +413,7 @@ describe("the mounted class ships 2x1", () => {
     it("every mounted creature declares 2x1 with the size-2 art tier", () => {
         for (const [factionName, creatureName] of MOUNTED_2X1) {
             const properties = getCreatureConfig(
-                PBTypes.TeamVals.LOWER,
+                PBTypes.TeamVals.LEFT,
                 factionName,
                 creatureName,
                 `${creatureName.toLowerCase().replace(/ /g, "_")}_512`,

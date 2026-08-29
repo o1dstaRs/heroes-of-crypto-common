@@ -25,8 +25,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 
 function contextFor(combat: CombatTestContext): IDecisionContext {
@@ -60,8 +60,8 @@ describe("v0.6 caster router A/B seat gate", () => {
         enumerated: Unit[];
     } {
         const combat = createCombatTestContext();
-        const greenCaster = createTestUnit({ team: LOWER, attackType: MELEE_MAGIC });
-        const redCaster = createTestUnit({ team: UPPER, attackType: MELEE_MAGIC });
+        const greenCaster = createTestUnit({ team: LEFT, attackType: MELEE_MAGIC });
+        const redCaster = createTestUnit({ team: RIGHT, attackType: MELEE_MAGIC });
         placeUnit(combat.grid, combat.unitsHolder, greenCaster, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, redCaster, { x: 5, y: 12 });
         const enumerated: Unit[] = [];

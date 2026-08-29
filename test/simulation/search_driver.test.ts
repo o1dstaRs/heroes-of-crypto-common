@@ -252,8 +252,8 @@ function buildBattle(
     const runtime = { ...createDefaultGameRuntime(), clock: { nowMillis: () => (clock.tick += 1) } };
     const { abilityFactory, effectFactory } = createCombatFactories();
 
-    const greenZone = new RectanglePlacement(gridSettings, PlacementPositionType.LOWER_LEFT, 3);
-    const redZone = new RectanglePlacement(gridSettings, PlacementPositionType.UPPER_RIGHT, 3);
+    const greenZone = new RectanglePlacement(gridSettings, PlacementPositionType.LEFT_BOTTOM, 3);
+    const redZone = new RectanglePlacement(gridSettings, PlacementPositionType.RIGHT_TOP, 3);
     const zoneHashesFor = (team: TeamType): Set<number> =>
         team === GREEN_TEAM ? greenZone.possibleCellHashes() : redZone.possibleCellHashes();
 
@@ -2313,7 +2313,7 @@ describe("search driver — gating, hygiene, determinism", () => {
         const harness = buildBattle(8101, "v0.8");
         const driver = harness.makeDriver();
         const actingTeam = harness.activeUnit()!.getTeam();
-        const enemyTeam = actingTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+        const enemyTeam = actingTeam === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
         const internals = driver as unknown as {
             processEvents(events: GameEvent[]): void;
             leafValue(team: TeamType): number;

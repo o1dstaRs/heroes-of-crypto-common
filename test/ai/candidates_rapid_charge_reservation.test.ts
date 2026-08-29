@@ -15,8 +15,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 function contextFor(combat: CombatTestContext): IDecisionContext {
@@ -34,7 +34,7 @@ function contextFor(combat: CombatTestContext): IDecisionContext {
 function createCharger(combat: CombatTestContext): Unit {
     const charger = createTestUnit({
         name: "Wolf Rider",
-        team: LOWER,
+        team: LEFT,
         attackType: MELEE,
         attack: 20,
         damageMin: 5,
@@ -51,7 +51,7 @@ function createCharger(combat: CombatTestContext): Unit {
 function createTarget(combat: CombatTestContext, name: string, cell: { x: number; y: number }, maxHp = 20): Unit {
     const target = createTestUnit({
         name,
-        team: UPPER,
+        team: RIGHT,
         attackType: MELEE,
         armor: 10,
         amountAlive: 20,

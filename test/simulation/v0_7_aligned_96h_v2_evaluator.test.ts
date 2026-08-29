@@ -424,7 +424,7 @@ describe("v0.7 aligned 96-hour v2 evaluator", () => {
         ]);
         expect(configs[0].seed).toBe(configs[1].seed);
         expect(records[0].physicalSetupSha256).toBe(records[1].physicalSetupSha256);
-        expect(records[0].lowerRoster).toBe(records[0].upperRoster);
+        expect(records[0].leftRoster).toBe(records[0].rightRoster);
         expect(
             configs.every((config) => (config.greenArtifactT1 ?? 0) === 0 && (config.greenArtifactT2 ?? 0) === 0),
         ).toBe(true);
@@ -448,8 +448,8 @@ describe("v0.7 aligned 96-hour v2 evaluator", () => {
         let attempt = 0;
         const record = playV07AlignedV2Task(task, {
             pickRunner: () => {
-                const lower = attempt++ === 0 ? army("ranged_precision") : army("mage_frontline");
-                return { lower, upper: army("mage_frontline") };
+                const left = attempt++ === 0 ? army("ranged_precision") : army("mage_frontline");
+                return { left, right: army("mage_frontline") };
             },
             matchRunner: (config) => fakeResult(config),
         });

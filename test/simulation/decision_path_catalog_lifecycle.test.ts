@@ -45,13 +45,13 @@ describe("SearchDriver decision path catalog lifecycle", () => {
 
         const combat = createCombatTestContext();
         const actor = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Rollout Actor",
             attackType: PBTypes.AttackVals.MELEE,
             initiative: 4.2,
         });
         const enemy = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Rollout Target",
             attackType: PBTypes.AttackVals.MELEE,
         });
@@ -116,7 +116,7 @@ describe("SearchDriver decision path catalog lifecycle", () => {
             ),
         ).toBe(true);
 
-        const enemyTeam = PBTypes.TeamVals.UPPER;
+        const enemyTeam = PBTypes.TeamVals.RIGHT;
         const firstPath = first.decisionPathCatalog!.getMovePath(
             actor.getBaseCell(),
             first.matrix,

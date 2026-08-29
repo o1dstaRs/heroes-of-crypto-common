@@ -39,8 +39,8 @@ import {
  * which is what lets a hover project the number the engine will actually deal.
  */
 
-const RED = PBTypes.TeamVals.UPPER;
-const GREEN = PBTypes.TeamVals.LOWER;
+const RED = PBTypes.TeamVals.RIGHT;
+const GREEN = PBTypes.TeamVals.LEFT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 /** The powers the differential measurement swept, plus 0 as the control. */

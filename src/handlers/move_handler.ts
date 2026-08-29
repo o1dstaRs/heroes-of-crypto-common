@@ -109,16 +109,16 @@ export class MoveHandler {
                 let moveY = false;
                 let priorityShift = 0;
                 if (updatePositionMask & UPDATE_UP) {
-                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LEFT ? 1 : -1;
                     moveX = true;
                 } else if (updatePositionMask & UPDATE_DOWN) {
-                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LEFT ? 1 : -1;
                     moveX = true;
                 } else if (updatePositionMask & UPDATE_LEFT) {
-                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LEFT ? 1 : -1;
                     moveY = true;
                 } else if (updatePositionMask & UPDATE_RIGHT) {
-                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LOWER ? 1 : -1;
+                    priorityShift = unit.getTeam() === PBTypes.TeamVals.LEFT ? 1 : -1;
                     moveY = true;
                 }
                 const initialTargetCells = structuredClone(targetCells);

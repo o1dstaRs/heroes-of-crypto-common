@@ -133,8 +133,8 @@ export function revealCells(): IRevealCell[] {
     ];
 }
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const PAIR_SEED_STEP = 0x9e3779b1;
 const MIX_POLICY_SALT = 0x51ed270b;
 
@@ -214,34 +214,34 @@ export function playRevealGame(
     if (cell.kind === "drafted") {
         policy = policyForPair(cell, seed);
         const outcome = runPickPhase(seed, policy, policy);
-        const lowerArmy = buildArmyFromPick(outcome.state.lower);
-        const upperArmy = buildArmyFromPick(outcome.state.upper);
-        const lowerRevealed = getKnownOpponentCreatures(outcome.state, LOWER);
-        const upperRevealed = getKnownOpponentCreatures(outcome.state, UPPER);
-        treatedRevealed = treatedSide === "green" ? lowerRevealed : upperRevealed;
+        const leftArmy = buildArmyFromPick(outcome.state.left);
+        const rightArmy = buildArmyFromPick(outcome.state.right);
+        const leftRevealed = getKnownOpponentCreatures(outcome.state, LEFT);
+        const rightRevealed = getKnownOpponentCreatures(outcome.state, RIGHT);
+        treatedRevealed = treatedSide === "green" ? leftRevealed : rightRevealed;
         config = {
             greenVersion: fightVersion,
             redVersion: fightVersion,
-            roster: lowerArmy.roster,
-            redRoster: upperArmy.roster,
+            roster: leftArmy.roster,
+            redRoster: rightArmy.roster,
             seed,
             gridType: PBTypes.GridVals.NORMAL,
-            greenDoctrine: lowerArmy.doctrine,
-            redDoctrine: upperArmy.doctrine,
-            greenAugments: lowerArmy.augments,
-            redAugments: upperArmy.augments,
-            greenArtifactT1: lowerArmy.tier1Artifact,
-            redArtifactT1: upperArmy.tier1Artifact,
-            greenArtifactT2: lowerArmy.tier2Artifact,
-            redArtifactT2: upperArmy.tier2Artifact,
-            greenSynergies: lowerArmy.synergies,
-            redSynergies: upperArmy.synergies,
+            greenDoctrine: leftArmy.doctrine,
+            redDoctrine: rightArmy.doctrine,
+            greenAugments: leftArmy.augments,
+            redAugments: rightArmy.augments,
+            greenArtifactT1: leftArmy.tier1Artifact,
+            redArtifactT1: rightArmy.tier1Artifact,
+            greenArtifactT2: leftArmy.tier2Artifact,
+            redArtifactT2: rightArmy.tier2Artifact,
+            greenSynergies: leftArmy.synergies,
+            redSynergies: rightArmy.synergies,
             ...(treatedSide === "green"
-                ? lowerRevealed.length
-                    ? { greenRevealedCreatures: lowerRevealed }
+                ? leftRevealed.length
+                    ? { greenRevealedCreatures: leftRevealed }
                     : {}
-                : upperRevealed.length
-                  ? { redRevealedCreatures: upperRevealed }
+                : rightRevealed.length
+                  ? { redRevealedCreatures: rightRevealed }
                   : {}),
         };
     } else {

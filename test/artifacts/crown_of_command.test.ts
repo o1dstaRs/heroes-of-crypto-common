@@ -29,10 +29,10 @@ const ARMOR = ARTIFACT_POWER.CROWN_ARMOR;
 const crownUnit = () => {
     const { grid, unitsHolder } = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_2, Tier2Artifact.CROWN_OF_COMMAND);
+    fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, ArtifactTier.TIER_2, Tier2Artifact.CROWN_OF_COMMAND);
     const unit = createTestUnit({
         name: "Crown Bearer",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         morale: 0,
     });
     placeUnit(grid, unitsHolder, unit, { x: 2, y: 2 });

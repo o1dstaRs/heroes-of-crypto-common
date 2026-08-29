@@ -44,8 +44,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const SMALL = PBTypes.UnitSizeVals.SMALL;
@@ -89,7 +89,7 @@ interface BlockFixture {
     readonly setActiveUnitId: (id: string) => void;
 }
 
-const otherTeam = (team: TeamType): TeamType => (team === LOWER ? UPPER : LOWER);
+const otherTeam = (team: TeamType): TeamType => (team === LEFT ? RIGHT : LEFT);
 
 const footprintAt = (unit: Unit, base: XY): XY[] =>
     unit.isSmallSize()
@@ -169,7 +169,7 @@ function buildBlockFixture(options: {
         combat.grid,
         combat.unitsHolder,
         enemy,
-        options.enemyBase ?? (options.team === LOWER ? { x: 15, y: 15 } : { x: 0, y: 0 }),
+        options.enemyBase ?? (options.team === LEFT ? { x: 15, y: 15 } : { x: 0, y: 0 }),
     );
     if (options.rangedAlly) {
         const ally = createTestUnit({
@@ -183,7 +183,7 @@ function buildBlockFixture(options: {
             shotDistance: 30,
             initiative: 1,
         });
-        placeUnit(combat.grid, combat.unitsHolder, ally, options.team === LOWER ? { x: 1, y: 14 } : { x: 14, y: 1 });
+        placeUnit(combat.grid, combat.unitsHolder, ally, options.team === LEFT ? { x: 1, y: 14 } : { x: 14, y: 1 });
     }
 
     const fightProperties = FightStateManager.getInstance().getFightProperties();
@@ -245,10 +245,10 @@ function buildBlockFixture(options: {
 
 function mountainDestination(side: MountainSide, team: TeamType, size: BodySize): XY {
     if (side === "left") {
-        if (team === LOWER) return { x: 4, y: 6 }; // exposed west corner
+        if (team === LEFT) return { x: 4, y: 6 }; // exposed west corner
         return size === "small" ? { x: 7, y: 6 } : { x: 8, y: 6 }; // corridor corner
     }
-    if (team === LOWER) return size === "small" ? { x: 8, y: 9 } : { x: 8, y: 10 }; // corridor corner
+    if (team === LEFT) return size === "small" ? { x: 8, y: 9 } : { x: 8, y: 10 }; // corridor corner
     return size === "small" ? { x: 11, y: 9 } : { x: 12, y: 10 }; // exposed east corner
 }
 
@@ -327,11 +327,11 @@ function trueAttackCellPathDistance(actor: Unit, target: Unit, grid: Grid, pathH
 
 function directEnemyBase(side: MountainSide, team: TeamType, size: BodySize): XY {
     if (size === "small") {
-        if (side === "left") return team === LOWER ? { x: 3, y: 6 } : { x: 7, y: 5 };
-        return team === LOWER ? { x: 8, y: 10 } : { x: 12, y: 9 };
+        if (side === "left") return team === LEFT ? { x: 3, y: 6 } : { x: 7, y: 5 };
+        return team === LEFT ? { x: 8, y: 10 } : { x: 12, y: 9 };
     }
-    if (side === "left") return team === LOWER ? { x: 2, y: 5 } : { x: 9, y: 5 };
-    return team === LOWER ? { x: 6, y: 10 } : { x: 13, y: 10 };
+    if (side === "left") return team === LEFT ? { x: 2, y: 5 } : { x: 9, y: 5 };
+    return team === LEFT ? { x: 6, y: 10 } : { x: 13, y: 10 };
 }
 
 function makeA13Driver(fixture: BlockFixture) {
@@ -363,10 +363,10 @@ function makeA13Driver(fixture: BlockFixture) {
 describe("v0.8 BLOCK_CENTER selection", () => {
     describe("uncapped mountain candidates complete in the real engine", () => {
         for (const side of ["left", "right"] as const) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 for (const size of ["small", "large"] as const) {
                     for (const mode of ["stationary", "routed"] as const) {
-                        const label = `${side} ${team === LOWER ? "LOWER" : "UPPER"} ${size} ${mode}`;
+                        const label = `${side} ${team === LEFT ? "LEFT" : "RIGHT"} ${size} ${mode}`;
                         it(label, () => {
                             const fixture = buildBlockFixture({
                                 team,
@@ -409,10 +409,10 @@ describe("v0.8 BLOCK_CENTER selection", () => {
 
     it("honors every independent cleared-side combination", () => {
         const cases = [
-            { left: true, right: true, size: SMALL, team: LOWER, base: { x: 7, y: 6 }, expected: "left" },
-            { left: true, right: false, size: LARGE, team: UPPER, base: { x: 8, y: 6 }, expected: "left" },
-            { left: false, right: true, size: LARGE, team: LOWER, base: { x: 8, y: 10 }, expected: "right" },
-            { left: false, right: false, size: SMALL, team: UPPER, base: { x: 8, y: 9 }, expected: undefined },
+            { left: true, right: true, size: SMALL, team: LEFT, base: { x: 7, y: 6 }, expected: "left" },
+            { left: true, right: false, size: LARGE, team: RIGHT, base: { x: 8, y: 6 }, expected: "left" },
+            { left: false, right: true, size: LARGE, team: LEFT, base: { x: 8, y: 10 }, expected: "right" },
+            { left: false, right: false, size: SMALL, team: RIGHT, base: { x: 8, y: 9 }, expected: undefined },
         ] as const;
 
         for (const testCase of cases) {
@@ -438,10 +438,10 @@ describe("v0.8 BLOCK_CENTER selection", () => {
 
     describe("production StrategyV0_8 advances by true attack-cell route distance", () => {
         for (const side of ["left", "right"] as const) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 for (const size of ["small", "large"] as const) {
                     for (const mode of ["stationary", "routed"] as const) {
-                        const label = `${side} ${team === LOWER ? "LOWER" : "UPPER"} ${size} ${mode}`;
+                        const label = `${side} ${team === LEFT ? "LEFT" : "RIGHT"} ${size} ${mode}`;
                         it(label, () => {
                             const fixture = buildBlockFixture({
                                 team,
@@ -489,9 +489,9 @@ describe("v0.8 BLOCK_CENTER selection", () => {
 
     describe("a direct enemy hit beats shield and mountain mining", () => {
         for (const side of ["left", "right"] as const) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 for (const size of ["small", "large"] as const) {
-                    const label = `${side} ${team === LOWER ? "LOWER" : "UPPER"} ${size}`;
+                    const label = `${side} ${team === LEFT ? "LEFT" : "RIGHT"} ${size}`;
                     it(label, () => {
                         const fixture = buildBlockFixture({
                             team,
@@ -549,7 +549,7 @@ describe("v0.8 BLOCK_CENTER selection", () => {
     for (const passiveKind of ["wait", "shield", "mine"] as const) {
         it(`exact production a13 selects valid late damage over ${passiveKind}`, () => {
             const fixture = buildBlockFixture({
-                team: LOWER,
+                team: LEFT,
                 size: SMALL,
                 actorBase: { x: 4, y: 7 },
                 enemyBase: { x: 3, y: 7 },

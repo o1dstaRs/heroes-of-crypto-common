@@ -54,7 +54,7 @@ export const V07_CASTER_ROUTER_POLICY = Object.freeze({
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const MAGIC = PBTypes.AttackVals.MAGIC;
 const RANGE = PBTypes.AttackVals.RANGE;
-const LOWER = PBTypes.TeamVals.LOWER;
+const LEFT = PBTypes.TeamVals.LEFT;
 
 const isSpell = (candidate: IEnumeratedCandidate, spellName: string): boolean =>
     candidate.kind === "spell" && candidate.spellName === spellName;
@@ -282,7 +282,7 @@ function casterRouterGateOn(unit: Unit): boolean {
         return true;
     }
     if (gate === "green" || gate === "red") {
-        return gate === (unit.getTeam() === LOWER ? "green" : "red");
+        return gate === (unit.getTeam() === LEFT ? "green" : "red");
     }
     return false;
 }

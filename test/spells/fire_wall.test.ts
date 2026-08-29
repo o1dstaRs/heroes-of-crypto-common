@@ -260,7 +260,7 @@ describe("Fire Wall through the action engine", () => {
 
         const caster = createTestUnit({
             name: "Nightmare",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             initiative: 5,
             morale: 4,
             spells: opts.casterSpells ?? ["Chaos:Fire Wall"],
@@ -269,7 +269,7 @@ describe("Fire Wall through the action engine", () => {
         });
         const enemy = createTestUnit({
             name: "Upper",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             initiative: 3,
             morale: 4,
             maxHp: opts.moverMaxHp ?? 20,
@@ -277,9 +277,9 @@ describe("Fire Wall through the action engine", () => {
         });
         placeUnit(context.grid, context.unitsHolder, caster, { x: 3, y: 3 });
         placeUnit(context.grid, context.unitsHolder, enemy, { x: 9, y: 9 });
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
         let active = caster;
         const sceneLog = new SceneLogMock();
@@ -337,7 +337,7 @@ describe("Fire Wall through the action engine", () => {
         const s = setup();
         const satyr = createTestUnit({
             name: "Satyr",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Sylvan Focus Aura"],
             auraEffects: ["Sylvan Focus"],
             auraRanges: [2],

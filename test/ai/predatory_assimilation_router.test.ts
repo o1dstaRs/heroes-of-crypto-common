@@ -20,8 +20,8 @@ import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 
@@ -35,7 +35,7 @@ function setupQueen(): QueenHarness {
     const combat = createCombatTestContext();
     const queen = createTestUnit({
         name: "Arachna Queen",
-        team: LOWER,
+        team: LEFT,
         attackType: MELEE,
         shotDistance: 0,
         initiative: 6.3,
@@ -44,8 +44,8 @@ function setupQueen(): QueenHarness {
         stackPower: 5,
         abilities: ["Predatory Assimilation"],
     });
-    const ally = createTestUnit({ name: "Ally", team: LOWER, amountAlive: 5 });
-    const enemy = createTestUnit({ name: "Enemy", team: UPPER, amountAlive: 50, maxHp: 100 });
+    const ally = createTestUnit({ name: "Ally", team: LEFT, amountAlive: 5 });
+    const enemy = createTestUnit({ name: "Enemy", team: RIGHT, amountAlive: 50, maxHp: 100 });
     placeUnit(combat.grid, combat.unitsHolder, queen, { x: 3, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, ally, { x: 5, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 10, y: 10 });
@@ -53,9 +53,9 @@ function setupQueen(): QueenHarness {
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(combat.grid.getGridType());
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, 2);
-    fightProperties.setTeamUnitsAlive(UPPER, 1);
-    fightProperties.startTurn(LOWER, 1_000);
+    fightProperties.setTeamUnitsAlive(LEFT, 2);
+    fightProperties.setTeamUnitsAlive(RIGHT, 1);
+    fightProperties.startTurn(LEFT, 1_000);
 
     const context: IDecisionContext = {
         grid: combat.grid,
@@ -182,7 +182,7 @@ describe("Arachna Queen Predatory Assimilation AI routing", () => {
         const incumbent: GameAction[] = [{ type: "end_turn", unitId: harness.queen.getId(), reason: "manual" }];
 
         expect(routeArachnaQueenAssimilation(harness.queen, harness.context, incumbent)).toBe(incumbent);
-        const nativeMelee = createTestUnit({ name: "Squire", team: LOWER });
+        const nativeMelee = createTestUnit({ name: "Squire", team: LEFT });
         expect(routeArachnaQueenAssimilation(nativeMelee, harness.context, incumbent)).toBe(incumbent);
     });
 });

@@ -33,150 +33,150 @@ import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } 
 describe("UnitsHolder", () => {
     it("indexes units by team and exposes team/enemy stat maps", () => {
         const { unitsHolder, grid } = createCombatTestContext();
-        const lower = createTestUnit({
+        const left = createTestUnit({
             name: "Lower Scout",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 20,
             magicResist: 5,
             movementType: PBTypes.MovementVals.FLY,
         });
-        const lowerWalker = createTestUnit({
+        const leftWalker = createTestUnit({
             name: "Lower Walker",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 12,
             magicResist: 2,
         });
-        const upper = createTestUnit({
+        const right = createTestUnit({
             name: "Upper Guard",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 30,
             magicResist: 7,
         });
 
-        placeUnit(grid, unitsHolder, lower, { x: 1, y: 1 });
-        placeUnit(grid, unitsHolder, lowerWalker, { x: 8, y: 8 });
-        placeUnit(grid, unitsHolder, upper, { x: 14, y: 14 });
+        placeUnit(grid, unitsHolder, left, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, leftWalker, { x: 8, y: 8 });
+        placeUnit(grid, unitsHolder, right, { x: 14, y: 14 });
 
         expect(Array.from(unitsHolder.getAllUnitsIterator()).map((unit) => unit.getId())).toEqual([
-            lower.getId(),
-            lowerWalker.getId(),
-            upper.getId(),
+            left.getId(),
+            leftWalker.getId(),
+            right.getId(),
         ]);
-        expect(unitsHolder.getAllEnemyUnits(PBTypes.TeamVals.LOWER).map((unit) => unit.getId())).toEqual([
-            upper.getId(),
+        expect(unitsHolder.getAllEnemyUnits(PBTypes.TeamVals.LEFT).map((unit) => unit.getId())).toEqual([
+            right.getId(),
         ]);
-        expect(unitsHolder.getAllAllies(PBTypes.TeamVals.LOWER).map((unit) => unit.getId())).toEqual([
-            lower.getId(),
-            lowerWalker.getId(),
+        expect(unitsHolder.getAllAllies(PBTypes.TeamVals.LEFT).map((unit) => unit.getId())).toEqual([
+            left.getId(),
+            leftWalker.getId(),
         ]);
-        expect(unitsHolder.getAllTeamUnitsBuffs(PBTypes.TeamVals.LOWER).get(lower.getId())).toEqual([]);
-        expect(unitsHolder.getAllEnemyUnitsBuffs(PBTypes.TeamVals.LOWER).get(upper.getId())).toEqual([]);
-        expect(unitsHolder.getAllEnemyUnitsDebuffs(PBTypes.TeamVals.LOWER).get(upper.getId())).toEqual([]);
-        expect(unitsHolder.getAllTeamUnitsCanFly(PBTypes.TeamVals.LOWER)).toEqual(
+        expect(unitsHolder.getAllTeamUnitsBuffs(PBTypes.TeamVals.LEFT).get(left.getId())).toEqual([]);
+        expect(unitsHolder.getAllEnemyUnitsBuffs(PBTypes.TeamVals.LEFT).get(right.getId())).toEqual([]);
+        expect(unitsHolder.getAllEnemyUnitsDebuffs(PBTypes.TeamVals.LEFT).get(right.getId())).toEqual([]);
+        expect(unitsHolder.getAllTeamUnitsCanFly(PBTypes.TeamVals.LEFT)).toEqual(
             new Map([
-                [lower.getId(), true],
-                [lowerWalker.getId(), false],
+                [left.getId(), true],
+                [leftWalker.getId(), false],
             ]),
         );
-        expect(unitsHolder.getAllEnemyUnitsCanFly(PBTypes.TeamVals.LOWER)).toEqual(new Map([[upper.getId(), false]]));
-        expect(unitsHolder.getAllTeamUnitsMagicResist(PBTypes.TeamVals.LOWER)).toEqual(
+        expect(unitsHolder.getAllEnemyUnitsCanFly(PBTypes.TeamVals.LEFT)).toEqual(new Map([[right.getId(), false]]));
+        expect(unitsHolder.getAllTeamUnitsMagicResist(PBTypes.TeamVals.LEFT)).toEqual(
             new Map([
-                [lower.getId(), 5],
-                [lowerWalker.getId(), 2],
+                [left.getId(), 5],
+                [leftWalker.getId(), 2],
             ]),
         );
-        expect(unitsHolder.getAllEnemyUnitsMagicResist(PBTypes.TeamVals.LOWER)).toEqual(new Map([[upper.getId(), 7]]));
-        expect(unitsHolder.getAllTeamUnitsHp(PBTypes.TeamVals.LOWER)).toEqual(
+        expect(unitsHolder.getAllEnemyUnitsMagicResist(PBTypes.TeamVals.LEFT)).toEqual(new Map([[right.getId(), 7]]));
+        expect(unitsHolder.getAllTeamUnitsHp(PBTypes.TeamVals.LEFT)).toEqual(
             new Map([
-                [lower.getId(), 20],
-                [lowerWalker.getId(), 12],
+                [left.getId(), 20],
+                [leftWalker.getId(), 12],
             ]),
         );
-        expect(unitsHolder.getAllTeamUnitsMaxHp(PBTypes.TeamVals.LOWER)).toEqual(
+        expect(unitsHolder.getAllTeamUnitsMaxHp(PBTypes.TeamVals.LEFT)).toEqual(
             new Map([
-                [lower.getId(), 20],
-                [lowerWalker.getId(), 12],
+                [left.getId(), 20],
+                [leftWalker.getId(), 12],
             ]),
         );
         expect(unitsHolder.getUnitByStats(undefined as unknown as UnitProperties)).toBeUndefined();
-        expect(unitsHolder.getUnitByStats(lower.getUnitProperties() as UnitProperties)).toBe(lower);
+        expect(unitsHolder.getUnitByStats(left.getUnitProperties() as UnitProperties)).toBe(left);
         expect(flatUnitIds(unitsHolder.refreshUnitsForAllTeams()).sort()).toEqual(
-            [lower.getId(), lowerWalker.getId(), upper.getId()].sort(),
+            [left.getId(), leftWalker.getId(), right.getId()].sort(),
         );
     });
 
     it("filters placed allies and selects the lowest-power units for cleanup", () => {
         const { unitsHolder, grid } = createCombatTestContext();
-        const lowerLeft = new SquarePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 3);
-        const upperRight = new SquarePlacement(testGridSettings, PlacementPositionType.UPPER_RIGHT, 3);
-        const lowerA = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const lowerB = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const lowerC = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const lowerOutside = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const upper = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const leftBottom = new SquarePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 3);
+        const rightTop = new SquarePlacement(testGridSettings, PlacementPositionType.RIGHT_TOP, 3);
+        const leftA = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const leftB = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const leftC = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const leftOutside = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const right = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
 
-        lowerA.setStackPower(3);
-        lowerB.setStackPower(1);
-        lowerC.setStackPower(2);
+        leftA.setStackPower(3);
+        leftB.setStackPower(1);
+        leftC.setStackPower(2);
 
-        placeUnit(grid, unitsHolder, lowerA, { x: 1, y: 1 });
-        placeUnit(grid, unitsHolder, lowerB, { x: 2, y: 1 });
-        placeUnit(grid, unitsHolder, lowerC, { x: 3, y: 1 });
-        placeUnit(grid, unitsHolder, lowerOutside, { x: 8, y: 8 });
-        placeUnit(grid, unitsHolder, upper, { x: 14, y: 14 });
+        placeUnit(grid, unitsHolder, leftA, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, leftB, { x: 2, y: 1 });
+        placeUnit(grid, unitsHolder, leftC, { x: 3, y: 1 });
+        placeUnit(grid, unitsHolder, leftOutside, { x: 8, y: 8 });
+        placeUnit(grid, unitsHolder, right, { x: 14, y: 14 });
 
         expect(
-            unitsHolder.getAllAlliesPlaced(PBTypes.TeamVals.LOWER, lowerLeft, upperRight).map((unit) => unit.getId()),
-        ).toEqual([lowerA.getId(), lowerB.getId(), lowerC.getId()]);
+            unitsHolder.getAllAlliesPlaced(PBTypes.TeamVals.LEFT, leftBottom, rightTop).map((unit) => unit.getId()),
+        ).toEqual([leftA.getId(), leftB.getId(), leftC.getId()]);
         expect(
-            unitsHolder.getAllAlliesPlaced(PBTypes.TeamVals.UPPER, lowerLeft, upperRight).map((unit) => unit.getId()),
-        ).toEqual([upper.getId()]);
-        expect(unitsHolder.toCleanupRandomUnitsTillTeamSize(5, PBTypes.TeamVals.LOWER, lowerLeft, upperRight)).toEqual(
+            unitsHolder.getAllAlliesPlaced(PBTypes.TeamVals.RIGHT, leftBottom, rightTop).map((unit) => unit.getId()),
+        ).toEqual([right.getId()]);
+        expect(unitsHolder.toCleanupRandomUnitsTillTeamSize(5, PBTypes.TeamVals.LEFT, leftBottom, rightTop)).toEqual(
             [],
         );
         expect(
             unitsHolder
-                .toCleanupRandomUnitsTillTeamSize(1, PBTypes.TeamVals.LOWER, lowerLeft, upperRight)
+                .toCleanupRandomUnitsTillTeamSize(1, PBTypes.TeamVals.LEFT, leftBottom, rightTop)
                 .map((unit) => unit.getId()),
-        ).toEqual([lowerB.getId(), lowerC.getId()]);
+        ).toEqual([leftB.getId(), leftC.getId()]);
         expect(
             unitsHolder
-                .toCleanupRandomUnitsTillTeamSize(-1, PBTypes.TeamVals.LOWER, lowerLeft, upperRight)
+                .toCleanupRandomUnitsTillTeamSize(-1, PBTypes.TeamVals.LEFT, leftBottom, rightTop)
                 .map((unit) => unit.getId()),
-        ).toEqual([lowerB.getId(), lowerC.getId(), lowerA.getId()]);
+        ).toEqual([leftB.getId(), leftC.getId(), leftA.getId()]);
     });
 
     it("tracks distances to closest enemies and adjacent enemy queries", () => {
         const { unitsHolder, grid } = createCombatTestContext();
-        const lower = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const upperAdjacent = createTestUnit({ team: PBTypes.TeamVals.UPPER });
-        const upperFar = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const left = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const rightAdjacent = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
+        const rightFar = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
 
-        placeUnit(grid, unitsHolder, lower, { x: 5, y: 5 });
-        placeUnit(grid, unitsHolder, upperAdjacent, { x: 5, y: 6 });
-        placeUnit(grid, unitsHolder, upperFar, { x: 12, y: 12 });
+        placeUnit(grid, unitsHolder, left, { x: 5, y: 5 });
+        placeUnit(grid, unitsHolder, rightAdjacent, { x: 5, y: 6 });
+        placeUnit(grid, unitsHolder, rightFar, { x: 12, y: 12 });
 
-        expect(unitsHolder.allEnemiesAroundUnit(lower, true, { x: 5, y: 5 })).toEqual([upperAdjacent]);
-        expect(unitsHolder.allEnemiesAroundUnit(lower, false)).toEqual([upperAdjacent]);
-        expect(unitsHolder.allEnemiesAroundUnit(lower, true)).toEqual([]);
-        expect(unitsHolder.getNumberOfEnemiesWithinRange(lower, 1)).toBe(1);
-        expect(unitsHolder.getUnitAuraAttackMod(lower)).toBe(0);
-        expect(unitsHolder.getDistanceToClosestEnemy(PBTypes.TeamVals.UPPER, lower.getPosition())).toBeGreaterThan(0);
+        expect(unitsHolder.allEnemiesAroundUnit(left, true, { x: 5, y: 5 })).toEqual([rightAdjacent]);
+        expect(unitsHolder.allEnemiesAroundUnit(left, false)).toEqual([rightAdjacent]);
+        expect(unitsHolder.allEnemiesAroundUnit(left, true)).toEqual([]);
+        expect(unitsHolder.getNumberOfEnemiesWithinRange(left, 1)).toBe(1);
+        expect(unitsHolder.getUnitAuraAttackMod(left)).toBe(0);
+        expect(unitsHolder.getDistanceToClosestEnemy(PBTypes.TeamVals.RIGHT, left.getPosition())).toBeGreaterThan(0);
         expect(unitsHolder.haveDistancesToClosestEnemiesDecreased()).toBe(true);
         expect(unitsHolder.haveDistancesToClosestEnemiesDecreased()).toBe(false);
 
-        lower.setPosition(positionForCell({ x: 5, y: 5 }).x, positionForCell({ x: 5, y: 5 }).y);
-        upperAdjacent.setPosition(positionForCell({ x: 5, y: 5 }).x, positionForCell({ x: 5, y: 5 }).y);
+        left.setPosition(positionForCell({ x: 5, y: 5 }).x, positionForCell({ x: 5, y: 5 }).y);
+        rightAdjacent.setPosition(positionForCell({ x: 5, y: 5 }).x, positionForCell({ x: 5, y: 5 }).y);
 
         expect(unitsHolder.haveDistancesToClosestEnemiesDecreased()).toBe(true);
     });
 
     it("removes units from holder, grid, and fight queues", () => {
         const { unitsHolder, grid } = createCombatTestContext();
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         // Seed the id into initial properties too: resetTarget() would otherwise make this test pass while
         // retaining a dangling target on a unit hydrated from a mid-fight snapshot.
-        const aggravated = createTestUnit({ team: PBTypes.TeamVals.UPPER, target: unit.getId() });
+        const aggravated = createTestUnit({ team: PBTypes.TeamVals.RIGHT, target: unit.getId() });
         const unitCell = { x: 2, y: 2 };
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
@@ -201,62 +201,62 @@ describe("UnitsHolder", () => {
 
     it("deletes units that are outside allowed placement", () => {
         const { unitsHolder, grid } = createCombatTestContext();
-        const lowerLeft = new SquarePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 3);
-        const upperRight = new SquarePlacement(testGridSettings, PlacementPositionType.UPPER_RIGHT, 3);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const leftBottom = new SquarePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 3);
+        const rightTop = new SquarePlacement(testGridSettings, PlacementPositionType.RIGHT_TOP, 3);
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT });
 
         placeUnit(grid, unitsHolder, unit, { x: 1, y: 1 });
 
-        expect(unitsHolder.deleteUnitIfNotAllowed(unit.getId(), lowerLeft, upperRight)).toBe(false);
-        expect(unitsHolder.deleteUnitIfNotAllowed(unit.getId(), undefined, upperRight)).toBe(true);
+        expect(unitsHolder.deleteUnitIfNotAllowed(unit.getId(), leftBottom, rightTop)).toBe(false);
+        expect(unitsHolder.deleteUnitIfNotAllowed(unit.getId(), undefined, rightTop)).toBe(true);
         expect(unitsHolder.getAllUnits().has(unit.getId())).toBe(false);
-        expect(unitsHolder.deleteUnitIfNotAllowed("missing", lowerLeft, upperRight)).toBe(true);
+        expect(unitsHolder.deleteUnitIfNotAllowed("missing", leftBottom, rightTop)).toBe(true);
     });
 
     it("finds summoned units by name and team", () => {
         const { unitsHolder } = createCombatTestContext();
         const summoned = createTestUnit({
             name: "Wolf",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             summoned: true,
         });
         const regular = createTestUnit({
             name: "Wolf",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             summoned: false,
         });
 
         unitsHolder.addUnit(summoned);
         unitsHolder.addUnit(regular);
 
-        expect(unitsHolder.getSummonedUnitByName(PBTypes.TeamVals.LOWER, "Wolf")).toBe(summoned);
-        expect(unitsHolder.getSummonedUnitByName(PBTypes.TeamVals.UPPER, "Wolf")).toBeUndefined();
-        expect(unitsHolder.getSummonedUnitByName(PBTypes.TeamVals.LOWER, "")).toBeUndefined();
+        expect(unitsHolder.getSummonedUnitByName(PBTypes.TeamVals.LEFT, "Wolf")).toBe(summoned);
+        expect(unitsHolder.getSummonedUnitByName(PBTypes.TeamVals.RIGHT, "Wolf")).toBeUndefined();
+        expect(unitsHolder.getSummonedUnitByName(PBTypes.TeamVals.LEFT, "")).toBeUndefined();
     });
 
     it("applies pre-fight supply synergy and skips it after fight start", () => {
         const { unitsHolder } = createCombatTestContext();
         const unit = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 10,
         });
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         unitsHolder.addUnit(unit);
-        fightProperties.setSynergyUnitsPerFactions(PBTypes.TeamVals.LOWER, 6, 0, 0, 0);
+        fightProperties.setSynergyUnitsPerFactions(PBTypes.TeamVals.LEFT, 6, 0, 0, 0);
         fightProperties.updateSynergyPerTeam(
-            PBTypes.TeamVals.LOWER,
+            PBTypes.TeamVals.LEFT,
             PBTypes.FactionVals.LIFE,
             LifeSynergy.PLUS_SUPPLY_PERCENTAGE,
             SynergyLevel.LEVEL_3,
         );
 
-        unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.LOWER);
+        unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.LEFT);
 
         expect(unit.getAmountAlive()).toBe(11);
 
         fightProperties.startFight();
-        unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.LOWER);
+        unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.LEFT);
 
         expect(unit.getAmountAlive()).toBe(11);
     });
@@ -264,28 +264,28 @@ describe("UnitsHolder", () => {
     it("applies configured augment buffs to placed units", () => {
         const { unitsHolder, grid } = createCombatTestContext();
         const ranged = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
         });
-        const melee = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const melee = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         placeUnit(grid, unitsHolder, ranged, { x: 2, y: 2 });
         placeUnit(grid, unitsHolder, melee, { x: 3, y: 2 });
-        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
             type: "Armor",
             value: ArmorAugment.LEVEL_1,
         });
-        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
             type: "Might",
             value: MightAugment.LEVEL_1,
         });
-        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
             type: "Sniper",
             value: SniperAugment.LEVEL_1,
         });
-        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
             type: "Movement",
             value: MovementAugment.LEVEL_1,
         });
@@ -305,12 +305,12 @@ describe("UnitsHolder", () => {
     it("does not let Tome amplify augments or tier-1 artifact stats", () => {
         const { unitsHolder, grid } = createCombatTestContext();
         const melee = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attack: 10,
             armor: 10,
         });
         const ranged = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             attack: 10,
             armor: 10,
@@ -321,25 +321,25 @@ describe("UnitsHolder", () => {
 
         placeUnit(grid, unitsHolder, melee, { x: 2, y: 2 });
         placeUnit(grid, unitsHolder, ranged, { x: 3, y: 2 });
-        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_1, Tier1Artifact.KEEN_BLADE);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, ArtifactTier.TIER_1, Tier1Artifact.KEEN_BLADE);
         fightProperties.setArtifactPerTeam(
-            PBTypes.TeamVals.LOWER,
+            PBTypes.TeamVals.LEFT,
             ArtifactTier.TIER_2,
             Tier2Artifact.TOME_OF_AMPLIFICATION,
         );
-        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
             type: "Armor",
             value: ArmorAugment.LEVEL_1,
         });
-        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
             type: "Might",
             value: MightAugment.LEVEL_1,
         });
-        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
             type: "Sniper",
             value: SniperAugment.LEVEL_1,
         });
-        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
             type: "Movement",
             value: MovementAugment.LEVEL_1,
         });
@@ -371,28 +371,24 @@ describe("UnitsHolder", () => {
     it("applies tier 1 & tier 2 artifact buffs to the right units", () => {
         const { unitsHolder, grid } = createCombatTestContext();
         const ranged = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
         });
-        const melee = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const melee = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         placeUnit(grid, unitsHolder, ranged, { x: 2, y: 2 });
         placeUnit(grid, unitsHolder, melee, { x: 3, y: 2 });
 
         expect(
-            fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_1, Tier1Artifact.VETERAN_HELM),
+            fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, ArtifactTier.TIER_1, Tier1Artifact.VETERAN_HELM),
         ).toBe(true);
         expect(
-            fightProperties.setArtifactPerTeam(
-                PBTypes.TeamVals.LOWER,
-                ArtifactTier.TIER_2,
-                Tier2Artifact.WARLORDS_EDGE,
-            ),
+            fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, ArtifactTier.TIER_2, Tier2Artifact.WARLORDS_EDGE),
         ).toBe(true);
-        expect(fightProperties.getArtifactTier1(PBTypes.TeamVals.LOWER)).toBe(Tier1Artifact.VETERAN_HELM);
-        expect(fightProperties.getArtifactTier2(PBTypes.TeamVals.LOWER)).toBe(Tier2Artifact.WARLORDS_EDGE);
+        expect(fightProperties.getArtifactTier1(PBTypes.TeamVals.LEFT)).toBe(Tier1Artifact.VETERAN_HELM);
+        expect(fightProperties.getArtifactTier2(PBTypes.TeamVals.LEFT)).toBe(Tier2Artifact.WARLORDS_EDGE);
 
         melee.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
         const baseAttackBefore = melee.getUnitProperties().base_attack;
@@ -418,18 +414,18 @@ describe("UnitsHolder", () => {
     it("applies movement artifacts only to eligible units", () => {
         const { unitsHolder, grid } = createCombatTestContext();
         const ranged = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
         });
-        const melee = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const melee = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         placeUnit(grid, unitsHolder, ranged, { x: 2, y: 2 });
         placeUnit(grid, unitsHolder, melee, { x: 3, y: 2 });
 
-        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_1, Tier1Artifact.SWIFT_BOOTS);
-        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_2, Tier2Artifact.FARSIGHT_QUIVER);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, ArtifactTier.TIER_1, Tier1Artifact.SWIFT_BOOTS);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, ArtifactTier.TIER_2, Tier2Artifact.FARSIGHT_QUIVER);
         unitsHolder.applyArtifacts();
 
         // Swift Boots grants movement to melee units only.
@@ -441,61 +437,61 @@ describe("UnitsHolder", () => {
 
     it("clears artifact buffs when the selection is reset", () => {
         const { unitsHolder, grid } = createCombatTestContext();
-        const melee = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const melee = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         placeUnit(grid, unitsHolder, melee, { x: 3, y: 2 });
-        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_1, Tier1Artifact.VETERAN_HELM);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, ArtifactTier.TIER_1, Tier1Artifact.VETERAN_HELM);
         unitsHolder.applyArtifacts();
         expect(melee.hasBuffActive("Veteran Helm")).toBe(true);
 
-        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, ArtifactTier.TIER_1, Tier1Artifact.NO_ARTIFACT);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, ArtifactTier.TIER_1, Tier1Artifact.NO_ARTIFACT);
         unitsHolder.applyArtifacts();
         expect(melee.hasBuffActive("Veteran Helm")).toBe(false);
     });
 
     it("refreshes stack power for all placed units", () => {
         const { unitsHolder, grid } = createCombatTestContext();
-        const lower = createTestUnit({ team: PBTypes.TeamVals.LOWER, amountAlive: 1, exp: 1 });
-        const upper = createTestUnit({ team: PBTypes.TeamVals.UPPER, amountAlive: 5, exp: 1 });
+        const left = createTestUnit({ team: PBTypes.TeamVals.LEFT, amountAlive: 1, exp: 1 });
+        const right = createTestUnit({ team: PBTypes.TeamVals.RIGHT, amountAlive: 5, exp: 1 });
 
-        placeUnit(grid, unitsHolder, lower, { x: 2, y: 2 });
-        placeUnit(grid, unitsHolder, upper, { x: 12, y: 12 });
+        placeUnit(grid, unitsHolder, left, { x: 2, y: 2 });
+        placeUnit(grid, unitsHolder, right, { x: 12, y: 12 });
 
         unitsHolder.refreshStackPowerForAllUnits();
 
-        expect(lower.getStackPower()).toBe(1);
-        expect(upper.getStackPower()).toBe(5);
+        expect(left.getStackPower()).toBe(1);
+        expect(right.getStackPower()).toBe(5);
     });
 
     it("refreshes aura effects for allies and enemies while keeping the strongest duplicate aura", () => {
         const { unitsHolder, grid } = createCombatTestContext();
         const weakAuraSource = createTestUnit({
             name: "Weak Aura",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             auraEffects: ["Sharpened Weapons"],
             stackPower: 1,
         });
         const strongAuraSource = createTestUnit({
             name: "Strong Aura",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             auraEffects: ["Sharpened Weapons", "Range Null Field"],
             stackPower: 10,
         });
         const meleeAlly = createTestUnit({
             name: "Melee Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE,
         });
         const rangedEnemy = createTestUnit({
             name: "Ranged Enemy",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 2,
         });
         const meleeEnemy = createTestUnit({
             name: "Melee Enemy",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
         });
 
@@ -517,34 +513,34 @@ describe("UnitsHolder", () => {
 describe("UnitsHolder.getDistanceToEnemyCentroid", () => {
     it("returns MAX_SAFE_INTEGER when there are no enemies", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const ally = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const ally = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, ally, { x: 3, y: 3 });
 
         // No UPPER units exist, so there is no enemy centroid.
-        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.UPPER, positionForCell({ x: 3, y: 3 }))).toBe(
+        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.RIGHT, positionForCell({ x: 3, y: 3 }))).toBe(
             Number.MAX_SAFE_INTEGER,
         );
     });
 
     it("equals the distance to the only enemy when there is exactly one", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
 
         const from = positionForCell({ x: 2, y: 2 });
         // With a single enemy the centroid coincides with the closest-enemy metric.
-        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.UPPER, from)).toBeCloseTo(
+        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.RIGHT, from)).toBeCloseTo(
             getDistance(from, enemy.getPosition()),
         );
-        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.UPPER, from)).toBeCloseTo(
-            unitsHolder.getDistanceToClosestEnemy(PBTypes.TeamVals.UPPER, from),
+        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.RIGHT, from)).toBeCloseTo(
+            unitsHolder.getDistanceToClosestEnemy(PBTypes.TeamVals.RIGHT, from),
         );
     });
 
     it("measures distance to the average position of all enemies", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const e1 = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "E1" });
-        const e2 = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "E2" });
+        const e1 = createTestUnit({ team: PBTypes.TeamVals.RIGHT, name: "E1" });
+        const e2 = createTestUnit({ team: PBTypes.TeamVals.RIGHT, name: "E2" });
         placeUnit(grid, unitsHolder, e1, { x: 2, y: 8 });
         placeUnit(grid, unitsHolder, e2, { x: 8, y: 8 });
 
@@ -553,21 +549,21 @@ describe("UnitsHolder.getDistanceToEnemyCentroid", () => {
             x: (e1.getPosition().x + e2.getPosition().x) / 2,
             y: (e1.getPosition().y + e2.getPosition().y) / 2,
         };
-        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.UPPER, from)).toBeCloseTo(
+        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.RIGHT, from)).toBeCloseTo(
             getDistance(from, centroid),
         );
     });
 
     it("ignores friendly units", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
-        const ally = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
+        const ally = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
         placeUnit(grid, unitsHolder, ally, { x: 1, y: 1 });
 
         const from = positionForCell({ x: 4, y: 4 });
         // Only the UPPER enemy counts; the LOWER ally must not move the centroid.
-        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.UPPER, from)).toBeCloseTo(
+        expect(unitsHolder.getDistanceToEnemyCentroid(PBTypes.TeamVals.RIGHT, from)).toBeCloseTo(
             getDistance(from, enemy.getPosition()),
         );
     });
@@ -581,17 +577,17 @@ describe("UnitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam", () => {
 
     it("drops morale only for living same-type allies of the fallen stack", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const knightA = createTestUnit({ team: PBTypes.TeamVals.LOWER, name: "Knight", morale: 10 });
-        const knightB = createTestUnit({ team: PBTypes.TeamVals.LOWER, name: "Knight", morale: 10 });
-        const archer = createTestUnit({ team: PBTypes.TeamVals.LOWER, name: "Archer", morale: 10 });
-        const enemyKnight = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "Knight", morale: 10 });
+        const knightA = createTestUnit({ team: PBTypes.TeamVals.LEFT, name: "Knight", morale: 10 });
+        const knightB = createTestUnit({ team: PBTypes.TeamVals.LEFT, name: "Knight", morale: 10 });
+        const archer = createTestUnit({ team: PBTypes.TeamVals.LEFT, name: "Archer", morale: 10 });
+        const enemyKnight = createTestUnit({ team: PBTypes.TeamVals.RIGHT, name: "Knight", morale: 10 });
         placeUnit(grid, unitsHolder, knightA, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, knightB, { x: 2, y: 2 });
         placeUnit(grid, unitsHolder, archer, { x: 3, y: 3 });
         placeUnit(grid, unitsHolder, enemyKnight, { x: 8, y: 8 });
 
         // A LOWER Knight fell: same-name + same-team allies lose MORALE_CHANGE_FOR_KILL (4) each.
-        unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam({ [`Knight:${PBTypes.TeamVals.LOWER}`]: 4 });
+        unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam({ [`Knight:${PBTypes.TeamVals.LEFT}`]: 4 });
 
         expect(sync(knightA)).toBe(6);
         expect(sync(knightB)).toBe(6);
@@ -601,11 +597,11 @@ describe("UnitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam", () => {
 
     it("accumulates the penalty when multiple same-type stacks die at once", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const knight = createTestUnit({ team: PBTypes.TeamVals.LOWER, name: "Knight", morale: 10 });
+        const knight = createTestUnit({ team: PBTypes.TeamVals.LEFT, name: "Knight", morale: 10 });
         placeUnit(grid, unitsHolder, knight, { x: 1, y: 1 });
 
         // Two Knights died in the same attack -> 2 * 4 = 8.
-        unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam({ [`Knight:${PBTypes.TeamVals.LOWER}`]: 8 });
+        unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam({ [`Knight:${PBTypes.TeamVals.LEFT}`]: 8 });
 
         expect(sync(knight)).toBe(2);
     });

@@ -234,7 +234,7 @@ describe("v0.8 aligned execution and map integrity", () => {
             attackFrom: { x: 1, y: 1 },
         };
         const defend: GameAction = { type: "defend_turn", unitId };
-        const fakeUnit = { getId: () => unitId, getTeam: () => PBTypes.TeamVals.LOWER } as Unit;
+        const fakeUnit = { getId: () => unitId, getTeam: () => PBTypes.TeamVals.LEFT } as Unit;
         const dependencies: IV08AlignedV1GameDependencies = {
             candidateEnumerator: (() => ({
                 candidates: [
@@ -269,7 +269,7 @@ describe("v0.8 aligned execution and map integrity", () => {
             "did not invoke the required turn execution observers",
         );
 
-        const opponent = { getId: () => "opponent", getTeam: () => PBTypes.TeamVals.UPPER } as Unit;
+        const opponent = { getId: () => "opponent", getTeam: () => PBTypes.TeamVals.RIGHT } as Unit;
         expect(() =>
             playV08AlignedV1Task(fixedTask(), searchOffBinding(), {
                 matchRunner: (config) => {

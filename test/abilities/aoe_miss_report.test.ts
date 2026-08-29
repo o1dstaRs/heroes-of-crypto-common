@@ -24,7 +24,7 @@ const runVolley = (missEverything: boolean) => {
     const { grid, unitsHolder } = createCombatTestContext();
     const attacker = createTestUnit({
         name: "Gargantuan",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         abilities: ["Area Throw"],
         attack: 40,
         damageMin: 100,
@@ -34,14 +34,14 @@ const runVolley = (missEverything: boolean) => {
     });
     const scavenger = createTestUnit({
         name: "Scavenger",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         maxHp: 10_000,
         abilities: ["Dodge"],
         stackPower: 5,
     });
     const bystander = createTestUnit({
         name: "Bystander",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         maxHp: 10_000,
         abilities: ["Dodge"],
         stackPower: 5,

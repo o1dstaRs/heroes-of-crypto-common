@@ -21,8 +21,8 @@ enum FactionVals {
 
 enum TeamVals {
   NO_TEAM = 0;
-  UPPER = 1;
-  LOWER = 2;
+  RIGHT = 1;
+  LEFT = 2;
 }
 
 enum AttackVals {

@@ -32,7 +32,7 @@ describe("Magic Mirror returns all direct magical ability damage", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Storm Caster",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Chain Lightning"],
             amountAlive: 1,
             maxHp: 100,
@@ -41,7 +41,7 @@ describe("Magic Mirror returns all direct magical ability damage", () => {
         });
         const target = createTestUnit({
             name: "Mirrored Target",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             amountAlive: 1,
             maxHp: 100,
         });
@@ -74,7 +74,7 @@ describe("Magic Mirror returns all direct magical ability damage", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Breath Thief",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Fire Breath"],
             amountAlive: 1,
             maxHp: 200,
@@ -83,8 +83,8 @@ describe("Magic Mirror returns all direct magical ability damage", () => {
             damageMax: 20,
             stackPower: 5,
         });
-        const primary = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.UPPER, maxHp: 200 });
-        const mirrored = createTestUnit({ name: "Behind", team: PBTypes.TeamVals.UPPER, maxHp: 200 });
+        const primary = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.RIGHT, maxHp: 200 });
+        const mirrored = createTestUnit({ name: "Behind", team: PBTypes.TeamVals.RIGHT, maxHp: 200 });
         applyMirror(mirrored);
         placeUnit(grid, unitsHolder, attacker, { x: 5, y: 7 });
         placeUnit(grid, unitsHolder, primary, { x: 5, y: 5 });
@@ -117,7 +117,7 @@ describe("Magic Mirror returns all direct magical ability damage", () => {
         const { unitsHolder } = createCombatTestContext();
         const shieldOwner = createTestUnit({
             name: "Shield Owner",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Fire Shield"],
             amountAlive: 1,
             maxHp: 200,
@@ -125,7 +125,7 @@ describe("Magic Mirror returns all direct magical ability damage", () => {
         });
         const mirroredAttacker = createTestUnit({
             name: "Mirrored Attacker",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 1,
             maxHp: 200,
         });
@@ -155,13 +155,13 @@ describe("Magic Mirror returns all direct magical ability damage", () => {
     it("returns the Fireforged Sword's magical rider without reflecting the physical swing", () => {
         const attacker = createTestUnit({
             name: "Swordsman",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 1,
             maxHp: 200,
         });
         const target = createTestUnit({
             name: "Mirrored Target",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             amountAlive: 1,
             maxHp: 200,
         });

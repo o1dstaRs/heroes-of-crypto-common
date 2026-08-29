@@ -70,18 +70,18 @@ const activatedActionEngine = (
     fightProperties.setGridType(combat.grid.getGridType());
     fightProperties.startFight();
     fightProperties.setTeamUnitsAlive(
-        PBTypes.TeamVals.LOWER,
+        PBTypes.TeamVals.LEFT,
         combat.unitsHolder
             .getAllUnits()
             .values()
-            .filter((unit) => unit.getTeam() === PBTypes.TeamVals.LOWER).length,
+            .filter((unit) => unit.getTeam() === PBTypes.TeamVals.LEFT).length,
     );
     fightProperties.setTeamUnitsAlive(
-        PBTypes.TeamVals.UPPER,
+        PBTypes.TeamVals.RIGHT,
         combat.unitsHolder
             .getAllUnits()
             .values()
-            .filter((unit) => unit.getTeam() === PBTypes.TeamVals.UPPER && !unit.isDead()).length,
+            .filter((unit) => unit.getTeam() === PBTypes.TeamVals.RIGHT && !unit.isDead()).length,
     );
     fightProperties.startTurn(actor.getTeam(), 1_000);
     const context: IDecisionContext = {
@@ -251,13 +251,13 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         const fightProperties = FightStateManager.getInstance().getFightProperties();
         fightProperties.setGridType(PBTypes.GridVals.BLOCK_CENTER);
         const actor = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE,
             damageMax: 5,
             name: "Knight",
         });
         const target = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             name: "Orc",
         });
@@ -294,13 +294,13 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
     test("uses target-team ability power when Dodge and Small Specie make a physical hit impossible", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
         const actor = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Large attacker",
             attackType: PBTypes.AttackVals.MELEE,
             size: PBTypes.UnitSizeVals.LARGE,
         });
         const target = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Synergy dodger",
             abilities: ["Dodge", "Small Specie"],
             stackPower: 5,
@@ -319,7 +319,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         // Small Specie to 100%, so the authoritative attack path cannot deal damage. Production obtains this
         // value from the selected Might stack-ability-power synergy through the same FightProperties method.
         const abilityPower = spyOn(context.fightProperties!, "getAdditionalAbilityPowerPerTeam").mockImplementation(
-            (team) => (team === PBTypes.TeamVals.UPPER ? 50 : 0),
+            (team) => (team === PBTypes.TeamVals.RIGHT ? 50 : 0),
         );
         try {
             expect(actor.calculateMissChance(target, 50)).toBe(100);
@@ -333,7 +333,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         const setup = (abilities: string[] = []) => {
             const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
             const shooter = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 name: abilities.length ? "Handyman shooter" : "Spent shooter",
                 attackType: PBTypes.AttackVals.RANGE,
                 attack: 1,
@@ -344,7 +344,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
                 abilities,
             });
             const target = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 name: "Armored neighbour",
                 attackType: PBTypes.AttackVals.MELEE,
                 armor: 100,
@@ -420,14 +420,14 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
     test("releases a dead forced target and emits an attack accepted by the authoritative engine", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
         const actor = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Released attacker",
             amountAlive: 5,
             damageMin: 5,
             damageMax: 5,
         });
-        const deadForced = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "Dead forced target" });
-        const liveTarget = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "Live target" });
+        const deadForced = createTestUnit({ team: PBTypes.TeamVals.RIGHT, name: "Dead forced target" });
+        const liveTarget = createTestUnit({ team: PBTypes.TeamVals.RIGHT, name: "Live target" });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 4, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, deadForced, { x: 13, y: 13 });
         placeUnit(combat.grid, combat.unitsHolder, liveTarget, { x: 4, y: 8 });
@@ -444,7 +444,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
     test("rejects a move-melee suffix when Fire Wall leaves Cowardice below the target's HP", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
         const actor = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Cowardly mover",
             initiative: 1,
             amountAlive: 10,
@@ -453,17 +453,17 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             damageMax: 5,
         });
         const target = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Stronger after burn",
             amountAlive: 6,
             maxHp: 10,
         });
-        const upperBlocker = createTestUnit({ team: PBTypes.TeamVals.LOWER, name: "Upper route blocker" });
-        const lowerBlocker = createTestUnit({ team: PBTypes.TeamVals.LOWER, name: "Lower route blocker" });
+        const rightBlocker = createTestUnit({ team: PBTypes.TeamVals.LEFT, name: "Upper route blocker" });
+        const leftBlocker = createTestUnit({ team: PBTypes.TeamVals.LEFT, name: "Lower route blocker" });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 5, y: 3 });
-        placeUnit(combat.grid, combat.unitsHolder, upperBlocker, { x: 4, y: 2 });
-        placeUnit(combat.grid, combat.unitsHolder, lowerBlocker, { x: 4, y: 4 });
+        placeUnit(combat.grid, combat.unitsHolder, rightBlocker, { x: 4, y: 2 });
+        placeUnit(combat.grid, combat.unitsHolder, leftBlocker, { x: 4, y: 4 });
         actor.applyDebuff(new Spell({ spellProperties: getSpellConfig("Order", "Cowardice"), amount: 1 }));
         const { context, engine } = activatedActionEngine(combat, actor);
         context.fightProperties!.getFireWalls().add({ x: 4, y: 3 }, 3, 60);
@@ -498,7 +498,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
     test("rejects an Area Throw whose authoritative primary is barred by Terrifying Gaze", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
         const actor = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Gaze-barred thrower",
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 5,
@@ -506,7 +506,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             abilities: ["Area Throw"],
         });
         const target = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Forbidden primary",
             amountAlive: 5,
             maxHp: 10,
@@ -530,7 +530,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
     test("does not advertise an Area Throw when allied splash outweighs its enemy damage", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
         const actor = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Harmful area thrower",
             attackType: PBTypes.AttackVals.RANGE,
             attack: 10,
@@ -542,13 +542,13 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             abilities: ["Area Throw"],
         });
         const tinyEnemy = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Tiny splash enemy",
             amountAlive: 1,
             maxHp: 1,
         });
         const largeAlly = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Large splash ally",
             amountAlive: 100,
             maxHp: 1_000,
@@ -588,7 +588,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
     test("does not advertise a Ring of Fire whose allied damage exceeds its enemy damage", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
         const caster = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Careful fire caster",
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
             amountAlive: 1,
@@ -597,20 +597,20 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             spells: ["Nature:Ring of Fire"],
         });
         const aimTarget = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Ring aim",
             amountAlive: 100,
             maxHp: 100,
         });
         const tinyEnemy = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Tiny ring enemy",
             amountAlive: 1,
             maxHp: 1,
         });
         tinyEnemy.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Hidden"), amount: 1 }));
         const largeAlly = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Large ring ally",
             amountAlive: 100,
             maxHp: 1_000,
@@ -643,7 +643,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
     test("treats display-only Rangebane as a hard ranged-action gate", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
         const actor = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Display-rangebaned shooter",
             attackType: PBTypes.AttackVals.RANGE,
             damageMin: 10,
@@ -653,7 +653,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             shotDistance: 30,
         });
         const target = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Range target",
             amountAlive: 100,
             maxHp: 100,
@@ -676,7 +676,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         const plan = planV08BlockCenterActionGame(OPTIONS, 0);
         const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
         const caster = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Smoke caster",
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
             stackPower: 4,
@@ -684,12 +684,12 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
             spells: ["Chaos:Smoke"],
         });
         const ally = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Smoke ally",
             amountAlive: 10,
         });
         const enemyRanger = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Enemy ranger",
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 5,
@@ -835,14 +835,14 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         const auditPinnedMindlessUnit = (creatureName: "Berserker" | "Frenzied Boar") => {
             const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
             const actor = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 name: creatureName,
                 attackType: PBTypes.AttackVals.MELEE,
                 damageMin: 5,
                 damageMax: 5,
             });
             const target = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 name: "Adjacent target",
             });
             placeUnit(combat.grid, combat.unitsHolder, actor, { x: 4, y: 7 });
@@ -941,13 +941,13 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         const plan = planV08BlockCenterActionGame(OPTIONS, 0);
         const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
         const actor = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Blocked Walker",
             attackType: PBTypes.AttackVals.MELEE,
             initiative: 1,
         });
         const target = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Distant target",
         });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 4, y: 7 });
@@ -1021,13 +1021,13 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         const plan = planV08BlockCenterActionGame(OPTIONS, 0);
         const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
         const actor = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             name: "Oscillating walker",
             attackType: PBTypes.AttackVals.MELEE,
             initiative: 1,
         });
         const target = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Distant target",
         });
         const a = { x: 1, y: 7 };
@@ -1192,7 +1192,7 @@ describe("v0.8 BLOCK_CENTER action oracle panel", () => {
         combat.grid.cleanupAll(target.getId(), target.getAttackRange(), target.isSmallSize());
         combat.unitsHolder.deleteUnitById(target.getId());
         const replacement = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             name: "Replacement target",
         });
         placeUnit(combat.grid, combat.unitsHolder, replacement, { x: 1, y: 5 });

@@ -50,9 +50,9 @@ function fixtureRecord(
     target: Exclude<PublicRosterPlacementTarget, "natural">,
 ): IPublicRosterPlacementRecord {
     const draft = publicRosterPlacementDraftEvidence(board);
-    const pickedLower = game < 2;
-    const seat = pickedLower ? draft.lower : draft.upper;
-    const opponent = pickedLower ? draft.upper : draft.lower;
+    const pickedLeft = game < 2;
+    const seat = pickedLeft ? draft.left : draft.right;
+    const opponent = pickedLeft ? draft.right : draft.left;
     const selected = seat.targets.includes(target);
     const secondMirror = game % 2 === 1;
     const treated = arm === CANDIDATE_ARM && seat.cohort !== "melee-other";
@@ -73,7 +73,7 @@ function fixtureRecord(
         pickSeed: board.pickSeed,
         battleSeed: board.battleSeed,
         gridType: board.gridType,
-        pickSeat: pickedLower ? "candidate-lower" : "candidate-upper",
+        pickSeat: pickedLeft ? "candidate-lower" : "candidate-upper",
         battleMirror: (game % 2) as 0 | 1,
         candidateSide: game === 0 || game === 3 ? "green" : "red",
         candidateResult,
@@ -164,8 +164,8 @@ describe("public-roster target evidence summarizer", () => {
         expect(target.sourceBoards).toBe(1);
         expect(target.selectedBoards).toBe(1);
         expect(target.selectedGames).toBe(2);
-        expect(target.selectedCandidateLowerGames + target.selectedCandidateUpperGames).toBe(2);
-        expect([target.selectedCandidateLowerGames, target.selectedCandidateUpperGames].sort()).toEqual([0, 2]);
+        expect(target.selectedCandidateLeftGames + target.selectedCandidateRightGames).toBe(2);
+        expect([target.selectedCandidateLeftGames, target.selectedCandidateRightGames].sort()).toEqual([0, 2]);
         expect(target.matchedControlDelta).toMatchObject({
             boards: 1,
             games: 2,

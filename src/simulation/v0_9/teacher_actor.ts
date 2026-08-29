@@ -355,7 +355,7 @@ function trajectoryStrategies(
             greenVersion: "v0.8+a13",
             redVersion: "v0.8+a13",
             overrides: {},
-            v08A13TrajectoryTeams: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+            v08A13TrajectoryTeams: [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT],
             studentTeams: [],
         };
     }
@@ -368,8 +368,8 @@ function trajectoryStrategies(
                 greenVersion: version,
                 redVersion: "v0.8+a13",
                 overrides: { greenStrategyOverride: student.strategy },
-                v08A13TrajectoryTeams: [PBTypes.TeamVals.UPPER],
-                studentTeams: [PBTypes.TeamVals.LOWER],
+                v08A13TrajectoryTeams: [PBTypes.TeamVals.RIGHT],
+                studentTeams: [PBTypes.TeamVals.LEFT],
             };
         case "student-red":
             return {
@@ -377,8 +377,8 @@ function trajectoryStrategies(
                 greenVersion: "v0.8+a13",
                 redVersion: version,
                 overrides: { redStrategyOverride: student.strategy },
-                v08A13TrajectoryTeams: [PBTypes.TeamVals.LOWER],
-                studentTeams: [PBTypes.TeamVals.UPPER],
+                v08A13TrajectoryTeams: [PBTypes.TeamVals.LEFT],
+                studentTeams: [PBTypes.TeamVals.RIGHT],
             };
         case "student-self-a":
             return {
@@ -387,7 +387,7 @@ function trajectoryStrategies(
                 redVersion: version,
                 overrides: { greenStrategyOverride: student.strategy, redStrategyOverride: student.strategy },
                 v08A13TrajectoryTeams: [],
-                studentTeams: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+                studentTeams: [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT],
             };
         case "student-self-b":
             return {
@@ -396,7 +396,7 @@ function trajectoryStrategies(
                 redVersion: version,
                 overrides: { greenStrategyOverride: student.strategy, redStrategyOverride: student.strategy },
                 v08A13TrajectoryTeams: [],
-                studentTeams: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+                studentTeams: [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT],
             };
     }
 }

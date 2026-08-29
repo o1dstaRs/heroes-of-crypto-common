@@ -143,7 +143,7 @@ export class PathHelper {
         }
 
         if (
-            targetUnitTeam === PBTypes.TeamVals.UPPER ||
+            targetUnitTeam === PBTypes.TeamVals.RIGHT ||
             (targetUnitTeam === PBTypes.TeamVals.NO_TEAM &&
                 (unitCell.x <= this.gridSettings.getGridSize() / 2 ||
                     unitCell.y <= this.gridSettings.getGridSize() / 2))
@@ -155,7 +155,7 @@ export class PathHelper {
             if (availableAttackCellHashes.has((newUnitCellX << 4) | unitCell.y)) {
                 return { x: newUnitCellX, y: unitCell.y };
             }
-        } else if (targetUnitTeam === PBTypes.TeamVals.LOWER || targetUnitTeam === PBTypes.TeamVals.NO_TEAM) {
+        } else if (targetUnitTeam === PBTypes.TeamVals.LEFT || targetUnitTeam === PBTypes.TeamVals.NO_TEAM) {
             if (availableAttackCellHashes.has((newUnitCellX << 4) | unitCell.y)) {
                 return { x: newUnitCellX, y: unitCell.y };
             }
@@ -179,7 +179,7 @@ export class PathHelper {
         }
 
         if (
-            targetUnitTeam === PBTypes.TeamVals.UPPER ||
+            targetUnitTeam === PBTypes.TeamVals.RIGHT ||
             (targetUnitTeam === PBTypes.TeamVals.NO_TEAM &&
                 (unitCell.x > this.gridSettings.getGridSize() / 2 || unitCell.y > this.gridSettings.getGridSize() / 2))
         ) {
@@ -190,7 +190,7 @@ export class PathHelper {
             if (availableAttackCellHashes.has((unitCell.x << 4) | newUnitCellY)) {
                 return { x: unitCell.x, y: newUnitCellY };
             }
-        } else if (targetUnitTeam === PBTypes.TeamVals.LOWER || targetUnitTeam === PBTypes.TeamVals.NO_TEAM) {
+        } else if (targetUnitTeam === PBTypes.TeamVals.LEFT || targetUnitTeam === PBTypes.TeamVals.NO_TEAM) {
             if (availableAttackCellHashes.has((unitCell.x << 4) | newUnitCellY)) {
                 return { x: unitCell.x, y: newUnitCellY };
             }
@@ -209,7 +209,7 @@ export class PathHelper {
         targetUnitTeam: TeamType,
     ): XY | undefined {
         if (
-            targetUnitTeam === PBTypes.TeamVals.UPPER ||
+            targetUnitTeam === PBTypes.TeamVals.RIGHT ||
             (targetUnitTeam === PBTypes.TeamVals.NO_TEAM &&
                 (unitCell.x > this.gridSettings.getGridSize() / 2 || unitCell.y <= this.gridSettings.getGridSize() / 2))
         ) {
@@ -225,7 +225,7 @@ export class PathHelper {
             ) {
                 return { x: newUnitCellX, y: secondUnitCellY };
             }
-        } else if (targetUnitTeam === PBTypes.TeamVals.LOWER || targetUnitTeam === PBTypes.TeamVals.NO_TEAM) {
+        } else if (targetUnitTeam === PBTypes.TeamVals.LEFT || targetUnitTeam === PBTypes.TeamVals.NO_TEAM) {
             const firstUnitCellY = unitCell.y + 1;
             if (
                 firstUnitCellY < this.gridSettings.getGridSize() &&
@@ -249,7 +249,7 @@ export class PathHelper {
         targetUnitTeam: TeamType,
     ): XY | undefined {
         if (
-            targetUnitTeam === PBTypes.TeamVals.UPPER ||
+            targetUnitTeam === PBTypes.TeamVals.RIGHT ||
             (targetUnitTeam === PBTypes.TeamVals.NO_TEAM &&
                 (unitCell.x <= this.gridSettings.getGridSize() / 2 || unitCell.y > this.gridSettings.getGridSize() / 2))
         ) {
@@ -265,7 +265,7 @@ export class PathHelper {
             ) {
                 return { x: secondUnitCellX, y: newUnitCellY };
             }
-        } else if (targetUnitTeam === PBTypes.TeamVals.LOWER) {
+        } else if (targetUnitTeam === PBTypes.TeamVals.LEFT) {
             const firstUnitCellX = unitCell.x + 1;
             if (
                 firstUnitCellX < this.gridSettings.getGridSize() &&
@@ -1158,12 +1158,12 @@ export class PathHelper {
         unit: Unit,
         cells: XY[],
         unitsHolder: UnitsHolder,
-        lowerLeftPlacement?: IPlacement,
-        upperRightPlacement?: IPlacement,
-        lowerRightPlacement?: IPlacement,
-        upperLeftPlacement?: IPlacement,
+        leftBottomPlacement?: IPlacement,
+        rightTopPlacement?: IPlacement,
+        leftTopPlacement?: IPlacement,
+        rightBottomPlacement?: IPlacement,
     ): boolean {
-        if (!lowerLeftPlacement || !upperRightPlacement) {
+        if (!leftBottomPlacement || !rightTopPlacement) {
             return false;
         }
 
@@ -1171,31 +1171,31 @@ export class PathHelper {
 
         // --- core placement rule: team must be in its placement rectangles
         const isInTeamPlacement =
-            ((unit.getTeam() === TeamVals.LOWER || unit.getTeam() === TeamVals.NO_TEAM) &&
-                ((lowerLeftPlacement.isAllowed(position) ?? false) ||
-                    (lowerRightPlacement?.isAllowed(position) ?? false))) ||
-            ((unit.getTeam() === TeamVals.UPPER || unit.getTeam() === TeamVals.NO_TEAM) &&
-                ((upperRightPlacement.isAllowed(position) ?? false) ||
-                    (upperLeftPlacement?.isAllowed(position) ?? false)));
+            ((unit.getTeam() === TeamVals.LEFT || unit.getTeam() === TeamVals.NO_TEAM) &&
+                ((leftBottomPlacement.isAllowed(position) ?? false) ||
+                    (leftTopPlacement?.isAllowed(position) ?? false))) ||
+            ((unit.getTeam() === TeamVals.RIGHT || unit.getTeam() === TeamVals.NO_TEAM) &&
+                ((rightTopPlacement.isAllowed(position) ?? false) ||
+                    (rightBottomPlacement?.isAllowed(position) ?? false)));
 
         // Determine which team the mouse is targeting (proposed team)
         let proposedTeam: TeamType = TeamVals.NO_TEAM;
-        if ((lowerLeftPlacement.isAllowed(position) ?? false) || (lowerRightPlacement?.isAllowed(position) ?? false)) {
-            proposedTeam = TeamVals.LOWER;
+        if ((leftBottomPlacement.isAllowed(position) ?? false) || (leftTopPlacement?.isAllowed(position) ?? false)) {
+            proposedTeam = TeamVals.LEFT;
         } else if (
-            (upperRightPlacement.isAllowed(position) ?? false) ||
-            (upperLeftPlacement?.isAllowed(position) ?? false)
+            (rightTopPlacement.isAllowed(position) ?? false) ||
+            (rightBottomPlacement?.isAllowed(position) ?? false)
         ) {
-            proposedTeam = TeamVals.UPPER;
+            proposedTeam = TeamVals.RIGHT;
         }
 
         // how many allies of this team are already placed on the field
         const alliesPlacedCount = unitsHolder.getAllAlliesPlaced(
             proposedTeam,
-            lowerLeftPlacement,
-            upperRightPlacement,
-            lowerRightPlacement,
-            upperLeftPlacement,
+            leftBottomPlacement,
+            rightTopPlacement,
+            leftTopPlacement,
+            rightBottomPlacement,
         ).length;
 
         const maxUnitsForTeam = FightStateManager.getInstance()

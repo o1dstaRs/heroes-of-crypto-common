@@ -36,8 +36,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const MAGIC = PBTypes.AttackVals.MAGIC;
@@ -66,8 +66,8 @@ function applyCowardice(unit: Unit): void {
 
 function setTeamCensus(combat: CombatTestContext): void {
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.setTeamUnitsAlive(LEFT, combat.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, combat.unitsHolder.getAllAllies(RIGHT).length);
 }
 
 class ExposedStrategyV0_1 extends StrategyV0_1 {
@@ -139,7 +139,7 @@ function boxedMindlessBerserker(): { combat: CombatTestContext; attacker: Unit; 
     const combat = createCombatTestContext();
     const attacker = createTestUnit({
         name: "Berserker",
-        team: LOWER,
+        team: LEFT,
         attackType: MELEE,
         abilities: ["AI Driven"],
     });
@@ -154,10 +154,10 @@ function boxedMindlessBerserker(): { combat: CombatTestContext; attacker: Unit; 
         { x: 5, y: 6 },
         { x: 6, y: 6 },
     ].entries()) {
-        const ally = createTestUnit({ name: `Ally ${index}`, team: LOWER, attackType: MELEE });
+        const ally = createTestUnit({ name: `Ally ${index}`, team: LEFT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, ally, cell);
     }
-    const enemy = createTestUnit({ name: "Distant Enemy", team: UPPER, attackType: MELEE });
+    const enemy = createTestUnit({ name: "Distant Enemy", team: RIGHT, attackType: MELEE });
     placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 12, y: 12 });
     setTeamCensus(combat);
     return { combat, attacker, context: contextFor(combat) };
@@ -176,7 +176,7 @@ describe("v0.1 melee robustness", () => {
         const combat = createCombatTestContext();
         const boar = createTestUnit({
             name: "Frenzied Boar",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             size: PBTypes.UnitSizeVals.LARGE,
             initiative: 7,
@@ -189,12 +189,12 @@ describe("v0.1 melee robustness", () => {
             { x: 7, y: 14 },
             { x: 6, y: 11 },
         ].entries()) {
-            const ally = createTestUnit({ name: `Blocker ${index}`, team: LOWER, attackType: MELEE });
+            const ally = createTestUnit({ name: `Blocker ${index}`, team: LEFT, attackType: MELEE });
             placeUnit(combat.grid, combat.unitsHolder, ally, cell);
         }
         const enemy = createTestUnit({
             name: "Distant Large Enemy",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             size: PBTypes.UnitSizeVals.LARGE,
         });
@@ -226,9 +226,9 @@ describe("v0.1 melee robustness", () => {
 
     it("always prioritizes a live adjacent Aggr target over sticky target memory", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Berserker", team: LOWER, attackType: MELEE });
-        const remembered = createTestUnit({ name: "Remembered", team: UPPER, attackType: MELEE });
-        const forced = createTestUnit({ name: "Forced", team: UPPER, attackType: MELEE });
+        const attacker = createTestUnit({ name: "Berserker", team: LEFT, attackType: MELEE });
+        const remembered = createTestUnit({ name: "Remembered", team: RIGHT, attackType: MELEE });
+        const forced = createTestUnit({ name: "Forced", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, remembered, { x: 5, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, forced, { x: 6, y: 5 });
@@ -242,9 +242,9 @@ describe("v0.1 melee robustness", () => {
 
     it("moves toward a distant live Aggr target instead of attacking an adjacent decoy", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Berserker", team: LOWER, attackType: MELEE });
-        const decoy = createTestUnit({ name: "Decoy", team: UPPER, attackType: MELEE });
-        const forced = createTestUnit({ name: "Forced", team: UPPER, attackType: MELEE });
+        const attacker = createTestUnit({ name: "Berserker", team: LEFT, attackType: MELEE });
+        const decoy = createTestUnit({ name: "Decoy", team: RIGHT, attackType: MELEE });
+        const forced = createTestUnit({ name: "Forced", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 4, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, decoy, { x: 4, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, forced, { x: 11, y: 5 });
@@ -263,11 +263,11 @@ describe("v0.1 melee robustness", () => {
         const combat = createCombatTestContext();
         const scavenger = createTestUnit({
             name: "Scavenger",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             abilities: ["Backstab"],
         });
-        const prey = createTestUnit({ name: "Prey", team: UPPER, attackType: MELEE });
+        const prey = createTestUnit({ name: "Prey", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, scavenger, { x: 6, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, prey, { x: 5, y: 5 });
         scavenger.setWebMovementLocked(true);
@@ -290,9 +290,9 @@ describe("v0.1 melee robustness", () => {
 
     it("never emits a melee against a dead unit left in grid occupancy", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Berserker", team: LOWER, attackType: MELEE });
-        const stale = createTestUnit({ name: "Stale", team: UPPER, attackType: MELEE });
-        const living = createTestUnit({ name: "Living", team: UPPER, attackType: MELEE });
+        const attacker = createTestUnit({ name: "Berserker", team: LEFT, attackType: MELEE });
+        const stale = createTestUnit({ name: "Stale", team: RIGHT, attackType: MELEE });
+        const living = createTestUnit({ name: "Living", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, stale, { x: 5, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, living, { x: 11, y: 5 });
@@ -308,21 +308,21 @@ describe("v0.1 melee robustness", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Coward",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             amountAlive: 1,
             maxHp: 10,
         });
         const stronger = createTestUnit({
             name: "Stronger",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 3,
             maxHp: 10,
         });
         const weaker = createTestUnit({
             name: "Weaker",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 1,
             maxHp: 5,
@@ -339,9 +339,9 @@ describe("v0.1 melee robustness", () => {
 
     it("never attacks the one enemy forbidden by Terrifying Gaze", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Berserker", team: LOWER, attackType: MELEE });
-        const manticore = createTestUnit({ name: "Manticore", team: UPPER, attackType: MELEE });
-        const legal = createTestUnit({ name: "Legal Bystander", team: UPPER, attackType: MELEE });
+        const attacker = createTestUnit({ name: "Berserker", team: LEFT, attackType: MELEE });
+        const manticore = createTestUnit({ name: "Manticore", team: RIGHT, attackType: MELEE });
+        const legal = createTestUnit({ name: "Legal Bystander", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, manticore, { x: 5, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, legal, { x: 6, y: 5 });
@@ -354,8 +354,8 @@ describe("v0.1 melee robustness", () => {
 
     it("falls back instead of emitting a rejected melee when Terrifying Gaze forbids the only target", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Frenzied Boar", team: LOWER, attackType: MELEE });
-        const manticore = createTestUnit({ name: "Manticore", team: UPPER, attackType: MELEE });
+        const attacker = createTestUnit({ name: "Frenzied Boar", team: LEFT, attackType: MELEE });
+        const manticore = createTestUnit({ name: "Manticore", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, manticore, { x: 5, y: 6 });
         attacker.setForbiddenTarget(manticore.getId());
@@ -365,9 +365,9 @@ describe("v0.1 melee robustness", () => {
 
     it("keeps v0.8 late-finish overlays from resurrecting the forbidden Gaze target", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Wolf Rider", team: LOWER, attackType: MELEE });
-        const manticore = createTestUnit({ name: "Manticore", team: UPPER, attackType: MELEE });
-        const legal = createTestUnit({ name: "Legal Bystander", team: UPPER, attackType: MELEE });
+        const attacker = createTestUnit({ name: "Wolf Rider", team: LEFT, attackType: MELEE });
+        const manticore = createTestUnit({ name: "Manticore", team: RIGHT, attackType: MELEE });
+        const legal = createTestUnit({ name: "Legal Bystander", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 7, y: 10 });
         placeUnit(combat.grid, combat.unitsHolder, manticore, { x: 6, y: 10 });
         placeUnit(combat.grid, combat.unitsHolder, legal, { x: 7, y: 9 });
@@ -382,17 +382,17 @@ describe("v0.1 melee robustness", () => {
 
     it("prefers an already-responded target but never overrides a live Aggr target", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Berserker", team: LOWER, attackType: MELEE });
+        const attacker = createTestUnit({ name: "Berserker", team: LEFT, attackType: MELEE });
         const fresh = createTestUnit({
             name: "Fresh",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 5,
             damageMax: 4,
         });
         const responded = createTestUnit({
             name: "Responded",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 5,
             damageMax: 4,
@@ -417,20 +417,20 @@ describe("v0.1 melee robustness", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Berserker",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             abilities: ["AI Driven"],
         });
         const fresh = createTestUnit({
             name: "Fresh",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 5,
             damageMax: 4,
         });
         const responded = createTestUnit({
             name: "Responded in ranked snapshot",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 5,
             damageMax: 4,
@@ -450,9 +450,9 @@ describe("v0.1 melee robustness", () => {
 
     it("can retarget a move-and-strike without changing its validated route", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Berserker", team: LOWER, attackType: MELEE });
-        const fresh = createTestUnit({ name: "Fresh", team: UPPER, attackType: MELEE });
-        const responded = createTestUnit({ name: "Responded", team: UPPER, attackType: MELEE });
+        const attacker = createTestUnit({ name: "Berserker", team: LEFT, attackType: MELEE });
+        const fresh = createTestUnit({ name: "Fresh", team: RIGHT, attackType: MELEE });
+        const responded = createTestUnit({ name: "Responded", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 4, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, fresh, { x: 7, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, responded, { x: 7, y: 6 });
@@ -476,13 +476,13 @@ describe("v0.1 melee robustness", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Primary hazard runner",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             amountAlive: 4,
             maxHp: 100,
             initiative: 4,
         });
-        const target = createTestUnit({ name: "Primary target", team: UPPER, attackType: MELEE });
+        const target = createTestUnit({ name: "Primary target", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 5 });
         for (const [index, cell] of [
@@ -494,13 +494,13 @@ describe("v0.1 melee robustness", () => {
             { x: 7, y: 6 },
             { x: 6, y: 6 },
         ].entries()) {
-            const blocker = createTestUnit({ name: `Attack-cell blocker ${index}`, team: LOWER, attackType: MELEE });
+            const blocker = createTestUnit({ name: `Attack-cell blocker ${index}`, team: LEFT, attackType: MELEE });
             placeUnit(combat.grid, combat.unitsHolder, blocker, cell);
         }
         const context = contextFor(combat);
         const destination = { x: 6, y: 5 };
         context.fightProperties!.getFireWalls().add(destination);
-        context.fightProperties!.getVines().add(destination, 2, UPPER);
+        context.fightProperties!.getVines().add(destination, 2, RIGHT);
 
         const actions = getAIStrategy("v0.1").decideTurn(attacker, context);
         expect(actions.map((action) => action.type)).toEqual(["move_unit", "melee_attack"]);
@@ -525,7 +525,7 @@ describe("v0.1 melee robustness", () => {
             const combat = createCombatTestContext();
             const charger = createTestUnit({
                 name: "Wolf Rider",
-                team: LOWER,
+                team: LEFT,
                 attackType: MELEE,
                 amountAlive: 10,
                 damageMin: 1,
@@ -535,7 +535,7 @@ describe("v0.1 melee robustness", () => {
             });
             const target = createTestUnit({
                 name: "Charge target",
-                team: UPPER,
+                team: RIGHT,
                 attackType: MELEE,
                 amountAlive: 100,
                 maxHp: 10,
@@ -577,16 +577,16 @@ describe("v0.1 melee robustness", () => {
         const combat = createCombatTestContext();
         const trent = createTestUnit({
             name: "Trent",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             abilities: ["In Its Own World"],
         });
-        const target = createTestUnit({ name: "Vine-road target", team: UPPER, attackType: MELEE });
+        const target = createTestUnit({ name: "Vine-road target", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, trent, { x: 2, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 9, y: 5 });
         const context = contextFor(combat);
         for (let x = 3; x <= 8; x += 1) {
-            context.fightProperties!.getVines().add({ x, y: 5 }, 2, LOWER);
+            context.fightProperties!.getVines().add({ x, y: 5 }, 2, LEFT);
         }
 
         const actions = getAIStrategy("v0.1").decideTurn(trent, context);
@@ -615,7 +615,7 @@ describe("v0.1 melee robustness", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Hazard runner",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             amountAlive: 4,
             maxHp: 100,
@@ -623,7 +623,7 @@ describe("v0.1 melee robustness", () => {
         });
         const target = createTestUnit({
             name: "Adjacent after move",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 10,
@@ -634,7 +634,7 @@ describe("v0.1 melee robustness", () => {
         const destination = { x: 6, y: 5 };
         const route = routeTo(destination, [{ x: 4, y: 5 }, { x: 5, y: 5 }, destination]);
         context.fightProperties!.getFireWalls().add(destination);
-        context.fightProperties!.getVines().add(destination, 2, UPPER);
+        context.fightProperties!.getVines().add(destination, 2, RIGHT);
 
         const actions = new ExposedStrategyV0_1().completeValidatedMove(attacker, context, route);
         expect(actions.map((action) => action.type)).toEqual(["move_unit", "melee_attack"]);
@@ -662,7 +662,7 @@ describe("v0.1 melee robustness", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Projected coward",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             amountAlive: 2,
             maxHp: 100,
@@ -670,7 +670,7 @@ describe("v0.1 melee robustness", () => {
         });
         const target = createTestUnit({
             name: "Stronger after burn",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 15,
             maxHp: 10,
@@ -705,7 +705,7 @@ describe("v0.1 melee robustness", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
             name: "Cowardly archer",
-            team: LOWER,
+            team: LEFT,
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 30,
@@ -715,7 +715,7 @@ describe("v0.1 melee robustness", () => {
         });
         const stronger = createTestUnit({
             name: "Stronger distant target",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 10,
@@ -743,11 +743,11 @@ describe("v0.1 melee robustness", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Hybrid",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE_MAGIC,
             spells: ["System:Resurrection"],
         });
-        const target = createTestUnit({ name: "Target", team: UPPER, attackType: MELEE });
+        const target = createTestUnit({ name: "Target", team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 5, y: 6 });
         attacker.refreshPossibleAttackTypes(true);

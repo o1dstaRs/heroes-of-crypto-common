@@ -15,7 +15,7 @@ import { parentPort, threadId, workerData } from "node:worker_threads";
 import {
     assertV08A19F184LowerHumanPlacementWorkerEnvironment,
     playV08A19F184LowerHumanPlacementAbGame,
-    v08A19F184LowerHumanPlacementEnvironmentSha256,
+    v08A19F184LeftHumanPlacementEnvironmentSha256,
     type IV08A19F184LowerHumanPlacementAbWorkerRequest,
     type IV08A19F184LowerHumanPlacementAbWorkerResponse,
 } from "./v0_8_a19_f184_lower_human_placement_ab";
@@ -32,7 +32,7 @@ try {
             type: "probe",
             probeId: request.probeId,
             isolateId,
-            environmentSha256: v08A19F184LowerHumanPlacementEnvironmentSha256(),
+            environmentSha256: v08A19F184LeftHumanPlacementEnvironmentSha256(),
         } satisfies IV08A19F184LowerHumanPlacementAbWorkerResponse);
     } else {
         parentPort!.postMessage({

@@ -98,7 +98,7 @@ const setupDragonFight = (opts: {
 
     const caster = createTestUnit({
         name: "Magic Dragon",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.MELEE_MAGIC,
         movementType: PBTypes.MovementVals.FLY,
         magicResist: opts.casterMagicResist ?? 0,
@@ -116,7 +116,7 @@ const setupDragonFight = (opts: {
     for (const [index, spec] of (opts.enemies ?? []).entries()) {
         const enemy = createTestUnit({
             name: `Enemy ${index}`,
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: spec.maxHp ?? 10_000, // survives by default, so a test reads damage rather than a death
             magicResist: spec.magicResist ?? 0,
             abilities: spec.abilities ?? [],
@@ -137,7 +137,7 @@ const setupDragonFight = (opts: {
     for (const [index, spec] of (opts.allies ?? []).entries()) {
         const ally = createTestUnit({
             name: `Friend ${index}`,
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 10_000,
             initiative: 2,
         });
@@ -146,13 +146,13 @@ const setupDragonFight = (opts: {
     }
 
     if (opts.blockerCell) {
-        const blocker = createTestUnit({ name: "Blocker", team: PBTypes.TeamVals.LOWER, maxHp: 10_000, initiative: 2 });
+        const blocker = createTestUnit({ name: "Blocker", team: PBTypes.TeamVals.LEFT, maxHp: 10_000, initiative: 2 });
         placeUnit(context.grid, context.unitsHolder, blocker, opts.blockerCell);
     }
 
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1 + allies.length);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, Math.max(1, enemies.length));
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1 + allies.length);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, Math.max(1, enemies.length));
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const sceneLog = new SceneLogMock();
     const moveHandler = new MoveHandler(context.grid.getSettings(), context.grid, context.unitsHolder);
@@ -946,7 +946,7 @@ describe("Magic Reflection (passive)", () => {
         });
         const abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 10_000,
             luck: 10,
             stackPower: 5,
@@ -986,13 +986,13 @@ describe("Magic Reflection (passive)", () => {
         // friendly-fire splash (120) and dies.
         const victim = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 100,
             morale: 4,
         });
         const witness = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 10_000,
             morale: 4,
         });

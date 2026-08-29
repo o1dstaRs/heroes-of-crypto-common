@@ -37,16 +37,16 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const RANGE = PBTypes.AttackVals.RANGE;
 
 function nativeWanderingMage(): Unit {
     const effectFactory = new EffectFactory();
     return Unit.createUnit(
-        getCreatureConfig(LOWER, "Chaos", "Wandering Mage", "", 50),
+        getCreatureConfig(LEFT, "Chaos", "Wandering Mage", "", 50),
         testGridSettings,
-        LOWER,
+        LEFT,
         PBTypes.UnitVals.CREATURE,
         new AbilityFactory(effectFactory),
         effectFactory,
@@ -90,7 +90,7 @@ function smokeHarness(
     const combat = createCombatTestContext(gridType);
     const caster = nativeWanderingMage();
     const enemy = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Enemy Ranger",
         attackType: RANGE,
         rangeShots: 8,
@@ -102,9 +102,9 @@ function smokeHarness(
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(gridType);
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, 1);
-    fightProperties.setTeamUnitsAlive(UPPER, 1);
-    fightProperties.startTurn(LOWER, 1_000);
+    fightProperties.setTeamUnitsAlive(LEFT, 1);
+    fightProperties.setTeamUnitsAlive(RIGHT, 1);
+    fightProperties.startTurn(LEFT, 1_000);
     const context = decisionContext(combat);
     const engine = new GameActionEngine({
         fightProperties,
@@ -130,7 +130,7 @@ describe("Smoke cell legality oracle", () => {
     test("rejects off-grid, units, mountains, holes, and caster occupancy while allowing ground and fluids", () => {
         const normal = createCombatTestContext();
         const caster = nativeWanderingMage();
-        const other = createTestUnit({ team: UPPER, name: "Occupant" });
+        const other = createTestUnit({ team: RIGHT, name: "Occupant" });
         placeUnit(normal.grid, normal.unitsHolder, caster, { x: 2, y: 8 });
         placeUnit(normal.grid, normal.unitsHolder, other, { x: 3, y: 8 });
         normal.grid.occupyByHole({ x: 4, y: 8 });
@@ -160,7 +160,7 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
     test("does not credit a center-line cloud when another visible target edge bypasses it", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Edge-aware ranger",
             attackType: RANGE,
             rangeShots: 8,
@@ -168,7 +168,7 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
             damageMax: 20,
             shotDistance: 16,
         });
-        const target = createTestUnit({ team: LOWER, name: "Edge target", maxHp: 1_000 });
+        const target = createTestUnit({ team: LEFT, name: "Edge target", maxHp: 1_000 });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 1 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 2, y: 3 });
         const context = decisionContext(combat);
@@ -208,7 +208,7 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
     test("keeps Smoke sticky for downstream Through Shot targets only after the ray crosses it", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Through ranger",
             attackType: RANGE,
             rangeShots: 8,
@@ -217,8 +217,8 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
             shotDistance: 16,
             abilities: ["Through Shot"],
         });
-        const front = createTestUnit({ team: LOWER, name: "Front", maxHp: 1_000 });
-        const rear = createTestUnit({ team: LOWER, name: "Rear", maxHp: 1_000 });
+        const front = createTestUnit({ team: LEFT, name: "Front", maxHp: 1_000 });
+        const rear = createTestUnit({ team: LEFT, name: "Rear", maxHp: 1_000 });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, front, { x: 6, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, rear, { x: 11, y: 5 });
@@ -257,7 +257,7 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
     test("stops at a mountain before downstream hypothetical Smoke or units", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Blocked ranger",
             attackType: RANGE,
             rangeShots: 8,
@@ -265,7 +265,7 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
             damageMax: 20,
             shotDistance: 16,
         });
-        const target = createTestUnit({ team: LOWER, name: "Blocked target", maxHp: 1_000 });
+        const target = createTestUnit({ team: LEFT, name: "Blocked target", maxHp: 1_000 });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 8 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 14, y: 8 });
         const aim = getRangeAttackSideCenter(
@@ -295,7 +295,7 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
     test("does not apply a cloud behind the authoritative front interceptor", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Intercepted ranger",
             attackType: RANGE,
             rangeShots: 8,
@@ -303,8 +303,8 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
             damageMax: 20,
             shotDistance: 16,
         });
-        const front = createTestUnit({ team: LOWER, name: "Front interceptor", maxHp: 1_000 });
-        const rear = createTestUnit({ team: LOWER, name: "Declared rear target", maxHp: 1_000 });
+        const front = createTestUnit({ team: LEFT, name: "Front interceptor", maxHp: 1_000 });
+        const rear = createTestUnit({ team: LEFT, name: "Declared rear target", maxHp: 1_000 });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, front, { x: 6, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, rear, { x: 11, y: 5 });
@@ -338,7 +338,7 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
     test("does not invent mitigation after range falloff has already reached the divisor-eight cap", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Long-range ranger",
             attackType: RANGE,
             rangeShots: 8,
@@ -346,7 +346,7 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
             damageMax: 80,
             shotDistance: 2,
         });
-        const target = createTestUnit({ team: LOWER, name: "Distant target", maxHp: 1_000 });
+        const target = createTestUnit({ team: LEFT, name: "Distant target", maxHp: 1_000 });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 1 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 14, y: 1 });
         const context = decisionContext(combat);
@@ -384,7 +384,7 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
     test("recomputes the best target after Smoke instead of valuing a blocked obsolete aim", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Retargeting ranger",
             attackType: RANGE,
             rangeShots: 8,
@@ -392,8 +392,8 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
             damageMax: 20,
             shotDistance: 16,
         });
-        const screened = createTestUnit({ team: LOWER, name: "Screened target", maxHp: 1_000 });
-        const open = createTestUnit({ team: LOWER, name: "Open target", maxHp: 1_000 });
+        const screened = createTestUnit({ team: LEFT, name: "Screened target", maxHp: 1_000 });
+        const open = createTestUnit({ team: LEFT, name: "Open target", maxHp: 1_000 });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 13, y: 8 });
         placeUnit(combat.grid, combat.unitsHolder, screened, { x: 2, y: 8 });
         placeUnit(combat.grid, combat.unitsHolder, open, { x: 13, y: 2 });
@@ -427,8 +427,8 @@ describe("hypothetical/live Smoke differential", () => {
             }),
         ).toThrow("Prepared range attack was not created by this AttackHandler instance");
 
-        const shooter = createTestUnit({ team: UPPER, attackType: RANGE, rangeShots: 1 });
-        const target = createTestUnit({ team: LOWER });
+        const shooter = createTestUnit({ team: RIGHT, attackType: RANGE, rangeShots: 1 });
+        const target = createTestUnit({ team: LEFT });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 1 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 8, y: 8 });
         const prepared = combat.attackHandler.prepareRangeAttack(
@@ -446,14 +446,14 @@ describe("hypothetical/live Smoke differential", () => {
     test("recomputes sticky live Smoke exactly for multiple hit groups", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Prepared Through ranger",
             attackType: RANGE,
             rangeShots: 8,
             abilities: ["Through Shot"],
         });
-        const front = createTestUnit({ team: LOWER, name: "Prepared front" });
-        const rear = createTestUnit({ team: LOWER, name: "Prepared rear" });
+        const front = createTestUnit({ team: LEFT, name: "Prepared front" });
+        const rear = createTestUnit({ team: LEFT, name: "Prepared rear" });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, front, { x: 6, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, rear, { x: 11, y: 5 });
@@ -490,14 +490,14 @@ describe("hypothetical/live Smoke differential", () => {
     test("applies revised live Smoke once to every unit in one prepared AOE hit group", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Prepared caliber ranger",
             attackType: RANGE,
             rangeShots: 8,
             abilities: ["Large Caliber"],
         });
-        const primary = createTestUnit({ team: LOWER, name: "Prepared AOE primary" });
-        const adjacent = createTestUnit({ team: LOWER, name: "Prepared AOE adjacent" });
+        const primary = createTestUnit({ team: LEFT, name: "Prepared AOE primary" });
+        const adjacent = createTestUnit({ team: LEFT, name: "Prepared AOE adjacent" });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, primary, { x: 6, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, adjacent, { x: 6, y: 6 });
@@ -551,7 +551,7 @@ describe("hypothetical/live Smoke differential", () => {
         for (let iteration = 0; iteration < 256; iteration += 1) {
             const combat = createCombatTestContext(gridTypes[iteration % gridTypes.length]!);
             const shooter = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: `Prepared fuzz shooter ${iteration}`,
                 attackType: RANGE,
                 rangeShots: 8,
@@ -567,12 +567,12 @@ describe("hypothetical/live Smoke differential", () => {
             };
             placeUnit(combat.grid, combat.unitsHolder, shooter, pickEmptyCell());
 
-            const target = createTestUnit({ team: LOWER, name: `Prepared fuzz target ${iteration}` });
+            const target = createTestUnit({ team: LEFT, name: `Prepared fuzz target ${iteration}` });
             placeUnit(combat.grid, combat.unitsHolder, target, pickEmptyCell());
             const extraCount = next(6);
             for (let extra = 0; extra < extraCount; extra += 1) {
                 const unit = createTestUnit({
-                    team: next(3) === 0 ? UPPER : LOWER,
+                    team: next(3) === 0 ? RIGHT : LEFT,
                     name: `Prepared fuzz extra ${iteration}:${extra}`,
                 });
                 placeUnit(combat.grid, combat.unitsHolder, unit, pickEmptyCell());
@@ -674,7 +674,7 @@ describe("hypothetical/live Smoke differential", () => {
             const combat = createCombatTestContext(gridType);
             const abilities = iteration % 5 === 0 ? ["Through Shot"] : iteration % 7 === 0 ? ["Large Caliber"] : [];
             const shooter = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: `Fuzz shooter ${iteration}`,
                 attackType: RANGE,
                 rangeShots: 8,
@@ -683,7 +683,7 @@ describe("hypothetical/live Smoke differential", () => {
                 shotDistance: 2 + next(15),
                 abilities,
             });
-            const target = createTestUnit({ team: LOWER, name: `Fuzz target ${iteration}`, maxHp: 1_000 });
+            const target = createTestUnit({ team: LEFT, name: `Fuzz target ${iteration}`, maxHp: 1_000 });
             const pickEmptyCell = (reserved?: XY): XY => {
                 for (let attempt = 0; attempt < 256; attempt += 1) {
                     const cell = { x: next(16), y: next(16) };
@@ -801,9 +801,9 @@ describe("Smoke candidate/runtime parity", () => {
             };
             placeUnit(combat.grid, combat.unitsHolder, caster, pickEmptyCell());
 
-            let lowerAlive = 1;
-            let upperAlive = 0;
-            const addRanger = (team: typeof LOWER | typeof UPPER, index: number): void => {
+            let leftAlive = 1;
+            let rightAlive = 0;
+            const addRanger = (team: typeof LEFT | typeof RIGHT, index: number): void => {
                 const ranger = createTestUnit({
                     team,
                     name: `Candidate fuzz ranger ${iteration}:${team}:${index}`,
@@ -815,24 +815,24 @@ describe("Smoke candidate/runtime parity", () => {
                     abilities: index % 5 === 0 ? ["Through Shot"] : index % 5 === 1 ? ["Large Caliber"] : [],
                 });
                 placeUnit(combat.grid, combat.unitsHolder, ranger, pickEmptyCell());
-                if (team === LOWER) lowerAlive += 1;
-                else upperAlive += 1;
+                if (team === LEFT) leftAlive += 1;
+                else rightAlive += 1;
             };
-            for (let index = 0; index < 1 + next(4); index += 1) addRanger(UPPER, index);
-            for (let index = 0; index < next(4); index += 1) addRanger(LOWER, index + 10);
+            for (let index = 0; index < 1 + next(4); index += 1) addRanger(RIGHT, index);
+            for (let index = 0; index < next(4); index += 1) addRanger(LEFT, index + 10);
             for (let index = 0; index < next(4); index += 1) {
-                const team = next(2) === 0 ? LOWER : UPPER;
+                const team = next(2) === 0 ? LEFT : RIGHT;
                 const blocker = createTestUnit({ team, name: `Candidate fuzz blocker ${iteration}:${index}` });
                 placeUnit(combat.grid, combat.unitsHolder, blocker, pickEmptyCell());
-                if (team === LOWER) lowerAlive += 1;
-                else upperAlive += 1;
+                if (team === LEFT) leftAlive += 1;
+                else rightAlive += 1;
             }
 
             const fightProperties = FightStateManager.getInstance().getFightProperties();
             fightProperties.startFight();
-            fightProperties.setTeamUnitsAlive(LOWER, lowerAlive);
-            fightProperties.setTeamUnitsAlive(UPPER, upperAlive);
-            fightProperties.startTurn(LOWER, 1_000);
+            fightProperties.setTeamUnitsAlive(LEFT, leftAlive);
+            fightProperties.setTeamUnitsAlive(RIGHT, rightAlive);
+            fightProperties.startTurn(LEFT, 1_000);
             const context = decisionContext(combat);
             const incumbent: GameAction[] = [{ type: "end_turn", unitId: caster.getId(), reason: "manual" }];
             const candidates = () =>
@@ -871,7 +871,7 @@ describe("Smoke candidate/runtime parity", () => {
         const combat = createCombatTestContext();
         const caster = nativeWanderingMage();
         const friendlyRanger = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Friendly ranger",
             attackType: RANGE,
             rangeShots: 12,
@@ -881,7 +881,7 @@ describe("Smoke candidate/runtime parity", () => {
             maxHp: 100,
         });
         const enemyRanger = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Enemy ranger",
             attackType: RANGE,
             rangeShots: 4,

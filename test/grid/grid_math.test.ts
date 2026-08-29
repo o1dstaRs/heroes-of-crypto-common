@@ -280,10 +280,10 @@ describe("grid_math", () => {
 
     it("finds random adjacent cells only within the grid", () => {
         const matrix = emptyMatrix();
-        const lowerCell = getRandomGridCellAroundPosition(
+        const leftCell = getRandomGridCellAroundPosition(
             testGridSettings,
             matrix,
-            PBTypes.TeamVals.LOWER,
+            PBTypes.TeamVals.LEFT,
             getPositionForCell(
                 { x: 5, y: 5 },
                 testGridSettings.getMinX(),
@@ -291,10 +291,10 @@ describe("grid_math", () => {
                 testGridSettings.getHalfStep(),
             ),
         );
-        const upperCell = getRandomGridCellAroundPosition(
+        const rightCell = getRandomGridCellAroundPosition(
             testGridSettings,
             matrix,
-            PBTypes.TeamVals.UPPER,
+            PBTypes.TeamVals.RIGHT,
             getPositionForCell(
                 { x: 5, y: 5 },
                 testGridSettings.getMinX(),
@@ -303,8 +303,8 @@ describe("grid_math", () => {
             ),
         );
 
-        expect(lowerCell?.y).toBe(6);
-        expect(upperCell?.y).toBe(4);
+        expect(leftCell?.y).toBe(6);
+        expect(rightCell?.y).toBe(4);
 
         matrix[5][6] = 1;
         matrix[4][6] = 1;
@@ -312,7 +312,7 @@ describe("grid_math", () => {
         const fallback = getRandomGridCellAroundPosition(
             testGridSettings,
             matrix,
-            PBTypes.TeamVals.LOWER,
+            PBTypes.TeamVals.LEFT,
             getPositionForCell(
                 { x: 5, y: 5 },
                 testGridSettings.getMinX(),
@@ -334,11 +334,11 @@ describe("grid_math", () => {
                 testGridSettings.getHalfStep(),
             );
 
-            expect(getRandomGridCellAroundPosition(testGridSettings, matrix, PBTypes.TeamVals.LOWER, center)).toEqual({
+            expect(getRandomGridCellAroundPosition(testGridSettings, matrix, PBTypes.TeamVals.LEFT, center)).toEqual({
                 x: 5,
                 y: 6,
             });
-            expect(getRandomGridCellAroundPosition(testGridSettings, matrix, PBTypes.TeamVals.UPPER, center)).toEqual({
+            expect(getRandomGridCellAroundPosition(testGridSettings, matrix, PBTypes.TeamVals.RIGHT, center)).toEqual({
                 x: 5,
                 y: 4,
             });
@@ -368,7 +368,7 @@ describe("grid_math", () => {
                 }
 
                 expect(
-                    getRandomGridCellAroundPosition(testGridSettings, matrix, PBTypes.TeamVals.LOWER, center),
+                    getRandomGridCellAroundPosition(testGridSettings, matrix, PBTypes.TeamVals.LEFT, center),
                 ).toEqual(onlyOpenFallbackCell);
             },
         );
@@ -499,7 +499,7 @@ describe("grid_math", () => {
             toPosition,
             true,
             true,
-            PBTypes.TeamVals.UPPER,
+            PBTypes.TeamVals.RIGHT,
         );
 
         expect(sideCenter).toBeDefined();
@@ -514,7 +514,7 @@ describe("grid_math", () => {
                 toPosition,
                 true,
                 true,
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
                 true,
             ),
         ).toBeDefined();
@@ -555,12 +555,12 @@ describe("grid_math", () => {
         // Visibility: an enemy unit hiding the LEFT neighbour (cell 2,1 -> matrix[1][2]) makes the
         // LEFT edge unobservable; a friendly/empty neighbour keeps it observable. matrix[y][x].
         const open = emptyMatrix();
-        expect(isRangeAttackSideObservable(open, targetCell, RangeAttackCellSide.LEFT, PBTypes.TeamVals.UPPER)).toBe(
+        expect(isRangeAttackSideObservable(open, targetCell, RangeAttackCellSide.LEFT, PBTypes.TeamVals.RIGHT)).toBe(
             true,
         );
         const blocked = emptyMatrix();
-        blocked[1][2] = PBTypes.TeamVals.LOWER;
-        expect(isRangeAttackSideObservable(blocked, targetCell, RangeAttackCellSide.LEFT, PBTypes.TeamVals.UPPER)).toBe(
+        blocked[1][2] = PBTypes.TeamVals.LEFT;
+        expect(isRangeAttackSideObservable(blocked, targetCell, RangeAttackCellSide.LEFT, PBTypes.TeamVals.RIGHT)).toBe(
             false,
         );
 
@@ -573,7 +573,7 @@ describe("grid_math", () => {
             targetCenter,
             true,
             true,
-            PBTypes.TeamVals.UPPER,
+            PBTypes.TeamVals.RIGHT,
         );
         const b = getClosestSideCenterDetailed(
             open,
@@ -583,7 +583,7 @@ describe("grid_math", () => {
             targetCenter,
             true,
             true,
-            PBTypes.TeamVals.UPPER,
+            PBTypes.TeamVals.RIGHT,
         );
         expect(a).toBeDefined();
         // Attacker is to the left, so the chosen visible edge is the LEFT side facing it.
@@ -615,11 +615,11 @@ describe("grid_math", () => {
         );
 
         const occluded = emptyMatrix();
-        occluded[1][2] = PBTypes.TeamVals.LOWER; // matrix[y][x]: a unit two cells in front of the target
+        occluded[1][2] = PBTypes.TeamVals.LEFT; // matrix[y][x]: a unit two cells in front of the target
 
         // The adjacent-cell check considers the LEFT side observable (its neighbour 3,1 is empty)...
         expect(
-            isRangeAttackSideObservable(occluded, targetCell, RangeAttackCellSide.LEFT, PBTypes.TeamVals.UPPER),
+            isRangeAttackSideObservable(occluded, targetCell, RangeAttackCellSide.LEFT, PBTypes.TeamVals.RIGHT),
         ).toBe(true);
         // ...and the aim resolver offers exactly that edge — it does not second-guess the trajectory.
         expect(
@@ -631,7 +631,7 @@ describe("grid_math", () => {
                 targetCenter,
                 true,
                 true,
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
             )?.side,
         ).toBe(RangeAttackCellSide.LEFT);
 
@@ -645,7 +645,7 @@ describe("grid_math", () => {
                 targetCenter,
                 true,
                 true,
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
                 true,
             )?.side,
         ).toBe(RangeAttackCellSide.LEFT);
@@ -660,7 +660,7 @@ describe("grid_math", () => {
                 targetCenter,
                 true,
                 true,
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
             )?.side,
         ).toBe(RangeAttackCellSide.LEFT);
     });
@@ -697,7 +697,7 @@ describe("grid_math", () => {
                     toPosition,
                     true,
                     true,
-                    PBTypes.TeamVals.UPPER,
+                    PBTypes.TeamVals.RIGHT,
                 ),
             ).toBeDefined();
         }
@@ -711,7 +711,7 @@ describe("grid_math", () => {
                 toPosition,
                 true,
                 true,
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
             ),
         ).toBeUndefined();
 
@@ -734,7 +734,7 @@ describe("grid_math", () => {
                 toPosition,
                 true,
                 true,
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
             ),
         ).toBeUndefined();
     });

@@ -57,7 +57,7 @@ describe("missed attack lands no on-hit effects", () => {
 
         const orc = createTestUnit({
             name: "Orc",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             attack: 11,
             damageMin: 1,
@@ -69,7 +69,7 @@ describe("missed attack lands no on-hit effects", () => {
         });
         const scavenger = createTestUnit({
             name: "Scavenger",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             maxHp: 100,
             amountAlive: 5,
@@ -92,9 +92,9 @@ describe("missed attack lands no on-hit effects", () => {
         placeSmall(scavenger, { x: 3, y: 9 });
         orc.refreshPossibleAttackTypes(true);
 
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
         const sceneLog = new RecordingSceneLog();
         const moveHandler = new MoveHandler(grid.getSettings(), grid, unitsHolder);

@@ -109,7 +109,7 @@ describe("battle engine turn execution observer", () => {
                         maxLaps: 2,
                         searchScoredDecisionObserver: () => {},
                         searchShadowOnly: true,
-                        searchV08A13TrajectoryTeams: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+                        searchV08A13TrajectoryTeams: [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT],
                     });
                 },
             );
@@ -166,7 +166,7 @@ describe("battle engine turn execution observer", () => {
                 seed: 91_001,
                 maxLaps: 2,
                 searchScoredDecisionObserver: () => {},
-                searchV08A13TrajectoryTeams: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+                searchV08A13TrajectoryTeams: [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT],
                 decisionObserver: ({ strategyVersion }) => observedVersions.push(strategyVersion),
             });
         } finally {

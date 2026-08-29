@@ -25,7 +25,7 @@ describe("Unit", () => {
         it("exposes metadata, target, position, and stack bounds", () => {
             const unit = createTestUnit({
                 name: "Stats Unit",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 attackType: PBTypes.AttackVals.RANGE,
                 attack: 12,
                 armor: 7,
@@ -72,8 +72,8 @@ describe("Unit", () => {
             expect(unit.getMovementType()).toBe(PBTypes.MovementVals.FLY);
             expect(unit.canFly()).toBe(true);
             expect(unit.getExp()).toBe(9);
-            expect(unit.getTeam()).toBe(PBTypes.TeamVals.LOWER);
-            expect(unit.getOppositeTeam()).toBe(PBTypes.TeamVals.UPPER);
+            expect(unit.getTeam()).toBe(PBTypes.TeamVals.LEFT);
+            expect(unit.getOppositeTeam()).toBe(PBTypes.TeamVals.RIGHT);
             expect(unit.getUnitType()).toBe(PBTypes.UnitVals.HERO);
             expect(unit.getSmallTextureName()).toBe("");
             expect(unit.getLargeTextureName()).toBe("");
@@ -498,12 +498,12 @@ describe("Unit", () => {
         });
 
         it("makes a lucky defender take less damage and an unlucky one take more", () => {
-            const attacker = createTestUnit({ team: PBTypes.TeamVals.LOWER, damageMax: 100, amountAlive: 1 });
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.LEFT, damageMax: 100, amountAlive: 1 });
             attacker.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
 
-            const neutral = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 1, luck: 0 });
-            const lucky = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 1, luck: 10 });
-            const unlucky = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 1, luck: -10 });
+            const neutral = createTestUnit({ team: PBTypes.TeamVals.RIGHT, armor: 1, luck: 0 });
+            const lucky = createTestUnit({ team: PBTypes.TeamVals.RIGHT, armor: 1, luck: 10 });
+            const unlucky = createTestUnit({ team: PBTypes.TeamVals.RIGHT, armor: 1, luck: -10 });
 
             const base = attacker.calculateAttackDamageMax(1, neutral, false, 0);
             const vsLucky = attacker.calculateAttackDamageMax(1, lucky, false, 0);
@@ -571,19 +571,19 @@ describe("Unit", () => {
         });
 
         it("Morale buff grants +20 morale and a higher attack multiplier; Dismorale lowers it", () => {
-            const target = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 1, luck: 0 });
+            const target = createTestUnit({ team: PBTypes.TeamVals.RIGHT, armor: 1, luck: 0 });
 
-            const baseline = createTestUnit({ team: PBTypes.TeamVals.LOWER, damageMax: 80, amountAlive: 1 });
+            const baseline = createTestUnit({ team: PBTypes.TeamVals.LEFT, damageMax: 80, amountAlive: 1 });
             baseline.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
             const baseMax = baseline.calculateAttackDamageMax(1, target, false, 0);
 
-            const inspired = createTestUnit({ team: PBTypes.TeamVals.LOWER, damageMax: 80, amountAlive: 1 });
+            const inspired = createTestUnit({ team: PBTypes.TeamVals.LEFT, damageMax: 80, amountAlive: 1 });
             inspired.applyBuff(spell("System", "Morale"));
             inspired.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
             expect(inspired.getMorale()).toBe(20);
             expect(inspired.calculateAttackDamageMax(1, target, false, 0)).toBeGreaterThan(baseMax);
 
-            const demoralized = createTestUnit({ team: PBTypes.TeamVals.LOWER, damageMax: 80, amountAlive: 1 });
+            const demoralized = createTestUnit({ team: PBTypes.TeamVals.LEFT, damageMax: 80, amountAlive: 1 });
             demoralized.applyDebuff(spell("System", "Dismorale"));
             demoralized.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
             expect(demoralized.getMorale()).toBe(-20);
@@ -593,11 +593,11 @@ describe("Unit", () => {
         it("shifts movement steps by STEPS_MORALE_MULTIPLIER per morale point", () => {
             // The 8th arg is the steps-morale multiplier the engine supplies at runtime
             // (STEPS_MORALE_MULTIPLIER = 0.05); steps_mod = multiplier * morale.
-            const high = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            const high = createTestUnit({ team: PBTypes.TeamVals.LEFT });
             high.applyBuff(spell("Life", "Courage")); // -> +20 morale
             high.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0.05);
 
-            const low = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            const low = createTestUnit({ team: PBTypes.TeamVals.LEFT });
             low.applyDebuff(spell("Death", "Sadness")); // -> -20 morale
             low.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0.05);
 
@@ -616,7 +616,7 @@ describe("Unit", () => {
                 rangeShots: 2,
             });
             const target = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 armor: 10,
             });
 
@@ -635,7 +635,7 @@ describe("Unit", () => {
                 rangeShots: 0,
             });
             const target = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 armor: 10,
             });
 
@@ -654,7 +654,7 @@ describe("Unit", () => {
                 rangeShots: 2,
             });
             const target = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 armor: 10,
             });
 
@@ -674,7 +674,7 @@ describe("Unit", () => {
                 abilities: ["Handyman"],
             });
             const target = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 armor: 10,
             });
 
@@ -686,11 +686,11 @@ describe("Unit", () => {
 
     describe("armor and penetration", () => {
         it("Piercing Spear penetrates enemy armor for more damage than a plain attacker", () => {
-            const armored = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 40, luck: 0 });
+            const armored = createTestUnit({ team: PBTypes.TeamVals.RIGHT, armor: 40, luck: 0 });
             // Piercing Spear's penetration scales with stack power ((power/100/MAX)·stackPower), so give
             // both attackers max stack power — the ONLY difference is the ability itself.
             const plain = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 attack: 10,
                 damageMin: 100,
                 damageMax: 100,
@@ -698,7 +698,7 @@ describe("Unit", () => {
                 stackPower: 5,
             });
             const piercer = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 attack: 10,
                 damageMin: 100,
                 damageMax: 100,
@@ -715,10 +715,10 @@ describe("Unit", () => {
         });
 
         it("Shatter Armor lowers effective armor and raises incoming damage", () => {
-            const attacker = createTestUnit({ team: PBTypes.TeamVals.LOWER, damageMax: 100, amountAlive: 1 });
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.LEFT, damageMax: 100, amountAlive: 1 });
             attacker.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
 
-            const target = createTestUnit({ team: PBTypes.TeamVals.UPPER, armor: 20, luck: 0 });
+            const target = createTestUnit({ team: PBTypes.TeamVals.RIGHT, armor: 20, luck: 0 });
             target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
             const armorBefore = target.getArmor();
             const damageBefore = attacker.calculateAttackDamageMax(1, target, false, 0);
@@ -764,7 +764,7 @@ describe("Unit", () => {
                 stackPower: 5,
             });
             const enemy = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 abilities: ["Dodge"],
                 stackPower: 5,
             });
@@ -866,7 +866,7 @@ describe("Unit", () => {
 
         it("finds melee attack targets for mobile and immobilized units", () => {
             const attacker = createTestUnit();
-            const enemy = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            const enemy = createTestUnit({ team: PBTypes.TeamVals.LEFT });
             const positions = new Map([[enemy.getId(), positionForCell({ x: 2, y: 1 })]]);
 
             attacker.setPosition(positionForCell({ x: 1, y: 1 }).x, positionForCell({ x: 1, y: 1 }).y);

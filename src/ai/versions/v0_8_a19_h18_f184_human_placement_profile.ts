@@ -31,7 +31,7 @@ export const V08_A19_H18_F184_HUMAN_PLACEMENT_IMPLEMENTATION_SOURCE =
 // replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
 // qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H18_F184_HUMAN_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "2fec445be38a175f91b4832622f826c9f20dd6436c24cae1bf02aeef710410b2" as const;
+    "2a85b4b0e51bd0e2bdad4052fb2aafee644cab05ca1921515c22277f954d0f6d" as const;
 
 /**
  * Browser-safe identity for the exact production-replay opening. The source digest is
@@ -59,8 +59,8 @@ export const V08_A19_H18_F184_HUMAN_PLACEMENT_POLICY_BINDING = Object.freeze({
         exactPublicMatchup: true as const,
         openingIds: Object.freeze(["prod-f184-lower-roster", "prod-f184-upper-roster"] as const),
         rosterCreatureIds: Object.freeze({
-            lower: Object.freeze([3, 4, 6, 9, 33, 37] as const),
-            upper: Object.freeze([12, 27, 34, 43, 47, 55] as const),
+            left: Object.freeze([3, 4, 6, 9, 33, 37] as const),
+            right: Object.freeze([12, 27, 34, 43, 47, 55] as const),
         }),
     }),
 });

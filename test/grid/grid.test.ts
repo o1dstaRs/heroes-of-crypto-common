@@ -97,12 +97,12 @@ describe("Grid Aggregation Matrix Tests", () => {
             { x: 6, y: 6 },
             { x: 5, y: 6 },
         ];
-        expect(grid.occupyCells(currentFootprint, unitId, PBTypes.TeamVals.LOWER, 1, false, false)).toBe(true);
+        expect(grid.occupyCells(currentFootprint, unitId, PBTypes.TeamVals.LEFT, 1, false, false)).toBe(true);
 
         expect(grid.canOccupyCells(shiftedOntoLava, true, false)).toBe(false);
         expect(grid.canOccupyCells(shiftedOntoLava, true, false, unitId)).toBe(true);
 
-        expect(grid.occupyCell({ x: 6, y: 7 }, "otherUnit", PBTypes.TeamVals.UPPER, 1, true, false)).toBe(true);
+        expect(grid.occupyCell({ x: 6, y: 7 }, "otherUnit", PBTypes.TeamVals.RIGHT, 1, true, false)).toBe(true);
         expect(grid.canOccupyCells(shiftedOntoLava, true, false, unitId)).toBe(false);
         expect(grid.canOccupyCells([{ x: -1, y: 7 }], true, true, unitId)).toBe(false);
     });
@@ -189,8 +189,8 @@ describe("Grid Aggregation Matrix Tests", () => {
         const logs: string[] = [];
         const originalLog = console.log;
 
-        printable.occupyCell({ x: 1, y: 1 }, "unit1", PBTypes.TeamVals.UPPER, 2, false, false);
-        printable.occupyCell({ x: 2, y: 2 }, "unit2", PBTypes.TeamVals.LOWER, 1, false, false);
+        printable.occupyCell({ x: 1, y: 1 }, "unit1", PBTypes.TeamVals.RIGHT, 2, false, false);
+        printable.occupyCell({ x: 2, y: 2 }, "unit2", PBTypes.TeamVals.LEFT, 1, false, false);
         printable.occupyByHole({ x: 0, y: 0 });
         printable.occupyByHole({ x: -1, y: -1 });
 
@@ -213,8 +213,8 @@ describe("Grid Aggregation Matrix Tests", () => {
         const matrixNoUnits = printable.getMatrixNoUnits();
 
         expect(matrix[0][0]).toBe(ObstacleType.HOLE);
-        expect(matrix[1][1]).toBe(PBTypes.TeamVals.UPPER);
-        expect(matrix[2][2]).toBe(PBTypes.TeamVals.LOWER);
+        expect(matrix[1][1]).toBe(PBTypes.TeamVals.RIGHT);
+        expect(matrix[2][2]).toBe(PBTypes.TeamVals.LEFT);
         expect(matrix[centerCell.y][centerCell.x]).toBe(ObstacleType.BLOCK);
         expect(matrixNoUnits[1][1]).toBe(0);
         expect(matrixNoUnits[2][2]).toBe(0);
@@ -249,11 +249,11 @@ describe("Grid Aggregation Matrix Tests", () => {
         first[0][0] = 999;
         expect(cached.getMatrix()[0][0]).toBe(0);
 
-        expect(cached.occupyCell({ x: 2, y: 3 }, "small", PBTypes.TeamVals.LOWER, 1, false, false)).toBe(true);
-        expect(cached.getMatrix()[3][2]).toBe(PBTypes.TeamVals.LOWER);
-        expect(cached.occupyCell({ x: 4, y: 5 }, "small", PBTypes.TeamVals.LOWER, 1, false, false)).toBe(true);
+        expect(cached.occupyCell({ x: 2, y: 3 }, "small", PBTypes.TeamVals.LEFT, 1, false, false)).toBe(true);
+        expect(cached.getMatrix()[3][2]).toBe(PBTypes.TeamVals.LEFT);
+        expect(cached.occupyCell({ x: 4, y: 5 }, "small", PBTypes.TeamVals.LEFT, 1, false, false)).toBe(true);
         expect(cached.getMatrix()[3][2]).toBe(0);
-        expect(cached.getMatrix()[5][4]).toBe(PBTypes.TeamVals.LOWER);
+        expect(cached.getMatrix()[5][4]).toBe(PBTypes.TeamVals.LEFT);
         cached.cleanupAll("small", 1, true);
         expect(cached.getMatrix()[5][4]).toBe(0);
 

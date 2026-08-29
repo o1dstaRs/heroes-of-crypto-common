@@ -20,11 +20,11 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 
 type AuraMaps = Map<number, AppliedAuraEffectProperties[]>;
 
-function auraMapsForLower(unitsHolder: UnitsHolder): AuraMaps {
+function auraMapsForLeft(unitsHolder: UnitsHolder): AuraMaps {
     const holder = unitsHolder as unknown as {
         teamsAuraEffects: Map<number, AuraMaps>;
     };
-    const maps = holder.teamsAuraEffects.get(PBTypes.TeamVals.LOWER);
+    const maps = holder.teamsAuraEffects.get(PBTypes.TeamVals.LEFT);
     if (!maps) throw new Error("Lower aura map is missing");
     return maps;
 }
@@ -40,25 +40,25 @@ describe("UnitsHolder aura-map aggregation", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const first = createTestUnit({
             name: "First source",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             stackPower: 1,
             auraEffects: ["Luck", "Sharpened Weapons"],
         });
         const strongest = createTestUnit({
             name: "Strongest source",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             stackPower: 5,
             auraEffects: ["Sharpened Weapons"],
         });
         const equalLater = createTestUnit({
             name: "Equal later source",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             stackPower: 5,
             auraEffects: ["Sharpened Weapons"],
         });
         const recipient = createTestUnit({
             name: "Recipient",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE,
         });
 
@@ -68,7 +68,7 @@ describe("UnitsHolder aura-map aggregation", () => {
         placeUnit(grid, unitsHolder, recipient, { x: 5, y: 5 });
         unitsHolder.refreshAuraEffectsForAllUnits();
 
-        const beforeMaps = auraMapsForLower(unitsHolder);
+        const beforeMaps = auraMapsForLeft(unitsHolder);
         const targetAuras = aurasAt(beforeMaps, 5, 5);
         expect(targetAuras.map((aura) => aura.getAuraEffectProperties().name)).toEqual(["Luck", "Sharpened Weapons"]);
 
@@ -91,7 +91,7 @@ describe("UnitsHolder aura-map aggregation", () => {
         unitsHolder.refreshAuraEffectsForAllUnits();
         restoreBattle(snapshot, unitsHolder, grid, fightProperties);
 
-        const restoredTargetAuras = aurasAt(auraMapsForLower(unitsHolder), 5, 5);
+        const restoredTargetAuras = aurasAt(auraMapsForLeft(unitsHolder), 5, 5);
         expect(restoredTargetAuras.map((aura) => aura.getAuraEffectProperties().name)).toEqual([
             "Luck",
             "Sharpened Weapons",

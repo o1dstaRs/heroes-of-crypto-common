@@ -66,7 +66,7 @@ interface IFootprintUnitOptions {
 function createFootprintUnit(width: number, height: number, options: IFootprintUnitOptions = {}): Unit {
     const effectFactory = new EffectFactory();
     const abilityFactory = new AbilityFactory(effectFactory);
-    const team = options.team ?? PBTypes.TeamVals.LOWER;
+    const team = options.team ?? PBTypes.TeamVals.LEFT;
     const abilities = options.abilities ?? [];
     const noStrings: string[] = [];
     const noNumbers: number[] = [];
@@ -194,9 +194,9 @@ function fightEngine(active: Unit, extra: Partial<IGameActionEngineContext> = {}
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(PBTypes.GridVals.NORMAL);
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
     const moveHandler = new MoveHandler(context.grid.getSettings(), context.grid, context.unitsHolder);
     const engine = new GameActionEngine({
         fightProperties,
@@ -329,7 +329,7 @@ describe("action engine footprints — placement", () => {
 
         it(`${label}: refuses a placement that would overlap another stack`, () => {
             const setup = placementEngine();
-            const blocker = createFootprintUnit(1, 1, { name: "Blocker", team: PBTypes.TeamVals.UPPER });
+            const blocker = createFootprintUnit(1, 1, { name: "Blocker", team: PBTypes.TeamVals.RIGHT });
             standAt(setup.grid, setup.unitsHolder, blocker, anchor);
             const unit = createFootprintUnit(width, height);
             setup.unitsHolder.addUnit(unit);
@@ -426,7 +426,7 @@ describe("action engine footprints — movement", () => {
             // that is precisely the cell an anchor-only check cannot see. Only a 1x1 has no such cell.
             const nonAnchorCells = targetCells.filter((cell) => cell.x !== to.x || cell.y !== to.y);
             const blockedCell = nonAnchorCells[nonAnchorCells.length - 1] ?? to;
-            const blocker = createFootprintUnit(1, 1, { name: "Blocker", team: PBTypes.TeamVals.UPPER });
+            const blocker = createFootprintUnit(1, 1, { name: "Blocker", team: PBTypes.TeamVals.RIGHT });
             standAt(setup.grid, setup.unitsHolder, blocker, blockedCell);
 
             const result = setup.engine.apply({
@@ -706,7 +706,7 @@ describe("action engine footprints — summoning", () => {
             const setup = summonSetup(width, height);
             const cells = getFootprintCellsForAnchor(summonAnchor, width, height);
             const blockedCell = cells[cells.length - 1];
-            const blocker = createFootprintUnit(1, 1, { name: "Blocker", team: PBTypes.TeamVals.UPPER });
+            const blocker = createFootprintUnit(1, 1, { name: "Blocker", team: PBTypes.TeamVals.RIGHT });
             standAt(setup.grid, setup.unitsHolder, blocker, blockedCell);
 
             const result = setup.engine.apply({
@@ -833,7 +833,7 @@ describe("action engine footprints — infested spawn on a corpse", () => {
         const killer = createFootprintUnit(1, 1, { name: "Infester", abilities: ["Infest"] });
         const victim = createFootprintUnit(corpse[0], corpse[1], {
             name: "Victim",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             level: PBTypes.UnitLevelVals.FIRST,
         });
         let spawned: Unit | undefined;

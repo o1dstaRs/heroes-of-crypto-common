@@ -733,7 +733,7 @@ const optimizeAbominationPlacement = (
     const lats = legalCells.map(lateral);
     const centreLat = (Math.min(...lats) + Math.max(...lats)) / 2;
     const frontness = (cell: XY): number =>
-        context.team === PBTypes.TeamVals.LOWER ? along(cell) : GRID_SIZE - 1 - along(cell);
+        context.team === PBTypes.TeamVals.LEFT ? along(cell) : GRID_SIZE - 1 - along(cell);
     const edgeness = (cell: XY): number => Math.abs(lateral(cell) - centreLat);
 
     for (const protector of units.filter((unit) => v08BacklineProtectorKind(unit) === "abomination")) {
@@ -893,7 +893,7 @@ const optimizeAngelPlacement = (
     const lats = legalCells.map(lateral);
     const centreLat = (Math.min(...lats) + Math.max(...lats)) / 2;
     const frontness = (cell: XY): number =>
-        context.team === PBTypes.TeamVals.LOWER ? along(cell) : GRID_SIZE - 1 - along(cell);
+        context.team === PBTypes.TeamVals.LEFT ? along(cell) : GRID_SIZE - 1 - along(cell);
     const edgeness = (cell: XY): number => Math.abs(lateral(cell) - centreLat);
 
     for (const angel of units.filter((unit) => v08BacklineProtectorKind(unit) === "angel")) {

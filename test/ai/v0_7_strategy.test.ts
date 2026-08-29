@@ -49,8 +49,8 @@ import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const ENV_KEYS = [
     "V07_WAIT_SCORER",
     "V07_WAIT_WEIGHTS",
@@ -110,16 +110,16 @@ function buildBoard(
 ): Board {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    const actor = createTestUnit({ name: "Actor", team: LOWER, initiative: 4, ...actorOptions });
-    const ally = createTestUnit({ name: "Ally", team: LOWER, initiative: 2, ...allyOptions });
-    const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, initiative: 3, amountAlive: enemyAmountAlive });
-    const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, initiative: 5, amountAlive: enemyAmountAlive });
+    const actor = createTestUnit({ name: "Actor", team: LEFT, initiative: 4, ...actorOptions });
+    const ally = createTestUnit({ name: "Ally", team: LEFT, initiative: 2, ...allyOptions });
+    const enemyA = createTestUnit({ name: "Enemy A", team: RIGHT, initiative: 3, amountAlive: enemyAmountAlive });
+    const enemyB = createTestUnit({ name: "Enemy B", team: RIGHT, initiative: 5, amountAlive: enemyAmountAlive });
     placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, ally, { x: 5, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 3, y: 10 });
     placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 5, y: 10 });
-    fightProperties.setTeamUnitsAlive(LOWER, 2);
-    fightProperties.setTeamUnitsAlive(UPPER, 2);
+    fightProperties.setTeamUnitsAlive(LEFT, 2);
+    fightProperties.setTeamUnitsAlive(RIGHT, 2);
 
     return {
         actor,
@@ -147,12 +147,12 @@ function buildBoard(
 }
 
 function primeArmyProfile(strategy: Pick<IAIStrategy, "placeArmy">, context: IDecisionContext): void {
-    strategy.placeArmy(context.unitsHolder.getAllAllies(LOWER), {
-        team: LOWER,
+    strategy.placeArmy(context.unitsHolder.getAllAllies(LEFT), {
+        team: LEFT,
         grid: context.grid,
         unitsHolder: context.unitsHolder,
         pathHelper: context.pathHelper,
-        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
     });
 }
 
@@ -265,17 +265,17 @@ describe("v0.7 strategy — baked wait scorer", () => {
 
     it("classifies partial placement requests from the complete team in the holder", () => {
         const combat = createCombatTestContext();
-        const enemy = createTestUnit({ team: UPPER, abilities: ["Area Throw"] });
+        const enemy = createTestUnit({ team: RIGHT, abilities: ["Area Throw"] });
         const ranged = Array.from({ length: 3 }, (_, index) =>
-            createTestUnit({ name: `Ranged ${index}`, team: LOWER, attackType: PBTypes.AttackVals.RANGE }),
+            createTestUnit({ name: `Ranged ${index}`, team: LEFT, attackType: PBTypes.AttackVals.RANGE }),
         );
-        const melee = createTestUnit({ name: "Melee ally", team: LOWER });
+        const melee = createTestUnit({ name: "Melee ally", team: LEFT });
         combat.unitsHolder.addUnit(enemy);
         for (const unit of [...ranged, melee]) combat.unitsHolder.addUnit(unit);
-        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5);
+        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5);
 
         const placed = new StrategyV0_7().placeArmy(ranged, {
-            team: LOWER,
+            team: LEFT,
             grid: combat.grid,
             unitsHolder: combat.unitsHolder,
             pathHelper: new PathHelper(testGridSettings),
@@ -291,20 +291,20 @@ describe("v0.7 strategy — baked wait scorer", () => {
     it("uses exact v0.4 placement only for a pure ranged army facing Area Throw", () => {
         const placeAgainst = (ability: string, version: "v0.4" | "v0.6" | "v0.7") => {
             const combat = createCombatTestContext();
-            const enemy = createTestUnit({ team: UPPER, abilities: [ability] });
+            const enemy = createTestUnit({ team: RIGHT, abilities: [ability] });
             const ranged = Array.from({ length: 4 }, (_, index) =>
-                createTestUnit({ name: `Ranged ${index}`, team: LOWER, attackType: PBTypes.AttackVals.RANGE }),
+                createTestUnit({ name: `Ranged ${index}`, team: LEFT, attackType: PBTypes.AttackVals.RANGE }),
             );
             combat.unitsHolder.addUnit(enemy);
             for (const unit of ranged) combat.unitsHolder.addUnit(unit);
             return [
                 ...getAIStrategy(version)
                     .placeArmy(ranged, {
-                        team: LOWER,
+                        team: LEFT,
                         grid: combat.grid,
                         unitsHolder: combat.unitsHolder,
                         pathHelper: new PathHelper(testGridSettings),
-                        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+                        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
                     })
                     .values(),
             ];
@@ -320,28 +320,28 @@ describe("v0.7 strategy — baked wait scorer", () => {
         });
         const secondMeleeMage = createTestUnit({
             name: "Second Melee Mage",
-            team: LOWER,
+            team: LEFT,
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
         });
         const excludedSalvageUnit = createTestUnit({
             name: "Excluded Salvage Unit",
-            team: LOWER,
+            team: LEFT,
             spells: ["System:Resurrection"],
         });
         placeUnit(context.grid, context.unitsHolder, secondMeleeMage, { x: 7, y: 3 });
         placeUnit(context.grid, context.unitsHolder, excludedSalvageUnit, { x: 9, y: 3 });
-        context.fightProperties!.setTeamUnitsAlive(LOWER, 4);
+        context.fightProperties!.setTeamUnitsAlive(LEFT, 4);
         const strategy = new TestStrategyV0_7();
         process.env.V07_WAIT_WEIGHTS = JSON.stringify({ b: 1_000, w: zeroWeights() });
 
         // Without placement, a late takeover does not infer a profile from survivors or run the scorer.
         expect(strategy.finalizeForTest(actor, context, incumbent)).toBe(incumbent);
         strategy.placeArmy([actor, secondMeleeMage], {
-            team: LOWER,
+            team: LEFT,
             grid: context.grid,
             unitsHolder: context.unitsHolder,
             pathHelper: context.pathHelper,
-            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
         });
 
         // The omitted holder unit has Resurrection, so the complete army is salvage-supported and must not
@@ -400,7 +400,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
 
     it("keeps the incumbent for a team's lone living stack", () => {
         const { actor, context, incumbent } = buildBoard(10);
-        context.fightProperties!.setTeamUnitsAlive(LOWER, 1);
+        context.fightProperties!.setTeamUnitsAlive(LEFT, 1);
 
         expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
     });
@@ -418,7 +418,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
 
     it("keeps the incumbent after the actor has made its turn", () => {
         const { actor, context, incumbent } = buildBoard(10);
-        context.fightProperties!.addAlreadyMadeTurn(LOWER, actor.getId());
+        context.fightProperties!.addAlreadyMadeTurn(LEFT, actor.getId());
 
         expect(applyWaitScorerWeights(actor, context, incumbent, v07BakedWaitWeights())).toBe(incumbent);
     });
@@ -471,7 +471,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
         const { actor, context } = buildBoard(10);
         const fightProperties = context.fightProperties!;
         fightProperties.startFight();
-        fightProperties.startTurn(LOWER, 1_000);
+        fightProperties.startTurn(LEFT, 1_000);
 
         expect(
             getAIStrategy("v0.6")
@@ -496,7 +496,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
 
         expect(result.completed).toBe(true);
         expect(result.rejectionReason).toBeUndefined();
-        expect(result.events).toContainEqual({ type: "unit_waited", unitId: actor.getId(), team: LOWER });
+        expect(result.events).toContainEqual({ type: "unit_waited", unitId: actor.getId(), team: LEFT });
         expect(fightProperties.hourglassIncludes(actor.getId())).toBe(true);
         expect(fightProperties.hasAlreadyMadeTurn(actor.getId())).toBe(false);
     });
@@ -515,24 +515,24 @@ describe("v0.7 strategy — baked wait scorer", () => {
         const fightProperties = FightStateManager.getInstance().getFightProperties();
         const actor = createTestUnit({
             name: "Shooter",
-            team: LOWER,
+            team: LEFT,
             initiative: 4,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 5,
         });
         const ally = createTestUnit({
             name: "Shooter Ally",
-            team: LOWER,
+            team: LEFT,
             initiative: 2,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 5,
         });
-        const enemy = createTestUnit({ name: "Enemy", team: UPPER, initiative: 3, amountAlive: 10 });
+        const enemy = createTestUnit({ name: "Enemy", team: RIGHT, initiative: 3, amountAlive: 10 });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 5, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 3, y: 10 });
-        fightProperties.setTeamUnitsAlive(LOWER, 2);
-        fightProperties.setTeamUnitsAlive(UPPER, 1);
+        fightProperties.setTeamUnitsAlive(LEFT, 2);
+        fightProperties.setTeamUnitsAlive(RIGHT, 1);
         const context: IDecisionContext = {
             grid: combat.grid,
             matrix: combat.grid.getMatrix(),
@@ -614,7 +614,7 @@ describe("v0.7 strategy — baked wait scorer", () => {
             {
                 type: "range_attack",
                 attackerId: ranged.actor.getId(),
-                targetId: ranged.context.unitsHolder.getAllEnemyUnits(LOWER)[0].getId(),
+                targetId: ranged.context.unitsHolder.getAllEnemyUnits(LEFT)[0].getId(),
             },
         ];
         const positiveV3 = JSON.stringify({ b: 5, w: new Array(WAIT_FEATURE_NAMES_V3.length).fill(0) });

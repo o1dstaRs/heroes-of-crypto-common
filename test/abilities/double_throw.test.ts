@@ -28,7 +28,7 @@ const setUpThrow = (targetAbilities: string[] = []) => {
     const { grid, unitsHolder } = createCombatTestContext();
     const gargantuan = createTestUnit({
         name: "Gargantuan",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.RANGE,
         abilities: ["Double Throw", "Area Throw"],
         attack: 20,
@@ -39,7 +39,7 @@ const setUpThrow = (targetAbilities: string[] = []) => {
     });
     const target = createTestUnit({
         name: "Target",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         abilities: targetAbilities,
         amountAlive: 100,
         maxHp: 100,

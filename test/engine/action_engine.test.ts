@@ -34,32 +34,32 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 const setupActionFight = (
     opts: {
         activeUnit?: "lower" | "upper";
-        lowerAttackType?: AttackType;
-        lowerAttack?: number;
-        lowerAbilities?: string[];
-        lowerDamageMin?: number;
-        lowerDamageMax?: number;
-        lowerRangeShots?: number;
-        lowerSize?: UnitSizeType;
-        lowerSpells?: string[];
-        lowerStackPower?: number;
-        lowerMovementType?: MovementType;
+        leftAttackType?: AttackType;
+        leftAttack?: number;
+        leftAbilities?: string[];
+        leftDamageMin?: number;
+        leftDamageMax?: number;
+        leftRangeShots?: number;
+        leftSize?: UnitSizeType;
+        leftSpells?: string[];
+        leftStackPower?: number;
+        leftMovementType?: MovementType;
         supportMovementType?: MovementType;
-        upperMovementType?: MovementType;
-        upperAttackType?: AttackType;
-        upperDamageMin?: number;
-        upperDamageMax?: number;
-        upperRangeShots?: number;
-        lowerCell?: { x: number; y: number };
+        rightMovementType?: MovementType;
+        rightAttackType?: AttackType;
+        rightDamageMin?: number;
+        rightDamageMax?: number;
+        rightRangeShots?: number;
+        leftCell?: { x: number; y: number };
         supportCell?: { x: number; y: number };
-        upperCell?: { x: number; y: number };
-        upperAbilities?: string[];
-        upperAmountAlive?: number;
-        upperArmor?: number;
-        upperMagicResist?: number;
-        upperMaxHp?: number;
-        upperSpells?: string[];
-        lowerUnitsAlive?: number;
+        rightCell?: { x: number; y: number };
+        rightAbilities?: string[];
+        rightAmountAlive?: number;
+        rightArmor?: number;
+        rightMagicResist?: number;
+        rightMaxHp?: number;
+        rightSpells?: string[];
+        leftUnitsAlive?: number;
         currentActiveKnownPaths?: Map<number, IWeightedRoute[]>;
         currentEnemiesCellsWithinMovementRange?: { x: number; y: number }[];
         createSummonedUnit?: IGameActionEngineContext["createSummonedUnit"];
@@ -72,54 +72,54 @@ const setupActionFight = (
     fightProperties.setGridType(gridType);
     fightProperties.startFight();
 
-    const lower = createTestUnit({
+    const left = createTestUnit({
         name: "Lower",
-        team: PBTypes.TeamVals.LOWER,
-        attackType: opts.lowerAttackType ?? PBTypes.AttackVals.MELEE,
-        attack: opts.lowerAttack,
-        damageMin: opts.lowerDamageMin,
-        damageMax: opts.lowerDamageMax,
-        abilities: opts.lowerAbilities,
-        rangeShots: opts.lowerRangeShots ?? 0,
-        size: opts.lowerSize,
+        team: PBTypes.TeamVals.LEFT,
+        attackType: opts.leftAttackType ?? PBTypes.AttackVals.MELEE,
+        attack: opts.leftAttack,
+        damageMin: opts.leftDamageMin,
+        damageMax: opts.leftDamageMax,
+        abilities: opts.leftAbilities,
+        rangeShots: opts.leftRangeShots ?? 0,
+        size: opts.leftSize,
         initiative: 5,
         morale: 4,
-        spells: opts.lowerSpells,
-        stackPower: opts.lowerStackPower,
-        movementType: opts.lowerMovementType,
+        spells: opts.leftSpells,
+        stackPower: opts.leftStackPower,
+        movementType: opts.leftMovementType,
     });
-    const upper = createTestUnit({
+    const right = createTestUnit({
         name: "Upper",
-        team: PBTypes.TeamVals.UPPER,
-        attackType: opts.upperAttackType,
+        team: PBTypes.TeamVals.RIGHT,
+        attackType: opts.rightAttackType,
         initiative: 3,
         morale: 4,
-        abilities: opts.upperAbilities,
-        amountAlive: opts.upperAmountAlive,
-        armor: opts.upperArmor,
-        damageMin: opts.upperDamageMin,
-        damageMax: opts.upperDamageMax,
-        magicResist: opts.upperMagicResist,
-        maxHp: opts.upperMaxHp,
-        rangeShots: opts.upperRangeShots,
-        spells: opts.upperSpells,
-        movementType: opts.upperMovementType,
+        abilities: opts.rightAbilities,
+        amountAlive: opts.rightAmountAlive,
+        armor: opts.rightArmor,
+        damageMin: opts.rightDamageMin,
+        damageMax: opts.rightDamageMax,
+        magicResist: opts.rightMagicResist,
+        maxHp: opts.rightMaxHp,
+        rangeShots: opts.rightRangeShots,
+        spells: opts.rightSpells,
+        movementType: opts.rightMovementType,
     });
-    const lowerSupport = createTestUnit({
+    const leftSupport = createTestUnit({
         name: "Lower Support",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         initiative: 2,
         movementType: opts.supportMovementType,
     });
 
-    placeUnit(context.grid, context.unitsHolder, lower, opts.lowerCell ?? { x: 3, y: 3 });
-    placeUnit(context.grid, context.unitsHolder, upper, opts.upperCell ?? { x: 9, y: 9 });
-    placeUnit(context.grid, context.unitsHolder, lowerSupport, opts.supportCell ?? { x: 4, y: 3 });
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, opts.lowerUnitsAlive ?? 2);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    placeUnit(context.grid, context.unitsHolder, left, opts.leftCell ?? { x: 3, y: 3 });
+    placeUnit(context.grid, context.unitsHolder, right, opts.rightCell ?? { x: 9, y: 9 });
+    placeUnit(context.grid, context.unitsHolder, leftSupport, opts.supportCell ?? { x: 4, y: 3 });
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, opts.leftUnitsAlive ?? 2);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
-    const activeUnit = opts.activeUnit === "upper" ? upper : lower;
+    const activeUnit = opts.activeUnit === "upper" ? right : left;
     const sceneLog = new SceneLogMock();
     const moveHandler = new MoveHandler(context.grid.getSettings(), context.grid, context.unitsHolder);
     const engine = new GameActionEngine({
@@ -136,7 +136,7 @@ const setupActionFight = (
         runtime: createSequenceGameRuntime({ nowMillis: [1400] }),
     });
 
-    return { ...context, fightProperties, lower, lowerSupport, upper, activeUnit, sceneLog, moveHandler, engine };
+    return { ...context, fightProperties, left, leftSupport, right, activeUnit, sceneLog, moveHandler, engine };
 };
 
 const setupPlacementFight = (
@@ -153,7 +153,7 @@ const setupPlacementFight = (
     const moveHandler = new MoveHandler(context.grid.getSettings(), context.grid, context.unitsHolder);
     const unit = createTestUnit({
         name: "Peasant",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         amountAlive: opts.amountAlive,
     });
     context.unitsHolder.addUnit(unit);
@@ -185,42 +185,42 @@ const weightedRoute = (route: { x: number; y: number }[]): IWeightedRoute => ({
 describe("GameActionEngine", () => {
     it("treats a manual end with no action taken as a skip (do-nothing turn, e.g. an AI unit)", () => {
         const setup = setupActionFight();
-        const moraleBefore = setup.lower.getMorale();
+        const moraleBefore = setup.left.getMorale();
 
         // The unit ends its turn without moving/attacking/casting. Reaching end_turn at all means it
         // didn't attack/cast (those complete the turn directly), and it didn't move either, so it did
         // nothing — that must read + score as a skip even though the end carried no explicit reason.
-        const result = setup.engine.apply({ type: "end_turn", unitId: setup.lower.getId() });
+        const result = setup.engine.apply({ type: "end_turn", unitId: setup.left.getId() });
 
         expect(result.completed).toBe(true);
         expect(result.rejectionReason).toBeUndefined();
         expect(result.events).toContainEqual(
-            expect.objectContaining({ type: "unit_skipped", unitId: setup.lower.getId(), reason: "skip" }),
+            expect.objectContaining({ type: "unit_skipped", unitId: setup.left.getId(), reason: "skip" }),
         );
         expect(result.events).toContainEqual({
             type: "turn_completed",
-            unitId: setup.lower.getId(),
-            team: PBTypes.TeamVals.LOWER,
+            unitId: setup.left.getId(),
+            team: PBTypes.TeamVals.LEFT,
             hourglass: false,
         });
         setup.unitsHolder.refreshStackPowerForAllUnits();
-        expect(setup.lower.getMorale()).toBeLessThan(moraleBefore);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
-        expect(setup.fightProperties.getCurrentLapTotalTime(PBTypes.TeamVals.LOWER)).toBe(400);
+        expect(setup.left.getMorale()).toBeLessThan(moraleBefore);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
+        expect(setup.fightProperties.getCurrentLapTotalTime(PBTypes.TeamVals.LEFT)).toBe(400);
     });
 
     it("drops morale and emits unit_skipped when the turn is skipped (Next/skip)", () => {
         const setup = setupActionFight();
-        const moraleBefore = setup.lower.getMorale();
+        const moraleBefore = setup.left.getMorale();
 
-        const result = setup.engine.apply({ type: "end_turn", unitId: setup.lower.getId(), reason: "skip" });
+        const result = setup.engine.apply({ type: "end_turn", unitId: setup.left.getId(), reason: "skip" });
 
         expect(result.completed).toBe(true);
         expect(result.events).toContainEqual(
-            expect.objectContaining({ type: "unit_skipped", unitId: setup.lower.getId(), reason: "skip" }),
+            expect.objectContaining({ type: "unit_skipped", unitId: setup.left.getId(), reason: "skip" }),
         );
         setup.unitsHolder.refreshStackPowerForAllUnits();
-        expect(setup.lower.getMorale()).toBeLessThan(moraleBefore);
+        expect(setup.left.getMorale()).toBeLessThan(moraleBefore);
     });
 
     it("keeps the full +3 distance morale when a move also ends the unit's turn", () => {
@@ -234,15 +234,15 @@ describe("GameActionEngine", () => {
         const setup = setupActionFight({
             currentActiveKnownPaths: new Map([[cellKey(targetCell), [weightedRoute(path)]]]),
         });
-        expect(setup.lower.getMorale()).toBe(4);
+        expect(setup.left.getMorale()).toBe(4);
 
         // Move toward the enemy (+3), then end the turn manually — the end must NOT apply the skip
         // penalty, so the net stays +3 (regression: it used to net -1).
-        expect(setup.engine.apply({ type: "move_unit", unitId: setup.lower.getId(), path }).completed).toBe(true);
-        expect(setup.engine.apply({ type: "end_turn", unitId: setup.lower.getId() }).completed).toBe(true);
+        expect(setup.engine.apply({ type: "move_unit", unitId: setup.left.getId(), path }).completed).toBe(true);
+        expect(setup.engine.apply({ type: "end_turn", unitId: setup.left.getId() }).completed).toBe(true);
 
         setup.unitsHolder.refreshStackPowerForAllUnits();
-        expect(setup.lower.getMorale()).toBe(7);
+        expect(setup.left.getMorale()).toBe(7);
     });
 
     it("applies the full -3 distance morale when a move away also ends the turn", () => {
@@ -256,34 +256,34 @@ describe("GameActionEngine", () => {
         const setup = setupActionFight({
             currentActiveKnownPaths: new Map([[cellKey(targetCell), [weightedRoute(path)]]]),
         });
-        expect(setup.lower.getMorale()).toBe(4);
+        expect(setup.left.getMorale()).toBe(4);
 
-        expect(setup.engine.apply({ type: "move_unit", unitId: setup.lower.getId(), path }).completed).toBe(true);
-        expect(setup.engine.apply({ type: "end_turn", unitId: setup.lower.getId() }).completed).toBe(true);
+        expect(setup.engine.apply({ type: "move_unit", unitId: setup.left.getId(), path }).completed).toBe(true);
+        expect(setup.engine.apply({ type: "end_turn", unitId: setup.left.getId() }).completed).toBe(true);
 
         setup.unitsHolder.refreshStackPowerForAllUnits();
-        expect(setup.lower.getMorale()).toBe(1);
+        expect(setup.left.getMorale()).toBe(1);
     });
 
     it("waits on hourglass without marking the unit as having completed the lap", () => {
         const setup = setupActionFight();
 
-        const result = setup.engine.apply({ type: "wait_turn", unitId: setup.lower.getId() });
+        const result = setup.engine.apply({ type: "wait_turn", unitId: setup.left.getId() });
 
         expect(result.completed).toBe(true);
         expect(result.events).toEqual([
-            { type: "unit_waited", unitId: setup.lower.getId(), team: PBTypes.TeamVals.LOWER },
+            { type: "unit_waited", unitId: setup.left.getId(), team: PBTypes.TeamVals.LEFT },
             {
                 type: "turn_completed",
-                unitId: setup.lower.getId(),
-                team: PBTypes.TeamVals.LOWER,
+                unitId: setup.left.getId(),
+                team: PBTypes.TeamVals.LEFT,
                 hourglass: true,
             },
         ]);
-        expect(setup.lower.isOnHourglass()).toBe(true);
-        expect(setup.fightProperties.hourglassIncludes(setup.lower.getId())).toBe(true);
-        expect(setup.fightProperties.hasAlreadyHourglass(setup.lower.getId())).toBe(true);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.left.isOnHourglass()).toBe(true);
+        expect(setup.fightProperties.hourglassIncludes(setup.left.getId())).toBe(true);
+        expect(setup.fightProperties.hasAlreadyHourglass(setup.left.getId())).toBe(true);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("grants additional turn time to the active team once per lap and refuses off-turn / repeat requests", () => {
@@ -291,21 +291,21 @@ describe("GameActionEngine", () => {
         const before = setup.fightProperties.getCurrentTurnEnd();
 
         // Off-turn: UPPER cannot extend the clock while a LOWER unit is active.
-        expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.UPPER })).toMatchObject({
+        expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.RIGHT })).toMatchObject({
             completed: false,
             rejectionReason: "additional_time_not_available",
         });
         expect(setup.fightProperties.getCurrentTurnEnd()).toBe(before);
 
         // The active team's first request this lap extends the running clock.
-        expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.LOWER }).completed).toBe(
+        expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.LEFT }).completed).toBe(
             true,
         );
         const extended = setup.fightProperties.getCurrentTurnEnd();
         expect(extended).toBeGreaterThan(before);
 
         // A second request in the same lap is refused (once per lap per team).
-        expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.LOWER })).toMatchObject({
+        expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.LEFT })).toMatchObject({
             completed: false,
             rejectionReason: "additional_time_not_available",
         });
@@ -315,75 +315,75 @@ describe("GameActionEngine", () => {
     it("defends with luck shield and completes the unit turn", () => {
         const setup = setupActionFight();
 
-        const result = setup.engine.apply({ type: "defend_turn", unitId: setup.lower.getId() });
+        const result = setup.engine.apply({ type: "defend_turn", unitId: setup.left.getId() });
 
         expect(result.completed).toBe(true);
         expect(result.events).toContainEqual({
             type: "unit_defended",
-            unitId: setup.lower.getId(),
-            team: PBTypes.TeamVals.LOWER,
+            unitId: setup.left.getId(),
+            team: PBTypes.TeamVals.LEFT,
         });
         expect(result.events).toContainEqual({
             type: "turn_completed",
-            unitId: setup.lower.getId(),
-            team: PBTypes.TeamVals.LOWER,
+            unitId: setup.left.getId(),
+            team: PBTypes.TeamVals.LEFT,
             hourglass: false,
         });
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
     it("defending (Luck Shield) costs MORALE_CHANGE_FOR_SHIELD morale", () => {
         const setup = setupActionFight();
-        const before = setup.lower.getMorale();
+        const before = setup.left.getMorale();
 
-        setup.engine.apply({ type: "defend_turn", unitId: setup.lower.getId() });
+        setup.engine.apply({ type: "defend_turn", unitId: setup.left.getId() });
 
-        expect(setup.lower.getMorale()).toBe(before - MORALE_CHANGE_FOR_SHIELD);
+        expect(setup.left.getMorale()).toBe(before - MORALE_CHANGE_FOR_SHIELD);
     });
 
     it("waiting on the hourglass costs MORALE_CHANGE_FOR_CLOCK morale", () => {
         const setup = setupActionFight();
-        const before = setup.lower.getMorale();
+        const before = setup.left.getMorale();
 
-        const result = setup.engine.apply({ type: "wait_turn", unitId: setup.lower.getId() });
+        const result = setup.engine.apply({ type: "wait_turn", unitId: setup.left.getId() });
 
         expect(result.completed).toBe(true);
-        expect(setup.lower.getMorale()).toBe(before - MORALE_CHANGE_FOR_CLOCK);
+        expect(setup.left.getMorale()).toBe(before - MORALE_CHANGE_FOR_CLOCK);
     });
 
     it("rejects Hourglass globally while a Time Denial holder is active", () => {
-        const setup = setupActionFight({ upperAbilities: ["Time Denial"] });
+        const setup = setupActionFight({ rightAbilities: ["Time Denial"] });
 
-        expect(setup.upper.hasAbilityActive("Time Denial")).toBe(true);
-        expect(setup.engine.apply({ type: "wait_turn", unitId: setup.lower.getId() })).toMatchObject({
+        expect(setup.right.hasAbilityActive("Time Denial")).toBe(true);
+        expect(setup.engine.apply({ type: "wait_turn", unitId: setup.left.getId() })).toMatchObject({
             completed: false,
             rejectionReason: "hourglass_not_available",
         });
     });
 
     it("lifts Time Denial when its holder is Broken and carries it with a thief", () => {
-        const brokenSource = setupActionFight({ upperAbilities: ["Time Denial"] });
-        brokenSource.upper.applyEffect(new EffectFactory().makeEffect("Break")!);
-        expect(brokenSource.upper.hasAbilityActive("Time Denial")).toBe(false);
-        expect(brokenSource.engine.apply({ type: "wait_turn", unitId: brokenSource.lower.getId() }).completed).toBe(
+        const brokenSource = setupActionFight({ rightAbilities: ["Time Denial"] });
+        brokenSource.right.applyEffect(new EffectFactory().makeEffect("Break")!);
+        expect(brokenSource.right.hasAbilityActive("Time Denial")).toBe(false);
+        expect(brokenSource.engine.apply({ type: "wait_turn", unitId: brokenSource.left.getId() }).completed).toBe(
             true,
         );
 
-        const stolenSource = setupActionFight({ upperAbilities: ["Time Denial"] });
-        expect(stolenSource.upper.disableAbilityAsStolen("Time Denial")).toBeDefined();
-        stolenSource.lower.grantStolenAbility("Time Denial");
-        expect(stolenSource.upper.hasAbilityActive("Time Denial")).toBe(false);
-        expect(stolenSource.lower.hasAbilityActive("Time Denial")).toBe(true);
-        expect(stolenSource.engine.apply({ type: "wait_turn", unitId: stolenSource.lower.getId() })).toMatchObject({
+        const stolenSource = setupActionFight({ rightAbilities: ["Time Denial"] });
+        expect(stolenSource.right.disableAbilityAsStolen("Time Denial")).toBeDefined();
+        stolenSource.left.grantStolenAbility("Time Denial");
+        expect(stolenSource.right.hasAbilityActive("Time Denial")).toBe(false);
+        expect(stolenSource.left.hasAbilityActive("Time Denial")).toBe(true);
+        expect(stolenSource.engine.apply({ type: "wait_turn", unitId: stolenSource.left.getId() })).toMatchObject({
             completed: false,
             rejectionReason: "hourglass_not_available",
         });
     });
 
     it("rejects hourglass when the active unit is the only living unit on its team", () => {
-        const setup = setupActionFight({ lowerUnitsAlive: 1 });
+        const setup = setupActionFight({ leftUnitsAlive: 1 });
 
-        const result = setup.engine.apply({ type: "wait_turn", unitId: setup.lower.getId() });
+        const result = setup.engine.apply({ type: "wait_turn", unitId: setup.left.getId() });
 
         expect(result).toEqual({
             completed: false,
@@ -391,19 +391,19 @@ describe("GameActionEngine", () => {
             rejectionReason: "hourglass_not_available",
             message: undefined,
         });
-        expect(setup.lower.isOnHourglass()).toBe(false);
-        expect(setup.fightProperties.hourglassIncludes(setup.lower.getId())).toBe(false);
+        expect(setup.left.isOnHourglass()).toBe(false);
+        expect(setup.fightProperties.hourglassIncludes(setup.left.getId())).toBe(false);
     });
 
     it("rejects hourglass when every living teammate already completed its turn this lap", () => {
         const setup = setupActionFight();
         setup.fightProperties.addAlreadyMadeTurn(
-            PBTypes.TeamVals.LOWER,
-            setup.lowerSupport.getId(),
+            PBTypes.TeamVals.LEFT,
+            setup.leftSupport.getId(),
             setup.fightProperties.getCurrentTurnStart(),
         );
 
-        const result = setup.engine.apply({ type: "wait_turn", unitId: setup.lower.getId() });
+        const result = setup.engine.apply({ type: "wait_turn", unitId: setup.left.getId() });
 
         expect(result).toEqual({
             completed: false,
@@ -411,14 +411,14 @@ describe("GameActionEngine", () => {
             rejectionReason: "hourglass_not_available",
             message: undefined,
         });
-        expect(setup.lower.isOnHourglass()).toBe(false);
-        expect(setup.fightProperties.hourglassIncludes(setup.lower.getId())).toBe(false);
+        expect(setup.left.isOnHourglass()).toBe(false);
+        expect(setup.fightProperties.hourglassIncludes(setup.left.getId())).toBe(false);
     });
 
     it("rejects actions for units that are not currently active", () => {
         const setup = setupActionFight();
 
-        const result = setup.engine.apply({ type: "end_turn", unitId: setup.upper.getId() });
+        const result = setup.engine.apply({ type: "end_turn", unitId: setup.right.getId() });
 
         expect(result).toEqual({
             completed: false,
@@ -426,16 +426,16 @@ describe("GameActionEngine", () => {
             rejectionReason: "unit_not_active",
             message: undefined,
         });
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.upper.getId())).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.right.getId())).toBe(false);
     });
 
     it("selects an available attack type for the active unit", () => {
-        const setup = setupActionFight({ lowerAttackType: PBTypes.AttackVals.RANGE, lowerRangeShots: 3 });
-        setup.lower.refreshPossibleAttackTypes(true);
+        const setup = setupActionFight({ leftAttackType: PBTypes.AttackVals.RANGE, leftRangeShots: 3 });
+        setup.left.refreshPossibleAttackTypes(true);
 
         const result = setup.engine.apply({
             type: "select_attack_type",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             attackType: PBTypes.AttackVals.MELEE,
         });
 
@@ -443,27 +443,27 @@ describe("GameActionEngine", () => {
         expect(result.events).toEqual([
             {
                 type: "attack_type_selected",
-                unitId: setup.lower.getId(),
-                team: PBTypes.TeamVals.LOWER,
+                unitId: setup.left.getId(),
+                team: PBTypes.TeamVals.LEFT,
                 attackType: PBTypes.AttackVals.MELEE,
             },
         ]);
-        expect(setup.lower.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
+        expect(setup.left.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
     });
 
     it("accepts selecting the already selected attack type as an idempotent action", () => {
-        const setup = setupActionFight({ lowerAttackType: PBTypes.AttackVals.RANGE, lowerRangeShots: 3 });
-        setup.lower.refreshPossibleAttackTypes(false);
-        expect(setup.lower.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
+        const setup = setupActionFight({ leftAttackType: PBTypes.AttackVals.RANGE, leftRangeShots: 3 });
+        setup.left.refreshPossibleAttackTypes(false);
+        expect(setup.left.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
 
         const result = setup.engine.apply({
             type: "select_attack_type",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             attackType: PBTypes.AttackVals.MELEE,
         });
 
         expect(result).toEqual({ completed: true, events: [] });
-        expect(setup.lower.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
+        expect(setup.left.getAttackTypeSelection()).toBe(PBTypes.AttackVals.MELEE);
     });
 
     it("moves the active unit and leaves the turn open", () => {
@@ -472,7 +472,7 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: [targetCell],
         });
 
@@ -480,12 +480,12 @@ describe("GameActionEngine", () => {
         expect(result.events).toHaveLength(1);
         expect(result.events[0]).toMatchObject({
             type: "unit_moved",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: [targetCell],
             targetCells: [targetCell],
         });
-        expect(setup.lower.getBaseCell()).toEqual(targetCell);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.left.getBaseCell()).toEqual(targetCell);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("accepts move routes that include the current cell", () => {
@@ -498,18 +498,18 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path,
         });
 
         expect(result.completed).toBe(true);
         expect(result.events[0]).toMatchObject({
             type: "unit_moved",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path,
             targetCells: [targetCell],
         });
-        expect(setup.lower.getBaseCell()).toEqual(targetCell);
+        expect(setup.left.getBaseCell()).toEqual(targetCell);
     });
 
     it("gives +3 morale end-to-end when a move_unit shortens the distance to the enemy", () => {
@@ -524,11 +524,11 @@ describe("GameActionEngine", () => {
         const setup = setupActionFight({
             currentActiveKnownPaths: new Map([[cellKey(targetCell), [weightedRoute(path)]]]),
         });
-        expect(setup.lower.getMorale()).toBe(4);
+        expect(setup.left.getMorale()).toBe(4);
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path,
         });
         expect(result.completed).toBe(true);
@@ -536,7 +536,7 @@ describe("GameActionEngine", () => {
         // refreshStackPowerForAllUnits syncs the morale change (written to initialUnitProperties by
         // increaseMorale) into unitProperties, exactly as the scene does after a move.
         setup.unitsHolder.refreshStackPowerForAllUnits();
-        expect(setup.lower.getMorale()).toBe(7);
+        expect(setup.left.getMorale()).toBe(7);
     });
 
     it("rejects direct moves that are not present in current active known paths", () => {
@@ -549,44 +549,44 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: [currentCell, forbiddenCell],
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("invalid_move");
-        expect(setup.lower.getBaseCell()).toEqual(currentCell);
+        expect(setup.left.getBaseCell()).toEqual(currentCell);
     });
 
     it("rejects move routes whose travelled cells exceed unit steps", () => {
         const setup = setupActionFight();
-        const currentCell = setup.lower.getBaseCell();
+        const currentCell = setup.left.getBaseCell();
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: [currentCell, { x: 3, y: 4 }, { x: 3, y: 5 }, { x: 3, y: 6 }, { x: 3, y: 7 }],
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("invalid_move");
-        expect(setup.lower.getBaseCell()).toEqual(currentCell);
+        expect(setup.left.getBaseCell()).toEqual(currentCell);
     });
 
     it("rejects discontinuous move routes when known paths are unavailable", () => {
         const setup = setupActionFight();
-        const currentCell = setup.lower.getBaseCell();
+        const currentCell = setup.left.getBaseCell();
         const targetCell = { x: 3, y: 5 };
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: [targetCell],
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("invalid_move");
-        expect(setup.lower.getBaseCell()).toEqual(currentCell);
+        expect(setup.left.getBaseCell()).toEqual(currentCell);
     });
 
     it("accepts large footprint-only moves when the footprint matches a known route", () => {
@@ -600,13 +600,13 @@ describe("GameActionEngine", () => {
             { x: 5, y: 5 },
         ];
         const setup = setupActionFight({
-            lowerSize: PBTypes.UnitSizeVals.LARGE,
+            leftSize: PBTypes.UnitSizeVals.LARGE,
             currentActiveKnownPaths: new Map([[cellKey(routeAnchor), [weightedRoute(route)]]]),
         });
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: footprint,
             targetCells: footprint,
         });
@@ -614,7 +614,7 @@ describe("GameActionEngine", () => {
         expect(result.completed).toBe(true);
         expect(result.events[0]).toMatchObject({
             type: "unit_moved",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: footprint,
             targetCells: footprint,
         });
@@ -632,17 +632,17 @@ describe("GameActionEngine", () => {
         const path = [currentCell, targetCell];
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.LAVA_CENTER,
-            lowerAbilities: ["Made of Fire"],
-            lowerSize: PBTypes.UnitSizeVals.LARGE,
-            lowerCell: currentCell,
+            leftAbilities: ["Made of Fire"],
+            leftSize: PBTypes.UnitSizeVals.LARGE,
+            leftCell: currentCell,
             supportCell: { x: 2, y: 2 },
-            upperCell: { x: 12, y: 12 },
+            rightCell: { x: 12, y: 12 },
             currentActiveKnownPaths: new Map([[cellKey(targetCell), [weightedRoute(path)]]]),
         });
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path,
             targetCells,
             hasLavaCell: true,
@@ -650,8 +650,8 @@ describe("GameActionEngine", () => {
 
         expect(result.completed).toBe(true);
         expect(result.rejectionReason).toBeUndefined();
-        expect(setup.lower.getBaseCell()).toEqual(targetCell);
-        expect(setup.lower.getCells()).toEqual(expect.arrayContaining(targetCells));
+        expect(setup.left.getBaseCell()).toEqual(targetCell);
+        expect(setup.left.getCells()).toEqual(expect.arrayContaining(targetCells));
         expect(result.events[0]).toMatchObject({
             type: "unit_moved",
             path,
@@ -662,14 +662,14 @@ describe("GameActionEngine", () => {
     it("performs a melee attack and completes the active unit turn", () => {
         const setup = setupActionFight({
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 4, y: 3 },
+            rightCell: { x: 4, y: 3 },
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
 
         const result = setup.engine.apply({
             type: "melee_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
             attackFrom: { x: 3, y: 3 },
         });
 
@@ -678,18 +678,18 @@ describe("GameActionEngine", () => {
             expect.objectContaining({
                 type: "unit_attacked",
                 attackType: "melee",
-                attackerId: setup.lower.getId(),
-                targetId: setup.upper.getId(),
+                attackerId: setup.left.getId(),
+                targetId: setup.right.getId(),
             }),
         );
         expect(result.events).toContainEqual({
             type: "turn_completed",
-            unitId: setup.lower.getId(),
-            team: PBTypes.TeamVals.LOWER,
+            unitId: setup.left.getId(),
+            team: PBTypes.TeamVals.LEFT,
             hourglass: false,
         });
-        expect(setup.upper.getCumulativeHp()).toBeLessThan(setup.upper.getCumulativeMaxHp());
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(setup.right.getCumulativeMaxHp());
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
     it("performs a move-melee attack when the supplied path matches known paths", () => {
@@ -698,15 +698,15 @@ describe("GameActionEngine", () => {
         const path = [currentCell, attackFrom];
         const setup = setupActionFight({
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 5, y: 3 },
+            rightCell: { x: 5, y: 3 },
             currentActiveKnownPaths: new Map([[cellKey(attackFrom), [weightedRoute(path)]]]),
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
 
         const result = setup.engine.apply({
             type: "melee_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
             attackFrom,
             path,
         });
@@ -716,11 +716,11 @@ describe("GameActionEngine", () => {
             expect.objectContaining({
                 type: "unit_attacked",
                 attackType: "melee",
-                attackerId: setup.lower.getId(),
-                targetId: setup.upper.getId(),
+                attackerId: setup.left.getId(),
+                targetId: setup.right.getId(),
             }),
         );
-        expect(setup.lower.getBaseCell()).toEqual(attackFrom);
+        expect(setup.left.getBaseCell()).toEqual(attackFrom);
     });
 
     it("rejects move-melee attacks when the supplied path is not in known paths", () => {
@@ -729,23 +729,23 @@ describe("GameActionEngine", () => {
         const attackFrom = { x: 4, y: 3 };
         const setup = setupActionFight({
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 5, y: 3 },
+            rightCell: { x: 5, y: 3 },
             currentActiveKnownPaths: new Map([[cellKey(allowedCell), [weightedRoute([currentCell, allowedCell])]]]),
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
 
         const result = setup.engine.apply({
             type: "melee_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
             attackFrom,
             path: [currentCell, attackFrom],
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("attack_not_available");
-        expect(setup.lower.getBaseCell()).toEqual(currentCell);
-        expect(setup.upper.getCumulativeHp()).toBe(setup.upper.getCumulativeMaxHp());
+        expect(setup.left.getBaseCell()).toEqual(currentCell);
+        expect(setup.right.getCumulativeHp()).toBe(setup.right.getCumulativeMaxHp());
     });
 
     // -------------------------------------------------------------------------------------------------
@@ -766,15 +766,15 @@ describe("GameActionEngine", () => {
         const clientDetour = [currentCell, { x: 3, y: 4 }, attackFrom];
         const setup = setupActionFight({
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 5, y: 3 },
+            rightCell: { x: 5, y: 3 },
             currentActiveKnownPaths: new Map([[cellKey(attackFrom), [weightedRoute(canonical)]]]),
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
 
         const result = setup.engine.apply({
             type: "melee_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
             attackFrom,
             path: clientDetour,
         });
@@ -784,13 +784,13 @@ describe("GameActionEngine", () => {
             expect.objectContaining({
                 type: "unit_attacked",
                 attackType: "melee",
-                attackerId: setup.lower.getId(),
-                targetId: setup.upper.getId(),
+                attackerId: setup.left.getId(),
+                targetId: setup.right.getId(),
             }),
         );
         // The unit moved to the (reachable) attack-from cell and the strike landed.
-        expect(setup.lower.getBaseCell()).toEqual(attackFrom);
-        expect(setup.upper.getCumulativeHp()).toBeLessThan(setup.upper.getCumulativeMaxHp());
+        expect(setup.left.getBaseCell()).toEqual(attackFrom);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(setup.right.getCumulativeMaxHp());
     });
 
     it("SECURITY: still refuses a move-melee whose attack-from cell is adjacent to the target but NOT reachable (no teleport-melee)", () => {
@@ -799,27 +799,27 @@ describe("GameActionEngine", () => {
         const attackFrom = { x: 4, y: 3 }; // adjacent to the target at (5,3) but absent from known paths
         const setup = setupActionFight({
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 5, y: 3 },
+            rightCell: { x: 5, y: 3 },
             // Known paths only reach a different cell — the attack-from cell has NO known route, so it is
             // unreachable this turn. The fallback must NOT invent a route to it.
             currentActiveKnownPaths: new Map([
                 [cellKey(reachableButIrrelevant), [weightedRoute([currentCell, reachableButIrrelevant])]],
             ]),
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
 
         const result = setup.engine.apply({
             type: "melee_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
             attackFrom,
             path: [currentCell, attackFrom],
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("attack_not_available");
-        expect(setup.lower.getBaseCell()).toEqual(currentCell);
-        expect(setup.upper.getCumulativeHp()).toBe(setup.upper.getCumulativeMaxHp());
+        expect(setup.left.getBaseCell()).toEqual(currentCell);
+        expect(setup.right.getCumulativeHp()).toBe(setup.right.getCumulativeMaxHp());
     });
 
     it("chooses the server's lowest-weight canonical route when several known routes reach the attack-from cell and none matches the client path", () => {
@@ -829,23 +829,23 @@ describe("GameActionEngine", () => {
         const shortRoute = weightedRoute([currentCell, attackFrom]); // weight 1 -> canonical
         const setup = setupActionFight({
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 5, y: 3 },
+            rightCell: { x: 5, y: 3 },
             // Order deliberately puts the longer route first to prove selection is by weight, not position.
             currentActiveKnownPaths: new Map([[cellKey(attackFrom), [longRoute, shortRoute]]]),
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
 
         const result = setup.engine.apply({
             type: "melee_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
             attackFrom,
             path: [currentCell, { x: 4, y: 4 }, attackFrom], // matches neither known route
         });
 
         expect(result.completed).toBe(true);
-        expect(setup.lower.getBaseCell()).toEqual(attackFrom);
-        expect(setup.upper.getCumulativeHp()).toBeLessThan(setup.upper.getCumulativeMaxHp());
+        expect(setup.left.getBaseCell()).toEqual(attackFrom);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(setup.right.getCumulativeMaxHp());
     });
 
     it("performs a move_unit to a reachable destination when the client's path differs from the server's canonical route", () => {
@@ -860,13 +860,13 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: clientDetour,
         });
 
         expect(result.completed).toBe(true);
-        expect(result.events[0]).toMatchObject({ type: "unit_moved", unitId: setup.lower.getId() });
-        expect(setup.lower.getBaseCell()).toEqual(destination);
+        expect(result.events[0]).toMatchObject({ type: "unit_moved", unitId: setup.left.getId() });
+        expect(setup.left.getBaseCell()).toEqual(destination);
     });
 
     it("SECURITY: still rejects a move_unit whose DESTINATION is not in known paths (path relaxation does not weaken reachability)", () => {
@@ -880,13 +880,13 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: [currentCell, { x: 3, y: 5 }, { x: 3, y: 6 }, unreachableDestination],
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("invalid_move");
-        expect(setup.lower.getBaseCell()).toEqual(currentCell);
+        expect(setup.left.getBaseCell()).toEqual(currentCell);
     });
 
     it("selects the lowest-weight canonical route for a move_unit when several routes reach the destination and none matches the client path", () => {
@@ -901,28 +901,28 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: [currentCell, { x: 4, y: 4 }, destination], // matches neither known route
         });
 
         expect(result.completed).toBe(true);
-        expect(setup.lower.getBaseCell()).toEqual(destination);
+        expect(setup.left.getBaseCell()).toEqual(destination);
     });
 
     it("performs a range attack and consumes a shot through common mechanics", () => {
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerRangeShots: 3,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftRangeShots: 3,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 7, y: 3 },
+            rightCell: { x: 7, y: 3 },
         });
-        setup.lower.refreshPossibleAttackTypes(true);
-        const shotsBefore = setup.lower.getRangeShots();
+        setup.left.refreshPossibleAttackTypes(true);
+        const shotsBefore = setup.left.getRangeShots();
 
         const result = setup.engine.apply({
             type: "range_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(true);
@@ -930,12 +930,12 @@ describe("GameActionEngine", () => {
             expect.objectContaining({
                 type: "unit_attacked",
                 attackType: "range",
-                attackerId: setup.lower.getId(),
-                targetId: setup.upper.getId(),
+                attackerId: setup.left.getId(),
+                targetId: setup.right.getId(),
             }),
         );
-        expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore - 1);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
     it("a shot-at shooter counter-shoots, and a bouncing Chakram attacker does not suppress it", () => {
@@ -944,33 +944,33 @@ describe("GameActionEngine", () => {
         // gets its counter-shot in both shapes — with and without extra enemies for the disc to bounce to.
         const run = (abilities?: string[], bounceTargets = 0): number => {
             const setup = setupActionFight({
-                lowerAttackType: PBTypes.AttackVals.RANGE,
-                lowerRangeShots: 3,
-                lowerAbilities: abilities,
-                lowerStackPower: 5,
+                leftAttackType: PBTypes.AttackVals.RANGE,
+                leftRangeShots: 3,
+                leftAbilities: abilities,
+                leftStackPower: 5,
                 supportCell: { x: 2, y: 3 },
-                upperAttackType: PBTypes.AttackVals.RANGE,
-                upperRangeShots: 3,
-                upperCell: { x: 7, y: 3 },
+                rightAttackType: PBTypes.AttackVals.RANGE,
+                rightRangeShots: 3,
+                rightCell: { x: 7, y: 3 },
             });
             for (let i = 0; i < bounceTargets; i++) {
                 const extra = createTestUnit({
                     name: `Bounce ${i}`,
-                    team: PBTypes.TeamVals.UPPER,
+                    team: PBTypes.TeamVals.RIGHT,
                     maxHp: 10_000,
                 });
                 placeUnit(setup.grid, setup.unitsHolder, extra, { x: 8, y: 4 + i });
             }
-            setup.lower.refreshPossibleAttackTypes(true);
-            setup.upper.refreshPossibleAttackTypes(true);
-            const hpBefore = setup.lower.getHp();
+            setup.left.refreshPossibleAttackTypes(true);
+            setup.right.refreshPossibleAttackTypes(true);
+            const hpBefore = setup.left.getHp();
             const result = setup.engine.apply({
                 type: "range_attack",
-                attackerId: setup.lower.getId(),
-                targetId: setup.upper.getId(),
+                attackerId: setup.left.getId(),
+                targetId: setup.right.getId(),
             });
             expect(result.completed).toBe(true);
-            return hpBefore - setup.lower.getHp();
+            return hpBefore - setup.left.getHp();
         };
         expect(run()).toBeGreaterThan(0);
         expect(run(["Chakram"])).toBeGreaterThan(0);
@@ -980,68 +980,68 @@ describe("GameActionEngine", () => {
 
     it("rejects a range attack from a unit standing in a Range Null Field", () => {
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerRangeShots: 3,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftRangeShots: 3,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 7, y: 3 },
+            rightCell: { x: 7, y: 3 },
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
         // Stand the shooter inside an enemy's Range Null Field (modelled as a debuff aura) — firing must
         // be impossible, not merely discouraged.
-        setup.lower.applyAuraEffect("Range Null Field Aura", "", false, 0, "");
-        expect(setup.lower.hasDebuffActive("Range Null Field Aura")).toBe(true);
-        const shotsBefore = setup.lower.getRangeShots();
+        setup.left.applyAuraEffect("Range Null Field Aura", "", false, 0, "");
+        expect(setup.left.hasDebuffActive("Range Null Field Aura")).toBe(true);
+        const shotsBefore = setup.left.getRangeShots();
 
         const result = setup.engine.apply({
             type: "range_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("attack_not_available");
-        expect(setup.lower.getRangeShots()).toBe(shotsBefore); // no shot consumed
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore); // no shot consumed
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("honors a valid range aim (visible edge) and clamps a tampered aim cell to the target", () => {
         const makeSetup = () => {
             const setup = setupActionFight({
-                lowerAttackType: PBTypes.AttackVals.RANGE,
-                lowerRangeShots: 3,
+                leftAttackType: PBTypes.AttackVals.RANGE,
+                leftRangeShots: 3,
                 supportCell: { x: 2, y: 3 },
-                upperCell: { x: 7, y: 3 },
+                rightCell: { x: 7, y: 3 },
             });
-            setup.lower.refreshPossibleAttackTypes(true);
+            setup.left.refreshPossibleAttackTypes(true);
             return setup;
         };
 
         // Valid aim: the target's own cell + its LEFT side (facing the attacker at x=3 < 7).
         const aimed = makeSetup();
-        const aimedHpBefore = aimed.upper.getCumulativeHp();
+        const aimedHpBefore = aimed.right.getCumulativeHp();
         const aimedResult = aimed.engine.apply({
             type: "range_attack",
-            attackerId: aimed.lower.getId(),
-            targetId: aimed.upper.getId(),
+            attackerId: aimed.left.getId(),
+            targetId: aimed.right.getId(),
             aimCell: { x: 7, y: 3 },
             aimSide: RangeAttackCellSide.LEFT,
         });
         expect(aimedResult.completed).toBe(true);
-        expect(aimed.upper.getCumulativeHp()).toBeLessThan(aimedHpBefore);
+        expect(aimed.right.getCumulativeHp()).toBeLessThan(aimedHpBefore);
 
         // Tampered aim: a cell that is NOT part of the target is clamped to the target's footprint —
         // the action still lands on the intended target rather than being honored or silently lost.
         const tampered = makeSetup();
-        const tamperedHpBefore = tampered.upper.getCumulativeHp();
+        const tamperedHpBefore = tampered.right.getCumulativeHp();
         const tamperedResult = tampered.engine.apply({
             type: "range_attack",
-            attackerId: tampered.lower.getId(),
-            targetId: tampered.upper.getId(),
+            attackerId: tampered.left.getId(),
+            targetId: tampered.right.getId(),
             aimCell: { x: 14, y: 14 },
             aimSide: RangeAttackCellSide.UP,
         });
         expect(tamperedResult.completed).toBe(true);
-        expect(tampered.upper.getCumulativeHp()).toBeLessThan(tamperedHpBefore);
+        expect(tampered.right.getCumulativeHp()).toBeLessThan(tamperedHpBefore);
     });
 
     it("carries per-affected-unit splash damage for a Large Caliber (AOE) range attack", () => {
@@ -1049,23 +1049,23 @@ describe("GameActionEngine", () => {
         // unit's damage must travel in damage.splash with the unit id + impact position so the client
         // can draw a floating number ON the affected unit, not at the primary-target spot only.
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAttack: 20,
-            lowerAbilities: ["Large Caliber"],
-            lowerDamageMin: 10,
-            lowerDamageMax: 10,
-            lowerRangeShots: 3,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Large Caliber"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 3,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 7, y: 3 },
+            rightCell: { x: 7, y: 3 },
         });
-        setup.lower.refreshPossibleAttackTypes(true);
-        const hpBefore = setup.upper.getCumulativeHp();
-        const upperPosition = { ...setup.upper.getPosition() };
+        setup.left.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.right.getCumulativeHp();
+        const rightPosition = { ...setup.right.getPosition() };
 
         const result = setup.engine.apply({
             type: "range_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(true);
@@ -1076,40 +1076,40 @@ describe("GameActionEngine", () => {
         }
         const splash = attacked.damage.splash;
         expect(splash?.length).toBeGreaterThan(0);
-        const entry = splash?.find((s) => s.unitId === setup.upper.getId());
+        const entry = splash?.find((s) => s.unitId === setup.right.getId());
         expect(entry).toBeDefined();
         expect(entry?.amount).toBeGreaterThan(0);
         // Position is captured at impact, so it matches where the unit stood when hit.
-        expect(entry?.position).toEqual(upperPosition);
+        expect(entry?.position).toEqual(rightPosition);
         // Sanity: the splashed amount reflects the HP actually lost.
-        expect(setup.upper.getCumulativeHp()).toBe(hpBefore - (entry?.amount ?? 0));
+        expect(setup.right.getCumulativeHp()).toBe(hpBefore - (entry?.amount ?? 0));
     });
 
     it("uses Double Shot's first projectile on a scattered stone and the second on the aimed unit", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAbilities: ["Double Shot"],
-            lowerRangeShots: 3,
-            lowerCell: { x: 3, y: 3 },
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAbilities: ["Double Shot"],
+            leftRangeShots: 3,
+            leftCell: { x: 3, y: 3 },
             supportCell: { x: 3, y: 4 },
-            upperCell: { x: 9, y: 3 },
+            rightCell: { x: 9, y: 3 },
         });
         setup.grid.setScatteredMountains([{ x: 6, y: 3 }]);
-        setup.lower.refreshPossibleAttackTypes(true);
-        const hpBefore = setup.upper.getCumulativeHp();
-        const shotsBefore = setup.lower.getRangeShots();
+        setup.left.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.right.getCumulativeHp();
+        const shotsBefore = setup.left.getRangeShots();
 
         const result = setup.engine.apply({
             type: "range_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(true);
         expect(setup.grid.getScatteredMountainsStanding()).toEqual([]);
-        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
-        expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore - 1);
         expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(1);
         expect(result.events.filter((event) => event.type === "unit_attacked")).toHaveLength(1);
     });
@@ -1125,15 +1125,15 @@ describe("GameActionEngine", () => {
         it(`fires THROUGH scattered stones with Double Shot + ${ignoring} instead of spending projectiles on them`, () => {
             const setup = setupActionFight({
                 gridType: PBTypes.GridVals.BLOCK_CENTER,
-                lowerAttackType: PBTypes.AttackVals.RANGE,
-                lowerAttack: 20,
-                lowerAbilities: ["Double Shot", ignoring],
-                lowerDamageMin: 10,
-                lowerDamageMax: 10,
-                lowerRangeShots: 3,
-                lowerCell: { x: 3, y: 7 },
+                leftAttackType: PBTypes.AttackVals.RANGE,
+                leftAttack: 20,
+                leftAbilities: ["Double Shot", ignoring],
+                leftDamageMin: 10,
+                leftDamageMax: 10,
+                leftRangeShots: 3,
+                leftCell: { x: 3, y: 7 },
                 supportCell: { x: 3, y: 6 },
-                upperCell: { x: 8, y: 7 },
+                rightCell: { x: 8, y: 7 },
             });
             // TWO stones strictly between shooter and target: the exact shape that used to eat both
             // projectiles and end the turn with zero unit_attacked events.
@@ -1141,17 +1141,17 @@ describe("GameActionEngine", () => {
                 { x: 5, y: 7 },
                 { x: 7, y: 7 },
             ]);
-            setup.lower.refreshPossibleAttackTypes(true);
-            const hpBefore = setup.upper.getCumulativeHp();
+            setup.left.refreshPossibleAttackTypes(true);
+            const hpBefore = setup.right.getCumulativeHp();
 
             const result = setup.engine.apply({
                 type: "range_attack",
-                attackerId: setup.lower.getId(),
-                targetId: setup.upper.getId(),
+                attackerId: setup.left.getId(),
+                targetId: setup.right.getId(),
             });
 
             expect(result.completed).toBe(true);
-            expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
+            expect(setup.right.getCumulativeHp()).toBeLessThan(hpBefore);
             // The old behaviour produced obstacle hits and NO unit_attacked at all.
             expect(result.events.filter((event) => event.type === "unit_attacked").length).toBeGreaterThan(0);
         });
@@ -1160,18 +1160,18 @@ describe("GameActionEngine", () => {
     it("shows direct obstacle targeting the same trajectory rule: Double Shot destroys the blocker then the aimed stone", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAbilities: ["Double Shot"],
-            lowerRangeShots: 3,
-            lowerCell: { x: 3, y: 3 },
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAbilities: ["Double Shot"],
+            leftRangeShots: 3,
+            leftCell: { x: 3, y: 3 },
             supportCell: { x: 3, y: 4 },
-            upperCell: { x: 10, y: 8 },
+            rightCell: { x: 10, y: 8 },
         });
         const blocker = { x: 5, y: 3 };
         const aimedStone = { x: 7, y: 3 };
         // Deliberately reverse layout order: emitted events must still follow projectile/trajectory order.
         setup.grid.setScatteredMountains([aimedStone, blocker]);
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
         const settings = setup.grid.getSettings();
         const targetPosition = getPositionForCell(
             aimedStone,
@@ -1179,17 +1179,17 @@ describe("GameActionEngine", () => {
             settings.getStep(),
             settings.getHalfStep(),
         );
-        const shotsBefore = setup.lower.getRangeShots();
+        const shotsBefore = setup.left.getRangeShots();
 
         const result = setup.engine.apply({
             type: "obstacle_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetPosition,
         });
 
         expect(result.completed).toBe(true);
         expect(setup.grid.getScatteredMountainsStanding()).toEqual([]);
-        expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore - 1);
         const obstacleEvents = result.events.filter((event) => event.type === "obstacle_attacked");
         expect(obstacleEvents).toHaveLength(2);
         expect(obstacleEvents.map((event) => event.targetPosition)).toEqual([
@@ -1201,28 +1201,28 @@ describe("GameActionEngine", () => {
     it("spends both Double Shot projectiles on the first two scattered stones before the aimed unit", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAbilities: ["Double Shot"],
-            lowerRangeShots: 3,
-            lowerCell: { x: 3, y: 3 },
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAbilities: ["Double Shot"],
+            leftRangeShots: 3,
+            leftCell: { x: 3, y: 3 },
             supportCell: { x: 3, y: 4 },
-            upperCell: { x: 10, y: 3 },
+            rightCell: { x: 10, y: 3 },
         });
         const thirdStone = { x: 8, y: 3 };
         setup.grid.setScatteredMountains([{ x: 5, y: 3 }, { x: 7, y: 3 }, thirdStone]);
-        setup.lower.refreshPossibleAttackTypes(true);
-        const hpBefore = setup.upper.getCumulativeHp();
-        const shotsBefore = setup.lower.getRangeShots();
+        setup.left.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.right.getCumulativeHp();
+        const shotsBefore = setup.left.getRangeShots();
 
         const result = setup.engine.apply({
             type: "range_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(true);
-        expect(setup.upper.getCumulativeHp()).toBe(hpBefore);
-        expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
+        expect(setup.right.getCumulativeHp()).toBe(hpBefore);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore - 1);
         expect(setup.grid.getScatteredMountainsStanding()).toEqual([thirdStone]);
         expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
         expect(result.events.filter((event) => event.type === "unit_attacked")).toHaveLength(0);
@@ -1231,15 +1231,15 @@ describe("GameActionEngine", () => {
     it("Large Caliber ignores scattered stones on its trajectory and destroys every stone in its 3x3 blast", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAttack: 20,
-            lowerAbilities: ["Large Caliber"],
-            lowerDamageMin: 10,
-            lowerDamageMax: 10,
-            lowerRangeShots: 3,
-            lowerCell: { x: 3, y: 7 },
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Large Caliber"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 3,
+            leftCell: { x: 3, y: 7 },
             supportCell: { x: 3, y: 6 },
-            upperCell: { x: 8, y: 7 },
+            rightCell: { x: 8, y: 7 },
         });
         const inBlast = [
             { x: 7, y: 7 },
@@ -1247,39 +1247,39 @@ describe("GameActionEngine", () => {
         ];
         const outsideBlast = { x: 11, y: 11 };
         setup.grid.setScatteredMountains([...inBlast, outsideBlast]);
-        setup.lower.refreshPossibleAttackTypes(true);
-        const hpBefore = setup.upper.getCumulativeHp();
+        setup.left.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.right.getCumulativeHp();
 
         const result = setup.engine.apply({
             type: "range_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(true);
-        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(hpBefore);
         expect(setup.grid.getScatteredMountainsStanding()).toEqual([outsideBlast]);
         expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
     });
 
     it("lets the actual front intersection retaliate when Large Caliber intentionally aims at a rear stack", () => {
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAttack: 20,
-            lowerAbilities: ["Large Caliber"],
-            lowerDamageMin: 10,
-            lowerDamageMax: 10,
-            lowerRangeShots: 3,
-            lowerCell: { x: 2, y: 7 },
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Large Caliber"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 3,
+            leftCell: { x: 2, y: 7 },
             supportCell: { x: 2, y: 6 },
-            upperAttackType: PBTypes.AttackVals.RANGE,
-            upperAbilities: ["Infest"],
-            upperAmountAlive: 100,
-            upperDamageMin: 1_000,
-            upperDamageMax: 1_000,
-            upperMaxHp: 100,
-            upperRangeShots: 3,
-            upperCell: { x: 7, y: 7 },
+            rightAttackType: PBTypes.AttackVals.RANGE,
+            rightAbilities: ["Infest"],
+            rightAmountAlive: 100,
+            rightDamageMin: 1_000,
+            rightDamageMax: 1_000,
+            rightMaxHp: 100,
+            rightRangeShots: 3,
+            rightCell: { x: 7, y: 7 },
             createSummonedUnit: ({ team, unitName }) =>
                 createTestUnit({
                     name: unitName,
@@ -1290,36 +1290,36 @@ describe("GameActionEngine", () => {
         });
         const rearAim = createTestUnit({
             name: "Rear aim anchor",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             amountAlive: 100,
             maxHp: 100,
         });
         placeUnit(setup.grid, setup.unitsHolder, rearAim, { x: 10, y: 7 });
-        setup.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 2);
-        setup.lower.refreshPossibleAttackTypes(true);
-        setup.upper.refreshPossibleAttackTypes(true);
-        const attackerHpBefore = setup.lower.getCumulativeHp();
-        const frontHpBefore = setup.upper.getCumulativeHp();
+        setup.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 2);
+        setup.left.refreshPossibleAttackTypes(true);
+        setup.right.refreshPossibleAttackTypes(true);
+        const attackerHpBefore = setup.left.getCumulativeHp();
+        const frontHpBefore = setup.right.getCumulativeHp();
         const rearHpBefore = rearAim.getCumulativeHp();
 
         const result = setup.engine.apply({
             type: "range_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetId: rearAim.getId(),
             aimCell: { x: 10, y: 7 },
             aimSide: RangeAttackCellSide.LEFT,
         });
 
         expect(result.completed).toBe(true);
-        expect(setup.upper.getCumulativeHp()).toBeLessThan(frontHpBefore);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(frontHpBefore);
         expect(rearAim.getCumulativeHp()).toBe(rearHpBefore);
-        expect(setup.upper.getResponded()).toBe(true);
-        expect(setup.lower.getCumulativeHp()).toBeLessThan(attackerHpBefore);
+        expect(setup.right.getResponded()).toBe(true);
+        expect(setup.left.getCumulativeHp()).toBeLessThan(attackerHpBefore);
         expect(result.events).toContainEqual(
             expect.objectContaining({
                 type: "unit_summoned",
-                team: setup.upper.getTeam(),
+                team: setup.right.getTeam(),
                 sourceAbility: "Infest",
             }),
         );
@@ -1328,7 +1328,7 @@ describe("GameActionEngine", () => {
             expect.objectContaining({
                 type: "unit_attacked",
                 attackType: "range",
-                attackerId: setup.lower.getId(),
+                attackerId: setup.left.getId(),
                 targetId: rearAim.getId(),
             }),
         );
@@ -1336,115 +1336,115 @@ describe("GameActionEngine", () => {
 
     it("rejects range attacks against hidden targets without consuming the turn", () => {
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerRangeShots: 3,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftRangeShots: 3,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 7, y: 3 },
+            rightCell: { x: 7, y: 3 },
         });
-        setup.upper.applyBuff(
+        setup.right.applyBuff(
             new Spell({
                 spellProperties: getSpellConfig("System", "Hidden"),
                 amount: 1,
             }),
         );
-        setup.lower.refreshPossibleAttackTypes(true);
-        const shotsBefore = setup.lower.getRangeShots();
+        setup.left.refreshPossibleAttackTypes(true);
+        const shotsBefore = setup.left.getRangeShots();
 
         const result = setup.engine.apply({
             type: "range_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("attack_not_available");
-        expect(setup.lower.getRangeShots()).toBe(shotsBefore);
-        expect(setup.upper.getCumulativeHp()).toBe(setup.upper.getCumulativeMaxHp());
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore);
+        expect(setup.right.getCumulativeHp()).toBe(setup.right.getCumulativeMaxHp());
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("cleans up units killed by common attacks from the holder and grid", () => {
-        const upperCell = { x: 7, y: 3 };
+        const rightCell = { x: 7, y: 3 };
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAttack: 100,
-            lowerDamageMin: 100,
-            lowerDamageMax: 100,
-            lowerRangeShots: 3,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 100,
+            leftDamageMin: 100,
+            leftDamageMax: 100,
+            leftRangeShots: 3,
             supportCell: { x: 2, y: 3 },
-            upperCell,
-            upperAmountAlive: 1,
-            upperArmor: 0,
-            upperMaxHp: 10,
+            rightCell,
+            rightAmountAlive: 1,
+            rightArmor: 0,
+            rightMaxHp: 10,
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
 
         const result = setup.engine.apply({
             type: "range_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(true);
         expect(result.events).toContainEqual({
             type: "unit_destroyed",
-            unitId: setup.upper.getId(),
+            unitId: setup.right.getId(),
             reason: "dead_cleanup",
         });
-        expect(setup.unitsHolder.getAllUnits().has(setup.upper.getId())).toBe(false);
-        expect(setup.grid.getOccupantUnitId(upperCell)).toBe("");
+        expect(setup.unitsHolder.getAllUnits().has(setup.right.getId())).toBe(false);
+        expect(setup.grid.getOccupantUnitId(rightCell)).toBe("");
     });
 
     it("keeps resurrecting units in the holder while emitting a common resurrection event", () => {
-        const upperCell = { x: 7, y: 3 };
+        const rightCell = { x: 7, y: 3 };
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAttack: 100,
-            lowerDamageMin: 100,
-            lowerDamageMax: 100,
-            lowerRangeShots: 3,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 100,
+            leftDamageMin: 100,
+            leftDamageMax: 100,
+            leftRangeShots: 3,
             supportCell: { x: 2, y: 3 },
-            upperCell,
-            upperAbilities: ["Resurrection"],
-            upperAmountAlive: 2,
-            upperArmor: 0,
-            upperMaxHp: 10,
-            upperSpells: ["System:Resurrection"],
+            rightCell,
+            rightAbilities: ["Resurrection"],
+            rightAmountAlive: 2,
+            rightArmor: 0,
+            rightMaxHp: 10,
+            rightSpells: ["System:Resurrection"],
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
 
         const result = setup.engine.apply({
             type: "range_attack",
-            attackerId: setup.lower.getId(),
-            targetId: setup.upper.getId(),
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(true);
         expect(result.events).toContainEqual(
             expect.objectContaining({
                 type: "unit_resurrected",
-                unitId: setup.upper.getId(),
-                team: setup.upper.getTeam(),
+                unitId: setup.right.getId(),
+                team: setup.right.getTeam(),
             }),
         );
         expect(
-            result.events.some((event) => event.type === "unit_destroyed" && event.unitId === setup.upper.getId()),
+            result.events.some((event) => event.type === "unit_destroyed" && event.unitId === setup.right.getId()),
         ).toBe(false);
-        expect(setup.unitsHolder.getAllUnits().get(setup.upper.getId())).toBe(setup.upper);
-        expect(setup.grid.getOccupantUnitId(upperCell)).toBe(setup.upper.getId());
-        expect(setup.upper.getAmountAlive()).toBeGreaterThan(0);
-        expect(setup.upper.hasSpellRemaining("Resurrection")).toBe(false);
+        expect(setup.unitsHolder.getAllUnits().get(setup.right.getId())).toBe(setup.right);
+        expect(setup.grid.getOccupantUnitId(rightCell)).toBe(setup.right.getId());
+        expect(setup.right.getAmountAlive()).toBeGreaterThan(0);
+        expect(setup.right.hasSpellRemaining("Resurrection")).toBe(false);
     });
 
     it("attacks a block-center obstacle through common mechanics", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerRangeShots: 3,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftRangeShots: 3,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 9, y: 9 },
+            rightCell: { x: 9, y: 9 },
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
         const settings = setup.grid.getSettings();
         const targetPosition = getPositionForCell(
             setup.grid.getCenterCells()[0],
@@ -1455,14 +1455,14 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "obstacle_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetPosition,
         });
 
         expect(result.completed).toBe(true);
         expect(result.events).toContainEqual({
             type: "obstacle_attacked",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetPosition,
             attackFrom: undefined,
             hitsBefore: 2 * HITS_PER_MOUNTAIN,
@@ -1471,19 +1471,19 @@ describe("GameActionEngine", () => {
             hitsAfterRight: HITS_PER_MOUNTAIN,
             animations: expect.any(Array),
         });
-        expect(setup.lower.getRangeShots()).toBe(2);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.left.getRangeShots()).toBe(2);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
     it("clears ONLY the struck mountain, leaving the other standing", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerRangeShots: 3,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftRangeShots: 3,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 9, y: 9 },
+            rightCell: { x: 9, y: 9 },
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
         const leftCells = setup.grid.getCenterCells().filter((cell) => cell.x < 8);
         const rightCells = setup.grid.getCenterCells().filter((cell) => cell.x >= 8);
         // Spend the left mountain down to its final hit so this attack (on a left cell) clears it.
@@ -1500,7 +1500,7 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "obstacle_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetPosition,
         });
 
@@ -1520,12 +1520,12 @@ describe("GameActionEngine", () => {
     it("clears the whole center once BOTH mountains are spent", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerRangeShots: 3,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftRangeShots: 3,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 9, y: 9 },
+            rightCell: { x: 9, y: 9 },
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
         const allCenterCells = [...setup.grid.getCenterCells()];
         const rightCells = allCenterCells.filter((cell) => cell.x >= 8);
         // Left fully spent, right down to its final hit — this attack (on a right cell) clears both.
@@ -1545,7 +1545,7 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "obstacle_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetPosition,
         });
 
@@ -1562,10 +1562,10 @@ describe("GameActionEngine", () => {
     it("rejects obstacle attacks when no ranged hit or melee approach can land", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerRangeShots: 0,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftRangeShots: 0,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 9, y: 9 },
+            rightCell: { x: 9, y: 9 },
         });
         const settings = setup.grid.getSettings();
         const targetPosition = getPositionForCell(
@@ -1577,7 +1577,7 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "obstacle_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetPosition,
         });
 
@@ -1588,7 +1588,7 @@ describe("GameActionEngine", () => {
             message: undefined,
         });
         expect(setup.fightProperties.getObstacleHitsLeft()).toBe(2 * HITS_PER_MOUNTAIN);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("rejects obstacle move-attacks when the supplied path is not in known paths", () => {
@@ -1596,12 +1596,12 @@ describe("GameActionEngine", () => {
         const allowedCell = { x: 3, y: 4 };
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
-            lowerAttackType: PBTypes.AttackVals.MELEE,
+            leftAttackType: PBTypes.AttackVals.MELEE,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 9, y: 9 },
+            rightCell: { x: 9, y: 9 },
             currentActiveKnownPaths: new Map([[cellKey(allowedCell), [weightedRoute([currentCell, allowedCell])]]]),
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
         const targetCell = setup.grid.getCenterCells().at(-1);
         expect(targetCell).toBeDefined();
         const attackFrom = { x: targetCell!.x + 1, y: targetCell!.y + 1 };
@@ -1615,7 +1615,7 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "obstacle_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetPosition,
             attackFrom,
             path: [currentCell, attackFrom],
@@ -1624,28 +1624,28 @@ describe("GameActionEngine", () => {
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("attack_not_available");
         expect(setup.fightProperties.getObstacleHitsLeft()).toBe(2 * HITS_PER_MOUNTAIN);
-        expect(setup.lower.getBaseCell()).toEqual(currentCell);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.left.getBaseCell()).toEqual(currentCell);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("performs an area throw at a target cell through common mechanics", () => {
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAttack: 20,
-            lowerAbilities: ["Area Throw"],
-            lowerDamageMin: 10,
-            lowerDamageMax: 10,
-            lowerRangeShots: 2,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Area Throw"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 2,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 7, y: 7 },
+            rightCell: { x: 7, y: 7 },
         });
-        setup.lower.refreshPossibleAttackTypes(true);
-        const shotsBefore = setup.lower.getRangeShots();
-        const hpBefore = setup.upper.getCumulativeHp();
+        setup.left.refreshPossibleAttackTypes(true);
+        const shotsBefore = setup.left.getRangeShots();
+        const hpBefore = setup.right.getCumulativeHp();
 
         const result = setup.engine.apply({
             type: "area_throw_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetCell: { x: 7, y: 6 },
         });
 
@@ -1654,14 +1654,14 @@ describe("GameActionEngine", () => {
             expect.objectContaining({
                 type: "area_attacked",
                 attackType: "area_throw",
-                attackerId: setup.lower.getId(),
+                attackerId: setup.left.getId(),
                 targetCell: { x: 7, y: 6 },
-                affectedUnitIds: [setup.upper.getId()],
+                affectedUnitIds: [setup.right.getId()],
             }),
         );
-        expect(setup.lower.getRangeShots()).toBe(shotsBefore - 1);
-        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore - 1);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
 
         // The affected unit's damage rides along in damage.splash (with its impact position) so the
         // client can place the floating number on the splashed unit rather than the throw's center.
@@ -1669,10 +1669,10 @@ describe("GameActionEngine", () => {
         if (area?.type !== "area_attacked") {
             throw new Error("expected area_attacked event");
         }
-        const entry = area.damage.splash?.find((s) => s.unitId === setup.upper.getId());
+        const entry = area.damage.splash?.find((s) => s.unitId === setup.right.getId());
         expect(entry).toBeDefined();
         expect(entry?.amount).toBeGreaterThan(0);
-        expect(entry?.position).toEqual(setup.upper.getPosition());
+        expect(entry?.position).toEqual(setup.right.getPosition());
     });
 
     it("carries a separate splash entry per shot for a Double-Shot area throw", () => {
@@ -1680,25 +1680,25 @@ describe("GameActionEngine", () => {
         // OWN per-unit splash entry so the client draws two distinct floating numbers per affected unit,
         // not a single merged total (the second shot's damage used to be applied but never recorded).
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAttack: 20,
-            lowerAbilities: ["Area Throw", "Double Shot"],
-            lowerDamageMin: 10,
-            lowerDamageMax: 10,
-            lowerRangeShots: 3,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Area Throw", "Double Shot"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 3,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 7, y: 7 },
+            rightCell: { x: 7, y: 7 },
             // Area Throw is stack-independent (full 100% from a single stack), so give the target enough bulk
             // to survive BOTH volleys — otherwise the first shot kills it and the second has nothing to splash,
             // which is not what this test is guarding (a recorded entry per shot).
-            upperAmountAlive: 100,
-            upperMaxHp: 100,
+            rightAmountAlive: 100,
+            rightMaxHp: 100,
         });
-        setup.lower.refreshPossibleAttackTypes(true);
+        setup.left.refreshPossibleAttackTypes(true);
 
         const result = setup.engine.apply({
             type: "area_throw_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetCell: { x: 7, y: 6 },
         });
 
@@ -1707,7 +1707,7 @@ describe("GameActionEngine", () => {
         if (area?.type !== "area_attacked") {
             throw new Error("expected area_attacked event");
         }
-        const entries = (area.damage.splash ?? []).filter((s) => s.unitId === setup.upper.getId());
+        const entries = (area.damage.splash ?? []).filter((s) => s.unitId === setup.right.getId());
         expect(entries.length).toBe(2); // one floating number per shot, not a merged total
         expect(entries.every((e) => e.amount > 0)).toBe(true);
     });
@@ -1715,15 +1715,15 @@ describe("GameActionEngine", () => {
     it("Area Throw flies over scattered stones and destroys every stone in the landing area", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAttack: 20,
-            lowerAbilities: ["Area Throw"],
-            lowerDamageMin: 10,
-            lowerDamageMax: 10,
-            lowerRangeShots: 2,
-            lowerCell: { x: 3, y: 7 },
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Area Throw"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 2,
+            leftCell: { x: 3, y: 7 },
             supportCell: { x: 3, y: 6 },
-            upperCell: { x: 8, y: 8 },
+            rightCell: { x: 8, y: 8 },
         });
         const inBlast = [
             { x: 7, y: 7 },
@@ -1731,17 +1731,17 @@ describe("GameActionEngine", () => {
         ];
         const outsideBlast = { x: 11, y: 11 };
         setup.grid.setScatteredMountains([...inBlast, outsideBlast]);
-        setup.lower.refreshPossibleAttackTypes(true);
-        const hpBefore = setup.upper.getCumulativeHp();
+        setup.left.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.right.getCumulativeHp();
 
         const result = setup.engine.apply({
             type: "area_throw_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetCell: { x: 7, y: 7 },
         });
 
         expect(result.completed).toBe(true);
-        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(hpBefore);
         expect(setup.grid.getScatteredMountainsStanding()).toEqual([outsideBlast]);
         expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
     });
@@ -1751,21 +1751,21 @@ describe("GameActionEngine", () => {
         // {7,3}. The throw must be intercepted by (project onto) that enemy instead of passing
         // through to the empty cell behind it.
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAttack: 20,
-            lowerAbilities: ["Area Throw"],
-            lowerDamageMin: 10,
-            lowerDamageMax: 10,
-            lowerRangeShots: 2,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Area Throw"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 2,
             supportCell: { x: 2, y: 8 },
-            upperCell: { x: 5, y: 3 },
+            rightCell: { x: 5, y: 3 },
         });
-        setup.lower.refreshPossibleAttackTypes(true);
-        const hpBefore = setup.upper.getCumulativeHp();
+        setup.left.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.right.getCumulativeHp();
 
         const result = setup.engine.apply({
             type: "area_throw_attack",
-            attackerId: setup.lower.getId(),
+            attackerId: setup.left.getId(),
             targetCell: { x: 7, y: 3 },
         });
 
@@ -1774,143 +1774,143 @@ describe("GameActionEngine", () => {
             expect.objectContaining({
                 type: "area_attacked",
                 attackType: "area_throw",
-                attackerId: setup.lower.getId(),
+                attackerId: setup.left.getId(),
                 // Projected from the aimed {7,3} onto the intercepting enemy at {5,3}.
                 targetCell: { x: 5, y: 3 },
-                affectedUnitIds: [setup.upper.getId()],
+                affectedUnitIds: [setup.right.getId()],
             }),
         );
-        expect(setup.upper.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(hpBefore);
     });
 
     it("rejects area throws without range selection or available shots", () => {
         const wrongType = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.MELEE,
-            lowerAbilities: ["Area Throw"],
-            lowerRangeShots: 2,
+            leftAttackType: PBTypes.AttackVals.MELEE,
+            leftAbilities: ["Area Throw"],
+            leftRangeShots: 2,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 7, y: 7 },
+            rightCell: { x: 7, y: 7 },
         });
 
         const wrongTypeResult = wrongType.engine.apply({
             type: "area_throw_attack",
-            attackerId: wrongType.lower.getId(),
+            attackerId: wrongType.left.getId(),
             targetCell: { x: 7, y: 6 },
         });
 
         expect(wrongTypeResult.completed).toBe(false);
         expect(wrongTypeResult.rejectionReason).toBe("attack_not_available");
-        expect(wrongType.fightProperties.hasAlreadyMadeTurn(wrongType.lower.getId())).toBe(false);
+        expect(wrongType.fightProperties.hasAlreadyMadeTurn(wrongType.left.getId())).toBe(false);
 
         const noShots = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAbilities: ["Area Throw"],
-            lowerRangeShots: 0,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAbilities: ["Area Throw"],
+            leftRangeShots: 0,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 7, y: 7 },
+            rightCell: { x: 7, y: 7 },
         });
-        noShots.lower.refreshPossibleAttackTypes(true);
+        noShots.left.refreshPossibleAttackTypes(true);
 
         const noShotsResult = noShots.engine.apply({
             type: "area_throw_attack",
-            attackerId: noShots.lower.getId(),
+            attackerId: noShots.left.getId(),
             targetCell: { x: 7, y: 6 },
         });
 
         expect(noShotsResult.completed).toBe(false);
         expect(noShotsResult.rejectionReason).toBe("attack_not_available");
-        expect(noShots.fightProperties.hasAlreadyMadeTurn(noShots.lower.getId())).toBe(false);
+        expect(noShots.fightProperties.hasAlreadyMadeTurn(noShots.left.getId())).toBe(false);
     });
 
     it("rejects area throws aimed at occupied unit cells", () => {
         const setup = setupActionFight({
-            lowerAttackType: PBTypes.AttackVals.RANGE,
-            lowerAbilities: ["Area Throw"],
-            lowerRangeShots: 2,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAbilities: ["Area Throw"],
+            leftRangeShots: 2,
             supportCell: { x: 2, y: 3 },
-            upperCell: { x: 7, y: 7 },
+            rightCell: { x: 7, y: 7 },
         });
-        setup.lower.refreshPossibleAttackTypes(true);
-        const shotsBefore = setup.lower.getRangeShots();
+        setup.left.refreshPossibleAttackTypes(true);
+        const shotsBefore = setup.left.getRangeShots();
 
         const result = setup.engine.apply({
             type: "area_throw_attack",
-            attackerId: setup.lower.getId(),
-            targetCell: setup.upper.getBaseCell(),
+            attackerId: setup.left.getId(),
+            targetCell: setup.right.getBaseCell(),
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("attack_not_available");
-        expect(setup.lower.getRangeShots()).toBe(shotsBefore);
-        expect(setup.upper.getCumulativeHp()).toBe(setup.upper.getCumulativeMaxHp());
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore);
+        expect(setup.right.getCumulativeHp()).toBe(setup.right.getCumulativeMaxHp());
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("casts a single-target spell and completes the active unit turn", () => {
-        const setup = setupActionFight({ lowerSpells: ["Death:Weakness"] });
+        const setup = setupActionFight({ leftSpells: ["Death:Weakness"] });
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Weakness",
-            targetId: setup.upper.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(true);
         expect(result.events).toContainEqual(
             expect.objectContaining({
                 type: "spell_cast",
-                casterId: setup.lower.getId(),
+                casterId: setup.left.getId(),
                 spellName: "Weakness",
-                targetId: setup.upper.getId(),
+                targetId: setup.right.getId(),
             }),
         );
         expect(result.events).toContainEqual({
             type: "turn_completed",
-            unitId: setup.lower.getId(),
-            team: PBTypes.TeamVals.LOWER,
+            unitId: setup.left.getId(),
+            team: PBTypes.TeamVals.LEFT,
             hourglass: false,
         });
-        expect(setup.upper.hasDebuffActive("Weakness")).toBe(true);
-        expect(setup.lower.hasSpellRemaining("Weakness")).toBe(false);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.right.hasDebuffActive("Weakness")).toBe(true);
+        expect(setup.left.hasSpellRemaining("Weakness")).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
     it("reports Wild Regeneration's delivered ability on the authoritative spell event", () => {
-        const setup = setupActionFight({ lowerAbilities: ["Wild Regeneration"] });
+        const setup = setupActionFight({ leftAbilities: ["Wild Regeneration"] });
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Wild Regeneration",
-            targetId: setup.lowerSupport.getId(),
+            targetId: setup.leftSupport.getId(),
         });
 
         expect(result.completed).toBe(true);
         expect(result.events).toContainEqual(
             expect.objectContaining({
                 type: "spell_cast",
-                casterId: setup.lower.getId(),
+                casterId: setup.left.getId(),
                 spellName: "Wild Regeneration",
-                targetId: setup.lowerSupport.getId(),
+                targetId: setup.leftSupport.getId(),
                 abilityTransfers: [
                     {
                         abilityName: "Wild Regeneration",
-                        fromUnitId: setup.lower.getId(),
-                        toUnitId: setup.lowerSupport.getId(),
+                        fromUnitId: setup.left.getId(),
+                        toUnitId: setup.leftSupport.getId(),
                         mode: "gifted",
                     },
                 ],
             }),
         );
-        expect(setup.lower.hasAbilityActive("Wild Regeneration")).toBe(false);
-        expect(setup.lowerSupport.hasAbilityActive("Wild Regeneration")).toBe(true);
-        expect(setup.lower.hasSpellRemaining("Wild Regeneration")).toBe(false);
+        expect(setup.left.hasAbilityActive("Wild Regeneration")).toBe(false);
+        expect(setup.leftSupport.hasAbilityActive("Wild Regeneration")).toBe(true);
+        expect(setup.left.hasSpellRemaining("Wild Regeneration")).toBe(false);
     });
 
     it("reports Holy Cross copying Wild Regeneration while both allies retain the ability", () => {
-        const setup = setupActionFight({ lowerAbilities: ["Wild Regeneration"] });
-        setup.lower.applyBuff(
+        const setup = setupActionFight({ leftAbilities: ["Wild Regeneration"] });
+        setup.left.applyBuff(
             new Spell({
                 spellProperties: getSpellConfig("System", "Holy Cross"),
                 amount: 1,
@@ -1919,41 +1919,41 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Wild Regeneration",
-            targetId: setup.lowerSupport.getId(),
+            targetId: setup.leftSupport.getId(),
         });
 
         expect(result.completed).toBe(true);
         expect(result.events).toContainEqual(
             expect.objectContaining({
                 type: "spell_cast",
-                casterId: setup.lower.getId(),
+                casterId: setup.left.getId(),
                 spellName: "Wild Regeneration",
-                targetId: setup.lowerSupport.getId(),
+                targetId: setup.leftSupport.getId(),
                 abilityTransfers: [
                     {
                         abilityName: "Wild Regeneration",
-                        fromUnitId: setup.lower.getId(),
-                        toUnitId: setup.lowerSupport.getId(),
+                        fromUnitId: setup.left.getId(),
+                        toUnitId: setup.leftSupport.getId(),
                         mode: "copied",
                     },
                 ],
             }),
         );
-        expect(setup.lower.hasAbilityActive("Wild Regeneration")).toBe(true);
-        expect(setup.lowerSupport.hasAbilityActive("Wild Regeneration")).toBe(true);
+        expect(setup.left.hasAbilityActive("Wild Regeneration")).toBe(true);
+        expect(setup.leftSupport.hasAbilityActive("Wild Regeneration")).toBe(true);
     });
 
     it("reports a Wild Regeneration gift delivered while Break temporarily disables the recipient", () => {
-        const setup = setupActionFight({ lowerAbilities: ["Wild Regeneration"] });
-        setup.lowerSupport.applyEffect(new EffectFactory().makeEffect("Break")!);
+        const setup = setupActionFight({ leftAbilities: ["Wild Regeneration"] });
+        setup.leftSupport.applyEffect(new EffectFactory().makeEffect("Break")!);
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Wild Regeneration",
-            targetId: setup.lowerSupport.getId(),
+            targetId: setup.leftSupport.getId(),
         });
 
         expect(result.completed).toBe(true);
@@ -1963,80 +1963,80 @@ describe("GameActionEngine", () => {
                 abilityTransfers: [
                     expect.objectContaining({
                         abilityName: "Wild Regeneration",
-                        toUnitId: setup.lowerSupport.getId(),
+                        toUnitId: setup.leftSupport.getId(),
                         mode: "gifted",
                     }),
                 ],
             }),
         );
-        expect(setup.lowerSupport.hasAbilityActive("Wild Regeneration")).toBe(false);
-        expect(setup.lowerSupport.getUnitProperties().abilities).toContain("Wild Regeneration");
+        expect(setup.leftSupport.hasAbilityActive("Wild Regeneration")).toBe(false);
+        expect(setup.leftSupport.getUnitProperties().abilities).toContain("Wild Regeneration");
     });
 
     it("casts Castling (POSITION_CHANGE) and swaps the caster with the in-range small enemy", () => {
         const enemyCell = { x: 5, y: 3 };
         const setup = setupActionFight({
-            lowerSpells: ["System:Castling"],
-            lowerStackPower: 4, // Castling needs minimal_caster_stack_power 4
-            upperCell: enemyCell,
+            leftSpells: ["System:Castling"],
+            leftStackPower: 4, // Castling needs minimal_caster_stack_power 4
+            rightCell: enemyCell,
             currentEnemiesCellsWithinMovementRange: [enemyCell],
         });
-        const casterStart = { ...setup.lower.getBaseCell() };
+        const casterStart = { ...setup.left.getBaseCell() };
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Castling",
-            targetId: setup.upper.getId(),
-            targetCell: setup.upper.getBaseCell(),
+            targetId: setup.right.getId(),
+            targetCell: setup.right.getBaseCell(),
         });
 
         expect(result.completed).toBe(true);
-        expect(setup.lower.getBaseCell()).toEqual(enemyCell);
-        expect(setup.upper.getBaseCell()).toEqual(casterStart);
+        expect(setup.left.getBaseCell()).toEqual(enemyCell);
+        expect(setup.right.getBaseCell()).toEqual(casterStart);
     });
 
     it("rejects Castling inherited by a LARGE caster without mutating combat state", () => {
         const enemyCell = { x: 5, y: 3 };
         const setup = setupActionFight({
-            lowerSize: PBTypes.UnitSizeVals.LARGE,
-            lowerSpells: ["System:Castling"],
-            lowerStackPower: 4,
-            upperCell: enemyCell,
+            leftSize: PBTypes.UnitSizeVals.LARGE,
+            leftSpells: ["System:Castling"],
+            leftStackPower: 4,
+            rightCell: enemyCell,
             currentEnemiesCellsWithinMovementRange: [enemyCell],
         });
-        const casterPosition = structuredClone(setup.lower.getPosition());
-        const targetPosition = structuredClone(setup.upper.getPosition());
+        const casterPosition = structuredClone(setup.left.getPosition());
+        const targetPosition = structuredClone(setup.right.getPosition());
         const matrix = structuredClone(setup.grid.getMatrix());
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Castling",
-            targetId: setup.upper.getId(),
-            targetCell: setup.upper.getBaseCell(),
+            targetId: setup.right.getId(),
+            targetCell: setup.right.getBaseCell(),
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("spell_not_available");
-        expect(setup.lower.getPosition()).toEqual(casterPosition);
-        expect(setup.upper.getPosition()).toEqual(targetPosition);
+        expect(setup.left.getPosition()).toEqual(casterPosition);
+        expect(setup.right.getPosition()).toEqual(targetPosition);
         expect(setup.grid.getMatrix()).toEqual(matrix);
-        expect(setup.lower.hasSpellRemaining("Castling")).toBe(true);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.left.hasSpellRemaining("Castling")).toBe(true);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("does not collapse a LARGE Absorb Penalties target when Castling is redirected", () => {
         const enemyCell = { x: 5, y: 3 };
         const setup = setupActionFight({
-            lowerSpells: ["System:Castling"],
-            lowerStackPower: 4,
-            upperCell: enemyCell,
+            leftSpells: ["System:Castling"],
+            leftStackPower: 4,
+            rightCell: enemyCell,
             currentEnemiesCellsWithinMovementRange: [enemyCell],
         });
         const absorber = createTestUnit({
             name: "Large Absorber",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             size: PBTypes.UnitSizeVals.LARGE,
         });
         const absorberCells = [
@@ -2057,45 +2057,45 @@ describe("GameActionEngine", () => {
             false,
         );
         setup.unitsHolder.addUnit(absorber);
-        setup.upper.applyAuraEffect("Absorb Penalties Aura", "absorb", true, 100, "7;5");
+        setup.right.applyAuraEffect("Absorb Penalties Aura", "absorb", true, 100, "7;5");
 
-        const casterPosition = structuredClone(setup.lower.getPosition());
-        const targetPosition = structuredClone(setup.upper.getPosition());
+        const casterPosition = structuredClone(setup.left.getPosition());
+        const targetPosition = structuredClone(setup.right.getPosition());
         const largePosition = structuredClone(absorber.getPosition());
         const matrix = structuredClone(setup.grid.getMatrix());
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Castling",
-            targetId: setup.upper.getId(),
-            targetCell: setup.upper.getBaseCell(),
+            targetId: setup.right.getId(),
+            targetCell: setup.right.getBaseCell(),
         });
 
         expect(result.completed).toBe(true);
         expect(result.rejectionReason).toBeUndefined();
-        expect(setup.lower.getPosition()).toEqual(casterPosition);
-        expect(setup.upper.getPosition()).toEqual(targetPosition);
+        expect(setup.left.getPosition()).toEqual(casterPosition);
+        expect(setup.right.getPosition()).toEqual(targetPosition);
         expect(absorber.getPosition()).toEqual(largePosition);
         expect(setup.grid.getMatrix()).toEqual(matrix);
         expect(result.events).toContainEqual(
             expect.objectContaining({
                 type: "spell_cast",
-                casterId: setup.lower.getId(),
-                targetId: setup.upper.getId(),
+                casterId: setup.left.getId(),
+                targetId: setup.right.getId(),
                 spellName: "Castling",
                 animations: [],
             }),
         );
-        expect(setup.lower.hasSpellRemaining("Castling")).toBe(false);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.left.hasSpellRemaining("Castling")).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
     it("rejects Castling when the in-range enemy list is absent (the ranked server-context bug)", () => {
         const enemyCell = { x: 5, y: 3 };
         const setup = setupActionFight({
-            lowerSpells: ["System:Castling"],
-            lowerStackPower: 4,
-            upperCell: enemyCell,
+            leftSpells: ["System:Castling"],
+            leftStackPower: 4,
+            rightCell: enemyCell,
             // currentEnemiesCellsWithinMovementRange intentionally omitted — exactly what the server used
             // to do, which made every Castling cast reject. Providing it (server fix) is what makes the
             // positive test above pass.
@@ -2103,10 +2103,10 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Castling",
-            targetId: setup.upper.getId(),
-            targetCell: setup.upper.getBaseCell(),
+            targetId: setup.right.getId(),
+            targetCell: setup.right.getBaseCell(),
         });
 
         expect(result.completed).toBe(false);
@@ -2114,76 +2114,76 @@ describe("GameActionEngine", () => {
     });
 
     it("rejects single-target spells with stale target-cell data", () => {
-        const setup = setupActionFight({ lowerSpells: ["Death:Weakness"] });
+        const setup = setupActionFight({ leftSpells: ["Death:Weakness"] });
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Weakness",
-            targetId: setup.upper.getId(),
-            targetCell: setup.lowerSupport.getBaseCell(),
+            targetId: setup.right.getId(),
+            targetCell: setup.leftSupport.getBaseCell(),
         });
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("spell_not_available");
-        expect(setup.upper.hasDebuffActive("Weakness")).toBe(false);
-        expect(setup.lower.hasSpellRemaining("Weakness")).toBe(true);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.right.hasDebuffActive("Weakness")).toBe(false);
+        expect(setup.left.hasSpellRemaining("Weakness")).toBe(true);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("emits spell animation metadata for Castling swaps", () => {
-        const upperCell = { x: 4, y: 3 };
+        const rightCell = { x: 4, y: 3 };
         const setup = setupActionFight({
-            lowerSpells: ["System:Castling"],
-            lowerStackPower: 4,
+            leftSpells: ["System:Castling"],
+            leftStackPower: 4,
             supportCell: { x: 2, y: 3 },
-            upperCell,
-            currentEnemiesCellsWithinMovementRange: [upperCell],
+            rightCell,
+            currentEnemiesCellsWithinMovementRange: [rightCell],
         });
-        const casterStart = structuredClone(setup.lower.getPosition());
-        const targetStart = structuredClone(setup.upper.getPosition());
+        const casterStart = structuredClone(setup.left.getPosition());
+        const targetStart = structuredClone(setup.right.getPosition());
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Castling",
-            targetId: setup.upper.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(true);
-        expect(setup.lower.getPosition()).toEqual(targetStart);
-        expect(setup.upper.getPosition()).toEqual(casterStart);
+        expect(setup.left.getPosition()).toEqual(targetStart);
+        expect(setup.right.getPosition()).toEqual(casterStart);
         expect(result.events).toContainEqual(
             expect.objectContaining({
                 type: "spell_cast",
-                casterId: setup.lower.getId(),
+                casterId: setup.left.getId(),
                 spellName: "Castling",
-                targetId: setup.upper.getId(),
+                targetId: setup.right.getId(),
                 animations: expect.arrayContaining([
                     expect.objectContaining({
-                        affectedUnitId: setup.lower.getId(),
-                        bodyUnitId: setup.lower.getId(),
+                        affectedUnitId: setup.left.getId(),
+                        bodyUnitId: setup.left.getId(),
                         toPosition: targetStart,
                     }),
                     expect.objectContaining({
-                        affectedUnitId: setup.upper.getId(),
-                        bodyUnitId: setup.upper.getId(),
+                        affectedUnitId: setup.right.getId(),
+                        bodyUnitId: setup.right.getId(),
                         toPosition: casterStart,
                     }),
                 ]),
             }),
         );
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
     it("rejects invalid spell targets without completing the turn", () => {
-        const setup = setupActionFight({ lowerSpells: ["Death:Weakness"] });
+        const setup = setupActionFight({ leftSpells: ["Death:Weakness"] });
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Weakness",
-            targetId: setup.lowerSupport.getId(),
+            targetId: setup.leftSupport.getId(),
         });
 
         expect(result).toEqual({
@@ -2192,27 +2192,27 @@ describe("GameActionEngine", () => {
             rejectionReason: "spell_not_available",
             message: undefined,
         });
-        expect(setup.lowerSupport.hasDebuffActive("Weakness")).toBe(false);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.leftSupport.hasDebuffActive("Weakness")).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("does not amplify healing spells with Tome", () => {
         const setup = setupActionFight({
-            lowerSpells: ["Life:Mass Heal"],
-            lowerStackPower: 3,
+            leftSpells: ["Life:Mass Heal"],
+            leftStackPower: 3,
         });
         setup.fightProperties.setArtifactPerTeam(
-            PBTypes.TeamVals.LOWER,
+            PBTypes.TeamVals.LEFT,
             ArtifactTier.TIER_2,
             Tier2Artifact.TOME_OF_AMPLIFICATION,
         );
         setup.unitsHolder.applyArtifacts(setup.fightProperties);
-        setup.lowerSupport.applyDamage(6, 0, setup.sceneLog);
-        const hpBefore = setup.lowerSupport.getHp();
+        setup.leftSupport.applyDamage(6, 0, setup.sceneLog);
+        const hpBefore = setup.leftSupport.getHp();
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Mass Heal",
         });
 
@@ -2220,55 +2220,55 @@ describe("GameActionEngine", () => {
         expect(result.events).toContainEqual(
             expect.objectContaining({
                 type: "spell_cast",
-                casterId: setup.lower.getId(),
+                casterId: setup.left.getId(),
                 spellName: "Mass Heal",
             }),
         );
-        expect(setup.lowerSupport.getHp()).toBe(hpBefore + 2);
-        expect(setup.lower.hasSpellRemaining("Mass Heal")).toBe(false);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.leftSupport.getHp()).toBe(hpBefore + 2);
+        expect(setup.left.hasSpellRemaining("Mass Heal")).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
     it("amplifies an Ogre Mage's Mass Riot once for every allied recipient", () => {
         const setup = setupActionFight({
-            lowerSpells: ["Chaos:Mass Riot"],
-            lowerStackPower: 4,
+            leftSpells: ["Chaos:Mass Riot"],
+            leftStackPower: 4,
         });
         setup.fightProperties.setArtifactPerTeam(
-            PBTypes.TeamVals.LOWER,
+            PBTypes.TeamVals.LEFT,
             ArtifactTier.TIER_2,
             Tier2Artifact.TOME_OF_AMPLIFICATION,
         );
         setup.unitsHolder.applyArtifacts(setup.fightProperties);
-        const sourceSpell = setup.lower.getSpells()[0];
+        const sourceSpell = setup.left.getSpells()[0];
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Mass Riot",
         });
 
         expect(result.completed).toBe(true);
         expect(sourceSpell.getPower()).toBe(25);
-        expect(setup.lower.getBuff("Mass Riot")?.getPower()).toBe(37.5);
-        expect(setup.lowerSupport.getBuff("Mass Riot")?.getPower()).toBe(37.5);
-        expect(setup.lowerSupport.getUnitProperties().applied_buffs_powers).toContain(37.5);
-        expect(setup.lowerSupport.getBuff("Mass Riot")?.getPower()).not.toBe(56.25);
-        setup.lowerSupport.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-        expect(setup.lowerSupport.getAttack()).toBeCloseTo(13.75);
-        setup.lowerSupport.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-        expect(setup.lowerSupport.getAttack()).toBeCloseTo(13.75);
+        expect(setup.left.getBuff("Mass Riot")?.getPower()).toBe(37.5);
+        expect(setup.leftSupport.getBuff("Mass Riot")?.getPower()).toBe(37.5);
+        expect(setup.leftSupport.getUnitProperties().applied_buffs_powers).toContain(37.5);
+        expect(setup.leftSupport.getBuff("Mass Riot")?.getPower()).not.toBe(56.25);
+        setup.leftSupport.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+        expect(setup.leftSupport.getAttack()).toBeCloseTo(13.75);
+        setup.leftSupport.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+        expect(setup.leftSupport.getAttack()).toBeCloseTo(13.75);
     });
 
     it("amplifies a cast Wind Flow only for allied flyers", () => {
         const setup = setupActionFight({
-            lowerSpells: ["System:Wind Flow"],
-            lowerStackPower: 5,
+            leftSpells: ["System:Wind Flow"],
+            leftStackPower: 5,
             supportMovementType: PBTypes.MovementVals.FLY,
-            upperMovementType: PBTypes.MovementVals.FLY,
+            rightMovementType: PBTypes.MovementVals.FLY,
         });
         setup.fightProperties.setArtifactPerTeam(
-            PBTypes.TeamVals.LOWER,
+            PBTypes.TeamVals.LEFT,
             ArtifactTier.TIER_2,
             Tier2Artifact.TOME_OF_AMPLIFICATION,
         );
@@ -2276,16 +2276,16 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Wind Flow",
         });
 
         expect(result.completed).toBe(true);
-        expect(setup.lowerSupport.hasBuffActive("Wind Flow")).toBe(true);
-        expect(setup.upper.hasBuffActive("Wind Flow")).toBe(true);
-        expect(setup.lowerSupport.getBuff("Wind Flow")?.getPower()).toBe(6);
-        expect(setup.upper.getBuff("Wind Flow")?.getPower()).toBe(4);
-        expect(setup.lower.hasSpellRemaining("Wind Flow")).toBe(false);
+        expect(setup.leftSupport.hasBuffActive("Wind Flow")).toBe(true);
+        expect(setup.right.hasBuffActive("Wind Flow")).toBe(true);
+        expect(setup.leftSupport.getBuff("Wind Flow")?.getPower()).toBe(6);
+        expect(setup.right.getBuff("Wind Flow")?.getPower()).toBe(4);
+        expect(setup.left.hasSpellRemaining("Wind Flow")).toBe(false);
     });
 
     it("casts mass enemy debuffs through common mechanics", () => {
@@ -2310,23 +2310,23 @@ describe("GameActionEngine", () => {
             weaknessProperties.is_giftable,
             weaknessProperties.maximum_gift_level,
         );
-        setup.lower.getSpells().push(new Spell({ spellProperties: massWeaknessProperties, amount: 1 }));
+        setup.left.getSpells().push(new Spell({ spellProperties: massWeaknessProperties, amount: 1 }));
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Mass Weakness",
         });
 
         expect(result.completed).toBe(true);
-        expect(setup.upper.hasDebuffActive("Mass Weakness")).toBe(true);
-        expect(setup.lower.hasSpellRemaining("Mass Weakness")).toBe(false);
+        expect(setup.right.hasDebuffActive("Mass Weakness")).toBe(true);
+        expect(setup.left.hasSpellRemaining("Mass Weakness")).toBe(false);
     });
 
     it("summons a new stack through common mechanics", () => {
         const summonCell = { x: 3, y: 4 };
         const setup = setupActionFight({
-            lowerSpells: ["Nature:Summon Wolves"],
+            leftSpells: ["Nature:Summon Wolves"],
             createSummonedUnit: ({ team, unitName, amount }) =>
                 createTestUnit({
                     name: unitName,
@@ -2338,7 +2338,7 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Summon Wolves",
             targetCell: summonCell,
         });
@@ -2352,22 +2352,22 @@ describe("GameActionEngine", () => {
         expect(result.events).toContainEqual(
             expect.objectContaining({
                 type: "unit_summoned",
-                casterId: setup.lower.getId(),
+                casterId: setup.left.getId(),
                 unitId: summoned?.getId(),
                 unitName: "Wolf",
                 amount: 1,
                 merged: false,
             }),
         );
-        expect(setup.lower.hasSpellRemaining("Summon Wolves")).toBe(false);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.left.hasSpellRemaining("Summon Wolves")).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
     it("merges summon amount into an existing summoned stack", () => {
-        const setup = setupActionFight({ lowerSpells: ["Nature:Summon Wolves"] });
+        const setup = setupActionFight({ leftSpells: ["Nature:Summon Wolves"] });
         const existingWolf = createTestUnit({
             name: "Wolf",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 3,
             summoned: true,
         });
@@ -2375,7 +2375,7 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Summon Wolves",
             targetCell: { x: 3, y: 4 },
         });
@@ -2390,15 +2390,15 @@ describe("GameActionEngine", () => {
                 merged: true,
             }),
         );
-        expect(setup.lower.hasSpellRemaining("Summon Wolves")).toBe(false);
+        expect(setup.left.hasSpellRemaining("Summon Wolves")).toBe(false);
     });
 
     it("rejects new summon stacks when no common factory is available", () => {
-        const setup = setupActionFight({ lowerSpells: ["Nature:Summon Wolves"] });
+        const setup = setupActionFight({ leftSpells: ["Nature:Summon Wolves"] });
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Summon Wolves",
             targetCell: { x: 3, y: 4 },
         });
@@ -2409,25 +2409,25 @@ describe("GameActionEngine", () => {
             rejectionReason: "summon_unit_factory_missing",
             message: undefined,
         });
-        expect(setup.lower.hasSpellRemaining("Summon Wolves")).toBe(true);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.left.hasSpellRemaining("Summon Wolves")).toBe(true);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
     it("starts a valid setup fight through common mechanics", () => {
         const setup = setupPlacementFight();
-        const upper = createTestUnit({ name: "Upper", team: PBTypes.TeamVals.UPPER });
+        const right = createTestUnit({ name: "Upper", team: PBTypes.TeamVals.RIGHT });
         placeUnit(setup.grid, setup.unitsHolder, setup.unit, { x: 2, y: 2 });
-        placeUnit(setup.grid, setup.unitsHolder, upper, { x: 10, y: 10 });
+        placeUnit(setup.grid, setup.unitsHolder, right, { x: 10, y: 10 });
 
         const result = setup.engine.apply({ type: "start_fight" });
 
         expect(result).toEqual({
             completed: true,
-            events: [{ type: "fight_started", lowerUnitsAlive: 1, upperUnitsAlive: 1 }],
+            events: [{ type: "fight_started", leftUnitsAlive: 1, rightUnitsAlive: 1 }],
         });
         expect(setup.fightProperties.hasFightStarted()).toBe(true);
-        expect(setup.fightProperties.getTeamUnitsAlive(PBTypes.TeamVals.LOWER)).toBe(1);
-        expect(setup.fightProperties.getTeamUnitsAlive(PBTypes.TeamVals.UPPER)).toBe(1);
+        expect(setup.fightProperties.getTeamUnitsAlive(PBTypes.TeamVals.LEFT)).toBe(1);
+        expect(setup.fightProperties.getTeamUnitsAlive(PBTypes.TeamVals.RIGHT)).toBe(1);
     });
 
     it("rejects fight starts without both teams or after the fight has started", () => {
@@ -2442,9 +2442,9 @@ describe("GameActionEngine", () => {
         });
 
         const started = setupPlacementFight();
-        const upper = createTestUnit({ name: "Upper", team: PBTypes.TeamVals.UPPER });
+        const right = createTestUnit({ name: "Upper", team: PBTypes.TeamVals.RIGHT });
         placeUnit(started.grid, started.unitsHolder, started.unit, { x: 2, y: 2 });
-        placeUnit(started.grid, started.unitsHolder, upper, { x: 10, y: 10 });
+        placeUnit(started.grid, started.unitsHolder, right, { x: 10, y: 10 });
         expect(started.engine.apply({ type: "start_fight" }).completed).toBe(true);
         expect(started.engine.apply({ type: "start_fight" }).rejectionReason).toBe("start_not_available");
     });
@@ -2477,7 +2477,7 @@ describe("GameActionEngine", () => {
 
     it("rolls back a moved unit when placement is blocked", () => {
         const setup = setupPlacementFight();
-        const blocker = createTestUnit({ name: "Blocker", team: PBTypes.TeamVals.UPPER });
+        const blocker = createTestUnit({ name: "Blocker", team: PBTypes.TeamVals.RIGHT });
         placeUnit(setup.grid, setup.unitsHolder, setup.unit, { x: 2, y: 2 });
         placeUnit(setup.grid, setup.unitsHolder, blocker, { x: 3, y: 3 });
         const originalPosition = structuredClone(setup.unit.getPosition());
@@ -2726,7 +2726,7 @@ describe("GameActionEngine", () => {
             currentActiveKnownPaths: new Map([[cellKey({ x: 4, y: 4 }), [weightedRoute(route)]]]),
         });
         const resolvedKnownPaths = (actionSetup.engine as any).resolveKnownPaths(
-            actionSetup.lower,
+            actionSetup.left,
             { x: 4, y: 4 },
             route,
         );
@@ -2765,13 +2765,13 @@ describe("GameActionEngine", () => {
 
         const result = setup.engine.apply({
             type: "unknown_action",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
         } as unknown as GameAction);
 
         expect(result.completed).toBe(false);
         expect(result.rejectionReason).toBe("unsupported_action");
         expect(result.events).toEqual([]);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 });
 
@@ -2796,138 +2796,138 @@ describe("action engine — custom targeted spell legality", () => {
     for (const spellCase of enemySpells) {
         it(`${spellCase.spellName} rejects a Hidden enemy without spending its charge or turn`, () => {
             const setup = setupActionFight({
-                lowerAbilities: spellCase.abilities,
-                lowerSpells: spellCase.spells,
-                lowerStackPower: spellCase.stackPower,
-                upperCell: { x: 6, y: 3 },
-                upperMaxHp: 10_000,
+                leftAbilities: spellCase.abilities,
+                leftSpells: spellCase.spells,
+                leftStackPower: spellCase.stackPower,
+                rightCell: { x: 6, y: 3 },
+                rightMaxHp: 10_000,
                 supportCell: spellCase.supportCell ?? { x: 3, y: 6 },
             });
-            setup.upper.applyBuff(
+            setup.right.applyBuff(
                 new Spell({
                     spellProperties: getSpellConfig("System", "Hidden"),
                     amount: 1,
                 }),
             );
-            const chargesBefore = setup.lower
+            const chargesBefore = setup.left
                 .getSpells()
                 .find((spell) => spell.getName() === spellCase.spellName)
                 ?.getAmount();
 
             const result = setup.engine.apply({
                 type: "cast_spell",
-                casterId: setup.lower.getId(),
+                casterId: setup.left.getId(),
                 spellName: spellCase.spellName,
-                targetId: setup.upper.getId(),
+                targetId: setup.right.getId(),
             });
 
             expect(result.completed).toBe(false);
             expect(result.rejectionReason).toBe("spell_not_available");
             expect(
-                setup.lower
+                setup.left
                     .getSpells()
                     .find((spell) => spell.getName() === spellCase.spellName)
                     ?.getAmount(),
             ).toBe(chargesBefore);
-            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
         });
 
         it(`${spellCase.spellName} rejects an allied target without spending its charge or turn`, () => {
             const setup = setupActionFight({
-                lowerAbilities: spellCase.abilities,
-                lowerSpells: spellCase.spells,
-                lowerStackPower: spellCase.stackPower,
-                upperCell: { x: 6, y: 3 },
+                leftAbilities: spellCase.abilities,
+                leftSpells: spellCase.spells,
+                leftStackPower: spellCase.stackPower,
+                rightCell: { x: 6, y: 3 },
                 supportCell: { x: 3, y: 6 },
             });
-            const chargesBefore = setup.lower
+            const chargesBefore = setup.left
                 .getSpells()
                 .find((spell) => spell.getName() === spellCase.spellName)
                 ?.getAmount();
 
             const result = setup.engine.apply({
                 type: "cast_spell",
-                casterId: setup.lower.getId(),
+                casterId: setup.left.getId(),
                 spellName: spellCase.spellName,
-                targetId: setup.lowerSupport.getId(),
+                targetId: setup.leftSupport.getId(),
             });
 
             expect(result.completed).toBe(false);
             expect(result.rejectionReason).toBe("spell_not_available");
             expect(
-                setup.lower
+                setup.left
                     .getSpells()
                     .find((spell) => spell.getName() === spellCase.spellName)
                     ?.getAmount(),
             ).toBe(chargesBefore);
-            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(false);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
         });
 
         it(`${spellCase.spellName} still accepts a visible enemy target`, () => {
             const setup = setupActionFight({
-                lowerAbilities: spellCase.abilities,
-                lowerSpells: spellCase.spells,
-                lowerStackPower: spellCase.stackPower,
-                upperCell: { x: 6, y: 3 },
-                upperMaxHp: 10_000,
+                leftAbilities: spellCase.abilities,
+                leftSpells: spellCase.spells,
+                leftStackPower: spellCase.stackPower,
+                rightCell: { x: 6, y: 3 },
+                rightMaxHp: 10_000,
                 supportCell: spellCase.supportCell ?? { x: 3, y: 6 },
             });
-            const aimedHpBefore = setup.upper.getCumulativeHp();
-            const ringVictimHpBefore = setup.lowerSupport.getCumulativeHp();
+            const aimedHpBefore = setup.right.getCumulativeHp();
+            const ringVictimHpBefore = setup.leftSupport.getCumulativeHp();
 
             const result = setup.engine.apply({
                 type: "cast_spell",
-                casterId: setup.lower.getId(),
+                casterId: setup.left.getId(),
                 spellName: spellCase.spellName,
-                targetId: setup.upper.getId(),
+                targetId: setup.right.getId(),
             });
 
             expect(result.completed).toBe(true);
-            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
             if (spellCase.spellName === "Ring of Fire") {
-                expect(setup.upper.getCumulativeHp()).toBe(aimedHpBefore);
-                expect(setup.lowerSupport.getCumulativeHp()).toBeLessThan(ringVictimHpBefore);
+                expect(setup.right.getCumulativeHp()).toBe(aimedHpBefore);
+                expect(setup.leftSupport.getCumulativeHp()).toBeLessThan(ringVictimHpBefore);
             }
         });
     }
 
     it("Armor Rune rejects an enemy but still accepts an ally", () => {
         const enemySetup = setupActionFight({
-            lowerAbilities: ["Enchants"],
-            lowerSpells: ["System:Armor Rune"],
-            lowerStackPower: 1,
-            upperCell: { x: 6, y: 3 },
+            leftAbilities: ["Enchants"],
+            leftSpells: ["System:Armor Rune"],
+            leftStackPower: 1,
+            rightCell: { x: 6, y: 3 },
             supportCell: { x: 3, y: 6 },
         });
         const rejected = enemySetup.engine.apply({
             type: "cast_spell",
-            casterId: enemySetup.lower.getId(),
+            casterId: enemySetup.left.getId(),
             spellName: "Armor Rune",
-            targetId: enemySetup.upper.getId(),
+            targetId: enemySetup.right.getId(),
         });
 
         expect(rejected.completed).toBe(false);
         expect(rejected.rejectionReason).toBe("spell_not_available");
-        expect(enemySetup.lower.hasSpellRemaining("Armor Rune")).toBe(true);
-        expect(enemySetup.fightProperties.hasAlreadyMadeTurn(enemySetup.lower.getId())).toBe(false);
+        expect(enemySetup.left.hasSpellRemaining("Armor Rune")).toBe(true);
+        expect(enemySetup.fightProperties.hasAlreadyMadeTurn(enemySetup.left.getId())).toBe(false);
 
         const allySetup = setupActionFight({
-            lowerAbilities: ["Enchants"],
-            lowerSpells: ["System:Armor Rune"],
-            lowerStackPower: 1,
-            upperCell: { x: 6, y: 3 },
+            leftAbilities: ["Enchants"],
+            leftSpells: ["System:Armor Rune"],
+            leftStackPower: 1,
+            rightCell: { x: 6, y: 3 },
             supportCell: { x: 3, y: 6 },
         });
         const accepted = allySetup.engine.apply({
             type: "cast_spell",
-            casterId: allySetup.lower.getId(),
+            casterId: allySetup.left.getId(),
             spellName: "Armor Rune",
-            targetId: allySetup.lowerSupport.getId(),
+            targetId: allySetup.leftSupport.getId(),
         });
 
         expect(accepted.completed).toBe(true);
-        expect(allySetup.lower.hasSpellRemaining("Armor Rune")).toBe(false);
-        expect(allySetup.fightProperties.hasAlreadyMadeTurn(allySetup.lower.getId())).toBe(true);
+        expect(allySetup.left.hasSpellRemaining("Armor Rune")).toBe(false);
+        expect(allySetup.fightProperties.hasAlreadyMadeTurn(allySetup.left.getId())).toBe(true);
     });
 });
 
@@ -2938,22 +2938,22 @@ describe("action engine — Vine Throw", () => {
     it("lays the vine along the path, snares the target, and spends the scroll", () => {
         const setup = setupActionFight({
             // Carried as a castable ABILITY (like Valkyrie's Wind Flow), not as a spellbook entry.
-            lowerAbilities: ["Vine Throw"],
-            lowerStackPower: 3,
-            upperCell: { x: 6, y: 3 },
+            leftAbilities: ["Vine Throw"],
+            leftStackPower: 3,
+            rightCell: { x: 6, y: 3 },
             // The harness parks the friendly support on (4,3) by default, which is ON the throw line and
             // would (correctly) block it. Move it aside so this test exercises the clear-line case.
             supportCell: { x: 3, y: 6 },
         });
         const vines = setup.fightProperties.getVines();
         expect(vines.size()).toBe(0);
-        const stepsBefore = setup.upper.getSteps();
+        const stepsBefore = setup.right.getSteps();
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Vine Throw",
-            targetId: setup.upper.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(true);
@@ -2970,16 +2970,16 @@ describe("action engine — Vine Throw", () => {
         expect(result.events).toContainEqual(
             expect.objectContaining({
                 type: "vine_placed",
-                casterId: setup.lower.getId(),
-                targetId: setup.upper.getId(),
+                casterId: setup.left.getId(),
+                targetId: setup.right.getId(),
                 // The harness default is 0 magic resist, so the snare cannot be saved against here.
                 snareResisted: false,
             }),
         );
-        expect(setup.upper.hasDebuffActive("Vine Throw")).toBe(true);
-        expect(setup.upper.getSteps()).toBeLessThan(stepsBefore);
-        expect(setup.lower.hasSpellRemaining("Vine Throw")).toBe(false);
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.lower.getId())).toBe(true);
+        expect(setup.right.hasDebuffActive("Vine Throw")).toBe(true);
+        expect(setup.right.getSteps()).toBeLessThan(stepsBefore);
+        expect(setup.left.hasSpellRemaining("Vine Throw")).toBe(false);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
     // The snare is a debuff, so magic armor takes its usual save against it. What the save does NOT undo is
@@ -3001,17 +3001,17 @@ describe("action engine — Vine Throw", () => {
         const throwAtWardedTarget = (source: number) => {
             setDeterministicRandomSource(() => source);
             const setup = setupActionFight({
-                lowerAbilities: ["Vine Throw"],
-                lowerStackPower: 3,
-                upperCell: { x: 6, y: 3 },
+                leftAbilities: ["Vine Throw"],
+                leftStackPower: 3,
+                rightCell: { x: 6, y: 3 },
                 supportCell: { x: 3, y: 6 },
-                upperMagicResist: WARDED_RESIST,
+                rightMagicResist: WARDED_RESIST,
             });
             const result = setup.engine.apply({
                 type: "cast_spell",
-                casterId: setup.lower.getId(),
+                casterId: setup.left.getId(),
                 spellName: "Vine Throw",
-                targetId: setup.upper.getId(),
+                targetId: setup.right.getId(),
             });
             return { setup, result };
         };
@@ -3033,12 +3033,12 @@ describe("action engine — Vine Throw", () => {
             const { setup, result } = throwAtWardedTarget(SOURCE_UNDER_RESIST);
 
             expect(result.completed).toBe(true);
-            expect(setup.upper.hasDebuffActive("Vine Throw")).toBe(false);
+            expect(setup.right.hasDebuffActive("Vine Throw")).toBe(false);
             // The throw landed its terrain regardless, and paid for it.
             for (const cell of VINED_CELLS) {
                 expect(setup.fightProperties.getVines().has(cell)).toBe(true);
             }
-            expect(setup.lower.hasSpellRemaining("Vine Throw")).toBe(false);
+            expect(setup.left.hasSpellRemaining("Vine Throw")).toBe(false);
             // Ranked rebuilds its scene log from events and never reads the engine's text, so the save has
             // to ride on the event or a resisted snare reads there exactly like one that landed.
             expect(result.events).toContainEqual(expect.objectContaining({ type: "vine_placed", snareResisted: true }));
@@ -3048,7 +3048,7 @@ describe("action engine — Vine Throw", () => {
             const { setup, result } = throwAtWardedTarget(SOURCE_OVER_RESIST);
 
             expect(result.completed).toBe(true);
-            expect(setup.upper.hasDebuffActive("Vine Throw")).toBe(true);
+            expect(setup.right.hasDebuffActive("Vine Throw")).toBe(true);
             for (const cell of VINED_CELLS) {
                 expect(setup.fightProperties.getVines().has(cell)).toBe(true);
             }
@@ -3061,24 +3061,24 @@ describe("action engine — Vine Throw", () => {
     it("refuses the throw when a body blocks the line and leaves no vine behind", () => {
         const setup = setupActionFight({
             // Carried as a castable ABILITY (like Valkyrie's Wind Flow), not as a spellbook entry.
-            lowerAbilities: ["Vine Throw"],
-            lowerStackPower: 3,
-            upperCell: { x: 6, y: 3 },
+            leftAbilities: ["Vine Throw"],
+            leftStackPower: 3,
+            rightCell: { x: 6, y: 3 },
             // The friendly support sits between caster and target, breaking line of sight.
             supportCell: { x: 5, y: 3 },
         });
 
         const result = setup.engine.apply({
             type: "cast_spell",
-            casterId: setup.lower.getId(),
+            casterId: setup.left.getId(),
             spellName: "Vine Throw",
-            targetId: setup.upper.getId(),
+            targetId: setup.right.getId(),
         });
 
         expect(result.completed).toBe(false);
         expect(setup.fightProperties.getVines().size()).toBe(0);
-        expect(setup.upper.hasDebuffActive("Vine Throw")).toBe(false);
-        expect(setup.lower.hasSpellRemaining("Vine Throw")).toBe(true);
+        expect(setup.right.hasDebuffActive("Vine Throw")).toBe(false);
+        expect(setup.left.hasSpellRemaining("Vine Throw")).toBe(true);
     });
 });
 
@@ -3103,24 +3103,24 @@ describe("action engine — walking the vine", () => {
         const opts: Parameters<typeof setupActionFight>[0] & {
             currentActiveKnownPaths?: Map<number, IWeightedRoute[]>;
         } = {
-            lowerAbilities: ["In Its Own World"],
+            leftAbilities: ["In Its Own World"],
             // Keep the friendly support off the vine road running east from (3,3).
             supportCell: { x: 3, y: 6 },
-            upperCell: { x: 12, y: 12 },
+            rightCell: { x: 12, y: 12 },
         };
         const setup = setupActionFight(opts);
         const road = layVineRoad(3, 3, 6);
 
-        const steps = setup.lower.getSteps();
+        const steps = setup.left.getSteps();
         const movePath = new PathHelper(setup.grid.getSettings()).getMovePath(
             { x: 3, y: 3 },
             setup.grid.getMatrix(),
             steps,
             undefined,
-            setup.lower.canFly(),
-            setup.lower.isSmallSize(),
-            setup.lower.canTraverseLava(),
-            setup.lower.hasAbilityActive("In Its Own World"),
+            setup.left.canFly(),
+            setup.left.isSmallSize(),
+            setup.left.canTraverseLava(),
+            setup.left.hasAbilityActive("In Its Own World"),
         );
 
         // The last vine cell is far beyond a plain walker's reach at these steps — that is the whole point.
@@ -3135,22 +3135,22 @@ describe("action engine — walking the vine", () => {
         opts.currentActiveKnownPaths = movePath.knownPaths;
         const result = setup.engine.apply({
             type: "move_unit",
-            unitId: setup.lower.getId(),
+            unitId: setup.left.getId(),
             path: route!.route as { x: number; y: number }[],
         });
 
         expect(result.rejectionReason).toBeUndefined();
         expect(result.completed).toBe(true);
-        expect(setup.lower.getBaseCell()).toEqual(destination);
+        expect(setup.left.getBaseCell()).toEqual(destination);
     });
 
     it("still refuses a vine cell beyond the discounted budget", () => {
         const opts: Parameters<typeof setupActionFight>[0] & {
             currentActiveKnownPaths?: Map<number, IWeightedRoute[]>;
         } = {
-            lowerAbilities: ["In Its Own World"],
+            leftAbilities: ["In Its Own World"],
             supportCell: { x: 3, y: 6 },
-            upperCell: { x: 12, y: 12 },
+            rightCell: { x: 12, y: 12 },
         };
         const setup = setupActionFight(opts);
         layVineRoad(3, 3, 12);
@@ -3158,7 +3158,7 @@ describe("action engine — walking the vine", () => {
         const movePath = new PathHelper(setup.grid.getSettings()).getMovePath(
             { x: 3, y: 3 },
             setup.grid.getMatrix(),
-            setup.lower.getSteps(),
+            setup.left.getSteps(),
             undefined,
             false,
             true,
@@ -3188,45 +3188,45 @@ describe("action engine — standing in a vine", () => {
         (opts as { currentActiveKnownPaths?: Map<number, IWeightedRoute[]> }).currentActiveKnownPaths = new Map([
             [cellKey(target), [weightedRoute(path)]],
         ]);
-        return setup.engine.apply({ type: "move_unit", unitId: setup.lower.getId(), path });
+        return setup.engine.apply({ type: "move_unit", unitId: setup.left.getId(), path });
     };
 
     it("snares a walker that ends its move in an enemy vine", () => {
-        const opts: Record<string, unknown> = { supportCell: { x: 6, y: 6 }, upperCell: { x: 12, y: 12 } };
+        const opts: Record<string, unknown> = { supportCell: { x: 6, y: 6 }, rightCell: { x: 12, y: 12 } };
         const setup = setupActionFight(opts);
-        layEnemyVine({ x: 3, y: 4 }, PBTypes.TeamVals.UPPER);
-        const stepsBefore = setup.lower.getSteps();
+        layEnemyVine({ x: 3, y: 4 }, PBTypes.TeamVals.RIGHT);
+        const stepsBefore = setup.left.getSteps();
 
         expect(walkOnto(setup, opts).completed).toBe(true);
-        expect(setup.lower.hasDebuffActive("Vine Throw")).toBe(true);
+        expect(setup.left.hasDebuffActive("Vine Throw")).toBe(true);
         // Steps are recomputed on the turn/lap boundary, the same cadence as Quagmire — force the recalc
         // here so the test pins the EFFECT rather than just the flag.
-        setup.lower.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
-        expect(setup.lower.getSteps()).toBeLessThan(stepsBefore);
+        setup.left.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(setup.left.getSteps()).toBeLessThan(stepsBefore);
     });
 
     it("snares a FLYER that lands in one — flying clears a vine, it does not clear standing in it", () => {
         const opts: Record<string, unknown> = {
             supportCell: { x: 6, y: 6 },
-            upperCell: { x: 12, y: 12 },
-            lowerMovementType: PBTypes.MovementVals.FLY,
+            rightCell: { x: 12, y: 12 },
+            leftMovementType: PBTypes.MovementVals.FLY,
         };
         const setup = setupActionFight(opts);
-        layEnemyVine({ x: 3, y: 4 }, PBTypes.TeamVals.UPPER);
+        layEnemyVine({ x: 3, y: 4 }, PBTypes.TeamVals.RIGHT);
 
         expect(walkOnto(setup, opts).completed).toBe(true);
-        expect(setup.lower.hasDebuffActive("Vine Throw")).toBe(true);
+        expect(setup.left.hasDebuffActive("Vine Throw")).toBe(true);
     });
 
     it("leaves a unit standing in its OWN side's vine alone", () => {
-        const opts: Record<string, unknown> = { supportCell: { x: 6, y: 6 }, upperCell: { x: 12, y: 12 } };
+        const opts: Record<string, unknown> = { supportCell: { x: 6, y: 6 }, rightCell: { x: 12, y: 12 } };
         const setup = setupActionFight(opts);
-        layEnemyVine({ x: 3, y: 4 }, PBTypes.TeamVals.LOWER); // same team as the mover
-        const stepsBefore = setup.lower.getSteps();
+        layEnemyVine({ x: 3, y: 4 }, PBTypes.TeamVals.LEFT); // same team as the mover
+        const stepsBefore = setup.left.getSteps();
 
         expect(walkOnto(setup, opts).completed).toBe(true);
-        expect(setup.lower.hasDebuffActive("Vine Throw")).toBe(false);
-        setup.lower.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
-        expect(setup.lower.getSteps()).toBe(stepsBefore);
+        expect(setup.left.hasDebuffActive("Vine Throw")).toBe(false);
+        setup.left.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(setup.left.getSteps()).toBe(stepsBefore);
     });
 });

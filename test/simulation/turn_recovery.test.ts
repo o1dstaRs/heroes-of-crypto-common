@@ -18,11 +18,11 @@ describe("turn recovery movement", () => {
     test("crosses lava without selecting an engine-illegal recovery endpoint", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
         const flyer = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             movementType: PBTypes.MovementVals.FLY,
             initiative: 6,
         });
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         placeUnit(combat.grid, combat.unitsHolder, flyer, { x: 5, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 11, y: 7 });
 

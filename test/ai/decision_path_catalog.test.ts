@@ -35,8 +35,8 @@ import {
 
 type MoveArgs = Parameters<PathHelper["getMovePath"]>;
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 function makeRng(seed: number, onDraw?: () => void): () => number {
@@ -52,7 +52,7 @@ function makeRng(seed: number, onDraw?: () => void): () => number {
 }
 
 function canonicalArgs(combat: CombatTestContext, unit: Unit, matrix: number[][]): MoveArgs {
-    const enemyTeam = unit.getTeam() === LOWER ? UPPER : LOWER;
+    const enemyTeam = unit.getTeam() === LEFT ? RIGHT : LEFT;
     return [
         { ...unit.getBaseCell() },
         matrix,
@@ -75,8 +75,8 @@ function placeCanonicalPair(initiative = 4.2): {
     matrix: number[][];
 } {
     const combat = createCombatTestContext();
-    const unit = createTestUnit({ team: LOWER, name: "Path Actor", attackType: MELEE, initiative });
-    const enemy = createTestUnit({ team: UPPER, name: "Path Target", attackType: MELEE });
+    const unit = createTestUnit({ team: LEFT, name: "Path Actor", attackType: MELEE, initiative });
+    const enemy = createTestUnit({ team: RIGHT, name: "Path Target", attackType: MELEE });
     placeUnit(combat.grid, combat.unitsHolder, unit, { x: 8, y: 8 });
     placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 11, y: 11 });
     return { combat, unit, enemy, matrix: combat.grid.getMatrix() };
@@ -155,7 +155,7 @@ describe("decision-scoped path catalog", () => {
                 Array.from({ length: 16 }, () => {
                     state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
                     const sample = state & 0xff;
-                    return sample < 28 ? -1 : sample < 52 ? UPPER : 0;
+                    return sample < 28 ? -1 : sample < 52 ? RIGHT : 0;
                 }),
             );
             const current = unit.getBaseCell();
@@ -230,10 +230,10 @@ describe("decision-scoped path catalog", () => {
         }
 
         const combat = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Collision Actor", attackType: MELEE, initiative: 20 });
+        const unit = createTestUnit({ team: LEFT, name: "Collision Actor", attackType: MELEE, initiative: 20 });
         placeUnit(combat.grid, combat.unitsHolder, unit, { x: 8, y: 8 });
         const occupancy = Array.from({ length: 16 }, () => Array<number>(17).fill(0));
-        const aggression = combat.grid.getAggrMatrixByTeam(UPPER)!;
+        const aggression = combat.grid.getAggrMatrixByTeam(RIGHT)!;
         for (const column of aggression) {
             column.push(1);
         }
@@ -311,7 +311,7 @@ describe("decision-scoped path catalog", () => {
             DecisionPathCatalog.canElideUnconsumedMeleeLayers(
                 catalog,
                 combat.grid,
-                createTestUnit({ team: LOWER }),
+                createTestUnit({ team: LEFT }),
                 matrix,
             ),
         ).toBe(false);
@@ -498,15 +498,15 @@ describe("decision-scoped path catalog", () => {
     it("keeps full root candidate order, metadata, identity, and RNG exact across the one-shot handoff", () => {
         const combat = createCombatTestContext();
         const actor = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Candidate Actor",
             attackType: MELEE,
             initiative: 4.2,
             amountAlive: 5,
         });
-        const adjacent = createTestUnit({ team: UPPER, name: "Adjacent Target", attackType: MELEE, amountAlive: 3 });
-        const distant = createTestUnit({ team: UPPER, name: "Distant Target", attackType: MELEE, amountAlive: 4 });
-        const blocker = createTestUnit({ team: LOWER, name: "Friendly Blocker", attackType: MELEE });
+        const adjacent = createTestUnit({ team: RIGHT, name: "Adjacent Target", attackType: MELEE, amountAlive: 3 });
+        const distant = createTestUnit({ team: RIGHT, name: "Distant Target", attackType: MELEE, amountAlive: 4 });
+        const blocker = createTestUnit({ team: LEFT, name: "Friendly Blocker", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, adjacent, { x: 5, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, distant, { x: 10, y: 7 });
@@ -572,12 +572,12 @@ describe("decision-scoped path catalog", () => {
     it("defers the finite path when native discovery already finds a reachable melee attack", () => {
         const combat = createCombatTestContext();
         const actor = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Reachable Actor",
             attackType: MELEE,
             initiative: 4.2,
         });
-        const target = createTestUnit({ team: UPPER, name: "Reachable Target", attackType: MELEE });
+        const target = createTestUnit({ team: RIGHT, name: "Reachable Target", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 8, y: 8 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 10, y: 8 });
         const matrix = combat.grid.getMatrix();

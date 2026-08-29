@@ -39,8 +39,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 function makeReal(team: number, faction: string, name: string): Unit {
@@ -84,8 +84,8 @@ function activateEngine(combat: CombatTestContext, active: Unit): GameActionEngi
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(PBTypes.GridVals.NORMAL);
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.setTeamUnitsAlive(LEFT, combat.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, combat.unitsHolder.getAllAllies(RIGHT).length);
     fightProperties.startTurn(active.getTeam(), 1_000);
     return new GameActionEngine({
         fightProperties,
@@ -150,7 +150,7 @@ function estimateWithMissSource(mutate?: (attacker: Unit, target: Unit) => void)
     const combat = createCombatTestContext();
     const attacker = createTestUnit({
         name: "Large Petrifier",
-        team: LOWER,
+        team: LEFT,
         attackType: MELEE,
         damageMin: 10,
         damageMax: 10,
@@ -162,7 +162,7 @@ function estimateWithMissSource(mutate?: (attacker: Unit, target: Unit) => void)
     });
     const target = createTestUnit({
         name: "Target",
-        team: UPPER,
+        team: RIGHT,
         attackType: MELEE,
         amountAlive: 20,
         maxHp: 100,
@@ -193,13 +193,13 @@ describe("v0.6 melee rider EV router", () => {
         expect(calculatePetrifyingGazeKillChance(60, 4, 25, 2)).toBe(15);
 
         const attacker = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             abilities: ["Stun"],
             luck: 0,
             stackPower: 100,
         });
-        const ordinary = createTestUnit({ team: UPPER });
-        const mechanism = createTestUnit({ team: UPPER, abilities: ["Mechanism"] });
+        const ordinary = createTestUnit({ team: RIGHT });
+        const mechanism = createTestUnit({ team: RIGHT, abilities: ["Mechanism"] });
         // Pre-extraction Stun arithmetic: 35 base at full stack; STATUS gets x1.5 vs Mechanism.
         expect(calculateStunApplyChance(attacker, ordinary, 0)).toBe(35);
         expect(calculateStunApplyChance(attacker, mechanism, 0)).toBe(52.5);
@@ -234,7 +234,7 @@ describe("v0.6 melee rider EV router", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Large Petrifier",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             damageMin: 10,
             damageMax: 10,
@@ -245,7 +245,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const evasive = createTestUnit({
             name: "Evasive",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 100,
@@ -254,7 +254,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const reliable = createTestUnit({
             name: "Reliable",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 100,
@@ -272,7 +272,7 @@ describe("v0.6 melee rider EV router", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Large Petrifier",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             damageMin: 10,
             damageMax: 10,
@@ -283,7 +283,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const evasive = createTestUnit({
             name: "Evasive",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 100,
@@ -292,7 +292,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const reliable = createTestUnit({
             name: "Reliable",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 100,
@@ -321,8 +321,8 @@ describe("v0.6 melee rider EV router", () => {
 
     it("is byte-parity inert while gated off and when fight state is unavailable", () => {
         const combat = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, attackType: MELEE, abilities: ["Stun"] });
-        const target = createTestUnit({ team: UPPER, attackType: MELEE });
+        const unit = createTestUnit({ team: LEFT, attackType: MELEE, abilities: ["Stun"] });
+        const target = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, unit, { x: 6, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 6 });
         const incumbent = melee(unit, target);
@@ -343,7 +343,7 @@ describe("v0.6 melee rider EV router", () => {
         const combat = createCombatTestContext();
         const medusa = createTestUnit({
             name: "Medusa",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             attack: 10,
             damageMin: 2,
@@ -354,7 +354,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const lowLevel = createTestUnit({
             name: "Level 1",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 100,
@@ -362,7 +362,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const highLevel = createTestUnit({
             name: "Level 4",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 100,
@@ -385,7 +385,7 @@ describe("v0.6 melee rider EV router", () => {
         const combat = createCombatTestContext();
         const squire = createTestUnit({
             name: "Squire",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             damageMin: 1,
             damageMax: 1,
@@ -395,7 +395,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const acted = createTestUnit({
             name: "Acted",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             damageMin: 10,
             damageMax: 10,
@@ -404,7 +404,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const pending = createTestUnit({
             name: "Pending",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             damageMin: 10,
             damageMax: 10,
@@ -413,7 +413,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         placeThree(combat, squire, acted, pending);
         const context = contextFor(combat);
-        context.fightProperties!.addAlreadyMadeTurn(UPPER, acted.getId(), 0);
+        context.fightProperties!.addAlreadyMadeTurn(RIGHT, acted.getId(), 0);
 
         const actedEv = estimateMeleeRiderEV(squire, context, candidateFor(squire, acted, context));
         const pendingEv = estimateMeleeRiderEV(squire, context, candidateFor(squire, pending, context));
@@ -421,7 +421,7 @@ describe("v0.6 melee rider EV router", () => {
         expect(pendingEv?.stunTurnDenialEv).toBeGreaterThan(0);
         expect(selectedTarget(routeMeleeRiderEV(squire, context, melee(squire, acted)))).toBe(pending.getId());
 
-        context.fightProperties!.addAlreadyMadeTurn(UPPER, pending.getId(), 0);
+        context.fightProperties!.addAlreadyMadeTurn(RIGHT, pending.getId(), 0);
         const incumbent = melee(squire, acted);
         expect(routeMeleeRiderEV(squire, context, incumbent)).toBe(incumbent);
     });
@@ -429,8 +429,8 @@ describe("v0.6 melee rider EV router", () => {
     it("preserves the incumbent for the shipped Hydra replacement-hit and Devour sequence", () => {
         process.env.V06_RIDER_EV = "on";
         const combat = createCombatTestContext();
-        const hydra = makeReal(LOWER, "Chaos", "Hydra");
-        const target = createTestUnit({ name: "Target", team: UPPER, attackType: MELEE, maxHp: 500 });
+        const hydra = makeReal(LEFT, "Chaos", "Hydra");
+        const target = createTestUnit({ name: "Target", team: RIGHT, attackType: MELEE, maxHp: 500 });
         placeLarge(combat, hydra, { x: 6, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 6 });
         const context = contextFor(combat);
@@ -448,7 +448,7 @@ describe("v0.6 melee rider EV router", () => {
         const combat = createCombatTestContext();
         const squire = createTestUnit({
             name: "Squire",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             damageMin: 2,
             damageMax: 2,
@@ -457,7 +457,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const target = createTestUnit({
             name: "Double Punch target",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 10,
             maxHp: 100,
@@ -478,7 +478,7 @@ describe("v0.6 melee rider EV router", () => {
         const combat = createCombatTestContext();
         const squire = createTestUnit({
             name: "Moving Squire",
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             damageMin: 1,
             damageMax: 1,
@@ -489,7 +489,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const acted = createTestUnit({
             name: "Acted target",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             damageMin: 10,
             damageMax: 10,
@@ -498,7 +498,7 @@ describe("v0.6 melee rider EV router", () => {
         });
         const pending = createTestUnit({
             name: "Pending target",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             damageMin: 10,
             damageMax: 10,
@@ -510,7 +510,7 @@ describe("v0.6 melee rider EV router", () => {
         placeUnit(combat.grid, combat.unitsHolder, pending, { x: 7, y: 6 });
         const engine = activateEngine(combat, squire);
         const context = contextFor(combat);
-        context.fightProperties!.addAlreadyMadeTurn(UPPER, acted.getId(), 0);
+        context.fightProperties!.addAlreadyMadeTurn(RIGHT, acted.getId(), 0);
         const standCell = { x: 6, y: 5 };
         const neutral: GameAction[] = [{ type: "end_turn", unitId: squire.getId(), reason: "manual" }];
         const incumbent = enumerateCandidates(squire, context, neutral).candidates.find(

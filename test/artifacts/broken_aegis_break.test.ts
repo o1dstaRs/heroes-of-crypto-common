@@ -33,7 +33,7 @@ class RecordingSceneLog implements ISceneLog {
 const makeTarget = (name: string) =>
     createTestUnit({
         name,
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         attackType: PBTypes.AttackVals.MELEE,
         maxHp: 1000,
         amountAlive: 1,

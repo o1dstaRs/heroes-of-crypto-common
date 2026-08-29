@@ -51,7 +51,7 @@ function runThroughShotScenario(abilities: string[]): number {
 
     const attacker = createTestUnit({
         name: "Tsar Cannon",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.RANGE,
         attack: 40,
         damageMin: 30,
@@ -75,7 +75,7 @@ function runThroughShotScenario(abilities: string[]): number {
     const enemies = enemyCells.map((cell, i) => {
         const e = createTestUnit({
             name: `Enemy${i}`,
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 100000,
             amountAlive: 1,
             armor: 0,
@@ -84,9 +84,9 @@ function runThroughShotScenario(abilities: string[]): number {
         return e;
     });
 
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, enemies.length);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, enemies.length);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const sceneLog = new SceneLogMock();
     const moveHandler = new MoveHandler(grid.getSettings(), grid, unitsHolder);

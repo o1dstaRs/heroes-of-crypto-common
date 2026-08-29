@@ -28,8 +28,8 @@ import type { Unit } from "../../src/units/unit";
 import { getRandomInt, setDeterministicRandomSource } from "../../src/utils/lib";
 import { createTestUnit, type TestUnitOptions } from "../helpers/combat";
 
-const RED = PBTypes.TeamVals.UPPER;
-const GREEN = PBTypes.TeamVals.LOWER;
+const RED = PBTypes.TeamVals.RIGHT;
+const GREEN = PBTypes.TeamVals.LEFT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const RANGE = PBTypes.AttackVals.RANGE;

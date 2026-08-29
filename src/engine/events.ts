@@ -36,7 +36,7 @@ export interface IAbilityTransfer {
 export type GameEventMode = "full" | "headless";
 
 export type GameEvent =
-    | { type: "fight_started"; lowerUnitsAlive: number; upperUnitsAlive: number }
+    | { type: "fight_started"; leftUnitsAlive: number; rightUnitsAlive: number }
     | { type: "turn_completed"; unitId: string; team: TeamType; hourglass: boolean }
     | { type: "lap_initialized"; lap: number }
     | { type: "lap_flipped"; previousLap: number; currentLap: number }

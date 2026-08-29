@@ -27,8 +27,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const MAGIC = PBTypes.AttackVals.MAGIC;
@@ -67,13 +67,13 @@ describe("AI version registry — v0.8 is the shipped default", () => {
 
         // placeArmy delegates to v0.3 for a non-Wolf-Rider roster -> identical deployment.
         const mkUnits = () => [
-            createTestUnit({ name: "R", team: LOWER, attackType: RANGE, rangeShots: 5 }),
-            createTestUnit({ name: "M1", team: LOWER, attackType: MELEE }),
-            createTestUnit({ name: "M2", team: LOWER, attackType: MELEE }),
+            createTestUnit({ name: "R", team: LEFT, attackType: RANGE, rangeShots: 5 }),
+            createTestUnit({ name: "M1", team: LEFT, attackType: MELEE }),
+            createTestUnit({ name: "M2", team: LEFT, attackType: MELEE }),
         ];
-        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 3);
+        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 3);
         const placeCtx = {
-            team: LOWER,
+            team: LEFT,
             grid: undefined as never,
             unitsHolder: undefined as never,
             pathHelper: undefined as never,
@@ -89,8 +89,8 @@ describe("AI version registry — v0.8 is the shipped default", () => {
 
         // decideTurn delegates too: a boxed-in shooter produces the same kind of action under both.
         const c = createCombatTestContext();
-        const shooter = createTestUnit({ team: LOWER, name: "S", attackType: RANGE, rangeShots: 5, initiative: 3 });
-        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE, amountAlive: 5 });
+        const shooter = createTestUnit({ team: LEFT, name: "S", attackType: RANGE, rangeShots: 5, initiative: 3 });
+        const enemy = createTestUnit({ team: RIGHT, name: "E", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 5, y: 6 });
         const actions = v04.decideTurn(shooter, ctxFor(c));
@@ -102,7 +102,7 @@ describe("AI version registry — v0.8 is the shipped default", () => {
 describe("v0.3 placeArmy — corner shooters, flyer wing, centred wall", () => {
     it("routes ranged to deep corners, ground melee to the centred front wall, flyers to a forward flank", () => {
         const mk = (name: string, attackType: number, opts = {}) =>
-            createTestUnit({ name, team: LOWER, attackType, ...opts });
+            createTestUnit({ name, team: LEFT, attackType, ...opts });
         const r1 = mk("R1", RANGE, { rangeShots: 5 });
         const r2 = mk("R2", RANGE, { rangeShots: 5 });
         const m1 = mk("M1", MELEE);
@@ -111,9 +111,9 @@ describe("v0.3 placeArmy — corner shooters, flyer wing, centred wall", () => {
         const support = mk("Caster", MAGIC);
         const units = [r1, r2, m1, m2, flyer, support];
 
-        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 3);
+        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 3);
         const placed = v03.placeArmy(units, {
-            team: LOWER,
+            team: LEFT,
             grid: undefined as never,
             unitsHolder: undefined as never,
             pathHelper: undefined as never,
@@ -140,8 +140,8 @@ describe("v0.3 placeArmy — corner shooters, flyer wing, centred wall", () => {
     it("uses Placement level 3's opened edge line for v0.8 ranged corners", () => {
         const v08 = getAIStrategy("v0.8");
         const scenarios = [
-            { team: LOWER, position: PlacementPositionType.LOWER_LEFT, edgeY: 0 },
-            { team: UPPER, position: PlacementPositionType.UPPER_RIGHT, edgeY: 15 },
+            { team: LEFT, position: PlacementPositionType.LEFT_BOTTOM, edgeY: 0 },
+            { team: RIGHT, position: PlacementPositionType.RIGHT_TOP, edgeY: 15 },
         ] as const;
 
         for (const { team, position, edgeY } of scenarios) {
@@ -190,10 +190,10 @@ describe("v0.3 placeArmy — corner shooters, flyer wing, centred wall", () => {
     });
 
     it("falls back gracefully when there are no legal placement cells", () => {
-        const u = createTestUnit({ name: "Lonely", team: LOWER, attackType: MELEE });
+        const u = createTestUnit({ name: "Lonely", team: LEFT, attackType: MELEE });
         const emptyZone = { possibleCellHashes: () => new Set<number>() } as unknown as RectanglePlacement;
         const placed = v03.placeArmy([u], {
-            team: LOWER,
+            team: LEFT,
             grid: undefined as never,
             unitsHolder: undefined as never,
             pathHelper: undefined as never,
@@ -207,11 +207,11 @@ describe("v0.3 decideTurn — cohesion keeps the army together", () => {
     it("redirects a detached melee straggler toward its allies instead of charging in alone", () => {
         const c = createCombatTestContext();
         // Two allies clustered on the left; one straggler far to the right (> STRAGGLER_DIST from centroid).
-        const ally1 = createTestUnit({ team: LOWER, name: "Ally1", attackType: MELEE, initiative: 3 });
-        const ally2 = createTestUnit({ team: LOWER, name: "Ally2", attackType: MELEE, initiative: 3 });
-        const straggler = createTestUnit({ team: LOWER, name: "Straggler", attackType: MELEE, initiative: 3 });
+        const ally1 = createTestUnit({ team: LEFT, name: "Ally1", attackType: MELEE, initiative: 3 });
+        const ally2 = createTestUnit({ team: LEFT, name: "Ally2", attackType: MELEE, initiative: 3 });
+        const straggler = createTestUnit({ team: LEFT, name: "Straggler", attackType: MELEE, initiative: 3 });
         // A lone enemy far away on the right edge so the straggler has no strike available (pure move turn).
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, ally1, { x: 1, y: 1 });
         placeUnit(c.grid, c.unitsHolder, ally2, { x: 2, y: 1 });
         placeUnit(c.grid, c.unitsHolder, straggler, { x: 13, y: 1 });
@@ -229,10 +229,10 @@ describe("v0.3 decideTurn — cohesion keeps the army together", () => {
 
     it("leaves a unit already with the pack to v0.2's normal decision", () => {
         const c = createCombatTestContext();
-        const a1 = createTestUnit({ team: LOWER, name: "A1", attackType: MELEE, initiative: 3 });
-        const a2 = createTestUnit({ team: LOWER, name: "A2", attackType: MELEE, initiative: 3 });
-        const a3 = createTestUnit({ team: LOWER, name: "A3", attackType: MELEE, initiative: 3 });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const a1 = createTestUnit({ team: LEFT, name: "A1", attackType: MELEE, initiative: 3 });
+        const a2 = createTestUnit({ team: LEFT, name: "A2", attackType: MELEE, initiative: 3 });
+        const a3 = createTestUnit({ team: LEFT, name: "A3", attackType: MELEE, initiative: 3 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, a1, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, a2, { x: 6, y: 5 });
         placeUnit(c.grid, c.unitsHolder, a3, { x: 5, y: 6 }); // tight cluster, none is a straggler
@@ -251,7 +251,7 @@ describe("v0.3 decideRangedTurn — focus-fire scoring & Beholder bias", () => {
     it("fires when it has a clear shot, exercising the enemy-range focus-fire weighting", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Shooter",
             attackType: RANGE,
             rangeShots: 10,
@@ -259,8 +259,8 @@ describe("v0.3 decideRangedTurn — focus-fire scoring & Beholder bias", () => {
             initiative: 2,
         });
         // Mixed enemy targets: a ranged shooter (weighted up by scoreShot) and a melee body.
-        const enemyRanged = createTestUnit({ team: UPPER, name: "EArcher", attackType: RANGE, rangeShots: 5 });
-        const enemyMelee = createTestUnit({ team: UPPER, name: "EBrute", attackType: MELEE, amountAlive: 5 });
+        const enemyRanged = createTestUnit({ team: RIGHT, name: "EArcher", attackType: RANGE, rangeShots: 5 });
+        const enemyMelee = createTestUnit({ team: RIGHT, name: "EBrute", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 8, y: 8 });
         placeUnit(c.grid, c.unitsHolder, enemyRanged, { x: 8, y: 11 });
         placeUnit(c.grid, c.unitsHolder, enemyMelee, { x: 9, y: 11 });
@@ -274,7 +274,7 @@ describe("v0.3 decideRangedTurn — focus-fire scoring & Beholder bias", () => {
     it("a Beholder biases its shot toward a less-debuffed, still-dangerous victim", () => {
         const c = createCombatTestContext();
         const beholder = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Beholder",
             attackType: RANGE,
             rangeShots: 10,
@@ -283,8 +283,8 @@ describe("v0.3 decideRangedTurn — focus-fire scoring & Beholder bias", () => {
         });
         // One ranged enemy with shots (canThreatenThisTurn range branch) and one melee enemy near our line
         // (canThreatenThisTurn melee branch). Neither is pre-debuffed, so the Spit Ball bonus is non-zero.
-        const enemyRanged = createTestUnit({ team: UPPER, name: "EArcher", attackType: RANGE, rangeShots: 5 });
-        const enemyMelee = createTestUnit({ team: UPPER, name: "EBrute", attackType: MELEE, amountAlive: 5 });
+        const enemyRanged = createTestUnit({ team: RIGHT, name: "EArcher", attackType: RANGE, rangeShots: 5 });
+        const enemyMelee = createTestUnit({ team: RIGHT, name: "EBrute", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, beholder, { x: 8, y: 8 });
         placeUnit(c.grid, c.unitsHolder, enemyRanged, { x: 8, y: 11 });
         placeUnit(c.grid, c.unitsHolder, enemyMelee, { x: 11, y: 8 }); // a few cells off — shootable, not boxing
@@ -298,14 +298,14 @@ describe("v0.3 decideTurn — boxed-in shooter prefers to preserve its shot", ()
     it("does not throw and returns actions for a shooter hemmed in by enemies", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Shooter",
             attackType: RANGE,
             rangeShots: 5,
             initiative: 3,
         });
-        const ally = createTestUnit({ team: LOWER, name: "Screen", attackType: MELEE });
-        const e1 = createTestUnit({ team: UPPER, name: "E1", attackType: MELEE, amountAlive: 5 });
+        const ally = createTestUnit({ team: LEFT, name: "Screen", attackType: MELEE });
+        const e1 = createTestUnit({ team: RIGHT, name: "E1", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, ally, { x: 5, y: 4 });
         placeUnit(c.grid, c.unitsHolder, e1, { x: 5, y: 6 });

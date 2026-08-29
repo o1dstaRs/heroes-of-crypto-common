@@ -20,8 +20,8 @@ import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, DamageStatisticHolder, placeUnit } from "../helpers/combat";
 
-const GREEN = PBTypes.TeamVals.LOWER;
-const RED = PBTypes.TeamVals.UPPER;
+const GREEN = PBTypes.TeamVals.LEFT;
+const RED = PBTypes.TeamVals.RIGHT;
 
 const giveGiantsMaul = (unit: Unit, power: number): void => {
     const buff = new Spell({

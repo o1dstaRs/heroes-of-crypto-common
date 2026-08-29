@@ -20,7 +20,7 @@ beforeEach(() => FightStateManager.getInstance().reset());
 const manticore = (stackPower: number, luck = 0) =>
     createTestUnit({
         name: "Manticore",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         abilities: ["Warding Mane Blessing"],
         stackPower,
         luck,
@@ -29,7 +29,7 @@ const manticore = (stackPower: number, luck = 0) =>
 describe("Warding Mane Blessing", () => {
     it("is a stack-powered mass buff with no aura effect or radius", () => {
         const ability = getAbilityConfig("Warding Mane Blessing");
-        const creature = getCreatureConfig(PBTypes.TeamVals.LOWER, "Chaos", "Manticore", "manticore_512", 1);
+        const creature = getCreatureConfig(PBTypes.TeamVals.LEFT, "Chaos", "Manticore", "manticore_512", 1);
         const abilityIndex = creature.abilities.indexOf("Warding Mane Blessing");
 
         expect(ability.type).toBe(AbilityType.MASS_BUFF);
@@ -59,10 +59,10 @@ describe("Warding Mane Blessing", () => {
         const fullStackCarrier = manticore(5);
         const distantAlly = createTestUnit({
             name: "Distant Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             magicResist: 20,
         });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, magicResist: 20 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, magicResist: 20 });
 
         placeUnit(grid, unitsHolder, luckyCarrier, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, fullStackCarrier, { x: 2, y: 1 });
@@ -95,7 +95,7 @@ describe("Warding Mane Blessing", () => {
     });
 
     it("prints the live projection and reuses the existing Warding Mane icon", () => {
-        const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LOWER, stackPower: 2, luck: 5 });
+        const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LEFT, stackPower: 2, luck: 5 });
         bearer.grantAbility("Warding Mane Blessing");
 
         const index = bearer.getUnitProperties().abilities.indexOf("Warding Mane Blessing");

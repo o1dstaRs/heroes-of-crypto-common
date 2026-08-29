@@ -23,13 +23,13 @@ import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
 import { createTestUnit } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
 describe("v0.8 Armageddon endgame", () => {
     it("matches the engine's exact per-wave raw damage and live-decision timing", () => {
         const abomination = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Abomination",
             maxHp: 600,
             amountAlive: 8,
@@ -47,7 +47,7 @@ describe("v0.8 Armageddon endgame", () => {
     });
 
     it("lets an intact Water Shield absorb exactly the first upcoming wave", () => {
-        const shielded = createTestUnit({ team: LOWER, name: "Shielded", maxHp: 100, amountAlive: 4 });
+        const shielded = createTestUnit({ team: LEFT, name: "Shielded", maxHp: 100, amountAlive: 4 });
         shielded.applyBuff(
             new Spell({ spellProperties: getSpellConfig("System", "Water Shield"), amount: shielded.getAmountAlive() }),
         );
@@ -59,8 +59,8 @@ describe("v0.8 Armageddon endgame", () => {
     });
 
     it("detects a current environmental survival edge and treats equality as doomed", () => {
-        const ally = createTestUnit({ team: LOWER, name: "Abomination", maxHp: 600, amountAlive: 8 });
-        const enemy = createTestUnit({ team: UPPER, name: "Abomination", maxHp: 600, amountAlive: 8 });
+        const ally = createTestUnit({ team: LEFT, name: "Abomination", maxHp: 600, amountAlive: 8 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Abomination", maxHp: 600, amountAlive: 8 });
         ally.applyDamage(964, 0, new SceneLogMock());
         enemy.applyDamage(1_416, 0, new SceneLogMock());
 

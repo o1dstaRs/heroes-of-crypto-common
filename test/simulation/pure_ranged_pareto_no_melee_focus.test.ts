@@ -27,8 +27,8 @@ import {
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const RANGE = PBTypes.AttackVals.RANGE;
 
 interface IFixture {
@@ -99,10 +99,10 @@ function shot(
 
 function fixture(actorAbilities: readonly string[] = ["Through Shot"]): IFixture {
     const context = createCombatTestContext();
-    const actor = createTestUnit({ team: LOWER, attackType: RANGE, rangeShots: 9, abilities: [...actorAbilities] });
-    const primary = createTestUnit({ team: UPPER, attackType: RANGE, rangeShots: 9, name: "Incumbent target" });
+    const actor = createTestUnit({ team: LEFT, attackType: RANGE, rangeShots: 9, abilities: [...actorAbilities] });
+    const primary = createTestUnit({ team: RIGHT, attackType: RANGE, rangeShots: 9, name: "Incumbent target" });
     const noMelee = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         attackType: RANGE,
         rangeShots: 9,
         name: "No Melee target",
@@ -149,27 +149,27 @@ function mixedSupportedFixture(
 ): IMixedSupportedFixture {
     const context = createCombatTestContext();
     const actor = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         attackType: RANGE,
         rangeShots: 9,
         name: actorName,
         abilities: [...actorAbilities],
     });
-    const guard = createTestUnit({ team: LOWER, attackType: PBTypes.AttackVals.MELEE, name: "Squire" });
+    const guard = createTestUnit({ team: LEFT, attackType: PBTypes.AttackVals.MELEE, name: "Squire" });
     const primary = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         attackType: RANGE,
         rangeShots: 9,
         name: "Incumbent target",
     });
     const threat = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         attackType: PBTypes.AttackVals.MELEE,
         name: "Enemy Squire",
         initiative: 2,
     });
     const noMelee = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         attackType: RANGE,
         rangeShots: 9,
         name: noMeleeName,
@@ -380,7 +380,7 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
         const noShotSpend = { ...f.focus, features: { ...f.focus.features, spendsRangeShot: 0 as const } };
         expect(rank(f, [f.incumbent, noShotSpend])).toEqual([]);
 
-        const summonedNoMelee = createTestUnit({ team: UPPER, attackType: RANGE, abilities: ["No Melee"] });
+        const summonedNoMelee = createTestUnit({ team: RIGHT, attackType: RANGE, abilities: ["No Melee"] });
         expect(rank(f, [f.incumbent, shot(f.actor, summonedNoMelee, "shot")])).toEqual([]);
     });
 
@@ -745,7 +745,7 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
 
         const unscreened = mixedSupportedFixture();
         const extraThreat = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             name: "Flanking threat",
             initiative: 2,
@@ -815,7 +815,7 @@ describe("pure-ranged aggregate-Pareto No-Melee focus", () => {
 
         const unscreened = mixedSupportedFixture();
         const extraThreat = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             name: "Flanking threat",
             initiative: 2,

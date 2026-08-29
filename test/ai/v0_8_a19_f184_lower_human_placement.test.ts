@@ -28,15 +28,15 @@ import type { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const NORMAL = PBTypes.GridVals.NORMAL;
-const LOWER_IDS = V08_A19_PROD_F184_ANCHOR.lower.creatureIds;
-const UPPER_IDS = V08_A19_PROD_F184_ANCHOR.upper.creatureIds;
-const LOWER_ROSTER = V08_A19_PROD_F184_ANCHOR.lower.roster;
-const UPPER_ROSTER = V08_A19_PROD_F184_ANCHOR.upper.roster;
+const LEFT_IDS = V08_A19_PROD_F184_ANCHOR.left.creatureIds;
+const RIGHT_IDS = V08_A19_PROD_F184_ANCHOR.right.creatureIds;
+const LEFT_ROSTER = V08_A19_PROD_F184_ANCHOR.left.roster;
+const RIGHT_ROSTER = V08_A19_PROD_F184_ANCHOR.right.roster;
 
-const lowerTemplate: Readonly<Record<string, XY>> = {
+const leftTemplate: Readonly<Record<string, XY>> = {
     Troglodyte: { x: 13, y: 2 },
     Arbalester: { x: 14, y: 1 },
     Beholder: { x: 13, y: 1 },
@@ -45,7 +45,7 @@ const lowerTemplate: Readonly<Record<string, XY>> = {
     "Black Dragon": { x: 9, y: 3 },
 };
 
-const upperTemplateNormalizedToLower: Readonly<Record<string, XY>> = {
+const rightTemplateNormalizedToLeft: Readonly<Record<string, XY>> = {
     Dryad: { x: 6, y: 1 },
     Berserker: { x: 2, y: 2 },
     "Battle Mage": { x: 4, y: 1 },
@@ -64,7 +64,7 @@ let scenarioId = 0;
 const scenario = (
     specs: readonly IArmyUnitSpec[],
     opponentIds: readonly number[],
-    team: TeamType = LOWER,
+    team: TeamType = LEFT,
     gridType: GridType = NORMAL,
     placementDepth = 3,
     setupPlacementPolicy: IPlacementContext["setupPlacementPolicy"] = "public-roster",
@@ -105,7 +105,7 @@ const scenario = (
         pathHelper: new PathHelper(testGridSettings),
         placement: new RectanglePlacement(
             testGridSettings,
-            team === LOWER ? PlacementPositionType.LOWER_LEFT : PlacementPositionType.UPPER_RIGHT,
+            team === LEFT ? PlacementPositionType.LEFT_BOTTOM : PlacementPositionType.RIGHT_TOP,
             placementDepth,
         ),
         publicOpponentCreatureIds: opponentIds,
@@ -174,7 +174,7 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
             schema: "hoc.v0_8_a19_f184_human_placement.v11.lower-only-v1",
             policyId: "a19-prod-f184-opening-lower-only-v1",
             treatment: "exact-public-matchup-production-opening-lower-only-v1",
-            supportedTeam: LOWER,
+            supportedTeam: LEFT,
             productionFixtureSha256: V08_A19_PROD_F184_FIXTURE_SHA256,
             researchOnly: true,
         });
@@ -184,8 +184,8 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
     });
 
     for (const [openingId, specs, opponentIds, template] of [
-        ["prod-f184-lower-roster", LOWER_ROSTER, UPPER_IDS, lowerTemplate],
-        ["prod-f184-upper-roster", UPPER_ROSTER, LOWER_IDS, upperTemplateNormalizedToLower],
+        ["prod-f184-lower-roster", LEFT_ROSTER, RIGHT_IDS, leftTemplate],
+        ["prod-f184-upper-roster", RIGHT_ROSTER, LEFT_IDS, rightTemplateNormalizedToLeft],
     ] as const satisfies readonly [
         V08A19F184LowerHumanOpeningId,
         readonly IArmyUnitSpec[],
@@ -215,10 +215,10 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
 
     test("returns the exact incumbent with explicit unsupported-team fallback for UPPER", () => {
         for (const [specs, opponentIds] of [
-            [LOWER_ROSTER, UPPER_IDS],
-            [UPPER_ROSTER, LOWER_IDS],
+            [LEFT_ROSTER, RIGHT_IDS],
+            [RIGHT_ROSTER, LEFT_IDS],
         ] as const) {
-            const fixture = scenario(specs, opponentIds, UPPER);
+            const fixture = scenario(specs, opponentIds, RIGHT);
             const { strategy, calls } = decoratedFor(fixture);
             expect(strategy.placeArmy(fixture.units, fixture.context)).toBe(fixture.incumbent);
             expect(calls.value).toBe(1);
@@ -239,7 +239,7 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
     });
 
     test("keeps the exact f184 opening above a generic ranked-placement correction", () => {
-        const fixture = scenario(UPPER_ROSTER, LOWER_IDS);
+        const fixture = scenario(RIGHT_ROSTER, LEFT_IDS);
         const strategy = createV08A19H18F184LowerHumanRankedFallbackStrategy();
         const generic = (strategy as unknown as { base: V08A19RankedPlacementStrategy }).base;
         const selected = strategy.placeArmy(fixture.units, fixture.context);
@@ -252,7 +252,7 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
             fallbackReason: null,
         });
         for (const unit of fixture.units) {
-            expect(selected.get(unit.getId())).toEqual(upperTemplateNormalizedToLower[unit.getName()]);
+            expect(selected.get(unit.getId())).toEqual(rightTemplateNormalizedToLeft[unit.getName()]);
         }
         expect(strategy.getLastPlacementAudit()).toMatchObject({
             treatmentApplied: true,
@@ -263,7 +263,7 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
     });
 
     test("uses the generic correction when a LOWER public roster does not match f184", () => {
-        const fixture = scenario(UPPER_ROSTER, [PBTypes.CreatureVals.BLACK_DRAGON, PBTypes.CreatureVals.GRIFFIN]);
+        const fixture = scenario(RIGHT_ROSTER, [PBTypes.CreatureVals.BLACK_DRAGON, PBTypes.CreatureVals.GRIFFIN]);
         const strategy = createV08A19H18F184LowerHumanRankedFallbackStrategy();
         const generic = (strategy as unknown as { base: V08A19RankedPlacementStrategy }).base;
         const selected = strategy.placeArmy(fixture.units, fixture.context);
@@ -287,20 +287,20 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
     });
 
     test("retains the v10 lower-side fail-closed gates", () => {
-        assertFallback(scenario(UPPER_ROSTER, LOWER_IDS, LOWER, PBTypes.GridVals.BLOCK_CENTER), "unsupported-map");
-        assertFallback(scenario(UPPER_ROSTER, LOWER_IDS, LOWER, NORMAL, 4), "unsupported-placement-geometry");
+        assertFallback(scenario(RIGHT_ROSTER, LEFT_IDS, LEFT, PBTypes.GridVals.BLOCK_CENTER), "unsupported-map");
+        assertFallback(scenario(RIGHT_ROSTER, LEFT_IDS, LEFT, NORMAL, 4), "unsupported-placement-geometry");
         assertFallback(
-            scenario(UPPER_ROSTER, LOWER_IDS, LOWER, NORMAL, 3, "legitimate-reveal"),
+            scenario(RIGHT_ROSTER, LEFT_IDS, LEFT, NORMAL, 3, "legitimate-reveal"),
             "unauthorized-or-missing-public-roster",
         );
-        assertFallback(scenario(UPPER_ROSTER, LOWER_IDS.slice(0, 5)), "invalid-public-roster");
-        assertFallback(scenario(UPPER_ROSTER, [...LOWER_IDS.slice(0, 5), 999_999]), "unknown-public-identity");
-        assertFallback(scenario(UPPER_ROSTER, UPPER_IDS), "unmatched-public-opening");
+        assertFallback(scenario(RIGHT_ROSTER, LEFT_IDS.slice(0, 5)), "invalid-public-roster");
+        assertFallback(scenario(RIGHT_ROSTER, [...LEFT_IDS.slice(0, 5), 999_999]), "unknown-public-identity");
+        assertFallback(scenario(RIGHT_ROSTER, RIGHT_IDS), "unmatched-public-opening");
 
-        const partial = scenario(UPPER_ROSTER, LOWER_IDS);
+        const partial = scenario(RIGHT_ROSTER, LEFT_IDS);
         assertFallback(partial, "partial-army", partial.units.slice(1));
 
-        const shapeMismatch = scenario(UPPER_ROSTER, LOWER_IDS);
+        const shapeMismatch = scenario(RIGHT_ROSTER, LEFT_IDS);
         (shapeMismatch.units[0] as unknown as { unitProperties: { level: number } }).unitProperties.level =
             PBTypes.UnitLevelVals.THIRD;
         assertFallback(shapeMismatch, "own-unit-shape-mismatch");
@@ -309,7 +309,7 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
     test("today's shipped catalog reshapes the mounted class, so live rosters fall back", () => {
         // Same live-catalog pin as the v10 suite: shipped Griffin is now 2x1 size-2 and the shape gate
         // disables the recorded opening rather than faking it onto a differently-shaped piece.
-        const fixture = scenario([...LOWER_ROSTER].reverse(), [...UPPER_IDS].reverse());
+        const fixture = scenario([...LEFT_ROSTER].reverse(), [...RIGHT_IDS].reverse());
         for (const unit of fixture.units) {
             if (unit.getName() !== "Griffin") continue;
             const liveShape = (
@@ -325,7 +325,7 @@ describe("v0.8 A19 exact f184 LOWER-only human-opening placement policy", () => 
     });
 
     test("delegates combat decisions unchanged", () => {
-        const fixture = scenario(UPPER_ROSTER, LOWER_IDS);
+        const fixture = scenario(RIGHT_ROSTER, LEFT_IDS);
         const unit = fixture.units[0];
         const decision: GameAction[] = [{ type: "defend_turn", unitId: unit.getId() }];
         const base: IAIStrategy = {

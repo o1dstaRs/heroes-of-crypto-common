@@ -18,8 +18,8 @@ export namespace PBTypes {
     }
     export enum TeamVals {
         NO_TEAM = 0,
-        UPPER = 1,
-        LOWER = 2
+        RIGHT = 1,
+        LEFT = 2
     }
     export enum AttackVals {
         NO_ATTACK = 0,

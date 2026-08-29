@@ -405,28 +405,28 @@ function summarizeTarget(report: ILoadedTargetReport) {
         candidateCreatureIds: number[];
         candidateTargets: PublicRosterPlacementTarget[];
     }> = [];
-    let candidateLowerGames = 0;
-    let candidateUpperGames = 0;
+    let candidateLeftGames = 0;
+    let candidateRightGames = 0;
     let bothSeatsMatchedBoards = 0;
     for (const board of report.boardLedger) {
         const draft = publicRosterPlacementDraftEvidence(board);
         if (draft.pickSeed !== board.pickSeed) throw new Error(`target ${report.target} draft seed mismatch`);
-        const lowerMatches = draft.lower.targets.includes(report.target);
-        const upperMatches = draft.upper.targets.includes(report.target);
-        if (!lowerMatches && !upperMatches) {
+        const leftMatches = draft.left.targets.includes(report.target);
+        const rightMatches = draft.right.targets.includes(report.target);
+        if (!leftMatches && !rightMatches) {
             throw new Error(
                 `target ${report.target} board ${board.pairSeed} no longer matches either reconstructed roster`,
             );
         }
-        bothSeatsMatchedBoards += Number(lowerMatches && upperMatches);
+        bothSeatsMatchedBoards += Number(leftMatches && rightMatches);
         for (const game of [0, 1, 2, 3] as const) {
             const key = `${board.pairSeed}/${game}`;
             const candidate = candidateByKey.get(key);
             const control = controlByKey.get(key);
             if (!candidate || !control) throw new Error(`target ${report.target} missing paired game ${key}`);
             validateArmPair(candidate, control, `target ${report.target} game ${key}`);
-            const seat = candidate.pickSeat === "candidate-lower" ? draft.lower : draft.upper;
-            const opponent = candidate.pickSeat === "candidate-lower" ? draft.upper : draft.lower;
+            const seat = candidate.pickSeat === "candidate-lower" ? draft.left : draft.right;
+            const opponent = candidate.pickSeat === "candidate-lower" ? draft.right : draft.left;
             if (
                 candidate.candidateCohort !== seat.cohort ||
                 control.candidateCohort !== seat.cohort ||
@@ -456,8 +456,8 @@ function summarizeTarget(report: ILoadedTargetReport) {
             if (!seat.targets.includes(report.target)) continue;
             selectedCandidate.push(candidate);
             selectedControl.push(control);
-            candidateLowerGames += Number(candidate.pickSeat === "candidate-lower");
-            candidateUpperGames += Number(candidate.pickSeat === "candidate-upper");
+            candidateLeftGames += Number(candidate.pickSeat === "candidate-lower");
+            candidateRightGames += Number(candidate.pickSeat === "candidate-upper");
             selectionRows.push({
                 pairSeed: board.pairSeed,
                 game,
@@ -480,8 +480,8 @@ function summarizeTarget(report: ILoadedTargetReport) {
         scannedBoards: report.scannedBoards,
         selectedBoards: new Set(selectedCandidate.map((record) => record.pairSeed)).size,
         selectedGames: selectedCandidate.length,
-        selectedCandidateLowerGames: candidateLowerGames,
-        selectedCandidateUpperGames: candidateUpperGames,
+        selectedCandidateLeftGames: candidateLeftGames,
+        selectedCandidateRightGames: candidateRightGames,
         bothSeatsMatchedBoards,
         selectionSha256: sha256Json(selectionRows),
         matchedControlDelta: delta,

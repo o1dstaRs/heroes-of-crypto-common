@@ -57,8 +57,8 @@ export type TurnSkipReason = "effect" | "timeout" | "manual" | "skip";
 
 interface IOrderedTurnUnits {
     allUnits: Unit[];
-    unitsUpper: Unit[];
-    unitsLower: Unit[];
+    unitsRight: Unit[];
+    unitsLeft: Unit[];
 }
 
 export class TurnEngine {
@@ -121,7 +121,7 @@ export class TurnEngine {
         const events: GameEvent[] = [];
         let ordered = this.getOrderedTurnUnits();
 
-        const finishEvent = this.finishFightIfNeeded(ordered.unitsLower, ordered.unitsUpper);
+        const finishEvent = this.finishFightIfNeeded(ordered.unitsLeft, ordered.unitsRight);
         if (finishEvent) {
             events.push(finishEvent);
             return { events: this.compactEvents(events), fightFinished: true };
@@ -132,11 +132,11 @@ export class TurnEngine {
             !this.fightProperties.getHourglassQueueSize() &&
             !this.fightProperties.getUpNextQueueSize();
         const allUnitsMadeTurn =
-            ordered.unitsUpper.every((u) => this.fightProperties.hasAlreadyMadeTurn(u.getId())) &&
-            ordered.unitsLower.every((u) => this.fightProperties.hasAlreadyMadeTurn(u.getId()));
+            ordered.unitsRight.every((u) => this.fightProperties.hasAlreadyMadeTurn(u.getId())) &&
+            ordered.unitsLeft.every((u) => this.fightProperties.hasAlreadyMadeTurn(u.getId()));
 
         if ((initFirstLap || allUnitsMadeTurn) && !this.fightProperties.hasFightFinished()) {
-            events.push(...this.handleLapTransition(ordered.unitsUpper, ordered.unitsLower, allUnitsMadeTurn, opts));
+            events.push(...this.handleLapTransition(ordered.unitsRight, ordered.unitsLeft, allUnitsMadeTurn, opts));
             ordered = this.getOrderedTurnUnits();
         }
 
@@ -144,7 +144,7 @@ export class TurnEngine {
             return { events: this.compactEvents(events), fightFinished: true };
         }
 
-        const afterTransitionFinish = this.finishFightIfNeeded(ordered.unitsLower, ordered.unitsUpper);
+        const afterTransitionFinish = this.finishFightIfNeeded(ordered.unitsLeft, ordered.unitsRight);
         if (afterTransitionFinish) {
             events.push(afterTransitionFinish);
             return { events: this.compactEvents(events), fightFinished: true };
@@ -152,8 +152,8 @@ export class TurnEngine {
 
         this.fightProperties.prefetchNextUnitsToTurn(
             this.unitsHolder.getAllUnits(),
-            ordered.unitsUpper,
-            ordered.unitsLower,
+            ordered.unitsRight,
+            ordered.unitsLeft,
             (min, max) => this.runtime.rng.int(min, max),
         );
 
@@ -182,13 +182,13 @@ export class TurnEngine {
         return { events: this.compactEvents(events), nextUnit, fightFinished: false };
     }
     private handleLapTransition(
-        unitsUpper: Unit[],
-        unitsLower: Unit[],
+        unitsRight: Unit[],
+        unitsLeft: Unit[],
         allUnitsMadeTurn: boolean,
         opts: IAdvanceTurnOptions,
     ): GameEvent[] {
         const events: GameEvent[] = [];
-        const allCurrentUnits = [...unitsUpper, ...unitsLower];
+        const allCurrentUnits = [...unitsRight, ...unitsLeft];
 
         for (const unit of allCurrentUnits) {
             unit.setResponded(false);
@@ -243,9 +243,9 @@ export class TurnEngine {
             events.push({ type: "lap_initialized", lap: this.fightProperties.getCurrentLap() });
         }
 
-        events.push(...this.applyArmageddonIfNeeded([...unitsLower, ...unitsUpper]));
+        events.push(...this.applyArmageddonIfNeeded([...unitsLeft, ...unitsRight]));
         let refreshed = this.getOrderedTurnUnits();
-        const finishEvent = this.finishFightIfNeeded(refreshed.unitsLower, refreshed.unitsUpper);
+        const finishEvent = this.finishFightIfNeeded(refreshed.unitsLeft, refreshed.unitsRight);
         if (finishEvent) {
             events.push(finishEvent);
             return events;
@@ -291,8 +291,8 @@ export class TurnEngine {
 
         this.fightProperties.prefetchNextUnitsToTurn(
             this.unitsHolder.getAllUnits(),
-            refreshed.unitsUpper,
-            refreshed.unitsLower,
+            refreshed.unitsRight,
+            refreshed.unitsLeft,
             (min, max) => this.runtime.rng.int(min, max),
         );
 
@@ -524,18 +524,18 @@ export class TurnEngine {
 
         return events;
     }
-    private finishFightIfNeeded(unitsLower: Unit[], unitsUpper: Unit[]): GameEvent | undefined {
-        if (unitsLower.length && unitsUpper.length) {
+    private finishFightIfNeeded(unitsLeft: Unit[], unitsRight: Unit[]): GameEvent | undefined {
+        if (unitsLeft.length && unitsRight.length) {
             return undefined;
         }
 
         // Both sides can be wiped out on the same lap (e.g. armageddon kills everyone at once) — that's
         // a draw, NOT an UPPER win. Only award a team the win when it's the sole side with units left.
         let winningTeam: TeamType;
-        if (unitsLower.length) {
-            winningTeam = PBTypes.TeamVals.LOWER;
-        } else if (unitsUpper.length) {
-            winningTeam = PBTypes.TeamVals.UPPER;
+        if (unitsLeft.length) {
+            winningTeam = PBTypes.TeamVals.LEFT;
+        } else if (unitsRight.length) {
+            winningTeam = PBTypes.TeamVals.RIGHT;
         } else {
             winningTeam = PBTypes.TeamVals.NO_TEAM;
         }
@@ -543,18 +543,18 @@ export class TurnEngine {
         return { type: "fight_finished", winningTeam };
     }
     private getOrderedTurnUnits(): IOrderedTurnUnits {
-        const unitsUpper = this.getAliveTeamUnits(PBTypes.TeamVals.UPPER);
-        const unitsLower = this.getAliveTeamUnits(PBTypes.TeamVals.LOWER);
-        const allUnits = shuffleWithRng([...unitsUpper, ...unitsLower], this.runtime.rng).sort(
+        const unitsRight = this.getAliveTeamUnits(PBTypes.TeamVals.RIGHT);
+        const unitsLeft = this.getAliveTeamUnits(PBTypes.TeamVals.LEFT);
+        const allUnits = shuffleWithRng([...unitsRight, ...unitsLeft], this.runtime.rng).sort(
             (a, b) => b.getInitiative() - a.getInitiative(),
         );
 
         return {
             allUnits,
-            unitsUpper: shuffleWithRng(unitsUpper, this.runtime.rng).sort(
+            unitsRight: shuffleWithRng(unitsRight, this.runtime.rng).sort(
                 (a, b) => b.getInitiative() - a.getInitiative(),
             ),
-            unitsLower: shuffleWithRng(unitsLower, this.runtime.rng).sort(
+            unitsLeft: shuffleWithRng(unitsLeft, this.runtime.rng).sort(
                 (a, b) => b.getInitiative() - a.getInitiative(),
             ),
         };

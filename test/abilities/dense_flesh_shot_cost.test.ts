@@ -23,7 +23,7 @@ const setup = (attackerAbilities: string[], targetAbilities: string[]) => {
 
     const attacker = createTestUnit({
         name: "Gargantuan",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.RANGE,
         attack: 30,
         damageMin: 20,
@@ -39,7 +39,7 @@ const setup = (attackerAbilities: string[], targetAbilities: string[]) => {
 
     const target = createTestUnit({
         name: "Abomination",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         maxHp: 8000,
         amountAlive: 20,
         armor: 0,
@@ -47,9 +47,9 @@ const setup = (attackerAbilities: string[], targetAbilities: string[]) => {
     });
     placeUnit(grid, unitsHolder, target, { x: 6, y: 5 });
 
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const engine = new GameActionEngine({
         fightProperties,

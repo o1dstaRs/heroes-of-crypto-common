@@ -56,7 +56,7 @@ const portalMatch = {
     abandoned: false,
     finished_time: 1700,
     opponent_username: "rival",
-    team: TypesPB.TeamVals.UPPER,
+    team: TypesPB.TeamVals.RIGHT,
     creature_ids: [1, 2, 3],
     opponent_creature_ids: [4, 5],
     duration_ms: 725000,

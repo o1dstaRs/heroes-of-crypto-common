@@ -84,11 +84,11 @@ describe("ability processors", () => {
     it("selects positional ability coefficients and next standing targets", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Backstab"],
         });
-        const target = createTestUnit({ team: PBTypes.TeamVals.UPPER });
-        const behindTarget = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const target = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
+        const behindTarget = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
 
         placeUnit(grid, unitsHolder, attacker, { x: 5, y: 7 });
         placeUnit(grid, unitsHolder, target, { x: 5, y: 5 });
@@ -101,7 +101,7 @@ describe("ability processors", () => {
                 { x: 5, y: 7 },
                 { x: 5, y: 5 },
                 true,
-                PBTypes.TeamVals.LOWER,
+                PBTypes.TeamVals.LEFT,
             ).map((ability) => ability.getName()),
         ).toEqual(["Backstab"]);
         expect(getAbilitiesWithPosisionCoefficient(attacker.getAbilities(), undefined, { x: 5, y: 5 }, true)).toEqual(
@@ -113,7 +113,7 @@ describe("ability processors", () => {
                 { x: 5, y: 4 },
                 { x: 5, y: 6 },
                 false,
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
             ).map((ability) => ability.getName()),
         ).toEqual(["Backstab"]);
         expect(nextStandingTargets(attacker, target, grid, unitsHolder).map((unit) => unit.getId())).toEqual([
@@ -124,12 +124,12 @@ describe("ability processors", () => {
         const largeContext = createCombatTestContext();
         const largeAttacker = createTestUnit({
             name: "Large Attacker",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             size: PBTypes.UnitSizeVals.LARGE,
         });
         const largeTarget = createTestUnit({
             name: "Large Target",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             size: PBTypes.UnitSizeVals.LARGE,
         });
 
@@ -146,17 +146,17 @@ describe("ability processors", () => {
         const stats = new DamageStatisticHolder();
         const attacker = createTestUnit({
             name: "Storm Caster",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Chain Lightning"],
             attack: 20,
             damageMin: 20,
             damageMax: 20,
             stackPower: 5,
         });
-        const target = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.LOWER, amountAlive: 3, maxHp: 20 });
-        const layer1 = createTestUnit({ name: "Layer 1", team: PBTypes.TeamVals.LOWER, amountAlive: 3, maxHp: 20 });
-        const layer2 = createTestUnit({ name: "Layer 2", team: PBTypes.TeamVals.LOWER, amountAlive: 3, maxHp: 20 });
-        const layer3 = createTestUnit({ name: "Layer 3", team: PBTypes.TeamVals.LOWER, amountAlive: 3, maxHp: 20 });
+        const target = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.LEFT, amountAlive: 3, maxHp: 20 });
+        const layer1 = createTestUnit({ name: "Layer 1", team: PBTypes.TeamVals.LEFT, amountAlive: 3, maxHp: 20 });
+        const layer2 = createTestUnit({ name: "Layer 2", team: PBTypes.TeamVals.LEFT, amountAlive: 3, maxHp: 20 });
+        const layer3 = createTestUnit({ name: "Layer 3", team: PBTypes.TeamVals.LEFT, amountAlive: 3, maxHp: 20 });
 
         placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, target, { x: 5, y: 5 });
@@ -189,7 +189,7 @@ describe("ability processors", () => {
         const stats = new DamageStatisticHolder();
         const attacker = createTestUnit({
             name: "Fragile Caster",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Chain Lightning"],
             amountAlive: 1,
             maxHp: 10,
@@ -200,7 +200,7 @@ describe("ability processors", () => {
         });
         const target = createTestUnit({
             name: "Mirrored Primary",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 1,
             maxHp: 5,
             // Magic Mirror is stack-powered now, so a full stack is what makes the power-100 buff below
@@ -209,7 +209,7 @@ describe("ability processors", () => {
         });
         const chainedTarget = createTestUnit({
             name: "Chained Neighbor",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 3,
             maxHp: 100,
         });
@@ -246,7 +246,7 @@ describe("ability processors", () => {
         const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Spinner",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Lightning Spin"],
             attack: 10,
             damageMin: 10,
@@ -254,8 +254,8 @@ describe("ability processors", () => {
             amountAlive: 2,
             stackPower: 5,
         });
-        const enemyA = createTestUnit({ name: "Enemy A", team: PBTypes.TeamVals.LOWER, amountAlive: 2 });
-        const enemyB = createTestUnit({ name: "Enemy B", team: PBTypes.TeamVals.LOWER, amountAlive: 2 });
+        const enemyA = createTestUnit({ name: "Enemy A", team: PBTypes.TeamVals.LEFT, amountAlive: 2 });
+        const enemyB = createTestUnit({ name: "Enemy B", team: PBTypes.TeamVals.LEFT, amountAlive: 2 });
 
         placeUnit(grid, unitsHolder, attacker, { x: 5, y: 5 });
         placeUnit(grid, unitsHolder, enemyA, { x: 5, y: 6 });
@@ -277,7 +277,7 @@ describe("ability processors", () => {
         const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Thrower",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             abilities: ["Area Throw"],
             attack: 10,
@@ -287,8 +287,8 @@ describe("ability processors", () => {
             amountAlive: 1,
             stackPower: 5,
         });
-        const targetA = createTestUnit({ name: "Target A", team: PBTypes.TeamVals.LOWER, amountAlive: 2 });
-        const targetB = createTestUnit({ name: "Target B", team: PBTypes.TeamVals.LOWER, amountAlive: 2 });
+        const targetA = createTestUnit({ name: "Target A", team: PBTypes.TeamVals.LEFT, amountAlive: 2 });
+        const targetB = createTestUnit({ name: "Target B", team: PBTypes.TeamVals.LEFT, amountAlive: 2 });
 
         placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, targetA, { x: 7, y: 7 });
@@ -337,7 +337,7 @@ describe("ability processors", () => {
         const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Piercer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             abilities: ["Through Shot"],
             attack: 10,
@@ -348,13 +348,13 @@ describe("ability processors", () => {
         });
         const frontTarget = createTestUnit({
             name: "Front",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 2,
             maxHp: 25,
         });
         const rearTarget = createTestUnit({
             name: "Rear",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 1,
             maxHp: 5,
         });
@@ -391,7 +391,7 @@ describe("ability processors", () => {
         const stats = new DamageStatisticHolder();
         const attacker = createTestUnit({
             name: "Repeater",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             abilities: ["Double Shot"],
             attack: 10,
@@ -402,7 +402,7 @@ describe("ability processors", () => {
         });
         const target = createTestUnit({
             name: "Target",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 2,
             maxHp: 20,
         });
@@ -457,7 +457,7 @@ describe("ability processors", () => {
         const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Repeater",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             abilities: ["Double Shot"],
             attack: 10,
@@ -466,7 +466,7 @@ describe("ability processors", () => {
             rangeShots: 2,
             stackPower: 100,
         });
-        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LOWER, amountAlive: 2, maxHp: 5 });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, amountAlive: 2, maxHp: 5 });
         placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, target, { x: 7, y: 7 });
 
@@ -497,7 +497,7 @@ describe("ability processors", () => {
         const stats = new DamageStatisticHolder();
         const attacker = createTestUnit({
             name: "Volley",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             abilities: ["Double Shot", "Area Throw"],
             attack: 10,
@@ -506,8 +506,8 @@ describe("ability processors", () => {
             rangeShots: 3,
             stackPower: 100,
         });
-        const targetA = createTestUnit({ name: "Cluster A", team: PBTypes.TeamVals.LOWER, amountAlive: 2 });
-        const targetB = createTestUnit({ name: "Cluster B", team: PBTypes.TeamVals.LOWER, amountAlive: 2 });
+        const targetA = createTestUnit({ name: "Cluster A", team: PBTypes.TeamVals.LEFT, amountAlive: 2 });
+        const targetB = createTestUnit({ name: "Cluster B", team: PBTypes.TeamVals.LEFT, amountAlive: 2 });
 
         placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, targetA, { x: 7, y: 7 });
@@ -540,15 +540,15 @@ describe("ability processors", () => {
         const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Skewer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Skewer Strike"],
             attack: 20,
             damageMin: 20,
             damageMax: 20,
             stackPower: 100,
         });
-        const primary = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.UPPER, amountAlive: 3, maxHp: 30 });
-        const behind = createTestUnit({ name: "Behind", team: PBTypes.TeamVals.UPPER, amountAlive: 1, maxHp: 5 });
+        const primary = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.RIGHT, amountAlive: 3, maxHp: 30 });
+        const behind = createTestUnit({ name: "Behind", team: PBTypes.TeamVals.RIGHT, amountAlive: 1, maxHp: 5 });
 
         placeUnit(grid, unitsHolder, attacker, { x: 5, y: 7 });
         placeUnit(grid, unitsHolder, primary, { x: 5, y: 5 });
@@ -571,7 +571,7 @@ describe("ability processors", () => {
         expect(behind.isDead()).toBe(true);
         expect(capture.lines.some((line) => line.includes("Behind") && line.includes("💀1"))).toBe(true);
 
-        const noAbility = createTestUnit({ name: "Plain", team: PBTypes.TeamVals.LOWER });
+        const noAbility = createTestUnit({ name: "Plain", team: PBTypes.TeamVals.LEFT });
         expect(
             processSkewerStrikeAbility(noAbility, primary, new SceneLogMock(), unitsHolder, grid, stats)
                 .secondaryDamages,
@@ -584,17 +584,17 @@ describe("ability processors", () => {
         const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Dragon",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Fire Breath"],
             attack: 20,
             damageMin: 20,
             damageMax: 20,
             stackPower: 100,
         });
-        const primary = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.UPPER, amountAlive: 3, maxHp: 30 });
+        const primary = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.RIGHT, amountAlive: 3, maxHp: 30 });
         const behind = createTestUnit({
             name: "Armored",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Heavy Armor"],
             amountAlive: 1,
             maxHp: 5,
@@ -622,7 +622,7 @@ describe("ability processors", () => {
         const sceneLog = new SceneLogMock();
         const attacker = createTestUnit({
             name: "Controller",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: [
                 "Stun",
                 "Paralysis",
@@ -638,18 +638,18 @@ describe("ability processors", () => {
         });
         const target = createTestUnit({
             name: "Target",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 3,
         });
         const mechanism = createTestUnit({
             name: "Mechanism",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Mechanism"],
             amountAlive: 3,
         });
         const resisted = createTestUnit({
             name: "Mindless",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Mechanism"],
         });
 
@@ -697,7 +697,7 @@ describe("ability processors", () => {
         const measure = (attacker: TestUnit): number =>
             processDeepWoundsAbility(
                 attacker,
-                createTestUnit({ name: "Fresh Target", team: PBTypes.TeamVals.LOWER, amountAlive: 3 }),
+                createTestUnit({ name: "Fresh Target", team: PBTypes.TeamVals.LEFT, amountAlive: 3 }),
                 attacker,
                 sceneLog,
             );
@@ -709,7 +709,7 @@ describe("ability processors", () => {
         expect(level2Power).toBeGreaterThan(level1Power);
 
         // A plain unit wounds at the SAME strength as a native Level-1 wounder — no scaling applied.
-        const recruit = createTestUnit({ name: "Recruit", team: PBTypes.TeamVals.UPPER });
+        const recruit = createTestUnit({ name: "Recruit", team: PBTypes.TeamVals.RIGHT });
         applyWoundingCharm(recruit);
         expect(measure(recruit)).toBeCloseTo(level1Power, 0);
 
@@ -732,7 +732,7 @@ describe("ability processors", () => {
         const measure = (luck: number, cards: string[], charm: boolean, stackPower = 5): number => {
             const attacker = createTestUnit({
                 name: "White Tiger",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 abilities: cards,
                 luck,
                 // Defaults to MAX_UNIT_STACK_POWER, so each card contributes exactly its configured power.
@@ -743,7 +743,7 @@ describe("ability processors", () => {
             }
             return processDeepWoundsAbility(
                 attacker,
-                createTestUnit({ name: "Fresh Target", team: PBTypes.TeamVals.LOWER, amountAlive: 3 }),
+                createTestUnit({ name: "Fresh Target", team: PBTypes.TeamVals.LEFT, amountAlive: 3 }),
                 attacker,
                 sceneLog,
             );
@@ -772,25 +772,25 @@ describe("ability processors", () => {
     it("processes low-level melee utility abilities", () => {
         const miner = createTestUnit({
             name: "Miner",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Miner", "Rapid Charge"],
             stackPower: 100,
             armor: 10,
         });
         const defender = createTestUnit({
             name: "Defender",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             armor: 10,
         });
         const duller = createTestUnit({
             name: "Duller",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Dulling Defense"],
             stackPower: 100,
         });
         const attacker = createTestUnit({
             name: "Attacker",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attack: 10,
         });
         const sceneLog = new SceneLogMock();
@@ -812,14 +812,14 @@ describe("ability processors", () => {
         createCombatTestContext();
         const miner = createTestUnit({
             name: "Miner",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Miner"],
             stackPower: 3,
             armor: 10,
         });
         const defender = createTestUnit({
             name: "Defender",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             armor: 2,
         });
         const sceneLog = new SceneLogMock();
@@ -860,20 +860,20 @@ describe("ability processors", () => {
     it("applies mind-control skip effects and respects mind resistance", () => {
         const aggrCaster = createTestUnit({
             name: "Agitator",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Aggr"],
             stackPower: 3,
         });
         const blindCaster = createTestUnit({
             name: "Blinder",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Blindness"],
             stackPower: 5,
         });
-        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LOWER });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT });
         const resistant = createTestUnit({
             name: "Mechanism",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Mechanism"],
         });
         const sceneLog = new SceneLogMock();
@@ -895,20 +895,20 @@ describe("ability processors", () => {
         const stats = new DamageStatisticHolder();
         const attacker = createTestUnit({
             name: "Gazer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Petrifying Gaze"],
             luck: 100,
             stackPower: 100,
         });
         const target = createTestUnit({
             name: "Victim",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 5,
             maxHp: 10,
         });
         const resistant = createTestUnit({
             name: "Mechanism",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Mechanism"],
             amountAlive: 5,
             maxHp: 10,
@@ -928,7 +928,7 @@ describe("ability processors", () => {
         const capture = capturingSceneLog();
         const attacker = createTestUnit({
             name: "Brawler",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Double Punch", "Lucky Strike", "Penetrating Bite"],
             attack: 10,
             damageMin: 10,
@@ -938,18 +938,18 @@ describe("ability processors", () => {
         });
         const target = createTestUnit({
             name: "Target",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             amountAlive: 3,
             maxHp: 3,
         });
         const dodger = createTestUnit({
             name: "Dodger",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Dodge"],
             luck: 100,
             stackPower: 100,
         });
-        const plain = createTestUnit({ name: "Plain", team: PBTypes.TeamVals.UPPER });
+        const plain = createTestUnit({ name: "Plain", team: PBTypes.TeamVals.RIGHT });
 
         const result = processDoublePunchAbility(attacker, target, capture.log);
         const missed = processDoublePunchAbility(attacker, dodger, sceneLog);
@@ -971,14 +971,14 @@ describe("ability processors", () => {
         const stats = new DamageStatisticHolder();
         const fireShield = createTestUnit({
             name: "Shield",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Fire Shield"],
             luck: 100,
             stackPower: 100,
         });
         const heavyTarget = createTestUnit({
             name: "Heavy",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Heavy Armor"],
             amountAlive: 1,
             maxHp: 5,
@@ -987,7 +987,7 @@ describe("ability processors", () => {
         });
         const devourer = createTestUnit({
             name: "Devourer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Devour Essence"],
             amountAlive: 1,
             maxHp: 20,
@@ -996,7 +996,7 @@ describe("ability processors", () => {
         });
         const killedEnemy = createTestUnit({
             name: "Killed",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
         });
 
         placeUnit(grid, unitsHolder, devourer, { x: 1, y: 1 });
@@ -1041,20 +1041,20 @@ describe("ability processors", () => {
         const { unitsHolder, grid } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Spitter",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Spit Ball"],
             luck: 100,
             stackPower: 100,
         });
         const rangedTarget = createTestUnit({
             name: "Ranged",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 2,
         });
         const resistant = createTestUnit({
             name: "Resistant",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 2,
             magicResist: 100,

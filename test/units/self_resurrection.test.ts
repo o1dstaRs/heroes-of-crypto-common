@@ -18,7 +18,7 @@ const fallenAngel = (amount: number, options: { spentSpell?: boolean; withAbilit
     const { grid, unitsHolder } = createCombatTestContext();
     const angel = createTestUnit({
         name: "Angel",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         amountAlive: amount,
         abilities: options.withAbility === false ? [] : ["Resurrection"],
         spells: ["System:Resurrection"],
@@ -39,7 +39,7 @@ const fallenAngel = (amount: number, options: { spentSpell?: boolean; withAbilit
 describe("self-resurrection on death", () => {
     it("brings a LONE stack back — the split-Angel case", () => {
         const { angel, unitsHolder, properties } = fallenAngel(1);
-        const aggravated = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const aggravated = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         unitsHolder.addUnit(aggravated);
         aggravated.setTarget(angel.getId());
 

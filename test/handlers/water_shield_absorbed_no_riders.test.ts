@@ -43,7 +43,7 @@ const pinRng = (): void => setDeterministicRandomSource(() => 0);
 const makeStunAttacker = (attackType: number, extra: Record<string, unknown> = {}) =>
     createTestUnit({
         name: "Stun Attacker",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         attackType,
         attack: 10,
         damageMin: 5,
@@ -57,7 +57,7 @@ const makeStunAttacker = (attackType: number, extra: Record<string, unknown> = {
 const makeShieldedTarget = () => {
     const mermaid = createTestUnit({
         name: "Mermaid",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.MELEE,
         maxHp: 100,
         amountAlive: 5,
@@ -151,7 +151,7 @@ describe("Water-Shield-absorbed hit lands no on-hit riders", () => {
         // The roles flip: the ATTACKER owns the shield, the struck defender counterattacks with Stun.
         const attacker = createTestUnit({
             name: "Shielded Attacker",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             attack: 10,
             damageMin: 5,
@@ -163,7 +163,7 @@ describe("Water-Shield-absorbed hit lands no on-hit riders", () => {
         attacker.trySeedWaterShield();
         const defender = createTestUnit({
             name: "Stun Defender",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE,
             attack: 10,
             damageMin: 5,

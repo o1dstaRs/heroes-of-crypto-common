@@ -31,8 +31,8 @@ import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } 
  */
 
 const gs = testGridSettings;
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const LARGE = PBTypes.UnitSizeVals.LARGE;
 
@@ -97,7 +97,7 @@ function buildRig(isSmall: boolean, startCell: XY, occupyFootprint: boolean): Ri
     fp.setGridType(PBTypes.GridVals.BLOCK_CENTER);
 
     const unit = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         attackType: MELEE,
         name: isSmall ? "Knight" : "Ogre",
         initiative: 8,
@@ -116,7 +116,7 @@ function buildRig(isSmall: boolean, startCell: XY, occupyFootprint: boolean): Ri
         ctx.unitsHolder.addUnit(unit);
     }
     // An opposing unit far away so start_fight has both teams.
-    const enemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Orc" });
+    const enemy = createTestUnit({ team: RIGHT, attackType: MELEE, name: "Orc" });
     placeUnit(ctx.grid, ctx.unitsHolder, enemy, { x: 14, y: 14 });
 
     let knownPaths: Map<number, IWeightedRoute[]> | undefined;

@@ -169,8 +169,8 @@ function round1Rosters(drafts: number, baseSeed: number): number[][] {
     for (let i = 0; i < drafts; i += 1) {
         const seed = (baseSeed + i * 0x9e3779b1) >>> 0;
         const pick = resolveLeaguePick(seed, genome, genome, true);
-        rosters.push([...pick.state.lower.creatures]);
-        rosters.push([...pick.state.upper.creatures]);
+        rosters.push([...pick.state.left.creatures]);
+        rosters.push([...pick.state.right.creatures]);
     }
     return rosters;
 }

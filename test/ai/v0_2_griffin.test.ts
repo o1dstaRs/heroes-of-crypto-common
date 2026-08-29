@@ -27,8 +27,8 @@ import {
     CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const FLY = PBTypes.MovementVals.FLY;
@@ -63,11 +63,11 @@ const meleeTargetId = (a: GameAction[]): string | undefined => {
 describe("v0.2 Griffin null-field dive", () => {
     it("dives the enemy range line and melees a shooter when it has flying support", () => {
         const c = createCombatTestContext();
-        const griffin = makeGriffin(LOWER);
-        const wingmate = createTestUnit({ team: LOWER, name: "Wingmate", attackType: MELEE, movementType: FLY });
-        const r1 = createTestUnit({ team: UPPER, name: "R1", attackType: RANGE, rangeShots: 5 });
-        const r2 = createTestUnit({ team: UPPER, name: "R2", attackType: RANGE, rangeShots: 5 });
-        const r3 = createTestUnit({ team: UPPER, name: "R3", attackType: RANGE, rangeShots: 5 });
+        const griffin = makeGriffin(LEFT);
+        const wingmate = createTestUnit({ team: LEFT, name: "Wingmate", attackType: MELEE, movementType: FLY });
+        const r1 = createTestUnit({ team: RIGHT, name: "R1", attackType: RANGE, rangeShots: 5 });
+        const r2 = createTestUnit({ team: RIGHT, name: "R2", attackType: RANGE, rangeShots: 5 });
+        const r3 = createTestUnit({ team: RIGHT, name: "R3", attackType: RANGE, rangeShots: 5 });
         placeUnit(c.grid, c.unitsHolder, griffin, { x: 4, y: 6 });
         placeUnit(c.grid, c.unitsHolder, wingmate, { x: 8, y: 5 });
         placeUnit(c.grid, c.unitsHolder, r1, { x: 3, y: 2 });
@@ -81,10 +81,10 @@ describe("v0.2 Griffin null-field dive", () => {
 
     it("does not dive alone — without flying support it engages normally", () => {
         const c = createCombatTestContext();
-        const griffin = makeGriffin(LOWER);
+        const griffin = makeGriffin(LEFT);
         // No other flyer. A front melee enemy is adjacent; ranged sit in the backline.
-        const frontMelee = createTestUnit({ team: UPPER, name: "Front", attackType: MELEE, amountAlive: 5 });
-        const ranged = createTestUnit({ team: UPPER, name: "Shooter", attackType: RANGE, rangeShots: 5 });
+        const frontMelee = createTestUnit({ team: RIGHT, name: "Front", attackType: MELEE, amountAlive: 5 });
+        const ranged = createTestUnit({ team: RIGHT, name: "Shooter", attackType: RANGE, rangeShots: 5 });
         placeUnit(c.grid, c.unitsHolder, griffin, { x: 4, y: 6 });
         placeUnit(c.grid, c.unitsHolder, frontMelee, { x: 4, y: 5 });
         placeUnit(c.grid, c.unitsHolder, ranged, { x: 4, y: 2 });
@@ -96,9 +96,9 @@ describe("v0.2 Griffin null-field dive", () => {
 
     it("with no enemy ranged units, behaves like a normal melee unit (no special dive)", () => {
         const c = createCombatTestContext();
-        const griffin = makeGriffin(LOWER);
-        const wingmate = createTestUnit({ team: LOWER, name: "Wingmate", attackType: MELEE, movementType: FLY });
-        const enemy = createTestUnit({ team: UPPER, name: "Brute", attackType: MELEE, amountAlive: 5 });
+        const griffin = makeGriffin(LEFT);
+        const wingmate = createTestUnit({ team: LEFT, name: "Wingmate", attackType: MELEE, movementType: FLY });
+        const enemy = createTestUnit({ team: RIGHT, name: "Brute", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, griffin, { x: 4, y: 6 });
         placeUnit(c.grid, c.unitsHolder, wingmate, { x: 6, y: 6 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 4, y: 5 });

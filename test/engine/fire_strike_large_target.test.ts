@@ -46,14 +46,14 @@ const setupStrike = (casterCell: XY) => {
 
     const caster = createTestUnit({
         name: "Mage",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         spells: ["Life:Fire Strike"],
         initiative: 5,
         morale: 4,
     });
     const bigTarget = createTestUnit({
         name: "Colossus",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         size: PBTypes.UnitSizeVals.LARGE,
         maxHp: 10_000,
         amountAlive: 1,
@@ -62,9 +62,9 @@ const setupStrike = (casterCell: XY) => {
     });
     place(context.grid, context.unitsHolder, caster, casterCell);
     place(context.grid, context.unitsHolder, bigTarget, { x: 8, y: 8 });
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const engine = new GameActionEngine({
         fightProperties,
@@ -124,14 +124,14 @@ describe("Fire Strike interception", () => {
         fightProperties.startFight();
         const caster = createTestUnit({
             name: "Mage",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             spells: ["Life:Fire Strike"],
             initiative: 5,
             morale: 4,
         });
         const aimed = createTestUnit({
             name: "Aimed",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 10_000,
             amountAlive: 1,
             initiative: 3,
@@ -142,7 +142,7 @@ describe("Fire Strike interception", () => {
         if (screenAt) {
             screen = createTestUnit({
                 name: "Screen",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 maxHp: 10_000,
                 amountAlive: 1,
                 initiative: 2,
@@ -152,9 +152,9 @@ describe("Fire Strike interception", () => {
         if (terrainMarker) {
             (context.grid as unknown as { boardCoord: string[][] }).boardCoord[5][8] = terrainMarker;
         }
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, screen ? 2 : 1);
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, screen ? 2 : 1);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
         const engine = new GameActionEngine({
             fightProperties,
             grid: context.grid,

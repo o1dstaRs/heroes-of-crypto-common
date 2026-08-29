@@ -42,17 +42,17 @@ const armRings = (options: { tier1?: Tier1Artifact; tier2?: Tier2Artifact; empow
     const { grid, unitsHolder } = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     if (options.tier1 !== undefined) {
-        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, 1, options.tier1);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 1, options.tier1);
     }
     if (options.tier2 !== undefined) {
-        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, 2, options.tier2);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 2, options.tier2);
     }
     if (options.empower !== undefined) {
-        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, { type: "Empower", value: options.empower });
+        fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, { type: "Empower", value: options.empower });
     }
 
-    const ally = createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.LOWER });
-    const enemy = createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.UPPER });
+    const ally = createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.LEFT });
+    const enemy = createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.RIGHT });
     placeUnit(grid, unitsHolder, ally, { x: 2, y: 2 });
     placeUnit(grid, unitsHolder, enemy, { x: 4, y: 4 });
 
@@ -140,8 +140,8 @@ describe("Arcane rings", () => {
         });
         expect(ally.getMagicDamageBonusPercentage()).toBe(MAGE + ARCHMAGE);
 
-        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, 1, Tier1Artifact.NO_ARTIFACT);
-        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, 2, Tier2Artifact.NO_ARTIFACT);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 1, Tier1Artifact.NO_ARTIFACT);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 2, Tier2Artifact.NO_ARTIFACT);
         unitsHolder.applyArtifacts(fightProperties);
         unitsHolder.refreshStackPowerForAllUnits();
 

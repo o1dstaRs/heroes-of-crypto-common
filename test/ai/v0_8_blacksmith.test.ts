@@ -32,8 +32,8 @@ import type { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const savedBlacksmithScope = process.env[V08_BLACKSMITH_ROLE_VERSIONS_ENV];
@@ -54,7 +54,7 @@ const decisionContext = (combat: ReturnType<typeof createCombatTestContext>): ID
 
 const blacksmith = (): Unit =>
     createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Blacksmith",
         attackType: MELEE,
         attack: 9,
@@ -74,7 +74,7 @@ describe("v0.8 Blacksmith Craft router", () => {
         const combat = createCombatTestContext();
         const smith = blacksmith();
         const highRanged = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "High ranged",
             attackType: RANGE,
             damageMax: 20,
@@ -82,25 +82,25 @@ describe("v0.8 Blacksmith Craft router", () => {
             rangeShots: 8,
         });
         const highMelee = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "High melee",
             attackType: MELEE,
             damageMax: 20,
             amountAlive: 10,
         });
         const lowFirst = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Low first",
             attackType: MELEE,
             damageMax: 1,
         });
         const lowSecond = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Low second",
             attackType: MELEE,
             damageMax: 1,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy" });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy" });
         placeUnit(combat.grid, combat.unitsHolder, smith, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, highRanged, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, highMelee, { x: 6, y: 5 });
@@ -122,8 +122,8 @@ describe("v0.8 Blacksmith Craft router", () => {
     it("does not spend Craft on one recipient and preserves only a stationary guaranteed kill", () => {
         const singleCombat = createCombatTestContext();
         const singleSmith = blacksmith();
-        const loneAlly = createTestUnit({ team: LOWER, name: "Lone ally" });
-        const distantEnemy = createTestUnit({ team: UPPER, name: "Distant enemy" });
+        const loneAlly = createTestUnit({ team: LEFT, name: "Lone ally" });
+        const distantEnemy = createTestUnit({ team: RIGHT, name: "Distant enemy" });
         placeUnit(singleCombat.grid, singleCombat.unitsHolder, singleSmith, { x: 2, y: 2 });
         placeUnit(singleCombat.grid, singleCombat.unitsHolder, loneAlly, { x: 8, y: 8 });
         placeUnit(singleCombat.grid, singleCombat.unitsHolder, distantEnemy, { x: 13, y: 13 });
@@ -132,9 +132,9 @@ describe("v0.8 Blacksmith Craft router", () => {
 
         const killCombat = createCombatTestContext();
         const killSmith = blacksmith();
-        const first = createTestUnit({ team: LOWER, name: "Craft first", damageMax: 10, amountAlive: 10 });
-        const second = createTestUnit({ team: LOWER, name: "Craft second", damageMax: 10, amountAlive: 10 });
-        const victim = createTestUnit({ team: UPPER, name: "Certain victim", maxHp: 1, armor: 0 });
+        const first = createTestUnit({ team: LEFT, name: "Craft first", damageMax: 10, amountAlive: 10 });
+        const second = createTestUnit({ team: LEFT, name: "Craft second", damageMax: 10, amountAlive: 10 });
+        const victim = createTestUnit({ team: RIGHT, name: "Certain victim", maxHp: 1, armor: 0 });
         placeUnit(killCombat.grid, killCombat.unitsHolder, killSmith, { x: 2, y: 2 });
         placeUnit(killCombat.grid, killCombat.unitsHolder, victim, { x: 3, y: 2 });
         placeUnit(killCombat.grid, killCombat.unitsHolder, first, { x: 7, y: 7 });
@@ -153,9 +153,9 @@ describe("v0.8 Blacksmith Craft router", () => {
     it("releases Craft during the universal dominant-finish sprint", () => {
         const combat = createCombatTestContext();
         const smith = blacksmith();
-        const first = createTestUnit({ team: LOWER, name: "Craft first" });
-        const second = createTestUnit({ team: LOWER, name: "Craft second" });
-        const enemy = createTestUnit({ team: UPPER, name: "Live enemy" });
+        const first = createTestUnit({ team: LEFT, name: "Craft first" });
+        const second = createTestUnit({ team: LEFT, name: "Craft second" });
+        const enemy = createTestUnit({ team: RIGHT, name: "Live enemy" });
         placeUnit(combat.grid, combat.unitsHolder, smith, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, first, { x: 7, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, second, { x: 8, y: 7 });
@@ -170,9 +170,9 @@ describe("v0.8 Blacksmith Craft router", () => {
     it("is wired into the shipped strategy and can isolate one exact alias for paired a13 trials", () => {
         const combat = createCombatTestContext();
         const smith = blacksmith();
-        const first = createTestUnit({ team: LOWER, name: "Craft first", damageMax: 10, amountAlive: 10 });
-        const second = createTestUnit({ team: LOWER, name: "Craft second", damageMax: 10, amountAlive: 10 });
-        const enemy = createTestUnit({ team: UPPER, name: "Distant enemy" });
+        const first = createTestUnit({ team: LEFT, name: "Craft first", damageMax: 10, amountAlive: 10 });
+        const second = createTestUnit({ team: LEFT, name: "Craft second", damageMax: 10, amountAlive: 10 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Distant enemy" });
         placeUnit(combat.grid, combat.unitsHolder, smith, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, first, { x: 7, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, second, { x: 8, y: 7 });
@@ -196,7 +196,7 @@ const placementFixture = (publicOpponentCreatureIds: readonly number[]): IPlacem
     const units = [
         blacksmith(),
         createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Artillery",
             attackType: RANGE,
             damageMax: 20,
@@ -204,16 +204,16 @@ const placementFixture = (publicOpponentCreatureIds: readonly number[]): IPlacem
             rangeShots: 8,
         }),
         createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Archer",
             attackType: RANGE,
             damageMax: 12,
             amountAlive: 10,
             rangeShots: 6,
         }),
-        createTestUnit({ team: LOWER, name: "Bruiser", damageMax: 20, amountAlive: 20 }),
-        createTestUnit({ team: LOWER, name: "Guard", damageMax: 10, amountAlive: 20 }),
-        createTestUnit({ team: LOWER, name: "Filler", damageMax: 1, amountAlive: 1 }),
+        createTestUnit({ team: LEFT, name: "Bruiser", damageMax: 20, amountAlive: 20 }),
+        createTestUnit({ team: LEFT, name: "Guard", damageMax: 10, amountAlive: 20 }),
+        createTestUnit({ team: LEFT, name: "Filler", damageMax: 1, amountAlive: 1 }),
     ];
     for (const unit of units) combat.unitsHolder.addUnit(unit);
     const initialCells: XY[] = [
@@ -229,11 +229,11 @@ const placementFixture = (publicOpponentCreatureIds: readonly number[]): IPlacem
         units,
         inherited,
         context: {
-            team: LOWER,
+            team: LEFT,
             grid: combat.grid,
             unitsHolder: combat.unitsHolder,
             pathHelper: new PathHelper(testGridSettings),
-            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
             publicOpponentCreatureIds,
             setupPlacementPolicy: "public-roster",
         },
@@ -305,7 +305,7 @@ describe("v0.8 Blacksmith Craft placement", () => {
     it("packs a high-value large recipient by footprint and preserves its inherited ward edge", () => {
         const fixture = placementFixture([PBTypes.CreatureVals.SQUIRE]);
         const largeProtector = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Abomination",
             size: PBTypes.UnitSizeVals.LARGE,
             damageMax: 50,
@@ -360,25 +360,25 @@ describe("v0.8 Blacksmith Craft placement", () => {
         const combat = createCombatTestContext();
         const smith = blacksmith();
         const highFirst = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "High first",
             damageMax: 30,
             amountAlive: 20,
         });
         const highSecond = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "High second",
             damageMax: 25,
             amountAlive: 20,
         });
         const plain = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Plain",
             damageMax: 20,
             amountAlive: 10,
         });
         const doubled = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Already doubled",
             damageMax: 20,
             amountAlive: 10,
@@ -395,11 +395,11 @@ describe("v0.8 Blacksmith Craft placement", () => {
         ];
         const inherited = new Map(units.map((unit, index) => [unit.getId(), initialCells[index]]));
         const context: IPlacementContext = {
-            team: LOWER,
+            team: LEFT,
             grid: combat.grid,
             unitsHolder: combat.unitsHolder,
             pathHelper: new PathHelper(testGridSettings),
-            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
             publicOpponentCreatureIds: [PBTypes.CreatureVals.SQUIRE],
             setupPlacementPolicy: "public-roster",
         };
@@ -408,7 +408,7 @@ describe("v0.8 Blacksmith Craft placement", () => {
         for (const ability of ["Crafted Double Punch", "Double Shot", "Crafted Double Shot"]) {
             const attackType = ability.includes("Shot") ? RANGE : MELEE;
             const alreadyDoubled = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 attackType,
                 rangeShots: attackType === RANGE ? 1 : 0,
                 damageMax: 20,
@@ -416,7 +416,7 @@ describe("v0.8 Blacksmith Craft placement", () => {
                 abilities: [ability],
             });
             const comparable = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 attackType,
                 rangeShots: attackType === RANGE ? 1 : 0,
                 damageMax: 20,
@@ -456,7 +456,7 @@ describe("v0.8 Blacksmith Craft placement", () => {
     it("uses the public roster rather than hidden opponent runtime state", () => {
         const fixture = placementFixture([PBTypes.CreatureVals.SQUIRE]);
         const hiddenSplash = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Gargantuan",
             attackType: RANGE,
             abilities: ["Area Throw"],
@@ -483,7 +483,7 @@ describe("v0.8 Blacksmith Craft placement", () => {
     it("composes after protector placement without breaking an inherited ward screen", () => {
         const fixture = placementFixture([PBTypes.CreatureVals.SQUIRE]);
         const protector = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Abomination",
             size: PBTypes.UnitSizeVals.LARGE,
         });
@@ -527,7 +527,7 @@ describe("v0.8 Blacksmith Craft placement", () => {
     it("preserves both range-2 Angel ward edges while clustering for Craft", () => {
         const fixture = placementFixture([PBTypes.CreatureVals.CENTAUR]);
         const angel = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Angel",
             size: PBTypes.UnitSizeVals.LARGE,
         });

@@ -31,8 +31,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const MAGIC = PBTypes.AttackVals.MAGIC;
 
@@ -132,7 +132,7 @@ describe("v0.8 ranked-replay fight tactics", () => {
     });
 
     test("measures removed creatures and damage on the surviving front creature", () => {
-        const target = createTestUnit({ team: UPPER, amountAlive: 10, maxHp: 10 });
+        const target = createTestUnit({ team: RIGHT, amountAlive: 10, maxHp: 10 });
         target.applyDamage(15, 0, new SceneLogMock());
 
         expect(target.getAmountAlive()).toBe(9);
@@ -142,13 +142,13 @@ describe("v0.8 ranked-replay fight tactics", () => {
 
     test("recognizes a live support spellbook without hard-coding a unit name", () => {
         const support = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Future support",
             attackType: MAGIC,
             stackPower: 4,
             spells: ["Life:Heal", "Life:Spiritual Armor"],
         });
-        const ordinary = createTestUnit({ team: UPPER, name: "Ordinary melee" });
+        const ordinary = createTestUnit({ team: RIGHT, name: "Ordinary melee" });
 
         expect(v08ReplayTargetRoleValue(support)).toBeGreaterThanOrEqual(7);
         expect(v08ReplayTargetRoleValue(ordinary)).toBe(0);
@@ -158,20 +158,20 @@ describe("v0.8 ranked-replay fight tactics", () => {
 
     test("enables replay focus when either army has a native ranged stack", () => {
         const combat = createCombatTestContext();
-        const actor = createTestUnit({ team: LOWER, name: "Squire" });
+        const actor = createTestUnit({ team: LEFT, name: "Squire" });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 2 });
         expect(v08ReplayNativeRangedMatchupEligible(contextFor(combat))).toBe(false);
         // Eligibility is frozen to the public base roster, not mutable fight-time attack properties or side.
-        const enemyShooter = createTestUnit({ team: UPPER, name: "Arbalester", attackType: MELEE });
+        const enemyShooter = createTestUnit({ team: RIGHT, name: "Arbalester", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, enemyShooter, { x: 12, y: 2 });
         expect(v08ReplayNativeRangedMatchupEligible(contextFor(combat))).toBe(true);
     });
 
     test("focuses only a guaranteed finish or a 25%-wounded stack at 90% damage", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ team: LOWER, name: "Attacker" });
-        const fresh = createTestUnit({ team: UPPER, name: "Fresh", amountAlive: 10, maxHp: 10 });
-        const wounded = createTestUnit({ team: UPPER, name: "Wounded", amountAlive: 10, maxHp: 10 });
+        const attacker = createTestUnit({ team: LEFT, name: "Attacker" });
+        const fresh = createTestUnit({ team: RIGHT, name: "Fresh", amountAlive: 10, maxHp: 10 });
+        const wounded = createTestUnit({ team: RIGHT, name: "Wounded", amountAlive: 10, maxHp: 10 });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, fresh, { x: 4, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, wounded, { x: 3, y: 4 });
@@ -197,14 +197,14 @@ describe("v0.8 ranked-replay fight tactics", () => {
     test("does not trade aggregate splash damage for a nonlethal focus-fire target", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Splash shooter",
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 8,
             abilities: ["Large Caliber"],
         });
-        const fresh = createTestUnit({ team: UPPER, name: "Fresh", amountAlive: 20, maxHp: 10 });
-        const wounded = createTestUnit({ team: UPPER, name: "Wounded", amountAlive: 20, maxHp: 10 });
+        const fresh = createTestUnit({ team: RIGHT, name: "Fresh", amountAlive: 20, maxHp: 10 });
+        const wounded = createTestUnit({ team: RIGHT, name: "Wounded", amountAlive: 20, maxHp: 10 });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 2, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, fresh, { x: 12, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, wounded, { x: 12, y: 5 });
@@ -223,11 +223,11 @@ describe("v0.8 ranked-replay fight tactics", () => {
 
     test("reserves one rollout-gated finish or high-value focus behind a lightly wounded incumbent", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ team: LOWER, name: "Attacker" });
-        const incumbentTarget = createTestUnit({ team: UPPER, name: "Lightly wounded", amountAlive: 10, maxHp: 10 });
-        const ordinary = createTestUnit({ team: UPPER, name: "Ordinary", amountAlive: 10, maxHp: 10 });
+        const attacker = createTestUnit({ team: LEFT, name: "Attacker" });
+        const incumbentTarget = createTestUnit({ team: RIGHT, name: "Lightly wounded", amountAlive: 10, maxHp: 10 });
+        const ordinary = createTestUnit({ team: RIGHT, name: "Ordinary", amountAlive: 10, maxHp: 10 });
         const support = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Support",
             attackType: MAGIC,
             amountAlive: 10,
@@ -292,9 +292,9 @@ describe("v0.8 ranked-replay fight tactics", () => {
 
     test("uses replay target preference only inside the scored near-tie window", () => {
         const combat = createCombatTestContext();
-        const attacker = createTestUnit({ team: LOWER, name: "Attacker" });
-        const fresh = createTestUnit({ team: UPPER, name: "Fresh", amountAlive: 10, maxHp: 10 });
-        const wounded = createTestUnit({ team: UPPER, name: "Wounded", amountAlive: 10, maxHp: 10 });
+        const attacker = createTestUnit({ team: LEFT, name: "Attacker" });
+        const fresh = createTestUnit({ team: RIGHT, name: "Fresh", amountAlive: 10, maxHp: 10 });
+        const wounded = createTestUnit({ team: RIGHT, name: "Wounded", amountAlive: 10, maxHp: 10 });
         placeUnit(combat.grid, combat.unitsHolder, attacker, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, fresh, { x: 4, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, wounded, { x: 3, y: 4 });
@@ -366,14 +366,14 @@ describe("v0.8 ranked-replay fight tactics", () => {
     test("a fast opening melee attacker prefers a comparable hit on a support target", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Flying diver",
             attackType: MELEE,
             movementType: PBTypes.MovementVals.FLY,
         });
-        const front = createTestUnit({ team: UPPER, name: "Front line", maxHp: 100 });
+        const front = createTestUnit({ team: RIGHT, name: "Front line", maxHp: 100 });
         const support = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Support",
             attackType: MAGIC,
             maxHp: 100,
@@ -412,7 +412,7 @@ describe("v0.8 ranked-replay fight tactics", () => {
     test("enumerates and returns an engine-legal move-and-dive from the supplied incumbent", () => {
         const combat = createCombatTestContext();
         const attacker = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Flying diver",
             attackType: MELEE,
             attack: 20,
@@ -421,9 +421,9 @@ describe("v0.8 ranked-replay fight tactics", () => {
             amountAlive: 10,
             movementType: PBTypes.MovementVals.FLY,
         });
-        const front = createTestUnit({ team: UPPER, name: "Front line", maxHp: 100, amountAlive: 10 });
+        const front = createTestUnit({ team: RIGHT, name: "Front line", maxHp: 100, amountAlive: 10 });
         const support = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Support",
             attackType: MAGIC,
             maxHp: 100,

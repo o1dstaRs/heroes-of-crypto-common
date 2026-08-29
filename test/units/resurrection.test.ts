@@ -17,7 +17,7 @@ import { createTestUnit } from "../helpers/combat";
 
 /** A stack with `alive` standing (front member on `hp`) and `died` in the graveyard. */
 const stack = (maxHp: number, hp: number, alive: number, died: number) => {
-    const unit = createTestUnit({ name: "Fallen", team: PBTypes.TeamVals.LOWER, maxHp, amountAlive: alive });
+    const unit = createTestUnit({ name: "Fallen", team: PBTypes.TeamVals.LEFT, maxHp, amountAlive: alive });
     const properties = unit.getUnitProperties();
     properties.hp = hp;
     properties.amount_alive = alive;

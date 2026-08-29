@@ -49,7 +49,7 @@ const sightBetween = (grid: Grid, from: XY, to: XY): boolean =>
 describe("thrown spell line of sight around 2x2 creatures", () => {
     it("reaches a 2x2 target from every side, not just the two its base cell faces", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const target = makeLarge("Big Target", PBTypes.TeamVals.UPPER);
+        const target = makeLarge("Big Target", PBTypes.TeamVals.RIGHT);
         place(grid, unitsHolder, target, { x: 8, y: 8 });
 
         // The base cell is the bottom-left of the square, so approaches from the right or from above are
@@ -72,7 +72,7 @@ describe("thrown spell line of sight around 2x2 creatures", () => {
 
     it("lets a 2x2 caster shoot in every direction instead of being walled in by itself", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const caster = makeLarge("Big Mage", PBTypes.TeamVals.LOWER);
+        const caster = makeLarge("Big Mage", PBTypes.TeamVals.LEFT);
         place(grid, unitsHolder, caster, { x: 8, y: 8 });
 
         const base = caster.getBaseCell();
@@ -90,9 +90,9 @@ describe("thrown spell line of sight around 2x2 creatures", () => {
 
     it("still refuses the shot when a THIRD creature stands in the way", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const caster = createTestUnit({ name: "Mage", team: PBTypes.TeamVals.LOWER });
-        const blocker = createTestUnit({ name: "Blocker", team: PBTypes.TeamVals.UPPER });
-        const target = makeLarge("Big Target", PBTypes.TeamVals.UPPER);
+        const caster = createTestUnit({ name: "Mage", team: PBTypes.TeamVals.LEFT });
+        const blocker = createTestUnit({ name: "Blocker", team: PBTypes.TeamVals.RIGHT });
+        const target = makeLarge("Big Target", PBTypes.TeamVals.RIGHT);
         place(grid, unitsHolder, caster, { x: 2, y: 8 });
         place(grid, unitsHolder, blocker, { x: 5, y: 8 });
         place(grid, unitsHolder, target, { x: 8, y: 8 });
@@ -104,8 +104,8 @@ describe("thrown spell line of sight around 2x2 creatures", () => {
 
     it("is unchanged for two small creatures with a clear lane", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const caster = createTestUnit({ name: "Mage", team: PBTypes.TeamVals.LOWER });
-        const target = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.UPPER });
+        const caster = createTestUnit({ name: "Mage", team: PBTypes.TeamVals.LEFT });
+        const target = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.RIGHT });
         place(grid, unitsHolder, caster, { x: 2, y: 8 });
         place(grid, unitsHolder, target, { x: 8, y: 8 });
 

@@ -37,7 +37,7 @@ const record = (
     cellId: cell.id,
     game,
     seed: ((baseSeed >>> 0) + Math.floor(game / 2) * 0x9e3779b1) >>> 0,
-    aIsLower: game % 2 === 0,
+    aIsLeft: game % 2 === 0,
     winnerSlot: game % 2 === 0 ? "a" : "b",
     laps: 10,
     endReason: "elimination",

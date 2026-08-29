@@ -30,8 +30,8 @@ import type { PureRangedTerminalState } from "../../src/simulation/v0_7_pure_ran
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const RANGE = PBTypes.AttackVals.RANGE;
 
 interface IFixture {
@@ -102,15 +102,15 @@ function shot(
 function fixture(actorAbilities: readonly string[] = [], rangeShots = 6): IFixture {
     const context = createCombatTestContext();
     const actor = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         attackType: RANGE,
         rangeShots,
         name: "Ordinary shooter",
         abilities: [...actorAbilities],
     });
-    const primary = createTestUnit({ team: UPPER, attackType: RANGE, rangeShots: 6, name: "Primary" });
+    const primary = createTestUnit({ team: RIGHT, attackType: RANGE, rangeShots: 6, name: "Primary" });
     const noMelee = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         attackType: RANGE,
         rangeShots: 4,
         maxHp: 100,
@@ -270,14 +270,14 @@ describe("pure-ranged JIT No-Melee focus", () => {
         const immediateKill = shot(f.actor, f.noMelee, "shot", { kill: 1, primary: 100 });
         expect(rank(f, [locked, immediateKill])[0]?.candidate).toBe(immediateKill);
 
-        const lowerRatio = shot(f.actor, f.noMelee, "shot", { enemy: 80, net: 80, primary: 20 });
+        const leftRatio = shot(f.actor, f.noMelee, "shot", { enemy: 80, net: 80, primary: 20 });
         const higherRatio = shot(f.actor, f.noMelee, "shot", { enemy: 90, net: 90, primary: 20 });
-        expect(rank(f, [f.incumbent, lowerRatio, higherRatio])[0]?.candidate).toBe(higherRatio);
+        expect(rank(f, [f.incumbent, leftRatio, higherRatio])[0]?.candidate).toBe(higherRatio);
         const killing = shot(f.actor, f.noMelee, "shot", { kill: 1, enemy: 80, net: 80, primary: 20 });
         expect(rank(f, [f.incumbent, higherRatio, killing])[0]?.candidate).toBe(killing);
 
         const wounded = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             attackType: RANGE,
             rangeShots: 4,
             maxHp: 100,

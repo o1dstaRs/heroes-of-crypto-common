@@ -16,13 +16,13 @@ import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
+const LEFT = PBTypes.TeamVals.LEFT;
 const DEEP_WOUNDS_1 = "Deep Wounds Level 1";
 
 /** Equip a Tier 1 artifact for LOWER and run the recompute the sandbox runs on every pick. */
 const equipTier1 = (context: ReturnType<typeof createCombatTestContext>, artifact: Tier1Artifact) => {
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    fightProperties.setArtifactPerTeam(LOWER, ArtifactTier.TIER_1, artifact);
+    fightProperties.setArtifactPerTeam(LEFT, ArtifactTier.TIER_1, artifact);
     context.unitsHolder.applyArtifacts(fightProperties);
     context.unitsHolder.refreshStackPowerForAllUnits();
 };
@@ -34,7 +34,7 @@ describe("Wounding Charm — the lent ability comes off with the artifact", () =
 
     it("grants Deep Wounds while equipped and takes it back on a same-tier swap", () => {
         const context = createCombatTestContext();
-        const unit = createTestUnit({ name: "Plain", team: LOWER });
+        const unit = createTestUnit({ name: "Plain", team: LEFT });
         placeUnit(context.grid, context.unitsHolder, unit, { x: 2, y: 2 });
 
         expect(unit.hasAbilityActive(DEEP_WOUNDS_1)).toBe(false);
@@ -50,7 +50,7 @@ describe("Wounding Charm — the lent ability comes off with the artifact", () =
 
     it("takes it back when the slot is cleared outright", () => {
         const context = createCombatTestContext();
-        const unit = createTestUnit({ name: "Plain", team: LOWER });
+        const unit = createTestUnit({ name: "Plain", team: LEFT });
         placeUnit(context.grid, context.unitsHolder, unit, { x: 2, y: 2 });
 
         equipTier1(context, Tier1Artifact.WOUNDING_CHARM);
@@ -64,7 +64,7 @@ describe("Wounding Charm — the lent ability comes off with the artifact", () =
     // the Wolf owns that card natively, and a blind cleanup would confiscate it.
     it("never confiscates a card the creature owns natively", () => {
         const context = createCombatTestContext();
-        const native = createTestUnit({ name: "Wolfish", team: LOWER, abilities: [DEEP_WOUNDS_1] });
+        const native = createTestUnit({ name: "Wolfish", team: LEFT, abilities: [DEEP_WOUNDS_1] });
         placeUnit(context.grid, context.unitsHolder, native, { x: 2, y: 2 });
 
         expect(native.hasAbilityActive(DEEP_WOUNDS_1)).toBe(true);
@@ -78,7 +78,7 @@ describe("Wounding Charm — the lent ability comes off with the artifact", () =
 
     it("survives repeated recomputes without stacking duplicates", () => {
         const context = createCombatTestContext();
-        const unit = createTestUnit({ name: "Plain", team: LOWER });
+        const unit = createTestUnit({ name: "Plain", team: LEFT });
         placeUnit(context.grid, context.unitsHolder, unit, { x: 2, y: 2 });
 
         for (let i = 0; i < 4; i += 1) {

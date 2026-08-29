@@ -114,7 +114,7 @@ const centerFor = footprintCenterForAnchor;
 const frontness = (team: IPlacementContext["team"], cell: XY, sideOriented = false): number => {
     // Depth toward the enemy along the axis of advance (X when this seat plays side-oriented).
     const along = sideOriented ? cell.x : cell.y;
-    return team === PBTypes.TeamVals.LOWER ? along : GRID_SIZE - 1 - along;
+    return team === PBTypes.TeamVals.LEFT ? along : GRID_SIZE - 1 - along;
 };
 
 const placementIsCompleteAndLegal = (

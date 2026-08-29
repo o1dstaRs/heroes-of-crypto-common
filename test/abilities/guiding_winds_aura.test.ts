@@ -27,7 +27,7 @@ const BOOSTED_SHOT_DISTANCE =
 const makeDryad = () =>
     createTestUnit({
         name: "Dryad",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         // Guiding Winds is stack-powered: a FULL stack projects exactly the configured percent, which is
         // what the shot-distance expectations below are written against.
         stackPower: 5,
@@ -43,7 +43,7 @@ const makeDryad = () =>
 const makeArcher = (name: string) =>
     createTestUnit({
         name,
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.RANGE,
         rangeShots: 5,
         shotDistance: ARCHER_SHOT_DISTANCE,
@@ -61,7 +61,7 @@ describe("Guiding Winds Aura", () => {
 
     it("scales with the owner's stack and luck, floored at 0 and capped", () => {
         const projected = (stackPower: number, luck: number) => {
-            const owner = createTestUnit({ name: "Dryad", team: PBTypes.TeamVals.LOWER, stackPower, luck });
+            const owner = createTestUnit({ name: "Dryad", team: PBTypes.TeamVals.LEFT, stackPower, luck });
             return Math.round(owner.calculateAuraPower(new AuraEffect(getAuraEffectConfig("Guiding Winds")!), 0));
         };
         expect([1, 2, 3, 4, 5].map((stack) => projected(stack, 0))).toEqual([5, 10, 15, 20, 25]);
@@ -75,7 +75,7 @@ describe("Guiding Winds Aura", () => {
     it("prints the live stack-and-luck projection on a runtime-granted card", () => {
         const bearer = createTestUnit({
             name: "Bearer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             stackPower: 3,
             luck: 5,
         });
@@ -92,7 +92,7 @@ describe("Guiding Winds Aura", () => {
         const farArcher = makeArcher("Far Archer");
         const meleeAlly = createTestUnit({
             name: "Melee Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE,
             shotDistance: ARCHER_SHOT_DISTANCE,
         });
@@ -153,7 +153,7 @@ describe("Guiding Winds Aura", () => {
 
 describe("Dryad", () => {
     it("carries Guiding Winds instead of the poison aura", () => {
-        const dryad = getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "Dryad", "dryad_512", 1, 0);
+        const dryad = getCreatureConfig(PBTypes.TeamVals.LEFT, "Nature", "Dryad", "dryad_512", 1, 0);
         expect(dryad.abilities).toEqual(["Guiding Winds Aura", "Hamstring"]);
     });
 });

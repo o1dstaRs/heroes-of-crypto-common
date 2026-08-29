@@ -235,8 +235,8 @@ proto.PBTypes.FactionVals = {
  */
 proto.PBTypes.TeamVals = {
   NO_TEAM: 0,
-  UPPER: 1,
-  LOWER: 2
+  RIGHT: 1,
+  LEFT: 2
 };
 
 /**

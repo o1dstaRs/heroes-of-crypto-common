@@ -54,8 +54,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const FLY = PBTypes.MovementVals.FLY;
@@ -112,8 +112,8 @@ function placeLarge(c: CombatTestContext, unit: Unit, base: XY): void {
 function startActionEngine(c: CombatTestContext, unit: Unit, context: IDecisionContext): GameActionEngine {
     const fightProperties = context.fightProperties!;
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, c.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, c.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.setTeamUnitsAlive(LEFT, c.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, c.unitsHolder.getAllAllies(RIGHT).length);
     fightProperties.startTurn(unit.getTeam(), 1_000);
     return new GameActionEngine({
         fightProperties,
@@ -134,8 +134,8 @@ const ofKind = (cands: IEnumeratedCandidate[], kind: string): IEnumeratedCandida
 describe("candidates — the F4 enumerated candidate generator", () => {
     it("candidate 0 is ALWAYS the incumbent decision (anchor pattern), verbatim", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, initiative: 2 });
-        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
+        const unit = createTestUnit({ team: LEFT, name: "U", attackType: MELEE, initiative: 2 });
+        const enemy = createTestUnit({ team: RIGHT, name: "E", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 4, y: 4 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 4, y: 5 });
         const incumbent = endTurn(unit);
@@ -147,9 +147,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("melee: emits in-place strikes on EVERY adjacent enemy", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Brawler", attackType: MELEE, initiative: 3, amountAlive: 5 });
-        const adj1 = createTestUnit({ team: UPPER, name: "Adj1", attackType: MELEE, amountAlive: 3 });
-        const adj2 = createTestUnit({ team: UPPER, name: "Adj2", attackType: MELEE, amountAlive: 3 });
+        const unit = createTestUnit({ team: LEFT, name: "Brawler", attackType: MELEE, initiative: 3, amountAlive: 5 });
+        const adj1 = createTestUnit({ team: RIGHT, name: "Adj1", attackType: MELEE, amountAlive: 3 });
+        const adj2 = createTestUnit({ team: RIGHT, name: "Adj2", attackType: MELEE, amountAlive: 3 });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, adj1, { x: 5, y: 6 });
         placeUnit(c.grid, c.unitsHolder, adj2, { x: 6, y: 5 });
@@ -172,9 +172,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("melee: only a live forced target constrains candidates; missing and dead targets release them", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Aggr-constrained brawler", attackType: MELEE });
-        const forced = createTestUnit({ team: UPPER, name: "Live forced target", attackType: MELEE });
-        const other = createTestUnit({ team: UPPER, name: "Other adjacent target", attackType: MELEE });
+        const unit = createTestUnit({ team: LEFT, name: "Aggr-constrained brawler", attackType: MELEE });
+        const forced = createTestUnit({ team: RIGHT, name: "Live forced target", attackType: MELEE });
+        const other = createTestUnit({ team: RIGHT, name: "Other adjacent target", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, forced, { x: 5, y: 6 });
         placeUnit(c.grid, c.unitsHolder, other, { x: 6, y: 5 });
@@ -200,7 +200,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const meleeMetadata = (abilities: string[] = []): IEnumeratedCandidate => {
             const c = createCombatTestContext();
             const shooter = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: abilities.length ? "Handyman shooter" : "Penalized shooter",
                 attackType: RANGE,
                 attack: 10,
@@ -210,7 +210,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 abilities,
             });
             const target = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Four HP target",
                 attackType: MELEE,
                 armor: 10,
@@ -239,9 +239,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("opt-in attack caps retain the best delivery to every distinct target", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Scheduler", attackType: MELEE, amountAlive: 5 });
-        const first = createTestUnit({ team: UPPER, name: "First blocker", attackType: MELEE, amountAlive: 3 });
-        const second = createTestUnit({ team: UPPER, name: "Second blocker", attackType: MELEE, amountAlive: 3 });
+        const unit = createTestUnit({ team: LEFT, name: "Scheduler", attackType: MELEE, amountAlive: 5 });
+        const first = createTestUnit({ team: RIGHT, name: "First blocker", attackType: MELEE, amountAlive: 3 });
+        const second = createTestUnit({ team: RIGHT, name: "Second blocker", attackType: MELEE, amountAlive: 3 });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, first, { x: 5, y: 6 });
         placeUnit(c.grid, c.unitsHolder, second, { x: 6, y: 5 });
@@ -262,8 +262,8 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const c = createCombatTestContext();
         // Unengaged unit (aggro pathing constrains movement once adjacent to an enemy — that legality
         // is intentional and mirrors v0.5's enumeration).
-        const unit = createTestUnit({ team: LOWER, name: "Brawler", attackType: MELEE, initiative: 4, amountAlive: 5 });
-        const far = createTestUnit({ team: UPPER, name: "Far", attackType: MELEE, amountAlive: 3 });
+        const unit = createTestUnit({ team: LEFT, name: "Brawler", attackType: MELEE, initiative: 4, amountAlive: 5 });
+        const far = createTestUnit({ team: RIGHT, name: "Far", attackType: MELEE, amountAlive: 3 });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, far, { x: 5, y: 8 }); // stand cells (4..6,7) reachable within 3 steps
         const { candidates } = enumerateCandidates(unit, ctxFor(c), endTurn(unit));
@@ -288,13 +288,13 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         }).candidates[0];
         expect(anchor.actions).toBe(moveStrike.actions);
         expect(ilCandidateFeatureVector(anchor.features)).toEqual(ilCandidateFeatureVector(moveStrike.features));
-        expect(ilCandidateActionEncoding(anchor, LOWER)).toEqual(ilCandidateActionEncoding(moveStrike, LOWER));
+        expect(ilCandidateActionEncoding(anchor, LEFT)).toEqual(ilCandidateActionEncoding(moveStrike, LEFT));
     });
 
     it("moves: every reachable destination; capped enumeration reports truncation", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Runner", attackType: MELEE, initiative: 4 });
-        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
+        const unit = createTestUnit({ team: LEFT, name: "Runner", attackType: MELEE, initiative: 4 });
+        const enemy = createTestUnit({ team: RIGHT, name: "E", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 8 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 14 });
 
@@ -315,8 +315,8 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("opt-in capped moves retain one closing and one non-closing posture without changing the default", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Screen", attackType: MELEE, initiative: 4 });
-        const enemy = createTestUnit({ team: UPPER, name: "Approaching enemy", attackType: MELEE });
+        const unit = createTestUnit({ team: LEFT, name: "Screen", attackType: MELEE, initiative: 4 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Approaching enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 8 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 14 });
         const distance = (cell: XY): number =>
@@ -348,8 +348,8 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("applies a hard move-role gate before selecting the nearest capped destination", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Role holder", attackType: MELEE, initiative: 4 });
-        const enemy = createTestUnit({ team: UPPER, name: "Approaching enemy", attackType: MELEE });
+        const unit = createTestUnit({ team: LEFT, name: "Role holder", attackType: MELEE, initiative: 4 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Approaching enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 8, y: 8 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 8, y: 14 });
         const distance = (cell: XY): number =>
@@ -373,8 +373,8 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("does not expand an opt-in move cap when every reachable destination is closing", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "Corner runner", attackType: MELEE, initiative: 2 });
-        const enemy = createTestUnit({ team: UPPER, name: "Far enemy", attackType: MELEE });
+        const unit = createTestUnit({ team: LEFT, name: "Corner runner", attackType: MELEE, initiative: 2 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Far enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 0, y: 0 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 14, y: 14 });
 
@@ -388,14 +388,14 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("defend is always offered; wait (hourglass) only when the engine would accept it", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, initiative: 1 });
-        const ally = createTestUnit({ team: LOWER, name: "A", attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
+        const unit = createTestUnit({ team: LEFT, name: "U", attackType: MELEE, initiative: 1 });
+        const ally = createTestUnit({ team: LEFT, name: "A", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "E", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, ally, { x: 5, y: 3 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 3, y: 12 });
         const fp = FightStateManager.getInstance().getFightProperties();
-        fp.setTeamUnitsAlive(LOWER, 2);
+        fp.setTeamUnitsAlive(LEFT, 2);
 
         const withWait = enumerateCandidates(unit, ctxFor(c, true), endTurn(unit));
         expect(ofKind(withWait.candidates, "defend").length).toBe(1);
@@ -415,14 +415,14 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Nightmare's Time Denial suppresses wait candidates board-wide", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, initiative: 1 });
-        const ally = createTestUnit({ team: LOWER, name: "A", attackType: MELEE });
-        const nightmare = makeReal(UPPER, "Chaos", "Nightmare");
+        const unit = createTestUnit({ team: LEFT, name: "U", attackType: MELEE, initiative: 1 });
+        const ally = createTestUnit({ team: LEFT, name: "A", attackType: MELEE });
+        const nightmare = makeReal(RIGHT, "Chaos", "Nightmare");
         placeUnit(c.grid, c.unitsHolder, unit, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, ally, { x: 5, y: 3 });
         placeUnit(c.grid, c.unitsHolder, nightmare, { x: 12, y: 12 });
         const fp = FightStateManager.getInstance().getFightProperties();
-        fp.setTeamUnitsAlive(LOWER, 2);
+        fp.setTeamUnitsAlive(LEFT, 2);
 
         expect(nightmare.hasAbilityActive("Time Denial")).toBe(true);
         const candidates = enumerateCandidates(unit, ctxFor(c, true), endTurn(unit)).candidates;
@@ -433,7 +433,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("shots: aim alternatives per enemy, deduped by identical hit set; lone enemy -> exactly one shot", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Archer",
             attackType: RANGE,
             rangeShots: 5,
@@ -441,7 +441,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             initiative: 2,
             amountAlive: 5,
         });
-        const lone = createTestUnit({ team: UPPER, name: "Lone", attackType: MELEE, amountAlive: 5 });
+        const lone = createTestUnit({ team: RIGHT, name: "Lone", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, lone, { x: 10, y: 10 });
         const { candidates } = enumerateCandidates(shooter, ctxFor(c), endTurn(shooter));
@@ -463,7 +463,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("shots: canonicalizes a screened rear aim to the visible edge and identity of the actual first hit", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Screened-shot archer",
             attackType: RANGE,
             rangeShots: 5,
@@ -472,8 +472,8 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         });
         // Insert the rear unit first so roster iteration would deterministically advertise it first without
         // first-hit canonicalization.
-        const rear = createTestUnit({ team: UPPER, name: "Screened rear", attackType: MELEE });
-        const front = createTestUnit({ team: UPPER, name: "Actual first hit", attackType: MELEE });
+        const rear = createTestUnit({ team: RIGHT, name: "Screened rear", attackType: MELEE });
+        const front = createTestUnit({ team: RIGHT, name: "Actual first hit", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
         placeUnit(c.grid, c.unitsHolder, rear, { x: 10, y: 7 });
         placeUnit(c.grid, c.unitsHolder, front, { x: 6, y: 7 });
@@ -535,7 +535,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         it(`shots: ${special.ability} retains an intentional rear aim while scoring the actual primary`, () => {
             const c = createCombatTestContext();
             const shooter = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: `${special.ability} shooter`,
                 attackType: RANGE,
                 rangeShots: 5,
@@ -543,8 +543,8 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 amountAlive: 5,
                 abilities: [special.ability],
             });
-            const rear = createTestUnit({ team: UPPER, name: "Intentional rear aim", attackType: MELEE });
-            const front = createTestUnit({ team: UPPER, name: "Special first hit", attackType: MELEE });
+            const rear = createTestUnit({ team: RIGHT, name: "Intentional rear aim", attackType: MELEE });
+            const front = createTestUnit({ team: RIGHT, name: "Special first hit", attackType: MELEE });
             placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
             placeUnit(c.grid, c.unitsHolder, rear, { x: 10, y: 7 });
             placeUnit(c.grid, c.unitsHolder, front, { x: 6, y: 7 });
@@ -653,7 +653,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         ): { estimated: number; applied: number } => {
             const c = createCombatTestContext();
             const shooter = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Low-power Through Shot",
                 attackType: RANGE,
                 attack: 10,
@@ -666,7 +666,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 abilities: ["Through Shot", ...(options.secondShot ? [options.secondShot] : [])],
             });
             const target = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Status-resistant target",
                 attackType: MELEE,
                 armor: 10,
@@ -730,7 +730,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("shots: Cowardice rejects the stronger resolved primary, leaves a legal lower-HP target, and does not enrich the invalid incumbent", () => {
         const c = createCombatTestContext();
         const beholder = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Beholder-like shooter",
             attackType: RANGE,
             rangeShots: 5,
@@ -739,14 +739,14 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             maxHp: 10,
         });
         const stronger = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Cowardice-blocked stack",
             attackType: MELEE,
             amountAlive: 10,
             maxHp: 10,
         });
         const weaker = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Cowardice-legal stack",
             attackType: MELEE,
             amountAlive: 3,
@@ -780,7 +780,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("shots: Through Shot remains legal against a stronger primary while the attacker has Cowardice", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Cowardly line shooter",
             attackType: RANGE,
             rangeShots: 5,
@@ -790,7 +790,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             abilities: ["Through Shot"],
         });
         const stronger = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Stronger line target",
             attackType: MELEE,
             amountAlive: 10,
@@ -814,14 +814,14 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("shots: a live forced target excludes other resolved primaries, while a dead forced target releases them", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Aggr-constrained shooter",
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 30,
         });
-        const forced = createTestUnit({ team: UPPER, name: "Forced", attackType: MELEE });
-        const other = createTestUnit({ team: UPPER, name: "Other", attackType: MELEE });
+        const forced = createTestUnit({ team: RIGHT, name: "Forced", attackType: MELEE });
+        const other = createTestUnit({ team: RIGHT, name: "Other", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
         placeUnit(c.grid, c.unitsHolder, forced, { x: 10, y: 3 });
         placeUnit(c.grid, c.unitsHolder, other, { x: 10, y: 11 });
@@ -841,7 +841,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("move-shots: default-off enumeration is unchanged; opt-in emits at most two exact legal composites", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Advancing archer",
             attackType: RANGE,
             rangeShots: 5,
@@ -852,7 +852,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             amountAlive: 5,
         });
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Distant target",
             attackType: MELEE,
             initiative: 1,
@@ -932,7 +932,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const fixture = (stationaryFriendlyFire: boolean) => {
             const c = createCombatTestContext();
             const shooter = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Large Caliber finisher",
                 attackType: RANGE,
                 attack: 10,
@@ -946,7 +946,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 abilities: ["Large Caliber"],
             });
             const target = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Large Caliber target",
                 attackType: MELEE,
                 armor: 20,
@@ -954,7 +954,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 maxHp: 1_000,
             });
             const ally = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Stationary splash ally",
                 attackType: MELEE,
                 armor: 10,
@@ -1043,7 +1043,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const fixture = (abilities: string[] = [], initiative = 4) => {
             const c = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
             const shooter = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Blocked-line archer",
                 attackType: RANGE,
                 rangeShots: 8,
@@ -1056,7 +1056,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 abilities,
             });
             const target = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Blocked-line target",
                 attackType: MELEE,
                 amountAlive: 10,
@@ -1163,7 +1163,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             { x: 10, y: 12 },
         ].entries()) {
             const ally = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: `Splash ally ${index}`,
                 attackType: MELEE,
                 amountAlive: 20,
@@ -1188,7 +1188,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
         const constrained = fixture();
         const other = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Unforced target",
             attackType: MELEE,
             amountAlive: 1,
@@ -1385,7 +1385,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         it(`move-shots: ${special.ability} discovery preserves a rear aim through an intercepted primary`, () => {
             const c = createCombatTestContext();
             const shooter = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: `${special.ability} mover`,
                 attackType: RANGE,
                 attack: 10,
@@ -1399,21 +1399,21 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 abilities: [special.ability],
             });
             const ally = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Stationary-line blocker",
                 attackType: MELEE,
                 amountAlive: 100,
                 maxHp: 1_000,
             });
             const front = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Resolved front primary",
                 attackType: MELEE,
                 amountAlive: 100,
                 maxHp: 1_000,
             });
             const rear = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Rear aim anchor",
                 attackType: MELEE,
                 amountAlive: 100,
@@ -1477,7 +1477,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("move-shots: enriches only an exact incumbent at cap zero without adding or reordering challengers", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "a13 advancing archer",
             attackType: RANGE,
             rangeShots: 5,
@@ -1488,7 +1488,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             amountAlive: 5,
         });
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "a13 pressure target",
             attackType: MELEE,
             initiative: 1,
@@ -1566,7 +1566,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("move-shots: does not enrich an incumbent whose legal move makes its shot melee-pinned", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Pinned after moving",
             attackType: RANGE,
             rangeShots: 5,
@@ -1576,7 +1576,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             damageMax: 10,
             amountAlive: 5,
         });
-        const pinner = createTestUnit({ team: UPPER, name: "Destination pinner", attackType: MELEE, initiative: 1 });
+        const pinner = createTestUnit({ team: RIGHT, name: "Destination pinner", attackType: MELEE, initiative: 1 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
         placeUnit(c.grid, c.unitsHolder, pinner, { x: 6, y: 7 });
         shooter.refreshPossibleAttackTypes(true);
@@ -1610,7 +1610,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("move-shots: a secondary RANGE selection completes after moving", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Dual-mode archer",
             attackType: RANGE,
             rangeShots: 5,
@@ -1621,7 +1621,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             amountAlive: 5,
         });
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Target",
             attackType: MELEE,
             initiative: 1,
@@ -1654,7 +1654,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("move-shots: a LARGE shooter evaluates and applies its exact legal 2x2 destination footprint", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Large cannon",
             attackType: RANGE,
             rangeShots: 5,
@@ -1666,7 +1666,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             amountAlive: 5,
         });
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Target",
             attackType: MELEE,
             initiative: 1,
@@ -1731,7 +1731,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const enumerateFor = (abilities: string[] = [], pinned = false): IEnumeratedCandidate[] => {
             const c = createCombatTestContext();
             const shooter = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: `Excluded ${abilities[0] ?? "pinned"}`,
                 attackType: RANGE,
                 rangeShots: 5,
@@ -1739,11 +1739,11 @@ describe("candidates — the F4 enumerated candidate generator", () => {
                 initiative: 3,
                 abilities,
             });
-            const target = createTestUnit({ team: UPPER, name: "Target", attackType: MELEE, initiative: 1 });
+            const target = createTestUnit({ team: RIGHT, name: "Target", attackType: MELEE, initiative: 1 });
             placeUnit(c.grid, c.unitsHolder, shooter, { x: 2, y: 7 });
             placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 7 });
             if (pinned) {
-                const pinner = createTestUnit({ team: UPPER, name: "Pinner", attackType: MELEE });
+                const pinner = createTestUnit({ team: RIGHT, name: "Pinner", attackType: MELEE });
                 placeUnit(c.grid, c.unitsHolder, pinner, { x: 3, y: 7 });
             }
             shooter.refreshPossibleAttackTypes(!pinned);
@@ -1767,15 +1767,15 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("opt-in shot caps expand to cover every primary target", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Coverage archer",
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 30,
             amountAlive: 5,
         });
-        const first = createTestUnit({ team: UPPER, name: "First shot target", attackType: MELEE });
-        const second = createTestUnit({ team: UPPER, name: "Second shot target", attackType: MELEE });
+        const first = createTestUnit({ team: RIGHT, name: "First shot target", attackType: MELEE });
+        const second = createTestUnit({ team: RIGHT, name: "Second shot target", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, first, { x: 10, y: 10 });
         placeUnit(c.grid, c.unitsHolder, second, { x: 12, y: 10 });
@@ -1795,16 +1795,16 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("shots: an exact incumbent duplicate is enriched in place and omitted from challengers", () => {
         const c = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Archer",
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 30,
             amountAlive: 5,
         });
-        const ally = createTestUnit({ team: LOWER, name: "Focus", attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, name: "Focus", attackType: MELEE });
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Target",
             attackType: RANGE,
             rangeShots: 3,
@@ -1843,7 +1843,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
             enrichIncumbentMetadata: false,
         }).candidates[0];
         expect(explicitOff).toEqual(anchor);
-        expect(ilCandidateActionEncoding(anchor, LOWER)).toEqual(ilCandidateActionEncoding(generated, LOWER));
+        expect(ilCandidateActionEncoding(anchor, LEFT)).toEqual(ilCandidateActionEncoding(generated, LEFT));
 
         // Candidate 0 keeps the exact action identity and the generator does not emit it again as a challenger.
         const signatures = candidates.map((candidate) => ilActionSignature(candidate.actions));
@@ -1853,9 +1853,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("shots: exposes friendly-fire damage separately without changing net expected damage", () => {
         const c = createCombatTestContext();
-        const garg = makeReal(LOWER, "Nature", "Gargantuan");
-        const ally = createTestUnit({ team: LOWER, name: "Ally", attackType: MELEE, amountAlive: 20 });
-        const target = createTestUnit({ team: UPPER, name: "Target", attackType: MELEE, amountAlive: 20 });
+        const garg = makeReal(LEFT, "Nature", "Gargantuan");
+        const ally = createTestUnit({ team: LEFT, name: "Ally", attackType: MELEE, amountAlive: 20 });
+        const target = createTestUnit({ team: RIGHT, name: "Target", attackType: MELEE, amountAlive: 20 });
         placeLarge(c, garg, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, target, { x: 10, y: 10 });
         placeUnit(c.grid, c.unitsHolder, ally, { x: 10, y: 9 });
@@ -1877,16 +1877,16 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("v0.8s target pressure rejects a net-negative splash even when it kills the primary target", () => {
         const c = createCombatTestContext();
-        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        const garg = makeReal(LEFT, "Nature", "Gargantuan");
         const ally = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Large ally",
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 100,
         });
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Tiny target",
             attackType: MELEE,
             amountAlive: 1,
@@ -1913,8 +1913,8 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("shots: a pinned shooter (adjacent enemy) gets NO shot candidates (engine would reject)", () => {
         const c = createCombatTestContext();
-        const shooter = createTestUnit({ team: LOWER, name: "Pinned", attackType: RANGE, rangeShots: 5 });
-        const pinner = createTestUnit({ team: UPPER, name: "Pinner", attackType: MELEE, amountAlive: 5 });
+        const shooter = createTestUnit({ team: LEFT, name: "Pinned", attackType: RANGE, rangeShots: 5 });
+        const pinner = createTestUnit({ team: RIGHT, name: "Pinner", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, pinner, { x: 3, y: 4 });
         const { candidates } = enumerateCandidates(shooter, ctxFor(c), endTurn(shooter));
@@ -1924,9 +1924,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("area_throw (Gargantuan): aim cells whose splash reaches enemies, incl. a two-enemy cluster aim", () => {
         const c = createCombatTestContext();
-        const garg = makeReal(LOWER, "Nature", "Gargantuan"); // RANGE, size 2, Area Throw + Double Shot
-        const e1 = createTestUnit({ team: UPPER, name: "E1", attackType: MELEE, amountAlive: 5, maxHp: 50 });
-        const e2 = createTestUnit({ team: UPPER, name: "E2", attackType: MELEE, amountAlive: 5, maxHp: 50 });
+        const garg = makeReal(LEFT, "Nature", "Gargantuan"); // RANGE, size 2, Area Throw + Double Shot
+        const e1 = createTestUnit({ team: RIGHT, name: "E1", attackType: MELEE, amountAlive: 5, maxHp: 50 });
+        const e2 = createTestUnit({ team: RIGHT, name: "E2", attackType: MELEE, amountAlive: 5, maxHp: 50 });
         placeLarge(c, garg, { x: 3, y: 3 });
         // Clustered enemies with the empty cell (10,10) adjacent to BOTH.
         placeUnit(c.grid, c.unitsHolder, e1, { x: 10, y: 11 });
@@ -1955,17 +1955,17 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         }).candidates[0];
         expect(anchor.actions).toBe(cluster!.actions);
         expect(ilCandidateFeatureVector(anchor.features)).toEqual(ilCandidateFeatureVector(cluster!.features));
-        expect(ilCandidateActionEncoding(anchor, LOWER)).toEqual(ilCandidateActionEncoding(cluster!, LOWER));
+        expect(ilCandidateActionEncoding(anchor, LEFT)).toEqual(ilCandidateActionEncoding(cluster!, LEFT));
         // Gargantuan also gets plain ranged shots (it is a shooter).
         expect(ofKind(candidates, "shot").length).toBeGreaterThan(0);
     });
 
     it("area_throw: only emits aims whose engine primary hit satisfies a forced target", () => {
         const c = createCombatTestContext();
-        const garg = makeReal(LOWER, "Nature", "Gargantuan");
-        const forced = createTestUnit({ team: UPPER, name: "Forced", attackType: MELEE, amountAlive: 20 });
-        const clusterA = createTestUnit({ team: UPPER, name: "Cluster A", attackType: MELEE, amountAlive: 20 });
-        const clusterB = createTestUnit({ team: UPPER, name: "Cluster B", attackType: MELEE, amountAlive: 20 });
+        const garg = makeReal(LEFT, "Nature", "Gargantuan");
+        const forced = createTestUnit({ team: RIGHT, name: "Forced", attackType: MELEE, amountAlive: 20 });
+        const clusterA = createTestUnit({ team: RIGHT, name: "Cluster A", attackType: MELEE, amountAlive: 20 });
+        const clusterB = createTestUnit({ team: RIGHT, name: "Cluster B", attackType: MELEE, amountAlive: 20 });
         placeLarge(c, garg, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, forced, { x: 14, y: 3 });
         placeUnit(c.grid, c.unitsHolder, clusterA, { x: 10, y: 9 });
@@ -1979,22 +1979,22 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("v0.8s target pressure schedules a positive Area Throw whose engine-primary hit is allied", () => {
         const c = createCombatTestContext();
-        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        const garg = makeReal(LEFT, "Nature", "Gargantuan");
         const enemyA = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Enemy A",
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 1,
         });
         const enemyB = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Enemy B",
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 1,
         });
-        const ally = createTestUnit({ team: LOWER, name: "Interceptor", attackType: MELEE, amountAlive: 1, maxHp: 1 });
+        const ally = createTestUnit({ team: LEFT, name: "Interceptor", attackType: MELEE, amountAlive: 1, maxHp: 1 });
         placeLarge(c, garg, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, enemyA, { x: 10, y: 9 });
         placeUnit(c.grid, c.unitsHolder, enemyB, { x: 10, y: 11 });
@@ -2016,9 +2016,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("area_throw: hit probability prevents a Dodge/Small Specie cluster from outranking a clean shot", () => {
         const c = createCombatTestContext();
-        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        const garg = makeReal(LEFT, "Nature", "Gargantuan");
         const evasive = {
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             amountAlive: 20,
             maxHp: 1_000,
@@ -2028,7 +2028,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const clusterA = createTestUnit({ ...evasive, name: "Cluster A" });
         const clusterB = createTestUnit({ ...evasive, name: "Cluster B" });
         const reliable = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Reliable",
             attackType: MELEE,
             amountAlive: 20,
@@ -2051,9 +2051,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("area_throw: Terrifying Gaze excludes a forbidden engine-primary even when another enemy is splashed", () => {
         const c = createCombatTestContext();
-        const garg = makeReal(LOWER, "Nature", "Gargantuan");
-        const enemyA = createTestUnit({ team: UPPER, name: "Enemy A", attackType: MELEE, amountAlive: 20 });
-        const enemyB = createTestUnit({ team: UPPER, name: "Enemy B", attackType: MELEE, amountAlive: 20 });
+        const garg = makeReal(LEFT, "Nature", "Gargantuan");
+        const enemyA = createTestUnit({ team: RIGHT, name: "Enemy A", attackType: MELEE, amountAlive: 20 });
+        const enemyB = createTestUnit({ team: RIGHT, name: "Enemy B", attackType: MELEE, amountAlive: 20 });
         placeLarge(c, garg, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, enemyA, { x: 10, y: 9 });
         placeUnit(c.grid, c.unitsHolder, enemyB, { x: 10, y: 11 });
@@ -2077,9 +2077,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("AOE damage estimates use the engine's miss, artifact, and physical-resistance modifiers", () => {
         const score = (mutate?: (attacker: Unit, target: Unit) => void): number => {
             const c = createCombatTestContext();
-            const garg = makeReal(LOWER, "Nature", "Gargantuan");
+            const garg = makeReal(LEFT, "Nature", "Gargantuan");
             const target = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Target",
                 attackType: MELEE,
                 amountAlive: 100,
@@ -2125,11 +2125,11 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Angel: Resurrection candidates target living allies with dead bodies and price the passive charge", () => {
         const c = createCombatTestContext();
-        const angel = makeReal(LOWER, "Life", "Angel"); // MELEE_MAGIC, ability-granted Resurrection
+        const angel = makeReal(LEFT, "Life", "Angel"); // MELEE_MAGIC, ability-granted Resurrection
         angel.setStackPower(5); // spell requires caster stack power >= 3
-        const hurt = createTestUnit({ team: LOWER, name: "Hurt", attackType: MELEE, amountAlive: 5, maxHp: 10 });
-        const fresh = createTestUnit({ team: LOWER, name: "Fresh", attackType: MELEE, amountAlive: 5, maxHp: 10 });
-        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE });
+        const hurt = createTestUnit({ team: LEFT, name: "Hurt", attackType: MELEE, amountAlive: 5, maxHp: 10 });
+        const fresh = createTestUnit({ team: LEFT, name: "Fresh", attackType: MELEE, amountAlive: 5, maxHp: 10 });
+        const enemy = createTestUnit({ team: RIGHT, name: "E", attackType: MELEE });
         placeLarge(c, angel, { x: 4, y: 4 });
         placeUnit(c.grid, c.unitsHolder, hurt, { x: 8, y: 4 });
         placeUnit(c.grid, c.unitsHolder, fresh, { x: 9, y: 4 });
@@ -2149,7 +2149,7 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         }).candidates[0];
         expect(anchor.actions).toBe(res[0].actions);
         expect(ilCandidateFeatureVector(anchor.features)).toEqual(ilCandidateFeatureVector(res[0].features));
-        expect(ilCandidateActionEncoding(anchor, LOWER)).toEqual(ilCandidateActionEncoding(res[0], LOWER));
+        expect(ilCandidateActionEncoding(anchor, LEFT)).toEqual(ilCandidateActionEncoding(res[0], LEFT));
         // And the MELEE_MAGIC Angel still gets melee/move candidates alongside the cast.
         expect(ofKind(candidates, "move").length).toBeGreaterThan(0);
 
@@ -2166,9 +2166,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Valkyrie: Wind Flow (ALL_FLYING mass) is emitted when a flyer is on the board", () => {
         const c = createCombatTestContext();
-        const valk = makeReal(LOWER, "Life", "Valkyrie");
+        const valk = makeReal(LEFT, "Life", "Valkyrie");
         valk.setStackPower(5); // Wind Flow requires stack power 5
-        const flyer = createTestUnit({ team: UPPER, name: "Flyer", attackType: MELEE, movementType: FLY });
+        const flyer = createTestUnit({ team: RIGHT, name: "Flyer", attackType: MELEE, movementType: FLY });
         placeUnit(c.grid, c.unitsHolder, valk, { x: 4, y: 4 });
         placeUnit(c.grid, c.unitsHolder, flyer, { x: 4, y: 12 });
         const { candidates } = enumerateCandidates(valk, ctxFor(c), endTurn(valk));
@@ -2181,10 +2181,10 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Harpy: Castling targets exactly the SMALL enemies within movement range", () => {
         const c = createCombatTestContext();
-        const harpy = makeReal(LOWER, "Might", "Harpy"); // initiative 7.6 flyer with Castling
+        const harpy = makeReal(LEFT, "Might", "Harpy"); // initiative 7.6 flyer with Castling
         harpy.setStackPower(5); // Castling requires stack power 4
-        const near = createTestUnit({ team: UPPER, name: "Near", attackType: MELEE, amountAlive: 3 });
-        const farAway = createTestUnit({ team: UPPER, name: "FarAway", attackType: MELEE, amountAlive: 3 });
+        const near = createTestUnit({ team: RIGHT, name: "Near", attackType: MELEE, amountAlive: 3 });
+        const farAway = createTestUnit({ team: RIGHT, name: "FarAway", attackType: MELEE, amountAlive: 3 });
         placeUnit(c.grid, c.unitsHolder, harpy, { x: 2, y: 2 });
         placeUnit(c.grid, c.unitsHolder, near, { x: 5, y: 5 }); // within ~7 steps
         placeUnit(c.grid, c.unitsHolder, farAway, { x: 15, y: 15 }); // out of reach
@@ -2202,9 +2202,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Harpy: a LARGE enemy within range is NOT a Castling target", () => {
         const c = createCombatTestContext();
-        const harpy = makeReal(LOWER, "Might", "Harpy");
+        const harpy = makeReal(LEFT, "Might", "Harpy");
         harpy.setStackPower(5);
-        const big = makeReal(UPPER, "Nature", "Gargantuan"); // size 2
+        const big = makeReal(RIGHT, "Nature", "Gargantuan"); // size 2
         placeUnit(c.grid, c.unitsHolder, harpy, { x: 2, y: 2 });
         placeLarge(c, big, { x: 6, y: 6 });
         const { candidates } = enumerateCandidates(harpy, ctxFor(c), endTurn(harpy));
@@ -2213,10 +2213,10 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Arachna Queen: inherited Castling is not enumerated for a LARGE caster", () => {
         const c = createCombatTestContext();
-        const queen = makeReal(LOWER, "Nature", "Arachna Queen");
+        const queen = makeReal(LEFT, "Nature", "Arachna Queen");
         queen.grantStolenAbility("Castling", [":Castling"]);
         queen.setStackPower(5);
-        const enemy = createTestUnit({ team: UPPER, name: "Near", attackType: MELEE, amountAlive: 3 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Near", attackType: MELEE, amountAlive: 3 });
         placeLarge(c, queen, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 6, y: 6 });
 
@@ -2227,18 +2227,18 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Battle Mage: Fire Strike respects thrown LOS and its clear candidate completes in the engine", () => {
         const c = createCombatTestContext();
-        const mage = makeReal(LOWER, "Life", "Battle Mage");
+        const mage = makeReal(LEFT, "Life", "Battle Mage");
         mage.setStackPower(5);
-        const blocker = createTestUnit({ team: UPPER, name: "Fireball blocker", attackType: MELEE });
+        const blocker = createTestUnit({ team: RIGHT, name: "Fireball blocker", attackType: MELEE });
         const blocked = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Blocked target",
             attackType: MELEE,
             amountAlive: 10,
             maxHp: 100,
         });
         const clear = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Clear target",
             attackType: MELEE,
             amountAlive: 10,
@@ -2269,10 +2269,10 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Battle Mage: Meteorite finds a two-LARGE-unit cluster through their occupied footprint cells", () => {
         const c = createCombatTestContext();
-        const mage = makeReal(LOWER, "Life", "Battle Mage");
+        const mage = makeReal(LEFT, "Life", "Battle Mage");
         mage.setStackPower(5);
-        const first = makeReal(UPPER, "Chaos", "Hydra");
-        const second = makeReal(UPPER, "Chaos", "Black Dragon");
+        const first = makeReal(RIGHT, "Chaos", "Hydra");
+        const second = makeReal(RIGHT, "Chaos", "Black Dragon");
         placeUnit(c.grid, c.unitsHolder, mage, { x: 2, y: 2 });
         // The 2x2 at (8,8) catches (9,8) of the first footprint and (8,9) of the second, while neither
         // base cell lies inside it. Base-cell-only anchor generation misses this unique two-target block.
@@ -2297,9 +2297,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Battle Mage: Meteorite does not score an Earth Element target it cannot damage", () => {
         const c = createCombatTestContext();
-        const mage = makeReal(LOWER, "Life", "Battle Mage");
+        const mage = makeReal(LEFT, "Life", "Battle Mage");
         mage.setStackPower(5);
-        const gargantuan = makeReal(UPPER, "Nature", "Gargantuan");
+        const gargantuan = makeReal(RIGHT, "Nature", "Gargantuan");
         placeUnit(c.grid, c.unitsHolder, mage, { x: 2, y: 2 });
         placeLarge(c, gargantuan, { x: 8, y: 8 });
 
@@ -2312,9 +2312,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Nightmare: Fire Wall emits an oriented FREE_CELL candidate accepted by the engine", () => {
         const c = createCombatTestContext();
-        const nightmare = makeReal(LOWER, "Chaos", "Nightmare");
+        const nightmare = makeReal(LEFT, "Chaos", "Nightmare");
         nightmare.setStackPower(5);
-        const enemy = createTestUnit({ team: UPPER, name: "Approaching enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Approaching enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, nightmare, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 12, y: 12 });
         const context = ctxFor(c, true);
@@ -2340,9 +2340,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Nightmare: Fire Wall identity keeps a different rotation at the same anchor", () => {
         const c = createCombatTestContext();
-        const nightmare = makeReal(LOWER, "Chaos", "Nightmare");
+        const nightmare = makeReal(LEFT, "Chaos", "Nightmare");
         nightmare.setStackPower(5);
-        const enemy = createTestUnit({ team: UPPER, name: "Approaching enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Approaching enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, nightmare, { x: 3, y: 3 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 12, y: 12 });
         const context = ctxFor(c, true);
@@ -2369,9 +2369,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Nightmare: Fire Wall falls back to a shifted legal wall on a field-edge approach", () => {
         const c = createCombatTestContext();
-        const nightmare = makeReal(LOWER, "Chaos", "Nightmare");
+        const nightmare = makeReal(LEFT, "Chaos", "Nightmare");
         nightmare.setStackPower(5);
-        const enemy = createTestUnit({ team: UPPER, name: "Edge approach", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Edge approach", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, nightmare, { x: 0, y: 3 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 0, y: 0 });
         const context = ctxFor(c, true);
@@ -2394,18 +2394,18 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Magic Dragon: AI only proposes Ring of Fire with a ring victim, spares its aim, and respects thrown LOS", () => {
         const c = createCombatTestContext();
-        const dragon = makeReal(LOWER, "Nature", "Magic Dragon");
+        const dragon = makeReal(LEFT, "Nature", "Magic Dragon");
         dragon.setStackPower(5);
-        const blocker = createTestUnit({ team: LOWER, name: "Ring blocker", attackType: MELEE });
+        const blocker = createTestUnit({ team: LEFT, name: "Ring blocker", attackType: MELEE });
         const blocked = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Blocked target",
             attackType: MELEE,
             amountAlive: 10,
             maxHp: 1_000,
         });
         const clear = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Clear target",
             attackType: MELEE,
             amountAlive: 10,
@@ -2415,28 +2415,28 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         // Park a second body beside the clear target — it burns friend or foe — so the ring has something
         // to hit and this still tests LINE OF SIGHT.
         const isolated = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Isolated target",
             attackType: MELEE,
             amountAlive: 10,
             maxHp: 1_000,
         });
         const ringVictim = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Ring victim",
             attackType: MELEE,
             amountAlive: 10,
             maxHp: 1_000,
         });
         const friendlyAim = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Friendly-fire aim",
             attackType: MELEE,
             amountAlive: 10,
             maxHp: 1_000,
         });
         const friendlyRingVictim = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Friendly ring victim",
             attackType: MELEE,
             amountAlive: 10,
@@ -2475,11 +2475,11 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("Magic Dragon: called-down Lightning and Whirlpool remain legal through an occupied LOS", () => {
         for (const spellName of ["Lightning Strike", "Whirlpool"]) {
             const c = createCombatTestContext();
-            const dragon = makeReal(LOWER, "Nature", "Magic Dragon");
+            const dragon = makeReal(LEFT, "Nature", "Magic Dragon");
             dragon.setStackPower(5);
-            const blocker = createTestUnit({ team: LOWER, name: `${spellName} blocker`, attackType: MELEE });
+            const blocker = createTestUnit({ team: LEFT, name: `${spellName} blocker`, attackType: MELEE });
             const target = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: `${spellName} target`,
                 attackType: MELEE,
                 amountAlive: 10,
@@ -2513,12 +2513,12 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Magic Dragon: Meteor Shower finds a two-LARGE-unit cluster through their occupied footprint cells", () => {
         const c = createCombatTestContext();
-        const dragon = makeReal(LOWER, "Nature", "Magic Dragon");
+        const dragon = makeReal(LEFT, "Nature", "Magic Dragon");
         dragon.setStackPower(5);
         // Meteor Shower is Earth magic, so neither target may be an Earth Element: the test needs HP loss to
         // prove that both non-base footprint cells were actually caught.
-        const first = makeReal(UPPER, "Chaos", "Black Dragon");
-        const second = makeReal(UPPER, "Chaos", "Hydra");
+        const first = makeReal(RIGHT, "Chaos", "Black Dragon");
+        const second = makeReal(RIGHT, "Chaos", "Hydra");
         placeLarge(c, dragon, { x: 3, y: 3 });
         // The 3x3 centered at (8,8) catches non-base footprint cells of both large targets. Its centre is
         // two cells away from either base on one axis, outside the old base-seeded offset set.
@@ -2542,10 +2542,10 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Blacksmith: Craft enumerates useful in-grid 2x2 ally areas and the engine accepts one", () => {
         const c = createCombatTestContext();
-        const blacksmith = makeReal(LOWER, "Life", "Blacksmith");
+        const blacksmith = makeReal(LEFT, "Life", "Blacksmith");
         blacksmith.setStackPower(5);
-        const ally = createTestUnit({ team: LOWER, name: "Craft target", attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, name: "Craft target", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, blacksmith, { x: 4, y: 4 });
         placeUnit(c.grid, c.unitsHolder, ally, { x: 5, y: 4 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 12, y: 12 });
@@ -2579,12 +2579,12 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("Trent: Vine Throw excludes blocked targets and emits an engine-accepted clear cast", () => {
         const c = createCombatTestContext();
-        const trent = makeReal(LOWER, "Nature", "Trent");
+        const trent = makeReal(LEFT, "Nature", "Trent");
         trent.setStackPower(5);
         // An ENEMY screen: friendly bodies are transparent to a throw, so a LOWER blocker would prove nothing.
-        const blocker = createTestUnit({ team: UPPER, name: "Blocker", attackType: MELEE });
-        const blocked = createTestUnit({ team: UPPER, name: "Blocked target", attackType: MELEE });
-        const clear = createTestUnit({ team: UPPER, name: "Clear target", attackType: MELEE });
+        const blocker = createTestUnit({ team: RIGHT, name: "Blocker", attackType: MELEE });
+        const blocked = createTestUnit({ team: RIGHT, name: "Blocked target", attackType: MELEE });
+        const clear = createTestUnit({ team: RIGHT, name: "Clear target", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, trent, { x: 2, y: 2 });
         placeUnit(c.grid, c.unitsHolder, blocker, { x: 5, y: 2 });
         placeUnit(c.grid, c.unitsHolder, blocked, { x: 8, y: 2 });
@@ -2608,10 +2608,10 @@ describe("candidates — the F4 enumerated candidate generator", () => {
     it("blocks a throw on a FRIENDLY body only for the spells the engine blocks", () => {
         const build = (casterFaction: string, casterName: string, spellName: string) => {
             const c = createCombatTestContext();
-            const caster = makeReal(LOWER, casterFaction, casterName);
+            const caster = makeReal(LEFT, casterFaction, casterName);
             caster.setStackPower(5);
-            const friend = createTestUnit({ team: LOWER, name: "Friendly screen", attackType: MELEE });
-            const behind = createTestUnit({ team: UPPER, name: "Behind the screen", attackType: MELEE });
+            const friend = createTestUnit({ team: LEFT, name: "Friendly screen", attackType: MELEE });
+            const behind = createTestUnit({ team: RIGHT, name: "Behind the screen", attackType: MELEE });
             placeUnit(c.grid, c.unitsHolder, caster, { x: 2, y: 2 });
             placeUnit(c.grid, c.unitsHolder, friend, { x: 5, y: 2 });
             placeUnit(c.grid, c.unitsHolder, behind, { x: 8, y: 2 });
@@ -2630,8 +2630,8 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("dedupes candidates identical to the incumbent (no double-scored actions)", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, initiative: 2, amountAlive: 3 });
-        const enemy = createTestUnit({ team: UPPER, name: "E", attackType: MELEE, amountAlive: 3 });
+        const unit = createTestUnit({ team: LEFT, name: "U", attackType: MELEE, initiative: 2, amountAlive: 3 });
+        const enemy = createTestUnit({ team: RIGHT, name: "E", attackType: MELEE, amountAlive: 3 });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 5, y: 6 });
         // Incumbent IS the in-place strike -> the melee enumeration must not repeat it.
@@ -2652,9 +2652,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
 
     it("is deterministic: two runs on the same board produce identical candidate sets", () => {
         const c = createCombatTestContext();
-        const unit = createTestUnit({ team: LOWER, name: "U", attackType: MELEE, initiative: 3, amountAlive: 4 });
-        const e1 = createTestUnit({ team: UPPER, name: "E1", attackType: MELEE, amountAlive: 4 });
-        const e2 = createTestUnit({ team: UPPER, name: "E2", attackType: MELEE, amountAlive: 4 });
+        const unit = createTestUnit({ team: LEFT, name: "U", attackType: MELEE, initiative: 3, amountAlive: 4 });
+        const e1 = createTestUnit({ team: RIGHT, name: "E1", attackType: MELEE, amountAlive: 4 });
+        const e2 = createTestUnit({ team: RIGHT, name: "E2", attackType: MELEE, amountAlive: 4 });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 6, y: 6 });
         placeUnit(c.grid, c.unitsHolder, e1, { x: 6, y: 7 });
         placeUnit(c.grid, c.unitsHolder, e2, { x: 9, y: 6 });
@@ -2667,19 +2667,19 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         const c = createCombatTestContext();
         const movers: Unit[] = [];
         // 2x6 mid-game-ish board: melee wall + shooters + the Gargantuan (widest enumeration).
-        const garg = makeReal(LOWER, "Nature", "Gargantuan");
+        const garg = makeReal(LEFT, "Nature", "Gargantuan");
         placeLarge(c, garg, { x: 3, y: 3 });
         movers.push(garg);
         for (let i = 0; i < 4; i += 1) {
-            const m = createTestUnit({ team: LOWER, name: `M${i}`, attackType: MELEE, initiative: 4, amountAlive: 5 });
+            const m = createTestUnit({ team: LEFT, name: `M${i}`, attackType: MELEE, initiative: 4, amountAlive: 5 });
             placeUnit(c.grid, c.unitsHolder, m, { x: 5 + i * 2, y: 4 });
             movers.push(m);
         }
-        const shooter = createTestUnit({ team: LOWER, name: "S", attackType: RANGE, rangeShots: 8, amountAlive: 5 });
+        const shooter = createTestUnit({ team: LEFT, name: "S", attackType: RANGE, rangeShots: 8, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, shooter, { x: 13, y: 3 });
         movers.push(shooter);
         for (let i = 0; i < 6; i += 1) {
-            const e = createTestUnit({ team: UPPER, name: `E${i}`, attackType: MELEE, initiative: 4, amountAlive: 5 });
+            const e = createTestUnit({ team: RIGHT, name: `E${i}`, attackType: MELEE, initiative: 4, amountAlive: 5 });
             placeUnit(c.grid, c.unitsHolder, e, { x: 3 + i * 2, y: 9 });
         }
         const ctx = ctxFor(c);

@@ -430,7 +430,7 @@ export function playV07ArchetypeGame(
     const roster = template.roster.map((unit) => ({ ...unit }));
     const redRoster = template.roster.map((unit) => ({ ...unit }));
     const decisionObserver = (observation: IDecisionObservation): void => {
-        const actorIsGreen = observation.unit.getTeam() === PBTypes.TeamVals.LOWER;
+        const actorIsGreen = observation.unit.getTeam() === PBTypes.TeamVals.LEFT;
         observeDecision(actorIsGreen === candidateIsGreen ? candidateTelemetry : opponentTelemetry, observation);
     };
     const matchRunner =

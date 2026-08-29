@@ -53,8 +53,8 @@ import {
 } from "./league_genome";
 import { creatureInfo } from "../ai/setup/creature_score";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const PAIR_SEED_STEP = 0x9e3779b1;
 
 export type LeagueAggregateMethod = "worst-case" | "softmin";
@@ -95,8 +95,8 @@ export interface INormalizedLeagueOptions {
 
 export interface IResolvedLeaguePick {
     state: IPickSimState;
-    lowerPlacement: LeaguePlacementTemplate;
-    upperPlacement: LeaguePlacementTemplate;
+    leftPlacement: LeaguePlacementTemplate;
+    rightPlacement: LeaguePlacementTemplate;
     lowerAugments: ReturnType<typeof pickLeagueAugments>;
     upperAugments: ReturnType<typeof pickLeagueAugments>;
 }
@@ -261,23 +261,23 @@ function applyAccepted(state: IPickSimState, action: PickAction, rng: PickRandom
  * simultaneous actor is committed; creature collisions reveal the occupied slot and retry from the new view. */
 export function resolveLeaguePick(
     seed: number,
-    lowerGenome: ILeagueGenome,
-    upperGenome: ILeagueGenome,
+    leftGenome: ILeagueGenome,
+    rightGenome: ILeagueGenome,
     freezeDoctrine: boolean = true,
 ): IResolvedLeaguePick {
     const rng = randomInt(seed);
     let state = createPickSimState(rng);
-    const genomeFor = (team: PickTeam): ILeagueGenome => (team === LOWER ? lowerGenome : upperGenome);
+    const genomeFor = (team: PickTeam): ILeagueGenome => (team === LEFT ? leftGenome : rightGenome);
 
-    const lowerDoctrine = pickLeagueDoctrine(lowerGenome, freezeDoctrine);
-    const upperDoctrine = pickLeagueDoctrine(upperGenome, freezeDoctrine);
-    state = applyAccepted(state, { type: "select_doctrine", team: LOWER, doctrine: lowerDoctrine }, rng);
-    state = applyAccepted(state, { type: "select_doctrine", team: UPPER, doctrine: upperDoctrine }, rng);
+    const leftDoctrine = pickLeagueDoctrine(leftGenome, freezeDoctrine);
+    const rightDoctrine = pickLeagueDoctrine(rightGenome, freezeDoctrine);
+    state = applyAccepted(state, { type: "select_doctrine", team: LEFT, doctrine: leftDoctrine }, rng);
+    state = applyAccepted(state, { type: "select_doctrine", team: RIGHT, doctrine: rightDoctrine }, rng);
 
-    const lowerBundle = pickLeagueBundle(state, LOWER, lowerGenome);
-    const upperBundle = pickLeagueBundle(state, UPPER, upperGenome);
-    state = applyAccepted(state, { type: "select_bundle", team: LOWER, bundleIndex: lowerBundle }, rng);
-    state = applyAccepted(state, { type: "select_bundle", team: UPPER, bundleIndex: upperBundle }, rng);
+    const leftBundle = pickLeagueBundle(state, LEFT, leftGenome);
+    const rightBundle = pickLeagueBundle(state, RIGHT, rightGenome);
+    state = applyAccepted(state, { type: "select_bundle", team: LEFT, bundleIndex: leftBundle }, rng);
+    state = applyAccepted(state, { type: "select_bundle", team: RIGHT, bundleIndex: rightBundle }, rng);
 
     let transitions = 0;
     while (!isPickSimComplete(state)) {
@@ -287,10 +287,10 @@ export function resolveLeaguePick(
         }
         const phase = getCurrentPickPhase(state);
         if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
-            const lowerArtifact = pickLeagueTier2(state, LOWER, lowerGenome);
-            const upperArtifact = pickLeagueTier2(state, UPPER, upperGenome);
-            state = applyAccepted(state, { type: "select_tier2", team: LOWER, artifactId: lowerArtifact }, rng);
-            state = applyAccepted(state, { type: "select_tier2", team: UPPER, artifactId: upperArtifact }, rng);
+            const leftArtifact = pickLeagueTier2(state, LEFT, leftGenome);
+            const rightArtifact = pickLeagueTier2(state, RIGHT, rightGenome);
+            state = applyAccepted(state, { type: "select_tier2", team: LEFT, artifactId: leftArtifact }, rng);
+            state = applyAccepted(state, { type: "select_tier2", team: RIGHT, artifactId: rightArtifact }, rng);
             continue;
         }
         if (phase.phase !== PBTypes.PickPhaseVals.PICK || phase.actors.length !== 1) {
@@ -305,8 +305,8 @@ export function resolveLeaguePick(
         state = result.state;
     }
 
-    const lowerOpponent = leagueOpponentCreatures(state, LOWER, !!lowerGenome.omniscientDraft);
-    const upperOpponent = leagueOpponentCreatures(state, UPPER, !!upperGenome.omniscientDraft);
+    const leftOpponent = leagueOpponentCreatures(state, LEFT, !!leftGenome.omniscientDraft);
+    const rightOpponent = leagueOpponentCreatures(state, RIGHT, !!rightGenome.omniscientDraft);
     const deployablePlacement = (
         requested: LeaguePlacementTemplate,
         knownOpponent: readonly number[],
@@ -323,25 +323,25 @@ export function resolveLeaguePick(
     };
     return {
         state,
-        lowerPlacement: deployablePlacement(
-            pickLeaguePlacement(state.lower.creatures, lowerOpponent, lowerGenome),
-            lowerOpponent,
+        leftPlacement: deployablePlacement(
+            pickLeaguePlacement(state.left.creatures, leftOpponent, leftGenome),
+            leftOpponent,
         ),
-        upperPlacement: deployablePlacement(
-            pickLeaguePlacement(state.upper.creatures, upperOpponent, upperGenome),
-            upperOpponent,
+        rightPlacement: deployablePlacement(
+            pickLeaguePlacement(state.right.creatures, rightOpponent, rightGenome),
+            rightOpponent,
         ),
         lowerAugments: pickLeagueAugments(
-            state.lower.creatures,
-            lowerOpponent,
-            getUpgradePoints(state.lower.doctrine),
-            lowerGenome,
+            state.left.creatures,
+            leftOpponent,
+            getUpgradePoints(state.left.doctrine),
+            leftGenome,
         ),
         upperAugments: pickLeagueAugments(
-            state.upper.creatures,
-            upperOpponent,
-            getUpgradePoints(state.upper.doctrine),
-            upperGenome,
+            state.right.creatures,
+            rightOpponent,
+            getUpgradePoints(state.right.doctrine),
+            rightGenome,
         ),
     };
 }
@@ -367,8 +367,8 @@ export function leagueRoster(creatureIds: readonly number[]): IArmyUnitSpec[] {
 }
 
 function withFightEnvironment<T>(
-    lowerPlacement: LeaguePlacementTemplate,
-    upperPlacement: LeaguePlacementTemplate,
+    leftPlacement: LeaguePlacementTemplate,
+    rightPlacement: LeaguePlacementTemplate,
     run: () => T,
 ): T {
     const overrides: Record<string, string> = {
@@ -382,11 +382,11 @@ function withFightEnvironment<T>(
         // W17: empty = the shipped V07_CASTER_ROUTER_POLICY exactly (extra caster tokens force-disabled).
         V07_CASTER_EXTRA: "",
         V06_DISPERSE_TEAM:
-            lowerPlacement === "adaptive" && upperPlacement === "adaptive"
+            leftPlacement === "adaptive" && rightPlacement === "adaptive"
                 ? "both"
-                : lowerPlacement === "adaptive"
+                : leftPlacement === "adaptive"
                   ? "lower"
-                  : upperPlacement === "adaptive"
+                  : rightPlacement === "adaptive"
                     ? "upper"
                     : "none",
     };
@@ -429,64 +429,64 @@ export function playLeagueGame(
     const pairSeed = (normalized.baseSeed + Math.imul(offerBoard, PAIR_SEED_STEP)) >>> 0;
     const pickSeed = hashSimulationParts("league-pick", pairSeed);
     const battleSeed = hashSimulationParts("league-battle", pairSeed, pickAssignment);
-    const candidatePickedLower = pickAssignment === 0;
-    const lowerGenome = candidatePickedLower ? candidate : opponent;
-    const upperGenome = candidatePickedLower ? opponent : candidate;
-    const pick = resolveLeaguePick(pickSeed, lowerGenome, upperGenome, normalized.freezeDoctrine);
-    const pickLower = {
-        roster: leagueRoster(pick.state.lower.creatures),
-        placement: pick.lowerPlacement,
-        artifactT1: pick.state.lower.tier1Artifact,
-        artifactT2: pick.state.lower.tier2Artifact,
-        doctrine: pick.state.lower.doctrine,
+    const candidatePickedLeft = pickAssignment === 0;
+    const leftGenome = candidatePickedLeft ? candidate : opponent;
+    const rightGenome = candidatePickedLeft ? opponent : candidate;
+    const pick = resolveLeaguePick(pickSeed, leftGenome, rightGenome, normalized.freezeDoctrine);
+    const pickLeft = {
+        roster: leagueRoster(pick.state.left.creatures),
+        placement: pick.leftPlacement,
+        artifactT1: pick.state.left.tier1Artifact,
+        artifactT2: pick.state.left.tier2Artifact,
+        doctrine: pick.state.left.doctrine,
         augments: pick.lowerAugments,
-        synergies: SETUP_POLICY_V0.pickSynergies(pick.state.lower.creatures),
+        synergies: SETUP_POLICY_V0.pickSynergies(pick.state.left.creatures),
     };
-    const pickUpper = {
-        roster: leagueRoster(pick.state.upper.creatures),
-        placement: pick.upperPlacement,
-        artifactT1: pick.state.upper.tier1Artifact,
-        artifactT2: pick.state.upper.tier2Artifact,
-        doctrine: pick.state.upper.doctrine,
+    const pickRight = {
+        roster: leagueRoster(pick.state.right.creatures),
+        placement: pick.rightPlacement,
+        artifactT1: pick.state.right.tier1Artifact,
+        artifactT2: pick.state.right.tier2Artifact,
+        doctrine: pick.state.right.doctrine,
         augments: pick.upperAugments,
-        synergies: SETUP_POLICY_V0.pickSynergies(pick.state.upper.creatures),
+        synergies: SETUP_POLICY_V0.pickSynergies(pick.state.right.creatures),
     };
-    const matchLower = battleMirror ? pickUpper : pickLower;
-    const matchUpper = battleMirror ? pickLower : pickUpper;
+    const matchLeft = battleMirror ? pickRight : pickLeft;
+    const matchRight = battleMirror ? pickLeft : pickRight;
     const setupFingerprint = hashSimulationParts(
         "league-fixed-setup",
-        JSON.stringify(pickLower),
-        JSON.stringify(pickUpper),
+        JSON.stringify(pickLeft),
+        JSON.stringify(pickRight),
     );
     const gridType = normalized.mapTypes[offerBoard % normalized.mapTypes.length];
-    const result = withFightEnvironment(matchLower.placement, matchUpper.placement, () =>
+    const result = withFightEnvironment(matchLeft.placement, matchRight.placement, () =>
         deps.matchRunner({
             greenVersion: normalized.fightVersion,
             redVersion: normalized.fightVersion,
-            roster: matchLower.roster,
-            redRoster: matchUpper.roster,
+            roster: matchLeft.roster,
+            redRoster: matchRight.roster,
             seed: battleSeed,
             maxLaps: normalized.maxLaps,
             gridType,
-            greenArtifactT1: matchLower.artifactT1,
-            redArtifactT1: matchUpper.artifactT1,
-            greenArtifactT2: matchLower.artifactT2,
-            redArtifactT2: matchUpper.artifactT2,
-            greenDoctrine: matchLower.doctrine,
-            redDoctrine: matchUpper.doctrine,
-            greenAugments: matchLower.augments,
-            redAugments: matchUpper.augments,
-            greenSynergies: matchLower.synergies,
-            redSynergies: matchUpper.synergies,
+            greenArtifactT1: matchLeft.artifactT1,
+            redArtifactT1: matchRight.artifactT1,
+            greenArtifactT2: matchLeft.artifactT2,
+            redArtifactT2: matchRight.artifactT2,
+            greenDoctrine: matchLeft.doctrine,
+            redDoctrine: matchRight.doctrine,
+            greenAugments: matchLeft.augments,
+            redAugments: matchRight.augments,
+            greenSynergies: matchLeft.synergies,
+            redSynergies: matchRight.synergies,
         }),
     );
-    const candidateIsMatchLower = battleMirror ? !candidatePickedLower : candidatePickedLower;
-    const candidateSide: Side = candidateIsMatchLower ? "green" : "red";
+    const candidateIsMatchLeft = battleMirror ? !candidatePickedLeft : candidatePickedLeft;
+    const candidateSide: Side = candidateIsMatchLeft ? "green" : "red";
     return {
         opponentId: opponent.id,
         game,
         offerBoard,
-        pickSeat: candidatePickedLower ? "candidate-lower" : "candidate-upper",
+        pickSeat: candidatePickedLeft ? "candidate-lower" : "candidate-upper",
         battleMirror,
         setupFingerprint,
         pairSeed,

@@ -68,7 +68,7 @@ describe("Water Shield break visibility", () => {
         (context.attackHandler as unknown as { sceneLog: RecordingSceneLog }).sceneLog = sceneLog;
         const attacker = createTestUnit({
             name: "Orc",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE,
             attack: 10,
             damageMin: 5,
@@ -77,7 +77,7 @@ describe("Water Shield break visibility", () => {
         });
         const mermaid = createTestUnit({
             name: "Mermaid",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             maxHp: 100,
             amountAlive: 5,
@@ -87,9 +87,9 @@ describe("Water Shield break visibility", () => {
         expect(mermaid.hasBuffActive("Water Shield")).toBe(true);
         placeUnit(context.grid, context.unitsHolder, attacker, { x: 3, y: 3 });
         placeUnit(context.grid, context.unitsHolder, mermaid, { x: 4, y: 3 });
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
         const result = engine.apply({
             type: "melee_attack",
@@ -113,7 +113,7 @@ describe("Water Shield break visibility", () => {
 
         // The shield is one-per-battle: a second blow damages normally and records no further absorb.
         fightProperties.flipLap();
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
         const second = engine.apply({
             type: "melee_attack",
             attackerId: attacker.getId(),

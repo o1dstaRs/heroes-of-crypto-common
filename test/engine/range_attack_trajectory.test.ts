@@ -58,7 +58,7 @@ const setupRangeFight = (opts: {
 
     const attacker = createTestUnit({
         name: "Archer",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.RANGE,
         attack: 40,
         damageMin: 30,
@@ -73,7 +73,7 @@ const setupRangeFight = (opts: {
 
     const target = createTestUnit({
         name: "Target",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         maxHp: 400,
         amountAlive: 20,
         armor: 0,
@@ -84,7 +84,7 @@ const setupRangeFight = (opts: {
     for (const cell of opts.extraEnemies ?? []) {
         const e = createTestUnit({
             name: `Cover${enemyCount}`,
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 400,
             amountAlive: 20,
         });
@@ -92,9 +92,9 @@ const setupRangeFight = (opts: {
         enemyCount += 1;
     }
 
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, enemyCount);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, enemyCount);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const sceneLog = new SceneLogMock();
     const moveHandler = new MoveHandler(grid.getSettings(), grid, unitsHolder);

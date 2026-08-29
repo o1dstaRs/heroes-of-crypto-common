@@ -48,8 +48,8 @@ describe("Blacksmith runes in ranked", () => {
      */
     it("still applies the stacked bonus to a unit that carries them as snapshot state only", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const live = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LOWER });
-        const ranked = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LOWER });
+        const live = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LEFT });
+        const ranked = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, live, { x: 2, y: 2 });
         placeUnit(grid, unitsHolder, ranked, { x: 4, y: 2 });
         const baseArmor = live.getArmor();
@@ -72,8 +72,8 @@ describe("Blacksmith runes in ranked", () => {
     // holds the live buff, nor leak a stat onto a unit that was never enchanted.
     it("counts each rune once and leaves an un-enchanted unit alone", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const enchanted = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LOWER });
-        const plain = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LOWER });
+        const enchanted = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LEFT });
+        const plain = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, enchanted, { x: 2, y: 2 });
         placeUnit(grid, unitsHolder, plain, { x: 4, y: 2 });
         const baseArmor = plain.getArmor();

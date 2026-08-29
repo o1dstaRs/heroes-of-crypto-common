@@ -23,7 +23,7 @@ describe("Skewer Strike vs Water Shield", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Skewer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Skewer Strike"],
             attack: 40,
             damageMin: 100,
@@ -31,10 +31,10 @@ describe("Skewer Strike vs Water Shield", () => {
             stackPower: 100,
             maxHp: 100,
         });
-        const primary = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.LOWER, maxHp: 500, amountAlive: 4 });
+        const primary = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.LEFT, maxHp: 500, amountAlive: 4 });
         const behind = createTestUnit({
             name: "Behind",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: behindAbilities,
             maxHp: 500,
             amountAlive: 4,

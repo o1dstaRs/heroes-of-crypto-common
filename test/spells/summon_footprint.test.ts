@@ -47,7 +47,7 @@ describe("a summon is seated with the summoned creature's real body", () => {
         const matrix = emptyBoard();
         // The preferred anchor's own cell is free, but its second cell is not — exactly the case the
         // 1x1 gate waves through and the engine then refuses.
-        matrix[5][4] = PBTypes.TeamVals.LOWER;
+        matrix[5][4] = PBTypes.TeamVals.LEFT;
         const preferred: XY = { x: 5, y: 5 };
         expect(canCastSummon(spell, matrix, preferred)).toBe(true); // the 1x1 question says yes
         expect(canCastSummon(spell, matrix, preferred, 2, 1)).toBe(false); // the real body says no
@@ -60,8 +60,8 @@ describe("a summon is seated with the summoned creature's real body", () => {
     it("still refuses when nothing around the caster can hold the body", () => {
         const spell = summonWolves();
         const matrix = emptyBoard();
-        matrix[5][4] = PBTypes.TeamVals.LOWER;
-        matrix[9][8] = PBTypes.TeamVals.LOWER;
+        matrix[5][4] = PBTypes.TeamVals.LEFT;
+        matrix[9][8] = PBTypes.TeamVals.LEFT;
         expect(
             resolveSummonAnchor(
                 spell,

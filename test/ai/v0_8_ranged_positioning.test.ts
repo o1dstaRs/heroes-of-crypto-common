@@ -46,8 +46,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const MAGIC = PBTypes.AttackVals.MAGIC;
@@ -75,7 +75,7 @@ function setupSupportedShot(
 } {
     const combat = createCombatTestContext();
     const shooter = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Supported Archer",
         attackType: RANGE,
         initiative: 3,
@@ -85,7 +85,7 @@ function setupSupportedShot(
         damageMax: 10,
     });
     const target = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Distant Target",
         attackType: rangedTarget ? RANGE : MELEE,
         initiative: 1,
@@ -99,7 +99,7 @@ function setupSupportedShot(
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, target, { x: 10, y: 7 });
     if (withScreen) {
-        const screen = createTestUnit({ team: LOWER, name: "Frontline", attackType: MELEE, initiative: 1 });
+        const screen = createTestUnit({ team: LEFT, name: "Frontline", attackType: MELEE, initiative: 1 });
         placeUnit(combat.grid, combat.unitsHolder, screen, { x: 6, y: offsetScreen ? 8 : 7 });
     }
     shooter.refreshPossibleAttackTypes(true);
@@ -116,7 +116,7 @@ function setupPinnedShooter(
 } {
     const combat = createCombatTestContext();
     const shooter = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: handyman ? "Handyman Archer" : "Pinned Archer",
         attackType: RANGE,
         initiative: 3,
@@ -126,13 +126,13 @@ function setupPinnedShooter(
         abilities: handyman ? ["Handyman"] : [],
     });
     const pinner = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Pinner",
         attackType: MELEE,
         initiative: 1,
         maxHp: targetHp,
     });
-    const screen = createTestUnit({ team: LOWER, name: "Bodyguard", attackType: MELEE, initiative: 1 });
+    const screen = createTestUnit({ team: LEFT, name: "Bodyguard", attackType: MELEE, initiative: 1 });
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 6, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, pinner, { x: 7, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, screen, { x: 5, y: 7 });
@@ -146,7 +146,7 @@ function setupPartiallyScreenedPinnedShooter(): {
 } {
     const combat = createCombatTestContext();
     const shooter = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Partially screened archer",
         attackType: RANGE,
         initiative: 2,
@@ -154,26 +154,26 @@ function setupPartiallyScreenedPinnedShooter(): {
         damageMin: 4,
         damageMax: 4,
     });
-    const pinner = createTestUnit({ team: UPPER, name: "Current pinner", attackType: MELEE, initiative: 1, maxHp: 3 });
-    const upperThreat = createTestUnit({
-        team: UPPER,
+    const pinner = createTestUnit({ team: RIGHT, name: "Current pinner", attackType: MELEE, initiative: 1, maxHp: 3 });
+    const rightThreat = createTestUnit({
+        team: RIGHT,
         name: "Upper threat",
         attackType: MELEE,
         initiative: 10,
         maxHp: 100,
     });
-    const lowerThreat = createTestUnit({
-        team: UPPER,
+    const leftThreat = createTestUnit({
+        team: RIGHT,
         name: "Lower threat",
         attackType: MELEE,
         initiative: 10,
         maxHp: 100,
     });
-    const screen = createTestUnit({ team: LOWER, name: "Bodyguard", attackType: MELEE, initiative: 1 });
+    const screen = createTestUnit({ team: LEFT, name: "Bodyguard", attackType: MELEE, initiative: 1 });
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 6, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, pinner, { x: 7, y: 7 });
-    placeUnit(combat.grid, combat.unitsHolder, upperThreat, { x: 4, y: 10 });
-    placeUnit(combat.grid, combat.unitsHolder, lowerThreat, { x: 4, y: 4 });
+    placeUnit(combat.grid, combat.unitsHolder, rightThreat, { x: 4, y: 10 });
+    placeUnit(combat.grid, combat.unitsHolder, leftThreat, { x: 4, y: 4 });
     placeUnit(combat.grid, combat.unitsHolder, screen, { x: 5, y: 7 });
     shooter.refreshPossibleAttackTypes(false);
     return { shooter, context: decisionContext(combat) };
@@ -201,7 +201,7 @@ function setupSupportedPrepinEgress(
 } {
     const combat = createCombatTestContext();
     const shooter = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Pre-pin Archer",
         attackType: RANGE,
         initiative: 1,
@@ -211,7 +211,7 @@ function setupSupportedPrepinEgress(
         damageMax: 10,
     });
     const target = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Shot target",
         attackType: options.targetRanged ? RANGE : MELEE,
         initiative: 0,
@@ -221,7 +221,7 @@ function setupSupportedPrepinEgress(
         maxHp: 20,
     });
     const threat = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Pending charger",
         attackType: options.threatRanged ? RANGE : MELEE,
         initiative: options.threatInitiative ?? 2,
@@ -229,7 +229,7 @@ function setupSupportedPrepinEgress(
         shotDistance: 16,
     });
     const guard = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Frontline screen",
         attackType: options.guardRanged ? RANGE : MELEE,
         initiative: 1,
@@ -238,7 +238,7 @@ function setupSupportedPrepinEgress(
     // The threat can reach the current cell by the optimistic one-activation distance bound, but not (0,0).
     // The melee ally at (1,1) is geometrically between that destination and the threat; the ranged wall proves
     // stable native class identity rather than merely accepting any occupied neighboring cell as support.
-    const wall = createTestUnit({ team: LOWER, name: "Corner wall", attackType: RANGE, initiative: 1, rangeShots: 1 });
+    const wall = createTestUnit({ team: LEFT, name: "Corner wall", attackType: RANGE, initiative: 1, rangeShots: 1 });
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 0, y: 1 });
     placeUnit(combat.grid, combat.unitsHolder, target, options.targetCell ?? { x: 0, y: 10 });
     placeUnit(combat.grid, combat.unitsHolder, threat, options.threatCell ?? { x: 2, y: 5 });
@@ -269,7 +269,7 @@ function setupProactiveScreenedClose(
 } {
     const combat = createCombatTestContext();
     const shooter = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Posture archer",
         attackType: RANGE,
         initiative: 1,
@@ -279,7 +279,7 @@ function setupProactiveScreenedClose(
         damageMax: 10,
     });
     const target = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Posture target",
         attackType: RANGE,
         initiative: 0,
@@ -291,13 +291,13 @@ function setupProactiveScreenedClose(
         maxHp: 1,
     });
     const escapedThreat = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Screened future charger",
         attackType: MELEE,
         initiative: 2,
         maxHp: 100,
     });
-    const guard = createTestUnit({ team: LOWER, name: "Posture guard", attackType: MELEE, initiative: 1 });
+    const guard = createTestUnit({ team: LEFT, name: "Posture guard", attackType: MELEE, initiative: 1 });
     const destination = { x: 5, y: 6 };
     placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 5, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, target, { x: 5, y: 1 });
@@ -311,10 +311,10 @@ function setupProactiveScreenedClose(
     );
     const context = decisionContext(combat);
     context.fightProperties!.addRepliedAttack(target.getId());
-    context.fightProperties!.addAlreadyMadeTurn(UPPER, escapedThreat.getId());
+    context.fightProperties!.addAlreadyMadeTurn(RIGHT, escapedThreat.getId());
     if (residualThreatCell) {
         const residualThreat = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Unscreened next-lap charger",
             attackType: MELEE,
             initiative: 2,
@@ -327,7 +327,7 @@ function setupProactiveScreenedClose(
                 amount: 1,
             }),
         );
-        context.fightProperties!.addAlreadyMadeTurn(UPPER, residualThreat.getId());
+        context.fightProperties!.addAlreadyMadeTurn(RIGHT, residualThreat.getId());
         context.matrix = combat.grid.getMatrix();
     }
     const destinationHash = (destination.x << 4) | destination.y;
@@ -383,7 +383,7 @@ function setupSupportedBandAdvance(
 } {
     const combat = createCombatTestContext();
     const shooter = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Band archer",
         attackType: RANGE,
         initiative: options.shooterInitiative ?? 1,
@@ -395,7 +395,7 @@ function setupSupportedBandAdvance(
     });
     const targetRanged = options.targetRanged ?? true;
     const target = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Band target",
         attackType: targetRanged ? RANGE : MELEE,
         initiative: 0,
@@ -414,7 +414,7 @@ function setupSupportedBandAdvance(
     let guard: Unit | undefined;
     if (options.includeGuard ?? true) {
         guard = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Band guard",
             attackType: options.guardRanged ? RANGE : MELEE,
             initiative: 1,
@@ -430,7 +430,7 @@ function setupSupportedBandAdvance(
     }
     if (options.withActedReachableThreat) {
         const threat = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Acted hidden flanker",
             attackType: MELEE,
             initiative: 1,
@@ -443,11 +443,11 @@ function setupSupportedBandAdvance(
                 amount: 1,
             }),
         );
-        context.fightProperties!.addAlreadyMadeTurn(UPPER, threat.getId());
+        context.fightProperties!.addAlreadyMadeTurn(RIGHT, threat.getId());
     }
     if (options.withCurrentPinner) {
         const pinner = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Current hidden pinner",
             attackType: MELEE,
             initiative: 0,
@@ -459,7 +459,7 @@ function setupSupportedBandAdvance(
                 amount: 1,
             }),
         );
-        context.fightProperties!.addAlreadyMadeTurn(UPPER, pinner.getId());
+        context.fightProperties!.addAlreadyMadeTurn(RIGHT, pinner.getId());
     }
     const destinationHash = (destination.x << 4) | destination.y;
     context.matrix = combat.grid.getMatrix();
@@ -1442,7 +1442,7 @@ describe("v0.8 protected ranged positioning", () => {
                 targetCell: { x: 4, y: 1 },
             });
             const actedThreat = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Acted screened threat",
                 attackType: MELEE,
                 maxHp: 1,
@@ -1454,7 +1454,7 @@ describe("v0.8 protected ranged positioning", () => {
                     amount: 1,
                 }),
             );
-            context.fightProperties!.addAlreadyMadeTurn(UPPER, actedThreat.getId());
+            context.fightProperties!.addAlreadyMadeTurn(RIGHT, actedThreat.getId());
             context.matrix = context.grid.getMatrix();
             context.decisionOrigin = "root";
             const events: IAIPolicyEvent[] = [];
@@ -2250,8 +2250,8 @@ describe("v0.8 protected ranged positioning", () => {
         const { shooter, target, context, strictDestination } = setupScreenedCloserDuel();
         const fightProperties = context.fightProperties!;
         fightProperties.startFight();
-        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
-        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.setTeamUnitsAlive(LEFT, context.unitsHolder.getAllAllies(LEFT).length);
+        fightProperties.setTeamUnitsAlive(RIGHT, context.unitsHolder.getAllAllies(RIGHT).length);
         fightProperties.startTurn(shooter.getTeam(), 1_000);
         shooter.refreshPossibleAttackTypes(
             context.attackHandler!.canLandRangeAttack(
@@ -2568,8 +2568,8 @@ describe("v0.8 protected ranged positioning", () => {
         const actions = new StrategyV0_8().decideTurn(shooter, context);
         const fightProperties = context.fightProperties!;
         fightProperties.startFight();
-        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
-        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.setTeamUnitsAlive(LEFT, context.unitsHolder.getAllAllies(LEFT).length);
+        fightProperties.setTeamUnitsAlive(RIGHT, context.unitsHolder.getAllAllies(RIGHT).length);
         fightProperties.startTurn(shooter.getTeam(), 1_000);
         const engine = new GameActionEngine({
             fightProperties,
@@ -2761,7 +2761,7 @@ describe("v0.8 protected ranged positioning", () => {
         expect(
             fixture.context.attackHandler!.canBeAttackedByMelee(
                 destinationPosition,
-                fixture.shooter.isSmallSize(),
+                fixture.shooter,
                 fixture.context.grid.getEnemyAggrMatrixByUnitId(fixture.shooter.getId()),
             ),
         ).toBe(true);
@@ -2930,7 +2930,7 @@ describe("v0.8 protected ranged positioning", () => {
         process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
         process.env.V08_RANGED_POSITION_MODE = "retreat";
         const futureThreat = setupSupportedPrepinEgress();
-        futureThreat.context.fightProperties!.addAlreadyMadeTurn(UPPER, futureThreat.threat.getId());
+        futureThreat.context.fightProperties!.addAlreadyMadeTurn(RIGHT, futureThreat.threat.getId());
         expect(
             new StrategyV0_8().decideTurn(futureThreat.shooter, futureThreat.context).map((action) => action.type),
         ).toEqual(["move_unit", "range_attack"]);
@@ -2961,7 +2961,7 @@ describe("v0.8 protected ranged positioning", () => {
         process.env.V08_RANGED_POSITION_MODE = "retreat";
         const { shooter, context } = setupSupportedPrepinEgress();
         const secondThreat = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Second pending charger",
             attackType: MELEE,
             initiative: 1,
@@ -2979,7 +2979,7 @@ describe("v0.8 protected ranged positioning", () => {
         process.env.V08_RANGED_POSITION_MODE = "retreat";
         const { shooter, context } = setupSupportedPrepinEgress();
         const secondThreat = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Second pending charger",
             attackType: MELEE,
             initiative: 0,
@@ -3017,7 +3017,7 @@ describe("v0.8 protected ranged positioning", () => {
         process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
         const { shooter, context } = setupSupportedPrepinEgress();
         const unscreenedShooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Unscreened enemy archer",
             attackType: RANGE,
             initiative: 2,
@@ -3037,7 +3037,7 @@ describe("v0.8 protected ranged positioning", () => {
         process.env.V08_SUPPORTED_PREPIN_EGRESS_VERSIONS = "v0.8";
         const { shooter, context } = setupSupportedPrepinEgress();
         const unscreenedCaster = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Unscreened enemy caster",
             attackType: MAGIC,
             initiative: 2,
@@ -3146,8 +3146,8 @@ describe("v0.8 protected ranged positioning", () => {
         const actions = new StrategyV0_8().decideTurn(shooter, context);
         const fightProperties = context.fightProperties!;
         fightProperties.startFight();
-        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
-        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.setTeamUnitsAlive(LEFT, context.unitsHolder.getAllAllies(LEFT).length);
+        fightProperties.setTeamUnitsAlive(RIGHT, context.unitsHolder.getAllAllies(RIGHT).length);
         fightProperties.startTurn(shooter.getTeam(), 1_000);
         const engine = new GameActionEngine({
             fightProperties,
@@ -3197,8 +3197,8 @@ describe("v0.8 protected ranged positioning", () => {
         const { shooter, target, context } = setupSupportedShot();
         const fightProperties = context.fightProperties!;
         fightProperties.startFight();
-        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
-        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.setTeamUnitsAlive(LEFT, context.unitsHolder.getAllAllies(LEFT).length);
+        fightProperties.setTeamUnitsAlive(RIGHT, context.unitsHolder.getAllAllies(RIGHT).length);
         fightProperties.startTurn(shooter.getTeam(), 1_000);
         shooter.refreshPossibleAttackTypes(
             context.attackHandler!.canLandRangeAttack(
@@ -3231,7 +3231,7 @@ describe("v0.8 protected ranged positioning", () => {
         expect(actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
 
         const threatened = setupSupportedShot(false);
-        const runner = createTestUnit({ team: UPPER, name: "Fast flanker", attackType: MELEE, initiative: 8 });
+        const runner = createTestUnit({ team: RIGHT, name: "Fast flanker", attackType: MELEE, initiative: 8 });
         placeUnit(threatened.context.grid, threatened.context.unitsHolder, runner, { x: 7, y: 8 });
         const held = new StrategyV0_8().decideTurn(threatened.shooter, threatened.context);
         expect(held.map((action) => action.type)).toEqual(["range_attack"]);
@@ -3249,7 +3249,7 @@ describe("v0.8 protected ranged positioning", () => {
         target.grantStolenAbility("Through Shot");
         target.adjustBaseStats(true, 1, 0, 0, 0, 0, 0);
         target.setAmountAlive(1);
-        const reserve = createTestUnit({ team: LOWER, name: "Dominant reserve", attackType: MELEE, maxHp: 100 });
+        const reserve = createTestUnit({ team: LEFT, name: "Dominant reserve", attackType: MELEE, maxHp: 100 });
         placeUnit(context.grid, context.unitsHolder, reserve, { x: 4, y: 5 });
 
         expect(new StrategyV0_8().decideTurn(shooter, context).some((action) => action.type === "move_unit")).toBe(
@@ -3300,8 +3300,8 @@ describe("v0.8 protected ranged positioning", () => {
 
         const fightProperties = context.fightProperties!;
         fightProperties.startFight();
-        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
-        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.setTeamUnitsAlive(LEFT, context.unitsHolder.getAllAllies(LEFT).length);
+        fightProperties.setTeamUnitsAlive(RIGHT, context.unitsHolder.getAllAllies(RIGHT).length);
         fightProperties.startTurn(shooter.getTeam(), 1_000);
         const engine = new GameActionEngine({
             fightProperties,
@@ -3523,8 +3523,8 @@ describe("v0.8 protected ranged positioning", () => {
         const { shooter, context } = setupPartiallyScreenedPinnedShooter();
         const fightProperties = context.fightProperties!;
         fightProperties.startFight();
-        fightProperties.setTeamUnitsAlive(LOWER, context.unitsHolder.getAllAllies(LOWER).length);
-        fightProperties.setTeamUnitsAlive(UPPER, context.unitsHolder.getAllAllies(UPPER).length);
+        fightProperties.setTeamUnitsAlive(LEFT, context.unitsHolder.getAllAllies(LEFT).length);
+        fightProperties.setTeamUnitsAlive(RIGHT, context.unitsHolder.getAllAllies(RIGHT).length);
         fightProperties.startTurn(shooter.getTeam(), 1_000);
         shooter.refreshPossibleAttackTypes(false);
         const actions = new StrategyV0_8().decideTurn(shooter, context);
@@ -3580,7 +3580,7 @@ describe("v0.8 protected ranged positioning", () => {
     it("does not mistake a native melee unit with a stolen quiver for a half-damage archer", () => {
         const combat = createCombatTestContext();
         const thief = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Quiver thief",
             attackType: MELEE,
             initiative: 3,
@@ -3589,7 +3589,7 @@ describe("v0.8 protected ranged positioning", () => {
         });
         thief.grantStolenAbility("Endless Quiver");
         thief.adjustBaseStats(true, 1, 0, 0, 0, 0, 0);
-        const pinner = createTestUnit({ team: UPPER, name: "Pinner", attackType: MELEE, maxHp: 3 });
+        const pinner = createTestUnit({ team: RIGHT, name: "Pinner", attackType: MELEE, maxHp: 3 });
         placeUnit(combat.grid, combat.unitsHolder, thief, { x: 6, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, pinner, { x: 7, y: 7 });
         thief.refreshPossibleAttackTypes(false);

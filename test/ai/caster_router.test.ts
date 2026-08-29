@@ -43,8 +43,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const MAGIC = PBTypes.AttackVals.MAGIC;
@@ -99,12 +99,12 @@ function placeLarge(combat: CombatTestContext, unit: Unit, base: XY): void {
 }
 
 function primeV07AuraProfile(strategy: StrategyV0_7, combat: CombatTestContext): void {
-    strategy.placeArmy(combat.unitsHolder.getAllAllies(LOWER), {
-        team: LOWER,
+    strategy.placeArmy(combat.unitsHolder.getAllAllies(LEFT), {
+        team: LEFT,
         grid: combat.grid,
         unitsHolder: combat.unitsHolder,
         pathHelper: new PathHelper(testGridSettings),
-        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
     });
 }
 
@@ -128,9 +128,9 @@ afterEach(() => {
 describe("v0.6 universal MELEE_MAGIC caster router", () => {
     it("is an exact no-op while gated off, and never touches incumbent MAGIC behavior", () => {
         const combat = createCombatTestContext();
-        const meleeMagic = createTestUnit({ team: LOWER, attackType: MELEE_MAGIC });
-        const magic = createTestUnit({ team: LOWER, attackType: MAGIC });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const meleeMagic = createTestUnit({ team: LEFT, attackType: MELEE_MAGIC });
+        const magic = createTestUnit({ team: LEFT, attackType: MAGIC });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, meleeMagic, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, magic, { x: 5, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 5, y: 12 });
@@ -150,10 +150,10 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
     it("routes Resurrection first when recovered allied HP exceeds the Angel's passive reserve", () => {
         process.env.V06_CASTER_ROUTER = "on";
         const combat = createCombatTestContext();
-        const angel = makeReal(LOWER, "Life", "Angel");
+        const angel = makeReal(LEFT, "Life", "Angel");
         angel.setStackPower(5);
-        const ally = createTestUnit({ team: LOWER, name: "High-value ally", amountAlive: 100, maxHp: 100 });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, name: "High-value ally", amountAlive: 100, maxHp: 100 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeLarge(combat, angel, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 8, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 12 });
@@ -176,10 +176,10 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
     it("keeps the incumbent when Resurrection recovery does not repay the shared passive charge", () => {
         process.env.V06_CASTER_ROUTER = "on";
         const combat = createCombatTestContext();
-        const angel = makeReal(LOWER, "Life", "Angel");
+        const angel = makeReal(LEFT, "Life", "Angel");
         angel.setStackPower(5);
-        const ally = createTestUnit({ team: LOWER, name: "Lightly depleted ally", amountAlive: 100, maxHp: 100 });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, name: "Lightly depleted ally", amountAlive: 100, maxHp: 100 });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeLarge(combat, angel, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 8, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 12 });
@@ -192,10 +192,10 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
     it("routes Wind Flow against greater hostile flying pressure", () => {
         process.env.V06_CASTER_ROUTER = "on";
         const combat = createCombatTestContext();
-        const valkyrie = makeReal(LOWER, "Life", "Valkyrie");
+        const valkyrie = makeReal(LEFT, "Life", "Valkyrie");
         valkyrie.setStackPower(5);
         const enemyFlyer = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Enemy flyer",
             attackType: MELEE,
             movementType: FLY,
@@ -214,17 +214,17 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
     it("does not cast Wind Flow when friendly-flyer mobility collateral is greater", () => {
         process.env.V06_CASTER_ROUTER = "on";
         const combat = createCombatTestContext();
-        const valkyrie = makeReal(LOWER, "Life", "Valkyrie");
+        const valkyrie = makeReal(LEFT, "Life", "Valkyrie");
         valkyrie.setStackPower(5);
         const alliedFlyer = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             movementType: FLY,
             initiative: 10,
             damageMax: 20,
             amountAlive: 20,
         });
         const enemyFlyer = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             movementType: FLY,
             initiative: 2,
             damageMax: 1,
@@ -241,10 +241,10 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
     it("counts the flying caster itself as Wind Flow collateral", () => {
         process.env.V06_CASTER_ROUTER = "on";
         const combat = createCombatTestContext();
-        const valkyrie = makeReal(LOWER, "Life", "Valkyrie");
+        const valkyrie = makeReal(LEFT, "Life", "Valkyrie");
         valkyrie.setStackPower(5);
         const enemyFlyer = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             movementType: FLY,
             initiative: 2,
             damageMax: 1,
@@ -260,10 +260,10 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
     it("routes Castling only for a forward enemy backliner that can be pulled into local support", () => {
         process.env.V06_CASTER_ROUTER = "on";
         const combat = createCombatTestContext();
-        const harpy = makeReal(LOWER, "Might", "Harpy");
+        const harpy = makeReal(LEFT, "Might", "Harpy");
         harpy.setStackPower(5);
-        const support = createTestUnit({ team: LOWER, name: "Support", attackType: MELEE });
-        const shooter = createTestUnit({ team: UPPER, name: "Shooter", attackType: RANGE, amountAlive: 10 });
+        const support = createTestUnit({ team: LEFT, name: "Support", attackType: MELEE });
+        const shooter = createTestUnit({ team: RIGHT, name: "Shooter", attackType: RANGE, amountAlive: 10 });
         placeUnit(combat.grid, combat.unitsHolder, harpy, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, support, { x: 1, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 5, y: 5 });
@@ -277,10 +277,10 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
     it("keeps normal play when Castling can only swap a melee frontliner", () => {
         process.env.V06_CASTER_ROUTER = "on";
         const combat = createCombatTestContext();
-        const harpy = makeReal(LOWER, "Might", "Harpy");
+        const harpy = makeReal(LEFT, "Might", "Harpy");
         harpy.setStackPower(5);
-        const support = createTestUnit({ team: LOWER, attackType: MELEE });
-        const frontliner = createTestUnit({ team: UPPER, attackType: MELEE });
+        const support = createTestUnit({ team: LEFT, attackType: MELEE });
+        const frontliner = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, harpy, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, support, { x: 1, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, frontliner, { x: 5, y: 5 });
@@ -292,10 +292,10 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
     it("extends Wild Regeneration through F4 while preserving an existing Troll cast verbatim", () => {
         process.env.V06_CASTER_ROUTER = "on";
         const combat = createCombatTestContext();
-        const troll = makeReal(LOWER, "Chaos", "Troll");
+        const troll = makeReal(LEFT, "Chaos", "Troll");
         troll.setStackPower(5);
-        const ally = createTestUnit({ team: LOWER, name: "Tank", level: 3, amountAlive: 20, maxHp: 50 });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, name: "Tank", level: 3, amountAlive: 20, maxHp: 50 });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, troll, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 6, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 12 });
@@ -309,17 +309,17 @@ describe("v0.6 universal MELEE_MAGIC caster router", () => {
 
     it("is invoked by StrategyV0_6 only when the opt-in gate is on", () => {
         const combat = createCombatTestContext();
-        const valkyrie = makeReal(LOWER, "Life", "Valkyrie");
+        const valkyrie = makeReal(LEFT, "Life", "Valkyrie");
         valkyrie.setStackPower(5);
         const enemyFlyer = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             movementType: FLY,
             initiative: 8,
             damageMax: 100,
             amountAlive: 100,
         });
-        const nonAuraAlly = createTestUnit({ team: LOWER, attackType: MELEE });
+        const nonAuraAlly = createTestUnit({ team: LEFT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, valkyrie, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, nonAuraAlly, { x: 6, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemyFlyer, { x: 4, y: 14 });
@@ -339,17 +339,17 @@ describe("v0.7 baked caster salvage", () => {
         process.env.V06_CASTER_SPELLS = "castling,wildregen";
         process.env.V06_RES_PREEMPT = "on";
         const combat = createCombatTestContext();
-        const valkyrie = makeReal(LOWER, "Life", "Valkyrie");
+        const valkyrie = makeReal(LEFT, "Life", "Valkyrie");
         valkyrie.setStackPower(5);
         const enemyFlyer = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             movementType: FLY,
             initiative: 8,
             damageMax: 100,
             amountAlive: 100,
         });
-        const nonAuraAlly = createTestUnit({ team: LOWER, attackType: MELEE });
+        const nonAuraAlly = createTestUnit({ team: LEFT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, valkyrie, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, nonAuraAlly, { x: 6, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemyFlyer, { x: 4, y: 14 });
@@ -361,10 +361,10 @@ describe("v0.7 baked caster salvage", () => {
 
     it("does not let Resurrection pre-empt a committed v0.7 action", () => {
         const combat = createCombatTestContext();
-        const angel = makeReal(LOWER, "Life", "Angel");
+        const angel = makeReal(LEFT, "Life", "Angel");
         angel.setStackPower(5);
-        const ally = createTestUnit({ team: LOWER, name: "High-value ally", amountAlive: 100, maxHp: 100 });
-        const enemy = createTestUnit({ team: UPPER, name: "Adjacent enemy", attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, name: "High-value ally", amountAlive: 100, maxHp: 100 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Adjacent enemy", attackType: MELEE });
         placeLarge(combat, angel, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 8, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 5, y: 4 });
@@ -381,8 +381,8 @@ describe("v0.7 baked caster salvage", () => {
     it("keeps Castling and Wild Regeneration outside the baked policy", () => {
         expect(V07_CASTER_ROUTER_POLICY.spells).toEqual(["resurrection", "windflow"]);
         const combat = createCombatTestContext();
-        const caster = createTestUnit({ team: LOWER, attackType: MELEE_MAGIC });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const caster = createTestUnit({ team: LEFT, attackType: MELEE_MAGIC });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, caster, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 12 });
         const incumbent = fallback(caster);
@@ -417,10 +417,10 @@ describe("v0.7 baked caster salvage", () => {
 
     it("preserves v0.6 gate, spell-scope, and Resurrection-preemption experiments", () => {
         const combat = createCombatTestContext();
-        const angel = makeReal(LOWER, "Life", "Angel");
+        const angel = makeReal(LEFT, "Life", "Angel");
         angel.setStackPower(5);
-        const ally = createTestUnit({ team: LOWER, name: "High-value ally", amountAlive: 100, maxHp: 100 });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, name: "High-value ally", amountAlive: 100, maxHp: 100 });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeLarge(combat, angel, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 8, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 12 });
@@ -449,17 +449,17 @@ describe("v0.7 baked caster salvage", () => {
 
     it("routes Wind Flow from the v0.4 incumbent only for an armed aura-saturated profile", () => {
         const combat = createCombatTestContext();
-        const valkyrie = makeReal(LOWER, "Life", "Valkyrie");
+        const valkyrie = makeReal(LEFT, "Life", "Valkyrie");
         valkyrie.setStackPower(5);
         const auraAlly = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             auraEffects: ["Luck"],
             auraRanges: [2],
             auraIsBuff: [true],
         });
         const enemyFlyer = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             movementType: FLY,
             initiative: 8,
@@ -470,7 +470,7 @@ describe("v0.7 baked caster salvage", () => {
         placeUnit(combat.grid, combat.unitsHolder, auraAlly, { x: 6, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemyFlyer, { x: 4, y: 14 });
         const context = contextFor(combat);
-        expect(isAuraSaturatedArmy(combat.unitsHolder.getAllAllies(LOWER))).toBe(true);
+        expect(isAuraSaturatedArmy(combat.unitsHolder.getAllAllies(LEFT))).toBe(true);
         const anchor = new StrategyV0_4().decideTurn(valkyrie, context);
 
         const control = new StrategyV0_7();
@@ -491,10 +491,10 @@ describe("v0.7 baked caster salvage", () => {
 
     it("W17 summonwolves: replaces a Satyr self-buff cast only when the token is routed", () => {
         const combat = createCombatTestContext();
-        const satyr = makeReal(LOWER, "Nature", "Satyr");
+        const satyr = makeReal(LEFT, "Nature", "Satyr");
         satyr.setStackPower(5);
-        const ally = createTestUnit({ team: LOWER, attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, satyr, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 6, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 12 });
@@ -533,9 +533,9 @@ describe("v0.7 baked caster salvage", () => {
 
     it("W17 summonwolves: v0.6 env path routes it only when explicitly scoped, never by default", () => {
         const combat = createCombatTestContext();
-        const satyr = makeReal(LOWER, "Nature", "Satyr");
+        const satyr = makeReal(LEFT, "Nature", "Satyr");
         satyr.setStackPower(5);
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, satyr, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 12 });
         const context = contextFor(combat);
@@ -550,10 +550,10 @@ describe("v0.7 baked caster salvage", () => {
 
     it("W17 reswiden: lowers the reserve bar and treats a wait incumbent as replaceable", () => {
         const combat = createCombatTestContext();
-        const angel = makeReal(LOWER, "Life", "Angel");
+        const angel = makeReal(LEFT, "Life", "Angel");
         angel.setStackPower(5);
-        const ally = createTestUnit({ team: LOWER, name: "Half-depleted ally", amountAlive: 100, maxHp: 100 });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, name: "Half-depleted ally", amountAlive: 100, maxHp: 100 });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeLarge(combat, angel, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 8, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 12 });
@@ -603,10 +603,10 @@ describe("v0.7 baked caster salvage", () => {
 
     it("W17 V07_CASTER_EXTRA: scopes by version and fails closed on unknown tokens", () => {
         const combat = createCombatTestContext();
-        const satyr = makeReal(LOWER, "Nature", "Satyr");
+        const satyr = makeReal(LEFT, "Nature", "Satyr");
         satyr.setStackPower(5);
-        const ally = createTestUnit({ team: LOWER, attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, satyr, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 6, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 10 });
@@ -628,14 +628,14 @@ describe("v0.7 baked caster salvage", () => {
 
     it("keeps Resurrection outside the Wind-only aura arm and non-preempting in the combined arm", () => {
         const combat = createCombatTestContext();
-        const angel = makeReal(LOWER, "Life", "Angel");
+        const angel = makeReal(LEFT, "Life", "Angel");
         angel.setStackPower(5);
         // This exercises the caster router's AURA arm, which only opens for an army where every stack carries
         // an aura. Angel stopped supplying its own when Arrows Wingshield became a board-wide blessing, so the
         // precondition is now stated outright instead of riding on the Angel's kit.
         angel.grantAbility("Pegasus Might Aura");
         const auraAlly = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "High-value aura ally",
             amountAlive: 100,
             maxHp: 100,
@@ -643,13 +643,13 @@ describe("v0.7 baked caster salvage", () => {
             auraRanges: [2],
             auraIsBuff: [true],
         });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeLarge(combat, angel, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, auraAlly, { x: 8, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 14 });
         auraAlly.applyDamage(9_500, 0, new SceneLogMock());
         const context = contextFor(combat);
-        expect(isAuraSaturatedArmy(combat.unitsHolder.getAllAllies(LOWER))).toBe(true);
+        expect(isAuraSaturatedArmy(combat.unitsHolder.getAllAllies(LEFT))).toBe(true);
         const anchor = new StrategyV0_4().decideTurn(angel, context);
 
         process.env.V07_AURA_CASTER_ROUTER = "on";
@@ -710,11 +710,11 @@ describe("v0.8 baked caster salvage", () => {
 
     it("routes a supported forward ranged target in v0.8/v0.8s while keeping v0.7 frozen", () => {
         const combat = createCombatTestContext();
-        const harpy = makeReal(LOWER, "Might", "Harpy");
+        const harpy = makeReal(LEFT, "Might", "Harpy");
         harpy.setStackPower(5);
-        const support = createTestUnit({ team: LOWER, name: "Local support", attackType: MELEE });
+        const support = createTestUnit({ team: LEFT, name: "Local support", attackType: MELEE });
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Forward shooter",
             attackType: RANGE,
             amountAlive: 10,
@@ -740,10 +740,10 @@ describe("v0.8 baked caster salvage", () => {
 
     it("casts Satyr Summon Wolves over a self-buff in v0.8/v0.8s while keeping v0.7 frozen", () => {
         const combat = createCombatTestContext();
-        const satyr = makeReal(LOWER, "Nature", "Satyr");
+        const satyr = makeReal(LEFT, "Nature", "Satyr");
         satyr.setStackPower(5);
-        const ally = createTestUnit({ team: LOWER, attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, satyr, { x: 4, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 6, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 4, y: 10 });
@@ -757,11 +757,11 @@ describe("v0.8 baked caster salvage", () => {
 
     it("supports a true version-scoped ablation and never replaces a committed attack", () => {
         const combat = createCombatTestContext();
-        const harpy = makeReal(LOWER, "Might", "Harpy");
+        const harpy = makeReal(LEFT, "Might", "Harpy");
         harpy.setStackPower(5);
-        const support = createTestUnit({ team: LOWER, name: "Local support", attackType: MELEE });
+        const support = createTestUnit({ team: LEFT, name: "Local support", attackType: MELEE });
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Forward shooter",
             attackType: RANGE,
             amountAlive: 10,

@@ -54,8 +54,8 @@ const collectFirstUnitBuffs = (config: Partial<IMatchConfig>): Map<number, strin
 describe("battle_engine setup seeding", () => {
     const acceptedPlacementWidth = (doctrine: Doctrine, augments?: ISetupAugment[]): number => {
         const properties = new FightProperties();
-        seedAcceptedSetupForPlacement(properties, PBTypes.TeamVals.LOWER, doctrine, augments);
-        return properties.getAugmentPlacement(PBTypes.TeamVals.LOWER)[0];
+        seedAcceptedSetupForPlacement(properties, PBTypes.TeamVals.LEFT, doctrine, augments);
+        return properties.getAugmentPlacement(PBTypes.TeamVals.LEFT)[0];
     };
 
     test("models accepted Placement L1/L2/L3 rectangle widths and rejects an over-budget expansion", () => {

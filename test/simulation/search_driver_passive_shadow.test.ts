@@ -108,7 +108,7 @@ function fakeDeps(): ILookaheadDeps {
 const fakeUnit = {
     getId: () => "unit",
     getName: () => "Squire",
-    getTeam: () => PBTypes.TeamVals.LOWER,
+    getTeam: () => PBTypes.TeamVals.LEFT,
 } as unknown as Unit;
 
 interface SearchInternals {

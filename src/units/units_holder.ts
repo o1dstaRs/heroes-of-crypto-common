@@ -118,10 +118,10 @@ export class UnitsHolder {
     }
     public getAllAlliesPlaced(
         teamType: TeamType,
-        lowerLeftPlacement: IPlacement,
-        upperRightPlacement: IPlacement,
-        lowerRightPlacement?: IPlacement,
-        upperLeftPlacement?: IPlacement,
+        leftBottomPlacement: IPlacement,
+        rightTopPlacement: IPlacement,
+        leftTopPlacement?: IPlacement,
+        rightBottomPlacement?: IPlacement,
     ): Unit[] {
         const allies: Unit[] = [];
 
@@ -142,12 +142,12 @@ export class UnitsHolder {
                     );
 
                     if (!(
-                        (teamType === PBTypes.TeamVals.LOWER &&
-                            (lowerLeftPlacement.isAllowed(cellPosition) ||
-                                (lowerRightPlacement && lowerRightPlacement.isAllowed(cellPosition)))) ||
-                        (teamType === PBTypes.TeamVals.UPPER &&
-                            (upperRightPlacement.isAllowed(cellPosition) ||
-                                (upperLeftPlacement && upperLeftPlacement.isAllowed(cellPosition))) &&
+                        (teamType === PBTypes.TeamVals.LEFT &&
+                            (leftBottomPlacement.isAllowed(cellPosition) ||
+                                (leftTopPlacement && leftTopPlacement.isAllowed(cellPosition)))) ||
+                        (teamType === PBTypes.TeamVals.RIGHT &&
+                            (rightTopPlacement.isAllowed(cellPosition) ||
+                                (rightBottomPlacement && rightBottomPlacement.isAllowed(cellPosition))) &&
                             isPositionWithinGrid(this.gridSettings, cellPosition))
                     )) {
                         allCellsAllowed = false;
@@ -166,10 +166,10 @@ export class UnitsHolder {
     public toCleanupRandomUnitsTillTeamSize(
         targetTeamSize: number,
         teamType: TeamType,
-        lowerLeftPlacement: IPlacement,
-        upperRightPlacement: IPlacement,
-        lowerRightPlacement?: IPlacement,
-        upperLeftPlacement?: IPlacement,
+        leftBottomPlacement: IPlacement,
+        rightTopPlacement: IPlacement,
+        leftTopPlacement?: IPlacement,
+        rightBottomPlacement?: IPlacement,
     ): Unit[] {
         const ret: Unit[] = [];
         let targetSize = targetTeamSize;
@@ -179,10 +179,10 @@ export class UnitsHolder {
 
         const units = this.getAllAlliesPlaced(
             teamType,
-            lowerLeftPlacement,
-            upperRightPlacement,
-            lowerRightPlacement,
-            upperLeftPlacement,
+            leftBottomPlacement,
+            rightTopPlacement,
+            leftTopPlacement,
+            rightBottomPlacement,
         );
 
         if (units.length <= targetSize) {
@@ -1425,14 +1425,14 @@ export class UnitsHolder {
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         // setup the initial empty maps
-        const upperAuraEffects = new Map<number, AppliedAuraEffectProperties[]>();
-        const lowerAuraEffects = new Map<number, AppliedAuraEffectProperties[]>();
+        const rightAuraEffects = new Map<number, AppliedAuraEffectProperties[]>();
+        const leftAuraEffects = new Map<number, AppliedAuraEffectProperties[]>();
         this.teamsAuraEffects = new Map([
-            [PBTypes.TeamVals.UPPER, upperAuraEffects],
-            [PBTypes.TeamVals.LOWER, lowerAuraEffects],
+            [PBTypes.TeamVals.RIGHT, rightAuraEffects],
+            [PBTypes.TeamVals.LEFT, leftAuraEffects],
         ]);
-        const upperAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
-        const lowerAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
+        const rightAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
+        const leftAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
 
         // Fill each cell with its strongest aura of each name as sources are visited. The companion indexes
         // retain first-seen order while allowing a stronger later source to replace the value in-place. This
@@ -1483,16 +1483,16 @@ export class UnitsHolder {
 
                 const recipientTeam = unitAuraEffectProperties.is_buff ? unitTeam : oppositeTeam;
                 const teamAuraEffects =
-                    recipientTeam === PBTypes.TeamVals.UPPER
-                        ? upperAuraEffects
-                        : recipientTeam === PBTypes.TeamVals.LOWER
-                          ? lowerAuraEffects
+                    recipientTeam === PBTypes.TeamVals.RIGHT
+                        ? rightAuraEffects
+                        : recipientTeam === PBTypes.TeamVals.LEFT
+                          ? leftAuraEffects
                           : undefined;
                 const teamAuraEffectIndexes =
-                    recipientTeam === PBTypes.TeamVals.UPPER
-                        ? upperAuraEffectIndexes
-                        : recipientTeam === PBTypes.TeamVals.LOWER
-                          ? lowerAuraEffectIndexes
+                    recipientTeam === PBTypes.TeamVals.RIGHT
+                        ? rightAuraEffectIndexes
+                        : recipientTeam === PBTypes.TeamVals.LEFT
+                          ? leftAuraEffectIndexes
                           : undefined;
 
                 if (!teamAuraEffects || !teamAuraEffectIndexes) {
@@ -1618,7 +1618,7 @@ export class UnitsHolder {
             if (unitNameKeySplit.length === 2) {
                 const unitName = unitNameKeySplit[0];
                 const unitTeam = parseInt(unitNameKeySplit[1]);
-                if (unitTeam !== PBTypes.TeamVals.LOWER && unitTeam !== PBTypes.TeamVals.UPPER) {
+                if (unitTeam !== PBTypes.TeamVals.LEFT && unitTeam !== PBTypes.TeamVals.RIGHT) {
                     continue;
                 }
                 for (const u of this.getAllUnitsIterator()) {
@@ -1650,10 +1650,10 @@ export class UnitsHolder {
     }
     public deleteUnitIfNotAllowed(
         unitId: string,
-        lowerLeftPlacement?: IPlacement,
-        upperRightPlacement?: IPlacement,
-        lowerRightPlacement?: IPlacement,
-        upperLeftPlacement?: IPlacement,
+        leftBottomPlacement?: IPlacement,
+        rightTopPlacement?: IPlacement,
+        leftTopPlacement?: IPlacement,
+        rightBottomPlacement?: IPlacement,
         verifyWithinGridPosition = true,
     ): boolean {
         const unit = this.allUnits.get(unitId);
@@ -1682,20 +1682,20 @@ export class UnitsHolder {
 
             const isWithinGrid = isPositionWithinGrid(this.gridSettings, cellPosition);
             if (
-                (enemyTeamType === PBTypes.TeamVals.LOWER &&
-                    ((lowerLeftPlacement && lowerLeftPlacement.isAllowed(cellPosition)) ||
-                        (lowerRightPlacement && lowerRightPlacement.isAllowed(cellPosition)))) ||
-                (enemyTeamType === PBTypes.TeamVals.UPPER &&
-                    ((upperRightPlacement && upperRightPlacement.isAllowed(cellPosition)) ||
-                        (upperLeftPlacement && upperLeftPlacement.isAllowed(cellPosition)))) ||
+                (enemyTeamType === PBTypes.TeamVals.LEFT &&
+                    ((leftBottomPlacement && leftBottomPlacement.isAllowed(cellPosition)) ||
+                        (leftTopPlacement && leftTopPlacement.isAllowed(cellPosition)))) ||
+                (enemyTeamType === PBTypes.TeamVals.RIGHT &&
+                    ((rightTopPlacement && rightTopPlacement.isAllowed(cellPosition)) ||
+                        (rightBottomPlacement && rightBottomPlacement.isAllowed(cellPosition)))) ||
                 (isWithinGrid &&
-                    teamType === PBTypes.TeamVals.LOWER &&
-                    !lowerLeftPlacement?.isAllowed(cellPosition) &&
-                    !lowerRightPlacement?.isAllowed(cellPosition)) ||
+                    teamType === PBTypes.TeamVals.LEFT &&
+                    !leftBottomPlacement?.isAllowed(cellPosition) &&
+                    !leftTopPlacement?.isAllowed(cellPosition)) ||
                 (isWithinGrid &&
-                    teamType === PBTypes.TeamVals.UPPER &&
-                    !upperRightPlacement?.isAllowed(cellPosition) &&
-                    !upperLeftPlacement?.isAllowed(cellPosition)) ||
+                    teamType === PBTypes.TeamVals.RIGHT &&
+                    !rightTopPlacement?.isAllowed(cellPosition) &&
+                    !rightBottomPlacement?.isAllowed(cellPosition)) ||
                 (verifyWithinGridPosition && !isWithinGrid)
             ) {
                 return this.deleteUnitById(unitId);

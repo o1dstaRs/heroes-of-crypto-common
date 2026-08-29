@@ -35,7 +35,7 @@ export const V08_A19_F184_LOWER_HUMAN_PLACEMENT_POLICY = Object.freeze({
     maps: V08_A19_F184_HUMAN_PLACEMENT_POLICY.maps,
     information: "own-army+map+legal-cells+public-opponent-identities" as const,
     treatment: "exact-public-matchup-production-opening-lower-only-v1" as const,
-    supportedTeam: PBTypes.TeamVals.LOWER,
+    supportedTeam: PBTypes.TeamVals.LEFT,
     productionFixtureSha256: V08_A19_F184_LOWER_HUMAN_PLACEMENT_FIXTURE_SHA256,
     upstreamPolicy: Object.freeze({
         schema: V08_A19_F184_HUMAN_PLACEMENT_POLICY.schema,
@@ -75,7 +75,7 @@ const normalizedPlacementFingerprint = (
             unit.getAmountAlive(),
             unit.getSize(),
             center?.x ?? null,
-            center === undefined ? null : team === PBTypes.TeamVals.LOWER ? center.y : GRID_SIZE - 1 - center.y,
+            center === undefined ? null : team === PBTypes.TeamVals.LEFT ? center.y : GRID_SIZE - 1 - center.y,
         ];
     });
     rows.sort((left, right) => JSON.stringify(left.slice(0, 4)).localeCompare(JSON.stringify(right.slice(0, 4))));
@@ -88,16 +88,16 @@ const normalizedPlacementFingerprint = (
  */
 export class V08A19F184LowerHumanPlacementStrategy implements IAIStrategy {
     public readonly version: string;
-    private readonly lowerPolicy: V08A19F184HumanPlacementStrategy;
+    private readonly leftPolicy: V08A19F184HumanPlacementStrategy;
     private lastPlacementAudit?: IV08A19F184LowerHumanPlacementAudit;
     public constructor(private readonly base: IAIStrategy) {
         this.version = base.version;
-        this.lowerPolicy = new V08A19F184HumanPlacementStrategy(base);
+        this.leftPolicy = new V08A19F184HumanPlacementStrategy(base);
     }
     public placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
-        if (context.team === PBTypes.TeamVals.LOWER) {
-            const selected = this.lowerPolicy.placeArmy(units, context);
-            const audit = this.lowerPolicy.getLastPlacementAudit();
+        if (context.team === PBTypes.TeamVals.LEFT) {
+            const selected = this.leftPolicy.placeArmy(units, context);
+            const audit = this.leftPolicy.getLastPlacementAudit();
             if (!audit) throw new Error("Lower-only f184 placement delegate did not produce an audit");
             this.lastPlacementAudit = Object.freeze({ ...audit });
             return selected;

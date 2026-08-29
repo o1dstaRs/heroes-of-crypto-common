@@ -52,22 +52,22 @@ describe("effects_applied event", () => {
         const { context, fightProperties, engine } = startFight();
         const caster = createTestUnit({
             name: "Caster",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
             spells: ["Chaos:Mass Riot"],
             amountAlive: 3,
             stackPower: 5,
         });
-        const allyOne = createTestUnit({ name: "Ally One", team: PBTypes.TeamVals.LOWER });
-        const allyTwo = createTestUnit({ name: "Ally Two", team: PBTypes.TeamVals.LOWER });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER });
+        const allyOne = createTestUnit({ name: "Ally One", team: PBTypes.TeamVals.LEFT });
+        const allyTwo = createTestUnit({ name: "Ally Two", team: PBTypes.TeamVals.LEFT });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT });
         placeUnit(context.grid, context.unitsHolder, caster, { x: 3, y: 3 });
         placeUnit(context.grid, context.unitsHolder, allyOne, { x: 5, y: 3 });
         placeUnit(context.grid, context.unitsHolder, allyTwo, { x: 7, y: 3 });
         placeUnit(context.grid, context.unitsHolder, enemy, { x: 9, y: 9 });
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 3);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 3);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
         const result = engine.apply({ type: "cast_spell", casterId: caster.getId(), spellName: "Mass Riot" });
         expect(result.completed).toBe(true);
@@ -100,7 +100,7 @@ describe("effects_applied event", () => {
         const { context, fightProperties, engine } = startFight();
         const attacker = createTestUnit({
             name: "Stunner",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
             attack: 10,
             damageMin: 5,
@@ -112,16 +112,16 @@ describe("effects_applied event", () => {
         });
         const victim = createTestUnit({
             name: "Victim",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 500,
             amountAlive: 5,
             magicResist: 50,
         });
         placeUnit(context.grid, context.unitsHolder, attacker, { x: 3, y: 3 });
         placeUnit(context.grid, context.unitsHolder, victim, { x: 4, y: 3 });
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
         const melee = engine.apply({
             type: "melee_attack",
@@ -145,23 +145,23 @@ describe("effects_applied event", () => {
         const { context, fightProperties, engine } = startFight();
         const caster = createTestUnit({
             name: "Hexer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
             spells: ["Death:Quagmire"],
             stackPower: 5,
         });
         const victim = createTestUnit({
             name: "Victim",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 500,
             amountAlive: 5,
             magicResist: 50,
         });
         placeUnit(context.grid, context.unitsHolder, caster, { x: 3, y: 3 });
         placeUnit(context.grid, context.unitsHolder, victim, { x: 4, y: 3 });
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
         const cast = engine.apply({
             type: "cast_spell",
@@ -181,13 +181,13 @@ describe("effects_applied event", () => {
 
     it("a plain move emits no effects_applied — refresh/seeding noise never leaks in", () => {
         const { context, fightProperties, engine } = startFight();
-        const walker = createTestUnit({ name: "Walker", team: PBTypes.TeamVals.LOWER, initiative: 4 });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER });
+        const walker = createTestUnit({ name: "Walker", team: PBTypes.TeamVals.LEFT, initiative: 4 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT });
         placeUnit(context.grid, context.unitsHolder, walker, { x: 3, y: 3 });
         placeUnit(context.grid, context.unitsHolder, enemy, { x: 12, y: 12 });
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
         const result = engine.apply({
             type: "move_unit",

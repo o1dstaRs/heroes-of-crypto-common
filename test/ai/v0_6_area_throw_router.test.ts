@@ -36,8 +36,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 function contextFor(combat: CombatTestContext): IDecisionContext {
@@ -50,7 +50,7 @@ function contextFor(combat: CombatTestContext): IDecisionContext {
     };
 }
 
-function makeGargantuan(team = LOWER): Unit {
+function makeGargantuan(team = LEFT): Unit {
     const effectFactory = new EffectFactory();
     const abilityFactory = new AbilityFactory(effectFactory);
     return Unit.createUnit(
@@ -68,8 +68,8 @@ function activateEngine(combat: CombatTestContext, active: Unit): GameActionEngi
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(PBTypes.GridVals.NORMAL);
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.setTeamUnitsAlive(LEFT, combat.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, combat.unitsHolder.getAllAllies(RIGHT).length);
     fightProperties.startTurn(active.getTeam(), 1_000);
     return new GameActionEngine({
         fightProperties,
@@ -139,8 +139,8 @@ describe("v0.6 Area Throw router", () => {
     it("StrategyV0_6 routes a two-target empty-cell splash only when the gate is on", () => {
         const combat = createCombatTestContext();
         const gargantuan = makeGargantuan();
-        const enemyA = createTestUnit({ team: UPPER, name: "A", attackType: MELEE, amountAlive: 20 });
-        const enemyB = createTestUnit({ team: UPPER, name: "B", attackType: MELEE, amountAlive: 20 });
+        const enemyA = createTestUnit({ team: RIGHT, name: "A", attackType: MELEE, amountAlive: 20 });
+        const enemyB = createTestUnit({ team: RIGHT, name: "B", attackType: MELEE, amountAlive: 20 });
         placeLarge(combat, gargantuan, { x: 3, y: 3 });
         // The enemies are not adjacent to each other, so an ordinary splash centred on either hits one.
         // An Area Throw at the empty middle row can hit both.
@@ -178,10 +178,10 @@ describe("v0.6 Area Throw router", () => {
     it("uses net effective damage, so a friendly stack in the shared splash prevents a tie override", () => {
         const combat = createCombatTestContext();
         const gargantuan = makeGargantuan();
-        const enemyA = createTestUnit({ team: UPPER, name: "A", attackType: MELEE, amountAlive: 20 });
-        const enemyB = createTestUnit({ team: UPPER, name: "B", attackType: MELEE, amountAlive: 20 });
-        const isolated = createTestUnit({ team: UPPER, name: "Isolated", attackType: MELEE, amountAlive: 20 });
-        const ally = createTestUnit({ team: LOWER, name: "Ally", attackType: MELEE, amountAlive: 20 });
+        const enemyA = createTestUnit({ team: RIGHT, name: "A", attackType: MELEE, amountAlive: 20 });
+        const enemyB = createTestUnit({ team: RIGHT, name: "B", attackType: MELEE, amountAlive: 20 });
+        const isolated = createTestUnit({ team: RIGHT, name: "Isolated", attackType: MELEE, amountAlive: 20 });
+        const ally = createTestUnit({ team: LEFT, name: "Ally", attackType: MELEE, amountAlive: 20 });
         placeLarge(combat, gargantuan, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 10, y: 9 });
         placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 10, y: 11 });
@@ -203,9 +203,9 @@ describe("v0.6 Area Throw router", () => {
     it("scores an occluded aim at its trajectory interceptor rather than the distant cluster", () => {
         const combat = createCombatTestContext();
         const gargantuan = makeGargantuan();
-        const enemyA = createTestUnit({ team: UPPER, name: "A", attackType: MELEE, amountAlive: 20 });
-        const enemyB = createTestUnit({ team: UPPER, name: "B", attackType: MELEE, amountAlive: 20 });
-        const blocker = createTestUnit({ team: UPPER, name: "Blocker", attackType: MELEE, amountAlive: 20 });
+        const enemyA = createTestUnit({ team: RIGHT, name: "A", attackType: MELEE, amountAlive: 20 });
+        const enemyB = createTestUnit({ team: RIGHT, name: "B", attackType: MELEE, amountAlive: 20 });
+        const blocker = createTestUnit({ team: RIGHT, name: "Blocker", attackType: MELEE, amountAlive: 20 });
         placeLarge(combat, gargantuan, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 10, y: 9 });
         placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 10, y: 11 });
@@ -231,9 +231,9 @@ describe("v0.6 Area Throw router", () => {
     it("never routes an Area Throw whose engine primary hit violates a forced target", () => {
         const combat = createCombatTestContext();
         const gargantuan = makeGargantuan();
-        const forced = createTestUnit({ team: UPPER, name: "Forced", attackType: MELEE, amountAlive: 20 });
-        const clusterA = createTestUnit({ team: UPPER, name: "Cluster A", attackType: MELEE, amountAlive: 20 });
-        const clusterB = createTestUnit({ team: UPPER, name: "Cluster B", attackType: MELEE, amountAlive: 20 });
+        const forced = createTestUnit({ team: RIGHT, name: "Forced", attackType: MELEE, amountAlive: 20 });
+        const clusterA = createTestUnit({ team: RIGHT, name: "Cluster A", attackType: MELEE, amountAlive: 20 });
+        const clusterB = createTestUnit({ team: RIGHT, name: "Cluster B", attackType: MELEE, amountAlive: 20 });
         placeLarge(combat, gargantuan, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, forced, { x: 14, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, clusterA, { x: 10, y: 9 });
@@ -266,7 +266,7 @@ describe("v0.6 Area Throw router", () => {
         const setup = (team: number) => {
             const combat = createCombatTestContext();
             const gargantuan = makeGargantuan(team);
-            const enemyTeam = team === LOWER ? UPPER : LOWER;
+            const enemyTeam = team === LEFT ? RIGHT : LEFT;
             const enemyA = createTestUnit({ team: enemyTeam, attackType: MELEE, amountAlive: 20 });
             const enemyB = createTestUnit({ team: enemyTeam, attackType: MELEE, amountAlive: 20 });
             placeLarge(combat, gargantuan, { x: 3, y: 3 });
@@ -285,20 +285,20 @@ describe("v0.6 Area Throw router", () => {
             expect(routed).toBe(incumbent);
         };
 
-        expectRouted(LOWER, "on");
-        expectRouted(UPPER, "both");
-        expectRouted(LOWER, "green");
-        expectRouted(UPPER, "red");
-        expectInert(LOWER, "red");
-        expectInert(UPPER, "green");
-        expectInert(LOWER, "1");
+        expectRouted(LEFT, "on");
+        expectRouted(RIGHT, "both");
+        expectRouted(LEFT, "green");
+        expectRouted(RIGHT, "red");
+        expectInert(LEFT, "red");
+        expectInert(RIGHT, "green");
+        expectInert(LEFT, "1");
     });
 
     it("honours V06_AREA_THROW_VERSIONS: unset = every caller, set = only listed strategy versions", () => {
         const combat = createCombatTestContext();
         const gargantuan = makeGargantuan();
-        const enemyA = createTestUnit({ team: UPPER, name: "A", attackType: MELEE, amountAlive: 20 });
-        const enemyB = createTestUnit({ team: UPPER, name: "B", attackType: MELEE, amountAlive: 20 });
+        const enemyA = createTestUnit({ team: RIGHT, name: "A", attackType: MELEE, amountAlive: 20 });
+        const enemyB = createTestUnit({ team: RIGHT, name: "B", attackType: MELEE, amountAlive: 20 });
         placeLarge(combat, gargantuan, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 10, y: 9 });
         placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 10, y: 11 });

@@ -292,7 +292,7 @@ export class StrategyV0_6 extends StrategyV0_5 {
      */
     public override placeArmy(units: Unit[], context: IPlacementContext): Map<string, XY> {
         const gate = process.env.V06_DISPERSE_TEAM;
-        const teamName = context.team === PBTypes.TeamVals.LOWER ? "lower" : "upper";
+        const teamName = context.team === PBTypes.TeamVals.LEFT ? "lower" : "upper";
         const gateOn = gate ? gate === "both" || gate === teamName : true;
         if (gateOn && this.enemyHasAoe(context)) {
             return placeArmyDispersed(units, context);
@@ -321,7 +321,7 @@ function placeArmyDispersed(units: Unit[], context: IPlacementContext): Map<stri
         return placements;
     }
     const key = (c: XY): number => (c.x << 4) | c.y;
-    const frontness = (c: XY): number => (context.team === PBTypes.TeamVals.LOWER ? c.y : GRID_SIZE - 1 - c.y);
+    const frontness = (c: XY): number => (context.team === PBTypes.TeamVals.LEFT ? c.y : GRID_SIZE - 1 - c.y);
     const xs = baseCells.map((c) => c.x);
     const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
     const edgeness = (c: XY): number => Math.abs(c.x - centreX);

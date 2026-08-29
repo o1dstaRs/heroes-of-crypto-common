@@ -105,7 +105,7 @@ const TRIO_AFFINITY_CAP = 0.25;
 const OPTION_AFFINITY_CAP = 0.12;
 const TOTAL_AFFINITY_CAP = 0.9;
 
-const clamp = (value: number, lower: number, upper: number): number => Math.min(upper, Math.max(lower, value));
+const clamp = (value: number, left: number, right: number): number => Math.min(right, Math.max(left, value));
 
 const uniqueCreatureIds = (creatureIds: readonly number[]): number[] => [
     ...new Set(creatureIds.filter((creatureId) => Number.isInteger(creatureId) && creatureId > 0)),

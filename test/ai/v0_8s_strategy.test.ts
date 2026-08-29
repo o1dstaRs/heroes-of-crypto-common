@@ -44,8 +44,8 @@ const SEARCH_ENV_KEYS = [
     "V08_RANGED_POSITION_VERSIONS",
 ] as const;
 const savedSearchEnv = Object.fromEntries(SEARCH_ENV_KEYS.map((key) => [key, process.env[key]]));
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 
@@ -104,7 +104,7 @@ function schedulerFixture(): {
     placeTarget: (target: Unit, cell: { x: number; y: number }) => Unit;
 } {
     const combat = createCombatTestContext();
-    const actor = createTestUnit({ team: LOWER, name: "Scheduler", attackType: MELEE, attack: 10 });
+    const actor = createTestUnit({ team: LEFT, name: "Scheduler", attackType: MELEE, attack: 10 });
     placeUnit(combat.grid, combat.unitsHolder, actor, { x: 5, y: 5 });
     return {
         actor,
@@ -232,12 +232,12 @@ describe("v0.8 search measurement alias", () => {
 
     it("takes an immediate kill before harder unfinished work", () => {
         const { actor, context, placeTarget } = schedulerFixture();
-        const killable = placeTarget(createTestUnit({ team: UPPER, name: "Kill now", maxHp: 10, amountAlive: 1 }), {
+        const killable = placeTarget(createTestUnit({ team: RIGHT, name: "Kill now", maxHp: 10, amountAlive: 1 }), {
             x: 5,
             y: 6,
         });
         const blocker = placeTarget(
-            createTestUnit({ team: UPPER, name: "Long blocker", maxHp: 100, amountAlive: 10 }),
+            createTestUnit({ team: RIGHT, name: "Long blocker", maxHp: 100, amountAlive: 10 }),
             { x: 7, y: 5 },
         );
         const kill = candidate(actor, killable, { damage: 10, kill: 1 });
@@ -248,7 +248,7 @@ describe("v0.8 search measurement alias", () => {
 
     it("groups delivery by target and prefers kill, damage, then stationary attack", () => {
         const { actor, context, placeTarget } = schedulerFixture();
-        const target = placeTarget(createTestUnit({ team: UPPER, name: "Shared target", maxHp: 100, amountAlive: 1 }), {
+        const target = placeTarget(createTestUnit({ team: RIGHT, name: "Shared target", maxHp: 100, amountAlive: 1 }), {
             x: 5,
             y: 6,
         });
@@ -266,12 +266,12 @@ describe("v0.8 search measurement alias", () => {
     it("prices repeated Wild Regeneration into hardest-work target selection", () => {
         const regeneration = schedulerFixture();
         const ordinary = regeneration.placeTarget(
-            createTestUnit({ team: UPPER, name: "Ordinary", maxHp: 15, amountAlive: 10 }),
+            createTestUnit({ team: RIGHT, name: "Ordinary", maxHp: 15, amountAlive: 10 }),
             { x: 5, y: 6 },
         );
         const regenerating = regeneration.placeTarget(
             createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Regenerator",
                 maxHp: 100,
                 amountAlive: 1,
@@ -292,12 +292,12 @@ describe("v0.8 search measurement alias", () => {
     it("defers nonlethal melee into fresh Dulling Defense while another positive target exists", () => {
         const dulling = schedulerFixture();
         const plainTank = dulling.placeTarget(
-            createTestUnit({ team: UPPER, name: "Plain tank", maxHp: 120, amountAlive: 1 }),
+            createTestUnit({ team: RIGHT, name: "Plain tank", maxHp: 120, amountAlive: 1 }),
             { x: 5, y: 6 },
         );
         const dullingTank = dulling.placeTarget(
             createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Dulling tank",
                 maxHp: 100,
                 amountAlive: 1,
@@ -320,7 +320,7 @@ describe("v0.8 search measurement alias", () => {
 
     it("preserves the exact same-target incumbent unless an alternative creates an immediate kill", () => {
         const { actor, context, placeTarget } = schedulerFixture();
-        const target = placeTarget(createTestUnit({ team: UPPER, name: "Same target", maxHp: 100, amountAlive: 1 }), {
+        const target = placeTarget(createTestUnit({ team: RIGHT, name: "Same target", maxHp: 100, amountAlive: 1 }), {
             x: 5,
             y: 6,
         });
@@ -341,11 +341,11 @@ describe("v0.8 search measurement alias", () => {
 
     it("finishes the most-wounded reachable target before opening fresh hard work", () => {
         const { actor, context, placeTarget } = schedulerFixture();
-        const wounded = createTestUnit({ team: UPPER, name: "Wounded focus", maxHp: 100, amountAlive: 1 });
+        const wounded = createTestUnit({ team: RIGHT, name: "Wounded focus", maxHp: 100, amountAlive: 1 });
         wounded.applyDamage(60, 0, new SceneLogMock());
         placeTarget(wounded, { x: 5, y: 6 });
         const freshHard = placeTarget(
-            createTestUnit({ team: UPPER, name: "Fresh hard", maxHp: 100, amountAlive: 10 }),
+            createTestUnit({ team: RIGHT, name: "Fresh hard", maxHp: 100, amountAlive: 10 }),
             { x: 7, y: 5 },
         );
         const focusedDelivery = candidate(actor, wounded, { damage: 10 });
@@ -359,11 +359,11 @@ describe("v0.8 search measurement alias", () => {
     it("uses primary-target shot damage rather than aggregate AOE damage for remaining work", () => {
         const { actor, context, placeTarget } = schedulerFixture();
         const splashPrimary = placeTarget(
-            createTestUnit({ team: UPPER, name: "Splash primary", maxHp: 100, amountAlive: 1 }),
+            createTestUnit({ team: RIGHT, name: "Splash primary", maxHp: 100, amountAlive: 1 }),
             { x: 5, y: 6 },
         );
         const directPrimary = placeTarget(
-            createTestUnit({ team: UPPER, name: "Direct primary", maxHp: 200, amountAlive: 1 }),
+            createTestUnit({ team: RIGHT, name: "Direct primary", maxHp: 200, amountAlive: 1 }),
             { x: 7, y: 5 },
         );
         const splash = candidate(actor, splashPrimary, { kind: "shot", damage: 200, primaryDamage: 10 });
@@ -375,11 +375,11 @@ describe("v0.8 search measurement alias", () => {
     it("never forces a positive-primary shot whose friendly-fire-adjusted damage is non-positive", () => {
         const { actor, context, placeTarget } = schedulerFixture();
         const unsafeTarget = placeTarget(
-            createTestUnit({ team: UPPER, name: "Unsafe primary", maxHp: 100, amountAlive: 1 }),
+            createTestUnit({ team: RIGHT, name: "Unsafe primary", maxHp: 100, amountAlive: 1 }),
             { x: 5, y: 6 },
         );
         const cleanTarget = placeTarget(
-            createTestUnit({ team: UPPER, name: "Clean primary", maxHp: 100, amountAlive: 1 }),
+            createTestUnit({ team: RIGHT, name: "Clean primary", maxHp: 100, amountAlive: 1 }),
             { x: 7, y: 5 },
         );
         const friendlyFire = candidate(actor, unsafeTarget, {
@@ -397,9 +397,9 @@ describe("v0.8 search measurement alias", () => {
     it("keeps a non-dominant stronger-ranged screen waiting through lap 8 and forces an advance at lap 9", () => {
         const combat = createCombatTestContext();
         const fightProperties = FightStateManager.getInstance().getFightProperties();
-        const screen = createTestUnit({ team: LOWER, name: "Screen", attackType: MELEE, initiative: 2 });
+        const screen = createTestUnit({ team: LEFT, name: "Screen", attackType: MELEE, initiative: 2 });
         const ownShooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Strong shooter",
             attackType: RANGE,
             amountAlive: 1,
@@ -408,7 +408,7 @@ describe("v0.8 search measurement alias", () => {
             damageMax: 100,
         });
         const enemyShooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Weak shooter",
             attackType: RANGE,
             amountAlive: 1,
@@ -420,8 +420,8 @@ describe("v0.8 search measurement alias", () => {
         placeUnit(combat.grid, combat.unitsHolder, screen, { x: 5, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, ownShooter, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, enemyShooter, { x: 12, y: 13 });
-        fightProperties.setTeamUnitsAlive(LOWER, 2);
-        fightProperties.setTeamUnitsAlive(UPPER, 1);
+        fightProperties.setTeamUnitsAlive(LEFT, 2);
+        fightProperties.setTeamUnitsAlive(RIGHT, 1);
         const context: IDecisionContext = {
             grid: combat.grid,
             matrix: combat.grid.getMatrix(),
@@ -444,9 +444,9 @@ describe("v0.8 search measurement alias", () => {
     it("closes on a sole surviving enemy summon in the lap-9 sprint", () => {
         const combat = createCombatTestContext();
         const fightProperties = FightStateManager.getInstance().getFightProperties();
-        const actor = createTestUnit({ team: LOWER, name: "Summon finisher", attackType: MELEE, initiative: 2 });
+        const actor = createTestUnit({ team: LEFT, name: "Summon finisher", attackType: MELEE, initiative: 2 });
         const ownShooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Strong shooter",
             attackType: RANGE,
             amountAlive: 1,
@@ -455,7 +455,7 @@ describe("v0.8 search measurement alias", () => {
             damageMax: 100,
         });
         const summonedEnemy = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Last summon",
             attackType: RANGE,
             maxHp: 100,
@@ -468,10 +468,10 @@ describe("v0.8 search measurement alias", () => {
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 5, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, ownShooter, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, summonedEnemy, { x: 12, y: 13 });
-        fightProperties.setTeamUnitsAlive(LOWER, 2);
+        fightProperties.setTeamUnitsAlive(LEFT, 2);
         // Summons are intentionally absent from original-stack accounting. The terminal sprint must use the
         // living board state instead of treating this fight as already empty.
-        fightProperties.setTeamUnitsAlive(UPPER, 0);
+        fightProperties.setTeamUnitsAlive(RIGHT, 0);
         while (fightProperties.getCurrentLap() < V08S_URGENT_FINISH_START_LAP) fightProperties.flipLap();
         const context: IDecisionContext = {
             grid: combat.grid,
@@ -501,7 +501,7 @@ describe("v0.8 search measurement alias", () => {
             const combat = createCombatTestContext();
             const fightProperties = FightStateManager.getInstance().getFightProperties();
             const shooter = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Own shooter",
                 attackType: RANGE,
                 amountAlive: ownAmount,
@@ -511,9 +511,9 @@ describe("v0.8 search measurement alias", () => {
                 shotDistance: 1,
                 initiative: 2,
             });
-            const ownScreen = createTestUnit({ team: LOWER, name: "Own screen", attackType: MELEE });
+            const ownScreen = createTestUnit({ team: LEFT, name: "Own screen", attackType: MELEE });
             const enemyShooter = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Enemy shooter",
                 attackType: RANGE,
                 amountAlive: enemyAmount,
@@ -522,7 +522,7 @@ describe("v0.8 search measurement alias", () => {
                 rangeShots: 1,
                 shotDistance: 1,
             });
-            const enemyScreen = createTestUnit({ team: UPPER, name: "Enemy screen", attackType: MELEE });
+            const enemyScreen = createTestUnit({ team: RIGHT, name: "Enemy screen", attackType: MELEE });
             placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 5, y: 2 });
             placeUnit(combat.grid, combat.unitsHolder, ownScreen, { x: 7, y: 2 });
             placeUnit(combat.grid, combat.unitsHolder, enemyScreen, { x: 5, y: 8 });
@@ -533,8 +533,8 @@ describe("v0.8 search measurement alias", () => {
                     amount: 1,
                 }),
             );
-            fightProperties.setTeamUnitsAlive(LOWER, 2);
-            fightProperties.setTeamUnitsAlive(UPPER, 2);
+            fightProperties.setTeamUnitsAlive(LEFT, 2);
+            fightProperties.setTeamUnitsAlive(RIGHT, 2);
             const context: IDecisionContext = {
                 grid: combat.grid,
                 matrix: combat.grid.getMatrix(),

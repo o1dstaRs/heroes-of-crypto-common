@@ -118,8 +118,8 @@ export function defaultCells(): ITableArmCell[] {
 // setup layer consults, never which creatures get offered/picked)
 // ---------------------------------------------------------------------------------------------------------
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
 const argmaxId = (candidates: readonly number[], score: (id: number) => number): number => {
     let best = candidates[0];
@@ -164,7 +164,7 @@ function chooseBundle(
     rng: PickRandomInt,
     genome?: ILeagueGenome,
 ): number {
-    const own = team === LOWER ? state.lower : state.upper;
+    const own = team === LEFT ? state.left : state.right;
     if (draft === "league") {
         return pickLeagueBundle(state, team, genome!);
     }
@@ -255,14 +255,14 @@ export function runTableArmPickGame(
     draft: TableArmDist,
     refreshedTeam: PickTeam | undefined,
     genome?: ILeagueGenome,
-): { lower: ITableArmArmy; upper: ITableArmArmy } {
+): { left: ITableArmArmy; right: ITableArmArmy } {
     const rng = makeRng(seed >>> 0);
     const rngInt: PickRandomInt = (maxExclusive) => Math.floor(rng() * maxExclusive);
     let state = createPickSimState(rngInt);
     const t2Outcome = new Map<PickTeam, { artifactId: number; overridden: boolean }>();
     const t1Outcome = new Map<PickTeam, boolean>();
 
-    const teamState = (team: PickTeam): IPickTeamState => (team === LOWER ? state.lower : state.upper);
+    const teamState = (team: PickTeam): IPickTeamState => (team === LEFT ? state.left : state.right);
     const accept = (action: Parameters<typeof transitionPickSim>[1]): void => {
         const transition = transitionPickSim(state, action, rngInt);
         if (transition.status !== "accepted") {
@@ -278,13 +278,13 @@ export function runTableArmPickGame(
         }
         const phase = getCurrentPickPhase(state);
         if (phase.phase === PBTypes.PickPhaseVals.DOCTRINE) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 if (teamState(team).doctrine === Doctrine.NO_DOCTRINE) {
                     accept({ type: "select_doctrine", team, doctrine: SETUP_POLICY_V0.pickDoctrine() });
                 }
             }
         } else if (phase.phase === PBTypes.PickPhaseVals.INITIAL_PICK) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 if (teamState(team).selectedBundleIndex === undefined) {
                     const refreshed = team === refreshedTeam;
                     const bundleIndex = chooseBundle(state, team, draft, refreshed, rngInt, genome);
@@ -306,7 +306,7 @@ export function runTableArmPickGame(
             }
             state = transition.state; // collisions reveal a slot; the next iteration re-picks
         } else if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 const own = teamState(team);
                 if (own.tier2Artifact !== undefined) {
                     continue;
@@ -363,7 +363,7 @@ export function runTableArmPickGame(
         };
     };
 
-    return { lower: materialize(LOWER), upper: materialize(UPPER) };
+    return { left: materialize(LEFT), right: materialize(RIGHT) };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -381,7 +381,7 @@ export interface ITableArmRecord {
     cellId: string;
     game: number;
     seed: number;
-    aIsLower: boolean;
+    aIsLeft: boolean;
     winnerSlot: "a" | "b" | "draw";
     laps: number;
     endReason: IMatchResult["endReason"];
@@ -412,36 +412,36 @@ export function playTableArmGame(cell: ITableArmCell, options: ITableArmOptions,
     }
     const pairIndex = Math.floor(game / 2);
     const seed = ((options.baseSeed >>> 0) + pairIndex * 0x9e3779b1) >>> 0;
-    const aIsLower = game % 2 === 0;
-    const refreshedTeam = cell.control ? undefined : aIsLower ? LOWER : UPPER;
+    const aIsLeft = game % 2 === 0;
+    const refreshedTeam = cell.control ? undefined : aIsLeft ? LEFT : RIGHT;
     const genome = cell.draft === "league" ? shippedLeagueGenome(options.leagueGenomeSpec) : undefined;
-    const { lower, upper } = runTableArmPickGame(seed, cell.draft, refreshedTeam, genome);
+    const { left, right } = runTableArmPickGame(seed, cell.draft, refreshedTeam, genome);
     FightStateManager.getInstance();
     const result = runMatch({
         greenVersion: options.fightVersion,
         redVersion: options.fightVersion,
-        roster: lower.roster,
-        redRoster: upper.roster,
+        roster: left.roster,
+        redRoster: right.roster,
         seed,
         gridType: PBTypes.GridVals.NORMAL,
-        greenDoctrine: lower.doctrine,
-        redDoctrine: upper.doctrine,
-        greenAugments: lower.augments,
-        redAugments: upper.augments,
-        greenArtifactT1: lower.tier1Artifact,
-        redArtifactT1: upper.tier1Artifact,
-        greenArtifactT2: lower.tier2Artifact,
-        redArtifactT2: upper.tier2Artifact,
-        greenSynergies: lower.synergies,
-        redSynergies: upper.synergies,
+        greenDoctrine: left.doctrine,
+        redDoctrine: right.doctrine,
+        greenAugments: left.augments,
+        redAugments: right.augments,
+        greenArtifactT1: left.tier1Artifact,
+        redArtifactT1: right.tier1Artifact,
+        greenArtifactT2: left.tier2Artifact,
+        redArtifactT2: right.tier2Artifact,
+        greenSynergies: left.synergies,
+        redSynergies: right.synergies,
     });
-    const a = aIsLower ? lower : upper;
-    const winnerSlot = result.winner === "draw" ? "draw" : (result.winner === "green") === aIsLower ? "a" : "b";
+    const a = aIsLeft ? left : right;
+    const winnerSlot = result.winner === "draw" ? "draw" : (result.winner === "green") === aIsLeft ? "a" : "b";
     return {
         cellId: cell.id,
         game,
         seed,
-        aIsLower,
+        aIsLeft,
         winnerSlot,
         laps: result.laps,
         endReason: result.endReason,

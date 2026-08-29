@@ -33,7 +33,7 @@ type ImmediateAttack = Extract<
     { type: "melee_attack" | "range_attack" | "area_throw_attack" | "obstacle_attack" | "cast_spell" }
 >;
 
-const LOWER = PBTypes.TeamVals.LOWER;
+const LEFT = PBTypes.TeamVals.LEFT;
 
 function areaThrowGateOn(unit: Unit): boolean {
     const gate = process.env.V06_AREA_THROW;
@@ -41,7 +41,7 @@ function areaThrowGateOn(unit: Unit): boolean {
         return true;
     }
     if (gate === "green" || gate === "red") {
-        return gate === (unit.getTeam() === LOWER ? "green" : "red");
+        return gate === (unit.getTeam() === LEFT ? "green" : "red");
     }
     return false;
 }

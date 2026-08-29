@@ -60,8 +60,8 @@ const savedBehaviorEnv = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => BEHAVIOR_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))),
 );
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 // This regression intentionally runs three complete max-lap matches. Leave enough wall-clock headroom when
@@ -84,15 +84,15 @@ function setupMountainDecision(
     const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(PBTypes.GridVals.BLOCK_CENTER);
-    const unit = createTestUnit({ team: LOWER, attackType: MELEE, initiative, name: "Miner" });
+    const unit = createTestUnit({ team: LEFT, attackType: MELEE, initiative, name: "Miner" });
     const rangedAlly = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         attackType: RANGE,
         rangeShots: 5,
         damageMax: 10,
         name: "Archer",
     });
-    const enemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Enemy" });
+    const enemy = createTestUnit({ team: RIGHT, attackType: MELEE, name: "Enemy" });
     placeUnit(combat.grid, combat.unitsHolder, unit, { x: 5, y: 7 });
     placeUnit(combat.grid, combat.unitsHolder, rangedAlly, { x: 1, y: 12 });
     placeUnit(combat.grid, combat.unitsHolder, enemy, enemyCell);
@@ -125,11 +125,11 @@ function setupRangedPosture(options: {
 } {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    const unit = createTestUnit({ team: LOWER, attackType: MELEE, initiative: 2, name: "Screen" });
+    const unit = createTestUnit({ team: LEFT, attackType: MELEE, initiative: 2, name: "Screen" });
     placeUnit(combat.grid, combat.unitsHolder, unit, { x: 5, y: 3 });
     for (let index = 0; index < options.ownShooters; index += 1) {
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             attackType: RANGE,
             rangeShots: options.ownShots ?? options.shots ?? 5,
             damageMin: options.ownDamage ?? 10,
@@ -140,7 +140,7 @@ function setupRangedPosture(options: {
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2 + index * 3, y: 2 });
     }
     const enemy = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         attackType: RANGE,
         rangeShots: options.enemyShots ?? options.shots ?? 5,
         damageMin: options.enemyDamage ?? 1,
@@ -149,8 +149,8 @@ function setupRangedPosture(options: {
         name: "Enemy Shooter",
     });
     placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 12, y: 13 });
-    fightProperties.setTeamUnitsAlive(LOWER, options.ownShooters + 1);
-    fightProperties.setTeamUnitsAlive(UPPER, 1);
+    fightProperties.setTeamUnitsAlive(LEFT, options.ownShooters + 1);
+    fightProperties.setTeamUnitsAlive(RIGHT, 1);
     return {
         unit,
         context: {
@@ -189,7 +189,7 @@ function setupVisibleEdgeScreenPressure(
 } {
     const combat = createCombatTestContext(gridType);
     const shooter = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Screen-pressure archer",
         attackType: RANGE,
         rangeShots: 5,
@@ -198,26 +198,26 @@ function setupVisibleEdgeScreenPressure(
         damageMax: 100,
         maxHp: 100,
         ...shooterOptions,
-        team: LOWER,
+        team: LEFT,
     });
     // Insert the rear first so the rejected ray is observed before its legal front equivalent.
     const rear = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Screened live archer",
         attackType: RANGE,
         rangeShots: 5,
         maxHp: 100,
         ...rearOptions,
-        team: UPPER,
+        team: RIGHT,
     });
     const screen = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Canonical melee screen",
         attackType: MELEE,
         maxHp: screenHp,
     });
     const bestDamageTarget = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Unscreened maximum-damage target",
         attackType: MELEE,
         maxHp: 100,
@@ -256,9 +256,9 @@ function applyVisibleEdgeShot(
 ): boolean {
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, fixture.context.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, fixture.context.unitsHolder.getAllAllies(UPPER).length);
-    fightProperties.startTurn(LOWER, 1_000);
+    fightProperties.setTeamUnitsAlive(LEFT, fixture.context.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, fixture.context.unitsHolder.getAllAllies(RIGHT).length);
+    fightProperties.startTurn(LEFT, 1_000);
     const engine = new GameActionEngine({
         fightProperties,
         grid: fixture.context.grid,
@@ -360,7 +360,7 @@ describe("v0.8 candidate policy", () => {
     it("targets the visible front stack instead of naming an occluded rear stack that it cannot hit", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "v0.8 screened-shot archer",
             attackType: RANGE,
             rangeShots: 5,
@@ -369,8 +369,8 @@ describe("v0.8 candidate policy", () => {
         });
         // Deliberately insert the rear stack first: equal-damage inherited scoring historically kept this
         // roster-order target even though the trajectory resolved against the intervening front stack.
-        const rear = createTestUnit({ team: UPPER, name: "Rear stack", attackType: MELEE });
-        const front = createTestUnit({ team: UPPER, name: "Front stack", attackType: MELEE });
+        const rear = createTestUnit({ team: RIGHT, name: "Rear stack", attackType: MELEE });
+        const front = createTestUnit({ team: RIGHT, name: "Front stack", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, rear, { x: 10, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, front, { x: 6, y: 7 });
@@ -680,8 +680,8 @@ describe("v0.8 candidate policy", () => {
         meleeCombat.grid.setScatteredMountains([{ x: 5, y: 7 }]);
         const meleeFight = FightStateManager.getInstance().getFightProperties();
         meleeFight.setGridType(PBTypes.GridVals.BLOCK_CENTER);
-        const melee = createTestUnit({ team: LOWER, attackType: MELEE, initiative: 3, name: "Cemetery miner" });
-        const distantEnemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Distant enemy" });
+        const melee = createTestUnit({ team: LEFT, attackType: MELEE, initiative: 3, name: "Cemetery miner" });
+        const distantEnemy = createTestUnit({ team: RIGHT, attackType: MELEE, name: "Distant enemy" });
         placeUnit(meleeCombat.grid, meleeCombat.unitsHolder, melee, { x: 4, y: 7 });
         placeUnit(meleeCombat.grid, meleeCombat.unitsHolder, distantEnemy, { x: 14, y: 14 });
         const meleeContext: IDecisionContext = {
@@ -697,7 +697,7 @@ describe("v0.8 candidate policy", () => {
             { type: "obstacle_attack", attackFrom: { x: 4, y: 7 } },
         ]);
 
-        const adjacentEnemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Adjacent enemy" });
+        const adjacentEnemy = createTestUnit({ team: RIGHT, attackType: MELEE, name: "Adjacent enemy" });
         placeUnit(meleeCombat.grid, meleeCombat.unitsHolder, adjacentEnemy, { x: 4, y: 6 });
         const enemyFirst = new StrategyV0_8().decideTurn(melee, meleeContext);
         expect(
@@ -712,14 +712,14 @@ describe("v0.8 candidate policy", () => {
         const rangedFight = FightStateManager.getInstance().getFightProperties();
         rangedFight.setGridType(PBTypes.GridVals.BLOCK_CENTER);
         const ranged = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 30,
             initiative: 3,
             name: "Cemetery archer",
         });
-        const hiddenEnemy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Hidden enemy" });
+        const hiddenEnemy = createTestUnit({ team: RIGHT, attackType: MELEE, name: "Hidden enemy" });
         hiddenEnemy.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Hidden"), amount: 1 }));
         placeUnit(rangedCombat.grid, rangedCombat.unitsHolder, ranged, { x: 2, y: 7 });
         placeUnit(rangedCombat.grid, rangedCombat.unitsHolder, hiddenEnemy, { x: 14, y: 14 });
@@ -778,7 +778,7 @@ describe("v0.8 candidate policy", () => {
         ]);
 
         unit.setWebMovementLocked(true);
-        context.fightProperties!.setTeamUnitsAlive(LOWER, 2);
+        context.fightProperties!.setTeamUnitsAlive(LEFT, 2);
         expect(prioritizeV08ProductiveAction(unit, context, defend)).toBe(defend);
         expect(new StrategyV0_8().decideTurn(unit, context)).toEqual([{ type: "wait_turn", unitId: unit.getId() }]);
 
@@ -789,15 +789,15 @@ describe("v0.8 candidate policy", () => {
     it("has Scavenger attack an adjacent enemy instead of defending while Backstab routes are constrained", () => {
         const combat = createCombatTestContext();
         const scavenger = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             luck: 10,
             name: "Scavenger",
             abilities: ["Backstab"],
         });
-        const hyena = createTestUnit({ team: UPPER, attackType: MELEE, name: "Hyena" });
-        const fairy = createTestUnit({ team: UPPER, attackType: MELEE, name: "Fairy" });
-        const crusader = createTestUnit({ team: UPPER, attackType: MELEE, name: "Crusader" });
+        const hyena = createTestUnit({ team: RIGHT, attackType: MELEE, name: "Hyena" });
+        const fairy = createTestUnit({ team: RIGHT, attackType: MELEE, name: "Fairy" });
+        const crusader = createTestUnit({ team: RIGHT, attackType: MELEE, name: "Crusader" });
         placeUnit(combat.grid, combat.unitsHolder, scavenger, { x: 8, y: 10 });
         placeUnit(combat.grid, combat.unitsHolder, hyena, { x: 7, y: 10 });
         placeUnit(combat.grid, combat.unitsHolder, fairy, { x: 7, y: 11 });
@@ -853,8 +853,8 @@ describe("v0.8 candidate policy", () => {
             enemyDamage: 1,
             shots: 1,
         });
-        expect(v08TeamRangedOutput(LOWER, actuallyWeaker.context.unitsHolder)).toBe(6);
-        expect(v08TeamRangedOutput(UPPER, actuallyWeaker.context.unitsHolder)).toBe(100);
+        expect(v08TeamRangedOutput(LEFT, actuallyWeaker.context.unitsHolder)).toBe(6);
+        expect(v08TeamRangedOutput(RIGHT, actuallyWeaker.context.unitsHolder)).toBe(100);
         // The historical proxy sees 3*2 > 1*1 because it intentionally ignores amount; v0.7 stays frozen.
         expect(new StrategyV0_7().decideTurn(actuallyWeaker.unit, actuallyWeaker.context)[0]?.type).toBe("wait_turn");
         const weakerV08 = new StrategyV0_8().decideTurn(actuallyWeaker.unit, actuallyWeaker.context);
@@ -869,8 +869,8 @@ describe("v0.8 candidate policy", () => {
             enemyDamage: 4,
             shots: 1,
         });
-        expect(v08TeamRangedOutput(LOWER, actuallyStronger.context.unitsHolder)).toBe(300);
-        expect(v08TeamRangedOutput(UPPER, actuallyStronger.context.unitsHolder)).toBe(4);
+        expect(v08TeamRangedOutput(LEFT, actuallyStronger.context.unitsHolder)).toBe(300);
+        expect(v08TeamRangedOutput(RIGHT, actuallyStronger.context.unitsHolder)).toBe(4);
         // The same frozen proxy sees 3*1 <= 1*4, so only v0.8 supplies the amount-aware wait.
         expect(new StrategyV0_7().decideTurn(actuallyStronger.unit, actuallyStronger.context)[0]?.type).toBe(
             "move_unit",
@@ -889,8 +889,8 @@ describe("v0.8 candidate policy", () => {
             enemyDamage: 1,
             shots: 1,
         });
-        expect(v08TeamRangedOutput(LOWER, stronger.context.unitsHolder)).toBe(4);
-        expect(v08TeamRangedOutput(UPPER, stronger.context.unitsHolder)).toBe(3);
+        expect(v08TeamRangedOutput(LEFT, stronger.context.unitsHolder)).toBe(4);
+        expect(v08TeamRangedOutput(RIGHT, stronger.context.unitsHolder)).toBe(3);
         expect(v08HasStrongerRangedPosture(stronger.unit, stronger.context.unitsHolder, 1, [])).toBe(true);
         expect(new StrategyV0_8().decideTurn(stronger.unit, stronger.context)[0]?.type).toBe("wait_turn");
 
@@ -902,8 +902,8 @@ describe("v0.8 candidate policy", () => {
             enemyDamage: 1,
             shots: 1,
         });
-        expect(v08TeamRangedOutput(LOWER, weaker.context.unitsHolder)).toBe(2);
-        expect(v08TeamRangedOutput(UPPER, weaker.context.unitsHolder)).toBe(3);
+        expect(v08TeamRangedOutput(LEFT, weaker.context.unitsHolder)).toBe(2);
+        expect(v08TeamRangedOutput(RIGHT, weaker.context.unitsHolder)).toBe(3);
         expect(v08HasStrongerRangedPosture(weaker.unit, weaker.context.unitsHolder, 1, [])).toBe(false);
         expect(
             new StrategyV0_8().decideTurn(weaker.unit, weaker.context).some((action) => action.type === "move_unit"),
@@ -920,8 +920,8 @@ describe("v0.8 candidate policy", () => {
             ownShots: 0,
             enemyShots: 1,
         });
-        expect(v08TeamRangedOutput(LOWER, depleted.context.unitsHolder)).toBe(0);
-        expect(v08TeamRangedOutput(UPPER, depleted.context.unitsHolder)).toBe(1);
+        expect(v08TeamRangedOutput(LEFT, depleted.context.unitsHolder)).toBe(0);
+        expect(v08TeamRangedOutput(RIGHT, depleted.context.unitsHolder)).toBe(1);
         expect(
             new StrategyV0_8()
                 .decideTurn(depleted.unit, depleted.context)
@@ -930,7 +930,7 @@ describe("v0.8 candidate policy", () => {
 
         const combat = createCombatTestContext();
         const runtimeShooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE,
             amountAlive: 3,
             damageMin: 7,
@@ -943,7 +943,7 @@ describe("v0.8 candidate policy", () => {
 
         expect(runtimeShooter.getAttackType()).toBe(MELEE);
         expect(runtimeShooter.isRangeCapable()).toBe(true);
-        expect(v08TeamRangedOutput(LOWER, combat.unitsHolder)).toBe(
+        expect(v08TeamRangedOutput(LEFT, combat.unitsHolder)).toBe(
             runtimeShooter.getRangeShots() * runtimeShooter.getAttackDamageMax() * runtimeShooter.getAmountAlive(),
         );
     });

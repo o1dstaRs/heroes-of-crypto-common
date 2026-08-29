@@ -30,8 +30,8 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
  * odd one out.
  */
 
-const RED = PBTypes.TeamVals.UPPER;
-const GREEN = PBTypes.TeamVals.LOWER;
+const RED = PBTypes.TeamVals.RIGHT;
+const GREEN = PBTypes.TeamVals.LEFT;
 const RANGE = PBTypes.AttackVals.RANGE;
 
 /** Raises "additional ability power" for the team that holds it. */

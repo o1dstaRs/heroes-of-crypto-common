@@ -25,14 +25,14 @@ describe("pierce wave depth follows the target's own extent", () => {
         const ctx = createCombatTestContext();
         const dragon = createTestUnit({
             name: "Dragon",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             size: PBTypes.UnitSizeVals.LARGE,
         });
-        const target = createTestUnit({ name: "Tall", team: PBTypes.TeamVals.UPPER });
+        const target = createTestUnit({ name: "Tall", team: PBTypes.TeamVals.RIGHT });
         (target.getUnitProperties() as { footprint_width: number }).footprint_width = 1;
         (target.getUnitProperties() as { footprint_height: number }).footprint_height = 2;
-        const behind = createTestUnit({ name: "Behind", team: PBTypes.TeamVals.UPPER });
-        const further = createTestUnit({ name: "Further", team: PBTypes.TeamVals.UPPER });
+        const behind = createTestUnit({ name: "Behind", team: PBTypes.TeamVals.RIGHT });
+        const further = createTestUnit({ name: "Further", team: PBTypes.TeamVals.RIGHT });
         stand(ctx, dragon, { x: 7, y: 5 }, 2, 2);
         stand(ctx, target, { x: 5, y: 5 }, 1, 2);
         stand(ctx, behind, { x: 4, y: 5 }, 1, 1);
@@ -49,11 +49,11 @@ describe("pierce wave depth follows the target's own extent", () => {
         const ctx = createCombatTestContext();
         const dragon = createTestUnit({
             name: "Dragon",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             size: PBTypes.UnitSizeVals.LARGE,
         });
-        const target = createTestUnit({ name: "Big", team: PBTypes.TeamVals.UPPER, size: PBTypes.UnitSizeVals.LARGE });
-        const behind = createTestUnit({ name: "Behind", team: PBTypes.TeamVals.UPPER });
+        const target = createTestUnit({ name: "Big", team: PBTypes.TeamVals.RIGHT, size: PBTypes.UnitSizeVals.LARGE });
+        const behind = createTestUnit({ name: "Behind", team: PBTypes.TeamVals.RIGHT });
         stand(ctx, dragon, { x: 7, y: 5 }, 2, 2);
         stand(ctx, target, { x: 5, y: 5 }, 2, 2);
         stand(ctx, behind, { x: 3, y: 5 }, 1, 1);

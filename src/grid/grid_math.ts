@@ -408,13 +408,13 @@ export function getPositionForCells(gridSettings: GridSettings, cells: XY[]): XY
  */
 export function advanceDepthOfCell(team: TeamType, cell: XY, sideOriented: boolean, gridSize = 16): number {
     const along = sideOriented ? cell.x : cell.y;
-    return team === PBTypes.TeamVals.LOWER ? along : gridSize - 1 - along;
+    return team === PBTypes.TeamVals.LEFT ? along : gridSize - 1 - along;
 }
 
 /** Signed advance from `from` to `to` for `team`, in cells: positive = toward the enemy. */
 export function advanceDeltaBetween(team: TeamType, from: XY, to: XY, sideOriented: boolean): number {
     const delta = sideOriented ? to.x - from.x : to.y - from.y;
-    return team === PBTypes.TeamVals.LOWER ? delta : -delta;
+    return team === PBTypes.TeamVals.LEFT ? delta : -delta;
 }
 
 export function getRandomGridCellAroundPosition(
@@ -431,7 +431,7 @@ export function getRandomGridCellAroundPosition(
     let proposedCells: XY[] = [];
     let hasHashes: number[] = [];
 
-    if (teamType === PBTypes.TeamVals.LOWER) {
+    if (teamType === PBTypes.TeamVals.LEFT) {
         if (!matrixElementOrDefault(gridMatrix, cell.x, cell.y + 1, 0)) {
             proposedCells.push({ x: cell.x, y: cell.y + 1 });
             hasHashes.push((cell.x << 4) | (cell.y + 1));
@@ -449,7 +449,7 @@ export function getRandomGridCellAroundPosition(
             proposedCells.push({ x: cell.x + 1, y: cell.y + 1 });
             hasHashes.push(((cell.x + 1) << 4) | (cell.y + 1));
         }
-    } else if (teamType === PBTypes.TeamVals.UPPER) {
+    } else if (teamType === PBTypes.TeamVals.RIGHT) {
         if (!matrixElementOrDefault(gridMatrix, cell.x, cell.y - 1, 0)) {
             proposedCells.push({ x: cell.x, y: cell.y - 1 });
             hasHashes.push((cell.x << 4) | (cell.y - 1));

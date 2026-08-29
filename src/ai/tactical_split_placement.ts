@@ -297,7 +297,7 @@ export function applyTacticalSplitPlacement(
     if (decoy && decoy.role !== "cover" && decoyUnit?.small) {
         const { candidates, alliedBases } = candidatesFor(decoy.unitId);
         const frontness = (cell: XY): number =>
-            context.team === PBTypes.TeamVals.LOWER ? along(cell) : 15 - along(cell);
+            context.team === PBTypes.TeamVals.LEFT ? along(cell) : 15 - along(cell);
         const mountainUtility =
             context.gridType === PBTypes.GridVals.BLOCK_CENTER &&
             (decoy.role === "aura" || decoy.role === "support" || decoy.role === "shield");
@@ -312,7 +312,7 @@ export function applyTacticalSplitPlacement(
             if (isolationDelta) return isolationDelta;
             const edgeDelta = Math.abs(lateralOf(right) - centerX) - Math.abs(lateralOf(left) - centerX);
             if (edgeDelta) return edgeDelta;
-            return context.team === PBTypes.TeamVals.LOWER
+            return context.team === PBTypes.TeamVals.LEFT
                 ? lateralOf(left) - lateralOf(right)
                 : lateralOf(right) - lateralOf(left);
         });
@@ -325,8 +325,8 @@ export function applyTacticalSplitPlacement(
         if (!coverUnit?.small) continue;
         const { candidates, alliedBases } = candidatesFor(cover.unitId);
         const backness = (cell: XY): number =>
-            context.team === PBTypes.TeamVals.LOWER ? 15 - along(cell) : along(cell);
-        const preferLeft = context.team === PBTypes.TeamVals.LOWER ? coverIndex % 2 === 0 : coverIndex % 2 !== 0;
+            context.team === PBTypes.TeamVals.LEFT ? 15 - along(cell) : along(cell);
+        const preferLeft = context.team === PBTypes.TeamVals.LEFT ? coverIndex % 2 === 0 : coverIndex % 2 !== 0;
         const sideDistance = (cell: XY): number => (preferLeft ? lateralOf(cell) : 15 - lateralOf(cell));
         candidates.sort((left, right) => {
             const backDelta = backness(right) - backness(left);
@@ -337,7 +337,7 @@ export function applyTacticalSplitPlacement(
             if (sideDelta) return sideDelta;
             const isolationDelta = isolationFor(right, alliedBases) - isolationFor(left, alliedBases);
             if (isolationDelta) return isolationDelta;
-            return context.team === PBTypes.TeamVals.LOWER ? left.x - right.x : right.x - left.x;
+            return context.team === PBTypes.TeamVals.LEFT ? left.x - right.x : right.x - left.x;
         });
         if (candidates[0]) {
             result.set(cover.unitId, candidates[0]);

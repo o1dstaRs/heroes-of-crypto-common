@@ -31,7 +31,7 @@ describe("Borrowed Grace setup-state exclusions", () => {
     const AUGMENT_BUFFS = ["Armor Augment", "Might Augment", "Empower Augment", "Sniper Augment", "Movement Augment"];
 
     it("cannot take any worn augment buff", () => {
-        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LOWER, amountAlive: 5, maxHp: 50 });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, amountAlive: 5, maxHp: 50 });
         for (const buffName of AUGMENT_BUFFS) {
             const buff = new Spell({
                 spellProperties: getSpellConfig("System", buffName, NUMBER_OF_LAPS_TOTAL),
@@ -64,7 +64,7 @@ describe("Borrowed Grace setup-state exclusions", () => {
     });
 
     it("still takes an ordinary cast blessing (positive control)", () => {
-        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LOWER, amountAlive: 5, maxHp: 50 });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, amountAlive: 5, maxHp: 50 });
         target.applyBuff(new Spell({ spellProperties: getSpellConfig("Life", "Spiritual Armor"), amount: 1 }));
         const worn = target.getBuffs();
         expect(worn.length).toBe(1);

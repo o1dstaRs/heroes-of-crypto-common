@@ -24,8 +24,8 @@ const PENALTY = ARTIFACT_POWER.CURSED_WARD_MORALE_PENALTY;
 const simulateLocally = (morale: number) => {
     const { grid, unitsHolder } = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, 1, Tier1Artifact.CURSED_WARD);
-    const unit = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LOWER, morale });
+    fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 1, Tier1Artifact.CURSED_WARD);
+    const unit = createTestUnit({ name: "Squire", team: PBTypes.TeamVals.LEFT, morale });
     placeUnit(grid, unitsHolder, unit, { x: 2, y: 2 });
     return { unitsHolder, fightProperties, unit };
 };

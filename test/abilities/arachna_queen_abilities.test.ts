@@ -28,8 +28,8 @@ afterEach(() => setDeterministicRandomSource(undefined));
 
 describe("Arachna Queen configuration", () => {
     it("configures Arachna Spider as a small level-3 Infest summon", () => {
-        const queen = getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "Arachna Queen", "arachna_queen_512", 1);
-        const spider = getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "Arachna Spider", "arachna_spider_512", 1);
+        const queen = getCreatureConfig(PBTypes.TeamVals.LEFT, "Nature", "Arachna Queen", "arachna_queen_512", 1);
+        const spider = getCreatureConfig(PBTypes.TeamVals.LEFT, "Nature", "Arachna Spider", "arachna_spider_512", 1);
 
         expect(queen.abilities).toEqual(["Web Aura", "Infest", "Predatory Assimilation"]);
         expect(queen.abilities_stack_powered[queen.abilities.indexOf("Predatory Assimilation")]).toBe(true);
@@ -51,7 +51,7 @@ describe("Web Aura", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const queen = createTestUnit({
             name: "Arachna Queen",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Web Aura"],
             auraEffects: ["Web"],
             auraRanges: [1],
@@ -59,13 +59,13 @@ describe("Web Aura", () => {
         });
         const enemyFlyer = createTestUnit({
             name: "Enemy Flyer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             movementType: PBTypes.MovementVals.FLY,
         });
-        const enemyWalker = createTestUnit({ name: "Enemy Walker", team: PBTypes.TeamVals.UPPER });
+        const enemyWalker = createTestUnit({ name: "Enemy Walker", team: PBTypes.TeamVals.RIGHT });
         const alliedFlyer = createTestUnit({
             name: "Allied Flyer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             movementType: PBTypes.MovementVals.FLY,
         });
         placeUnit(grid, unitsHolder, queen, { x: 4, y: 4 });
@@ -304,13 +304,13 @@ describe("Predatory Assimilation", () => {
             ["Life", "Valkyrie", "valkyrie_512", "Wind Flow"],
             ["Might", "Behemoth", "behemoth_512", "Battle Roar"],
         ] as const) {
-            const properties = getCreatureConfig(PBTypes.TeamVals.LOWER, faction, creatureName, textureName, 1);
+            const properties = getCreatureConfig(PBTypes.TeamVals.LEFT, faction, creatureName, textureName, 1);
             expect(properties.spell_entries_authoritative).toBeUndefined();
             const effectFactory = new EffectFactory();
             const unit = Unit.createUnit(
                 properties,
                 testGridSettings,
-                PBTypes.TeamVals.LOWER,
+                PBTypes.TeamVals.LEFT,
                 PBTypes.UnitVals.CREATURE,
                 new AbilityFactory(effectFactory),
                 effectFactory,
@@ -429,7 +429,7 @@ describe("Infest", () => {
         const fightProperties = FightStateManager.getInstance().getFightProperties();
         const killer = createTestUnit({
             name: "Infester",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Infest"],
         });
         const place = (unit: Unit, cell: XY) => {
@@ -483,7 +483,7 @@ describe("Infest", () => {
     ] as const)("spawns the correct child for destroyed level %i", (level, size, expectedName) => {
         const victim = createTestUnit({
             name: "Victim",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 10,
             level,
             size,
@@ -505,7 +505,7 @@ describe("Infest", () => {
     it("does not spawn from a destroyed no-level stack", () => {
         const victim = createTestUnit({
             name: "No-level Victim",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 10,
             level: PBTypes.UnitLevelVals.NO_LEVEL,
         });
@@ -521,7 +521,7 @@ describe("Infest", () => {
     it("does not spawn when the destroyed stack actually resurrects", () => {
         const victim = createTestUnit({
             name: "Resurrecting Victim",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 10,
             amountAlive: 2,
             level: PBTypes.UnitLevelVals.FIRST,
@@ -543,13 +543,13 @@ describe("Stolen Endless Quiver", () => {
         const { grid, unitsHolder, attackHandler } = createCombatTestContext();
         const thief = createTestUnit({
             name: "Arachna Queen",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Predatory Assimilation"],
             shotDistance: 0,
         });
         const archer = createTestUnit({
             name: "Medusa",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 9,
             shotDistance: 6.5,
@@ -602,7 +602,7 @@ describe("Stolen Endless Quiver", () => {
 
         const thief = createTestUnit({
             name: "Arachna Queen",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Predatory Assimilation"],
             shotDistance: 0,
             attack: 40,
@@ -612,7 +612,7 @@ describe("Stolen Endless Quiver", () => {
         });
         const farEnemy = createTestUnit({
             name: "Far Enemy",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 400,
             amountAlive: 20,
             armor: 0,
@@ -625,9 +625,9 @@ describe("Stolen Endless Quiver", () => {
         thief.refreshPossibleAttackTypes(true);
         expect(thief.selectAttackType(PBTypes.AttackVals.RANGE)).toBe(true);
 
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
         const engine = new GameActionEngine({
             fightProperties,

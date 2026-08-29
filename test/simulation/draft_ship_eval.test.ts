@@ -35,7 +35,7 @@ const opponent = (opponentId: string, clusteredLowerBound: number): ILeagueOppon
     clusteredLowerBound,
 });
 
-const report = (heuristicLower: number, defaultLower: number): ILeagueEvaluationReport => ({
+const report = (heuristicLeft: number, defaultLeft: number): ILeagueEvaluationReport => ({
     schemaVersion: 1,
     status: "measurement_only",
     generatedAt: "2026-07-11T00:00:00.000Z",
@@ -53,13 +53,13 @@ const report = (heuristicLower: number, defaultLower: number): ILeagueEvaluation
         softminTemperature: 0.025,
         confidenceZ: 1.96,
     },
-    opponents: [opponent(DRAFT_SHIP_HEURISTIC_ID, heuristicLower), opponent(DRAFT_SHIP_DEFAULT_ID, defaultLower)],
+    opponents: [opponent(DRAFT_SHIP_HEURISTIC_ID, heuristicLeft), opponent(DRAFT_SHIP_DEFAULT_ID, defaultLeft)],
     aggregate: {
         method: "worst-case",
-        fitness: Math.min(heuristicLower, defaultLower),
-        worstCaseLowerBound: Math.min(heuristicLower, defaultLower),
+        fitness: Math.min(heuristicLeft, defaultLeft),
+        worstCaseLowerBound: Math.min(heuristicLeft, defaultLeft),
         worstCaseOpponent: DRAFT_SHIP_DEFAULT_ID,
-        softminLowerBound: Math.min(heuristicLower, defaultLower),
+        softminLowerBound: Math.min(heuristicLeft, defaultLeft),
         adversarialMixture: [],
     },
     limitations: [],

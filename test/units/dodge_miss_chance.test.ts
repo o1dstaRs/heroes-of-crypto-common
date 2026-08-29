@@ -22,10 +22,10 @@ import { createCombatTestContext, createTestUnit } from "../helpers/combat";
  */
 describe("Dodge miss chance (Scavenger)", () => {
     const attacker = () =>
-        createTestUnit({ team: PBTypes.TeamVals.LOWER, attackType: PBTypes.AttackVals.RANGE, name: "Archer" });
+        createTestUnit({ team: PBTypes.TeamVals.LEFT, attackType: PBTypes.AttackVals.RANGE, name: "Archer" });
     const scavenger = (stackPower: number, luck: number) =>
         createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             name: "Scavenger",
             abilities: ["Dodge", "Backstab"],
@@ -54,7 +54,7 @@ describe("Dodge miss chance (Scavenger)", () => {
 
     test("no Dodge ability -> no miss chance at all", () => {
         createCombatTestContext();
-        const orc = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE, name: "Orc" });
+        const orc = createTestUnit({ team: PBTypes.TeamVals.RIGHT, attackType: PBTypes.AttackVals.MELEE, name: "Orc" });
         expect(attacker().calculateMissChance(orc, 0)).toBe(0);
     });
 });

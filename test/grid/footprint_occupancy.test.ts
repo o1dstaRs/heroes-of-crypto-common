@@ -33,7 +33,7 @@ import {
 // legacy corner-mask branch only fired when the body was wider than one cell in BOTH axes), and it must stay
 // bit-identical for the two shipped shapes, whose boards every baked AI weight was trained against.
 
-const TEAM = PBTypes.TeamVals.LOWER;
+const TEAM = PBTypes.TeamVals.LEFT;
 const ATTACK_RANGE = 1;
 const BASELINE = 1;
 

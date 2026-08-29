@@ -28,8 +28,8 @@ import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, testGridSettings, type CombatTestContext } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 type WardName = "Battle Mage" | "Magic Dragon";
 
 const wardFaction = (name: WardName): "Life" | "Nature" => (name === "Battle Mage" ? "Life" : "Nature");
@@ -101,9 +101,9 @@ function board(
     context: IDecisionContext;
 } {
     const combat = createCombatTestContext();
-    const protector = nativeUnit(LOWER, "Chaos", "Abomination");
-    const ward = wardName ? nativeUnit(LOWER, wardFaction(wardName), wardName) : undefined;
-    const enemy = nativeUnit(UPPER, "Life", "Squire");
+    const protector = nativeUnit(LEFT, "Chaos", "Abomination");
+    const ward = wardName ? nativeUnit(LEFT, wardFaction(wardName), wardName) : undefined;
+    const enemy = nativeUnit(RIGHT, "Life", "Squire");
 
     placeAtAnchor(combat, protector, { x: 6, y: 6 });
     if (ward) {
@@ -169,17 +169,17 @@ describe("Abomination runtime role contract", () => {
     ] as const)("places Abomination in native Flesh Shield range of %s", (_label, wardName) => {
         for (const [version, createStrategy] of strategyFactories) {
             const combat = createCombatTestContext();
-            const protector = nativeUnit(LOWER, "Chaos", "Abomination");
-            const ward = nativeUnit(LOWER, wardFaction(wardName), wardName);
-            const melee = nativeUnit(LOWER, "Life", "Squire");
-            const enemy = nativeUnit(UPPER, "Life", "Squire");
+            const protector = nativeUnit(LEFT, "Chaos", "Abomination");
+            const ward = nativeUnit(LEFT, wardFaction(wardName), wardName);
+            const melee = nativeUnit(LEFT, "Life", "Squire");
+            const enemy = nativeUnit(RIGHT, "Life", "Squire");
             for (const unit of [protector, ward, melee, enemy]) combat.unitsHolder.addUnit(unit);
             const context: IPlacementContext = {
-                team: LOWER,
+                team: LEFT,
                 grid: combat.grid,
                 unitsHolder: combat.unitsHolder,
                 pathHelper: new PathHelper(testGridSettings),
-                placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+                placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
                 publicOpponentCreatureIds: [PBTypes.CreatureVals.SQUIRE],
             };
 

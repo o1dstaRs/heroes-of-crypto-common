@@ -41,8 +41,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 function makeNative(team: number, faction: string, name: string, amount: number): Unit {
@@ -108,8 +108,8 @@ function applyCast(
 ): boolean {
     const fightProperties = context.fightProperties!;
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.setTeamUnitsAlive(LEFT, combat.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, combat.unitsHolder.getAllAllies(RIGHT).length);
     fightProperties.startTurn(caster.getTeam(), 1_000);
     const engine = new GameActionEngine({
         fightProperties,
@@ -126,7 +126,7 @@ function applyCast(
 
 function enemy(name: string, magicResist = 0): Unit {
     return createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name,
         attackType: MELEE,
         maxHp: 1_000,
@@ -143,7 +143,7 @@ function spell(unit: Unit, name: string) {
 describe("v0.8 damage-spell policy", () => {
     it("Battle Mage and the v0.8s alias cast Fire Strike instead of walking when it is the best legal hit", () => {
         const combat = createCombatTestContext();
-        const mage = makeNative(LOWER, "Life", "Battle Mage", 5);
+        const mage = makeNative(LEFT, "Life", "Battle Mage", 5);
         const target = enemy("Single target");
         placeCombatUnit(combat, mage, { x: 2, y: 2 });
         placeCombatUnit(combat, target, { x: 10, y: 10 });
@@ -165,7 +165,7 @@ describe("v0.8 damage-spell policy", () => {
     it("Battle Mage spends Meteorite on a stronger cluster, then falls back to Fire Strike when it is exhausted", () => {
         const setup = () => {
             const combat = createCombatTestContext();
-            const mage = makeNative(LOWER, "Life", "Battle Mage", 5);
+            const mage = makeNative(LEFT, "Life", "Battle Mage", 5);
             const first = enemy("Meteorite first");
             const second = enemy("Meteorite second");
             placeCombatUnit(combat, mage, { x: 2, y: 2 });
@@ -195,9 +195,9 @@ describe("v0.8 damage-spell policy", () => {
 
     it("Battle Mage never proposes a depleted Meteorite or a blocked Fire Strike", () => {
         const combat = createCombatTestContext();
-        const mage = makeNative(LOWER, "Life", "Battle Mage", 5);
+        const mage = makeNative(LEFT, "Life", "Battle Mage", 5);
         // An ENEMY screen — a friendly one is transparent, the mage arcs the throw over its own troops.
-        const blocker = createTestUnit({ team: UPPER, name: "Line blocker", attackType: MELEE });
+        const blocker = createTestUnit({ team: RIGHT, name: "Line blocker", attackType: MELEE });
         const target = enemy("Blocked target");
         placeCombatUnit(combat, mage, { x: 2, y: 2 });
         placeCombatUnit(combat, blocker, { x: 5, y: 2 });
@@ -216,7 +216,7 @@ describe("v0.8 damage-spell policy", () => {
         ]) {
             const combat = createCombatTestContext();
             const hybrid = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: `${setup.label} hybrid`,
                 attackType: PBTypes.AttackVals.MELEE_MAGIC,
                 attack: setup.attack,
@@ -226,7 +226,7 @@ describe("v0.8 damage-spell policy", () => {
                 stackPower: 5,
             });
             const target = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: `${setup.label} adjacent target`,
                 attackType: MELEE,
                 armor: setup.targetArmor,
@@ -246,7 +246,7 @@ describe("v0.8 damage-spell policy", () => {
     it("conserves a finite spell when both the physical hit and its overkill would kill the target", () => {
         const combat = createCombatTestContext();
         const hybrid = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Overkill hybrid",
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
             attack: 100,
@@ -256,7 +256,7 @@ describe("v0.8 damage-spell policy", () => {
             stackPower: 5,
         });
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "One HP adjacent target",
             attackType: MELEE,
             armor: 0,
@@ -285,7 +285,7 @@ describe("v0.8 damage-spell policy", () => {
     it("overrides the selected adjacent physical hit when Fire Strike is strictly better", () => {
         const combat = createCombatTestContext();
         const hybrid = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Weak hybrid",
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
             attack: 10,
@@ -295,7 +295,7 @@ describe("v0.8 damage-spell policy", () => {
             stackPower: 5,
         });
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Durable adjacent target",
             attackType: MELEE,
             armor: 10,
@@ -316,7 +316,7 @@ describe("v0.8 damage-spell policy", () => {
 
     it("Magic Dragon picks Lightning Strike for one target and executes the called-down cast", () => {
         const combat = createCombatTestContext();
-        const dragon = makeNative(LOWER, "Nature", "Magic Dragon", 1);
+        const dragon = makeNative(LEFT, "Nature", "Magic Dragon", 1);
         const target = enemy("Lightning target");
         placeCombatUnit(combat, dragon, { x: 3, y: 3 });
         placeCombatUnit(combat, target, { x: 10, y: 10 });
@@ -335,7 +335,7 @@ describe("v0.8 damage-spell policy", () => {
     it("Magic Dragon ranks Meteor Shower, Ring of Fire, then Lightning as cluster charges run out", () => {
         const setup = () => {
             const combat = createCombatTestContext();
-            const dragon = makeNative(LOWER, "Nature", "Magic Dragon", 1);
+            const dragon = makeNative(LEFT, "Nature", "Magic Dragon", 1);
             const aim = enemy("Cluster aim");
             const first = enemy("Cluster first");
             const second = enemy("Cluster second");
@@ -377,8 +377,8 @@ describe("v0.8 damage-spell policy", () => {
 
     it("rejects a friendly-fire-negative Ring candidate and casts Lightning instead", () => {
         const combat = createCombatTestContext();
-        const dragon = makeNative(LOWER, "Nature", "Magic Dragon", 1);
-        const ally = createTestUnit({ team: LOWER, name: "Ring-exposed ally", attackType: MELEE, maxHp: 1_000 });
+        const dragon = makeNative(LEFT, "Nature", "Magic Dragon", 1);
+        const ally = createTestUnit({ team: LEFT, name: "Ring-exposed ally", attackType: MELEE, maxHp: 1_000 });
         const aim = enemy("Ring aim");
         placeCombatUnit(combat, dragon, { x: 3, y: 3 });
         placeCombatUnit(combat, aim, { x: 9, y: 9 });
@@ -400,7 +400,7 @@ describe("v0.8 damage-spell policy", () => {
 
     it("does not treat Whirlpool as damage and falls back without an illegal immune cast", () => {
         const combat = createCombatTestContext();
-        const dragon = makeNative(LOWER, "Nature", "Magic Dragon", 1);
+        const dragon = makeNative(LEFT, "Nature", "Magic Dragon", 1);
         const immune = enemy("Magic-immune target", 100);
         placeCombatUnit(combat, dragon, { x: 3, y: 3 });
         placeCombatUnit(combat, immune, { x: 10, y: 10 });
@@ -413,8 +413,8 @@ describe("v0.8 damage-spell policy", () => {
 
     it("leaves an existing pure-MAGIC beneficial cast byte-identical", () => {
         const combat = createCombatTestContext();
-        const healer = makeNative(LOWER, "Life", "Healer", 5);
-        const wounded = createTestUnit({ team: LOWER, name: "Wounded ally", attackType: MELEE, maxHp: 100 });
+        const healer = makeNative(LEFT, "Life", "Healer", 5);
+        const wounded = createTestUnit({ team: LEFT, name: "Wounded ally", attackType: MELEE, maxHp: 100 });
         const target = enemy("Distant enemy");
         wounded.applyDamage(50, 0, new SceneLogMock());
         placeCombatUnit(combat, healer, { x: 2, y: 2 });
@@ -430,8 +430,8 @@ describe("v0.8 damage-spell policy", () => {
 
     it("lets Battle Mage cast while its stationary turn remains inside an Abomination ward", () => {
         const combat = createCombatTestContext();
-        const mage = makeNative(LOWER, "Life", "Battle Mage", 5);
-        const abomination = createTestUnit({ team: LOWER, name: "Abomination", attackType: MELEE });
+        const mage = makeNative(LEFT, "Life", "Battle Mage", 5);
+        const abomination = createTestUnit({ team: LEFT, name: "Abomination", attackType: MELEE });
         const target = enemy("Ward-safe target");
         placeCombatUnit(combat, abomination, { x: 5, y: 4 });
         placeCombatUnit(combat, mage, { x: 5, y: 5 });
@@ -462,7 +462,7 @@ describe("v0.8 damage-spell policy", () => {
 
         for (const testCase of cases) {
             const combat = createCombatTestContext();
-            const queen = makeNative(LOWER, "Nature", "Arachna Queen", 1);
+            const queen = makeNative(LEFT, "Nature", "Arachna Queen", 1);
             queen.grantStolenAbility(testCase.ability, [...testCase.entries]);
             const aim = enemy(`${testCase.expected} aim`);
             const victim = enemy(`${testCase.expected} victim`);

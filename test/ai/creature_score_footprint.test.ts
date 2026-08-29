@@ -70,7 +70,7 @@ describe("draft-time creature footprint", () => {
             expect(info).toBeDefined();
 
             const properties = getCreatureConfig(
-                PBTypes.TeamVals.LOWER,
+                PBTypes.TeamVals.LEFT,
                 factionName,
                 creatureName,
                 `${creatureName.replace(/\s+/g, "_")}_512`,

@@ -36,8 +36,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 function contextFor(combat: CombatTestContext): IDecisionContext {
@@ -99,8 +99,8 @@ function activateEngine(combat: CombatTestContext, unit: Unit): GameActionEngine
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(PBTypes.GridVals.NORMAL);
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.setTeamUnitsAlive(LEFT, combat.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, combat.unitsHolder.getAllAllies(RIGHT).length);
     fightProperties.startTurn(unit.getTeam(), 1_000);
     return new GameActionEngine({
         fightProperties,
@@ -151,9 +151,9 @@ function sameAreaThrowAction(left: readonly GameAction[], right: readonly GameAc
 describe("v0.8 ranged splash targeting", () => {
     it("upgrades Gargantuan's ordinary shot to the highest-value Area Throw cluster", () => {
         const combat = createCombatTestContext();
-        const gargantuan = makeReal(LOWER, "Nature", "Gargantuan");
-        const enemyA = createTestUnit({ team: UPPER, name: "Cluster A", attackType: MELEE, amountAlive: 20 });
-        const enemyB = createTestUnit({ team: UPPER, name: "Cluster B", attackType: MELEE, amountAlive: 20 });
+        const gargantuan = makeReal(LEFT, "Nature", "Gargantuan");
+        const enemyA = createTestUnit({ team: RIGHT, name: "Cluster A", attackType: MELEE, amountAlive: 20 });
+        const enemyB = createTestUnit({ team: RIGHT, name: "Cluster B", attackType: MELEE, amountAlive: 20 });
         placeLarge(combat, gargantuan, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 10, y: 9 });
         placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 10, y: 11 });
@@ -175,16 +175,16 @@ describe("v0.8 ranged splash targeting", () => {
 
     it("retargets Cyclops from an allied splash to the higher-value clean enemy cluster", () => {
         const combat = createCombatTestContext();
-        const cyclops = makeReal(LOWER, "Might", "Cyclops");
+        const cyclops = makeReal(LEFT, "Might", "Cyclops");
         const harmfulTarget = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Harmful target",
             attackType: MELEE,
             amountAlive: 20,
         });
-        const harmedAlly = createTestUnit({ team: LOWER, name: "Splash ally", attackType: MELEE, amountAlive: 20 });
-        const clusterA = createTestUnit({ team: UPPER, name: "Safe cluster A", attackType: MELEE, amountAlive: 20 });
-        const clusterB = createTestUnit({ team: UPPER, name: "Safe cluster B", attackType: MELEE, amountAlive: 20 });
+        const harmedAlly = createTestUnit({ team: LEFT, name: "Splash ally", attackType: MELEE, amountAlive: 20 });
+        const clusterA = createTestUnit({ team: RIGHT, name: "Safe cluster A", attackType: MELEE, amountAlive: 20 });
+        const clusterB = createTestUnit({ team: RIGHT, name: "Safe cluster B", attackType: MELEE, amountAlive: 20 });
         placeUnit(combat.grid, combat.unitsHolder, cyclops, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, harmfulTarget, { x: 8, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, harmedAlly, { x: 8, y: 4 });

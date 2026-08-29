@@ -18,7 +18,7 @@ import { MoveHandler } from "../../src/handlers/move_handler";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
+const LEFT = PBTypes.TeamVals.LEFT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 // 16-grid BLOCK_CENTER: left mountain cells x∈{5,6}, right x∈{9,10}, both y∈{7,8}.
@@ -32,7 +32,7 @@ function strikeFrom(standCell: XY, targetCell: XY = LEFT_MOUNTAIN_CELL): boolean
     const fp = FightStateManager.getInstance().getFightProperties();
     fp.setGridType(PBTypes.GridVals.BLOCK_CENTER);
 
-    const unit = createTestUnit({ team: LOWER, attackType: MELEE, name: "Knight" });
+    const unit = createTestUnit({ team: LEFT, attackType: MELEE, name: "Knight" });
     placeUnit(ctx.grid, ctx.unitsHolder, unit, standCell);
 
     const hitsBefore = fp.getObstacleHitsLeft();

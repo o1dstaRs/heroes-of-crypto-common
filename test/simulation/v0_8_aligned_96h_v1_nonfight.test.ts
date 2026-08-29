@@ -142,7 +142,7 @@ describe("v0.8 aligned deployed-v0.7 non-fight binding", () => {
                 },
             );
             const actual = runV08AlignedV1BoundRankedPick(seed);
-            for (const seat of ["lower", "upper"] as const) {
+            for (const seat of ["left", "right"] as const) {
                 expect(actual[seat].creatureIds).toEqual(expected[seat].creatureIds);
                 expect(actual[seat].doctrine).toBe(expected[seat].doctrine);
                 expect(actual[seat].tier1Artifact).toBe(expected[seat].tier1Artifact);
@@ -156,14 +156,14 @@ describe("v0.8 aligned deployed-v0.7 non-fight binding", () => {
     });
 
     it("binds both physical seats explicitly and keeps fixed templates artifact-free", () => {
-        const lower = v07ArchetypeTemplate("mage_frontline").roster.map((unit) => ({ ...unit }));
-        const upper = v07ArchetypeTemplate("ranged_control").roster.map((unit) => ({ ...unit }));
+        const left = v07ArchetypeTemplate("mage_frontline").roster.map((unit) => ({ ...unit }));
+        const right = v07ArchetypeTemplate("ranged_control").roster.map((unit) => ({ ...unit }));
         const doctrine = SETUP_POLICY_V0.pickDoctrine();
         const base = {
             greenVersion: "v0.8s",
             redVersion: "v0.7",
-            roster: lower,
-            redRoster: upper,
+            roster: left,
+            redRoster: right,
             seed: 11,
             gridType: PBTypes.GridVals.NORMAL,
             greenDoctrine: doctrine,

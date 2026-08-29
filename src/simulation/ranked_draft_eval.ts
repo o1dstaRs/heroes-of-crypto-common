@@ -77,8 +77,8 @@ for (const faction of Object.values(CREATURES)) {
     }
 }
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const CURRENT_INCUMBENT_ID = "ranked-round1-incumbent";
 const HEURISTIC_ID = "untrained-heuristic";
 const DEFAULT_ID = "shipped-default-draft";
@@ -506,7 +506,7 @@ export interface IRankedDraftBoardInspection {
     pairSeed: number;
     pickSeed: number;
     assignments: {
-        candidatePickedLower: boolean;
+        candidatePickedLeft: boolean;
         candidateCohorts: RankedDraftCohort[];
     }[];
 }
@@ -562,63 +562,61 @@ function applyAccepted(state: IPickSimState, action: PickAction, rng: PickRandom
  * recomputing it after the level-4 pick would leak future roster information into the setup policy.
  */
 export interface IRankedDraftSetupPolicySpecs {
-    lower?: string;
-    upper?: string;
+    left?: string;
+    right?: string;
 }
 
 export function resolveRankedDraftPick(
     seed: number,
-    lowerInput: ILeagueGenome,
-    upperInput: ILeagueGenome,
+    leftInput: ILeagueGenome,
+    rightInput: ILeagueGenome,
     setupPolicySpecs: IRankedDraftSetupPolicySpecs = {},
 ): IPickSimState {
-    const lowerGenome = normalizeRankedDraftGenome(lowerInput);
-    const upperGenome = normalizeRankedDraftGenome(upperInput);
-    const lowerSetupPolicy = resolveSetupPolicy(setupPolicySpecs.lower ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC);
-    const upperSetupPolicy = resolveSetupPolicy(setupPolicySpecs.upper ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC);
+    const leftGenome = normalizeRankedDraftGenome(leftInput);
+    const rightGenome = normalizeRankedDraftGenome(rightInput);
+    const leftSetupPolicy = resolveSetupPolicy(setupPolicySpecs.left ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC);
+    const rightSetupPolicy = resolveSetupPolicy(setupPolicySpecs.right ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC);
     const rng = randomInt(seed);
     let state = createPickSimState(rng);
-    const teamState = (team: PickTeam): IPickTeamState => (team === LOWER ? state.lower : state.upper);
+    const teamState = (team: PickTeam): IPickTeamState => (team === LEFT ? state.left : state.right);
 
     const doctrine = SETUP_POLICY_V0.pickDoctrine();
-    state = applyAccepted(state, { type: "select_doctrine", team: LOWER, doctrine }, rng);
-    state = applyAccepted(state, { type: "select_doctrine", team: UPPER, doctrine }, rng);
+    state = applyAccepted(state, { type: "select_doctrine", team: LEFT, doctrine }, rng);
+    state = applyAccepted(state, { type: "select_doctrine", team: RIGHT, doctrine }, rng);
 
     // Both simultaneous policies decide from the same pre-commit state.
-    const lowerBundle = pickCoherentDraftBundle(
-        state.lower.bundles,
-        (creatureId) => draftGenomeCreatureScore(lowerGenome, creatureId),
+    const leftBundle = pickCoherentDraftBundle(
+        state.left.bundles,
+        (creatureId) => draftGenomeCreatureScore(leftGenome, creatureId),
         (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
         {
-            ...(lowerGenome.draftSpellRangedPolicy
-                ? { draftSpellRangedPolicy: lowerGenome.draftSpellRangedPolicy }
+            ...(leftGenome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: leftGenome.draftSpellRangedPolicy } : {}),
+        },
+    );
+    const rightBundle = pickCoherentDraftBundle(
+        state.right.bundles,
+        (creatureId) => draftGenomeCreatureScore(rightGenome, creatureId),
+        (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+        {
+            ...(rightGenome.draftSpellRangedPolicy
+                ? { draftSpellRangedPolicy: rightGenome.draftSpellRangedPolicy }
                 : {}),
         },
     );
-    const upperBundle = pickCoherentDraftBundle(
-        state.upper.bundles,
-        (creatureId) => draftGenomeCreatureScore(upperGenome, creatureId),
-        (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
-        {
-            ...(upperGenome.draftSpellRangedPolicy
-                ? { draftSpellRangedPolicy: upperGenome.draftSpellRangedPolicy }
-                : {}),
-        },
-    );
-    state = applyAccepted(state, { type: "select_bundle", team: LOWER, bundleIndex: lowerBundle }, rng);
-    state = applyAccepted(state, { type: "select_bundle", team: UPPER, bundleIndex: upperBundle }, rng);
+    state = applyAccepted(state, { type: "select_bundle", team: LEFT, bundleIndex: leftBundle }, rng);
+    state = applyAccepted(state, { type: "select_bundle", team: RIGHT, bundleIndex: rightBundle }, rng);
 
     let transitions = 0;
     while (!isPickSimComplete(state)) {
         if ((transitions += 1) > 40) throw new Error("Ranked draft pick exceeded the collision retry guard");
         const phase = getCurrentPickPhase(state);
         if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
-            const lower = teamState(LOWER);
-            const upper = teamState(UPPER);
-            const lowerArtifact = lowerSetupPolicy.pickArtifactT2(lower.tier2Offers, lower.creatures);
-            const upperArtifact = upperSetupPolicy.pickArtifactT2(upper.tier2Offers, upper.creatures);
-            state = applyAccepted(state, { type: "select_tier2", team: LOWER, artifactId: lowerArtifact }, rng);
-            state = applyAccepted(state, { type: "select_tier2", team: UPPER, artifactId: upperArtifact }, rng);
+            const left = teamState(LEFT);
+            const right = teamState(RIGHT);
+            const leftArtifact = leftSetupPolicy.pickArtifactT2(left.tier2Offers, left.creatures);
+            const rightArtifact = rightSetupPolicy.pickArtifactT2(right.tier2Offers, right.creatures);
+            state = applyAccepted(state, { type: "select_tier2", team: LEFT, artifactId: leftArtifact }, rng);
+            state = applyAccepted(state, { type: "select_tier2", team: RIGHT, artifactId: rightArtifact }, rng);
             continue;
         }
         if (phase.phase !== PBTypes.PickPhaseVals.PICK || phase.actors.length !== 1) {
@@ -627,7 +625,7 @@ export function resolveRankedDraftPick(
         const team = phase.actors[0];
         const own = teamState(team);
         const creatureId = pickDraftGenomeCreature(
-            team === LOWER ? lowerGenome : upperGenome,
+            team === LEFT ? leftGenome : rightGenome,
             getVisibleCreatureChoices(state, team),
             own.creatures,
             getKnownOpponentCreatures(state, team),
@@ -761,27 +759,27 @@ export function playRankedDraftGame(
     const pickAssignment = Math.floor(withinBoard / 2) as 0 | 1;
     const battleMirror = (withinBoard % 2) as 0 | 1;
     const { pairSeed, pickSeed, battleSeed } = rankedDraftBoardSeeds(options, seedLaneIndex, offerBoard);
-    const candidatePickedLower = pickAssignment === 0;
-    const lowerGenome = candidatePickedLower ? candidate : opponent;
-    const upperGenome = candidatePickedLower ? opponent : candidate;
-    const lowerSetupPolicySpec = candidatePickedLower
+    const candidatePickedLeft = pickAssignment === 0;
+    const leftGenome = candidatePickedLeft ? candidate : opponent;
+    const rightGenome = candidatePickedLeft ? opponent : candidate;
+    const leftSetupPolicySpec = candidatePickedLeft
         ? options.candidateSetupPolicySpec
         : options.opponentSetupPolicySpec;
-    const upperSetupPolicySpec = candidatePickedLower
+    const rightSetupPolicySpec = candidatePickedLeft
         ? options.opponentSetupPolicySpec
         : options.candidateSetupPolicySpec;
-    const lowerSetupPolicy = resolveSetupPolicy(lowerSetupPolicySpec);
-    const upperSetupPolicy = resolveSetupPolicy(upperSetupPolicySpec);
-    const pick = resolveRankedDraftPick(pickSeed, lowerGenome, upperGenome, {
-        lower: lowerSetupPolicy.spec,
-        upper: upperSetupPolicy.spec,
+    const leftSetupPolicy = resolveSetupPolicy(leftSetupPolicySpec);
+    const rightSetupPolicy = resolveSetupPolicy(rightSetupPolicySpec);
+    const pick = resolveRankedDraftPick(pickSeed, leftGenome, rightGenome, {
+        left: leftSetupPolicy.spec,
+        right: rightSetupPolicy.spec,
     });
-    const lower = materializeArmy(pick.lower, getKnownOpponentCreatures(pick, LOWER), lowerSetupPolicy);
-    const upper = materializeArmy(pick.upper, getKnownOpponentCreatures(pick, UPPER), upperSetupPolicy);
-    const green = battleMirror ? upper : lower;
-    const red = battleMirror ? lower : upper;
-    const candidateIsGreen = battleMirror ? !candidatePickedLower : candidatePickedLower;
-    const candidateArmy = candidatePickedLower ? lower : upper;
+    const left = materializeArmy(pick.left, getKnownOpponentCreatures(pick, LEFT), leftSetupPolicy);
+    const right = materializeArmy(pick.right, getKnownOpponentCreatures(pick, RIGHT), rightSetupPolicy);
+    const green = battleMirror ? right : left;
+    const red = battleMirror ? left : right;
+    const candidateIsGreen = battleMirror ? !candidatePickedLeft : candidatePickedLeft;
+    const candidateArmy = candidatePickedLeft ? left : right;
     const gridType = options.mapTypes[(offerBoard + seedLaneIndex) % options.mapTypes.length];
     const result = (dependencies.matchRunner ?? DEFAULT_DEPENDENCIES.matchRunner)(
         matchConfig(green, red, battleSeed, gridType, options.maxLaps, options.fightProfile),
@@ -792,9 +790,9 @@ export function playRankedDraftGame(
         opponentId: opponent.id,
         game,
         offerBoard,
-        pickSeat: candidatePickedLower ? "candidate-lower" : "candidate-upper",
+        pickSeat: candidatePickedLeft ? "candidate-lower" : "candidate-upper",
         battleMirror,
-        setupFingerprint: createHash("sha256").update(JSON.stringify({ lower, upper, gridType })).digest("hex"),
+        setupFingerprint: createHash("sha256").update(JSON.stringify({ left, right, gridType })).digest("hex"),
         behaviorTraceSha256: rankedDraftBehaviorTraceSha256(result),
         pairSeed,
         pickSeed,
@@ -832,16 +830,16 @@ export function inspectRankedDraftBoard(
         throw new RangeError(`offerBoard must be in [0, ${boards})`);
     }
     const { pairSeed, pickSeed } = rankedDraftBoardSeeds(options, seedLaneIndex, offerBoard);
-    const assignments = ([true, false] as const).map((candidatePickedLower) => {
-        const lowerGenome = candidatePickedLower ? candidate : opponent;
-        const upperGenome = candidatePickedLower ? opponent : candidate;
-        const pick = resolveRankedDraftPick(pickSeed, lowerGenome, upperGenome, {
-            lower: candidatePickedLower ? options.candidateSetupPolicySpec : options.opponentSetupPolicySpec,
-            upper: candidatePickedLower ? options.opponentSetupPolicySpec : options.candidateSetupPolicySpec,
+    const assignments = ([true, false] as const).map((candidatePickedLeft) => {
+        const leftGenome = candidatePickedLeft ? candidate : opponent;
+        const rightGenome = candidatePickedLeft ? opponent : candidate;
+        const pick = resolveRankedDraftPick(pickSeed, leftGenome, rightGenome, {
+            left: candidatePickedLeft ? options.candidateSetupPolicySpec : options.opponentSetupPolicySpec,
+            right: candidatePickedLeft ? options.opponentSetupPolicySpec : options.candidateSetupPolicySpec,
         });
-        const candidateTeam = candidatePickedLower ? pick.lower : pick.upper;
+        const candidateTeam = candidatePickedLeft ? pick.left : pick.right;
         return {
-            candidatePickedLower,
+            candidatePickedLeft,
             candidateCohorts: classifyRankedDraftCohorts(candidateTeam.creatures),
         };
     });

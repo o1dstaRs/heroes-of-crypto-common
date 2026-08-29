@@ -140,7 +140,7 @@ describe("PathHelper Tests", () => {
                 true, // unitIsSmall
                 2, // range
                 true, // targetIsSmall
-                PBTypes.TeamVals.LOWER,
+                PBTypes.TeamVals.LEFT,
                 new Map(),
             );
 
@@ -149,7 +149,7 @@ describe("PathHelper Tests", () => {
 
         test("should select directional attack cells around target quadrants", () => {
             const helperAny = pathHelper as any;
-            const upperHashes = new Set<number>([
+            const rightHashes = new Set<number>([
                 (4 << 4) | 4,
                 (5 << 4) | 4,
                 (4 << 4) | 5,
@@ -160,41 +160,41 @@ describe("PathHelper Tests", () => {
                 (6 << 4) | 4,
             ]);
 
-            expect(helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, upperHashes, PBTypes.TeamVals.UPPER)).toEqual({
+            expect(helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, rightHashes, PBTypes.TeamVals.RIGHT)).toEqual({
                 x: 4,
                 y: 4,
             });
             expect(
-                helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, new Set([(5 << 4) | 4]), PBTypes.TeamVals.UPPER),
+                helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, new Set([(5 << 4) | 4]), PBTypes.TeamVals.RIGHT),
             ).toEqual({ x: 5, y: 4 });
-            expect(
-                helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, new Set([(4 << 4) | 5]), PBTypes.TeamVals.LOWER),
-            ).toEqual({ x: 4, y: 5 });
+            expect(helperAny.attackCellA({ x: 5, y: 5 }, 4, 4, new Set([(4 << 4) | 5]), PBTypes.TeamVals.LEFT)).toEqual(
+                { x: 4, y: 5 },
+            );
 
-            expect(helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, upperHashes, PBTypes.TeamVals.UPPER)).toEqual({
+            expect(helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, rightHashes, PBTypes.TeamVals.RIGHT)).toEqual({
                 x: 6,
                 y: 6,
             });
             expect(
-                helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, new Set([(6 << 4) | 5]), PBTypes.TeamVals.UPPER),
+                helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, new Set([(6 << 4) | 5]), PBTypes.TeamVals.RIGHT),
             ).toEqual({ x: 6, y: 5 });
-            expect(
-                helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, new Set([(5 << 4) | 6]), PBTypes.TeamVals.LOWER),
-            ).toEqual({ x: 5, y: 6 });
+            expect(helperAny.attackCellB({ x: 5, y: 5 }, 6, 6, new Set([(5 << 4) | 6]), PBTypes.TeamVals.LEFT)).toEqual(
+                { x: 5, y: 6 },
+            );
 
-            expect(helperAny.attackCellC({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 4]), PBTypes.TeamVals.UPPER)).toEqual({
+            expect(helperAny.attackCellC({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 4]), PBTypes.TeamVals.RIGHT)).toEqual({
                 x: 6,
                 y: 4,
             });
-            expect(helperAny.attackCellC({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 6]), PBTypes.TeamVals.LOWER)).toEqual({
+            expect(helperAny.attackCellC({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 6]), PBTypes.TeamVals.LEFT)).toEqual({
                 x: 6,
                 y: 6,
             });
-            expect(helperAny.attackCellD({ x: 5, y: 5 }, 6, new Set([(4 << 4) | 6]), PBTypes.TeamVals.UPPER)).toEqual({
+            expect(helperAny.attackCellD({ x: 5, y: 5 }, 6, new Set([(4 << 4) | 6]), PBTypes.TeamVals.RIGHT)).toEqual({
                 x: 4,
                 y: 6,
             });
-            expect(helperAny.attackCellD({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 6]), PBTypes.TeamVals.LOWER)).toEqual({
+            expect(helperAny.attackCellD({ x: 5, y: 5 }, 6, new Set([(6 << 4) | 6]), PBTypes.TeamVals.LEFT)).toEqual({
                 x: 6,
                 y: 6,
             });
@@ -240,7 +240,7 @@ describe("PathHelper Tests", () => {
                     false,
                     2,
                     false,
-                    PBTypes.TeamVals.UPPER,
+                    PBTypes.TeamVals.RIGHT,
                     attackCellHashesToLargeCells,
                 ),
             ).toBeUndefined();
@@ -254,7 +254,7 @@ describe("PathHelper Tests", () => {
                 false,
                 2,
                 false,
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
                 attackCellHashesToLargeCells,
             );
 
@@ -410,30 +410,30 @@ describe("PathHelper Tests", () => {
 
         test("should validate pre-start placement for small and large units", () => {
             const { unitsHolder } = createCombatTestContext();
-            const lowerLeft = new SquarePlacement(gridSettings, PlacementPositionType.LOWER_LEFT, 3);
-            const upperRight = new SquarePlacement(gridSettings, PlacementPositionType.UPPER_RIGHT, 3);
-            const lower = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-            const upper = createTestUnit({ team: PBTypes.TeamVals.UPPER });
-            const largeLower = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+            const leftBottom = new SquarePlacement(gridSettings, PlacementPositionType.LEFT_BOTTOM, 3);
+            const rightTop = new SquarePlacement(gridSettings, PlacementPositionType.RIGHT_TOP, 3);
+            const left = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+            const right = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
+            const largeLeft = createTestUnit({
+                team: PBTypes.TeamVals.LEFT,
                 size: PBTypes.UnitSizeVals.LARGE,
             });
 
-            lower.setPosition(positionForCell({ x: 1, y: 1 }).x, positionForCell({ x: 1, y: 1 }).y);
-            upper.setPosition(positionForCell({ x: 1, y: 1 }).x, positionForCell({ x: 1, y: 1 }).y);
-            largeLower.setPosition(positionForCell({ x: 1, y: 1 }).x, positionForCell({ x: 1, y: 1 }).y);
-            unitsHolder.addUnit(lower);
+            left.setPosition(positionForCell({ x: 1, y: 1 }).x, positionForCell({ x: 1, y: 1 }).y);
+            right.setPosition(positionForCell({ x: 1, y: 1 }).x, positionForCell({ x: 1, y: 1 }).y);
+            largeLeft.setPosition(positionForCell({ x: 1, y: 1 }).x, positionForCell({ x: 1, y: 1 }).y);
+            unitsHolder.addUnit(left);
 
-            expect(pathHelper.isAllowedPreStartUnitPosition(lower, lower.getCells(), unitsHolder)).toBe(false);
+            expect(pathHelper.isAllowedPreStartUnitPosition(left, left.getCells(), unitsHolder)).toBe(false);
             expect(
-                pathHelper.isAllowedPreStartUnitPosition(lower, lower.getCells(), unitsHolder, lowerLeft, upperRight),
+                pathHelper.isAllowedPreStartUnitPosition(left, left.getCells(), unitsHolder, leftBottom, rightTop),
             ).toBe(true);
             expect(
-                pathHelper.isAllowedPreStartUnitPosition(upper, upper.getCells(), unitsHolder, lowerLeft, upperRight),
+                pathHelper.isAllowedPreStartUnitPosition(right, right.getCells(), unitsHolder, leftBottom, rightTop),
             ).toBe(false);
             expect(
                 pathHelper.isAllowedPreStartUnitPosition(
-                    largeLower,
+                    largeLeft,
                     [
                         { x: 1, y: 1 },
                         { x: 1, y: 2 },
@@ -441,13 +441,13 @@ describe("PathHelper Tests", () => {
                         { x: 2, y: 2 },
                     ],
                     unitsHolder,
-                    lowerLeft,
-                    upperRight,
+                    leftBottom,
+                    rightTop,
                 ),
             ).toBe(true);
             expect(
                 pathHelper.isAllowedPreStartUnitPosition(
-                    largeLower,
+                    largeLeft,
                     [
                         { x: 1, y: 1 },
                         { x: 1, y: 3 },
@@ -455,8 +455,8 @@ describe("PathHelper Tests", () => {
                         { x: 2, y: 2 },
                     ],
                     unitsHolder,
-                    lowerLeft,
-                    upperRight,
+                    leftBottom,
+                    rightTop,
                 ),
             ).toBe(false);
         });

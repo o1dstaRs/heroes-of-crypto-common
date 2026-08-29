@@ -310,7 +310,7 @@ export function decisionPathSource(context: {
 }
 
 function canonicalInput(grid: Grid, unit: Unit, matrix: number[][]): ICanonicalMovePathInput {
-    const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     return {
         currentCell: { ...unit.getBaseCell() },
         matrix,

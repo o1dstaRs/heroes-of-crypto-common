@@ -68,7 +68,7 @@ describe("FightProperties", () => {
             fightProperties.enqueueMoraleMinus("morale-minus");
             fightProperties.enqueueHourglass("hourglass");
             fightProperties.addRepliedAttack("reply");
-            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LOWER, "done");
+            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LEFT, "done");
             fightProperties.increaseStepsMoraleMultiplier();
             fightProperties.encounterDamageDealFact();
             fightProperties.encounterObstacleHit(false);
@@ -150,24 +150,24 @@ describe("FightProperties", () => {
 
             expect(fightProperties.requestAdditionalTurnTime()).toBe(0);
 
-            fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 2);
-            fightProperties.startTurn(PBTypes.TeamVals.LOWER);
+            fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 2);
+            fightProperties.startTurn(PBTypes.TeamVals.LEFT);
 
             const originalStart = fightProperties.getCurrentTurnStart();
             const originalEnd = fightProperties.getCurrentTurnEnd();
-            const justCheckedAdditionalTime = fightProperties.requestAdditionalTurnTime(PBTypes.TeamVals.LOWER, true);
+            const justCheckedAdditionalTime = fightProperties.requestAdditionalTurnTime(PBTypes.TeamVals.LEFT, true);
 
             expect(originalStart).toBeGreaterThan(0);
             expect(originalEnd).toBeGreaterThan(originalStart);
             expect(justCheckedAdditionalTime).toBeGreaterThan(0);
-            expect(fightProperties.getHasAdditionalTimeRequestedPerTeam().get(PBTypes.TeamVals.LOWER)).toBeUndefined();
+            expect(fightProperties.getHasAdditionalTimeRequestedPerTeam().get(PBTypes.TeamVals.LEFT)).toBeUndefined();
 
-            const grantedAdditionalTime = fightProperties.requestAdditionalTurnTime(PBTypes.TeamVals.LOWER);
+            const grantedAdditionalTime = fightProperties.requestAdditionalTurnTime(PBTypes.TeamVals.LEFT);
 
             expect(grantedAdditionalTime).toBe(justCheckedAdditionalTime);
             expect(fightProperties.getCurrentTurnEnd()).toBe(originalEnd + grantedAdditionalTime);
-            expect(fightProperties.getHasAdditionalTimeRequestedPerTeam().get(PBTypes.TeamVals.LOWER)).toBe(true);
-            expect(fightProperties.requestAdditionalTurnTime(PBTypes.TeamVals.LOWER)).toBe(0);
+            expect(fightProperties.getHasAdditionalTimeRequestedPerTeam().get(PBTypes.TeamVals.LEFT)).toBe(true);
+            expect(fightProperties.requestAdditionalTurnTime(PBTypes.TeamVals.LEFT)).toBe(0);
         });
 
         it("detects narrowing, dry-center, and armageddon laps", () => {
@@ -210,65 +210,65 @@ describe("FightProperties", () => {
         it("applies augment budget rules and placement defaults", () => {
             const fightProperties = new FightProperties();
 
-            expect(fightProperties.getAugmentArmor(PBTypes.TeamVals.LOWER)).toBe(ArmorAugment.NO_AUGMENT);
-            expect(fightProperties.getAugmentMight(PBTypes.TeamVals.LOWER)).toBe(MightAugment.NO_AUGMENT);
-            expect(fightProperties.getAugmentSniper(PBTypes.TeamVals.LOWER)).toBe(SniperAugment.NO_AUGMENT);
-            expect(fightProperties.getAugmentMovement(PBTypes.TeamVals.LOWER)).toBe(MovementAugment.NO_AUGMENT);
+            expect(fightProperties.getAugmentArmor(PBTypes.TeamVals.LEFT)).toBe(ArmorAugment.NO_AUGMENT);
+            expect(fightProperties.getAugmentMight(PBTypes.TeamVals.LEFT)).toBe(MightAugment.NO_AUGMENT);
+            expect(fightProperties.getAugmentSniper(PBTypes.TeamVals.LEFT)).toBe(SniperAugment.NO_AUGMENT);
+            expect(fightProperties.getAugmentMovement(PBTypes.TeamVals.LEFT)).toBe(MovementAugment.NO_AUGMENT);
             expect(fightProperties.getAugmentPlacement(PBTypes.TeamVals.NO_TEAM)).toEqual([]);
-            expect(() => fightProperties.getAugmentPlacement(PBTypes.TeamVals.UPPER)).toThrow(
+            expect(() => fightProperties.getAugmentPlacement(PBTypes.TeamVals.RIGHT)).toThrow(
                 "Default placement not found",
             );
 
-            fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LOWER, DefaultPlacementLevel1.THREE_BY_THREE);
+            fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LEFT, DefaultPlacementLevel1.THREE_BY_THREE);
 
-            expect(fightProperties.getAugmentPlacement(PBTypes.TeamVals.LOWER)).toEqual([3]);
+            expect(fightProperties.getAugmentPlacement(PBTypes.TeamVals.LEFT)).toEqual([3]);
 
-            fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LOWER, DefaultPlacementLevel1.FOUR_BY_FOUR);
+            fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LEFT, DefaultPlacementLevel1.FOUR_BY_FOUR);
 
-            expect(fightProperties.getAugmentPlacement(PBTypes.TeamVals.LOWER)).toEqual([3]);
+            expect(fightProperties.getAugmentPlacement(PBTypes.TeamVals.LEFT)).toEqual([3]);
             expect(
                 fightProperties.canAugment(PBTypes.TeamVals.NO_TEAM, { type: "Armor", value: ArmorAugment.LEVEL_1 }),
             ).toBe(false);
             expect(
-                fightProperties.canAugment(PBTypes.TeamVals.LOWER, {
+                fightProperties.canAugment(PBTypes.TeamVals.LEFT, {
                     type: "Armor",
                     value: -1 as ArmorAugment,
                 }),
             ).toBe(false);
 
             expect(
-                fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+                fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
                     type: "Placement",
                     value: PlacementAugment.LEVEL_3,
                 }),
             ).toBe(true);
             expect(
-                fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+                fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
                     type: "Armor",
                     value: ArmorAugment.LEVEL_3,
                 }),
             ).toBe(true);
             expect(
-                fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+                fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
                     type: "Might",
                     value: MightAugment.LEVEL_3,
                 }),
             ).toBe(false);
             expect(
-                fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, {
+                fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, {
                     type: "Movement",
                     value: MovementAugment.LEVEL_2,
                 }),
             ).toBe(true);
 
-            expect(fightProperties.getAugmentPlacement(PBTypes.TeamVals.LOWER)).toEqual([6]);
-            expect(fightProperties.getAugmentArmor(PBTypes.TeamVals.LOWER)).toBe(ArmorAugment.LEVEL_3);
-            expect(fightProperties.getAugmentMovement(PBTypes.TeamVals.LOWER)).toBe(MovementAugment.LEVEL_2);
-            expect(fightProperties.getNumberOfUnitsAvailableForPlacement(PBTypes.TeamVals.LOWER)).toBe(8);
+            expect(fightProperties.getAugmentPlacement(PBTypes.TeamVals.LEFT)).toEqual([6]);
+            expect(fightProperties.getAugmentArmor(PBTypes.TeamVals.LEFT)).toBe(ArmorAugment.LEVEL_3);
+            expect(fightProperties.getAugmentMovement(PBTypes.TeamVals.LEFT)).toBe(MovementAugment.LEVEL_2);
+            expect(fightProperties.getNumberOfUnitsAvailableForPlacement(PBTypes.TeamVals.LEFT)).toBe(8);
         });
 
         it("scales Chaos Break on Attack across all synergy levels", () => {
-            const team = PBTypes.TeamVals.LOWER;
+            const team = PBTypes.TeamVals.LEFT;
             const levels = [
                 { unitCount: 2, level: SynergyLevel.LEVEL_1, chance: 6 },
                 { unitCount: 4, level: SynergyLevel.LEVEL_2, chance: 11 },
@@ -293,7 +293,7 @@ describe("FightProperties", () => {
 
         it("exposes possible synergies and selected synergy bonuses", () => {
             const fightProperties = new FightProperties();
-            const team = PBTypes.TeamVals.LOWER;
+            const team = PBTypes.TeamVals.LEFT;
 
             expect(
                 fightProperties.updateSynergyPerTeam(
@@ -437,7 +437,7 @@ describe("FightProperties", () => {
         });
 
         it("restores a team's active synergies without sharing the input array", () => {
-            const team = PBTypes.TeamVals.LOWER;
+            const team = PBTypes.TeamVals.LEFT;
             const prior = new FightProperties();
             prior.setSynergyUnitsPerFactions(team, 6, 6, 6, 6);
             expect(
@@ -455,14 +455,14 @@ describe("FightProperties", () => {
             synergies.length = 0;
 
             expect(restored.getAdditionalAuraRangePerTeam(team)).toBe(3);
-            expect(restored.getSynergiesPerTeam(PBTypes.TeamVals.UPPER)).toEqual([]);
+            expect(restored.getSynergiesPerTeam(PBTypes.TeamVals.RIGHT)).toEqual([]);
 
             restored.setSynergiesPerTeam(team, []);
             expect(restored.getAdditionalAuraRangePerTeam(team)).toBe(0);
         });
 
         it("keeps the legacy three-part synergy-key parsing contract", () => {
-            const team = PBTypes.TeamVals.LOWER;
+            const team = PBTypes.TeamVals.LEFT;
             const fightProperties = new FightProperties();
             const auraSynergy = MightSynergy.PLUS_AURAS_RANGE;
 
@@ -486,7 +486,7 @@ describe("FightProperties", () => {
         });
 
         it("setSynergiesPerTeam carries synergies across a fresh FightProperties (the ranked hydrate)", () => {
-            const team = PBTypes.TeamVals.LOWER;
+            const team = PBTypes.TeamVals.LEFT;
             // "prior" — the client's FightProperties holding a picked synergy, just before a snapshot hydrate.
             const prior = new FightProperties();
             prior.setSynergyUnitsPerFactions(team, 6, 6, 6, 6);
@@ -520,12 +520,12 @@ describe("FightProperties", () => {
             expect(fresh.getAdditionalAuraRangePerTeam(team)).toBe(0);
 
             // Isolation: restoring LOWER's synergies must not leak into UPPER.
-            expect(prior.getAdditionalAuraRangePerTeam(PBTypes.TeamVals.UPPER)).toBe(0);
+            expect(prior.getAdditionalAuraRangePerTeam(PBTypes.TeamVals.RIGHT)).toBe(0);
         });
 
         it("updates selected synergies when team faction counts change", () => {
             const fightProperties = new FightProperties();
-            const team = PBTypes.TeamVals.LOWER;
+            const team = PBTypes.TeamVals.LEFT;
 
             fightProperties.setSynergyUnitsPerFactions(team, 6, 6, 6, 6);
             fightProperties.updateSynergyPerTeam(
@@ -579,7 +579,7 @@ describe("FightProperties", () => {
             // serialized fight (e.g. the ranked journal's FIGHT_INITIALIZED replay checkpoint).
             const fightProperties = new FightProperties();
             fightProperties.setHighestInitiativeThisTurn(11.4);
-            fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000.25);
+            fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000.25);
 
             const restored = FightProperties.deserialize(fightProperties.serialize());
             expect(restored.getHighestInitiativeThisTurn()).toBe(11);
@@ -592,18 +592,18 @@ describe("FightProperties", () => {
             fightProperties.markFirstTurn();
             fightProperties.startFight();
             fightProperties.finishFight();
-            fightProperties.updatePreviousTurnTeam(PBTypes.TeamVals.UPPER);
+            fightProperties.updatePreviousTurnTeam(PBTypes.TeamVals.RIGHT);
             fightProperties.setHighestInitiativeThisTurn(7);
-            fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 2);
-            fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 3);
-            fightProperties.startTurn(PBTypes.TeamVals.LOWER);
-            fightProperties.requestAdditionalTurnTime(PBTypes.TeamVals.LOWER);
+            fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 2);
+            fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 3);
+            fightProperties.startTurn(PBTypes.TeamVals.LEFT);
+            fightProperties.requestAdditionalTurnTime(PBTypes.TeamVals.LEFT);
             fightProperties.enqueueUpNext("next");
             fightProperties.enqueueMoralePlus("plus");
             fightProperties.enqueueMoraleMinus("minus");
             fightProperties.enqueueHourglass("hourglass");
             fightProperties.addRepliedAttack("reply");
-            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LOWER, "done");
+            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LEFT, "done");
             fightProperties.increaseStepsMoraleMultiplier();
             fightProperties.flipLap();
             fightProperties.enqueueUpNext("after-flip");
@@ -616,10 +616,10 @@ describe("FightProperties", () => {
             expect(restored.getFirstTurnMade()).toBe(true);
             expect(restored.hasFightStarted()).toBe(true);
             expect(restored.hasFightFinished()).toBe(true);
-            expect(restored.getPreviousTurnTeam()).toBe(PBTypes.TeamVals.UPPER);
+            expect(restored.getPreviousTurnTeam()).toBe(PBTypes.TeamVals.RIGHT);
             expect(restored.getHighestInitiativeThisTurn()).toBe(7);
-            expect(restored.getTeamUnitsAlive(PBTypes.TeamVals.LOWER)).toBe(2);
-            expect(restored.getTeamUnitsAlive(PBTypes.TeamVals.UPPER)).toBe(3);
+            expect(restored.getTeamUnitsAlive(PBTypes.TeamVals.LEFT)).toBe(2);
+            expect(restored.getTeamUnitsAlive(PBTypes.TeamVals.RIGHT)).toBe(3);
             expect(restored.getStepsMoraleMultiplier()).toBe(STEPS_MORALE_MULTIPLIER);
             expect(restored.dequeueNextUnitId()).toBe("after-flip");
         });
@@ -627,8 +627,8 @@ describe("FightProperties", () => {
         it("roundtrips already-made-turn team buckets", () => {
             const fightProperties = new FightProperties();
 
-            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LOWER, "lower-one");
-            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LOWER, "lower-two");
+            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LEFT, "lower-one");
+            fightProperties.addAlreadyMadeTurn(PBTypes.TeamVals.LEFT, "lower-two");
 
             const restored = FightProperties.deserialize(fightProperties.serialize());
 
@@ -665,24 +665,24 @@ describe("FightProperties", () => {
     describe("prefetchNextUnitsToTurn", () => {
         it("uses each team's own unit count when comparing average army morale", () => {
             const fightProperties = new FightProperties();
-            const upperUnits = [
-                createTestUnit({ team: PBTypes.TeamVals.UPPER, morale: 3 }),
-                createTestUnit({ team: PBTypes.TeamVals.UPPER, morale: 3 }),
-                createTestUnit({ team: PBTypes.TeamVals.UPPER, morale: 3 }),
+            const rightUnits = [
+                createTestUnit({ team: PBTypes.TeamVals.RIGHT, morale: 3 }),
+                createTestUnit({ team: PBTypes.TeamVals.RIGHT, morale: 3 }),
+                createTestUnit({ team: PBTypes.TeamVals.RIGHT, morale: 3 }),
             ];
-            const lowerUnits = [createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 4 })];
-            const allUnits = new Map([...upperUnits, ...lowerUnits].map((unit) => [unit.getId(), unit]));
+            const leftUnits = [createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 4 })];
+            const allUnits = new Map([...rightUnits, ...leftUnits].map((unit) => [unit.getId(), unit]));
 
-            fightProperties.prefetchNextUnitsToTurn(allUnits, upperUnits, lowerUnits);
+            fightProperties.prefetchNextUnitsToTurn(allUnits, rightUnits, leftUnits);
 
-            expect(Array.from(fightProperties.getUpNextQueueIterable())[0]).toBe(lowerUnits[0].getId());
+            expect(Array.from(fightProperties.getUpNextQueueIterable())[0]).toBe(leftUnits[0].getId());
         });
 
         it("releases a living hourglass unit without counting an ineligible dead stack", () => {
             const fightProperties = new FightProperties();
-            const waiter = createTestUnit({ team: PBTypes.TeamVals.UPPER });
-            const completed = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-            const dead = createTestUnit({ team: PBTypes.TeamVals.LOWER, amountAlive: 0 });
+            const waiter = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
+            const completed = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+            const dead = createTestUnit({ team: PBTypes.TeamVals.LEFT, amountAlive: 0 });
             const allUnits = new Map([waiter, completed, dead].map((unit) => [unit.getId(), unit]));
 
             expect(dead.isDead()).toBe(true);
@@ -696,16 +696,16 @@ describe("FightProperties", () => {
 
         it("does not let stale dead up-next entries consume the living queue budget", () => {
             const fightProperties = new FightProperties();
-            const upper = createTestUnit({ team: PBTypes.TeamVals.UPPER });
-            const lower = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-            const dead = createTestUnit({ team: PBTypes.TeamVals.UPPER, amountAlive: 0 });
-            const allUnits = new Map([upper, lower, dead].map((unit) => [unit.getId(), unit]));
+            const right = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
+            const left = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+            const dead = createTestUnit({ team: PBTypes.TeamVals.RIGHT, amountAlive: 0 });
+            const allUnits = new Map([right, left, dead].map((unit) => [unit.getId(), unit]));
 
             fightProperties.enqueueUpNext(dead.getId());
-            fightProperties.prefetchNextUnitsToTurn(allUnits, [upper], [lower]);
+            fightProperties.prefetchNextUnitsToTurn(allUnits, [right], [left]);
 
             expect(Array.from(fightProperties.getUpNextQueueIterable())).toEqual(
-                expect.arrayContaining([dead.getId(), upper.getId(), lower.getId()]),
+                expect.arrayContaining([dead.getId(), right.getId(), left.getId()]),
             );
         });
     });

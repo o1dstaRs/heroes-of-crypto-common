@@ -66,7 +66,7 @@ const fakeDeps = {
 const fakeUnit = {
     getId: () => "unit",
     getName: () => "Squire",
-    getTeam: () => PBTypes.TeamVals.LOWER,
+    getTeam: () => PBTypes.TeamVals.LEFT,
 } as unknown as Unit;
 
 const features = {
@@ -149,8 +149,8 @@ describe("research-only version-scoped search horizon", () => {
         setEnv({ V07_SEARCH: "1", SEARCH_VERSIONS: "v0.8,v0.8s", SEARCH_HORIZON: "12" });
         const driver = new SearchDriver(fakeDeps) as unknown as SearchInternals;
 
-        expect(driver.turnHorizonForVersion("v0.8", PBTypes.TeamVals.LOWER)).toBe(12);
-        expect(driver.turnHorizonForVersion("v0.8s", PBTypes.TeamVals.LOWER)).toBe(12);
+        expect(driver.turnHorizonForVersion("v0.8", PBTypes.TeamVals.LEFT)).toBe(12);
+        expect(driver.turnHorizonForVersion("v0.8s", PBTypes.TeamVals.LEFT)).toBe(12);
     });
 
     it("freezes a distinct native RANGE-name scope for each acting team at fight readiness", () => {
@@ -180,13 +180,13 @@ describe("research-only version-scoped search horizon", () => {
                 isDead: () => dead,
             } as unknown as Unit);
         };
-        addUnit("lower-medusa-a", "Medusa", PBTypes.TeamVals.LOWER, PBTypes.AttackVals.RANGE);
-        addUnit("lower-medusa-b", "Medusa", PBTypes.TeamVals.LOWER, PBTypes.AttackVals.RANGE);
-        addUnit("lower-cyclops", "Cyclops", PBTypes.TeamVals.LOWER, PBTypes.AttackVals.RANGE);
-        addUnit("upper-medusa", "Medusa", PBTypes.TeamVals.UPPER, PBTypes.AttackVals.RANGE);
-        addUnit("upper-dead", "Cyclops", PBTypes.TeamVals.UPPER, PBTypes.AttackVals.RANGE, false, true);
-        addUnit("upper-summon", "Arachna Spider", PBTypes.TeamVals.UPPER, PBTypes.AttackVals.RANGE, true);
-        addUnit("upper-mage", "Healer", PBTypes.TeamVals.UPPER, PBTypes.AttackVals.MAGIC);
+        addUnit("lower-medusa-a", "Medusa", PBTypes.TeamVals.LEFT, PBTypes.AttackVals.RANGE);
+        addUnit("lower-medusa-b", "Medusa", PBTypes.TeamVals.LEFT, PBTypes.AttackVals.RANGE);
+        addUnit("lower-cyclops", "Cyclops", PBTypes.TeamVals.LEFT, PBTypes.AttackVals.RANGE);
+        addUnit("upper-medusa", "Medusa", PBTypes.TeamVals.RIGHT, PBTypes.AttackVals.RANGE);
+        addUnit("upper-dead", "Cyclops", PBTypes.TeamVals.RIGHT, PBTypes.AttackVals.RANGE, false, true);
+        addUnit("upper-summon", "Arachna Spider", PBTypes.TeamVals.RIGHT, PBTypes.AttackVals.RANGE, true);
+        addUnit("upper-mage", "Healer", PBTypes.TeamVals.RIGHT, PBTypes.AttackVals.MAGIC);
         const deps = {
             fightProperties: { getCurrentLap: () => 3 },
             unitsHolder: { getAllUnits: () => units },
@@ -194,13 +194,13 @@ describe("research-only version-scoped search horizon", () => {
         const driver = new SearchDriver(deps) as unknown as SearchInternals;
 
         driver.onFightReady();
-        expect(driver.turnHorizonForVersion("v0.8", PBTypes.TeamVals.LOWER)).toBe(18);
-        expect(driver.turnHorizonForVersion("v0.8", PBTypes.TeamVals.UPPER)).toBe(12);
-        expect(driver.turnHorizonForVersion("v0.8s", PBTypes.TeamVals.LOWER)).toBe(12);
+        expect(driver.turnHorizonForVersion("v0.8", PBTypes.TeamVals.LEFT)).toBe(18);
+        expect(driver.turnHorizonForVersion("v0.8", PBTypes.TeamVals.RIGHT)).toBe(12);
+        expect(driver.turnHorizonForVersion("v0.8s", PBTypes.TeamVals.LEFT)).toBe(12);
 
-        addUnit("upper-late-ranged", "Cyclops", PBTypes.TeamVals.UPPER, PBTypes.AttackVals.RANGE);
+        addUnit("upper-late-ranged", "Cyclops", PBTypes.TeamVals.RIGHT, PBTypes.AttackVals.RANGE);
         driver.onFightReady();
-        expect(driver.turnHorizonForVersion("v0.8", PBTypes.TeamVals.UPPER)).toBe(12);
+        expect(driver.turnHorizonForVersion("v0.8", PBTypes.TeamVals.RIGHT)).toBe(12);
     });
 
     it("uses H18 for v0.8 discovery and validation while v0.8s remains H12", () => {

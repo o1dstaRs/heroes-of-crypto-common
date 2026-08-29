@@ -19,15 +19,15 @@ import { PathHelper } from "../../src/grid/path_helper";
 import { playV07SelfplayPassiveAuditGame } from "../../src/simulation/v0_7_selfplay_passive_audit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const MAGIC = PBTypes.AttackVals.MAGIC;
 
 describe("v0.7 melee-magic attack selection", () => {
     it("drops an inherited MELEE selector when MELEE_MAGIC is already selected", () => {
-        const unit = createTestUnit({ team: LOWER, attackType: MELEE_MAGIC });
+        const unit = createTestUnit({ team: LEFT, attackType: MELEE_MAGIC });
         unit.refreshPossibleAttackTypes(true);
         const strike: GameAction = {
             type: "melee_attack",
@@ -44,7 +44,7 @@ describe("v0.7 melee-magic attack selection", () => {
     });
 
     it("rewrites an inherited MELEE selector when the actor must switch from MAGIC", () => {
-        const unit = createTestUnit({ team: LOWER, attackType: MELEE_MAGIC, spells: ["System:Resurrection"] });
+        const unit = createTestUnit({ team: LEFT, attackType: MELEE_MAGIC, spells: ["System:Resurrection"] });
         unit.refreshPossibleAttackTypes(true);
         expect(unit.selectAttackType(MAGIC)).toBe(true);
         const decision: GameAction[] = [
@@ -65,7 +65,7 @@ describe("v0.7 melee-magic attack selection", () => {
     });
 
     it("preserves the exact decision reference outside the melee-magic-only capability", () => {
-        const unit = createTestUnit({ team: LOWER, attackType: MELEE });
+        const unit = createTestUnit({ team: LEFT, attackType: MELEE });
         unit.refreshPossibleAttackTypes(true);
         const decision: GameAction[] = [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }];
 
@@ -75,12 +75,12 @@ describe("v0.7 melee-magic attack selection", () => {
     it("emits a legal MELEE_MAGIC prefix for enumerated attacks after a magic selection", () => {
         const c = createCombatTestContext();
         const unit = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE_MAGIC,
             spells: ["System:Resurrection"],
             initiative: 2,
         });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, unit, { x: 4, y: 4 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 4, y: 5 });
         unit.refreshPossibleAttackTypes(true);

@@ -487,9 +487,9 @@ export class FightProperties {
             alreadyMadeTurnTeamMembers = alreadyMadeTurnTeamMembersSet.size;
         }
         const teamMembersAlive =
-            teamType === PBTypes.TeamVals.LOWER
-                ? (this.teamUnitsAlive.get(PBTypes.TeamVals.LOWER) ?? 0)
-                : (this.teamUnitsAlive.get(PBTypes.TeamVals.UPPER) ?? 0);
+            teamType === PBTypes.TeamVals.LEFT
+                ? (this.teamUnitsAlive.get(PBTypes.TeamVals.LEFT) ?? 0)
+                : (this.teamUnitsAlive.get(PBTypes.TeamVals.RIGHT) ?? 0);
         let teamMembersToMakeTurn = teamMembersAlive - alreadyMadeTurnTeamMembers - 1;
         if (teamMembersToMakeTurn < 0) {
             teamMembersToMakeTurn = 0;
@@ -536,9 +536,9 @@ export class FightProperties {
             alreadyMadeTurnTeamMembers = alreadyMadeTurnTeamMembersSet.size;
         }
         const teamMembersAlive =
-            teamType === PBTypes.TeamVals.LOWER
-                ? (this.teamUnitsAlive.get(PBTypes.TeamVals.LOWER) ?? 0)
-                : (this.teamUnitsAlive.get(PBTypes.TeamVals.UPPER) ?? 0);
+            teamType === PBTypes.TeamVals.LEFT
+                ? (this.teamUnitsAlive.get(PBTypes.TeamVals.LEFT) ?? 0)
+                : (this.teamUnitsAlive.get(PBTypes.TeamVals.RIGHT) ?? 0);
 
         let teamMembersToMakeTurn = teamMembersAlive - alreadyMadeTurnTeamMembers;
         if (teamMembersToMakeTurn < 0) {
@@ -1340,8 +1340,8 @@ export class FightProperties {
     }
     public prefetchNextUnitsToTurn(
         allUnits: ReadonlyMap<string, Unit>,
-        unitsUpper: Unit[],
-        unitsLower: Unit[],
+        unitsRight: Unit[],
+        unitsLeft: Unit[],
         randomInt: RandomIntFn = getRandomInt,
     ): void {
         // The holder can temporarily retain a dead stack while attack cleanup/resurrection resolves. Turn-order
@@ -1349,13 +1349,13 @@ export class FightProperties {
         // the hourglass queue from reaching the old allUnits.size threshold and the surviving waiter is dropped
         // when the simulator recovers the apparently stalled lap. Keep the map intersection so stale caller lists
         // cannot make a removed unit eligible, while living summons remain eligible immediately.
-        const eligibleUnits = [...unitsUpper, ...unitsLower].filter((unit) => {
+        const eligibleUnits = [...unitsRight, ...unitsLeft].filter((unit) => {
             const stored = allUnits.get(unit.getId());
             return stored !== undefined && !stored.isDead() && !unit.isDead();
         });
         const eligibleUnitIds = new Set(eligibleUnits.map((unit) => unit.getId()));
-        const eligibleUpper = unitsUpper.filter((unit) => eligibleUnitIds.has(unit.getId()));
-        const eligibleLower = unitsLower.filter((unit) => eligibleUnitIds.has(unit.getId()));
+        const eligibleRight = unitsRight.filter((unit) => eligibleUnitIds.has(unit.getId()));
+        const eligibleLeft = unitsLeft.filter((unit) => eligibleUnitIds.has(unit.getId()));
         const upNextUnitsCount = eligibleUnitIds.size;
         const eligibleUpNextCount = (): number => {
             const queued = new Set<string>();
@@ -1371,7 +1371,7 @@ export class FightProperties {
         }
 
         while (eligibleUpNextCount() < upNextUnitsCount) {
-            const nextUnitId = this.getNextTurnUnitId(eligibleUnitIds, eligibleUpper, eligibleLower, randomInt);
+            const nextUnitId = this.getNextTurnUnitId(eligibleUnitIds, eligibleRight, eligibleLeft, randomInt);
 
             if (nextUnitId) {
                 const unit = allUnits.get(nextUnitId);
@@ -1478,11 +1478,11 @@ export class FightProperties {
     }
     private getNextTurnUnitId(
         eligibleUnitIds: ReadonlySet<string>,
-        unitsUpper: Unit[],
-        unitsLower: Unit[],
+        unitsRight: Unit[],
+        unitsLeft: Unit[],
         randomInt: RandomIntFn,
     ): string | undefined {
-        if (!unitsLower.length || !unitsUpper.length) {
+        if (!unitsLeft.length || !unitsRight.length) {
             return undefined;
         }
 
@@ -1499,66 +1499,65 @@ export class FightProperties {
             }
         }
 
-        let totalArmyMoraleUpper = 0;
-        let totalArmyMoraleLower = 0;
+        let totalArmyMoraleRight = 0;
+        let totalArmyMoraleLeft = 0;
         let firstBatch: Unit[];
         let secondBatch: Unit[];
 
         // total morale based
         if (this.previousTurnTeam == PBTypes.TeamVals.NO_TEAM) {
-            for (const u of unitsUpper) {
+            for (const u of unitsRight) {
                 this.setHighestInitiativeThisTurn(Math.max(this.highestInitiativeThisTurn, u.getInitiative()));
-                totalArmyMoraleUpper += u.getMorale();
+                totalArmyMoraleRight += u.getMorale();
             }
-            for (const u of unitsLower) {
+            for (const u of unitsLeft) {
                 this.setHighestInitiativeThisTurn(Math.max(this.highestInitiativeThisTurn, u.getInitiative()));
-                totalArmyMoraleLower += u.getMorale();
+                totalArmyMoraleLeft += u.getMorale();
             }
 
-            const avgArmyMoraleUpper = unitsUpper.length ? totalArmyMoraleUpper / unitsUpper.length : 0;
-            const avgArmyMoraleLower = unitsLower.length ? totalArmyMoraleLower / unitsLower.length : 0;
+            const avgArmyMoraleRight = unitsRight.length ? totalArmyMoraleRight / unitsRight.length : 0;
+            const avgArmyMoraleLeft = unitsLeft.length ? totalArmyMoraleLeft / unitsLeft.length : 0;
 
-            if (avgArmyMoraleUpper > avgArmyMoraleLower) {
-                firstBatch = unitsUpper;
-                secondBatch = unitsLower;
-            } else if (avgArmyMoraleUpper < avgArmyMoraleLower) {
-                firstBatch = unitsLower;
-                secondBatch = unitsUpper;
+            if (avgArmyMoraleRight > avgArmyMoraleLeft) {
+                firstBatch = unitsRight;
+                secondBatch = unitsLeft;
+            } else if (avgArmyMoraleRight < avgArmyMoraleLeft) {
+                firstBatch = unitsLeft;
+                secondBatch = unitsRight;
             } else {
-                let lowerMaxInitiative = Number.MIN_SAFE_INTEGER;
-                for (const u of unitsLower) {
-                    lowerMaxInitiative =
-                        u.getInitiative() > lowerMaxInitiative ? u.getInitiative() : lowerMaxInitiative;
+                let leftMaxInitiative = Number.MIN_SAFE_INTEGER;
+                for (const u of unitsLeft) {
+                    leftMaxInitiative = u.getInitiative() > leftMaxInitiative ? u.getInitiative() : leftMaxInitiative;
                 }
-                let upperMaxInitiative = Number.MIN_SAFE_INTEGER;
-                for (const u of unitsUpper) {
-                    upperMaxInitiative =
-                        u.getInitiative() > upperMaxInitiative ? u.getInitiative() : upperMaxInitiative;
+                let rightMaxInitiative = Number.MIN_SAFE_INTEGER;
+                for (const u of unitsRight) {
+                    rightMaxInitiative =
+                        u.getInitiative() > rightMaxInitiative ? u.getInitiative() : rightMaxInitiative;
                 }
 
-                if (lowerMaxInitiative > upperMaxInitiative) {
-                    firstBatch = unitsLower;
-                    secondBatch = unitsUpper;
-                } else if (lowerMaxInitiative < upperMaxInitiative) {
-                    firstBatch = unitsUpper;
-                    secondBatch = unitsLower;
+                if (leftMaxInitiative > rightMaxInitiative) {
+                    firstBatch = unitsLeft;
+                    secondBatch = unitsRight;
+                } else if (leftMaxInitiative < rightMaxInitiative) {
+                    firstBatch = unitsRight;
+                    secondBatch = unitsLeft;
                 } else {
                     const rnd = randomInt(0, 2);
                     if (rnd) {
-                        firstBatch = unitsUpper;
-                        secondBatch = unitsLower;
+                        firstBatch = unitsRight;
+                        secondBatch = unitsLeft;
                     } else {
-                        firstBatch = unitsLower;
-                        secondBatch = unitsUpper;
+                        firstBatch = unitsLeft;
+                        secondBatch = unitsRight;
                     }
                 }
             }
-        } else if (this.previousTurnTeam === PBTypes.TeamVals.LOWER) {
-            firstBatch = unitsUpper;
-            secondBatch = unitsLower;
+        } else if (this.previousTurnTeam === PBTypes.TeamVals.LEFT) {
+            firstBatch = unitsRight;
+            secondBatch = unitsLeft;
         } else {
-            firstBatch = unitsLower;
-            secondBatch = unitsUpper;
+            firstBatch = unitsLeft;
+            secondBatch = unitsRight;
         }
 
         for (const u of firstBatch) {

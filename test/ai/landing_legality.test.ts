@@ -17,8 +17,8 @@ import { Spell } from "../../src/spells/spell";
 import type { IUnitAIRepr } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const FLY = PBTypes.MovementVals.FLY;
 
 describe("AI landing legality", () => {
@@ -27,18 +27,18 @@ describe("AI landing legality", () => {
         const water = createCombatTestContext(PBTypes.GridVals.WATER_CENTER).grid;
         const hazardCell = { x: 7, y: 7 };
 
-        const plain = createTestUnit({ team: LOWER, movementType: FLY });
+        const plain = createTestUnit({ team: LEFT, movementType: FLY });
         expect(canUnitLandAt(plain, lava, hazardCell)).toBe(false);
 
         // "All army units may move over AND STAND in lava" — the marker buff alone carries that, without
         // the artifact granting anyone the Made of Fire ability.
-        const strider = createTestUnit({ team: LOWER });
+        const strider = createTestUnit({ team: LEFT });
         strider.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Lava Striders"), amount: 1 }));
         expect(strider.canTraverseLava()).toBe(true);
         expect(strider.hasAbilityActive("Made of Fire")).toBe(false);
         expect(canUnitLandAt(strider, lava, hazardCell)).toBe(true);
 
-        const madeOfFire = createTestUnit({ team: LOWER, abilities: ["Made of Fire"] });
+        const madeOfFire = createTestUnit({ team: LEFT, abilities: ["Made of Fire"] });
         expect(canUnitLandAt(madeOfFire, lava, hazardCell)).toBe(true);
 
         const madeOfWater = {
@@ -52,7 +52,7 @@ describe("AI landing legality", () => {
 
     test("checks every cell in a large unit footprint", () => {
         const lava = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER).grid;
-        const largeFlyer = createTestUnit({ team: LOWER, movementType: FLY, size: PBTypes.UnitSizeVals.LARGE });
+        const largeFlyer = createTestUnit({ team: LEFT, movementType: FLY, size: PBTypes.UnitSizeVals.LARGE });
 
         // The anchor is clear, but the lower half of the 2x2 footprint clips the lava square.
         expect(lava.getOccupantUnitId({ x: 7, y: 10 })).toBe("");
@@ -62,7 +62,7 @@ describe("AI landing legality", () => {
 
     test("rejects a large-unit anchor whose footprint crosses the board edge", () => {
         const normal = createCombatTestContext(PBTypes.GridVals.NORMAL).grid;
-        const large = createTestUnit({ team: LOWER, size: PBTypes.UnitSizeVals.LARGE });
+        const large = createTestUnit({ team: LEFT, size: PBTypes.UnitSizeVals.LARGE });
 
         expect(canUnitLandAt(large, normal, { x: 1, y: 1 })).toBe(true);
         expect(canUnitLandAt(large, normal, { x: 0, y: 0 })).toBe(false);
@@ -70,16 +70,16 @@ describe("AI landing legality", () => {
 
     test("keeps a legal Made of Fire lava cell in ranged safety candidates", () => {
         const lava = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER).grid;
-        const madeOfFire = createTestUnit({ team: LOWER, abilities: ["Made of Fire"] });
+        const madeOfFire = createTestUnit({ team: LEFT, abilities: ["Made of Fire"] });
         const occupiedPreferred = { x: 5, y: 5 };
         const legalLavaCell = { x: 7, y: 7 };
-        lava.occupyCell(occupiedPreferred, "enemy", UPPER, 1, false, false);
+        lava.occupyCell(occupiedPreferred, "enemy", RIGHT, 1, false, false);
 
         const safer = findSaferMoveCell(
             occupiedPreferred,
             new Map([[(legalLavaCell.x << 4) | legalLavaCell.y, []]]),
             lava.getMatrix(),
-            UPPER,
+            RIGHT,
             true,
             (cell) => canUnitLandAt(madeOfFire, lava, cell),
         );
@@ -90,8 +90,8 @@ describe("AI landing legality", () => {
 
     test("fallback can cross lava but chooses a legal far-side endpoint", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
-        const flyer = createTestUnit({ team: LOWER, movementType: FLY, initiative: 6 });
-        const enemy = createTestUnit({ team: UPPER, initiative: 1 });
+        const flyer = createTestUnit({ team: LEFT, movementType: FLY, initiative: 6 });
+        const enemy = createTestUnit({ team: RIGHT, initiative: 1 });
         placeUnit(combat.grid, combat.unitsHolder, flyer, { x: 5, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 11, y: 7 });
 
@@ -114,8 +114,8 @@ describe("AI landing legality", () => {
 
     test("findTarget never emits an unlandable infinite-route endpoint", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
-        const flyer = createTestUnit({ team: LOWER, movementType: FLY, initiative: 3 });
-        const enemy = createTestUnit({ team: UPPER, initiative: 1 });
+        const flyer = createTestUnit({ team: LEFT, movementType: FLY, initiative: 3 });
+        const enemy = createTestUnit({ team: RIGHT, initiative: 1 });
         placeUnit(combat.grid, combat.unitsHolder, flyer, { x: 5, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 11, y: 7 });
 

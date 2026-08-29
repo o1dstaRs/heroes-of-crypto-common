@@ -544,7 +544,7 @@ export function v07BakedWaitWeights(): IWaitWeights | null {
  * between games in the same worker process.
  */
 export function v07WaitWeightsForTeam(team: TeamType): IWaitWeights | null | undefined {
-    const raw = process.env[team === PBTypes.TeamVals.LOWER ? "V07_WAIT_WEIGHTS_LOWER" : "V07_WAIT_WEIGHTS_UPPER"];
+    const raw = process.env[team === PBTypes.TeamVals.LEFT ? "V07_WAIT_WEIGHTS_LOWER" : "V07_WAIT_WEIGHTS_UPPER"];
     if (raw === undefined) {
         return undefined;
     }
@@ -870,7 +870,7 @@ export function parseWaitCancelWeights(raw: string | undefined): IWaitCancelWeig
 }
 
 function waitCancelWeightsForTeam(team: TeamType): IWaitCancelWeights | null {
-    const perTeam = process.env[team === PBTypes.TeamVals.LOWER ? "V08_WAIT_CANCEL_LOWER" : "V08_WAIT_CANCEL_UPPER"];
+    const perTeam = process.env[team === PBTypes.TeamVals.LEFT ? "V08_WAIT_CANCEL_LOWER" : "V08_WAIT_CANCEL_UPPER"];
     return parseWaitCancelWeights(perTeam) ?? parseWaitCancelWeights(process.env.V08_WAIT_CANCEL);
 }
 

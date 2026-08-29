@@ -33,10 +33,10 @@ const ARMOR = ARTIFACT_POWER.WINGED_BOOTS_ARMOR;
 const armFlight = (movementType: number) => {
     const { grid, unitsHolder } = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, 1, Tier1Artifact.WINGED_BOOTS);
+    fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 1, Tier1Artifact.WINGED_BOOTS);
     const unit = createTestUnit({
         name: "Griffin",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         movementType,
     });
     placeUnit(grid, unitsHolder, unit, { x: 2, y: 2 });
@@ -72,10 +72,10 @@ describe("Winged Boots", () => {
     it("applies once however many times the stats are recomputed", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const fightProperties = FightStateManager.getInstance().getFightProperties();
-        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LOWER, 1, Tier1Artifact.WINGED_BOOTS);
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 1, Tier1Artifact.WINGED_BOOTS);
         const unit = createTestUnit({
             name: "Griffin",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             movementType: PBTypes.MovementVals.FLY,
         });
         placeUnit(grid, unitsHolder, unit, { x: 2, y: 2 });

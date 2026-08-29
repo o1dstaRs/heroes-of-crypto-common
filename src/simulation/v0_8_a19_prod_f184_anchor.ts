@@ -33,7 +33,7 @@ interface IRecordedArmySetup {
     readonly synergies: readonly { faction: number; synergy: number; level: 1 | 2 | 3 }[];
 }
 
-const LOWER_SETUP: IRecordedArmySetup = Object.freeze({
+const LEFT_SETUP: IRecordedArmySetup = Object.freeze({
     creatureIds: Object.freeze([3, 33, 6, 4, 37, 9]),
     roster: Object.freeze([
         Object.freeze({ faction: "Chaos", creatureName: "Troglodyte", level: 1, size: 1, amount: 125 }),
@@ -54,7 +54,7 @@ const LOWER_SETUP: IRecordedArmySetup = Object.freeze({
     ]),
 });
 
-const UPPER_SETUP: IRecordedArmySetup = Object.freeze({
+const RIGHT_SETUP: IRecordedArmySetup = Object.freeze({
     creatureIds: Object.freeze([47, 12, 55, 34, 27, 43]),
     roster: Object.freeze([
         Object.freeze({ faction: "Nature", creatureName: "Dryad", level: 1, size: 1, amount: 100 }),
@@ -92,10 +92,10 @@ export const V08_A19_PROD_F184_ANCHOR = Object.freeze({
     }),
     map: PBTypes.GridVals.NORMAL,
     defaultPlacementDepth: 3 as const,
-    lower: LOWER_SETUP,
-    upper: UPPER_SETUP,
+    left: LEFT_SETUP,
+    right: RIGHT_SETUP,
     observedPlacement: Object.freeze({
-        lower: Object.freeze([
+        left: Object.freeze([
             Object.freeze({ creatureId: 3, creatureName: "Troglodyte", x: 13, y: 2 }),
             Object.freeze({ creatureId: 33, creatureName: "Arbalester", x: 14, y: 1 }),
             Object.freeze({ creatureId: 6, creatureName: "Beholder", x: 13, y: 1 }),
@@ -103,7 +103,7 @@ export const V08_A19_PROD_F184_ANCHOR = Object.freeze({
             Object.freeze({ creatureId: 37, creatureName: "Griffin", x: 10, y: 3 }),
             Object.freeze({ creatureId: 9, creatureName: "Black Dragon", x: 9, y: 3 }),
         ]),
-        upper: Object.freeze([
+        right: Object.freeze([
             Object.freeze({ creatureId: 47, creatureName: "Dryad", x: 6, y: 14 }),
             Object.freeze({ creatureId: 12, creatureName: "Berserker", x: 2, y: 13 }),
             Object.freeze({ creatureId: 55, creatureName: "Battle Mage", x: 4, y: 14 }),
@@ -122,7 +122,7 @@ export const V08_A19_PROD_F184_ANCHOR = Object.freeze({
  * bytes it hashes. The recorded production setup itself is unchanged.
  */
 export const V08_A19_PROD_F184_FIXTURE_SHA256 =
-    "6649cc5a3fe134f0289c1d6ffb8a056cf25e1a56d6c45f5a34f53354b1cdc0a1" as const;
+    "b55e8b7d0b7038416e1821dc93b8d1488473bb3ff6a133adb1a3555865e48a94" as const;
 
 const recordedArmy = (setup: IRecordedArmySetup, opponent: IRecordedArmySetup, seed: number): IAiMetaArmy => {
     const base = chooseMetaArmy(
@@ -170,7 +170,7 @@ export function prepareV08A19ProdF184Pair(
         setupSeed,
         combatSeed,
         map: V08_A19_PROD_F184_ANCHOR.map,
-        armyA: recordedArmy(LOWER_SETUP, UPPER_SETUP, hashSimulationParts(setupSeed, "lower")),
-        armyB: recordedArmy(UPPER_SETUP, LOWER_SETUP, hashSimulationParts(setupSeed, "upper")),
+        armyA: recordedArmy(LEFT_SETUP, RIGHT_SETUP, hashSimulationParts(setupSeed, "lower")),
+        armyB: recordedArmy(RIGHT_SETUP, LEFT_SETUP, hashSimulationParts(setupSeed, "upper")),
     };
 }

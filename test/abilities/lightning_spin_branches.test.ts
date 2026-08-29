@@ -24,7 +24,7 @@ describe("lightning spin branches", () => {
         // the Fire Shield reflection pass) runs instead of the kill path.
         const attacker = createTestUnit({
             name: "Spinner",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Lightning Spin"],
             attack: 1,
             damageMin: 1,
@@ -36,7 +36,7 @@ describe("lightning spin branches", () => {
         // damage bookkeeping) in addition to the on-hit sub-ability chain.
         const survivor = createTestUnit({
             name: "Tank",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 1000,
             amountAlive: 10,
             armor: 50,
@@ -67,14 +67,14 @@ describe("lightning spin branches", () => {
         const stats = new DamageStatisticHolder();
         const attacker = createTestUnit({
             name: "Spinner",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Lightning Spin"],
             attack: 1,
             damageMin: 1,
             damageMax: 1,
             amountAlive: 1,
         });
-        const survivor = createTestUnit({ name: "Tank", team: PBTypes.TeamVals.LOWER, maxHp: 1000, amountAlive: 10 });
+        const survivor = createTestUnit({ name: "Tank", team: PBTypes.TeamVals.LEFT, maxHp: 1000, amountAlive: 10 });
 
         placeUnit(grid, unitsHolder, attacker, { x: 5, y: 5 });
         placeUnit(grid, unitsHolder, survivor, { x: 5, y: 6 });
@@ -97,8 +97,8 @@ describe("lightning spin branches", () => {
     it("no-ops for a unit without the Lightning Spin ability", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const stats = new DamageStatisticHolder();
-        const plain = createTestUnit({ name: "Plain", team: PBTypes.TeamVals.UPPER });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LOWER });
+        const plain = createTestUnit({ name: "Plain", team: PBTypes.TeamVals.RIGHT });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, plain, { x: 5, y: 5 });
         placeUnit(grid, unitsHolder, enemy, { x: 5, y: 6 });
 

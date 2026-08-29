@@ -42,8 +42,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 
@@ -95,8 +95,8 @@ function activate(combat: CombatTestContext, active: Unit): LegalityHarness {
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(combat.grid.getGridType());
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.setTeamUnitsAlive(LEFT, combat.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, combat.unitsHolder.getAllAllies(RIGHT).length);
     fightProperties.startTurn(active.getTeam(), 1000);
 
     const context: IDecisionContext = {
@@ -159,13 +159,13 @@ describe("enumerated candidate engine legality", () => {
     it("applies every emitted move and melee shape, including move-then-strike", () => {
         const combat = createCombatTestContext();
         const active = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Brawler",
             attackType: MELEE,
             initiative: 4,
             amountAlive: 5,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Target", attackType: MELEE, amountAlive: 20 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Target", attackType: MELEE, amountAlive: 20 });
         placeUnit(combat.grid, combat.unitsHolder, active, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 5, y: 8 });
         const harness = activate(combat, active);
@@ -185,7 +185,7 @@ describe("enumerated candidate engine legality", () => {
     it("applies every emitted ranged aim", () => {
         const combat = createCombatTestContext();
         const active = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Shooter",
             attackType: RANGE,
             rangeShots: 5,
@@ -193,7 +193,7 @@ describe("enumerated candidate engine legality", () => {
             initiative: 3,
             amountAlive: 5,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Target", attackType: MELEE, amountAlive: 20 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Target", attackType: MELEE, amountAlive: 20 });
         placeUnit(combat.grid, combat.unitsHolder, active, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 10, y: 10 });
         const harness = activate(combat, active);
@@ -206,9 +206,9 @@ describe("enumerated candidate engine legality", () => {
 
     it("applies every emitted Area Throw aim", () => {
         const combat = createCombatTestContext();
-        const active = makeReal(LOWER, "Nature", "Gargantuan");
-        const enemyA = createTestUnit({ team: UPPER, name: "Target A", attackType: MELEE, amountAlive: 20 });
-        const enemyB = createTestUnit({ team: UPPER, name: "Target B", attackType: MELEE, amountAlive: 20 });
+        const active = makeReal(LEFT, "Nature", "Gargantuan");
+        const enemyA = createTestUnit({ team: RIGHT, name: "Target A", attackType: MELEE, amountAlive: 20 });
+        const enemyB = createTestUnit({ team: RIGHT, name: "Target B", attackType: MELEE, amountAlive: 20 });
         placeLarge(combat, active, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 10, y: 11 });
         placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 11, y: 10 });
@@ -222,8 +222,8 @@ describe("enumerated candidate engine legality", () => {
 
     it("applies an in-place mountain strike and deduplicates the same incumbent", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
-        const active = createTestUnit({ team: LOWER, name: "Miner", attackType: MELEE, initiative: 3 });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const active = createTestUnit({ team: LEFT, name: "Miner", attackType: MELEE, initiative: 3 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, active, { x: 4, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 14, y: 14 });
         const harness = activate(combat, active);
@@ -274,8 +274,8 @@ describe("enumerated candidate engine legality", () => {
 
     it("applies a move-to-mine mountain strike with its authoritative route metadata", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
-        const active = createTestUnit({ team: LOWER, name: "Miner", attackType: MELEE, initiative: 3 });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const active = createTestUnit({ team: LEFT, name: "Miner", attackType: MELEE, initiative: 3 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, active, { x: 2, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 14, y: 14 });
         const harness = activate(combat, active);
@@ -301,8 +301,8 @@ describe("enumerated candidate engine legality", () => {
             { x: 10, y: 10 },
             { x: 5, y: 7 },
         ]);
-        const active = createTestUnit({ team: LOWER, name: "Cemetery cleaner", attackType: MELEE, initiative: 3 });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const active = createTestUnit({ team: LEFT, name: "Cemetery cleaner", attackType: MELEE, initiative: 3 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, active, { x: 4, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 14, y: 14 });
         const harness = activate(combat, active);
@@ -330,14 +330,14 @@ describe("enumerated candidate engine legality", () => {
             { x: 5, y: 7 },
         ]);
         const active = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Cemetery archer",
             attackType: RANGE,
             rangeShots: 5,
             shotDistance: 30,
             initiative: 3,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, active, { x: 2, y: 7 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 14, y: 14 });
         active.refreshPossibleAttackTypes(true);
@@ -371,28 +371,28 @@ describe("enumerated candidate engine legality", () => {
         }> = [
             {
                 name: "LOWER right-side reported base",
-                team: LOWER,
+                team: LEFT,
                 base: { x: 12, y: 8 },
                 targetCell: { x: 10, y: 7 },
                 side: "right",
             },
             {
                 name: "UPPER right-mountain high-Y edge",
-                team: UPPER,
+                team: RIGHT,
                 base: { x: 10, y: 10 },
                 targetCell: { x: 9, y: 8 },
                 side: "right",
             },
             {
                 name: "LOWER left-mountain corridor edge",
-                team: LOWER,
+                team: LEFT,
                 base: { x: 8, y: 8 },
                 targetCell: { x: 6, y: 7 },
                 side: "left",
             },
             {
                 name: "UPPER left-mountain high-Y edge",
-                team: UPPER,
+                team: RIGHT,
                 base: { x: 6, y: 10 },
                 targetCell: { x: 5, y: 8 },
                 side: "left",
@@ -409,7 +409,7 @@ describe("enumerated candidate engine legality", () => {
                 initiative: 1,
             });
             const enemy = createTestUnit({
-                team: testCase.team === LOWER ? UPPER : LOWER,
+                team: testCase.team === LEFT ? RIGHT : LEFT,
                 name: `${testCase.name} enemy`,
                 attackType: MELEE,
             });
@@ -453,13 +453,13 @@ describe("enumerated candidate engine legality", () => {
     it("chooses the cheapest legal LARGE mountain route and preserves that route's terrain flags", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
         const active = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Large routed miner",
             attackType: MELEE,
             size: PBTypes.UnitSizeVals.LARGE,
             initiative: 1,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeLarge(combat, active, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 15, y: 15 });
         const harness = activate(combat, active);
@@ -518,15 +518,15 @@ describe("enumerated candidate engine legality", () => {
         };
 
         const normal = createCombatTestContext(PBTypes.GridVals.NORMAL);
-        const normalMiner = createTestUnit({ team: LOWER, attackType: MELEE, initiative: 3 });
-        const normalEnemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const normalMiner = createTestUnit({ team: LEFT, attackType: MELEE, initiative: 3 });
+        const normalEnemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(normal.grid, normal.unitsHolder, normalMiner, { x: 4, y: 7 });
         placeUnit(normal.grid, normal.unitsHolder, normalEnemy, { x: 14, y: 14 });
         expect(mineCount(normal, normalMiner)).toBe(0);
 
         const cleared = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
-        const clearedMiner = createTestUnit({ team: LOWER, attackType: MELEE, initiative: 3 });
-        const clearedEnemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const clearedMiner = createTestUnit({ team: LEFT, attackType: MELEE, initiative: 3 });
+        const clearedEnemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(cleared.grid, cleared.unitsHolder, clearedMiner, { x: 4, y: 7 });
         placeUnit(cleared.grid, cleared.unitsHolder, clearedEnemy, { x: 14, y: 14 });
         const clearedHarness = activate(cleared, clearedMiner);
@@ -538,23 +538,23 @@ describe("enumerated candidate engine legality", () => {
         ).toBe(false);
 
         const ranged = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
-        const rangedMiner = createTestUnit({ team: LOWER, attackType: RANGE, rangeShots: 5, initiative: 3 });
-        const rangedEnemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const rangedMiner = createTestUnit({ team: LEFT, attackType: RANGE, rangeShots: 5, initiative: 3 });
+        const rangedEnemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(ranged.grid, ranged.unitsHolder, rangedMiner, { x: 4, y: 7 });
         placeUnit(ranged.grid, ranged.unitsHolder, rangedEnemy, { x: 14, y: 14 });
         expect(mineCount(ranged, rangedMiner)).toBe(0);
 
         const immobilized = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
-        const immobilizedMiner = createTestUnit({ team: LOWER, attackType: MELEE, initiative: 3 });
-        const immobilizedEnemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const immobilizedMiner = createTestUnit({ team: LEFT, attackType: MELEE, initiative: 3 });
+        const immobilizedEnemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         immobilizedMiner.applyEffect(new EffectFactory().makeEffect("Paralysis")!);
         placeUnit(immobilized.grid, immobilized.unitsHolder, immobilizedMiner, { x: 4, y: 7 });
         placeUnit(immobilized.grid, immobilized.unitsHolder, immobilizedEnemy, { x: 14, y: 14 });
         expect(mineCount(immobilized, immobilizedMiner)).toBe(0);
 
         const forced = createCombatTestContext(PBTypes.GridVals.BLOCK_CENTER);
-        const forcedMiner = createTestUnit({ team: LOWER, attackType: MELEE, initiative: 3 });
-        const forcedEnemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const forcedMiner = createTestUnit({ team: LEFT, attackType: MELEE, initiative: 3 });
+        const forcedEnemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         forcedMiner.setTarget(forcedEnemy.getId());
         placeUnit(forced.grid, forced.unitsHolder, forcedMiner, { x: 4, y: 7 });
         placeUnit(forced.grid, forced.unitsHolder, forcedEnemy, { x: 14, y: 14 });
@@ -563,10 +563,10 @@ describe("enumerated candidate engine legality", () => {
 
     it("applies targeted, mass, and movement-range spell candidates, including Castling", () => {
         const castlingCombat = createCombatTestContext();
-        const harpy = makeReal(LOWER, "Might", "Harpy");
+        const harpy = makeReal(LEFT, "Might", "Harpy");
         harpy.setStackPower(5);
-        const nearEnemy = createTestUnit({ team: UPPER, name: "Near", attackType: MELEE, amountAlive: 5 });
-        const farEnemy = createTestUnit({ team: UPPER, name: "Far", attackType: MELEE, amountAlive: 5 });
+        const nearEnemy = createTestUnit({ team: RIGHT, name: "Near", attackType: MELEE, amountAlive: 5 });
+        const farEnemy = createTestUnit({ team: RIGHT, name: "Far", attackType: MELEE, amountAlive: 5 });
         placeUnit(castlingCombat.grid, castlingCombat.unitsHolder, harpy, { x: 2, y: 2 });
         placeUnit(castlingCombat.grid, castlingCombat.unitsHolder, nearEnemy, { x: 5, y: 5 });
         placeUnit(castlingCombat.grid, castlingCombat.unitsHolder, farEnemy, { x: 15, y: 15 });
@@ -580,10 +580,10 @@ describe("enumerated candidate engine legality", () => {
         expectCandidatesToApply(castlingHarness, castling);
 
         const resurrectionCombat = createCombatTestContext();
-        const angel = makeReal(LOWER, "Life", "Angel");
+        const angel = makeReal(LEFT, "Life", "Angel");
         angel.setStackPower(5);
-        const hurtAlly = createTestUnit({ team: LOWER, name: "Hurt", attackType: MELEE, amountAlive: 5, maxHp: 10 });
-        const resurrectionEnemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE, amountAlive: 5 });
+        const hurtAlly = createTestUnit({ team: LEFT, name: "Hurt", attackType: MELEE, amountAlive: 5, maxHp: 10 });
+        const resurrectionEnemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE, amountAlive: 5 });
         placeLarge(resurrectionCombat, angel, { x: 4, y: 4 });
         placeUnit(resurrectionCombat.grid, resurrectionCombat.unitsHolder, hurtAlly, { x: 8, y: 4 });
         placeUnit(resurrectionCombat.grid, resurrectionCombat.unitsHolder, resurrectionEnemy, { x: 8, y: 12 });
@@ -599,10 +599,10 @@ describe("enumerated candidate engine legality", () => {
         expectCandidatesToApply(resurrectionHarness, resurrection);
 
         const massCombat = createCombatTestContext();
-        const valkyrie = makeReal(LOWER, "Life", "Valkyrie");
+        const valkyrie = makeReal(LEFT, "Life", "Valkyrie");
         valkyrie.setStackPower(5);
         const flyer = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Flyer",
             attackType: MELEE,
             movementType: PBTypes.MovementVals.FLY,
@@ -626,11 +626,11 @@ describe("enumerated candidate engine legality", () => {
         }
 
         const combat = createCombatTestContext();
-        const harpy = makeReal(LOWER, "Might", "Harpy");
+        const harpy = makeReal(LEFT, "Might", "Harpy");
         harpy.setStackPower(5);
-        const support = createTestUnit({ team: LOWER, name: "Local support", attackType: MELEE });
+        const support = createTestUnit({ team: LEFT, name: "Local support", attackType: MELEE });
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Forward shooter",
             attackType: RANGE,
             amountAlive: 5,

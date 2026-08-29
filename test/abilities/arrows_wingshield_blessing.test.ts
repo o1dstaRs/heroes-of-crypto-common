@@ -21,7 +21,7 @@ beforeEach(() => FightStateManager.getInstance().reset());
 const angel = (stackPower: number, luck = 0) =>
     createTestUnit({
         name: "Angel",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         abilities: ["Arrows Wingshield Blessing"],
         stackPower,
         luck,
@@ -30,7 +30,7 @@ const angel = (stackPower: number, luck = 0) =>
 describe("Arrows Wingshield Blessing", () => {
     it("is a stack-powered mass buff with no aura effect or radius", () => {
         const ability = getAbilityConfig("Arrows Wingshield Blessing");
-        const creature = getCreatureConfig(PBTypes.TeamVals.LOWER, "Life", "Angel", "angel_512", 1);
+        const creature = getCreatureConfig(PBTypes.TeamVals.LEFT, "Life", "Angel", "angel_512", 1);
         const abilityIndex = creature.abilities.indexOf("Arrows Wingshield Blessing");
 
         expect(ability.type).toBe(AbilityType.MASS_BUFF);
@@ -59,8 +59,8 @@ describe("Arrows Wingshield Blessing", () => {
         const luckyCarrier = angel(5, 10);
         const fullStackCarrier = angel(5);
         // Far outside the range-2 radius the old aura painted — the whole point of the redo.
-        const distantAlly = createTestUnit({ name: "Distant Ally", team: PBTypes.TeamVals.LOWER, armor: 20 });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, armor: 20 });
+        const distantAlly = createTestUnit({ name: "Distant Ally", team: PBTypes.TeamVals.LEFT, armor: 20 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, armor: 20 });
 
         placeUnit(grid, unitsHolder, luckyCarrier, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, fullStackCarrier, { x: 2, y: 1 });
@@ -97,7 +97,7 @@ describe("Arrows Wingshield Blessing", () => {
     });
 
     it("prints the live projection, keeps the barrier clause and reuses the existing Wingshield icon", () => {
-        const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LOWER, stackPower: 2, luck: 5 });
+        const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LEFT, stackPower: 2, luck: 5 });
         bearer.grantAbility("Arrows Wingshield Blessing");
 
         const index = bearer.getUnitProperties().abilities.indexOf("Arrows Wingshield Blessing");

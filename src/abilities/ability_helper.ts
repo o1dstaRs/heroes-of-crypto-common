@@ -60,13 +60,13 @@ export function getAbilitiesWithPosisionCoefficient(
             const along = sideOrientedBoard ? fromCell.x : fromCell.y;
             const targetAlong = sideOrientedBoard ? toCell.x : toCell.y;
 
-            if (fromUnitTeam === PBTypes.TeamVals.LOWER && along > targetAlong) {
+            if (fromUnitTeam === PBTypes.TeamVals.LEFT && along > targetAlong) {
                 abilities.push(a);
             }
 
             // The footprint margin follows the axis too: along the advance axis the anchor names the
             // FAR edge, so the UPPER attacker must clear the body's full extent along that axis.
-            if (fromUnitTeam === PBTypes.TeamVals.UPPER && along < targetAlong - (targetAlongExtent - 1)) {
+            if (fromUnitTeam === PBTypes.TeamVals.RIGHT && along < targetAlong - (targetAlongExtent - 1)) {
                 abilities.push(a);
             }
         }

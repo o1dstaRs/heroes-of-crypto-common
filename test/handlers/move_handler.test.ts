@@ -34,7 +34,7 @@ describe("MoveHandler", () => {
             unitIdToNewPosition: new Map(),
         });
 
-        grid.occupyCell({ x: 1, y: 1 }, "missing", PBTypes.TeamVals.LOWER, 1, false, false);
+        grid.occupyCell({ x: 1, y: 1 }, "missing", PBTypes.TeamVals.LEFT, 1, false, false);
 
         expect(moveHandler.moveUnitTowardsCenter({ x: 1, y: 1 }, UPDATE_UP, 0)).toEqual({
             log: "",
@@ -46,7 +46,7 @@ describe("MoveHandler", () => {
     it("moves units directly toward the center when the target cell is empty", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT });
 
         placeUnit(grid, unitsHolder, unit, { x: 1, y: 1 });
 
@@ -61,8 +61,8 @@ describe("MoveHandler", () => {
     it("shifts blocked system moves sideways before giving up", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const blocker = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const blocker = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
 
         placeUnit(grid, unitsHolder, unit, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, blocker, { x: 1, y: 2 });
@@ -77,8 +77,8 @@ describe("MoveHandler", () => {
     it("applies route move modifiers only when a known path exists", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         const route: IWeightedRoute = {
             cell: { x: 2, y: 2 },
             route: [
@@ -104,8 +104,8 @@ describe("MoveHandler", () => {
     it("gives +3 morale for moving closer to the enemy and -3 for moving away", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 0 });
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 0 });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
 
         placeUnit(grid, unitsHolder, unit, { x: 4, y: 4 });
         placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
@@ -118,11 +118,31 @@ describe("MoveHandler", () => {
         };
 
         // Closer: destination (5,5) is nearer the enemy (8,8) than the current cell (4,4).
-        expect(moveHandler.applyRouteMoveModifiers([{ x: 4, y: 4 }, { x: 5, y: 5 }], unit, 0, 0)).toBe(true);
+        expect(
+            moveHandler.applyRouteMoveModifiers(
+                [
+                    { x: 4, y: 4 },
+                    { x: 5, y: 5 },
+                ],
+                unit,
+                0,
+                0,
+            ),
+        ).toBe(true);
         expect(syncMorale()).toBe(3);
 
         // Farther: destination (3,3) is farther from the enemy (8,8) than the current cell (4,4).
-        expect(moveHandler.applyRouteMoveModifiers([{ x: 4, y: 4 }, { x: 3, y: 3 }], unit, 0, 0)).toBe(true);
+        expect(
+            moveHandler.applyRouteMoveModifiers(
+                [
+                    { x: 4, y: 4 },
+                    { x: 3, y: 3 },
+                ],
+                unit,
+                0,
+                0,
+            ),
+        ).toBe(true);
         expect(syncMorale()).toBe(0);
     });
 
@@ -130,13 +150,13 @@ describe("MoveHandler", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
         const unit = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Crusade"],
             attack: 10,
             armor: 10,
             stackPower: 5,
         });
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         const crusade = unit.getAbility("Crusade");
         const attackBefore = unit.getBaseAttack();
         const armorBefore = unit.getBaseArmor();
@@ -164,11 +184,11 @@ describe("MoveHandler", () => {
     it("finishes directed moves with explicit positions and update masks", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const up = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const down = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const left = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const right = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const deleted = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const up = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const down = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const left = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const right = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const deleted = createTestUnit({ team: PBTypes.TeamVals.LEFT });
 
         placeUnit(grid, unitsHolder, up, { x: 2, y: 2 });
         placeUnit(grid, unitsHolder, down, { x: 4, y: 4 });
@@ -218,8 +238,8 @@ describe("MoveHandler distance morale", () => {
     it("classifies a move toward the enemy centroid as TOWARD and grants +3", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 0 });
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 0 });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         placeUnit(grid, unitsHolder, unit, { x: 4, y: 4 });
         placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
 
@@ -232,8 +252,8 @@ describe("MoveHandler distance morale", () => {
     it("classifies a move away from the enemy centroid as AWAY and applies -3", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 0 });
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 0 });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         placeUnit(grid, unitsHolder, unit, { x: 4, y: 4 });
         placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
 
@@ -246,8 +266,8 @@ describe("MoveHandler distance morale", () => {
     it("classifies an equidistant move as SAME and changes nothing", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 0 });
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 0 });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         placeUnit(grid, unitsHolder, unit, { x: 5, y: 5 });
         placeUnit(grid, unitsHolder, enemy, { x: 5, y: 9 });
 
@@ -263,10 +283,10 @@ describe("MoveHandler distance morale", () => {
     it("is not fooled by a lone flanker: advancing into the enemy army still grants +3", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 0 });
-        const flanker = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "Flanker" });
-        const army1 = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "Army1" });
-        const army2 = createTestUnit({ team: PBTypes.TeamVals.UPPER, name: "Army2" });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 0 });
+        const flanker = createTestUnit({ team: PBTypes.TeamVals.RIGHT, name: "Flanker" });
+        const army1 = createTestUnit({ team: PBTypes.TeamVals.RIGHT, name: "Army1" });
+        const army2 = createTestUnit({ team: PBTypes.TeamVals.RIGHT, name: "Army2" });
         placeUnit(grid, unitsHolder, unit, { x: 5, y: 5 });
         placeUnit(grid, unitsHolder, flanker, { x: 5, y: 4 }); // right behind the unit
         placeUnit(grid, unitsHolder, army1, { x: 4, y: 9 }); // the bulk of the army, ahead
@@ -277,8 +297,8 @@ describe("MoveHandler distance morale", () => {
 
         // The OLD closest-enemy metric would have PENALISED this advance — the nearest enemy (the
         // flanker behind) gets farther — which is exactly the bug this change fixes.
-        expect(unitsHolder.getDistanceToClosestEnemy(PBTypes.TeamVals.UPPER, to)).toBeGreaterThan(
-            unitsHolder.getDistanceToClosestEnemy(PBTypes.TeamVals.UPPER, from),
+        expect(unitsHolder.getDistanceToClosestEnemy(PBTypes.TeamVals.RIGHT, to)).toBeGreaterThan(
+            unitsHolder.getDistanceToClosestEnemy(PBTypes.TeamVals.RIGHT, from),
         );
         // The centroid metric correctly reads it as advancing into the army.
         expect(moveHandler.applyDistanceMoraleModifier(unit, from, to, 0)).toBe("TOWARD");
@@ -290,8 +310,8 @@ describe("MoveHandler distance morale", () => {
         // before the fix those moves got no morale at all.
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const large = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 0, size: PBTypes.UnitSizeVals.LARGE });
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const large = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 0, size: PBTypes.UnitSizeVals.LARGE });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         placeUnit(grid, unitsHolder, large, { x: 3, y: 3 });
         placeUnit(grid, unitsHolder, enemy, { x: 9, y: 9 });
 
@@ -305,7 +325,7 @@ describe("MoveHandler distance morale", () => {
     it("does nothing when there are no enemies", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 0 });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 0 });
         placeUnit(grid, unitsHolder, unit, { x: 4, y: 4 });
 
         expect(moveHandler.applyDistanceMoraleModifier(unit, cellPos({ x: 4, y: 4 }), cellPos({ x: 5, y: 5 }), 0)).toBe(
@@ -317,15 +337,15 @@ describe("MoveHandler distance morale", () => {
     it("clamps morale at +/-20", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
 
-        const hot = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 19 });
+        const hot = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 19 });
         placeUnit(grid, unitsHolder, hot, { x: 4, y: 4 });
         moveHandler.applyDistanceMoraleModifier(hot, cellPos({ x: 4, y: 4 }), cellPos({ x: 5, y: 5 }), 0);
         expect(syncMorale(hot)).toBe(20);
 
-        const cold = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: -19 });
+        const cold = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: -19 });
         placeUnit(grid, unitsHolder, cold, { x: 4, y: 4 });
         moveHandler.applyDistanceMoraleModifier(cold, cellPos({ x: 4, y: 4 }), cellPos({ x: 3, y: 3 }), 0);
         expect(syncMorale(cold)).toBe(-20);
@@ -336,8 +356,8 @@ describe("MoveHandler distance morale", () => {
         // still net +3 on top of the synergy, not (3 - synergy).
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 0 });
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 0 });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         placeUnit(grid, unitsHolder, unit, { x: 4, y: 4 });
         placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
 
@@ -350,8 +370,8 @@ describe("MoveHandler distance morale", () => {
     it("applyRouteMoveModifiers honours an explicit destination override", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER, morale: 0 });
-        const enemy = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT, morale: 0 });
+        const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
         placeUnit(grid, unitsHolder, unit, { x: 4, y: 4 });
         placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
 

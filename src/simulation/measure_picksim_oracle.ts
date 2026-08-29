@@ -249,8 +249,8 @@ const championBundleChoice = (bundles: readonly (readonly [number, number, numbe
 // Pick-phase driver
 // ---------------------------------------------------------------------------------------------------------
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const UNIFORM_MIX: Record<Role, number> = { melee: 1 / 3, ranged: 1 / 3, flyer: 1 / 3 };
 
 export type OracleDecisionKind = "bundle" | "L1" | "L2" | "L3" | "L4";
@@ -267,8 +267,8 @@ export interface ITeamPickStats {
 
 export interface IPickPhaseOutcome {
     state: IPickSimState;
-    lower: ITeamPickStats;
-    upper: ITeamPickStats;
+    left: ITeamPickStats;
+    right: ITeamPickStats;
 }
 
 const emptyTeamPickStats = (): ITeamPickStats => ({
@@ -289,27 +289,27 @@ const emptyTeamPickStats = (): ITeamPickStats => ({
  */
 export function runPickPhase(
     seed: number,
-    lowerPolicy: PickPolicyName,
-    upperPolicy: PickPolicyName,
+    leftPolicy: PickPolicyName,
+    rightPolicy: PickPolicyName,
     payoff: RolePayoff = WAVE2_ROLE_PAYOFF,
 ): IPickPhaseOutcome {
     const rng = makeRng(seed >>> 0);
     const rngInt: PickRandomInt = (maxExclusive) => Math.floor(rng() * maxExclusive);
     let state = createPickSimState(rngInt);
     const stats: Record<PickTeam, ITeamPickStats> = {
-        [LOWER]: emptyTeamPickStats(),
-        [UPPER]: emptyTeamPickStats(),
+        [LEFT]: emptyTeamPickStats(),
+        [RIGHT]: emptyTeamPickStats(),
     } as Record<PickTeam, ITeamPickStats>;
     const policies: Record<PickTeam, PickPolicyName> = {
-        [LOWER]: lowerPolicy,
-        [UPPER]: upperPolicy,
+        [LEFT]: leftPolicy,
+        [RIGHT]: rightPolicy,
     } as Record<PickTeam, PickPolicyName>;
     const combinedOrder: PickTeam[] =
-        isInformedPolicy(lowerPolicy) && !isInformedPolicy(upperPolicy) ? [UPPER, LOWER] : [LOWER, UPPER];
+        isInformedPolicy(leftPolicy) && !isInformedPolicy(rightPolicy) ? [RIGHT, LEFT] : [LEFT, RIGHT];
 
-    const teamState = (team: PickTeam): IPickTeamState => (team === LOWER ? state.lower : state.upper);
+    const teamState = (team: PickTeam): IPickTeamState => (team === LEFT ? state.left : state.right);
     const opponentCreatures = (team: PickTeam): readonly number[] =>
-        team === LOWER ? state.upper.creatures : state.lower.creatures;
+        team === LEFT ? state.right.creatures : state.left.creatures;
 
     const accept = (action: Parameters<typeof transitionPickSim>[1]): void => {
         const transition = transitionPickSim(state, action, rngInt);
@@ -424,7 +424,7 @@ export function runPickPhase(
             throw new Error(`Pick driver reached unexpected phase ${phase.phase}`);
         }
     }
-    return { state, lower: stats[LOWER], upper: stats[UPPER] };
+    return { state, left: stats[LEFT], right: stats[RIGHT] };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -548,7 +548,7 @@ export interface IPickSimGameRecord {
     cellId: string;
     game: number;
     seed: number;
-    aIsLower: boolean;
+    aIsLeft: boolean;
     winnerSide: Side | "draw";
     winnerSlot: "a" | "b" | "draw";
     laps: number;
@@ -601,13 +601,13 @@ export function playPickSimGame(
     }
     const pairIndex = Math.floor(game / 2);
     const seed = ((options.baseSeed >>> 0) + pairIndex * 0x9e3779b1) >>> 0;
-    const aIsLower = game % 2 === 0;
-    const lowerPolicy = aIsLower ? cell.policyA : cell.policyB;
-    const upperPolicy = aIsLower ? cell.policyB : cell.policyA;
+    const aIsLeft = game % 2 === 0;
+    const leftPolicy = aIsLeft ? cell.policyA : cell.policyB;
+    const rightPolicy = aIsLeft ? cell.policyB : cell.policyA;
     const payoff = dependencies.payoff ?? WAVE2_ROLE_PAYOFF;
-    const outcome = runPickPhase(seed, lowerPolicy, upperPolicy, payoff);
-    const lowerArmy = buildArmyFromPick(outcome.state.lower);
-    const upperArmy = buildArmyFromPick(outcome.state.upper);
+    const outcome = runPickPhase(seed, leftPolicy, rightPolicy, payoff);
+    const leftArmy = buildArmyFromPick(outcome.state.left);
+    const rightArmy = buildArmyFromPick(outcome.state.right);
     // LOWER is the green team (battle_engine GREEN_TEAM = TeamVals.LOWER), matching the live seat mapping.
     const matchRunner =
         dependencies.matchRunner ??
@@ -625,35 +625,35 @@ export function playPickSimGame(
     const result = matchRunner({
         greenVersion: FROZEN_FIGHT_VERSION,
         redVersion: FROZEN_FIGHT_VERSION,
-        roster: lowerArmy.roster,
-        redRoster: upperArmy.roster,
+        roster: leftArmy.roster,
+        redRoster: rightArmy.roster,
         seed,
         gridType: PBTypes.GridVals.NORMAL,
         ...(options.maxLaps === undefined ? {} : { maxLaps: options.maxLaps }),
-        greenDoctrine: lowerArmy.doctrine,
-        redDoctrine: upperArmy.doctrine,
-        greenAugments: lowerArmy.augments,
-        redAugments: upperArmy.augments,
-        greenArtifactT1: lowerArmy.tier1Artifact,
-        redArtifactT1: upperArmy.tier1Artifact,
-        greenArtifactT2: lowerArmy.tier2Artifact,
-        redArtifactT2: upperArmy.tier2Artifact,
-        greenSynergies: lowerArmy.synergies,
-        redSynergies: upperArmy.synergies,
+        greenDoctrine: leftArmy.doctrine,
+        redDoctrine: rightArmy.doctrine,
+        greenAugments: leftArmy.augments,
+        redAugments: rightArmy.augments,
+        greenArtifactT1: leftArmy.tier1Artifact,
+        redArtifactT1: rightArmy.tier1Artifact,
+        greenArtifactT2: leftArmy.tier2Artifact,
+        redArtifactT2: rightArmy.tier2Artifact,
+        greenSynergies: leftArmy.synergies,
+        redSynergies: rightArmy.synergies,
     });
-    const aStats = aIsLower ? outcome.lower : outcome.upper;
-    const bStats = aIsLower ? outcome.upper : outcome.lower;
-    const aArmy = aIsLower ? lowerArmy : upperArmy;
-    const bArmy = aIsLower ? upperArmy : lowerArmy;
-    const winnerSlot = result.winner === "draw" ? "draw" : (result.winner === "green") === aIsLower ? "a" : "b";
-    const collisionsByLevel = outcome.lower.collisionsByLevel.map(
-        (count, index) => count + outcome.upper.collisionsByLevel[index],
+    const aStats = aIsLeft ? outcome.left : outcome.right;
+    const bStats = aIsLeft ? outcome.right : outcome.left;
+    const aArmy = aIsLeft ? leftArmy : rightArmy;
+    const bArmy = aIsLeft ? rightArmy : leftArmy;
+    const winnerSlot = result.winner === "draw" ? "draw" : (result.winner === "green") === aIsLeft ? "a" : "b";
+    const collisionsByLevel = outcome.left.collisionsByLevel.map(
+        (count, index) => count + outcome.right.collisionsByLevel[index],
     ) as [number, number, number, number];
     return {
         cellId: cell.id,
         game,
         seed,
-        aIsLower,
+        aIsLeft,
         winnerSide: result.winner,
         winnerSlot,
         laps: result.laps,

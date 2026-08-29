@@ -19,7 +19,7 @@ const AURA_PERCENT = getAbilityConfig("Sylvan Focus Aura").power;
 const makeSatyr = () =>
     createTestUnit({
         name: "Satyr",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.MAGIC,
         abilities: ["Sylvan Focus Aura"],
         auraEffects: ["Sylvan Focus"],
@@ -28,7 +28,7 @@ const makeSatyr = () =>
     });
 
 const makeAlly = (name: string) =>
-    createTestUnit({ name, team: PBTypes.TeamVals.LOWER, attackType: PBTypes.AttackVals.MAGIC });
+    createTestUnit({ name, team: PBTypes.TeamVals.LEFT, attackType: PBTypes.AttackVals.MAGIC });
 
 describe("Sylvan Focus Aura", () => {
     it("is a flat, non-stack-powered 2-cell buff aura worth 15%", () => {
@@ -46,7 +46,7 @@ describe("Sylvan Focus Aura", () => {
         const far = makeAlly("Far Ally");
         const enemy = createTestUnit({
             name: "Enemy",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MAGIC,
         });
 
@@ -74,7 +74,7 @@ describe("Sylvan Focus Aura", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const luckySatyr = createTestUnit({
             name: "Lucky Satyr",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MAGIC,
             abilities: ["Sylvan Focus Aura"],
             auraEffects: ["Sylvan Focus"],
@@ -84,7 +84,7 @@ describe("Sylvan Focus Aura", () => {
         });
         const ally = createTestUnit({
             name: "Unlucky Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MAGIC,
             luck: -10,
         });
@@ -101,7 +101,7 @@ describe("Sylvan Focus Aura", () => {
     it("prints the owner's luck-adjusted value on a runtime-granted card", () => {
         const bearer = createTestUnit({
             name: "Bearer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             stackPower: 1,
             luck: 10,
         });
@@ -149,7 +149,7 @@ describe("Sylvan Focus Aura", () => {
 
 describe("Satyr", () => {
     it("carries Sylvan Focus alongside its spellbook", () => {
-        const satyr = getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "Satyr", "satyr_512", 1, 0);
+        const satyr = getCreatureConfig(PBTypes.TeamVals.LEFT, "Nature", "Satyr", "satyr_512", 1, 0);
         expect(satyr.abilities).toEqual(["Forest Spellbook", "Sylvan Focus Aura"]);
     });
 });

@@ -62,8 +62,8 @@ import {
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const savedV2 = process.env.V07_WAIT_WEIGHTS_V2;
 const savedV3 = process.env.V07_WAIT_WEIGHTS_V3;
 
@@ -199,16 +199,16 @@ class TestStrategyV0_7 extends StrategyV0_7 {
 function board(attackType: number): { actor: Unit; context: IDecisionContext; shot: GameAction[] } {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
-    const actor = createTestUnit({ name: "Actor", team: LOWER, attackType, rangeShots: 5, initiative: 4 });
-    const ally = createTestUnit({ name: "Ally", team: LOWER, initiative: 2 });
-    const enemyA = createTestUnit({ name: "Enemy A", team: UPPER, initiative: 3, amountAlive: 10 });
-    const enemyB = createTestUnit({ name: "Enemy B", team: UPPER, initiative: 5, amountAlive: 10 });
+    const actor = createTestUnit({ name: "Actor", team: LEFT, attackType, rangeShots: 5, initiative: 4 });
+    const ally = createTestUnit({ name: "Ally", team: LEFT, initiative: 2 });
+    const enemyA = createTestUnit({ name: "Enemy A", team: RIGHT, initiative: 3, amountAlive: 10 });
+    const enemyB = createTestUnit({ name: "Enemy B", team: RIGHT, initiative: 5, amountAlive: 10 });
     placeUnit(combat.grid, combat.unitsHolder, actor, { x: 3, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, ally, { x: 5, y: 3 });
     placeUnit(combat.grid, combat.unitsHolder, enemyA, { x: 3, y: 10 });
     placeUnit(combat.grid, combat.unitsHolder, enemyB, { x: 5, y: 10 });
-    fightProperties.setTeamUnitsAlive(LOWER, 2);
-    fightProperties.setTeamUnitsAlive(UPPER, 2);
+    fightProperties.setTeamUnitsAlive(LEFT, 2);
+    fightProperties.setTeamUnitsAlive(RIGHT, 2);
     return {
         actor,
         context: {
@@ -224,12 +224,12 @@ function board(attackType: number): { actor: Unit; context: IDecisionContext; sh
 }
 
 function prime(strategy: StrategyV0_7, context: IDecisionContext): void {
-    strategy.placeArmy(context.unitsHolder.getAllAllies(LOWER), {
-        team: LOWER,
+    strategy.placeArmy(context.unitsHolder.getAllAllies(LEFT), {
+        team: LEFT,
         grid: context.grid,
         unitsHolder: context.unitsHolder,
         pathHelper: context.pathHelper,
-        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+        placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
     });
 }
 

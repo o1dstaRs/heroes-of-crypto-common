@@ -32,7 +32,7 @@ const setupFight = (withAbomination: boolean) => {
 
     const caster = createTestUnit({
         name: "Battle Mage",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.MELEE_MAGIC,
         spells: ["Life:Fire Strike"],
         amountAlive: 38,
@@ -44,7 +44,7 @@ const setupFight = (withAbomination: boolean) => {
 
     const victim = createTestUnit({
         name: "Victim",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         maxHp: 10_000,
         armor: 20,
         initiative: 3,
@@ -56,7 +56,7 @@ const setupFight = (withAbomination: boolean) => {
     if (withAbomination) {
         abomination = createTestUnit({
             name: "Abomination",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: 10_000,
             armor: 20,
             magicResist: 0,
@@ -73,9 +73,9 @@ const setupFight = (withAbomination: boolean) => {
     }
     context.unitsHolder.refreshAuraEffectsForAllUnits();
 
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, withAbomination ? 2 : 1);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, withAbomination ? 2 : 1);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const sceneLog = new SceneLogMock();
     const engine = new GameActionEngine({
@@ -120,7 +120,7 @@ const setupMeteoriteFight = (
 
     const caster = createTestUnit({
         name: "Battle Mage",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.MELEE_MAGIC,
         spells: ["Life:Meteorite"],
         amountAlive: casterAmountAlive,
@@ -139,15 +139,15 @@ const setupMeteoriteFight = (
     }
 
     const victims = [
-        createTestUnit({ name: "Victim A", team: PBTypes.TeamVals.UPPER, maxHp: 10_000, initiative: 3 }),
-        createTestUnit({ name: "Victim B", team: PBTypes.TeamVals.UPPER, maxHp: 10_000, initiative: 3 }),
+        createTestUnit({ name: "Victim A", team: PBTypes.TeamVals.RIGHT, maxHp: 10_000, initiative: 3 }),
+        createTestUnit({ name: "Victim B", team: PBTypes.TeamVals.RIGHT, maxHp: 10_000, initiative: 3 }),
     ];
     placeUnit(context.grid, context.unitsHolder, victims[0], { x: 6, y: 3 });
     placeUnit(context.grid, context.unitsHolder, victims[1], { x: 6, y: 4 });
 
     const abomination = createTestUnit({
         name: "Abomination",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         maxHp: 500,
         magicResist: 0,
         stackPower: 5,
@@ -161,9 +161,9 @@ const setupMeteoriteFight = (
     placeUnit(context.grid, context.unitsHolder, abomination, abominationCell);
     context.unitsHolder.refreshAuraEffectsForAllUnits();
 
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 3);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 3);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const engine = new GameActionEngine({
         fightProperties,

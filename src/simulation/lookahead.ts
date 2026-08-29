@@ -36,8 +36,8 @@ import { restoreBattle, snapshotBattle } from "./battle_snapshot";
 import { footprintCellsForAnchor } from "./footprint";
 import { extractValueFeatures, VALUE_FEATURE_NAMES } from "./value_features";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 /** How many turns to advance/play (worst case) while eliciting the opponent's immediate reply. */
@@ -82,7 +82,7 @@ const LEARNED_VALUE: { b: number; w: number[] } | null = (() => {
     return null;
 })();
 
-const otherTeam = (team: TeamType): TeamType => (team === LOWER ? UPPER : LOWER);
+const otherTeam = (team: TeamType): TeamType => (team === LEFT ? RIGHT : LEFT);
 const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbilityActive("Hidden");
 
 /**

@@ -96,7 +96,7 @@ export const V07_COMPOSED_NONFIGHT_COHORT_DEFINITIONS: Readonly<Record<V07Compos
 };
 
 const TOP_BITS_11 = 3;
-const LOWER = PBTypes.TeamVals.LOWER;
+const LEFT = PBTypes.TeamVals.LEFT;
 const RULES = parseConditionalRules("all");
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -1217,20 +1217,20 @@ function pickForAssignment(
     candidate: IV07ComposedArm,
     baseline: IV07ComposedArm,
     board: IV07ComposedSeedBoard,
-    candidatePickedLower: boolean,
+    candidatePickedLeft: boolean,
 ) {
-    const lowerArm = candidatePickedLower ? candidate : baseline;
-    const upperArm = candidatePickedLower ? baseline : candidate;
-    const armForTeam = (team: PickTeam): IV07ComposedArm => (team === LOWER ? lowerArm : upperArm);
+    const leftArm = candidatePickedLeft ? candidate : baseline;
+    const rightArm = candidatePickedLeft ? baseline : candidate;
+    const armForTeam = (team: PickTeam): IV07ComposedArm => (team === LEFT ? leftArm : rightArm);
     const pick = runRankedConditionalPickGame(board.pickSeed, RULES, baseline.genome, {
-        lowerGenome: lowerArm.genome,
-        upperGenome: upperArm.genome,
+        leftGenome: leftArm.genome,
+        rightGenome: rightArm.genome,
         pickArtifactT2: (team, offered, ownCreatureIdsAtTier2) => {
             const policy = armForTeam(team).policy;
             return compileNonFightSetupPolicy(policy, policy.id).pickArtifactT2(offered, ownCreatureIdsAtTier2);
         },
     });
-    return { pick, lowerArm, upperArm };
+    return { pick, leftArm, rightArm };
 }
 
 /** Targeted selection is based only on both candidate pick-seat rosters; it never starts a fight. */
@@ -1240,9 +1240,9 @@ export function inspectV07ComposedBoardCohorts(
     board: IV07ComposedSeedBoard,
 ): V07ComposedNonfightCohort[] {
     const cohorts = new Set<V07ComposedNonfightCohort>();
-    for (const candidatePickedLower of [true, false]) {
-        const { pick } = pickForAssignment(candidate, baseline, board, candidatePickedLower);
-        const army = candidatePickedLower ? pick.lower : pick.upper;
+    for (const candidatePickedLeft of [true, false]) {
+        const { pick } = pickForAssignment(candidate, baseline, board, candidatePickedLeft);
+        const army = candidatePickedLeft ? pick.left : pick.right;
         for (const cohort of composedCohorts(army.creatureIds)) cohorts.add(cohort);
     }
     return V07_COMPOSED_NONFIGHT_COHORTS.filter((cohort) => cohorts.has(cohort));
@@ -1276,7 +1276,7 @@ export function prepareV07ComposedMatch(
     candidate: IV07ComposedArm,
     baseline: IV07ComposedArm,
     board: IV07ComposedSeedBoard,
-    candidatePickedLower: boolean,
+    candidatePickedLeft: boolean,
     battleMirror: 0 | 1,
 ): IV07ComposedPreparedMatch {
     if (
@@ -1285,19 +1285,19 @@ export function prepareV07ComposedMatch(
     ) {
         throw new Error("composed guard entrants must both use setup-before-placement");
     }
-    const { pick, lowerArm, upperArm } = pickForAssignment(candidate, baseline, board, candidatePickedLower);
-    const lowerSetup = armySetup(lowerArm.policy, pick.lower, pick.upper);
-    const upperSetup = armySetup(upperArm.policy, pick.upper, pick.lower);
-    const greenArmy = battleMirror === 0 ? pick.lower : pick.upper;
-    const redArmy = battleMirror === 0 ? pick.upper : pick.lower;
-    const greenSetup = battleMirror === 0 ? lowerSetup : upperSetup;
-    const redSetup = battleMirror === 0 ? upperSetup : lowerSetup;
-    const candidateIsGreen = battleMirror === 0 ? candidatePickedLower : !candidatePickedLower;
+    const { pick, leftArm, rightArm } = pickForAssignment(candidate, baseline, board, candidatePickedLeft);
+    const leftSetup = armySetup(leftArm.policy, pick.left, pick.right);
+    const rightSetup = armySetup(rightArm.policy, pick.right, pick.left);
+    const greenArmy = battleMirror === 0 ? pick.left : pick.right;
+    const redArmy = battleMirror === 0 ? pick.right : pick.left;
+    const greenSetup = battleMirror === 0 ? leftSetup : rightSetup;
+    const redSetup = battleMirror === 0 ? rightSetup : leftSetup;
+    const candidateIsGreen = battleMirror === 0 ? candidatePickedLeft : !candidatePickedLeft;
     const candidateSide: Side = candidateIsGreen ? "green" : "red";
-    const candidateArmy = candidatePickedLower ? pick.lower : pick.upper;
-    const baselineArmy = candidatePickedLower ? pick.upper : pick.lower;
-    const candidateSetup = candidatePickedLower ? lowerSetup : upperSetup;
-    const baselineSetup = candidatePickedLower ? upperSetup : lowerSetup;
+    const candidateArmy = candidatePickedLeft ? pick.left : pick.right;
+    const baselineArmy = candidatePickedLeft ? pick.right : pick.left;
+    const candidateSetup = candidatePickedLeft ? leftSetup : rightSetup;
+    const baselineSetup = candidatePickedLeft ? rightSetup : leftSetup;
     const config: IMatchConfig = {
         greenVersion: "v0.7",
         redVersion: "v0.7",
@@ -1342,8 +1342,8 @@ export function prepareV07ComposedMatch(
         candidatePublicOpponentCreatures: candidateSetup.publicOpponentCreatures,
         baselinePublicOpponentCreatures: baselineSetup.publicOpponentCreatures,
         setupFingerprint: fingerprintRankedDraftArtifact({
-            lower: { army: pick.lower, setup: lowerSetup, policy: lowerArm.policy.id },
-            upper: { army: pick.upper, setup: upperSetup, policy: upperArm.policy.id },
+            left: { army: pick.left, setup: leftSetup, policy: leftArm.policy.id },
+            right: { army: pick.right, setup: rightSetup, policy: rightArm.policy.id },
             gridType: board.gridType,
         }),
     };
@@ -1353,10 +1353,10 @@ function playBattleMirror(
     candidate: IV07ComposedArm,
     baseline: IV07ComposedArm,
     board: IV07ComposedSeedBoard,
-    candidatePickedLower: boolean,
+    candidatePickedLeft: boolean,
     battleMirror: 0 | 1,
 ): IV07ComposedGameRecord {
-    const prepared = prepareV07ComposedMatch(candidate, baseline, board, candidatePickedLower, battleMirror);
+    const prepared = prepareV07ComposedMatch(candidate, baseline, board, candidatePickedLeft, battleMirror);
     const { candidateSide, config } = prepared;
     FightStateManager.getInstance();
     const result = runMatch(config);
@@ -1370,12 +1370,12 @@ function playBattleMirror(
         panel: board.panel,
         cohort: board.cohort,
         boardIndex: board.selectedIndex,
-        game: (candidatePickedLower ? 0 : 2) + battleMirror,
+        game: (candidatePickedLeft ? 0 : 2) + battleMirror,
         pairSeed: board.pairSeed,
         pickSeed: board.pickSeed,
         battleSeed: board.battleSeed,
         gridType: board.gridType,
-        pickSeat: candidatePickedLower ? "candidate-lower" : "candidate-upper",
+        pickSeat: candidatePickedLeft ? "candidate-lower" : "candidate-upper",
         battleMirror,
         candidateSide,
         candidateResult: resultForSide(result, candidateSide),
@@ -1396,9 +1396,9 @@ export function evaluateV07ComposedCluster(
     baseline: IV07ComposedArm,
     board: IV07ComposedSeedBoard,
 ): IV07ComposedCluster {
-    const records = ([true, false] as const).flatMap((candidatePickedLower) =>
+    const records = ([true, false] as const).flatMap((candidatePickedLeft) =>
         ([0, 1] as const).map((battleMirror) =>
-            playBattleMirror(candidate, baseline, board, candidatePickedLower, battleMirror),
+            playBattleMirror(candidate, baseline, board, candidatePickedLeft, battleMirror),
         ),
     ) as IV07ComposedCluster["records"];
     validateV07ComposedClusters([{ board, records }]);

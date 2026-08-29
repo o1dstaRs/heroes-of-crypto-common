@@ -119,7 +119,7 @@ export function placeByPolicy(
         return placements;
     }
 
-    const frontnessRaw = (c: XY): number => (context.team === PBTypes.TeamVals.LOWER ? c.y : GRID_SIZE - 1 - c.y);
+    const frontnessRaw = (c: XY): number => (context.team === PBTypes.TeamVals.LEFT ? c.y : GRID_SIZE - 1 - c.y);
     const xs = baseCells.map((c) => c.x);
     const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
     const maxFront = Math.max(1, ...baseCells.map(frontnessRaw));

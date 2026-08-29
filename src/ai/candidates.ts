@@ -62,10 +62,10 @@ import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const RANGE = PBTypes.AttackVals.RANGE;
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
-const otherTeam = (team: number): number => (team === LOWER ? UPPER : LOWER);
+const otherTeam = (team: number): number => (team === LEFT ? RIGHT : LEFT);
 const isAdjacentCell = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
 const haveAdjacentCells = (left: readonly XY[], right: readonly XY[]): boolean => {
     for (const leftCell of left) {

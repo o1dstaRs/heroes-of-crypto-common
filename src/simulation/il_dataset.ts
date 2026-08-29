@@ -675,7 +675,7 @@ export function parseIlRow(value: unknown, expectedFingerprint: string, context 
         ? row.cands
         : fail(`${context}.cands`, "expected >= 2 candidates");
     if (candidateRows.length < 2) fail(`${context}.cands`, "expected >= 2 candidates");
-    const perspectiveTeam = parsedSide === "green" ? PBTypes.TeamVals.LOWER : PBTypes.TeamVals.UPPER;
+    const perspectiveTeam = parsedSide === "green" ? PBTypes.TeamVals.LEFT : PBTypes.TeamVals.RIGHT;
     const cands = candidateRows.map((candidate, index) =>
         parseCandidate(candidate, index, perspectiveTeam, `${context}.cands[${index}]`),
     );

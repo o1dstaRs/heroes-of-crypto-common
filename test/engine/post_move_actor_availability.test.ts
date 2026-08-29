@@ -38,8 +38,8 @@ import {
     type TestUnitOptions,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
 function placeLarge(combat: CombatTestContext, unit: Unit, base: XY): void {
     const cells = [
@@ -73,12 +73,12 @@ function activatedMover(
 } {
     const combat = createCombatTestContext(gridType);
     const unit = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Projected mover",
         initiative: 12,
         ...options,
     });
-    const enemy = createTestUnit({ team: UPPER, name: "Projection witness" });
+    const enemy = createTestUnit({ team: RIGHT, name: "Projection witness" });
     if (unit.isSmallSize()) {
         placeUnit(combat.grid, combat.unitsHolder, unit, base);
     } else {
@@ -89,9 +89,9 @@ function activatedMover(
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(gridType);
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, 1);
-    fightProperties.setTeamUnitsAlive(UPPER, 1);
-    fightProperties.startTurn(LOWER, 1_000);
+    fightProperties.setTeamUnitsAlive(LEFT, 1);
+    fightProperties.setTeamUnitsAlive(RIGHT, 1);
+    fightProperties.startTurn(LEFT, 1_000);
     const engine = new GameActionEngine({
         fightProperties,
         grid: combat.grid,

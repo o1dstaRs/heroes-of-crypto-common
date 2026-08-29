@@ -34,25 +34,25 @@ export class SquarePlacement implements IPlacement {
         this.possibleCellHashesSet = new Set();
 
         switch (placementPositionType) {
-            case PlacementPositionType.LOWER_LEFT:
+            case PlacementPositionType.LEFT_BOTTOM:
                 this.xLeft = -gridSettings.getMaxX() + gridSettings.getStep();
                 this.xRight = this.xLeft + this.size * gridSettings.getStep();
                 this.yUpper = gridSettings.getStep() * this.size + gridSettings.getStep();
                 this.yLower = gridSettings.getStep();
                 break;
-            case PlacementPositionType.UPPER_LEFT:
+            case PlacementPositionType.RIGHT_BOTTOM:
                 this.xLeft = -gridSettings.getMaxX() + gridSettings.getStep();
                 this.xRight = this.xLeft + this.size * gridSettings.getStep();
                 this.yLower = gridSettings.getMaxY() - gridSettings.getStep() * this.size - gridSettings.getStep();
                 this.yUpper = gridSettings.getMaxY() - gridSettings.getStep();
                 break;
-            case PlacementPositionType.LOWER_RIGHT:
+            case PlacementPositionType.LEFT_TOP:
                 this.xLeft = gridSettings.getMaxX() - gridSettings.getStep() - gridSettings.getStep() * this.size;
                 this.xRight = gridSettings.getMaxX() - gridSettings.getStep();
                 this.yUpper = gridSettings.getStep() * this.size + gridSettings.getStep();
                 this.yLower = gridSettings.getStep();
                 break;
-            case PlacementPositionType.UPPER_RIGHT:
+            case PlacementPositionType.RIGHT_TOP:
                 this.xLeft = gridSettings.getMaxX() - gridSettings.getStep() - gridSettings.getStep() * this.size;
                 this.xRight = gridSettings.getMaxX() - gridSettings.getStep();
                 this.yLower = gridSettings.getMaxY() - gridSettings.getStep() * this.size - gridSettings.getStep();
@@ -107,7 +107,7 @@ export class SquarePlacement implements IPlacement {
         const keepsLegacyLargeOvershoot = width === 2 && height === 2;
 
         switch (this.placementPositionType) {
-            case PlacementPositionType.LOWER_LEFT:
+            case PlacementPositionType.LEFT_BOTTOM:
                 x = 1 + diffX;
                 y = 1 + diffY;
                 sx = 1;
@@ -115,7 +115,7 @@ export class SquarePlacement implements IPlacement {
                 borderX = x + this.size - diffX;
                 borderY = y + this.size - diffY;
                 break;
-            case PlacementPositionType.UPPER_LEFT:
+            case PlacementPositionType.RIGHT_BOTTOM:
                 x = 1 + diffX;
                 y = this.gridSettings.getGridSize() - 2;
                 sx = 1;
@@ -125,7 +125,7 @@ export class SquarePlacement implements IPlacement {
                 // far end instead: it stops H-1 rows above the zone's bottom row.
                 borderY = y - this.size + diffY;
                 break;
-            case PlacementPositionType.LOWER_RIGHT:
+            case PlacementPositionType.LEFT_TOP:
                 x = this.gridSettings.getGridSize() - 2;
                 y = 1 + diffY;
                 sx = -1;
@@ -133,7 +133,7 @@ export class SquarePlacement implements IPlacement {
                 borderX = keepsLegacyLargeOvershoot ? x - this.size - diffX : x - this.size + diffX;
                 borderY = y + this.size - diffY;
                 break;
-            case PlacementPositionType.UPPER_RIGHT:
+            case PlacementPositionType.RIGHT_TOP:
                 sx = -1;
                 sy = -1;
                 x = this.gridSettings.getGridSize() + sx - 1;

@@ -41,8 +41,8 @@ export interface IApproximateZeroSumSolution {
     rowMixture: ILeagueMixtureEntry[];
     adversarialMixture: ILeagueMixtureEntry[];
     symmetricMixture: ILeagueMixtureEntry[];
-    lowerValueBound: number;
-    upperValueBound: number;
+    leftValueBound: number;
+    rightValueBound: number;
     midpointValue: number;
     dualityGap: number;
     symmetricExploitability: number;
@@ -232,8 +232,8 @@ export function solveApproximateZeroSumLeague(
         }
     }
 
-    const lowerValueBound = Math.min(...rowMatrix(averageRow, payoffs));
-    const upperValueBound = Math.max(...matrixVector(payoffs, averageColumn));
+    const leftValueBound = Math.min(...rowMatrix(averageRow, payoffs));
+    const rightValueBound = Math.max(...matrixVector(payoffs, averageColumn));
     const averagePlayPayoff = cumulativePlayPayoff / iterations;
     const symmetricWeights = averageRow.map((weight, index) => (weight + averageColumn[index]) / 2);
     const symmetricExploitability = Math.max(0, ...matrixVector(payoffs, symmetricWeights));
@@ -244,13 +244,13 @@ export function solveApproximateZeroSumLeague(
         rowMixture: mixture(entrantIds, averageRow),
         adversarialMixture: mixture(entrantIds, averageColumn),
         symmetricMixture: mixture(entrantIds, symmetricWeights),
-        lowerValueBound,
-        upperValueBound,
-        midpointValue: (lowerValueBound + upperValueBound) / 2,
-        dualityGap: Math.max(0, upperValueBound - lowerValueBound),
+        leftValueBound,
+        rightValueBound,
+        midpointValue: (leftValueBound + rightValueBound) / 2,
+        dualityGap: Math.max(0, rightValueBound - leftValueBound),
         symmetricExploitability,
         averagePlayPayoff,
-        rowExternalRegret: Math.max(0, upperValueBound - averagePlayPayoff),
-        adversaryExternalRegret: Math.max(0, averagePlayPayoff - lowerValueBound),
+        rowExternalRegret: Math.max(0, rightValueBound - averagePlayPayoff),
+        adversaryExternalRegret: Math.max(0, averagePlayPayoff - leftValueBound),
     };
 }

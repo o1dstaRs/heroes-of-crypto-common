@@ -91,7 +91,7 @@ describe("auras on a body wider than one cell", () => {
 
     it("applies one aura once to a 2x1 recipient, not once per body cell", () => {
         const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
-        const team = PBTypes.TeamVals.LOWER;
+        const team = PBTypes.TeamVals.LEFT;
 
         // Wolf Rider emits Wolf Trail; Nomad is a 2x1 that carries no aura of its own.
         const rider = createConfiguredUnit("Might", "Wolf Rider", team, 10);
@@ -111,7 +111,7 @@ describe("auras on a body wider than one cell", () => {
 
     it("applies one aura once to a 2x2 recipient either — the same defect predated any rectangle", () => {
         const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
-        const team = PBTypes.TeamVals.LOWER;
+        const team = PBTypes.TeamVals.LEFT;
 
         const rider = createConfiguredUnit("Might", "Wolf Rider", team, 10);
         const behemoth = createConfiguredUnit("Might", "Behemoth", team, 2);

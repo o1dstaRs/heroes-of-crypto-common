@@ -14,8 +14,8 @@ import type { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, testGridSettings, type TestUnitOptions } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const RANGE = PBTypes.AttackVals.RANGE;
@@ -37,7 +37,7 @@ const SUPPORT_FIRELINE: readonly TestUnitOptions[] = [
 ];
 
 const scenario = (
-    team: TeamType = LOWER,
+    team: TeamType = LEFT,
     publicOpponentCreatureIds: readonly number[] = [creatureIdForName("Peasant")!],
     placementSize = 5,
 ): IScenario => {
@@ -51,7 +51,7 @@ const scenario = (
         pathHelper: new PathHelper(testGridSettings),
         placement: new RectanglePlacement(
             testGridSettings,
-            team === LOWER ? PlacementPositionType.LOWER_LEFT : PlacementPositionType.UPPER_RIGHT,
+            team === LEFT ? PlacementPositionType.LEFT_BOTTOM : PlacementPositionType.RIGHT_TOP,
             placementSize,
         ),
         setupPlacementPolicy: "public-roster",
@@ -125,7 +125,7 @@ describe("v0.8 A19 Ogre Mage and Behemoth ranged-corner placement", () => {
     });
 
     test("mirrors the formation for the upper seat", () => {
-        const fixture = scenario(UPPER);
+        const fixture = scenario(RIGHT);
         const placed = candidate(fixture).placeArmy(fixture.units, fixture.context);
         assertLegalCompletePlacement(fixture, placed);
         expect(supportSpan(fixture, placed)).toBeLessThan(supportSpan(fixture, fixture.incumbent));
@@ -137,7 +137,7 @@ describe("v0.8 A19 Ogre Mage and Behemoth ranged-corner placement", () => {
             [[creatureIdForName("Gargantuan")!], "opponent-splash"],
             [[creatureIdForName("Battle Mage")!], "opponent-ranged-spell-damage"],
         ] as const) {
-            const fixture = scenario(LOWER, opponent);
+            const fixture = scenario(LEFT, opponent);
             const strategy = candidate(fixture);
             expect(strategy.placeArmy(fixture.units, fixture.context)).toBe(fixture.incumbent);
             expect(strategy.getLastPlacementAudit()?.fallbackReason).toBe(reason);
@@ -145,7 +145,7 @@ describe("v0.8 A19 Ogre Mage and Behemoth ranged-corner placement", () => {
     });
 
     test("keeps the incumbent formation without an extended placement zone", () => {
-        const fixture = scenario(LOWER, [creatureIdForName("Peasant")!], 3);
+        const fixture = scenario(LEFT, [creatureIdForName("Peasant")!], 3);
         const strategy = candidate(fixture);
         expect(strategy.placeArmy(fixture.units, fixture.context)).toBe(fixture.incumbent);
         expect(strategy.getLastPlacementAudit()?.fallbackReason).toBe("placement-not-extended");

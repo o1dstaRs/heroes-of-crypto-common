@@ -56,7 +56,7 @@ const setRolls = (...rolls: number[]) => {
 };
 
 const config = (faction: string, name: string) =>
-    getCreatureConfig(PBTypes.TeamVals.LOWER, faction, name, `${name.toLowerCase()}_512`, 1, 0);
+    getCreatureConfig(PBTypes.TeamVals.LEFT, faction, name, `${name.toLowerCase()}_512`, 1, 0);
 
 /** adjustBaseStats rolls this turn's luck spread over [-L, L]; the mid value of that range pins luck to 0. */
 const setNeutralLuckRoll = () => setRolls(LUCK_MAX_CHANGE_FOR_TURN);
@@ -148,7 +148,7 @@ describe("Borrowed Grace", () => {
 
     it("takes a cast buff off the target and wears it with the laps it had left", () => {
         const monk = makeMonk(5);
-        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.UPPER });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.RIGHT });
         castBuff(target, "Life", "Blessing");
         const laps = target.getBuff("Blessing")?.getLaps();
 
@@ -162,7 +162,7 @@ describe("Borrowed Grace", () => {
 
     it("takes nothing when the roll misses", () => {
         const monk = makeMonk(1); // 20% chance
-        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.UPPER });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.RIGHT });
         castBuff(target, "Life", "Blessing");
 
         setRolls(20); // the boundary itself misses
@@ -172,7 +172,7 @@ describe("Borrowed Grace", () => {
 
     it("leaves auras and worn equipment alone", () => {
         const monk = makeMonk(5);
-        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.UPPER });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.RIGHT });
         target.applyAuraEffect("Luck Aura", "aura", true, 10, "3;3");
         target.applyBuff(
             new Spell({ spellProperties: getSpellConfig("System", "Keen Blade", NUMBER_OF_LAPS_TOTAL), amount: 1 }),
@@ -192,13 +192,13 @@ describe("Absolving Arrow", () => {
         const context = createCombatTestContext();
         const monk = createTestUnit({
             name: "Monk",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Absolving Arrow"],
             attackType: PBTypes.AttackVals.RANGE,
             stackPower,
         });
-        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LOWER });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER });
+        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LEFT });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT });
 
         // One straight column: the arrow leaves the Monk, crosses the ally and ends on the enemy.
         placeUnit(context.grid, context.unitsHolder, monk, { x: 5, y: 2 });
@@ -236,7 +236,7 @@ describe("Absolving Arrow", () => {
         const monkWithLuck = (stackPower: number, luck: number) =>
             createTestUnit({
                 name: "Monk",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 abilities: ["Absolving Arrow"],
                 attackType: PBTypes.AttackVals.RANGE,
                 stackPower,
@@ -259,7 +259,7 @@ describe("Absolving Arrow", () => {
         // common must print the real chance there — it used to fall through to the raw-power default.
         const bearer = createTestUnit({
             name: "Bearer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             stackPower: 2,
         });
@@ -345,7 +345,7 @@ describe("Absolving Arrow", () => {
         const { grid, unitsHolder, attackHandler } = createCombatTestContext();
         const monk = createTestUnit({
             name: "Monk",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             abilities: ["Borrowed Grace", "Absolving Arrow"],
             attack: 10,
@@ -354,10 +354,10 @@ describe("Absolving Arrow", () => {
             rangeShots: 3,
             stackPower: 5,
         });
-        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LOWER });
+        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LEFT });
         const enemy = createTestUnit({
             name: "Enemy",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             armor: 100,
             maxHp: 500,
             amountAlive: 5,
@@ -393,7 +393,7 @@ describe("Absolving Arrow", () => {
 
     it("does not touch an ally standing off the line", () => {
         const { monk, ally, enemy, ...context } = setup();
-        const offLine = createTestUnit({ name: "Off Line", team: PBTypes.TeamVals.LOWER });
+        const offLine = createTestUnit({ name: "Off Line", team: PBTypes.TeamVals.LEFT });
         placeUnit(context.grid, context.unitsHolder, offLine, { x: 9, y: 5 });
         offLine.applyEffect(new EffectFactory().makeEffect("Stun")!);
         ally.applyEffect(new EffectFactory().makeEffect("Stun")!);

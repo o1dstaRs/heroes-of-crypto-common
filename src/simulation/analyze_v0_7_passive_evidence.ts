@@ -569,10 +569,10 @@ function shadowMetrics(tally: IShadowAccumulator): Record<V07PassiveShadowMetric
 
 function quantile(sorted: readonly number[], probability: number): number {
     const position = (sorted.length - 1) * probability;
-    const lower = Math.floor(position);
-    const upper = Math.ceil(position);
-    if (lower === upper) return sorted[lower];
-    return sorted[lower] * (upper - position) + sorted[upper] * (position - lower);
+    const left = Math.floor(position);
+    const right = Math.ceil(position);
+    if (left === right) return sorted[left];
+    return sorted[left] * (right - position) + sorted[right] * (position - left);
 }
 
 function mulberry32(seed: number): () => number {

@@ -31,12 +31,12 @@ const setupTeam = (empower: EmpowerAugment) => {
     const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     fightProperties.setGridType(PBTypes.GridVals.NORMAL);
-    fightProperties.setDoctrinePerTeam(PBTypes.TeamVals.LOWER, Doctrine.SEE_NONE);
-    fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LOWER, DefaultPlacementLevel1.THREE_BY_THREE);
-    fightProperties.setDoctrinePerTeam(PBTypes.TeamVals.UPPER, Doctrine.SEE_NONE);
-    fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.UPPER, DefaultPlacementLevel1.THREE_BY_THREE);
+    fightProperties.setDoctrinePerTeam(PBTypes.TeamVals.LEFT, Doctrine.SEE_NONE);
+    fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.LEFT, DefaultPlacementLevel1.THREE_BY_THREE);
+    fightProperties.setDoctrinePerTeam(PBTypes.TeamVals.RIGHT, Doctrine.SEE_NONE);
+    fightProperties.setDefaultPlacementPerTeam(PBTypes.TeamVals.RIGHT, DefaultPlacementLevel1.THREE_BY_THREE);
     if (empower) {
-        expect(fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LOWER, { type: "Empower", value: empower })).toBe(
+        expect(fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, { type: "Empower", value: empower })).toBe(
             true,
         );
     }
@@ -51,9 +51,9 @@ describe("Empower augment in a live fight", () => {
     it("puts the buff on the whole team, and on nobody else's", () => {
         const { context, fightProperties } = setupTeam(EmpowerAugment.LEVEL_2);
 
-        const mage = createTestUnit({ name: "Battle Mage", team: PBTypes.TeamVals.LOWER, initiative: 5 });
-        const friend = createTestUnit({ name: "Friend", team: PBTypes.TeamVals.LOWER, initiative: 4 });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, initiative: 3 });
+        const mage = createTestUnit({ name: "Battle Mage", team: PBTypes.TeamVals.LEFT, initiative: 5 });
+        const friend = createTestUnit({ name: "Friend", team: PBTypes.TeamVals.LEFT, initiative: 4 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, initiative: 3 });
         placeUnit(context.grid, context.unitsHolder, mage, { x: 3, y: 3 });
         placeUnit(context.grid, context.unitsHolder, friend, { x: 4, y: 3 });
         placeUnit(context.grid, context.unitsHolder, enemy, { x: 3, y: 6 });
@@ -69,7 +69,7 @@ describe("Empower augment in a live fight", () => {
 
     it("is nothing at all until the team buys it", () => {
         const { context, fightProperties } = setupTeam(EmpowerAugment.NO_AUGMENT);
-        const mage = createTestUnit({ name: "Battle Mage", team: PBTypes.TeamVals.LOWER, initiative: 5 });
+        const mage = createTestUnit({ name: "Battle Mage", team: PBTypes.TeamVals.LEFT, initiative: 5 });
         placeUnit(context.grid, context.unitsHolder, mage, { x: 3, y: 3 });
 
         context.unitsHolder.applyAugments(fightProperties);
@@ -84,13 +84,13 @@ describe("Empower augment in a live fight", () => {
 
         const empowered = createTestUnit({
             name: "Dragon",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             initiative: 5,
             abilities: ["Fire Breath", "Fire Shield", "Chain Lightning", "Double Punch"],
         });
         const baseline = createTestUnit({
             name: "Dragon",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             initiative: 5,
             abilities: ["Fire Breath", "Fire Shield", "Chain Lightning", "Double Punch"],
         });
@@ -122,7 +122,7 @@ describe("Empower augment in a live fight", () => {
 
     it("prints the raised figure on the Fire Shield / Fire Breath cards", () => {
         const { context, fightProperties } = setupTeam(EmpowerAugment.LEVEL_1);
-        const dragon = createTestUnit({ name: "Dragon", team: PBTypes.TeamVals.LOWER, initiative: 5 });
+        const dragon = createTestUnit({ name: "Dragon", team: PBTypes.TeamVals.LEFT, initiative: 5 });
         placeUnit(context.grid, context.unitsHolder, dragon, { x: 3, y: 3 });
 
         // Augment first, then hand the abilities over: registerAbility writes each card's text as it lands,
@@ -139,7 +139,7 @@ describe("Empower augment in a live fight", () => {
 
     it("sharpens a Fireforged Sword's bonus damage on the unit that holds it", () => {
         const { context, fightProperties } = setupTeam(EmpowerAugment.LEVEL_3);
-        const swordsman = createTestUnit({ name: "Swordsman", team: PBTypes.TeamVals.LOWER, initiative: 5 });
+        const swordsman = createTestUnit({ name: "Swordsman", team: PBTypes.TeamVals.LEFT, initiative: 5 });
         placeUnit(context.grid, context.unitsHolder, swordsman, { x: 3, y: 3 });
 
         context.unitsHolder.applyAugments(fightProperties);

@@ -38,7 +38,7 @@ import {
     playV08A19F184LowerHumanPlacementAbCluster,
     runV08A19F184LowerHumanPlacementWorkerRequestInFreshIsolate,
     summarizeV08A19F184LowerHumanPlacementAbRecords,
-    v08A19F184LowerHumanPlacementEnvironmentSha256,
+    v08A19F184LeftHumanPlacementEnvironmentSha256,
     validateV08A19F184LowerHumanPlacementAbRecords,
     type IV08A19F184LowerHumanPlacementAbClusterRecord,
     type IV08A19F184LowerHumanPlacementAbGameOutcome,
@@ -199,7 +199,7 @@ describe("v0.8+A19 f184 LOWER-only causal placement A/B", () => {
         );
         expect(V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_CANDIDATE_IDENTITY).toMatchObject({
             candidateId: "a19-h18-prod-f184-opening-lower-only-v1-research",
-            implementationSha256: "0e2f6a5eab0cfa228754a6f76f394289833fc734f703f8444c6ad3463862a698",
+            implementationSha256: "25a195624d401fdd429722bdb209e0aff7b274576d5392c5944130cb1c94e37c",
         });
         expect(V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_SOURCE_FILES).toContain(
             "src/simulation/v0_8_a19_f184_lower_human_placement_ab_worker.ts",
@@ -271,7 +271,7 @@ describe("v0.8+A19 f184 LOWER-only causal placement A/B", () => {
     });
 
     test("keeps the recorded f184 setups inside the benchmark's unsplit treatment lifecycle", () => {
-        for (const setup of [V08_A19_PROD_F184_ANCHOR.lower, V08_A19_PROD_F184_ANCHOR.upper]) {
+        for (const setup of [V08_A19_PROD_F184_ANCHOR.left, V08_A19_PROD_F184_ANCHOR.right]) {
             const split = materializeReplayAbSplits(
                 setup.roster,
                 setup.creatureIds,
@@ -344,7 +344,7 @@ describe("v0.8+A19 f184 LOWER-only causal placement A/B", () => {
         expect(second.type).toBe("probe");
         if (first.type !== "probe" || second.type !== "probe") throw new Error("fresh-isolate probe drifted");
         expect(first.isolateId).not.toBe(second.isolateId);
-        expect(first.environmentSha256).toBe(v08A19F184LowerHumanPlacementEnvironmentSha256());
+        expect(first.environmentSha256).toBe(v08A19F184LeftHumanPlacementEnvironmentSha256());
         expect(second.environmentSha256).toBe(first.environmentSha256);
     });
 

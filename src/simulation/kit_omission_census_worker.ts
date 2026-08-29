@@ -121,7 +121,7 @@ function observeDecision(tally: IKitOmissionTally, observation: IDecisionObserva
                 t: "turn",
                 seed: tally.currentSeed,
                 lap: observation.context.fightProperties?.getCurrentLap() ?? 0,
-                side: observation.unit.getTeam() === PBTypes.TeamVals.LOWER ? "green" : "red",
+                side: observation.unit.getTeam() === PBTypes.TeamVals.LEFT ? "green" : "red",
                 unit: creatureName,
                 shape,
                 chosen: [...chosenCaps].sort(),

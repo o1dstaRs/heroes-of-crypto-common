@@ -316,7 +316,7 @@ export function playV07CrossArchetypeGame(
     const opponentTelemetry = emptyTelemetry();
     const setup = liveTwinSetup();
     const decisionObserver = (observation: IDecisionObservation): void => {
-        const actorIsGreen = observation.unit.getTeam() === PBTypes.TeamVals.LOWER;
+        const actorIsGreen = observation.unit.getTeam() === PBTypes.TeamVals.LEFT;
         observeDecision(actorIsGreen === candidateIsGreen ? candidateTelemetry : opponentTelemetry, observation);
     };
     const matchRunner =

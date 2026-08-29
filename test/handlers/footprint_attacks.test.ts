@@ -197,11 +197,11 @@ describe("AttackHandler.canBeAttackedByMelee with a real footprint", () => {
         // the shooter actually stands on.
         const shooter = createFootprintUnit({
             name: "Tall Shooter",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             width: 1,
             height: 2,
         });
-        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.UPPER, width: 1, height: 1 });
+        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.RIGHT, width: 1, height: 1 });
 
         place(grid, unitsHolder, shooter, { x: 5, y: 6 });
         place(grid, unitsHolder, enemy, { x: 7, y: 5 });
@@ -225,12 +225,12 @@ describe("AttackHandler.canBeAttackedByMelee with a real footprint", () => {
         const { grid, unitsHolder, attackHandler } = createCombatTestContext();
         const shooter = createFootprintUnit({
             name: "Very Tall Shooter",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             width: 1,
             height: 3,
         });
         // Body = column x=5, rows 4..6. The legacy window covers rows 6..7, so row 4 is outside it.
-        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.UPPER, width: 1, height: 1 });
+        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.RIGHT, width: 1, height: 1 });
 
         place(grid, unitsHolder, shooter, { x: 5, y: 6 });
         place(grid, unitsHolder, enemy, { x: 6, y: 3 });
@@ -249,11 +249,11 @@ describe("AttackHandler.canBeAttackedByMelee with a real footprint", () => {
         // invents the row ABOVE. The enemy at (4,8) rings rows 7..9, threatening only that phantom row.
         const shooter = createFootprintUnit({
             name: "Wide Shooter",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             width: 2,
             height: 1,
         });
-        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.UPPER, width: 1, height: 1 });
+        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.RIGHT, width: 1, height: 1 });
 
         place(grid, unitsHolder, shooter, { x: 5, y: 6 });
         place(grid, unitsHolder, enemy, { x: 4, y: 8 });
@@ -264,7 +264,7 @@ describe("AttackHandler.canBeAttackedByMelee with a real footprint", () => {
         expect(attackHandler.canBeAttackedByMelee(shooter.getPosition(), false, enemyAggr)).toBe(true);
 
         // ...and it does see a threat that really touches its row.
-        const closeEnemy = createFootprintUnit({ name: "Close", team: PBTypes.TeamVals.UPPER, width: 1, height: 1 });
+        const closeEnemy = createFootprintUnit({ name: "Close", team: PBTypes.TeamVals.RIGHT, width: 1, height: 1 });
         place(grid, unitsHolder, closeEnemy, { x: 6, y: 6 });
         expect(
             attackHandler.canBeAttackedByMelee(
@@ -277,9 +277,9 @@ describe("AttackHandler.canBeAttackedByMelee with a real footprint", () => {
 
     it("answers exactly what the legacy boolean answered for the two shipped shapes", () => {
         const { grid, unitsHolder, attackHandler } = createCombatTestContext();
-        const small = createFootprintUnit({ name: "Small", team: PBTypes.TeamVals.LOWER, width: 1, height: 1 });
-        const large = createFootprintUnit({ name: "Large", team: PBTypes.TeamVals.LOWER, width: 2, height: 2 });
-        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.UPPER, width: 1, height: 1 });
+        const small = createFootprintUnit({ name: "Small", team: PBTypes.TeamVals.LEFT, width: 1, height: 1 });
+        const large = createFootprintUnit({ name: "Large", team: PBTypes.TeamVals.LEFT, width: 2, height: 2 });
+        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.RIGHT, width: 1, height: 1 });
 
         place(grid, unitsHolder, small, { x: 4, y: 4 });
         place(grid, unitsHolder, large, { x: 9, y: 9 });
@@ -308,8 +308,8 @@ describe("AttackHandler.canBeAttackedByMelee with a real footprint", () => {
         const { grid, unitsHolder, attackHandler } = createCombatTestContext();
         // Footprint cells are deliberately UNCLIPPED, so a body parked against the edge reports cells with a
         // negative coordinate. The aggro board is only gridSize wide; indexing it with those used to throw.
-        const edgeUnit = createFootprintUnit({ name: "Edge", team: PBTypes.TeamVals.LOWER, width: 2, height: 2 });
-        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.UPPER, width: 1, height: 1 });
+        const edgeUnit = createFootprintUnit({ name: "Edge", team: PBTypes.TeamVals.LEFT, width: 2, height: 2 });
+        const enemy = createFootprintUnit({ name: "Pinner", team: PBTypes.TeamVals.RIGHT, width: 1, height: 1 });
 
         place(grid, unitsHolder, enemy, { x: 1, y: 1 });
         const offBoard = getPositionForFootprintAnchor(testGridSettings, { x: 0, y: 0 }, 2, 2);
@@ -326,11 +326,11 @@ describe("AttackHandler.handleMeleeAttack with a rectangular body", () => {
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
         const attacker = createFootprintUnit({
             name: "Tall Attacker",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             width: 1,
             height: 2,
         });
-        const target = createFootprintUnit({ name: "Small Target", team: PBTypes.TeamVals.LOWER, width: 1, height: 1 });
+        const target = createFootprintUnit({ name: "Small Target", team: PBTypes.TeamVals.LEFT, width: 1, height: 1 });
         attacker.calculateMissChance = () => 0;
         target.calculateMissChance = () => 0;
 
@@ -382,11 +382,11 @@ describe("AttackHandler.handleMeleeAttack with a rectangular body", () => {
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
         const attacker = createFootprintUnit({
             name: "Small Attacker",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             width: 1,
             height: 1,
         });
-        const target = createFootprintUnit({ name: "Tall Target", team: PBTypes.TeamVals.LOWER, width: 1, height: 2 });
+        const target = createFootprintUnit({ name: "Tall Target", team: PBTypes.TeamVals.LEFT, width: 1, height: 2 });
         attacker.calculateMissChance = () => 0;
         target.calculateMissChance = () => 0;
 
@@ -429,11 +429,11 @@ describe("AttackHandler.handleMeleeAttack with a rectangular body", () => {
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
         const attacker = createFootprintUnit({
             name: "Tall Charger",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             width: 1,
             height: 2,
         });
-        const target = createFootprintUnit({ name: "Small Target", team: PBTypes.TeamVals.LOWER, width: 1, height: 1 });
+        const target = createFootprintUnit({ name: "Small Target", team: PBTypes.TeamVals.LEFT, width: 1, height: 1 });
         attacker.calculateMissChance = () => 0;
         target.calculateMissChance = () => 0;
 
@@ -481,8 +481,8 @@ describe("AttackHandler.handleMeleeAttack with a rectangular body", () => {
     it("fights a 2x2 in both directions", () => {
         const { grid, unitsHolder, attackHandler } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const rectangle = createFootprintUnit({ name: "Tall One", team: PBTypes.TeamVals.UPPER, width: 1, height: 2 });
-        const square = createFootprintUnit({ name: "Square One", team: PBTypes.TeamVals.LOWER, width: 2, height: 2 });
+        const rectangle = createFootprintUnit({ name: "Tall One", team: PBTypes.TeamVals.RIGHT, width: 1, height: 2 });
+        const square = createFootprintUnit({ name: "Square One", team: PBTypes.TeamVals.LEFT, width: 2, height: 2 });
         rectangle.calculateMissChance = () => 0;
         square.calculateMissChance = () => 0;
 
@@ -543,13 +543,13 @@ describe("Splash damage against a rectangular body", () => {
         const { grid, unitsHolder, attackHandler } = createCombatTestContext();
         const shooter = createFootprintUnit({
             name: "Archer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             width: 1,
             height: 1,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
         });
-        const victim = createFootprintUnit({ name: "Tall Victim", team: PBTypes.TeamVals.UPPER, width: 1, height: 2 });
+        const victim = createFootprintUnit({ name: "Tall Victim", team: PBTypes.TeamVals.RIGHT, width: 1, height: 2 });
 
         place(grid, unitsHolder, shooter, { x: 5, y: 1 });
         place(grid, unitsHolder, victim, { x: 5, y: 8 });
@@ -570,17 +570,17 @@ describe("Splash damage against a rectangular body", () => {
         const { grid, unitsHolder, attackHandler } = createCombatTestContext();
         const thrower = createFootprintUnit({
             name: "Thrower",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             width: 1,
             height: 1,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
             abilities: ["Area Throw"],
         });
-        const aimed = createFootprintUnit({ name: "Aimed", team: PBTypes.TeamVals.UPPER, width: 1, height: 1 });
+        const aimed = createFootprintUnit({ name: "Aimed", team: PBTypes.TeamVals.RIGHT, width: 1, height: 1 });
         const splashed = createFootprintUnit({
             name: "Tall Bystander",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             width: 1,
             height: 2,
         });
@@ -608,7 +608,7 @@ describe("MoveHandler with a rectangular body", () => {
     it("shoves a 1x2 one cell without turning it into a square or destroying it", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createFootprintUnit({ name: "Tall Walker", team: PBTypes.TeamVals.LOWER, width: 1, height: 2 });
+        const unit = createFootprintUnit({ name: "Tall Walker", team: PBTypes.TeamVals.LEFT, width: 1, height: 2 });
 
         place(grid, unitsHolder, unit, { x: 5, y: 5 });
 
@@ -629,8 +629,8 @@ describe("MoveHandler with a rectangular body", () => {
     it("shifts a blocked 1x2 sideways rather than destroying it", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createFootprintUnit({ name: "Tall Walker", team: PBTypes.TeamVals.LOWER, width: 1, height: 2 });
-        const blocker = createFootprintUnit({ name: "Blocker", team: PBTypes.TeamVals.UPPER, width: 1, height: 1 });
+        const unit = createFootprintUnit({ name: "Tall Walker", team: PBTypes.TeamVals.LEFT, width: 1, height: 2 });
+        const blocker = createFootprintUnit({ name: "Blocker", team: PBTypes.TeamVals.RIGHT, width: 1, height: 1 });
 
         place(grid, unitsHolder, unit, { x: 5, y: 5 });
         place(grid, unitsHolder, blocker, { x: 5, y: 6 });
@@ -650,8 +650,8 @@ describe("MoveHandler with a rectangular body", () => {
     it("refuses a move loudly instead of moving the body off its own cells", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-        const unit = createFootprintUnit({ name: "Tall Walker", team: PBTypes.TeamVals.LOWER, width: 1, height: 2 });
-        const blocker = createFootprintUnit({ name: "Blocker", team: PBTypes.TeamVals.UPPER, width: 1, height: 1 });
+        const unit = createFootprintUnit({ name: "Tall Walker", team: PBTypes.TeamVals.LEFT, width: 1, height: 2 });
+        const blocker = createFootprintUnit({ name: "Blocker", team: PBTypes.TeamVals.RIGHT, width: 1, height: 1 });
 
         place(grid, unitsHolder, unit, { x: 5, y: 5 });
         place(grid, unitsHolder, blocker, { x: 8, y: 8 });

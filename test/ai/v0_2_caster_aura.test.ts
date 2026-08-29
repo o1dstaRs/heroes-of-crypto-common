@@ -29,8 +29,8 @@ import {
     CombatTestContext,
 } from "../helpers/combat";
 
-const UPPER = PBTypes.TeamVals.UPPER;
-const LOWER = PBTypes.TeamVals.LOWER;
+const RIGHT = PBTypes.TeamVals.RIGHT;
+const LEFT = PBTypes.TeamVals.LEFT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 
@@ -60,10 +60,10 @@ const castName = (actions: GameAction[]): string | undefined => {
 describe("v0.2 MAGIC caster (decideSpellTurn)", () => {
     it("Healer heals when an ally is wounded", () => {
         const c = createCombatTestContext();
-        const healer = makeCreature("Healer", "Life", UPPER);
-        const wounded = createTestUnit({ team: UPPER, name: "Wounded", maxHp: 100, amountAlive: 1, attackType: MELEE });
+        const healer = makeCreature("Healer", "Life", RIGHT);
+        const wounded = createTestUnit({ team: RIGHT, name: "Wounded", maxHp: 100, amountAlive: 1, attackType: MELEE });
         // Enemy far (no imminent fight) so timed buffs are skipped and only the heal path applies.
-        const enemy = createTestUnit({ team: LOWER, name: "Enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: LEFT, name: "Enemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, healer, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, wounded, { x: 6, y: 6 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 14, y: 14 });
@@ -74,10 +74,10 @@ describe("v0.2 MAGIC caster (decideSpellTurn)", () => {
 
     it("Healer with everyone at full HP and no imminent fight does not cast", () => {
         const c = createCombatTestContext();
-        const healer = makeCreature("Healer", "Life", UPPER);
-        const ally = createTestUnit({ team: UPPER, name: "Ally", maxHp: 100, amountAlive: 1, attackType: MELEE });
+        const healer = makeCreature("Healer", "Life", RIGHT);
+        const ally = createTestUnit({ team: RIGHT, name: "Ally", maxHp: 100, amountAlive: 1, attackType: MELEE });
         // Enemy far away (> half board) so timed buffs aren't worth casting yet.
-        const enemy = createTestUnit({ team: LOWER, name: "Far", attackType: MELEE });
+        const enemy = createTestUnit({ team: LEFT, name: "Far", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, healer, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, ally, { x: 6, y: 6 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 14, y: 14 });
@@ -87,15 +87,15 @@ describe("v0.2 MAGIC caster (decideSpellTurn)", () => {
 
     it("Satyr summons wolves when our ranged army is superior", () => {
         const c = createCombatTestContext();
-        const satyr = makeCreature("Satyr", "Nature", UPPER);
+        const satyr = makeCreature("Satyr", "Nature", RIGHT);
         const archer = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Archer",
             attackType: RANGE,
             rangeShots: 10,
             damageMax: 20,
         });
-        const enemy = createTestUnit({ team: LOWER, name: "Grunt", attackType: MELEE });
+        const enemy = createTestUnit({ team: LEFT, name: "Grunt", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, satyr, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, archer, { x: 4, y: 4 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 7, y: 7 });
@@ -107,11 +107,11 @@ describe("v0.2 MAGIC caster (decideSpellTurn)", () => {
 describe("v0.2 aura emitter (Pegasus, withAura)", () => {
     it("does not just advance into the enemy — holds, repositions, or waits to keep its aura up", () => {
         const c = createCombatTestContext();
-        const pegasus = makeCreature("Pegasus", "Nature", UPPER);
+        const pegasus = makeCreature("Pegasus", "Nature", RIGHT);
         // Allies it should keep covered, all on its own side; the enemy is far (no imminent melee).
-        const allyA = createTestUnit({ team: UPPER, name: "A", attackType: MELEE });
-        const allyB = createTestUnit({ team: UPPER, name: "B", attackType: MELEE });
-        const enemy = createTestUnit({ team: LOWER, name: "Far", attackType: MELEE });
+        const allyA = createTestUnit({ team: RIGHT, name: "A", attackType: MELEE });
+        const allyB = createTestUnit({ team: RIGHT, name: "B", attackType: MELEE });
+        const enemy = createTestUnit({ team: LEFT, name: "Far", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, pegasus, { x: 8, y: 12 });
         placeUnit(c.grid, c.unitsHolder, allyA, { x: 7, y: 13 });
         placeUnit(c.grid, c.unitsHolder, allyB, { x: 9, y: 13 });
@@ -126,18 +126,18 @@ describe("v0.2 aura emitter (Pegasus, withAura)", () => {
 
     it("hourglasses (waits) when an ally is out of aura range and unreachable, to re-cover later", () => {
         const c = createCombatTestContext();
-        const pegasus = makeCreature("Pegasus", "Nature", UPPER);
-        const covered = createTestUnit({ team: UPPER, name: "Near", attackType: MELEE });
+        const pegasus = makeCreature("Pegasus", "Nature", RIGHT);
+        const covered = createTestUnit({ team: RIGHT, name: "Near", attackType: MELEE });
         // A second ally far across the board: out of aura range and unreachable this turn, so no move
         // improves coverage — the Pegasus should wait for the army to close up rather than advance.
-        const faraway = createTestUnit({ team: UPPER, name: "Faraway", attackType: MELEE });
+        const faraway = createTestUnit({ team: RIGHT, name: "Faraway", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, pegasus, { x: 8, y: 12 });
         placeUnit(c.grid, c.unitsHolder, covered, { x: 8, y: 11 });
         placeUnit(c.grid, c.unitsHolder, faraway, { x: 8, y: 1 });
 
         const ctx = ctxFor(c);
         // The engine only accepts a hourglass when the team has more than one unit alive.
-        ctx.fightProperties!.setTeamUnitsAlive(UPPER, 3);
+        ctx.fightProperties!.setTeamUnitsAlive(RIGHT, 3);
 
         const actions = getAIStrategy("v0.2").decideTurn(pegasus, ctx);
         expect(actions.some((a) => a.type === "wait_turn")).toBe(true);

@@ -32,7 +32,7 @@ const mockUnit = ({
         getLevel: () => level,
         getName: () => name,
         getSteps: () => steps,
-        getTeam: () => PBTypes.TeamVals.UPPER,
+        getTeam: () => PBTypes.TeamVals.RIGHT,
         isDead: () => false,
     }) as unknown as Unit;
 
@@ -155,7 +155,7 @@ describe("A19 H18 opening-tempo guard", () => {
         expect(
             isEarlyIsolatingFastFlyerWaitMove(
                 thunderbird,
-                holderWith(thunderbird, ...allies.getAllAllies(PBTypes.TeamVals.UPPER).slice(1)),
+                holderWith(thunderbird, ...allies.getAllAllies(PBTypes.TeamVals.RIGHT).slice(1)),
                 1,
                 moveCandidate(isolatedDestination, [
                     {

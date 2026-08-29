@@ -41,7 +41,7 @@ message PortalMatch {
     bool abandoned = 3;
     int64 finished_time = 4;
     string opponent_username = 5;
-    // Viewer's team for this match: PBTypes.TeamVals (UPPER = 1, LOWER = 2).
+    // Viewer's team for this match: PBTypes.TeamVals (RIGHT = 1, LEFT = 2).
     int32 team = 6;
     // Creature ids the viewer fielded, and the opponent's (when known).
     repeated int32 creature_ids = 7 [packed = false];

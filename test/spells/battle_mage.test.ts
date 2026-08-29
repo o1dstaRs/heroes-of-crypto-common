@@ -76,7 +76,7 @@ const setupMageFight = (opts: {
 
     const caster = createTestUnit({
         name: "Battle Mage",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.MELEE_MAGIC,
         spells: opts.spells ?? ["Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Meteorite"],
         amountAlive: opts.casterAmountAlive,
@@ -92,7 +92,7 @@ const setupMageFight = (opts: {
     for (const [index, spec] of (opts.enemies ?? []).entries()) {
         const enemy = createTestUnit({
             name: `Enemy ${index}`,
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             maxHp: spec.maxHp ?? 10_000, // survives by default, so a test reads damage rather than a death
             magicResist: spec.magicResist ?? 0,
             amountAlive: spec.amountAlive ?? 1,
@@ -108,26 +108,23 @@ const setupMageFight = (opts: {
     if (opts.allyCell) {
         ally = createTestUnit({
             name: "Friend",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 10_000,
             initiative: 2,
         });
         placeUnit(context.grid, context.unitsHolder, ally, opts.allyCell);
     }
     let blocker: Unit | undefined;
-    const blockerTeam = opts.blockerTeam ?? PBTypes.TeamVals.LOWER;
+    const blockerTeam = opts.blockerTeam ?? PBTypes.TeamVals.LEFT;
     if (opts.blockerCell) {
         blocker = createTestUnit({ name: "Blocker", team: blockerTeam, maxHp: 10_000, initiative: 2 });
         placeUnit(context.grid, context.unitsHolder, blocker, opts.blockerCell);
     }
 
-    const blockerIsEnemy = !!blocker && blockerTeam === PBTypes.TeamVals.UPPER;
-    fightProperties.setTeamUnitsAlive(
-        PBTypes.TeamVals.LOWER,
-        1 + (ally ? 1 : 0) + (blocker && !blockerIsEnemy ? 1 : 0),
-    );
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, Math.max(1, enemies.length + (blockerIsEnemy ? 1 : 0)));
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    const blockerIsEnemy = !!blocker && blockerTeam === PBTypes.TeamVals.RIGHT;
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1 + (ally ? 1 : 0) + (blocker && !blockerIsEnemy ? 1 : 0));
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, Math.max(1, enemies.length + (blockerIsEnemy ? 1 : 0)));
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const sceneLog = new SceneLogMock();
     const moveHandler = new MoveHandler(context.grid.getSettings(), context.grid, context.unitsHolder);
@@ -329,7 +326,7 @@ describe("action engine — Fire Strike", () => {
         });
         const satyr = createTestUnit({
             name: "Satyr",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Sylvan Focus Aura"],
             auraEffects: ["Sylvan Focus"],
             auraRanges: [2],
@@ -399,7 +396,7 @@ describe("action engine — Fire Strike", () => {
             casterStackPower: 5,
             enemies: [{ cell: { x: 6, y: 3 } }],
             blockerCell: { x: 5, y: 3 }, // squarely between (3,3) and (6,3)
-            blockerTeam: PBTypes.TeamVals.UPPER,
+            blockerTeam: PBTypes.TeamVals.RIGHT,
         });
         const aimedHpBefore = setup.enemies[0].getHp();
         const blockerHpBefore = setup.blocker!.getHp();
@@ -433,7 +430,7 @@ describe("action engine — Fire Strike", () => {
             casterStackPower: 5,
             enemies: [{ cell: { x: 6, y: 3 } }],
             blockerCell: { x: 5, y: 3 },
-            blockerTeam: PBTypes.TeamVals.LOWER,
+            blockerTeam: PBTypes.TeamVals.LEFT,
         });
         const aimedHpBefore = setup.enemies[0].getHp();
         const friendHpBefore = setup.blocker!.getHp();

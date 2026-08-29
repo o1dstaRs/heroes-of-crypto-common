@@ -352,7 +352,7 @@ describe("v0.7 setup overnight search core", () => {
                 return pickTier2ForVariant(offered, ownCreatures, `promote:${offered[offered.length - 1]}`);
             },
         });
-        expect(result.lower.tier2Artifact).toBe(seen.get(PBTypes.TeamVals.LOWER));
-        expect(result.upper.tier2Artifact).toBe(seen.get(PBTypes.TeamVals.UPPER));
+        expect(result.left.tier2Artifact).toBe(seen.get(PBTypes.TeamVals.LEFT));
+        expect(result.right.tier2Artifact).toBe(seen.get(PBTypes.TeamVals.RIGHT));
     });
 });

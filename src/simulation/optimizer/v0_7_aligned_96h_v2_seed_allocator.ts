@@ -401,7 +401,7 @@ function hasExactKeys(value: Record<string, unknown>, expected: readonly string[
     return actual.length === sortedExpected.length && actual.every((key, index) => key === sortedExpected[index]);
 }
 
-function isLowerHexSha256(value: unknown): value is string {
+function isLeftHexSha256(value: unknown): value is string {
     if (typeof value !== "string" || value.length !== 64) return false;
     for (let index = 0; index < value.length; index += 1) {
         const code = value.charCodeAt(index);
@@ -411,7 +411,7 @@ function isLowerHexSha256(value: unknown): value is string {
 }
 
 function requireSha256(value: unknown, label: string): string {
-    if (!isLowerHexSha256(value)) throw new Error(`${label} must be a lowercase SHA-256`);
+    if (!isLeftHexSha256(value)) throw new Error(`${label} must be a lowercase SHA-256`);
     return value;
 }
 

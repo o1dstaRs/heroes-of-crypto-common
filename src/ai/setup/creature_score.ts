@@ -232,7 +232,7 @@ const resolveCreatureFootprint = (
 ): { width: number; height: number } => {
     try {
         const properties = getCreatureConfig(
-            PBTypes.TeamVals.LOWER,
+            PBTypes.TeamVals.LEFT,
             factionName,
             creatureName,
             // Only the art tier is derived from this name, and nothing here looks at textures.

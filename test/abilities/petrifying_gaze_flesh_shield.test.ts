@@ -30,7 +30,7 @@ function createShieldedGazeFight(
     const context = createCombatTestContext();
     const attacker = createTestUnit({
         name: "Gazer",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         attackType,
         abilities: attackerAbilities,
         rangeShots: attackType === PBTypes.AttackVals.RANGE ? 4 : 0,
@@ -39,14 +39,14 @@ function createShieldedGazeFight(
     });
     const target = createTestUnit({
         name: "Protected Target",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         amountAlive: 3,
         maxHp: 100,
         armor: 20,
     });
     const abomination = createTestUnit({
         name: "Abomination",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         amountAlive: 1,
         maxHp: 500,
         armor: 20,

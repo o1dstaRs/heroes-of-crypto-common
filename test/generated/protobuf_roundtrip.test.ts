@@ -70,14 +70,14 @@ describe("generated protobuf messages", () => {
             confirmed: true,
             init_time: 100,
             abandoned: true,
-            team: TypesPB.TeamVals.UPPER,
+            team: TypesPB.TeamVals.RIGHT,
         });
         expect(GamePublicPB.GamePublic.deserializeBinary(game.serializeBinary()).toObject()).toEqual({
             id: "game-id",
             confirmed: true,
             init_time: 100,
             abandoned: true,
-            team: TypesPB.TeamVals.UPPER,
+            team: TypesPB.TeamVals.RIGHT,
         });
 
         const responseMe = ResponseMePB.ResponseMe.fromObject({
@@ -135,7 +135,7 @@ describe("generated protobuf messages", () => {
             id: new Uint8Array([9, 8, 7]),
             faction: TypesPB.FactionVals.MIGHT,
             name: "Berserker",
-            team: TypesPB.TeamVals.UPPER,
+            team: TypesPB.TeamVals.RIGHT,
             max_hp: 10,
             hp: 9,
             steps: 3,
@@ -178,22 +178,22 @@ describe("generated protobuf messages", () => {
             first_turn_made: true,
             fight_started: true,
             fight_finished: true,
-            previous_turn_team: TypesPB.TeamVals.UPPER,
+            previous_turn_team: TypesPB.TeamVals.RIGHT,
             highest_initiative_this_turn: 6,
             already_made_turn: ["u1"],
-            already_made_turn_by_team: { [TypesPB.TeamVals.UPPER]: { values: ["u1"] } },
+            already_made_turn_by_team: { [TypesPB.TeamVals.RIGHT]: { values: ["u1"] } },
             already_hourglass: ["u2"],
             already_replied_attack: ["u3"],
-            team_units_alive: { [TypesPB.TeamVals.UPPER]: 2 },
+            team_units_alive: { [TypesPB.TeamVals.RIGHT]: 2 },
             hourglass_queue: ["u4"],
             morale_plus_queue: ["u5"],
             morale_minus_queue: ["u6"],
             current_turn_start: 100,
             current_turn_end: 200,
-            current_lap_total_time_per_team: { [TypesPB.TeamVals.UPPER]: 50 },
+            current_lap_total_time_per_team: { [TypesPB.TeamVals.RIGHT]: 50 },
             up_next: ["u7"],
             steps_morale_multiplier: 1.5,
-            has_additional_time_requested_per_team: { [TypesPB.TeamVals.UPPER]: true },
+            has_additional_time_requested_per_team: { [TypesPB.TeamVals.RIGHT]: true },
         });
         expect(FightPB.Fight.deserializeBinary(fight.serializeBinary()).toObject()).toEqual(fight.toObject());
     });
@@ -218,7 +218,7 @@ describe("generated protobuf messages", () => {
             id: new Uint8Array([1, 3, 5]),
             faction: TypesPB.FactionVals.NATURE,
             name: "Direct Unit",
-            team: TypesPB.TeamVals.LOWER,
+            team: TypesPB.TeamVals.LEFT,
             max_hp: 40,
             hp: 35,
             steps: 6,

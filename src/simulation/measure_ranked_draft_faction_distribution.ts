@@ -40,8 +40,8 @@ import {
 } from "../picks/pick_sim";
 import { creaturesByLevel, makeRng } from "./army";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
 const randomInt = (seed: number): PickRandomInt => {
     const rng = makeRng(seed);
@@ -60,7 +60,7 @@ for (let level = 1; level <= 4; level += 1) {
 }
 const factionOf = (id: number): string => factionById.get(id) ?? `faction#${creatureInfo(id)?.faction ?? "?"}`;
 
-const teamState = (state: IPickSimState, team: PickTeam) => (team === LOWER ? state.lower : state.upper);
+const teamState = (state: IPickSimState, team: PickTeam) => (team === LEFT ? state.left : state.right);
 
 const DOCTRINE_BY_NAME: Record<string, Doctrine> = {
     three_reveals: Doctrine.THREE_REVEALS,
@@ -85,19 +85,19 @@ function draftRanked(seed: number, genome: ReturnType<typeof parseDraftGenome>, 
     };
 
     // DOCTRINE (both) — reveal setting (deployed AI picks uniformly among the three; pass --doctrine to bound it).
-    apply({ type: "select_doctrine", team: LOWER, doctrine });
-    apply({ type: "select_doctrine", team: UPPER, doctrine });
+    apply({ type: "select_doctrine", team: LEFT, doctrine });
+    apply({ type: "select_doctrine", team: RIGHT, doctrine });
     // INITIAL_PICK / bundle (both) — server bundle policy.
-    apply({ type: "select_bundle", team: LOWER, bundleIndex: pickBundle(LOWER) });
-    apply({ type: "select_bundle", team: UPPER, bundleIndex: pickBundle(UPPER) });
+    apply({ type: "select_bundle", team: LEFT, bundleIndex: pickBundle(LEFT) });
+    apply({ type: "select_bundle", team: RIGHT, bundleIndex: pickBundle(RIGHT) });
 
     let guard = 0;
     while (!isPickSimComplete(state)) {
         if ((guard += 1) > 60) throw new Error("ranked pick exceeded collision guard");
         const phase = getCurrentPickPhase(state);
         if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
-            apply({ type: "select_tier2", team: LOWER, artifactId: teamState(state, LOWER).tier2Offers[0] });
-            apply({ type: "select_tier2", team: UPPER, artifactId: teamState(state, UPPER).tier2Offers[0] });
+            apply({ type: "select_tier2", team: LEFT, artifactId: teamState(state, LEFT).tier2Offers[0] });
+            apply({ type: "select_tier2", team: RIGHT, artifactId: teamState(state, RIGHT).tier2Offers[0] });
             continue;
         }
         if (phase.phase !== PBTypes.PickPhaseVals.PICK || phase.actors.length !== 1) {
@@ -117,7 +117,7 @@ function draftRanked(seed: number, genome: ReturnType<typeof parseDraftGenome>, 
         // from the updated visible set (mirrors pick_decider's in-tick re-pick).
         apply({ type: "pick_creature", team, creatureId });
     }
-    return [[...state.lower.creatures], [...state.upper.creatures]];
+    return [[...state.left.creatures], [...state.right.creatures]];
 }
 
 function main(): void {

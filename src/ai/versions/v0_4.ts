@@ -391,7 +391,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
         if (!frontlineOn) return placed;
         const tanks = units.filter((u) => FRONT_TANKS.has(u.getName()));
         if (!tanks.length) return placed;
-        const front = (cc: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cc.y : -cc.y);
+        const front = (cc: XY): number => (context.team === PBTypes.TeamVals.LEFT ? cc.y : -cc.y);
         for (const t of tanks) {
             const tc = placed.get(t.getId());
             if (!tc) continue;
@@ -1242,7 +1242,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             return decision;
         }
         const myCells = unit.getCells();
-        const lower = context.unitsHolder
+        const left = context.unitsHolder
             .getAllAllies(otherTeam(unit.getTeam()))
             .filter(
                 (e) =>
@@ -1252,11 +1252,11 @@ export class StrategyV0_4 extends StrategyV0_3 {
                     e.getCells().some((ec) => myCells.some((uc) => isAdjacentCell(ec, uc))),
             )
             .sort((a, b) => a.getLevel() - b.getLevel());
-        if (!lower.length) {
+        if (!left.length) {
             return decision;
         }
         const swapped = [...decision];
-        swapped[idx] = { ...strike, targetId: lower[0].getId() };
+        swapped[idx] = { ...strike, targetId: left[0].getId() };
         return swapped;
     }
     /** How many friendly BUFF auras cover a cell (receiver-side: is the unit standing inside an ally's aura). */
@@ -1509,7 +1509,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             return placements;
         }
         // Deeper = safer first-pick (farther from the enemy); used only to break ties (and to seed unit 1).
-        const frontness = (cc: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cc.y : -cc.y);
+        const frontness = (cc: XY): number => (context.team === PBTypes.TeamVals.LEFT ? cc.y : -cc.y);
         // The unit's real body. The spread below reserves this footprint against the stacks placed after it,
         // so a presumed 2x2 would both refuse legal anchors and fence off cells nobody occupies — and this
         // layout is the INCUMBENT the learned v0.5 placement policy is scored against, so a wrong shape here

@@ -27,7 +27,7 @@ export const V08_A19_H18_RANKED_PLACEMENT_IMPLEMENTATION_SOURCE =
 // replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
 // qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H18_RANKED_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "28f9c145fb7082511046d8807d113e59d493e6ded97871084ad7002f9cd5d23c" as const;
+    "6abcd286f3f325c64c51ead0ffdd2cd2615b861649a02c3a58bbaee994037599" as const;
 
 /**
  * Browser-safe identity for the production-replay-derived anti-flyer role correction. The source digest is

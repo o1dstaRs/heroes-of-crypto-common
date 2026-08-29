@@ -273,10 +273,9 @@ export function leagueComposition(creatureIds: readonly number[]): [number, numb
     return counts.map((count) => count / creatureIds.length) as [number, number, number];
 }
 
-const teamState = (state: IPickSimState, team: PickTeam) =>
-    team === PBTypes.TeamVals.LOWER ? state.lower : state.upper;
+const teamState = (state: IPickSimState, team: PickTeam) => (team === PBTypes.TeamVals.LEFT ? state.left : state.right);
 const opponentState = (state: IPickSimState, team: PickTeam) =>
-    team === PBTypes.TeamVals.LOWER ? state.upper : state.lower;
+    team === PBTypes.TeamVals.LEFT ? state.right : state.left;
 
 export function leagueOpponentCreatures(state: IPickSimState, team: PickTeam, omniscient: boolean): number[] {
     return omniscient ? [...opponentState(state, team).creatures] : getKnownOpponentCreatures(state, team);

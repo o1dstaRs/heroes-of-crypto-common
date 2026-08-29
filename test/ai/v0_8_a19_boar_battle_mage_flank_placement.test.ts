@@ -18,8 +18,8 @@ import type { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const NORMAL = PBTypes.GridVals.NORMAL;
 
 interface IScenarioOptions {
@@ -37,7 +37,7 @@ interface IScenario {
 }
 
 const scenario = ({
-    team = LOWER,
+    team = LEFT,
     gridType = NORMAL,
     battleMageCount = 1,
     boarCount = 1,
@@ -64,7 +64,7 @@ const scenario = ({
         pathHelper: new PathHelper(testGridSettings),
         placement: new RectanglePlacement(
             testGridSettings,
-            team === LOWER ? PlacementPositionType.LOWER_LEFT : PlacementPositionType.UPPER_RIGHT,
+            team === LEFT ? PlacementPositionType.LEFT_BOTTOM : PlacementPositionType.RIGHT_TOP,
             3,
         ),
     };
@@ -124,13 +124,13 @@ describe("v0.8 A19 Boar + Battle Mage far-flank placement", () => {
     });
 
     test("calls the base first and moves only the Boar to the legal far flank for both seats", () => {
-        for (const team of [LOWER, UPPER] as const) {
+        for (const team of [LEFT, RIGHT] as const) {
             const fixture = scenario({ team });
             const calls = { value: 0 };
             const strategy = decoratedFor(fixture, calls);
             const boar = unitByName(fixture, "Frenzied Boar");
             const originalEntries = [...fixture.incumbent].map(([id, cell]) => [id, { ...cell }] as const);
-            const expectedY = team === LOWER ? 3 : 13;
+            const expectedY = team === LEFT ? 3 : 13;
 
             expect(fixture.incumbent.get(boar.getId())).toEqual({ x: 2, y: expectedY });
             const placed = strategy.placeArmy(fixture.units, fixture.context);

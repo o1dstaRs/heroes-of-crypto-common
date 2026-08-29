@@ -138,7 +138,7 @@ export function createV09TeacherObserver(
         recorder.record({
             ...options,
             decision: decisionOrdinal,
-            seat: decision.unit.getTeam() === PBTypes.TeamVals.LOWER ? "green" : "red",
+            seat: decision.unit.getTeam() === PBTypes.TeamVals.LEFT ? "green" : "red",
             lap: decision.context.fightProperties!.getCurrentLap(),
             actorUnitName: decision.unit.getName(),
             valueFeatures: [...decision.valueFeatures],

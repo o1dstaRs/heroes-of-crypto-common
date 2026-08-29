@@ -44,7 +44,7 @@ describe("AttackHandler", () => {
             damageStatisticHolder.add({
                 unitName: "Target",
                 damage: 5,
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 lap: 2,
             });
 
@@ -136,12 +136,12 @@ describe("AttackHandler", () => {
         it("evaluates hypothetical shots with the supplied origin's falloff", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const attacker = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
                 shotDistance: 2,
             });
-            const target = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            const target = createTestUnit({ team: PBTypes.TeamVals.LEFT });
 
             placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
             placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
@@ -169,12 +169,12 @@ describe("AttackHandler", () => {
         it("calculates range divisors and evaluates affected range targets", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const attacker = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
                 shotDistance: 2,
             });
-            const target = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            const target = createTestUnit({ team: PBTypes.TeamVals.LEFT });
 
             placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
             placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
@@ -186,7 +186,7 @@ describe("AttackHandler", () => {
             expect(
                 attackHandler.canBeAttackedByMelee(
                     attacker.getPosition(),
-                    attacker.isSmallSize(),
+                    attacker,
                     grid.getEnemyAggrMatrixByUnitId(attacker.getId()),
                 ),
             ).toBe(false);
@@ -208,11 +208,11 @@ describe("AttackHandler", () => {
         it("returns incomplete for missing spell context and hidden enemy targets", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const caster = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 spells: ["Death:Weakness"],
             });
             const target = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
             });
 
             placeUnit(grid, unitsHolder, caster, { x: 1, y: 1 });
@@ -234,12 +234,12 @@ describe("AttackHandler", () => {
         it("heals damaged allies and consumes the spell", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const caster = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 spells: ["Life:Heal"],
                 amountAlive: 2,
             });
             const target = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 maxHp: 20,
                 amountAlive: 1,
             });
@@ -269,11 +269,11 @@ describe("AttackHandler", () => {
         it("applies common enemy debuffs", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const caster = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 spells: ["Death:Weakness"],
             });
             const target = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 magicResist: 0,
             });
 
@@ -297,13 +297,13 @@ describe("AttackHandler", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const caster = createTestUnit({
                 name: "Helping Caster",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 spells: ["Life:Helping Hand"],
                 stackPower: 4,
             });
             const target = createTestUnit({
                 name: "Helping Target",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 stackPower: 4,
             });
 
@@ -327,12 +327,12 @@ describe("AttackHandler", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const caster = createTestUnit({
                 name: "Healer",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 spells: ["Life:Spiritual Armor"],
             });
             const target = createTestUnit({
                 name: "Armor Target",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 armor: 20,
             });
             const fightProperties = FightStateManager.getInstance().getFightProperties();
@@ -340,7 +340,7 @@ describe("AttackHandler", () => {
             placeUnit(grid, unitsHolder, caster, { x: 1, y: 1 });
             placeUnit(grid, unitsHolder, target, { x: 2, y: 1 });
             fightProperties.setArtifactPerTeam(
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
                 ArtifactTier.TIER_2,
                 Tier2Artifact.TOME_OF_AMPLIFICATION,
             );
@@ -361,7 +361,7 @@ describe("AttackHandler", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const caster = createTestUnit({
                 name: "Satyr",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 spells: ["Life:Helping Hand"],
                 stackPower: 4,
                 maxHp: 100,
@@ -369,7 +369,7 @@ describe("AttackHandler", () => {
             });
             const target = createTestUnit({
                 name: "Helping Target",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 stackPower: 4,
                 maxHp: 10,
                 armor: 10,
@@ -379,7 +379,7 @@ describe("AttackHandler", () => {
             placeUnit(grid, unitsHolder, caster, { x: 1, y: 1 });
             placeUnit(grid, unitsHolder, target, { x: 2, y: 1 });
             fightProperties.setArtifactPerTeam(
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
                 ArtifactTier.TIER_2,
                 Tier2Artifact.TOME_OF_AMPLIFICATION,
             );
@@ -404,12 +404,12 @@ describe("AttackHandler", () => {
         it("swaps positions for Castling", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const caster = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 spells: ["System:Castling"],
                 stackPower: 4,
             });
             const target = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 stackPower: 4,
             });
 
@@ -441,7 +441,7 @@ describe("AttackHandler", () => {
             // One-shot the whole target stack (single 1-HP Peasant) with an overwhelming ranged hit.
             const attacker = createTestUnit({
                 name: "Arbalester",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 attack: 100,
                 damageMin: 100,
@@ -452,7 +452,7 @@ describe("AttackHandler", () => {
             });
             const target = createTestUnit({
                 name: "Peasant",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 armor: 1,
                 amountAlive: 1,
                 maxHp: 1,
@@ -461,7 +461,7 @@ describe("AttackHandler", () => {
             // Another Peasant stack on the target's team, off to the side (same name + team → loses morale).
             const targetAlly = createTestUnit({
                 name: "Peasant",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 amountAlive: 1,
                 morale: 10,
             });
@@ -502,7 +502,7 @@ describe("AttackHandler", () => {
 
             const attacker = createTestUnit({
                 name: "Range Attacker",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 attack: 10,
                 armor: 10,
@@ -513,7 +513,7 @@ describe("AttackHandler", () => {
             });
             const target = createTestUnit({
                 name: "Range Target",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 attackType: PBTypes.AttackVals.MELEE,
                 attack: 10,
                 armor: 10,
@@ -549,7 +549,7 @@ describe("AttackHandler", () => {
                 {
                     unitName: "Range Attacker",
                     damage: 10,
-                    team: PBTypes.TeamVals.UPPER,
+                    team: PBTypes.TeamVals.RIGHT,
                     lap: 1,
                 },
             ]);
@@ -558,14 +558,14 @@ describe("AttackHandler", () => {
         it("does not land a range attack while the attacker is threatened by melee", () => {
             const { grid, unitsHolder, attackHandler, damageStatisticHolder } = createCombatTestContext();
             const attacker = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 damageMin: 10,
                 damageMax: 10,
                 rangeShots: 3,
             });
             const adjacentEnemy = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 attackType: PBTypes.AttackVals.MELEE,
                 amountAlive: 3,
             });
@@ -595,18 +595,18 @@ describe("AttackHandler", () => {
         it("does not attack a different unit while a live forced target exists", () => {
             const { grid, unitsHolder, attackHandler, damageStatisticHolder } = createCombatTestContext();
             const attacker = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 damageMin: 10,
                 damageMax: 10,
                 rangeShots: 3,
             });
             const selectedTarget = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 amountAlive: 3,
             });
             const forcedTarget = createTestUnit({
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 amountAlive: 3,
             });
 
@@ -637,7 +637,7 @@ describe("AttackHandler", () => {
             const { grid, unitsHolder, attackHandler, damageStatisticHolder } = createCombatTestContext();
             const attacker = createTestUnit({
                 name: "Attacking Archer",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 attack: 10,
                 armor: 30,
@@ -648,7 +648,7 @@ describe("AttackHandler", () => {
             });
             const target = createTestUnit({
                 name: "Responding Archer",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 attackType: PBTypes.AttackVals.RANGE,
                 attack: 10,
                 armor: 30,
@@ -683,13 +683,13 @@ describe("AttackHandler", () => {
                 {
                     unitName: "Responding Archer",
                     damage: 10,
-                    team: PBTypes.TeamVals.LOWER,
+                    team: PBTypes.TeamVals.LEFT,
                     lap: 1,
                 },
                 {
                     unitName: "Attacking Archer",
                     damage: 10,
-                    team: PBTypes.TeamVals.UPPER,
+                    team: PBTypes.TeamVals.RIGHT,
                     lap: 1,
                 },
             ]);
@@ -699,7 +699,7 @@ describe("AttackHandler", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const attacker = createTestUnit({
                 name: "Gazer",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
                 amountAlive: 1,
@@ -710,7 +710,7 @@ describe("AttackHandler", () => {
             });
             const target = createTestUnit({
                 name: "Responder",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
                 amountAlive: 1,
@@ -719,7 +719,7 @@ describe("AttackHandler", () => {
             });
             const targetAlly = createTestUnit({
                 name: "Responder",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 amountAlive: 1,
                 morale: 10,
             });
@@ -771,7 +771,7 @@ describe("AttackHandler", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const attacker = createTestUnit({
                 name: "AOE Gazer",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
                 amountAlive: 1,
@@ -781,7 +781,7 @@ describe("AttackHandler", () => {
             });
             const target = createTestUnit({
                 name: "AOE Target",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 amountAlive: 3,
                 maxHp: 100,
             });
@@ -828,7 +828,7 @@ describe("AttackHandler", () => {
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
             const attacker = createTestUnit({
                 name: "Melee Attacker",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.MELEE,
                 attack: 10,
                 armor: 30,
@@ -838,7 +838,7 @@ describe("AttackHandler", () => {
             });
             const target = createTestUnit({
                 name: "Melee Target",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 attackType: PBTypes.AttackVals.MELEE,
                 attack: 10,
                 armor: 30,
@@ -872,13 +872,13 @@ describe("AttackHandler", () => {
                 {
                     unitName: "Melee Target",
                     damage: 10,
-                    team: PBTypes.TeamVals.LOWER,
+                    team: PBTypes.TeamVals.LEFT,
                     lap: 1,
                 },
                 {
                     unitName: "Melee Attacker",
                     damage: 10,
-                    team: PBTypes.TeamVals.UPPER,
+                    team: PBTypes.TeamVals.RIGHT,
                     lap: 1,
                 },
             ]);
@@ -892,13 +892,13 @@ describe("AttackHandler", () => {
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
             const attacker = createTestUnit({
                 name: "Skewerer",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.MELEE,
                 abilities: ["Skewer Strike"],
             });
             const abomination = createTestUnit({
                 name: "Abomination",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 maxHp: 50,
                 armor: 20,
                 luck: 10,
@@ -910,7 +910,7 @@ describe("AttackHandler", () => {
             });
             const protectedAlly = createTestUnit({
                 name: "Protected Rear Unit",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 maxHp: 1000,
                 armor: 20,
             });
@@ -962,7 +962,7 @@ describe("AttackHandler", () => {
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
             const abomination = createTestUnit({
                 name: "Abomination",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 maxHp: 50,
                 armor: 20,
                 luck: 10,
@@ -974,13 +974,13 @@ describe("AttackHandler", () => {
             });
             const protectedAlly = createTestUnit({
                 name: "Protected Rear Unit",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 maxHp: 1000,
                 armor: 20,
             });
             const responder = createTestUnit({
                 name: "Responding Skewerer",
-                team: PBTypes.TeamVals.LOWER,
+                team: PBTypes.TeamVals.LEFT,
                 maxHp: 1000,
                 armor: 20,
                 attackType: PBTypes.AttackVals.MELEE,
@@ -1025,11 +1025,11 @@ describe("AttackHandler", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
             const attacker = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
             });
-            const target = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+            const target = createTestUnit({ team: PBTypes.TeamVals.LEFT });
 
             placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
             placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
@@ -1065,7 +1065,7 @@ describe("AttackHandler", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
             const attacker = createTestUnit({
                 name: "Siege Archer",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
             });
@@ -1088,7 +1088,7 @@ describe("AttackHandler", () => {
         it("range attack hits the RIGHT mountain and spends only its own hit points", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
             const attacker = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
             });
@@ -1112,7 +1112,7 @@ describe("AttackHandler", () => {
             const survivor = { x: 10, y: 8 };
             grid.setScatteredMountains([target, survivor]);
             const attacker = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
             });
@@ -1139,7 +1139,7 @@ describe("AttackHandler", () => {
             const survivor = { x: 10, y: 8 };
             grid.setScatteredMountains([first, second, survivor]);
             const attacker = createTestUnit({
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.RANGE,
                 rangeShots: 3,
                 abilities: ["Double Shot"],
@@ -1165,7 +1165,7 @@ describe("AttackHandler", () => {
 
         it("small melee unit strikes the left mountain from an outer (non-corridor) cell", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
-            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.RIGHT, attackType: PBTypes.AttackVals.MELEE });
             placeUnit(grid, unitsHolder, attacker, { x: 6, y: 6 }); // col-6 side of the left mountain
 
             const result = attackHandler.handleObstacleAttack(
@@ -1183,7 +1183,7 @@ describe("AttackHandler", () => {
 
         it("small melee unit strikes the LEFT mountain from the corridor between the two mountains", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
-            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.RIGHT, attackType: PBTypes.AttackVals.MELEE });
             placeUnit(grid, unitsHolder, attacker, { x: 7, y: 7 }); // corridor cell, adjacent to left (6,7)
 
             const result = attackHandler.handleObstacleAttack(
@@ -1201,7 +1201,7 @@ describe("AttackHandler", () => {
 
         it("small melee unit strikes the RIGHT mountain from the corridor between the two mountains", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
-            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.RIGHT, attackType: PBTypes.AttackVals.MELEE });
             placeUnit(grid, unitsHolder, attacker, { x: 8, y: 7 }); // corridor cell, adjacent to right (9,7)
 
             const result = attackHandler.handleObstacleAttack(
@@ -1219,7 +1219,7 @@ describe("AttackHandler", () => {
 
         it("small melee unit strikes the left mountain from a DIAGONAL corner cell", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
-            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.RIGHT, attackType: PBTypes.AttackVals.MELEE });
             // (4,6) is diagonally (Chebyshev 1) adjacent to left mountain cell (5,7) — a legal corner strike.
             placeUnit(grid, unitsHolder, attacker, { x: 4, y: 6 });
 
@@ -1238,7 +1238,7 @@ describe("AttackHandler", () => {
 
         it("does not land a melee strike from a non-adjacent cell", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
-            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER, attackType: PBTypes.AttackVals.MELEE });
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.RIGHT, attackType: PBTypes.AttackVals.MELEE });
             placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
 
             const result = attackHandler.handleObstacleAttack(
@@ -1257,7 +1257,7 @@ describe("AttackHandler", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
             const attacker = createTestUnit({
                 name: "Mountain Breaker",
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 attackType: PBTypes.AttackVals.MELEE,
                 size: PBTypes.UnitSizeVals.LARGE,
             });
@@ -1279,7 +1279,7 @@ describe("AttackHandler", () => {
         it("returns incomplete for non-block grids", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
-            const attacker = createTestUnit({ team: PBTypes.TeamVals.UPPER });
+            const attacker = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
 
             placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
 

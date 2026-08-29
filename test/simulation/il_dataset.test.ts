@@ -72,7 +72,7 @@ const candidate = (
     actions: GameAction[],
     mean: number | null,
     shotFeatures?: IShotCandidateFeatures,
-    perspective = PBTypes.TeamVals.LOWER,
+    perspective = PBTypes.TeamVals.LEFT,
 ) => {
     const enumerated: IEnumeratedCandidate = { kind, actions, features: candidateFeatures, shotFeatures };
     const encoding = ilCandidateActionEncoding(enumerated, perspective);
@@ -89,7 +89,7 @@ const candidate = (
 };
 
 const decision = (overrides: Record<string, unknown> = {}) => {
-    const perspective = overrides.side === "red" ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const perspective = overrides.side === "red" ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     return {
         t: "ild",
         v: 3,
@@ -207,7 +207,7 @@ describe("IL dataset v3", () => {
     });
 
     it("makes spatial action features relative to the acting team", () => {
-        const lowerShot: IEnumeratedCandidate = {
+        const leftShot: IEnumeratedCandidate = {
             kind: "shot",
             actions: [
                 selectRange,
@@ -219,7 +219,7 @@ describe("IL dataset v3", () => {
             ],
             features: candidateFeatures,
         };
-        const upperShot: IEnumeratedCandidate = {
+        const rightShot: IEnumeratedCandidate = {
             kind: "shot",
             actions: [
                 { ...selectRange, unitId: "upper" },
@@ -233,7 +233,7 @@ describe("IL dataset v3", () => {
             ],
             features: candidateFeatures,
         };
-        const lowerMoveMelee: IEnumeratedCandidate = {
+        const leftMoveMelee: IEnumeratedCandidate = {
             kind: "melee",
             actions: [
                 {
@@ -248,7 +248,7 @@ describe("IL dataset v3", () => {
             ],
             features: candidateFeatures,
         };
-        const upperMoveMelee: IEnumeratedCandidate = {
+        const rightMoveMelee: IEnumeratedCandidate = {
             kind: "melee",
             actions: [
                 {
@@ -269,12 +269,12 @@ describe("IL dataset v3", () => {
             features: candidateFeatures,
         };
 
-        const lowerShotEncoding = ilCandidateActionEncoding(lowerShot, PBTypes.TeamVals.LOWER);
-        const upperShotEncoding = ilCandidateActionEncoding(upperShot, PBTypes.TeamVals.UPPER);
-        expect(lowerShotEncoding.metadata).not.toEqual(upperShotEncoding.metadata);
-        expect(lowerShotEncoding.features).toEqual(upperShotEncoding.features);
-        expect(ilCandidateActionEncoding(lowerMoveMelee, PBTypes.TeamVals.LOWER).features).toEqual(
-            ilCandidateActionEncoding(upperMoveMelee, PBTypes.TeamVals.UPPER).features,
+        const leftShotEncoding = ilCandidateActionEncoding(leftShot, PBTypes.TeamVals.LEFT);
+        const rightShotEncoding = ilCandidateActionEncoding(rightShot, PBTypes.TeamVals.RIGHT);
+        expect(leftShotEncoding.metadata).not.toEqual(rightShotEncoding.metadata);
+        expect(leftShotEncoding.features).toEqual(rightShotEncoding.features);
+        expect(ilCandidateActionEncoding(leftMoveMelee, PBTypes.TeamVals.LEFT).features).toEqual(
+            ilCandidateActionEncoding(rightMoveMelee, PBTypes.TeamVals.RIGHT).features,
         );
     });
 

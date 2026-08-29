@@ -95,7 +95,7 @@ function mulberry(seedValue: number): () => number {
 }
 
 function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
-    const controlTeam = spec.candidateTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const controlTeam = spec.candidateTeam === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     // Per-team candidate leaf (per-game env; the SearchDriver is constructed per match).
     delete process.env.V07_VALUE_WEIGHTS_V2_LOWER;
     delete process.env.V07_VALUE_WEIGHTS_V2_UPPER;
@@ -103,8 +103,8 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
     delete process.env.V07_WAIT_WEIGHTS_UPPER;
     delete process.env.V08_WAIT_CANCEL_LOWER;
     delete process.env.V08_WAIT_CANCEL_UPPER;
-    const candidateSeatKey = spec.candidateTeam === PBTypes.TeamVals.LOWER ? "LOWER" : "UPPER";
-    const controlSeatKey = spec.candidateTeam === PBTypes.TeamVals.LOWER ? "UPPER" : "LOWER";
+    const candidateSeatKey = spec.candidateTeam === PBTypes.TeamVals.LEFT ? "LOWER" : "UPPER";
+    const controlSeatKey = spec.candidateTeam === PBTypes.TeamVals.LEFT ? "UPPER" : "LOWER";
     if (spec.candidateLeaf) {
         process.env[`V07_VALUE_WEIGHTS_V2_${candidateSeatKey}`] = JSON.stringify(spec.candidateLeaf);
     }
@@ -120,8 +120,8 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
     const roster = buildRoster(mulberry(spec.seed ^ 0x5f356495), undefined, undefined, undefined, "expBudget");
     const setup = { doctrine: Doctrine.SEE_NONE, augments: SETUP_POLICY_V0.pickAugments(7) };
     const result = runMatch({
-        greenVersion: spec.candidateTeam === PBTypes.TeamVals.LOWER ? spec.candidateVersion : "v0.8",
-        redVersion: spec.candidateTeam === PBTypes.TeamVals.LOWER ? "v0.8" : spec.candidateVersion,
+        greenVersion: spec.candidateTeam === PBTypes.TeamVals.LEFT ? spec.candidateVersion : "v0.8",
+        redVersion: spec.candidateTeam === PBTypes.TeamVals.LEFT ? "v0.8" : spec.candidateVersion,
         roster,
         seed: spec.seed,
         gridType: spec.gridType,
@@ -133,14 +133,14 @@ function playSideAbGame(spec: ISideAbGameSpec): ISideAbGameResult {
         greenAugments: setup.augments,
         redAugments: setup.augments,
         ...(spec.candidatePolicy
-            ? spec.candidateTeam === PBTypes.TeamVals.LOWER
+            ? spec.candidateTeam === PBTypes.TeamVals.LEFT
                 ? { greenSetupPlacementPolicy: spec.candidatePolicy as PlacementPolicyVariant }
                 : { redSetupPlacementPolicy: spec.candidatePolicy as PlacementPolicyVariant }
             : {}),
         ...(spec.candidateSearchOverrides ? { searchEnvOverrideTeams: [spec.candidateTeam] } : {}),
         ...(spec.deterministicSearch ? { searchOfflineDeterministicWork: true } : {}),
     });
-    const candidateSide = spec.candidateTeam === PBTypes.TeamVals.LOWER ? "green" : "red";
+    const candidateSide = spec.candidateTeam === PBTypes.TeamVals.LEFT ? "green" : "red";
     return {
         game: spec.game,
         pair: spec.pair,
@@ -242,7 +242,7 @@ async function main(): Promise<void> {
     for (let pair = 0; pair < pairs; pair += 1) {
         const seed = (baseSeed + pair * 0x9e3779b1) >>> 0;
         const gridType = maps[pair % maps.length];
-        for (const candidateTeam of [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER]) {
+        for (const candidateTeam of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
             specs.push({
                 game: specs.length,
                 pair,

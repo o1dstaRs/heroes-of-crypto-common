@@ -30,7 +30,7 @@ export function advanceTowardEnemyAction(
     if (!unit.canMove()) {
         return undefined;
     }
-    const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     const enemies = unitsHolder.getAllAllies(enemyTeam).filter((candidate) => !candidate.isDead());
     if (!enemies.length) {
         return undefined;

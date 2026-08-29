@@ -34,7 +34,7 @@ const silentSceneLog = () => {
 const makeCannon = () =>
     createTestUnit({
         name: "Tsar Cannon",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         maxHp: 200,
         abilities: ["Mechanism"],
     });
@@ -43,7 +43,7 @@ describe("Mechanism poison immunity", () => {
     it("reports itself unpoisonable, unlike flesh-and-blood units", () => {
         createCombatTestContext();
         expect(makeCannon().canBePoisoned()).toBe(false);
-        expect(createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.UPPER }).canBePoisoned()).toBe(true);
+        expect(createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.RIGHT }).canBePoisoned()).toBe(true);
     });
 
     it("takes no Poison from a direct application, and logs nothing", () => {
@@ -61,16 +61,16 @@ describe("Mechanism poison immunity", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const wyvern = createTestUnit({
             name: "Wyvern",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             movementType: PBTypes.MovementVals.FLY,
             abilities: ["Venom Cloud Aura"],
             auraEffects: ["Venom Cloud"],
             auraRanges: [2],
             auraIsBuff: [true],
         });
-        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LOWER, attack: 10 });
+        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LEFT, attack: 10 });
         const cannon = makeCannon();
-        const flesh = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, maxHp: 200 });
+        const flesh = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, maxHp: 200 });
 
         placeUnit(grid, unitsHolder, wyvern, { x: 3, y: 3 });
         placeUnit(grid, unitsHolder, ally, { x: 4, y: 3 });

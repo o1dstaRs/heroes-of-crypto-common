@@ -37,7 +37,7 @@ const setupBlacksmith = (allyCells: { x: number; y: number }[]) => {
 
     const caster = createTestUnit({
         name: "Blacksmith",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         spells: blacksmith.spells,
         abilities: ["Blacksmith Tools"],
         amountAlive: 5,
@@ -51,7 +51,7 @@ const setupBlacksmith = (allyCells: { x: number; y: number }[]) => {
     const allies = allyCells.map((cell, index) => {
         const ally = createTestUnit({
             name: `Friend ${index}`,
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             maxHp: 10_000,
             initiative: 2,
             morale: 4,
@@ -60,9 +60,9 @@ const setupBlacksmith = (allyCells: { x: number; y: number }[]) => {
         return ally;
     });
 
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1 + allies.length);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1 + allies.length);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const sceneLog = new SceneLogMock();
     const engine = new GameActionEngine({

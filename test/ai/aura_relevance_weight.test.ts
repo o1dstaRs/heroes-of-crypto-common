@@ -20,13 +20,13 @@ const warAngerAura = {
 
 const shooter = createTestUnit({
     name: "Shooter",
-    team: PBTypes.TeamVals.UPPER,
+    team: PBTypes.TeamVals.RIGHT,
     attackType: PBTypes.AttackVals.RANGE,
     amountAlive: 12,
 });
 const meleeEnemy = createTestUnit({
     name: "Bruiser",
-    team: PBTypes.TeamVals.UPPER,
+    team: PBTypes.TeamVals.RIGHT,
     attackType: PBTypes.AttackVals.MELEE,
     amountAlive: 30,
 });

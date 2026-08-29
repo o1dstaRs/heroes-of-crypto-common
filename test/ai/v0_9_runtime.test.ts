@@ -42,8 +42,8 @@ import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PathHelper } from "../../src/grid/path_helper";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 const features = {
@@ -108,9 +108,9 @@ describe("v0.9 fixed-point runtime", () => {
 
     test("extracts a finite 166-value vector for every candidate in a live decision", () => {
         const combat = createCombatTestContext();
-        const actor = createTestUnit({ team: LOWER, name: "Feature Actor", attackType: MELEE });
-        const ally = createTestUnit({ team: LOWER, name: "Feature Screen", attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, name: "Feature Enemy", attackType: MELEE });
+        const actor = createTestUnit({ team: LEFT, name: "Feature Actor", attackType: MELEE });
+        const ally = createTestUnit({ team: LEFT, name: "Feature Screen", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Feature Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 3, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 8 });
@@ -267,10 +267,10 @@ describe("v0.9 fixed-point runtime", () => {
 
     test("a learned override discards anchor focus memory and records only its executed target", () => {
         const combat = createCombatTestContext();
-        const actor = createTestUnit({ team: LOWER, name: "Memory Actor", attackType: MELEE });
-        const previous = createTestUnit({ team: UPPER, name: "Previous", attackType: MELEE });
-        const abandoned = createTestUnit({ team: UPPER, name: "Abandoned", attackType: MELEE });
-        const selected = createTestUnit({ team: UPPER, name: "Selected", attackType: MELEE });
+        const actor = createTestUnit({ team: LEFT, name: "Memory Actor", attackType: MELEE });
+        const previous = createTestUnit({ team: RIGHT, name: "Previous", attackType: MELEE });
+        const abandoned = createTestUnit({ team: RIGHT, name: "Abandoned", attackType: MELEE });
+        const selected = createTestUnit({ team: RIGHT, name: "Selected", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, previous, { x: 8, y: 8 });
         placeUnit(combat.grid, combat.unitsHolder, abandoned, { x: 9, y: 8 });
@@ -293,8 +293,8 @@ describe("v0.9 fixed-point runtime", () => {
 
     test("blocks luck shield and mountain challengers while a productive move exists", () => {
         const combat = createCombatTestContext();
-        const actor = createTestUnit({ team: LOWER, name: "Actor", attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const actor = createTestUnit({ team: LEFT, name: "Actor", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 9, y: 9 });
         const context: IDecisionContext = {
@@ -344,7 +344,7 @@ describe("v0.9 fixed-point runtime", () => {
     test("preserves the v0.8 Abomination screen for both protector and ranged ward candidates", () => {
         const combat = createCombatTestContext();
         const protector = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Abomination",
             attackType: MELEE,
             auraEffects: ["Flesh Shield"],
@@ -352,14 +352,14 @@ describe("v0.9 fixed-point runtime", () => {
             auraIsBuff: [true],
         });
         const ward = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Protected Archer",
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 8,
             damageMax: 20,
             amountAlive: 5,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, protector, { x: 5, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ward, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 12, y: 12 });
@@ -393,7 +393,7 @@ describe("v0.9 fixed-point runtime", () => {
     test("keeps a forced-displacement Abomination hold safe when no catch-up route exists", () => {
         const combat = createCombatTestContext();
         const protector = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Abomination",
             attackType: MELEE,
             auraEffects: ["Flesh Shield"],
@@ -401,14 +401,14 @@ describe("v0.9 fixed-point runtime", () => {
             auraIsBuff: [true],
         });
         const ward = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Protected Healer",
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 8,
             damageMax: 20,
             amountAlive: 5,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, protector, { x: 1, y: 1 });
         placeUnit(combat.grid, combat.unitsHolder, ward, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 12, y: 12 });
@@ -453,12 +453,12 @@ describe("v0.9 fixed-point runtime", () => {
     test("rejects a visible declared shot when authoritative trajectory evaluation hits no unit", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Shooter",
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 8,
         });
-        const declaredTarget = createTestUnit({ team: UPPER, name: "Declared", attackType: MELEE });
+        const declaredTarget = createTestUnit({ team: RIGHT, name: "Declared", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, declaredTarget, { x: 8, y: 2 });
         const noHitAttackHandler = Object.create(combat.attackHandler) as typeof combat.attackHandler;
@@ -495,9 +495,9 @@ describe("v0.9 fixed-point runtime", () => {
 
     test("forces immediate damage over retreat, support, or mere closing in the urgent finish window", () => {
         const combat = createCombatTestContext();
-        const actor = createTestUnit({ team: LOWER, name: "Finisher", attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, name: "Last Enemy", attackType: MELEE });
-        const forbiddenEnemy = createTestUnit({ team: UPPER, name: "Forbidden Enemy", attackType: MELEE });
+        const actor = createTestUnit({ team: LEFT, name: "Finisher", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Last Enemy", attackType: MELEE });
+        const forbiddenEnemy = createTestUnit({ team: RIGHT, name: "Forbidden Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 5, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, forbiddenEnemy, { x: 5, y: 3 });
@@ -566,8 +566,8 @@ describe("v0.9 fixed-point runtime", () => {
 
     test("evaluates research weights offline without forging the promoted runtime state", () => {
         const combat = createCombatTestContext();
-        const actor = createTestUnit({ team: LOWER, name: "Research Actor", attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, name: "Research Enemy", attackType: MELEE });
+        const actor = createTestUnit({ team: LEFT, name: "Research Actor", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Research Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 8 });
         const events: IAIPolicyEvent[] = [];
@@ -605,8 +605,8 @@ describe("v0.9 fixed-point runtime", () => {
 
     test("the embedded v0.9 emits one attribution event and returns exact v0.8 actions", () => {
         const combat = createCombatTestContext();
-        const actor = createTestUnit({ team: LOWER, name: "Anchor Actor", attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, name: "Anchor Enemy", attackType: MELEE });
+        const actor = createTestUnit({ team: LEFT, name: "Anchor Actor", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Anchor Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, actor, { x: 2, y: 2 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 8, y: 8 });
         const context: IDecisionContext = {

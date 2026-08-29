@@ -171,18 +171,18 @@ function solveRidge(
         matrix[index * dimension + index] += lambda;
         target[index] = all.target[index] - withheld.target[index];
     }
-    const lower = new Float64Array(matrix.length);
+    const left = new Float64Array(matrix.length);
     for (let row = 0; row < dimension; row += 1) {
         const rowOffset = row * dimension;
         for (let column = 0; column <= row; column += 1) {
             let value = matrix[rowOffset + column];
             for (let inner = 0; inner < column; inner += 1) {
-                value -= lower[rowOffset + inner] * lower[column * dimension + inner];
+                value -= left[rowOffset + inner] * left[column * dimension + inner];
             }
             if (row === column) {
-                lower[rowOffset + column] = Math.sqrt(Math.max(value, Number.EPSILON));
+                left[rowOffset + column] = Math.sqrt(Math.max(value, Number.EPSILON));
             } else {
-                lower[rowOffset + column] = value / lower[column * dimension + column];
+                left[rowOffset + column] = value / left[column * dimension + column];
             }
         }
     }
@@ -190,16 +190,16 @@ function solveRidge(
     for (let row = 0; row < dimension; row += 1) {
         let value = target[row];
         const rowOffset = row * dimension;
-        for (let column = 0; column < row; column += 1) value -= lower[rowOffset + column] * forward[column];
-        forward[row] = value / lower[rowOffset + row];
+        for (let column = 0; column < row; column += 1) value -= left[rowOffset + column] * forward[column];
+        forward[row] = value / left[rowOffset + row];
     }
     const result = new Float64Array(dimension);
     for (let row = dimension - 1; row >= 0; row -= 1) {
         let value = forward[row];
         for (let column = row + 1; column < dimension; column += 1) {
-            value -= lower[column * dimension + row] * result[column];
+            value -= left[column * dimension + row] * result[column];
         }
-        result[row] = value / lower[row * dimension + row];
+        result[row] = value / left[row * dimension + row];
     }
     return result;
 }

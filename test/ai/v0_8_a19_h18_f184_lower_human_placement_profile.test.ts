@@ -182,8 +182,8 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
                 unsupportedTeamFallback: "exact-incumbent",
                 openingIds: ["prod-f184-lower-roster", "prod-f184-upper-roster"],
                 rosterCreatureIds: {
-                    lower: [3, 4, 6, 9, 33, 37],
-                    upper: [12, 27, 34, 43, 47, 55],
+                    left: [3, 4, 6, 9, 33, 37],
+                    right: [12, 27, 34, 43, 47, 55],
                 },
             },
         });
@@ -296,7 +296,7 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             "3711c6671beb1e0f0bf3198d1e37596d3c2731814c260026352745b620bbfe24",
         );
         expect(serializedSha256(V08_A19_H18_F184_LOWER_HUMAN_RANKED_FALLBACK_PROFILE)).toBe(
-            "d7dd4660c78d2bd5ac60b6d1b6544dd162dede3f47cc1a5c851ad96ab3958cb0",
+            "accc304bc99c55dfabbb442966fca1219eb23aa6913aac3a35b68fdd43bb97f6",
         );
     });
 
@@ -363,7 +363,7 @@ describe("v0.8 A19-H18 f184 LOWER-only human-placement research profile", () => 
             placementComposition: ["exact-f184-lower", "generic-ranked-placement", "plain-v0.8"],
         });
         expect(fingerprintV08AlignedV1(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_PROFILE)).toBe(
-            "869198db8b58a642c4f7fa8aafa21dc97002c0aa94da911edd2a95bdf43f52a8",
+            "599b3cdcf9e432d15c18fbe81300733dd0a69a684867a112499cd6679813bc7f",
         );
         expect(Object.isFrozen(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_PROFILE)).toBe(true);
         expect(Object.isFrozen(V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_SEARCH)).toBe(true);

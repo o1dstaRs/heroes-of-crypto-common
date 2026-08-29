@@ -14,7 +14,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import { getDoctrineRevealMode, DOCTRINES, Doctrine } from "../doctrines/doctrine_properties";
 import { CreatureLevelList, CreatureLevelMap, CreaturePoolByLevel } from "../units/unit_properties";
 
-export type PickTeam = typeof PBTypes.TeamVals.LOWER | typeof PBTypes.TeamVals.UPPER;
+export type PickTeam = typeof PBTypes.TeamVals.LEFT | typeof PBTypes.TeamVals.RIGHT;
 export type PickBundle = readonly [level1Creature: number, level2Creature: number, tier1Artifact: number];
 export type PickRandomInt = (maxExclusive: number) => number;
 
@@ -49,35 +49,35 @@ export interface ILivePickPhase {
 export const LIVE_PICK_PHASES: readonly ILivePickPhase[] = [
     {
         phase: PBTypes.PickPhaseVals.DOCTRINE,
-        actors: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+        actors: [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT],
         creatureLevel: 0,
     },
     {
         phase: PBTypes.PickPhaseVals.INITIAL_PICK,
-        actors: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+        actors: [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT],
         creatureLevel: 0,
     },
-    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.LOWER], creatureLevel: 1 },
-    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.UPPER], creatureLevel: 1 },
-    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.UPPER], creatureLevel: 2 },
-    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.LOWER], creatureLevel: 2 },
-    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.LOWER], creatureLevel: 3 },
-    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.UPPER], creatureLevel: 3 },
+    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.LEFT], creatureLevel: 1 },
+    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.RIGHT], creatureLevel: 1 },
+    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.RIGHT], creatureLevel: 2 },
+    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.LEFT], creatureLevel: 2 },
+    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.LEFT], creatureLevel: 3 },
+    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.RIGHT], creatureLevel: 3 },
     {
         phase: PBTypes.PickPhaseVals.ARTIFACT_2,
-        actors: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+        actors: [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT],
         creatureLevel: 0,
     },
-    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.UPPER], creatureLevel: 4 },
-    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.LOWER], creatureLevel: 4 },
+    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.RIGHT], creatureLevel: 4 },
+    { phase: PBTypes.PickPhaseVals.PICK, actors: [PBTypes.TeamVals.LEFT], creatureLevel: 4 },
     {
         phase: PBTypes.PickPhaseVals.AUGMENTS,
-        actors: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+        actors: [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT],
         creatureLevel: 0,
     },
     {
         phase: PBTypes.PickPhaseVals.AUGMENTS_SCOUT,
-        actors: [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER],
+        actors: [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT],
         creatureLevel: 0,
     },
 ] as const;
@@ -135,8 +135,8 @@ export interface IPickSimState {
      * show the outcome and the server can persist it.
      */
     extraBan?: number;
-    lower: IPickTeamState;
-    upper: IPickTeamState;
+    left: IPickTeamState;
+    right: IPickTeamState;
     transcript: PickTranscriptEntry[];
 }
 
@@ -193,8 +193,8 @@ export interface IPickTeamView {
     artifacts: [tier: number, artifactId: number][];
 }
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 // The AUGMENTS phase (seq 11) is the ranked handoff: the server transitions PICK -> PLAY when it reaches an
 // AUGMENTS/AUGMENTS_SCOUT phase, so the sim is "complete" from AUGMENTS onward. (AUGMENTS_SCOUT at seq 12
 // only fires for scout augments, which the sim does not model; it stops at the AUGMENTS handoff.)
@@ -259,15 +259,15 @@ export function createPickSimState(rng: PickRandomInt): IPickSimState {
         level2[index],
         tier1Artifact,
     ];
-    const lowerTier1 = tier1ArtifactPair(rng);
-    const upperTier1 = tier1ArtifactPair(rng);
-    const lowerBundles: [PickBundle, PickBundle] = [makeBundle(0, lowerTier1[0]), makeBundle(1, lowerTier1[1])];
-    const upperBundles: [PickBundle, PickBundle] = [makeBundle(2, upperTier1[0]), makeBundle(3, upperTier1[1])];
+    const leftTier1 = tier1ArtifactPair(rng);
+    const rightTier1 = tier1ArtifactPair(rng);
+    const leftBundles: [PickBundle, PickBundle] = [makeBundle(0, leftTier1[0]), makeBundle(1, leftTier1[1])];
+    const rightBundles: [PickBundle, PickBundle] = [makeBundle(2, rightTier1[0]), makeBundle(3, rightTier1[1])];
 
     // The server generates both teams' T2 offers before auto-bans.
-    const lowerTier2Offers = artifactOffers(rng);
-    const upperTier2Offers = artifactOffers(rng);
-    const offeredBundleCreatures = [...lowerBundles, ...upperBundles].flatMap(([level1Id, level2Id]) => [
+    const leftTier2Offers = artifactOffers(rng);
+    const rightTier2Offers = artifactOffers(rng);
+    const offeredBundleCreatures = [...leftBundles, ...rightBundles].flatMap(([level1Id, level2Id]) => [
         level1Id,
         level2Id,
     ]);
@@ -285,8 +285,8 @@ export function createPickSimState(rng: PickRandomInt): IPickSimState {
     return {
         phaseSequence: 0,
         creaturesBanned,
-        lower: emptyTeam(lowerBundles, lowerTier2Offers),
-        upper: emptyTeam(upperBundles, upperTier2Offers),
+        left: emptyTeam(leftBundles, leftTier2Offers),
+        right: emptyTeam(rightBundles, rightTier2Offers),
         transcript: [],
     };
 }
@@ -296,11 +296,10 @@ export const isPickSimComplete = (state: IPickSimState): boolean => state.phaseS
 export const getCurrentPickPhase = (state: IPickSimState): ILivePickPhase =>
     LIVE_PICK_PHASES[Math.min(state.phaseSequence, LIVE_PICK_PHASES.length - 1)];
 
-const teamState = (state: IPickSimState, team: PickTeam): IPickTeamState =>
-    team === LOWER ? state.lower : state.upper;
+const teamState = (state: IPickSimState, team: PickTeam): IPickTeamState => (team === LEFT ? state.left : state.right);
 
 const opponentState = (state: IPickSimState, team: PickTeam): IPickTeamState =>
-    team === LOWER ? state.upper : state.lower;
+    team === LEFT ? state.right : state.left;
 
 const cloneState = (state: IPickSimState): IPickSimState => structuredClone(state);
 
@@ -313,13 +312,13 @@ const phaseAccepts = (state: IPickSimState, team: PickTeam, phase: PBTypes.PickP
 };
 
 const doctrinePhaseComplete = (state: IPickSimState): boolean =>
-    state.lower.doctrine !== Doctrine.NO_DOCTRINE && state.upper.doctrine !== Doctrine.NO_DOCTRINE;
+    state.left.doctrine !== Doctrine.NO_DOCTRINE && state.right.doctrine !== Doctrine.NO_DOCTRINE;
 
 const bundlePhaseComplete = (state: IPickSimState): boolean =>
-    state.lower.selectedBundleIndex !== undefined && state.upper.selectedBundleIndex !== undefined;
+    state.left.selectedBundleIndex !== undefined && state.right.selectedBundleIndex !== undefined;
 
 const tier2PhaseComplete = (state: IPickSimState): boolean =>
-    state.lower.tier2Artifact !== undefined && state.upper.tier2Artifact !== undefined;
+    state.left.tier2Artifact !== undefined && state.right.tier2Artifact !== undefined;
 
 const advanceIfReady = (state: IPickSimState, rng: PickRandomInt): void => {
     if (state.phaseSequence === 0 && doctrinePhaseComplete(state)) {
@@ -363,7 +362,7 @@ const rejected = (state: IPickSimState, reason: PickRejectionReason): PickTransi
  */
 export function getBannableCreatures(state: IPickSimState): number[] {
     const offered = new Set(
-        [...state.lower.bundles, ...state.upper.bundles].flatMap(([level1Id, level2Id]) => [level1Id, level2Id]),
+        [...state.left.bundles, ...state.right.bundles].flatMap(([level1Id, level2Id]) => [level1Id, level2Id]),
     );
     const banned = new Set(state.creaturesBanned);
     const bannable: number[] = [];
@@ -391,13 +390,13 @@ export function getBannableCreatures(state: IPickSimState): number[] {
  * level happens to have no auto-ban left to release, the ban still lands and the level is simply one short.
  */
 const resolveProposedBans = (state: IPickSimState, rng: PickRandomInt): void => {
-    const lowerBan = state.lower.proposedBan;
-    const upperBan = state.upper.proposedBan;
+    const leftBan = state.left.proposedBan;
+    const rightBan = state.right.proposedBan;
     let chosen: number | undefined;
-    if (lowerBan !== undefined && upperBan !== undefined) {
-        chosen = lowerBan === upperBan ? lowerBan : [lowerBan, upperBan][draw(rng, 2)];
+    if (leftBan !== undefined && rightBan !== undefined) {
+        chosen = leftBan === rightBan ? leftBan : [leftBan, rightBan][draw(rng, 2)];
     } else {
-        chosen = lowerBan ?? upperBan;
+        chosen = leftBan ?? rightBan;
     }
     if (chosen === undefined || state.creaturesBanned.includes(chosen)) {
         return;
@@ -635,7 +634,7 @@ const applyTier2 = (
 
 /** Pure reducer: ordinary rejections preserve the input state; accepted actions and collisions return a clone. */
 export function transitionPickSim(state: IPickSimState, action: PickAction, rng: PickRandomInt): PickTransition {
-    if (action.team !== LOWER && action.team !== UPPER) {
+    if (action.team !== LEFT && action.team !== RIGHT) {
         return rejected(state, "not_actor");
     }
     switch (action.type) {
@@ -679,8 +678,8 @@ export function transitionServerPersistedPickSim(
 ): PickTransition {
     const transition = transitionPickSim(state, action, rng);
     if (transition.status === "accepted" && (action.type === "select_bundle" || action.type === "pick_creature")) {
-        transition.state.lower.creatures = sortServerPersistedCreatures(transition.state.lower.creatures);
-        transition.state.upper.creatures = sortServerPersistedCreatures(transition.state.upper.creatures);
+        transition.state.left.creatures = sortServerPersistedCreatures(transition.state.left.creatures);
+        transition.state.right.creatures = sortServerPersistedCreatures(transition.state.right.creatures);
     }
     return transition;
 }

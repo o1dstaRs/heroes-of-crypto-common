@@ -42,8 +42,8 @@ import { MightSynergy, SynergyLevel } from "../../src/synergies/synergy_properti
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
 const RANGE = PBTypes.AttackVals.RANGE;
@@ -114,7 +114,7 @@ const protectorBoard = (
 } => {
     const combat = createCombatTestContext();
     const protector = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: protectorName,
         attackType: MELEE,
         movementType: WALK,
@@ -124,7 +124,7 @@ const protectorBoard = (
             : { damageMin: options.protectorDamage, damageMax: options.protectorDamage }),
     });
     const ward = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Valuable Archer",
         attackType: RANGE,
         rangeShots: 8,
@@ -132,7 +132,7 @@ const protectorBoard = (
         amountAlive: 5,
     });
     const enemy = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: options.flyer ? "Enemy Flyer" : "Enemy Ground",
         attackType: MELEE,
         movementType: options.flyer ? FLY : WALK,
@@ -151,15 +151,15 @@ const protectorBoard = (
 
 describe("v0.8 back-line protector intent", () => {
     it("recognizes live shot output and remaining hybrid-caster spells, but not depleted shooters", () => {
-        const shooter = createTestUnit({ team: LOWER, attackType: RANGE, rangeShots: 1 });
-        const depleted = createTestUnit({ team: LOWER, attackType: RANGE, rangeShots: 0 });
+        const shooter = createTestUnit({ team: LEFT, attackType: RANGE, rangeShots: 1 });
+        const depleted = createTestUnit({ team: LEFT, attackType: RANGE, rangeShots: 0 });
         const hybrid = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE_MAGIC,
             spells: ["Life:Fire Strike"],
         });
         const underpoweredCaster = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             attackType: MELEE_MAGIC,
             spells: ["System:Castling"],
             stackPower: 1,
@@ -287,7 +287,7 @@ describe("v0.8 back-line protector intent", () => {
             protectorDamage: 20,
         });
         const enemyAbsorber = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Enemy Abomination",
             abilities: ["Flesh Shield Aura"],
             auraEffects: ["Flesh Shield"],
@@ -440,7 +440,7 @@ describe("v0.8 back-line protector intent", () => {
     it("preserves every currently covered ward and rejects lateral pure-move jitter", () => {
         const { protector, ward, context } = protectorBoard("Abomination");
         const secondary = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Secondary Mage",
             attackType: MELEE_MAGIC,
             spells: ["Life:Fire Strike"],
@@ -483,14 +483,14 @@ describe("v0.8 back-line protector intent", () => {
             {
                 type: "melee_attack",
                 attackerId: protector.getId(),
-                targetId: context.unitsHolder.getAllEnemyUnits(LOWER)[0].getId(),
+                targetId: context.unitsHolder.getAllEnemyUnits(LEFT)[0].getId(),
                 attackFrom: { x: 4, y: 4 },
             },
         ];
         expect(preservesV08BacklineProtectorIntent(intent, protector, context, relocatingAttack)).toBe(false);
 
         const uncoveredWard = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Third Archer",
             attackType: RANGE,
             rangeShots: 1,
@@ -525,7 +525,7 @@ describe("v0.8 back-line protector intent", () => {
             protectorCell: { x: 1, y: 1 },
         });
         const secondaryA = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Secondary Archer A",
             attackType: RANGE,
             rangeShots: 10,
@@ -533,7 +533,7 @@ describe("v0.8 back-line protector intent", () => {
             amountAlive: 1,
         });
         const secondaryB = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Secondary Archer B",
             attackType: RANGE,
             rangeShots: 10,
@@ -555,7 +555,7 @@ describe("v0.8 back-line protector intent", () => {
         ];
         expect(preservesV08BacklineProtectorIntent(intent, protector, context, dropsSecondariesPartway)).toBe(false);
 
-        const lowerValueSwap: GameAction[] = [
+        const leftValueSwap: GameAction[] = [
             {
                 type: "move_unit",
                 unitId: protector.getId(),
@@ -563,7 +563,7 @@ describe("v0.8 back-line protector intent", () => {
                 targetCells: [{ x: 4, y: 4 }],
             },
         ];
-        expect(preservesV08BacklineProtectorIntent(intent, protector, context, lowerValueSwap)).toBe(false);
+        expect(preservesV08BacklineProtectorIntent(intent, protector, context, leftValueSwap)).toBe(false);
 
         const follow = prioritizeV08BacklineProtector(protector, context, dropsSecondariesPartway, false);
         expect(follow[0]?.type).toBe("move_unit");
@@ -575,7 +575,7 @@ describe("v0.8 back-line protector intent", () => {
         // immediate swap is allowed, while a partial dropping move remains forbidden.
         const valueBoard = protectorBoard("Abomination", { protectorCell: { x: 1, y: 1 } });
         const loneSecondary = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Lone Secondary",
             attackType: RANGE,
             rangeShots: 10,
@@ -679,8 +679,8 @@ describe("v0.8 back-line protector intent", () => {
 
     it("evaluates Castling at the caster's real post-swap footprint", () => {
         const { protector, ward, context } = protectorBoard("Abomination");
-        const nearAlly = createTestUnit({ team: LOWER, name: "Near ally", attackType: MELEE });
-        const farAlly = createTestUnit({ team: LOWER, name: "Far ally", attackType: MELEE });
+        const nearAlly = createTestUnit({ team: LEFT, name: "Near ally", attackType: MELEE });
+        const farAlly = createTestUnit({ team: LEFT, name: "Far ally", attackType: MELEE });
         placeUnit(context.grid, context.unitsHolder, nearAlly, { x: 6, y: 4 });
         placeUnit(context.grid, context.unitsHolder, farAlly, { x: 10, y: 10 });
         const intent = buildV08BacklineWardIntent(ward, context)!;
@@ -701,14 +701,14 @@ describe("v0.8 back-line protector intent", () => {
 
     it("keeps a spell-bearing melee ward screened instead of letting it rush", () => {
         const combat = createCombatTestContext();
-        const protector = createTestUnit({ team: LOWER, name: "Abomination", attackType: MELEE });
+        const protector = createTestUnit({ team: LEFT, name: "Abomination", attackType: MELEE });
         const ward = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Battle Mage",
             attackType: MELEE_MAGIC,
             spells: ["Life:Fire Strike", "Life:Meteorite"],
         });
-        const enemy = createTestUnit({ team: UPPER, attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, protector, { x: 5, y: 4 });
         placeUnit(combat.grid, combat.unitsHolder, ward, { x: 5, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 10, y: 10 });
@@ -731,10 +731,10 @@ describe("v0.8 back-line protector intent", () => {
 
     it("uses the authoritative Auras Range synergy instead of hard-coding adjacency", () => {
         const { protector, context } = protectorBoard("Abomination");
-        context.unitsHolder.getAllEnemyUnits(LOWER)[0].setResponded(true);
-        context.fightProperties!.setSynergyUnitsPerFactions(LOWER, 0, 0, 6, 0);
+        context.unitsHolder.getAllEnemyUnits(LEFT)[0].setResponded(true);
+        context.fightProperties!.setSynergyUnitsPerFactions(LEFT, 0, 0, 6, 0);
         context.fightProperties!.updateSynergyPerTeam(
-            LOWER,
+            LEFT,
             PBTypes.FactionVals.MIGHT,
             MightSynergy.PLUS_AURAS_RANGE,
             SynergyLevel.LEVEL_3,
@@ -744,7 +744,7 @@ describe("v0.8 back-line protector intent", () => {
             {
                 type: "melee_attack",
                 attackerId: protector.getId(),
-                targetId: context.unitsHolder.getAllEnemyUnits(LOWER)[0].getId(),
+                targetId: context.unitsHolder.getAllEnemyUnits(LEFT)[0].getId(),
                 attackFrom: { x: 9, y: 5 },
             },
         ];
@@ -760,9 +760,9 @@ describe("v0.8 back-line protector intent", () => {
         expect(isV08BacklineProtectorDecisionAllowed(protector, context, beyondExtendedAura)).toBe(false);
 
         const tighteningBoard = protectorBoard("Abomination", { protectorCell: { x: 5, y: 1 } });
-        tighteningBoard.context.fightProperties!.setSynergyUnitsPerFactions(LOWER, 0, 0, 6, 0);
+        tighteningBoard.context.fightProperties!.setSynergyUnitsPerFactions(LEFT, 0, 0, 6, 0);
         tighteningBoard.context.fightProperties!.updateSynergyPerTeam(
-            LOWER,
+            LEFT,
             PBTypes.FactionVals.MIGHT,
             MightSynergy.PLUS_AURAS_RANGE,
             SynergyLevel.LEVEL_3,
@@ -824,7 +824,7 @@ describe("v0.8 back-line protector intent", () => {
         expect(isV08BacklineProtectorDecisionAllowed(flyerBoard.protector, flyerBoard.context, rush)).toBe(false);
 
         const secondary = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Secondary Mage",
             attackType: MELEE_MAGIC,
             spells: ["Life:Fire Strike"],
@@ -854,13 +854,13 @@ describe("v0.8 back-line protector intent", () => {
         const angelBoard = (enemyShots: number, includeSecondWard: boolean) => {
             const combat = createCombatTestContext();
             const angel = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Angel",
                 attackType: MELEE_MAGIC,
                 movementType: FLY,
             });
             const primary = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Primary Archer",
                 attackType: RANGE,
                 rangeShots: 8,
@@ -868,7 +868,7 @@ describe("v0.8 back-line protector intent", () => {
                 amountAlive: 5,
             });
             const secondary = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Secondary Mage",
                 attackType: MELEE_MAGIC,
                 spells: ["Life:Fire Strike"],
@@ -876,7 +876,7 @@ describe("v0.8 back-line protector intent", () => {
                 amountAlive: 5,
             });
             const enemy = createTestUnit({
-                team: UPPER,
+                team: RIGHT,
                 name: "Enemy Shooter",
                 attackType: RANGE,
                 rangeShots: enemyShots,
@@ -926,7 +926,7 @@ describe("v0.8 back-line protector intent", () => {
     it("keeps a large Angel catch-up route off Lava Center cells it cannot occupy", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.LAVA_CENTER);
         const angel = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Angel",
             attackType: MELEE_MAGIC,
             movementType: FLY,
@@ -934,7 +934,7 @@ describe("v0.8 back-line protector intent", () => {
             initiative: 3,
         });
         const primary = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Primary Archer",
             attackType: RANGE,
             rangeShots: 8,
@@ -942,7 +942,7 @@ describe("v0.8 back-line protector intent", () => {
             amountAlive: 5,
         });
         const secondary = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Secondary Mage",
             attackType: MELEE_MAGIC,
             spells: ["Life:Fire Strike"],
@@ -950,7 +950,7 @@ describe("v0.8 back-line protector intent", () => {
             amountAlive: 2,
         });
         const enemy = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Enemy Shooter",
             attackType: RANGE,
             rangeShots: 8,
@@ -1011,17 +1011,17 @@ describe("v0.8 back-line protector placement", () => {
         result: Map<string, { x: number; y: number }> | undefined;
     } => {
         const combat = createCombatTestContext();
-        const protector = createTestUnit({ team: LOWER, name: protectorName, attackType: MELEE });
+        const protector = createTestUnit({ team: LEFT, name: protectorName, attackType: MELEE });
         const ward = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: options.casterAttackType ? "Battle Mage" : "Archer",
             attackType: options.casterAttackType ?? RANGE,
             rangeShots: options.casterAttackType ? 0 : 5,
             spells: options.casterAttackType ? ["Life:Fire Strike"] : [],
         });
-        const extraMelee = createTestUnit({ team: LOWER, name: "Squire", attackType: MELEE });
+        const extraMelee = createTestUnit({ team: LEFT, name: "Squire", attackType: MELEE });
         const enemy = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Public Enemy",
             attackType: RANGE,
             movementType: options.holderFlyer ? FLY : WALK,
@@ -1029,11 +1029,11 @@ describe("v0.8 back-line protector placement", () => {
         });
         for (const unit of [protector, ward, extraMelee, enemy]) combat.unitsHolder.addUnit(unit);
         const context: IPlacementContext = {
-            team: LOWER,
+            team: LEFT,
             grid: combat.grid,
             unitsHolder: combat.unitsHolder,
             pathHelper: new PathHelper(testGridSettings),
-            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
             publicOpponentCreatureIds: options.publicFlyer
                 ? [PBTypes.CreatureVals.GRIFFIN]
                 : [PBTypes.CreatureVals.SQUIRE],
@@ -1064,7 +1064,7 @@ describe("v0.8 back-line protector placement", () => {
     it("places a large Abomination on the safest tied cell covering the most ward value", () => {
         const combat = createCombatTestContext();
         const protector = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Abomination",
             attackType: MELEE,
             size: PBTypes.UnitSizeVals.LARGE,
@@ -1073,7 +1073,7 @@ describe("v0.8 back-line protector placement", () => {
             auraIsBuff: [true],
         });
         const primary = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Primary Archer",
             attackType: RANGE,
             rangeShots: 10,
@@ -1081,7 +1081,7 @@ describe("v0.8 back-line protector placement", () => {
             amountAlive: 5,
         });
         const secondary = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Secondary Archer",
             attackType: RANGE,
             rangeShots: 6,
@@ -1089,22 +1089,22 @@ describe("v0.8 back-line protector placement", () => {
             amountAlive: 5,
         });
         const caster = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Backline Healer",
             attackType: MELEE_MAGIC,
             spells: ["Life:Heal", "Life:Mass Heal"],
             damageMax: 5,
             amountAlive: 5,
         });
-        const melee = createTestUnit({ team: LOWER, name: "Frontliner", attackType: MELEE });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const melee = createTestUnit({ team: LEFT, name: "Frontliner", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         for (const unit of [protector, primary, secondary, caster, melee, enemy]) combat.unitsHolder.addUnit(unit);
         const context: IPlacementContext = {
-            team: LOWER,
+            team: LEFT,
             grid: combat.grid,
             unitsHolder: combat.unitsHolder,
             pathHelper: new PathHelper(testGridSettings),
-            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
             publicOpponentCreatureIds: [PBTypes.CreatureVals.SQUIRE],
         };
 
@@ -1134,35 +1134,35 @@ describe("v0.8 back-line protector placement", () => {
         const angelPlacement = (opponentId: number) => {
             const combat = createCombatTestContext();
             const angel = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Angel",
                 attackType: MELEE_MAGIC,
                 movementType: FLY,
                 size: PBTypes.UnitSizeVals.LARGE,
             });
             const primary = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Primary Archer",
                 attackType: RANGE,
                 rangeShots: 10,
                 damageMax: 20,
             });
             const secondary = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Secondary Mage",
                 attackType: MELEE_MAGIC,
                 spells: ["Life:Fire Strike"],
                 damageMax: 10,
             });
-            const melee = createTestUnit({ team: LOWER, name: "Frontliner", attackType: MELEE });
-            const enemy = createTestUnit({ team: UPPER, name: "Hidden Enemy", attackType: MELEE });
+            const melee = createTestUnit({ team: LEFT, name: "Frontliner", attackType: MELEE });
+            const enemy = createTestUnit({ team: RIGHT, name: "Hidden Enemy", attackType: MELEE });
             for (const unit of [angel, primary, secondary, melee, enemy]) combat.unitsHolder.addUnit(unit);
             const context: IPlacementContext = {
-                team: LOWER,
+                team: LEFT,
                 grid: combat.grid,
                 unitsHolder: combat.unitsHolder,
                 pathHelper: new PathHelper(testGridSettings),
-                placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+                placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
                 publicOpponentCreatureIds: [opponentId],
                 setupPlacementPolicy: "public-roster",
             };
@@ -1190,7 +1190,7 @@ describe("v0.8 back-line protector placement", () => {
     it("preserves both Abomination and Angel coverage when their placement roles share wards", () => {
         const combat = createCombatTestContext();
         const abomination = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Abomination",
             attackType: MELEE,
             size: PBTypes.UnitSizeVals.LARGE,
@@ -1199,14 +1199,14 @@ describe("v0.8 back-line protector placement", () => {
             auraIsBuff: [true],
         });
         const angel = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Angel",
             attackType: MELEE_MAGIC,
             movementType: FLY,
             size: PBTypes.UnitSizeVals.LARGE,
         });
         const primary = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Primary Archer",
             attackType: RANGE,
             rangeShots: 10,
@@ -1214,7 +1214,7 @@ describe("v0.8 back-line protector placement", () => {
             amountAlive: 5,
         });
         const secondary = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Secondary Mage",
             attackType: MELEE_MAGIC,
             spells: ["Life:Fire Strike"],
@@ -1222,23 +1222,23 @@ describe("v0.8 back-line protector placement", () => {
             amountAlive: 5,
         });
         const third = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Third Archer",
             attackType: RANGE,
             rangeShots: 4,
             damageMax: 5,
             amountAlive: 5,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy Shooter", attackType: RANGE, rangeShots: 5 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy Shooter", attackType: RANGE, rangeShots: 5 });
         for (const unit of [abomination, angel, primary, secondary, third, enemy]) {
             combat.unitsHolder.addUnit(unit);
         }
         const context: IPlacementContext = {
-            team: LOWER,
+            team: LEFT,
             grid: combat.grid,
             unitsHolder: combat.unitsHolder,
             pathHelper: new PathHelper(testGridSettings),
-            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
             publicOpponentCreatureIds: [PBTypes.CreatureVals.CENTAUR],
             setupPlacementPolicy: "public-roster",
         };
@@ -1258,7 +1258,7 @@ describe("v0.8 back-line protector placement", () => {
         const combat = createCombatTestContext();
         const angels = [0, 1].map(() =>
             createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Angel",
                 attackType: MELEE_MAGIC,
                 movementType: FLY,
@@ -1267,28 +1267,28 @@ describe("v0.8 back-line protector placement", () => {
         );
         const wards = [
             createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Primary Archer",
                 attackType: RANGE,
                 rangeShots: 10,
                 damageMax: 20,
             }),
             createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Secondary Mage",
                 attackType: MELEE_MAGIC,
                 spells: ["Life:Fire Strike"],
                 damageMax: 10,
             }),
         ];
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy Shooter", attackType: RANGE, rangeShots: 5 });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy Shooter", attackType: RANGE, rangeShots: 5 });
         for (const unit of [...angels, ...wards, enemy]) combat.unitsHolder.addUnit(unit);
         const context: IPlacementContext = {
-            team: LOWER,
+            team: LEFT,
             grid: combat.grid,
             unitsHolder: combat.unitsHolder,
             pathHelper: new PathHelper(testGridSettings),
-            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 5),
+            placement: new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 5),
             publicOpponentCreatureIds: [PBTypes.CreatureVals.CENTAUR],
             setupPlacementPolicy: "public-roster",
         };

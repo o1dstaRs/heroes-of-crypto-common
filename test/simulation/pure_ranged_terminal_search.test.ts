@@ -54,27 +54,27 @@ afterEach(() => {
 
 function pureRangedLeafHarness() {
     const combat = createCombatTestContext();
-    const lower = createTestUnit({
-        team: PBTypes.TeamVals.LOWER,
+    const left = createTestUnit({
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.RANGE,
         rangeShots: 4,
         damageMin: 10,
         damageMax: 10,
         maxHp: 20,
     });
-    const upper = createTestUnit({
-        team: PBTypes.TeamVals.UPPER,
+    const right = createTestUnit({
+        team: PBTypes.TeamVals.RIGHT,
         attackType: PBTypes.AttackVals.RANGE,
         rangeShots: 4,
         damageMin: 10,
         damageMax: 10,
         maxHp: 20,
     });
-    placeUnit(combat.grid, combat.unitsHolder, lower, { x: 3, y: 3 });
-    placeUnit(combat.grid, combat.unitsHolder, upper, { x: 3, y: 11 });
+    placeUnit(combat.grid, combat.unitsHolder, left, { x: 3, y: 3 });
+    placeUnit(combat.grid, combat.unitsHolder, right, { x: 3, y: 11 });
     const fightProperties = FightStateManager.getInstance().getFightProperties();
     const deps = { unitsHolder: combat.unitsHolder, fightProperties } as ILookaheadDeps;
-    return { lower, upper, fightProperties, makeDriver: () => new SearchDriver(deps) };
+    return { left, right, fightProperties, makeDriver: () => new SearchDriver(deps) };
 }
 
 const leafValue = (driver: SearchDriver, team: PBTypes.TeamVals): number =>
@@ -126,15 +126,15 @@ describe("SearchDriver pure-ranged terminal overlay", () => {
             harness.fightProperties.flipLap();
         }
         for (let i = 0; i < 4; i += 1) {
-            harness.upper.decreaseNumberOfShots();
+            harness.right.decreaseNumberOfShots();
         }
 
-        const lowerBaseline = leafValue(baseline, PBTypes.TeamVals.LOWER);
-        const upperBaseline = leafValue(baseline, PBTypes.TeamVals.UPPER);
-        const lowerWeighted = leafValue(weighted, PBTypes.TeamVals.LOWER);
-        const upperWeighted = leafValue(weighted, PBTypes.TeamVals.UPPER);
-        expect(lowerWeighted).toBeGreaterThan(lowerBaseline);
-        expect(upperWeighted).toBeLessThan(upperBaseline);
+        const leftBaseline = leafValue(baseline, PBTypes.TeamVals.LEFT);
+        const rightBaseline = leafValue(baseline, PBTypes.TeamVals.RIGHT);
+        const leftWeighted = leafValue(weighted, PBTypes.TeamVals.LEFT);
+        const rightWeighted = leafValue(weighted, PBTypes.TeamVals.RIGHT);
+        expect(leftWeighted).toBeGreaterThan(leftBaseline);
+        expect(rightWeighted).toBeLessThan(rightBaseline);
 
         const state = weighted as unknown as {
             counters: {

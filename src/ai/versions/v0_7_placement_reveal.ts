@@ -202,8 +202,7 @@ export function layoutRevealPlacement(
     const sideOriented = context.sideOrientedPlacement === true;
     const along = (c: XY): number => (sideOriented ? c.x : c.y);
     const lateral = (c: XY): number => (sideOriented ? c.y : c.x);
-    const frontness = (c: XY): number =>
-        context.team === PBTypes.TeamVals.LOWER ? along(c) : GRID_SIZE - 1 - along(c);
+    const frontness = (c: XY): number => (context.team === PBTypes.TeamVals.LEFT ? along(c) : GRID_SIZE - 1 - along(c));
     const lats = baseCells.map(lateral);
     const minLat = Math.min(...lats);
     const centreLat = (minLat + Math.max(...lats)) / 2;

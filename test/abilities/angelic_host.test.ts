@@ -20,7 +20,7 @@ beforeEach(() => FightStateManager.getInstance().reset());
 describe("Angelic Host Blessing configuration", () => {
     it("assigns the non-stacking army passive to Angel without an aura radius", () => {
         const ability = getAbilityConfig("Angelic Host Blessing");
-        const angel = getCreatureConfig(PBTypes.TeamVals.LOWER, "Life", "Angel", "angel_512", 1);
+        const angel = getCreatureConfig(PBTypes.TeamVals.LEFT, "Life", "Angel", "angel_512", 1);
         const abilityIndex = angel.abilities.indexOf("Angelic Host Blessing");
 
         expect(ability.type).toBe(AbilityType.MASS_BUFF);
@@ -40,25 +40,25 @@ describe("Angelic Host Blessing army passive", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const firstCarrier = createTestUnit({
             name: "Angel",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Angelic Host Blessing"],
             movementType: PBTypes.MovementVals.FLY,
         });
         const secondCarrier = createTestUnit({
             name: "Second Carrier",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Angelic Host Blessing"],
             movementType: PBTypes.MovementVals.FLY,
         });
         const distantAlliedFlyer = createTestUnit({
             name: "Distant Allied Flyer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             movementType: PBTypes.MovementVals.FLY,
         });
-        const alliedWalker = createTestUnit({ name: "Allied Walker", team: PBTypes.TeamVals.LOWER });
+        const alliedWalker = createTestUnit({ name: "Allied Walker", team: PBTypes.TeamVals.LEFT });
         const enemyFlyer = createTestUnit({
             name: "Enemy Flyer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             movementType: PBTypes.MovementVals.FLY,
         });
 
@@ -117,18 +117,18 @@ describe("Angelic Host Blessing army passive", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const carrier = createTestUnit({
             name: "Angel",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Angelic Host Blessing"],
             movementType: PBTypes.MovementVals.FLY,
         });
         const hostedFlyer = createTestUnit({
             name: "Hosted Flyer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             movementType: PBTypes.MovementVals.FLY,
         });
         const controlFlyer = createTestUnit({
             name: "Control Flyer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             movementType: PBTypes.MovementVals.FLY,
         });
 
@@ -154,13 +154,13 @@ describe("Angelic Host Blessing army passive", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const carrier = createTestUnit({
             name: "Angel",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Angelic Host Blessing"],
             movementType: PBTypes.MovementVals.FLY,
         });
         const alliedFlyer = createTestUnit({
             name: "Allied Flyer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             movementType: PBTypes.MovementVals.FLY,
         });
         placeUnit(grid, unitsHolder, carrier, { x: 2, y: 2 });
@@ -221,7 +221,7 @@ describe("Angelic Host Blessing army passive", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const carrier = createTestUnit({
             name: "Angel",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Angelic Host Blessing", "Resurrection"],
             spells: [":Resurrection"],
             amountAlive: 2,
@@ -229,7 +229,7 @@ describe("Angelic Host Blessing army passive", () => {
         });
         const alliedFlyer = createTestUnit({
             name: "Allied Flyer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             movementType: PBTypes.MovementVals.FLY,
         });
         placeUnit(grid, unitsHolder, carrier, { x: 2, y: 2 });
@@ -262,34 +262,34 @@ describe("Angelic Host Blessing army passive", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const originalCarrier = createTestUnit({
             name: "Angel",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Angelic Host Blessing"],
             movementType: PBTypes.MovementVals.FLY,
         });
-        const lowerFlyer = createTestUnit({
+        const leftFlyer = createTestUnit({
             name: "Lower Flyer",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             movementType: PBTypes.MovementVals.FLY,
         });
         const thief = createTestUnit({
             name: "Arachna Queen",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             abilities: ["Predatory Assimilation"],
             movementType: PBTypes.MovementVals.FLY,
         });
-        const upperFlyer = createTestUnit({
+        const rightFlyer = createTestUnit({
             name: "Upper Flyer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             movementType: PBTypes.MovementVals.FLY,
         });
         placeUnit(grid, unitsHolder, originalCarrier, { x: 1, y: 1 });
-        placeUnit(grid, unitsHolder, lowerFlyer, { x: 3, y: 3 });
+        placeUnit(grid, unitsHolder, leftFlyer, { x: 3, y: 3 });
         placeUnit(grid, unitsHolder, thief, { x: 8, y: 8 });
-        placeUnit(grid, unitsHolder, upperFlyer, { x: 10, y: 8 });
+        placeUnit(grid, unitsHolder, rightFlyer, { x: 10, y: 8 });
 
         unitsHolder.refreshStackPowerForAllUnits();
-        expect(lowerFlyer.getAttack()).toBe(11);
-        expect(upperFlyer.getAttack()).toBe(10);
+        expect(leftFlyer.getAttack()).toBe(11);
+        expect(rightFlyer.getAttack()).toBe(10);
 
         expect(originalCarrier.disableAbilityAsStolen("Angelic Host Blessing")).toBeDefined();
         thief.grantStolenAbility("Angelic Host Blessing");
@@ -297,9 +297,9 @@ describe("Angelic Host Blessing army passive", () => {
 
         expect(originalCarrier.hasAbilityActive("Angelic Host Blessing")).toBe(false);
         expect(thief.hasAbilityActive("Angelic Host Blessing")).toBe(true);
-        expect(lowerFlyer.getAttack()).toBe(10);
-        expect(lowerFlyer.hasBuffActive("Angelic Host Blessing")).toBe(false);
+        expect(leftFlyer.getAttack()).toBe(10);
+        expect(leftFlyer.hasBuffActive("Angelic Host Blessing")).toBe(false);
         expect(thief.getAttack()).toBe(11);
-        expect(upperFlyer.getAttack()).toBe(11);
+        expect(rightFlyer.getAttack()).toBe(11);
     });
 });

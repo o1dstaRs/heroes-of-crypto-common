@@ -152,8 +152,8 @@ describe("exact ranked draft evaluator", () => {
         let witnessedConditionalOverride = false;
         for (let seed = 0; seed < 100; seed += 1) {
             const state = resolveRankedDraftPick(seed, incumbent, incumbent);
-            for (const team of [PBTypes.TeamVals.LOWER, PBTypes.TeamVals.UPPER] as const) {
-                const own = team === PBTypes.TeamVals.LOWER ? state.lower : state.upper;
+            for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT] as const) {
+                const own = team === PBTypes.TeamVals.LEFT ? state.left : state.right;
                 const bundle = state.transcript.find(
                     (entry) => entry.type === "bundle_selected" && entry.team === team,
                 );

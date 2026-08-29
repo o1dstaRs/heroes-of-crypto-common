@@ -19,7 +19,7 @@ import { RectanglePlacement } from "../../src/grid/rectangle_placement";
 import type { Unit } from "../../src/units/unit";
 import { createTestUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
+const LEFT = PBTypes.TeamVals.LEFT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const FLY = PBTypes.MovementVals.FLY;
@@ -31,9 +31,9 @@ const v05 = getAIStrategy("v0.5");
 function place(mode: string, units: Unit[]): Map<string, { x: number; y: number }> {
     const prev = process.env.V05_PLACEMENT;
     process.env.V05_PLACEMENT = mode;
-    const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 3);
+    const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 3);
     const result = v05.placeArmy(units, {
-        team: LOWER,
+        team: LEFT,
         grid: undefined as never,
         unitsHolder: undefined as never,
         pathHelper: undefined as never,
@@ -52,12 +52,12 @@ const norm = (m: Map<string, { x: number; y: number }>): string[] =>
 
 // A mixed roster exercising every role branch: ground melee, flyers, ranged, and a LARGE (2x2) footprint.
 const mixedRoster = (): Unit[] => [
-    createTestUnit({ team: LOWER, name: "M1", attackType: MELEE }),
-    createTestUnit({ team: LOWER, name: "M2", attackType: MELEE }),
-    createTestUnit({ team: LOWER, name: "F1", attackType: MELEE, movementType: FLY }),
-    createTestUnit({ team: LOWER, name: "F2", attackType: MELEE, movementType: FLY }),
-    createTestUnit({ team: LOWER, name: "R1", attackType: RANGE, rangeShots: 5 }),
-    createTestUnit({ team: LOWER, name: "Big", attackType: MELEE, size: LARGE }),
+    createTestUnit({ team: LEFT, name: "M1", attackType: MELEE }),
+    createTestUnit({ team: LEFT, name: "M2", attackType: MELEE }),
+    createTestUnit({ team: LEFT, name: "F1", attackType: MELEE, movementType: FLY }),
+    createTestUnit({ team: LEFT, name: "F2", attackType: MELEE, movementType: FLY }),
+    createTestUnit({ team: LEFT, name: "R1", attackType: RANGE, rangeShots: 5 }),
+    createTestUnit({ team: LEFT, name: "Big", attackType: MELEE, size: LARGE }),
 ];
 
 describe("v0.5 learned placement seam", () => {

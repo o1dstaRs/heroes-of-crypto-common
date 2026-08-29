@@ -37,8 +37,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const SMALL = PBTypes.UnitSizeVals.SMALL;
 const LARGE = PBTypes.UnitSizeVals.LARGE;
@@ -69,8 +69,8 @@ function makeFixture(
     initiative = 3.3,
 ): IFixture {
     const combat = createCombatTestContext(gridType);
-    const actor = createTestUnit({ team: LOWER, name: "Layer Actor", attackType: MELEE, size, initiative });
-    const target = createTestUnit({ team: UPPER, name: "Layer Target", attackType: MELEE, initiative: 1 });
+    const actor = createTestUnit({ team: LEFT, name: "Layer Actor", attackType: MELEE, size, initiative });
+    const target = createTestUnit({ team: RIGHT, name: "Layer Target", attackType: MELEE, initiative: 1 });
     placeUnit(combat.grid, combat.unitsHolder, actor, actorCell);
     placeUnit(combat.grid, combat.unitsHolder, target, targetCell);
     return { actor, combat, matrix: combat.grid.getMatrix(), target };

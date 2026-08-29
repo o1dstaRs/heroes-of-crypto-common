@@ -26,19 +26,19 @@ describe("v0.1 ranged-fire robustness", () => {
         const combat = createCombatTestContext();
         const shooter = createTestUnit({
             name: "Gaze-aware shooter",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 5,
             shotDistance: 30,
         });
         const forbidden = createTestUnit({
             name: "Forbidden gazer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
         });
         const legal = createTestUnit({
             name: "Legal alternate",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
         });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 2, y: 5 });
@@ -48,8 +48,8 @@ describe("v0.1 ranged-fire robustness", () => {
         shooter.refreshPossibleAttackTypes(true);
 
         const fightProperties = FightStateManager.getInstance().getFightProperties();
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 2);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 2);
         const context: IDecisionContext = {
             grid: combat.grid,
             matrix: combat.grid.getMatrix(),

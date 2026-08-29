@@ -59,7 +59,7 @@ describe("generated message constructors (new X({...}))", () => {
                 confirmed: true,
                 init_time: 5,
                 abandoned: true,
-                team: TypesPB.TeamVals.LOWER,
+                team: TypesPB.TeamVals.LEFT,
             }),
             GamePublicPB.GamePublic.deserializeBinary,
         );
@@ -135,7 +135,7 @@ describe("generated message constructors (new X({...}))", () => {
             abandoned: true,
             finished_time: 1,
             opponent_username: "o",
-            team: TypesPB.TeamVals.UPPER,
+            team: TypesPB.TeamVals.RIGHT,
             creature_ids: [1, 2],
             opponent_creature_ids: [3],
             duration_ms: 150000,

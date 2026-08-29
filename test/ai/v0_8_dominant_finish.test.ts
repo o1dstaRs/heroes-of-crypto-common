@@ -24,16 +24,16 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
-function strengthState(ownHp: number, enemyHp: number, lap: number, team: TeamType = LOWER) {
+function strengthState(ownHp: number, enemyHp: number, lap: number, team: TeamType = LEFT) {
     const combat = createCombatTestContext();
-    const enemyTeam = team === LOWER ? UPPER : LOWER;
+    const enemyTeam = team === LEFT ? RIGHT : LEFT;
     const own = createTestUnit({ team, maxHp: ownHp });
     const enemy = createTestUnit({ team: enemyTeam, maxHp: enemyHp });
-    placeUnit(combat.grid, combat.unitsHolder, own, team === LOWER ? { x: 3, y: 3 } : { x: 3, y: 10 });
-    placeUnit(combat.grid, combat.unitsHolder, enemy, team === LOWER ? { x: 3, y: 10 } : { x: 3, y: 3 });
+    placeUnit(combat.grid, combat.unitsHolder, own, team === LEFT ? { x: 3, y: 3 } : { x: 3, y: 10 });
+    placeUnit(combat.grid, combat.unitsHolder, enemy, team === LEFT ? { x: 3, y: 10 } : { x: 3, y: 3 });
     return { combat, state: v08DominantFinishState(combat.unitsHolder, team, lap) };
 }
 
@@ -67,11 +67,11 @@ describe("v0.8 dominant-finish policy", () => {
 
     it("ignores summoned HP and is symmetric when the commanding side is swapped", () => {
         const { combat, state } = strengthState(10, 10, V08_DOMINANT_FINISH_START_LAP);
-        const summon = createTestUnit({ team: LOWER, maxHp: 1_000, summoned: true });
+        const summon = createTestUnit({ team: LEFT, maxHp: 1_000, summoned: true });
         placeUnit(combat.grid, combat.unitsHolder, summon, { x: 5, y: 3 });
 
-        expect(v08DominantFinishState(combat.unitsHolder, LOWER, V08_DOMINANT_FINISH_START_LAP)).toEqual(state);
-        expect(strengthState(20, 10, V08_DOMINANT_FINISH_START_LAP, UPPER).state.active).toBe(true);
+        expect(v08DominantFinishState(combat.unitsHolder, LEFT, V08_DOMINANT_FINISH_START_LAP)).toEqual(state);
+        expect(strengthState(20, 10, V08_DOMINANT_FINISH_START_LAP, RIGHT).state.active).toBe(true);
     });
 
     it("classifies only enemy-damaging attack actions as direct combat", () => {

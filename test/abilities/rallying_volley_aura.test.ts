@@ -25,7 +25,7 @@ const AURA_SHOTS = getAbilityConfig("Rallying Volley Aura").power;
 const makeZena = () =>
     createTestUnit({
         name: "Zena",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.RANGE,
         rangeShots: 8,
         abilities: ["Rallying Volley Aura"],
@@ -37,7 +37,7 @@ const makeZena = () =>
 const makeArcher = (name: string) =>
     createTestUnit({
         name,
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.RANGE,
         rangeShots: 5,
     });
@@ -55,7 +55,7 @@ describe("Rallying Volley Aura", () => {
         const farArcher = makeArcher("Far Archer");
         const meleeAlly = createTestUnit({
             name: "Melee Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.MELEE,
         });
 
@@ -128,9 +128,9 @@ describe("Rallying Volley Aura vs Limited Supply", () => {
         const abilityFactory = new AbilityFactory(effectFactory);
         const build = (faction: string, name: string, texture: string, amount: number) =>
             Unit.createUnit(
-                getCreatureConfig(PBTypes.TeamVals.LOWER, faction, name, texture, amount, 0),
+                getCreatureConfig(PBTypes.TeamVals.LEFT, faction, name, texture, amount, 0),
                 ctx.grid.getSettings(),
-                PBTypes.TeamVals.LOWER,
+                PBTypes.TeamVals.LEFT,
                 PBTypes.UnitVals.CREATURE,
                 abilityFactory,
                 effectFactory,

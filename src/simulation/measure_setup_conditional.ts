@@ -97,8 +97,8 @@ export function defaultCells(): ISetupConditionalCell[] {
 // Draft policies (identical on both seats within a cell)
 // ---------------------------------------------------------------------------------------------------------
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
 const argmaxId = (candidates: readonly number[], score: (id: number) => number): number => {
     let best = candidates[0];
@@ -118,7 +118,7 @@ const isRanged = (creatureId: number): boolean => !!ownComposition([creatureId])
 const rangedFirstScore = (id: number): number => (isRanged(id) ? 1_000_000 : 0) + scoreCreature(id);
 
 function chooseBundle(state: IPickSimState, team: PickTeam, draft: DraftDistName, genome?: ILeagueGenome): number {
-    const own = team === LOWER ? state.lower : state.upper;
+    const own = team === LEFT ? state.left : state.right;
     if (draft === "league") {
         return pickLeagueBundle(state, team, genome!);
     }
@@ -217,9 +217,9 @@ interface IConditionalPickDriverOptions {
 
 export interface IRankedConditionalPickOverrides {
     /** Optional lower-seat draft policy. The positional genome remains the backward-compatible default. */
-    lowerGenome?: ILeagueGenome;
+    leftGenome?: ILeagueGenome;
     /** Optional upper-seat draft policy. The positional genome remains the backward-compatible default. */
-    upperGenome?: ILeagueGenome;
+    rightGenome?: ILeagueGenome;
     /** Return undefined to retain CONDITIONAL_SETUP_V1 for this seat. */
     pickArtifactT2?: IConditionalPickDriverOptions["pickArtifactT2"];
     /** Opt into the live server's stable level sort after every accepted bundle or creature write. */
@@ -236,7 +236,7 @@ export function runConditionalPickGame(
     conditionalTeam: PickTeam | undefined,
     rules: ReadonlySet<ConditionalSetupRule>,
     genome?: ILeagueGenome,
-): { lower: IConditionalArmy; upper: IConditionalArmy } {
+): { left: IConditionalArmy; right: IConditionalArmy } {
     return runConditionalPickGameWithOptions(seed, draft, rules, genome, {
         conditionalTeams: conditionalTeam === undefined ? new Set() : new Set([conditionalTeam]),
         preservePickOrder: false,
@@ -253,7 +253,7 @@ export function runRankedConditionalPickGame(
     rules: ReadonlySet<ConditionalSetupRule>,
     genome: ILeagueGenome,
     overrides: IRankedConditionalPickOverrides = {},
-): { lower: IConditionalArmy; upper: IConditionalArmy } {
+): { left: IConditionalArmy; right: IConditionalArmy } {
     if (
         overrides.rankedCreatureOrder !== undefined &&
         overrides.rankedCreatureOrder !== SERVER_PERSISTED_CREATURE_ORDER
@@ -261,11 +261,10 @@ export function runRankedConditionalPickGame(
         throw new Error(`Unsupported ranked creature order: ${String(overrides.rankedCreatureOrder)}`);
     }
     return runConditionalPickGameWithOptions(seed, "league", rules, genome, {
-        conditionalTeams: new Set([LOWER, UPPER]),
+        conditionalTeams: new Set([LEFT, RIGHT]),
         preservePickOrder: true,
         rankedCreatureOrder: overrides.rankedCreatureOrder,
-        genomeForTeam: (team) =>
-            team === LOWER ? (overrides.lowerGenome ?? genome) : (overrides.upperGenome ?? genome),
+        genomeForTeam: (team) => (team === LEFT ? (overrides.leftGenome ?? genome) : (overrides.rightGenome ?? genome)),
         pickArtifactT2: overrides.pickArtifactT2,
     });
 }
@@ -276,13 +275,13 @@ function runConditionalPickGameWithOptions(
     rules: ReadonlySet<ConditionalSetupRule>,
     genome: ILeagueGenome | undefined,
     options: IConditionalPickDriverOptions,
-): { lower: IConditionalArmy; upper: IConditionalArmy } {
+): { left: IConditionalArmy; right: IConditionalArmy } {
     const rng = makeRng(seed >>> 0);
     const rngInt: PickRandomInt = (maxExclusive) => Math.floor(rng() * maxExclusive);
     let state = createPickSimState(rngInt);
     const setupOutcome = new Map<PickTeam, ITeamSetupOutcome>();
 
-    const teamState = (team: PickTeam): IPickTeamState => (team === LOWER ? state.lower : state.upper);
+    const teamState = (team: PickTeam): IPickTeamState => (team === LEFT ? state.left : state.right);
     const transition = (action: Parameters<typeof transitionPickSim>[1]) =>
         options.rankedCreatureOrder === SERVER_PERSISTED_CREATURE_ORDER
             ? transitionServerPersistedPickSim(state, action, rngInt)
@@ -302,13 +301,13 @@ function runConditionalPickGameWithOptions(
         }
         const phase = getCurrentPickPhase(state);
         if (phase.phase === PBTypes.PickPhaseVals.DOCTRINE) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 if (teamState(team).doctrine === Doctrine.NO_DOCTRINE) {
                     accept({ type: "select_doctrine", team, doctrine: SETUP_POLICY_V0.pickDoctrine() });
                 }
             }
         } else if (phase.phase === PBTypes.PickPhaseVals.INITIAL_PICK) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 if (teamState(team).selectedBundleIndex === undefined) {
                     accept({
                         type: "select_bundle",
@@ -326,7 +325,7 @@ function runConditionalPickGameWithOptions(
             }
             state = result.state; // collisions reveal a slot; the next iteration re-picks
         } else if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
-            for (const team of [LOWER, UPPER] as const) {
+            for (const team of [LEFT, RIGHT] as const) {
                 const own = teamState(team);
                 if (own.tier2Artifact !== undefined) {
                     continue;
@@ -400,7 +399,7 @@ function runConditionalPickGameWithOptions(
         };
     };
 
-    return { lower: materialize(LOWER), upper: materialize(UPPER) };
+    return { left: materialize(LEFT), right: materialize(RIGHT) };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -420,7 +419,7 @@ export interface ISetupConditionalRecord {
     cellId: string;
     game: number;
     seed: number;
-    aIsLower: boolean;
+    aIsLeft: boolean;
     winnerSlot: "a" | "b" | "draw";
     laps: number;
     endReason: IMatchResult["endReason"];
@@ -513,42 +512,42 @@ export function playSetupConditionalGame(
     }
     const pairIndex = Math.floor(game / 2);
     const seed = ((options.baseSeed >>> 0) + pairIndex * 0x9e3779b1) >>> 0;
-    const aIsLower = game % 2 === 0;
+    const aIsLeft = game % 2 === 0;
     const rules = parseConditionalRules(cell.rules);
-    const conditionalTeam = cell.control ? undefined : aIsLower ? LOWER : UPPER;
+    const conditionalTeam = cell.control ? undefined : aIsLeft ? LEFT : RIGHT;
     const genome = cell.draft === "league" ? shippedLeagueGenome(options.leagueGenomeSpec) : undefined;
-    const { lower, upper } = runConditionalPickGame(seed, cell.draft, conditionalTeam, rules, genome);
+    const { left, right } = runConditionalPickGame(seed, cell.draft, conditionalTeam, rules, genome);
     // LOWER is the green team (battle_engine GREEN_TEAM = TeamVals.LOWER), matching the live seat mapping.
     FightStateManager.getInstance();
     const result = runMatch({
         greenVersion: options.fightVersion,
         redVersion: options.fightVersion,
-        roster: lower.roster,
-        redRoster: upper.roster,
+        roster: left.roster,
+        redRoster: right.roster,
         seed,
         gridType: PBTypes.GridVals.NORMAL,
-        greenDoctrine: lower.doctrine,
-        redDoctrine: upper.doctrine,
-        greenAugments: lower.augments,
-        redAugments: upper.augments,
-        greenArtifactT1: lower.tier1Artifact,
-        redArtifactT1: upper.tier1Artifact,
-        greenArtifactT2: lower.tier2Artifact,
-        redArtifactT2: upper.tier2Artifact,
-        greenSynergies: lower.synergies,
-        redSynergies: upper.synergies,
+        greenDoctrine: left.doctrine,
+        redDoctrine: right.doctrine,
+        greenAugments: left.augments,
+        redAugments: right.augments,
+        greenArtifactT1: left.tier1Artifact,
+        redArtifactT1: right.tier1Artifact,
+        greenArtifactT2: left.tier2Artifact,
+        redArtifactT2: right.tier2Artifact,
+        greenSynergies: left.synergies,
+        redSynergies: right.synergies,
         sideOrientedPlacement: options.sideOriented === true,
     });
-    const a = aIsLower ? lower : upper;
-    const b = aIsLower ? upper : lower;
-    const winnerSlot = result.winner === "draw" ? "draw" : (result.winner === "green") === aIsLower ? "a" : "b";
-    const rejectedA = aIsLower ? result.rejectedGreen : result.rejectedRed;
-    const rejectedB = aIsLower ? result.rejectedRed : result.rejectedGreen;
+    const a = aIsLeft ? left : right;
+    const b = aIsLeft ? right : left;
+    const winnerSlot = result.winner === "draw" ? "draw" : (result.winner === "green") === aIsLeft ? "a" : "b";
+    const rejectedA = aIsLeft ? result.rejectedGreen : result.rejectedRed;
+    const rejectedB = aIsLeft ? result.rejectedRed : result.rejectedGreen;
     return {
         cellId: cell.id,
         game,
         seed,
-        aIsLower,
+        aIsLeft,
         winnerSlot,
         laps: result.laps,
         endReason: result.endReason,
@@ -734,8 +733,8 @@ export function tallyRecord(tally: ICellTally, record: ISetupConditionalRecord):
     if (tally.recordsByGame.has(record.game)) {
         throw new Error(`${tally.cell.id}: duplicate game ${record.game}`);
     }
-    const expectedLower = record.game % 2 === 0;
-    if (record.aIsLower !== expectedLower) {
+    const expectedLeft = record.game % 2 === 0;
+    if (record.aIsLeft !== expectedLeft) {
         throw new Error(`${tally.cell.id}: game ${record.game} did not side-swap arm A`);
     }
     const expectedSeed = ((tally.baseSeed >>> 0) + Math.floor(record.game / 2) * 0x9e3779b1) >>> 0;

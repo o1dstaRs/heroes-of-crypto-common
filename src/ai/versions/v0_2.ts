@@ -172,7 +172,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
 
         // "Frontness" grows toward the enemy (LOWER faces up, UPPER faces down). "Edgeness" is distance
         // from the zone's horizontal centre, so a high edgeness = toward a corner.
-        const frontness = (c: XY): number => (context.team === PBTypes.TeamVals.LOWER ? c.y : GRID_SIZE - 1 - c.y);
+        const frontness = (c: XY): number => (context.team === PBTypes.TeamVals.LEFT ? c.y : GRID_SIZE - 1 - c.y);
         const xs = baseCells.map((c) => c.x);
         const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
         const edgeness = (c: XY): number => Math.abs(c.x - centreX);

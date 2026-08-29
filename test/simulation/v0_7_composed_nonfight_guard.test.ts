@@ -271,16 +271,16 @@ describe("ranked conditional dual-genome compatibility", () => {
         const round3 = projectDraftGenomeForShipping(parseDraftGenome(LEAGUE_ROUND3_DRAFT_SPEC));
         const historical = runRankedConditionalPickGame(1, rules, round1);
         const explicitDefault = runRankedConditionalPickGame(1, rules, round1, {
-            lowerGenome: round1,
-            upperGenome: round1,
+            leftGenome: round1,
+            rightGenome: round1,
         });
         expect(explicitDefault).toEqual(historical);
 
         const mixed = runRankedConditionalPickGame(1, rules, round1, {
-            lowerGenome: round3,
-            upperGenome: round1,
+            leftGenome: round3,
+            rightGenome: round1,
         });
-        expect(mixed.lower.creatureIds).not.toEqual(historical.lower.creatureIds);
+        expect(mixed.left.creatureIds).not.toEqual(historical.left.creatureIds);
         // Re-pinned after Blacksmith expanded the Life L1 catalog and shifted the seeded round-3 draft picks.
         // Re-pinned again after Wandering Mage (Chaos L1) grew the L1 pool 15 -> 16, shifting the same draw.
         // Re-pinned again after Zena (50) grew the L2 pool, which swaps 36 for her in the same seeded draw.
@@ -292,7 +292,7 @@ describe("ranked conditional dual-genome compatibility", () => {
         // Re-pinned again after Battle Mage (55) and Nightmare (56) grew the L2/L3 pools once more, and the
         // Venom Cloud Aura's poison began stacking (+35% per further poison) — both legitimately move this
         // seeded draw. They landed in one shared working tree, so per-change isolation was not possible.
-        expect(mixed.lower.creatureIds).toEqual([32, 55, 31, 36, 18, 9]);
+        expect(mixed.left.creatureIds).toEqual([32, 55, 31, 36, 18, 9]);
     });
 });
 

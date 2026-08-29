@@ -462,10 +462,10 @@ function generateSyntheticRoster(
 }
 
 const AI_META_RANKED_DRAFT_GENOME = parseDraftGenome(AI_META_RANKED_DRAFT_POLICY_SPEC, "ai-meta-ranked-draft");
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
-const rankedTeamState = (state: IPickSimState, team: PickTeam) => (team === LOWER ? state.lower : state.upper);
+const rankedTeamState = (state: IPickSimState, team: PickTeam) => (team === LEFT ? state.left : state.right);
 
 const rankedPickRandomInt = (seed: number): PickRandomInt => {
     const rng = makeRng(seed);
@@ -538,14 +538,14 @@ function generateRankedRosters(seed: number): [IArmyUnitSpec[], IArmyUnitSpec[]]
     const rng = rankedPickRandomInt(seed);
     let state = createPickSimState(rng);
     const doctrine = SETUP_POLICY_V0.pickDoctrine();
-    state = applyRankedPick(state, { type: "select_doctrine", team: LOWER, doctrine }, rng);
-    state = applyRankedPick(state, { type: "select_doctrine", team: UPPER, doctrine }, rng);
+    state = applyRankedPick(state, { type: "select_doctrine", team: LEFT, doctrine }, rng);
+    state = applyRankedPick(state, { type: "select_doctrine", team: RIGHT, doctrine }, rng);
 
     // Both simultaneous bundle decisions consume the same pre-commit state, matching the live timeout policy.
-    const lowerBundle = pickRankedBundle(getPickTeamView(state, LOWER).bundles);
-    const upperBundle = pickRankedBundle(getPickTeamView(state, UPPER).bundles);
-    state = applyRankedPick(state, { type: "select_bundle", team: LOWER, bundleIndex: lowerBundle }, rng);
-    state = applyRankedPick(state, { type: "select_bundle", team: UPPER, bundleIndex: upperBundle }, rng);
+    const leftBundle = pickRankedBundle(getPickTeamView(state, LEFT).bundles);
+    const rightBundle = pickRankedBundle(getPickTeamView(state, RIGHT).bundles);
+    state = applyRankedPick(state, { type: "select_bundle", team: LEFT, bundleIndex: leftBundle }, rng);
+    state = applyRankedPick(state, { type: "select_bundle", team: RIGHT, bundleIndex: rightBundle }, rng);
 
     let transitions = 0;
     while (!isPickSimComplete(state)) {
@@ -554,10 +554,10 @@ function generateRankedRosters(seed: number): [IArmyUnitSpec[], IArmyUnitSpec[]]
         }
         const phase = getCurrentPickPhase(state);
         if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
-            const lowerArtifact = SETUP_POLICY_V0.pickArtifactT2(getPickTeamView(state, LOWER).tier2Offers);
-            const upperArtifact = SETUP_POLICY_V0.pickArtifactT2(getPickTeamView(state, UPPER).tier2Offers);
-            state = applyRankedPick(state, { type: "select_tier2", team: LOWER, artifactId: lowerArtifact }, rng);
-            state = applyRankedPick(state, { type: "select_tier2", team: UPPER, artifactId: upperArtifact }, rng);
+            const leftArtifact = SETUP_POLICY_V0.pickArtifactT2(getPickTeamView(state, LEFT).tier2Offers);
+            const rightArtifact = SETUP_POLICY_V0.pickArtifactT2(getPickTeamView(state, RIGHT).tier2Offers);
+            state = applyRankedPick(state, { type: "select_tier2", team: LEFT, artifactId: leftArtifact }, rng);
+            state = applyRankedPick(state, { type: "select_tier2", team: RIGHT, artifactId: rightArtifact }, rng);
             continue;
         }
         if (phase.phase !== PBTypes.PickPhaseVals.PICK || phase.actors.length !== 1) {
@@ -583,7 +583,7 @@ function generateRankedRosters(seed: number): [IArmyUnitSpec[], IArmyUnitSpec[]]
         state = result.state;
     }
 
-    return [materializeRankedRoster(state.lower.creatures), materializeRankedRoster(state.upper.creatures)];
+    return [materializeRankedRoster(state.left.creatures), materializeRankedRoster(state.right.creatures)];
 }
 
 const CROSS_ARCHETYPES = ["ranged", "melee", "flyer", "caster"] as const;

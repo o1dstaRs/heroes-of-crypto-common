@@ -40,7 +40,7 @@ const HIT = 100;
 const makeAbomination = () =>
     createTestUnit({
         name: "Abomination",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         maxHp: 10_000,
         armor: 20,
         luck: 10,
@@ -54,7 +54,7 @@ const makeAbomination = () =>
 const makeProtectedAlly = () =>
     createTestUnit({
         name: "Protected Ally",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         maxHp: 10_000,
         armor: 20,
         magicResist: 0,
@@ -74,11 +74,11 @@ const setupSweep = (abilityName: string) => {
     const context = createCombatTestContext();
     const attacker = createTestUnit({
         name: "Sweeper",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         attackType: PBTypes.AttackVals.MELEE,
         abilities: [abilityName],
     });
-    const decoy = createTestUnit({ name: "Aimed Decoy", team: PBTypes.TeamVals.LOWER, maxHp: 10_000, armor: 20 });
+    const decoy = createTestUnit({ name: "Aimed Decoy", team: PBTypes.TeamVals.LEFT, maxHp: 10_000, armor: 20 });
     const ally = makeProtectedAlly();
     const abomination = makeAbomination();
     attacker.calculateMissChance = () => 0;
@@ -106,7 +106,7 @@ describe("Flesh Shield aura absorbs PHYSICAL damage", () => {
         const ally = makeProtectedAlly();
         const attacker = createTestUnit({
             name: "Brawler",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
         });
         attacker.calculateMissChance = () => 0;
@@ -146,7 +146,7 @@ describe("Flesh Shield aura absorbs PHYSICAL damage", () => {
         const ally = makeProtectedAlly();
         const responder = createTestUnit({
             name: "Counter-puncher",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             maxHp: 10_000,
         });
@@ -185,7 +185,7 @@ describe("Flesh Shield aura absorbs PHYSICAL damage", () => {
         const ally = makeProtectedAlly();
         const shooter = createTestUnit({
             name: "Archer",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
         });
@@ -281,7 +281,7 @@ describe("Flesh Shield aura ignores MAGICAL damage", () => {
         const context = createCombatTestContext();
         const caster = createTestUnit({
             name: "Storm Caller",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             stackPower: 5,
             abilities: ["Chain Lightning"],

@@ -38,7 +38,7 @@ export function canWaitOnHourglass(
 ): boolean {
     const team = unit.getTeam();
     return (
-        (team === PBTypes.TeamVals.LOWER || team === PBTypes.TeamVals.UPPER) &&
+        (team === PBTypes.TeamVals.LEFT || team === PBTypes.TeamVals.RIGHT) &&
         !hasActiveTimeDenial(allUnits.values()) &&
         fightProperties.hasUnactedTeammate(team, unit.getId(), allUnits) &&
         !unit.isOnHourglass() &&

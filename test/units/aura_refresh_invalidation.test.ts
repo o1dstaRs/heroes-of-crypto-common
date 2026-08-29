@@ -101,35 +101,35 @@ function compareWithForcedFullRefresh(
 describe("aura refresh dirty invalidation", () => {
     it("matches a forced full refresh through no-op, movement, cleanse, power, Break, and restore events", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const lowerEmitter = createTestUnit({
+        const leftEmitter = createTestUnit({
             name: "Lower Emitter",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             luck: 4,
             stackPower: 3,
             auraEffects: ["Luck", "Flesh Shield", "Sharpened Weapons"],
         });
-        const lowerLarge = createTestUnit({
+        const leftLarge = createTestUnit({
             name: "Large Recipient",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             size: PBTypes.UnitSizeVals.LARGE,
         });
-        const upperEmitter = createTestUnit({
+        const rightEmitter = createTestUnit({
             name: "Upper Emitter",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             auraEffects: ["Range Null Field", "Venom Cloud"],
         });
-        const upperRanged = createTestUnit({
+        const rightRanged = createTestUnit({
             name: "Upper Ranged",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
             luck: -2,
         });
 
-        placeUnit(grid, unitsHolder, lowerEmitter, { x: 4, y: 4 });
-        placeUnit(grid, unitsHolder, lowerLarge, { x: 6, y: 5 });
-        placeUnit(grid, unitsHolder, upperEmitter, { x: 8, y: 5 });
-        placeUnit(grid, unitsHolder, upperRanged, { x: 7, y: 5 });
+        placeUnit(grid, unitsHolder, leftEmitter, { x: 4, y: 4 });
+        placeUnit(grid, unitsHolder, leftLarge, { x: 6, y: 5 });
+        placeUnit(grid, unitsHolder, rightEmitter, { x: 8, y: 5 });
+        placeUnit(grid, unitsHolder, rightRanged, { x: 7, y: 5 });
 
         const compare = (expectedChanged: boolean): void => {
             expect(compareWithForcedFullRefresh(unitsHolder, grid)).toBe(expectedChanged);
@@ -138,49 +138,49 @@ describe("aura refresh dirty invalidation", () => {
         compare(true);
         compare(false);
 
-        lowerLarge.deleteBuff("Luck Aura");
+        leftLarge.deleteBuff("Luck Aura");
         compare(true);
 
-        lowerEmitter.setStackPower(5);
+        leftEmitter.setStackPower(5);
         compare(true);
 
-        lowerEmitter.getAuraEffect("Luck")!.extendRange();
+        leftEmitter.getAuraEffect("Luck")!.extendRange();
         compare(true);
 
         const fightProperties = FightStateManager.getInstance().getFightProperties();
-        fightProperties.setSynergiesPerTeam(PBTypes.TeamVals.LOWER, ["Might:1:3"]);
+        fightProperties.setSynergiesPerTeam(PBTypes.TeamVals.LEFT, ["Might:1:3"]);
         compare(true);
-        fightProperties.setSynergiesPerTeam(PBTypes.TeamVals.LOWER, ["Might:2:3"]);
+        fightProperties.setSynergiesPerTeam(PBTypes.TeamVals.LEFT, ["Might:2:3"]);
         compare(true);
-        fightProperties.setSynergiesPerTeam(PBTypes.TeamVals.LOWER, []);
+        fightProperties.setSynergiesPerTeam(PBTypes.TeamVals.LEFT, []);
         compare(true);
 
         const movedLargePosition = positionForCell({ x: 5, y: 5 });
-        lowerLarge.setPosition(movedLargePosition.x, movedLargePosition.y);
+        leftLarge.setPosition(movedLargePosition.x, movedLargePosition.y);
         compare(true);
 
-        lowerEmitter.applyEffect(new EffectFactory().makeEffect("Break")!);
+        leftEmitter.applyEffect(new EffectFactory().makeEffect("Break")!);
         compare(true);
-        lowerEmitter.deleteEffect("Break");
+        leftEmitter.deleteEffect("Break");
         compare(true);
 
         const stable = snapshotBattle(unitsHolder, grid, FightStateManager.getInstance().getFightProperties());
         const movedEmitterPosition = positionForCell({ x: 12, y: 12 });
-        upperEmitter.setPosition(movedEmitterPosition.x, movedEmitterPosition.y);
+        rightEmitter.setPosition(movedEmitterPosition.x, movedEmitterPosition.y);
         compare(true);
         restoreBattle(stable, unitsHolder, grid, FightStateManager.getInstance().getFightProperties());
         compare(false);
 
-        upperEmitter.applyDamage(1_000_000, 0, new SceneLogMock());
+        rightEmitter.applyDamage(1_000_000, 0, new SceneLogMock());
         compare(false);
-        expect(upperRanged.hasBuffActive("Venom Cloud Aura")).toBe(true);
+        expect(rightRanged.hasBuffActive("Venom Cloud Aura")).toBe(true);
 
-        unitsHolder.deleteUnitById(upperEmitter.getId());
+        unitsHolder.deleteUnitById(rightEmitter.getId());
         compare(true);
-        expect(upperRanged.hasBuffActive("Venom Cloud Aura")).toBe(false);
+        expect(rightRanged.hasBuffActive("Venom Cloud Aura")).toBe(false);
 
         const offGridPosition = positionForCell({ x: 30, y: 30 });
-        upperRanged.setPosition(offGridPosition.x, offGridPosition.y);
+        rightRanged.setPosition(offGridPosition.x, offGridPosition.y);
         compare(true);
         compare(false);
     });
@@ -188,7 +188,7 @@ describe("aura refresh dirty invalidation", () => {
     it("fails closed to a full refresh for extended or malformed aura-property shapes", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const emitter = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             auraEffects: ["Luck"],
         });
         placeUnit(grid, unitsHolder, emitter, { x: 4, y: 4 });
@@ -225,11 +225,11 @@ describe("aura refresh dirty invalidation", () => {
     it("invalidates when an aura ability is stolen and restored at runtime", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const emitter = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             abilities: ["Flesh Shield Aura"],
             stackPower: 5,
         });
-        const recipient = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const recipient = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, emitter, { x: 4, y: 4 });
         placeUnit(grid, unitsHolder, recipient, { x: 5, y: 4 });
 
@@ -249,10 +249,10 @@ describe("aura refresh dirty invalidation", () => {
     it("keeps rebuilding while applied-effect property arrays are misaligned", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const emitter = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             auraEffects: ["Luck"],
         });
-        const recipient = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const recipient = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, emitter, { x: 4, y: 4 });
         placeUnit(grid, unitsHolder, recipient, { x: 5, y: 4 });
 
@@ -265,15 +265,15 @@ describe("aura refresh dirty invalidation", () => {
     it("invalidates finite property rows that are changed to collide with permanent aura names", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const allyEmitter = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             auraEffects: ["Luck"],
         });
         const enemyEmitter = createTestUnit({
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             auraEffects: ["Range Null Field"],
         });
         const recipient = createTestUnit({
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
         });
@@ -304,8 +304,8 @@ describe("aura refresh dirty invalidation", () => {
 
     it("keeps the aura-free fast path exact and notices a manually injected permanent effect", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const unit = createTestUnit({ team: PBTypes.TeamVals.LOWER });
-        const recipient = createTestUnit({ team: PBTypes.TeamVals.LOWER });
+        const unit = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+        const recipient = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, unit, { x: 4, y: 4 });
         placeUnit(grid, unitsHolder, recipient, { x: 5, y: 4 });
 

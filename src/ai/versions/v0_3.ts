@@ -354,7 +354,7 @@ export class StrategyV0_3 extends StrategyV0_2 {
         if (!baseCells.length) {
             return placements;
         }
-        const frontness = (cc: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cc.y : GRID_SIZE - 1 - cc.y);
+        const frontness = (cc: XY): number => (context.team === PBTypes.TeamVals.LEFT ? cc.y : GRID_SIZE - 1 - cc.y);
         const xs = baseCells.map((cc) => cc.x);
         const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
         const edgeness = (cc: XY): number => Math.abs(cc.x - centreX);

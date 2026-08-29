@@ -90,9 +90,9 @@ const levelFourPickState = (
     const state = createPickSimState(() => 0);
     state.phaseSequence = 10;
     state.creaturesBanned = CreatureLevelList[4].filter((creatureId) => !choices.includes(creatureId));
-    state.lower.creatures = [...own];
-    state.upper.creatures = [...opponent];
-    state.lower.revealedOpponentSlots = [...revealedOpponentSlots];
+    state.left.creatures = [...own];
+    state.right.creatures = [...opponent];
+    state.left.revealedOpponentSlots = [...revealedOpponentSlots];
     return state;
 };
 
@@ -163,31 +163,31 @@ describe("B1 full-game league genome", () => {
         const flyer = creature("Manticore");
 
         expect(
-            pickLeagueCreature(levelFourPickState([abomination, champion], [], []), PBTypes.TeamVals.LOWER, anchor),
+            pickLeagueCreature(levelFourPickState([abomination, champion], [], []), PBTypes.TeamVals.LEFT, anchor),
         ).toBe(champion);
         expect(
-            pickLeagueCreature(levelFourPickState([abomination, champion], [ward], []), PBTypes.TeamVals.LOWER, anchor),
+            pickLeagueCreature(levelFourPickState([abomination, champion], [ward], []), PBTypes.TeamVals.LEFT, anchor),
         ).toBe(champion);
         expect(
             pickLeagueCreature(
                 levelFourPickState([abomination, champion], [ward, creature("Battle Mage")], []),
-                PBTypes.TeamVals.LOWER,
+                PBTypes.TeamVals.LEFT,
                 anchor,
             ),
         ).toBe(abomination);
         expect(
-            pickLeagueCreature(levelFourPickState([queen, champion], [ward], [flyer]), PBTypes.TeamVals.LOWER, anchor),
+            pickLeagueCreature(levelFourPickState([queen, champion], [ward], [flyer]), PBTypes.TeamVals.LEFT, anchor),
         ).toBe(champion);
         expect(
             pickLeagueCreature(
                 levelFourPickState([queen, champion], [ward], [flyer], [0]),
-                PBTypes.TeamVals.LOWER,
+                PBTypes.TeamVals.LEFT,
                 anchor,
             ),
         ).toBe(queen);
         expect(
             [abomination, queen].includes(
-                pickLeagueCreature(levelFourPickState([abomination, queen], [], []), PBTypes.TeamVals.LOWER, anchor),
+                pickLeagueCreature(levelFourPickState([abomination, queen], [], []), PBTypes.TeamVals.LEFT, anchor),
             ),
         ).toBe(true);
     });
@@ -218,10 +218,10 @@ describe("B1 full-game league genome", () => {
         const second = resolveLeaguePick(777, anchor, melee);
         expect(first).toEqual(second);
         expect(first.state.phaseSequence).toBe(11);
-        expect(first.state.lower.creatures).toHaveLength(6);
-        expect(first.state.upper.creatures).toHaveLength(6);
-        expect(first.state.lower.tier1Artifact).toBeGreaterThan(0);
-        expect(first.state.lower.tier2Artifact).toBeGreaterThan(0);
+        expect(first.state.left.creatures).toHaveLength(6);
+        expect(first.state.right.creatures).toHaveLength(6);
+        expect(first.state.left.tier1Artifact).toBeGreaterThan(0);
+        expect(first.state.left.tier2Artifact).toBeGreaterThan(0);
         expect(first.lowerAugments.reduce((sum, augment) => sum + augment.value, 0)).toBe(7);
 
         const collisionSeed = Array.from({ length: 200 }, (_, seed) => seed).find((seed) =>
@@ -230,7 +230,7 @@ describe("B1 full-game league genome", () => {
             ),
         );
         expect(collisionSeed).toBeDefined();
-        expect(resolveLeaguePick(collisionSeed!, anchor, melee).state.lower.creatures).toHaveLength(6);
+        expect(resolveLeaguePick(collisionSeed!, anchor, melee).state.left.creatures).toHaveLength(6);
     });
 
     it("wires draft, T2, augment, doctrine and deployable placement heads into a resolved setup", () => {
@@ -254,17 +254,17 @@ describe("B1 full-game league genome", () => {
         const opponent = createLeagueGenome("opponent");
         const seed = Array.from({ length: 500 }, (_, value) => value).find((value) => {
             const resolved = resolveLeaguePick(value, alternative, opponent, false);
-            return resolved.state.lower.tier2Offers.includes(1) && resolved.lowerPlacement === "adaptive";
+            return resolved.state.left.tier2Offers.includes(1) && resolved.leftPlacement === "adaptive";
         });
         expect(seed).toBeDefined();
 
         const baseline = resolveLeaguePick(seed!, anchor, opponent, false);
         const resolved = resolveLeaguePick(seed!, alternative, opponent, false);
-        expect(resolved.state.lower.creatures).not.toEqual(baseline.state.lower.creatures);
-        expect(resolved.state.lower.tier2Artifact).toBe(1);
-        expect(resolved.state.lower.doctrine).toBe(Doctrine.SEE_ALL);
+        expect(resolved.state.left.creatures).not.toEqual(baseline.state.left.creatures);
+        expect(resolved.state.left.tier2Artifact).toBe(1);
+        expect(resolved.state.left.doctrine).toBe(Doctrine.SEE_ALL);
         expect(resolved.lowerAugments).toEqual([{ kind: "Movement", value: 2 }]);
-        expect(resolved.lowerPlacement).toBe("adaptive");
+        expect(resolved.leftPlacement).toBe("adaptive");
 
         let wiredConfig: IMatchConfig | undefined;
         let wiredGate = "";
@@ -301,9 +301,9 @@ describe("B1 full-game league genome", () => {
         // first 5000 seeds. The binding assertion is the empty known-creature list — SEE_NONE and "tight"
         // hold broadly. The search stays out of the test so it cannot pass tautologically.
         const noVision = resolveLeaguePick(75, alternative, opponent, true);
-        expect(getKnownOpponentCreatures(noVision.state, PBTypes.TeamVals.LOWER)).toEqual([]);
-        expect(noVision.state.lower.doctrine).toBe(Doctrine.SEE_NONE);
-        expect(noVision.lowerPlacement).toBe("tight");
+        expect(getKnownOpponentCreatures(noVision.state, PBTypes.TeamVals.LEFT)).toEqual([]);
+        expect(noVision.state.left.doctrine).toBe(Doctrine.SEE_NONE);
+        expect(noVision.leftPlacement).toBe("tight");
     });
 });
 

@@ -23,8 +23,8 @@ import { V07_ARCHETYPE_TAXONOMY, V07_ARCHETYPE_TEMPLATES } from "../../src/simul
 import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const RANGE = PBTypes.AttackVals.RANGE;
 
 function damage(unit: Unit, hp: number): void {
@@ -55,42 +55,42 @@ describe("v0.7 finish pressure", () => {
 
     it("is zero on a melee board and on ranged boards through lap 3", () => {
         const melee = createCombatTestContext();
-        const meleeLower = createTestUnit({ team: LOWER, maxHp: 100 });
-        const meleeUpper = createTestUnit({ team: UPPER, maxHp: 100 });
-        placeUnit(melee.grid, melee.unitsHolder, meleeLower, { x: 3, y: 3 });
-        placeUnit(melee.grid, melee.unitsHolder, meleeUpper, { x: 3, y: 10 });
+        const meleeLeft = createTestUnit({ team: LEFT, maxHp: 100 });
+        const meleeRight = createTestUnit({ team: RIGHT, maxHp: 100 });
+        placeUnit(melee.grid, melee.unitsHolder, meleeLeft, { x: 3, y: 3 });
+        placeUnit(melee.grid, melee.unitsHolder, meleeRight, { x: 3, y: 10 });
         const meleeState = captureFinishPressureState(melee.unitsHolder);
-        damage(meleeUpper, 50);
+        damage(meleeRight, 50);
 
         expect(meleeState.initialBoardRangedness).toBe(0);
-        expect(finishPressureForSide(meleeState, melee.unitsHolder, LOWER, NUMBER_OF_LAPS_FIRST_ARMAGEDDON)).toBe(0);
+        expect(finishPressureForSide(meleeState, melee.unitsHolder, LEFT, NUMBER_OF_LAPS_FIRST_ARMAGEDDON)).toBe(0);
 
         const ranged = createCombatTestContext();
-        const rangedLower = createTestUnit({ team: LOWER, attackType: RANGE, maxHp: 100 });
-        const rangedUpper = createTestUnit({ team: UPPER, attackType: RANGE, maxHp: 100 });
-        placeUnit(ranged.grid, ranged.unitsHolder, rangedLower, { x: 3, y: 3 });
-        placeUnit(ranged.grid, ranged.unitsHolder, rangedUpper, { x: 3, y: 10 });
+        const rangedLeft = createTestUnit({ team: LEFT, attackType: RANGE, maxHp: 100 });
+        const rangedRight = createTestUnit({ team: RIGHT, attackType: RANGE, maxHp: 100 });
+        placeUnit(ranged.grid, ranged.unitsHolder, rangedLeft, { x: 3, y: 3 });
+        placeUnit(ranged.grid, ranged.unitsHolder, rangedRight, { x: 3, y: 10 });
         const rangedState = captureFinishPressureState(ranged.unitsHolder);
-        damage(rangedUpper, 50);
+        damage(rangedRight, 50);
 
         expect(finishPressureProximity(NUMBER_OF_LAPS_TILL_NARROWING_NORMAL)).toBe(0);
-        expect(
-            finishPressureForSide(rangedState, ranged.unitsHolder, LOWER, NUMBER_OF_LAPS_TILL_NARROWING_NORMAL),
-        ).toBe(0);
+        expect(finishPressureForSide(rangedState, ranged.unitsHolder, LEFT, NUMBER_OF_LAPS_TILL_NARROWING_NORMAL)).toBe(
+            0,
+        );
     });
 
     it("is positive, linear, and bounded late on a damaged ranged board", () => {
         const combat = createCombatTestContext();
-        const lower = createTestUnit({ team: LOWER, maxHp: 100 });
-        const upper = createTestUnit({ team: UPPER, attackType: RANGE, maxHp: 100 });
-        placeUnit(combat.grid, combat.unitsHolder, lower, { x: 3, y: 3 });
-        placeUnit(combat.grid, combat.unitsHolder, upper, { x: 3, y: 10 });
+        const left = createTestUnit({ team: LEFT, maxHp: 100 });
+        const right = createTestUnit({ team: RIGHT, attackType: RANGE, maxHp: 100 });
+        placeUnit(combat.grid, combat.unitsHolder, left, { x: 3, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, right, { x: 3, y: 10 });
         const state = captureFinishPressureState(combat.unitsHolder);
-        damage(upper, 50);
+        damage(right, 50);
 
         const midpointLap = (NUMBER_OF_LAPS_TILL_NARROWING_NORMAL + NUMBER_OF_LAPS_FIRST_ARMAGEDDON) / 2;
-        const midpoint = finishPressureForSide(state, combat.unitsHolder, LOWER, midpointLap);
-        const armageddon = finishPressureForSide(state, combat.unitsHolder, LOWER, NUMBER_OF_LAPS_FIRST_ARMAGEDDON);
+        const midpoint = finishPressureForSide(state, combat.unitsHolder, LEFT, midpointLap);
+        const armageddon = finishPressureForSide(state, combat.unitsHolder, LEFT, NUMBER_OF_LAPS_FIRST_ARMAGEDDON);
 
         expect(state.initialBoardRangedness).toBe(0.5);
         expect(midpoint).toBeCloseTo(0.125, 12);
@@ -102,16 +102,16 @@ describe("v0.7 finish pressure", () => {
 
     it("ignores units summoned after the initial state was captured", () => {
         const combat = createCombatTestContext();
-        const lower = createTestUnit({ team: LOWER, attackType: RANGE, maxHp: 100 });
-        const upper = createTestUnit({ team: UPPER, maxHp: 100 });
-        placeUnit(combat.grid, combat.unitsHolder, lower, { x: 3, y: 3 });
-        placeUnit(combat.grid, combat.unitsHolder, upper, { x: 3, y: 10 });
+        const left = createTestUnit({ team: LEFT, attackType: RANGE, maxHp: 100 });
+        const right = createTestUnit({ team: RIGHT, maxHp: 100 });
+        placeUnit(combat.grid, combat.unitsHolder, left, { x: 3, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, right, { x: 3, y: 10 });
         const state = captureFinishPressureState(combat.unitsHolder);
-        damage(upper, 50);
-        const beforeSummon = finishPressureForSide(state, combat.unitsHolder, LOWER, NUMBER_OF_LAPS_FIRST_ARMAGEDDON);
+        damage(right, 50);
+        const beforeSummon = finishPressureForSide(state, combat.unitsHolder, LEFT, NUMBER_OF_LAPS_FIRST_ARMAGEDDON);
 
         const summoned = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             attackType: RANGE,
             maxHp: 1_000,
             amountAlive: 10,
@@ -120,7 +120,7 @@ describe("v0.7 finish pressure", () => {
         placeUnit(combat.grid, combat.unitsHolder, summoned, { x: 5, y: 10 });
 
         expect(state.originalUnits.map((unit) => unit.id)).not.toContain(summoned.getId());
-        expect(finishPressureForSide(state, combat.unitsHolder, LOWER, NUMBER_OF_LAPS_FIRST_ARMAGEDDON)).toBeCloseTo(
+        expect(finishPressureForSide(state, combat.unitsHolder, LEFT, NUMBER_OF_LAPS_FIRST_ARMAGEDDON)).toBeCloseTo(
             beforeSummon,
             12,
         );
@@ -128,17 +128,17 @@ describe("v0.7 finish pressure", () => {
 
     it("excludes summoned stacks already present when the initial state is captured", () => {
         const combat = createCombatTestContext();
-        const lower = createTestUnit({ team: LOWER, maxHp: 100 });
-        const upper = createTestUnit({ team: UPPER, maxHp: 100 });
+        const left = createTestUnit({ team: LEFT, maxHp: 100 });
+        const right = createTestUnit({ team: RIGHT, maxHp: 100 });
         const summoned = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             attackType: RANGE,
             maxHp: 1_000,
             amountAlive: 10,
             summoned: true,
         });
-        placeUnit(combat.grid, combat.unitsHolder, lower, { x: 3, y: 3 });
-        placeUnit(combat.grid, combat.unitsHolder, upper, { x: 3, y: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, left, { x: 3, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, right, { x: 3, y: 10 });
         placeUnit(combat.grid, combat.unitsHolder, summoned, { x: 5, y: 3 });
 
         const state = captureFinishPressureState(combat.unitsHolder);
@@ -149,19 +149,19 @@ describe("v0.7 finish pressure", () => {
 
     it("counts dead and missing original units as zero remaining HP", () => {
         const combat = createCombatTestContext();
-        const lower = createTestUnit({ team: LOWER, attackType: RANGE, maxHp: 200 });
-        const deadUpper = createTestUnit({ team: UPPER, maxHp: 100 });
-        const missingUpper = createTestUnit({ team: UPPER, maxHp: 100 });
-        placeUnit(combat.grid, combat.unitsHolder, lower, { x: 3, y: 3 });
-        placeUnit(combat.grid, combat.unitsHolder, deadUpper, { x: 3, y: 10 });
-        placeUnit(combat.grid, combat.unitsHolder, missingUpper, { x: 5, y: 10 });
+        const left = createTestUnit({ team: LEFT, attackType: RANGE, maxHp: 200 });
+        const deadRight = createTestUnit({ team: RIGHT, maxHp: 100 });
+        const missingRight = createTestUnit({ team: RIGHT, maxHp: 100 });
+        placeUnit(combat.grid, combat.unitsHolder, left, { x: 3, y: 3 });
+        placeUnit(combat.grid, combat.unitsHolder, deadRight, { x: 3, y: 10 });
+        placeUnit(combat.grid, combat.unitsHolder, missingRight, { x: 5, y: 10 });
         const state = captureFinishPressureState(combat.unitsHolder);
 
-        damage(deadUpper, deadUpper.getCumulativeHp());
-        combat.unitsHolder.deleteUnitById(missingUpper.getId());
+        damage(deadRight, deadRight.getCumulativeHp());
+        combat.unitsHolder.deleteUnitById(missingRight.getId());
 
-        expect(deadUpper.isDead()).toBe(true);
-        expect(finishPressureForSide(state, combat.unitsHolder, LOWER, NUMBER_OF_LAPS_FIRST_ARMAGEDDON)).toBeCloseTo(
+        expect(deadRight.isDead()).toBe(true);
+        expect(finishPressureForSide(state, combat.unitsHolder, LEFT, NUMBER_OF_LAPS_FIRST_ARMAGEDDON)).toBeCloseTo(
             0.5,
             12,
         );
@@ -169,23 +169,23 @@ describe("v0.7 finish pressure", () => {
 
     it("is symmetric when the two sides are swapped", () => {
         const first = createCombatTestContext();
-        const firstLower = createTestUnit({ team: LOWER, attackType: RANGE, maxHp: 120 });
-        const firstUpper = createTestUnit({ team: UPPER, maxHp: 80 });
-        placeUnit(first.grid, first.unitsHolder, firstLower, { x: 3, y: 3 });
-        placeUnit(first.grid, first.unitsHolder, firstUpper, { x: 3, y: 10 });
+        const firstLeft = createTestUnit({ team: LEFT, attackType: RANGE, maxHp: 120 });
+        const firstRight = createTestUnit({ team: RIGHT, maxHp: 80 });
+        placeUnit(first.grid, first.unitsHolder, firstLeft, { x: 3, y: 3 });
+        placeUnit(first.grid, first.unitsHolder, firstRight, { x: 3, y: 10 });
         const firstState = captureFinishPressureState(first.unitsHolder);
-        damage(firstUpper, 20);
+        damage(firstRight, 20);
 
         const swapped = createCombatTestContext();
-        const swappedUpper = createTestUnit({ team: UPPER, attackType: RANGE, maxHp: 120 });
-        const swappedLower = createTestUnit({ team: LOWER, maxHp: 80 });
-        placeUnit(swapped.grid, swapped.unitsHolder, swappedLower, { x: 3, y: 3 });
-        placeUnit(swapped.grid, swapped.unitsHolder, swappedUpper, { x: 3, y: 10 });
+        const swappedRight = createTestUnit({ team: RIGHT, attackType: RANGE, maxHp: 120 });
+        const swappedLeft = createTestUnit({ team: LEFT, maxHp: 80 });
+        placeUnit(swapped.grid, swapped.unitsHolder, swappedLeft, { x: 3, y: 3 });
+        placeUnit(swapped.grid, swapped.unitsHolder, swappedRight, { x: 3, y: 10 });
         const swappedState = captureFinishPressureState(swapped.unitsHolder);
-        damage(swappedLower, 20);
+        damage(swappedLeft, 20);
 
-        expect(finishPressureForSide(firstState, first.unitsHolder, LOWER, 9)).toBeCloseTo(
-            finishPressureForSide(swappedState, swapped.unitsHolder, UPPER, 9),
+        expect(finishPressureForSide(firstState, first.unitsHolder, LEFT, 9)).toBeCloseTo(
+            finishPressureForSide(swappedState, swapped.unitsHolder, RIGHT, 9),
             12,
         );
     });

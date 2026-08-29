@@ -90,15 +90,15 @@ describe("measure_picksim_oracle priors", () => {
 
 describe("measure_picksim_oracle pick phase", () => {
     it("completes a valid deterministic live draft for every policy pairing", () => {
-        for (const lower of ALL_POLICIES) {
-            for (const upper of ALL_POLICIES) {
+        for (const left of ALL_POLICIES) {
+            for (const right of ALL_POLICIES) {
                 for (const seed of [1, 42, 1337]) {
-                    const outcome = runPickPhase(seed, lower, upper);
-                    const again = runPickPhase(seed, lower, upper);
+                    const outcome = runPickPhase(seed, left, right);
+                    const again = runPickPhase(seed, left, right);
                     expect(outcome.state.phaseSequence).toBe(11);
-                    expect(again.state.lower.creatures).toEqual(outcome.state.lower.creatures);
-                    expect(again.state.upper.creatures).toEqual(outcome.state.upper.creatures);
-                    for (const team of [outcome.state.lower, outcome.state.upper]) {
+                    expect(again.state.left.creatures).toEqual(outcome.state.left.creatures);
+                    expect(again.state.right.creatures).toEqual(outcome.state.right.creatures);
+                    for (const team of [outcome.state.left, outcome.state.right]) {
                         expect(team.creatures).toHaveLength(6);
                         const levels = team.creatures.map(levelOf).sort();
                         expect(levels).toEqual([1, 1, 2, 2, 3, 4]);
@@ -109,9 +109,9 @@ describe("measure_picksim_oracle pick phase", () => {
                         expect(team.tier1Artifact! >= 1 && team.tier1Artifact! <= LIVE_TIER1_ARTIFACT_COUNT).toBe(true);
                     }
                     // Shared exclusive pool: no creature fielded by both teams.
-                    const lowerSet = new Set(outcome.state.lower.creatures);
-                    for (const id of outcome.state.upper.creatures) {
-                        expect(lowerSet.has(id)).toBe(false);
+                    const leftSet = new Set(outcome.state.left.creatures);
+                    for (const id of outcome.state.right.creatures) {
+                        expect(leftSet.has(id)).toBe(false);
                     }
                 }
             }
@@ -122,14 +122,14 @@ describe("measure_picksim_oracle pick phase", () => {
         let baselineCollisions = 0;
         for (let seed = 1; seed <= 40; seed += 1) {
             const oracleGame = runPickPhase(seed, "oracle", "champion");
-            expect(oracleGame.lower.collisions).toBe(0);
+            expect(oracleGame.left.collisions).toBe(0);
             const mirror = runPickPhase(seed, "champion", "champion");
-            baselineCollisions += mirror.lower.collisions + mirror.upper.collisions;
-            const byLevel = mirror.lower.collisionsByLevel.map(
-                (count, index) => count + mirror.upper.collisionsByLevel[index],
+            baselineCollisions += mirror.left.collisions + mirror.right.collisions;
+            const byLevel = mirror.left.collisionsByLevel.map(
+                (count, index) => count + mirror.right.collisionsByLevel[index],
             );
             expect(byLevel.reduce((sum, count) => sum + count, 0)).toBe(
-                mirror.lower.collisions + mirror.upper.collisions,
+                mirror.left.collisions + mirror.right.collisions,
             );
         }
         // Two greedy identical policies chase the same creatures, so hidden-pick collisions must show up.
@@ -140,14 +140,14 @@ describe("measure_picksim_oracle pick phase", () => {
         let decisions = 0;
         for (let seed = 1; seed <= 20; seed += 1) {
             const outcome = runPickPhase(seed, "oracle", "policy_v0");
-            decisions += outcome.lower.oracleDecisions;
-            expect(outcome.upper.oracleDecisions).toBe(0);
-            expect(outcome.lower.oracleOverrides).toBeLessThanOrEqual(outcome.lower.oracleDecisions);
-            const byDecision = Object.values(outcome.lower.overridesByDecision).reduce(
+            decisions += outcome.left.oracleDecisions;
+            expect(outcome.right.oracleDecisions).toBe(0);
+            expect(outcome.left.oracleOverrides).toBeLessThanOrEqual(outcome.left.oracleDecisions);
+            const byDecision = Object.values(outcome.left.overridesByDecision).reduce(
                 (sum, count) => sum + (count ?? 0),
                 0,
             );
-            expect(byDecision).toBe(outcome.lower.oracleOverrides);
+            expect(byDecision).toBe(outcome.left.oracleOverrides);
         }
         // One bundle + four creature picks per game for the oracle seat.
         expect(decisions).toBe(20 * 5);
@@ -157,7 +157,7 @@ describe("measure_picksim_oracle pick phase", () => {
 describe("measure_picksim_oracle armies and games", () => {
     it("materializes the picked army with live expBudget stack sizing and the picked artifacts", () => {
         const outcome = runPickPhase(7, "champion", "policy_v0");
-        const army = buildArmyFromPick(outcome.state.lower);
+        const army = buildArmyFromPick(outcome.state.left);
         expect(army.roster).toHaveLength(6);
         expect(army.roster.map((unit) => unit.level)).toEqual([1, 1, 2, 2, 3, 4]);
         for (const unit of army.roster) {
@@ -166,8 +166,8 @@ describe("measure_picksim_oracle armies and games", () => {
         }
         // Live exp-budget sizing: an L1 stack fields far more bodies than an L4 stack.
         expect(army.roster[0].amount).toBeGreaterThan(army.roster[5].amount);
-        expect(army.tier1Artifact).toBe(outcome.state.lower.tier1Artifact!);
-        expect(army.tier2Artifact).toBe(outcome.state.lower.tier2Artifact!);
+        expect(army.tier1Artifact).toBe(outcome.state.left.tier1Artifact!);
+        expect(army.tier2Artifact).toBe(outcome.state.left.tier2Artifact!);
         expect(army.doctrine).toBe(3); // SEE_NONE
         expect(army.augments.length).toBeGreaterThan(0);
         expect(army.roleStacks.reduce((sum, count) => sum + count, 0)).toBe(6);
@@ -193,8 +193,8 @@ describe("measure_picksim_oracle armies and games", () => {
         expect(configs[0].greenArtifactT2).toBeGreaterThanOrEqual(1);
         expect(configs[0].greenDoctrine).toBe(3);
         expect(configs[0].greenAugments!.length).toBeGreaterThan(0);
-        expect(even.aIsLower).toBe(true);
-        expect(odd.aIsLower).toBe(false);
+        expect(even.aIsLeft).toBe(true);
+        expect(odd.aIsLeft).toBe(false);
         expect(even.winnerSlot).toBe("a");
         expect(odd.winnerSlot).toBe("b");
         // A fresh pair draws a different seed.

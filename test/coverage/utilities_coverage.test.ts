@@ -60,7 +60,7 @@ describe("config_provider getters and error paths", () => {
         expect(() => getAbilityConfig("__nope__")).toThrow();
     });
     it("throws on unknown creature faction/spell race", () => {
-        expect(() => getCreatureConfig(PBTypes.TeamVals.UPPER, "__nope__", "X", "tex", 1)).toThrow();
+        expect(() => getCreatureConfig(PBTypes.TeamVals.RIGHT, "__nope__", "X", "tex", 1)).toThrow();
         expect(() => getSpellConfig("__nope__", "Morale")).toThrow();
         expect(() => getSpellConfig("System", "__nope__")).toThrow();
     });

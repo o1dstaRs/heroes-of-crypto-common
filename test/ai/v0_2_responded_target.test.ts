@@ -24,8 +24,8 @@ import {
     CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 function ctxFor(c: CombatTestContext): IDecisionContext {
@@ -46,18 +46,18 @@ const meleeTargetId = (actions: GameAction[]): string | undefined => {
 describe("v0.2 prefers already-responded melee targets", () => {
     it("hits the responded enemy over an equally-adjacent one that would still counter", () => {
         const c = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Striker", team: LOWER, attackType: MELEE, stackPower: 3 });
+        const attacker = createTestUnit({ name: "Striker", team: LEFT, attackType: MELEE, stackPower: 3 });
         // Two meaningful (stack power 3) enemies, both adjacent to the attacker.
         const willCounter = createTestUnit({
             name: "Fresh",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             stackPower: 3,
             amountAlive: 5,
         });
         const responded = createTestUnit({
             name: "Spent",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             stackPower: 3,
             amountAlive: 5,
@@ -77,9 +77,9 @@ describe("v0.2 prefers already-responded melee targets", () => {
         // The tiny stack is excluded as a swap target (its hit would be wasted), so the strike is left
         // on whatever findTarget chose — we never trade a real target for a trivial one.
         const c = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Striker", team: LOWER, attackType: MELEE, stackPower: 3 });
-        const fresh = createTestUnit({ name: "Fresh", team: UPPER, attackType: MELEE, stackPower: 4, amountAlive: 8 });
-        const tiny = createTestUnit({ name: "Tiny", team: UPPER, attackType: MELEE, stackPower: 1, amountAlive: 1 });
+        const attacker = createTestUnit({ name: "Striker", team: LEFT, attackType: MELEE, stackPower: 3 });
+        const fresh = createTestUnit({ name: "Fresh", team: RIGHT, attackType: MELEE, stackPower: 4, amountAlive: 8 });
+        const tiny = createTestUnit({ name: "Tiny", team: RIGHT, attackType: MELEE, stackPower: 1, amountAlive: 1 });
         placeUnit(c.grid, c.unitsHolder, attacker, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, fresh, { x: 5, y: 6 });
         placeUnit(c.grid, c.unitsHolder, tiny, { x: 6, y: 5 });
@@ -94,10 +94,10 @@ describe("v0.2 prefers already-responded melee targets", () => {
 
     it("swaps onto a can't-respond (No Melee) enemy as well", () => {
         const c = createCombatTestContext();
-        const attacker = createTestUnit({ name: "Striker", team: LOWER, attackType: MELEE, stackPower: 3 });
+        const attacker = createTestUnit({ name: "Striker", team: LEFT, attackType: MELEE, stackPower: 3 });
         const willCounter = createTestUnit({
             name: "Fresh",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             stackPower: 3,
             amountAlive: 5,
@@ -105,7 +105,7 @@ describe("v0.2 prefers already-responded melee targets", () => {
         // A "No Melee" unit cannot melee-respond, so attacking it provokes no counter.
         const cantRespond = createTestUnit({
             name: "Shooter",
-            team: UPPER,
+            team: RIGHT,
             attackType: MELEE,
             stackPower: 3,
             amountAlive: 5,

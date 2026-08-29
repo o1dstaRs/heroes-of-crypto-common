@@ -19,10 +19,10 @@ import type { XY } from "../../src/utils/math";
 import { testGridSettings } from "../helpers/combat";
 
 const PLACEMENT_POSITION_TYPES = [
-    ["LOWER_LEFT", PlacementPositionType.LOWER_LEFT],
-    ["UPPER_LEFT", PlacementPositionType.UPPER_LEFT],
-    ["LOWER_RIGHT", PlacementPositionType.LOWER_RIGHT],
-    ["UPPER_RIGHT", PlacementPositionType.UPPER_RIGHT],
+    ["LOWER_LEFT", PlacementPositionType.LEFT_BOTTOM],
+    ["UPPER_LEFT", PlacementPositionType.RIGHT_BOTTOM],
+    ["LOWER_RIGHT", PlacementPositionType.LEFT_TOP],
+    ["UPPER_RIGHT", PlacementPositionType.RIGHT_TOP],
 ] as const;
 
 const SQUARE_SIZES = [3, 4, 5] as const;
@@ -222,11 +222,11 @@ describe("footprint-aware placement", () => {
     });
 
     it("preserves the SquarePlacement LOWER_RIGHT 2x2 overshoot, and only there", () => {
-        const lowerRight = new SquarePlacement(testGridSettings, PlacementPositionType.LOWER_RIGHT, 3);
-        const zone = lowerRight.possibleCellHashes();
+        const leftTop = new SquarePlacement(testGridSettings, PlacementPositionType.LEFT_TOP, 3);
+        const zone = leftTop.possibleCellHashes();
 
         // The zone is columns 12-14 x rows 1-3, so a correct 2x2 list would be the four anchors (13..14, 2..3).
-        const legacyAnchors = lowerRight.possibleCellPositions(false);
+        const legacyAnchors = leftTop.possibleCellPositions(false);
         expect(describeCells(legacyAnchors)).toBe("14,2 14,3 13,2 13,3 12,2 12,3 11,2 11,3");
         const overshooting = legacyAnchors.filter((anchor) =>
             getFootprintCellsForAnchor(anchor, 2, 2).some((cell) => !zone.has(cellHash(cell))),
@@ -234,8 +234,8 @@ describe("footprint-aware placement", () => {
         expect(describeCells(overshooting)).toBe("12,2 12,3 11,2 11,3");
 
         // The dominoes go through the corrected border, so they stay inside the zone in the same corner.
-        expect(describeCells(lowerRight.possibleCellPositions(false, 2, 1))).toBe("14,1 14,2 14,3 13,1 13,2 13,3");
-        expect(describeCells(lowerRight.possibleCellPositions(false, 1, 2))).toBe("14,2 14,3 13,2 13,3 12,2 12,3");
+        expect(describeCells(leftTop.possibleCellPositions(false, 2, 1))).toBe("14,1 14,2 14,3 13,1 13,2 13,3");
+        expect(describeCells(leftTop.possibleCellPositions(false, 1, 2))).toBe("14,2 14,3 13,2 13,3 12,2 12,3");
     });
 
     it("yields no anchors for a body bigger than the zone instead of walking off the board", () => {

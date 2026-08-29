@@ -69,13 +69,13 @@ export class Grid {
         this.availableCenterStart = quarter + halfQuarter;
         this.availableCenterEnd = this.availableCenterStart + quarter;
         this.boardCoord = new Array(gridSize);
-        const boardAggTeamLower: number[][] = new Array(gridSize);
-        const boardAggTeamUpper: number[][] = new Array(gridSize);
+        const boardAggTeamLeft: number[][] = new Array(gridSize);
+        const boardAggTeamRight: number[][] = new Array(gridSize);
 
         for (let row = 0; row < gridSize; row++) {
             this.boardCoord[row] = new Array(gridSize).fill(NO_UNIT);
-            boardAggTeamLower[row] = new Array(gridSize);
-            boardAggTeamUpper[row] = new Array(gridSize);
+            boardAggTeamLeft[row] = new Array(gridSize);
+            boardAggTeamRight[row] = new Array(gridSize);
         }
 
         for (let row = 0; row < gridSize; row++) {
@@ -91,13 +91,13 @@ export class Grid {
                     }
                 }
 
-                boardAggTeamLower[row][column] = 1;
-                boardAggTeamUpper[row][column] = 1;
+                boardAggTeamLeft[row][column] = 1;
+                boardAggTeamRight[row][column] = 1;
             }
         }
 
-        this.boardAggrPerTeam.set(1, boardAggTeamUpper);
-        this.boardAggrPerTeam.set(2, boardAggTeamLower);
+        this.boardAggrPerTeam.set(1, boardAggTeamRight);
+        this.boardAggrPerTeam.set(2, boardAggTeamLeft);
     }
     public cleanupCenterObstacle(): void {
         if (
@@ -460,7 +460,7 @@ export class Grid {
         }
 
         return this.getAggrMatrixByTeam(
-            team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER,
+            team === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT,
         );
     }
     public occupyCells(
@@ -641,13 +641,13 @@ export class Grid {
         console.log(msg);
 
         if (printAggrGrids) {
-            const aggrUpper = this.getAggrMatrixByTeam(1);
-            if (aggrUpper) {
+            const aggrRight = this.getAggrMatrixByTeam(1);
+            if (aggrRight) {
                 msg = "";
                 for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
                     const rowElements: string[] = [];
                     for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
-                        rowElements.push(`${aggrUpper[row][column]}`);
+                        rowElements.push(`${aggrRight[row][column]}`);
                     }
                     msg += rowElements.join(" ");
                     msg += "\n";
@@ -655,13 +655,13 @@ export class Grid {
                 console.log(msg);
             }
 
-            const aggrLower = this.getAggrMatrixByTeam(2);
-            if (aggrLower) {
+            const aggrLeft = this.getAggrMatrixByTeam(2);
+            if (aggrLeft) {
                 msg = "";
                 for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
                     const rowElements: string[] = [];
                     for (let row = 0; row < this.gridSettings.getGridSize(); row++) {
-                        rowElements.push(`${aggrLower[row][column]}`);
+                        rowElements.push(`${aggrLeft[row][column]}`);
                     }
                     msg += rowElements.join(" ");
                     msg += "\n";

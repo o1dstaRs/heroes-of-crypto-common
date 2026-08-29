@@ -22,8 +22,8 @@ import { Unit } from "../../src/units/unit";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import { createCombatTestContext, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
 const createConfiguredUnit = (factionName: string, creatureName: string, team: PBTypes.TeamVals, amount: number) => {
     const effectFactory = new EffectFactory();
@@ -63,31 +63,31 @@ describe("a multi-cell shooter does not screen itself", () => {
     it("walks through its own body cells but still stops at a genuine ally", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
         // Centaur is 2x1: anchor (8,8) is the top-right cell, so the body is (8,8) and (7,8).
-        const centaur = createConfiguredUnit("Might", "Centaur", LOWER, 10);
+        const centaur = createConfiguredUnit("Might", "Centaur", LEFT, 10);
         placeUnit(combat.grid, combat.unitsHolder, centaur, { x: 8, y: 8 });
         const matrix = combat.grid.getMatrix();
         const body = centaur.getCells();
         expect(body).toHaveLength(2);
-        expect(matrix[8][7]).toBe(LOWER); // the shooter's own second cell is stamped with its team
+        expect(matrix[8][7]).toBe(LEFT); // the shooter's own second cell is stamped with its team
 
         // Firing WEST, straight along its own long axis and over its own second cell.
-        expect(isLineBlockedByFriendlyUnit({ x: 8, y: 8 }, { x: 4, y: 8 }, matrix, LOWER, body)).toBe(false);
+        expect(isLineBlockedByFriendlyUnit({ x: 8, y: 8 }, { x: 4, y: 8 }, matrix, LEFT, body)).toBe(false);
 
         // A real ally further down that same line still blocks — own cells are stepped OVER, not treated
         // as "line is clear". Without this the fix would trade one wrong answer for another.
-        const ally = createConfiguredUnit("Might", "Mermaid", LOWER, 10);
+        const ally = createConfiguredUnit("Might", "Mermaid", LEFT, 10);
         placeUnit(combat.grid, combat.unitsHolder, ally, { x: 6, y: 8 });
         const withAlly = combat.grid.getMatrix();
-        expect(isLineBlockedByFriendlyUnit({ x: 8, y: 8 }, { x: 4, y: 8 }, withAlly, LOWER, body)).toBe(true);
+        expect(isLineBlockedByFriendlyUnit({ x: 8, y: 8 }, { x: 4, y: 8 }, withAlly, LEFT, body)).toBe(true);
     });
 
     it("shoots a western enemy instead of walking into melee", () => {
         setDeterministicRandomSource(() => 0.5);
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
-        const centaur = createConfiguredUnit("Might", "Centaur", LOWER, 10);
+        const centaur = createConfiguredUnit("Might", "Centaur", LEFT, 10);
         placeUnit(combat.grid, combat.unitsHolder, centaur, { x: 8, y: 8 });
         // Due WEST of the anchor, so the line crosses the Centaur's own second cell at (7,8).
-        const enemy = createConfiguredUnit("Chaos", "Troglodyte", UPPER, 10);
+        const enemy = createConfiguredUnit("Chaos", "Troglodyte", RIGHT, 10);
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 5, y: 8 });
 
         const matrix = combat.grid.getMatrix();

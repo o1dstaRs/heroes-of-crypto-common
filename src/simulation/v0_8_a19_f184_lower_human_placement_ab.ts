@@ -462,11 +462,11 @@ const canonicalPlacementRows = (
 export function expectedV08A19F184CanonicalPlacement(
     roster: V08A19F184LowerHumanPlacementAbRoster,
 ): IV08A19F184CanonicalPlacementRow[] {
-    const setup = roster === "a" ? V08_A19_PROD_F184_ANCHOR.lower : V08_A19_PROD_F184_ANCHOR.upper;
+    const setup = roster === "a" ? V08_A19_PROD_F184_ANCHOR.left : V08_A19_PROD_F184_ANCHOR.right;
     const observed =
         roster === "a"
-            ? V08_A19_PROD_F184_ANCHOR.observedPlacement.lower
-            : V08_A19_PROD_F184_ANCHOR.observedPlacement.upper;
+            ? V08_A19_PROD_F184_ANCHOR.observedPlacement.left
+            : V08_A19_PROD_F184_ANCHOR.observedPlacement.right;
     const sourceSide = sourceSideForRoster(roster);
     return setup.roster
         .map((unit) => {
@@ -1185,7 +1185,7 @@ const sourceIdentity = (): IV08A19F184LowerHumanPlacementSourceIdentity => {
     };
 };
 
-export const v08A19F184LowerHumanPlacementEnvironmentSha256 = (): string =>
+export const v08A19F184LeftHumanPlacementEnvironmentSha256 = (): string =>
     sha256(
         Object.entries(buildV08A19F184LowerHumanPlacementAbEnvironment()).sort(([left], [right]) =>
             left.localeCompare(right),
@@ -1279,7 +1279,7 @@ export async function runV08A19F184LowerHumanPlacementAb(
                     fixture: V08_A19_PROD_F184_ANCHOR,
                 },
                 sourceBefore,
-                environmentSha256: v08A19F184LowerHumanPlacementEnvironmentSha256(),
+                environmentSha256: v08A19F184LeftHumanPlacementEnvironmentSha256(),
                 timing: V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_TIMING,
                 startedAt: startedAt.toISOString(),
             },
@@ -1340,7 +1340,7 @@ export async function runV08A19F184LowerHumanPlacementAb(
             physicalOrder: "balanced four-position rotation independent of logical record order",
             sourceBefore,
             sourceAfter,
-            environmentSha256: v08A19F184LowerHumanPlacementEnvironmentSha256(),
+            environmentSha256: v08A19F184LeftHumanPlacementEnvironmentSha256(),
             timing: V08_A19_F184_LOWER_HUMAN_PLACEMENT_AB_TIMING,
             startedAt: startedAt.toISOString(),
             runtime: { bun: Bun.version, platform: platform(), arch: arch() },

@@ -27,8 +27,8 @@ import {
     CombatTestContext,
 } from "../helpers/combat";
 
-const UPPER = PBTypes.TeamVals.UPPER;
-const LOWER = PBTypes.TeamVals.LOWER;
+const RIGHT = PBTypes.TeamVals.RIGHT;
+const LEFT = PBTypes.TeamVals.LEFT;
 const MELEE = PBTypes.AttackVals.MELEE;
 
 function makeCreature(name: string, faction: string, team: number): Unit {
@@ -58,9 +58,9 @@ const hasMelee = (actions: GameAction[]): boolean => actions.some((a) => a.type 
 describe("v0.2 creature openers", () => {
     it("Ogre Mage casts Mass Riot when no enemy is adjacent", () => {
         const c = createCombatTestContext();
-        const ogre = makeCreature("Ogre Mage", "Might", UPPER);
-        const ally = createTestUnit({ team: UPPER, name: "Ally", attackType: MELEE });
-        const enemy = createTestUnit({ team: LOWER, name: "FarEnemy", attackType: MELEE });
+        const ogre = makeCreature("Ogre Mage", "Might", RIGHT);
+        const ally = createTestUnit({ team: RIGHT, name: "Ally", attackType: MELEE });
+        const enemy = createTestUnit({ team: LEFT, name: "FarEnemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, ogre, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, ally, { x: 6, y: 6 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 1, y: 1 });
@@ -70,8 +70,8 @@ describe("v0.2 creature openers", () => {
 
     it("Ogre Mage melees instead of casting when an enemy is adjacent", () => {
         const c = createCombatTestContext();
-        const ogre = makeCreature("Ogre Mage", "Might", UPPER);
-        const enemy = createTestUnit({ team: LOWER, name: "Adjacent", attackType: MELEE, amountAlive: 5 });
+        const ogre = makeCreature("Ogre Mage", "Might", RIGHT);
+        const enemy = createTestUnit({ team: LEFT, name: "Adjacent", attackType: MELEE, amountAlive: 5 });
         placeUnit(c.grid, c.unitsHolder, ogre, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 5, y: 6 });
 
@@ -82,9 +82,9 @@ describe("v0.2 creature openers", () => {
 
     it("Behemoth casts Battle Roar on its opening turn", () => {
         const c = createCombatTestContext();
-        const behemoth = makeCreature("Behemoth", "Might", UPPER);
-        const ally = createTestUnit({ team: UPPER, name: "Ally", attackType: MELEE });
-        const enemy = createTestUnit({ team: LOWER, name: "FarEnemy", attackType: MELEE });
+        const behemoth = makeCreature("Behemoth", "Might", RIGHT);
+        const ally = createTestUnit({ team: RIGHT, name: "Ally", attackType: MELEE });
+        const enemy = createTestUnit({ team: LEFT, name: "FarEnemy", attackType: MELEE });
         placeUnit(c.grid, c.unitsHolder, behemoth, { x: 5, y: 5 });
         placeUnit(c.grid, c.unitsHolder, ally, { x: 6, y: 6 });
         placeUnit(c.grid, c.unitsHolder, enemy, { x: 1, y: 1 });

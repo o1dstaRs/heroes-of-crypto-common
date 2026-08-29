@@ -19,8 +19,8 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Unit } from "../../src/units/unit";
 import { createCombatTestContext, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
 const createConfiguredUnit = (factionName: string, creatureName: string, team: PBTypes.TeamVals, amount: number) => {
     const effectFactory = new EffectFactory();
@@ -48,10 +48,10 @@ const createConfiguredUnit = (factionName: string, creatureName: string, team: P
 describe("piercing sweep target contract", () => {
     const build = () => {
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
-        const pikeman = createConfiguredUnit("Life", "Pikeman", LOWER, 10);
+        const pikeman = createConfiguredUnit("Life", "Pikeman", LEFT, 10);
         // A 2x2 anchored at (7,8) covers x 6..7, y 7..8, so it stands between the attacker and the unit behind.
-        const large = createConfiguredUnit("Chaos", "Hydra", UPPER, 10);
-        const behind = createConfiguredUnit("Chaos", "Troglodyte", UPPER, 10);
+        const large = createConfiguredUnit("Chaos", "Hydra", RIGHT, 10);
+        const behind = createConfiguredUnit("Chaos", "Troglodyte", RIGHT, 10);
         placeUnit(combat.grid, combat.unitsHolder, pikeman, { x: 5, y: 8 });
         placeUnit(combat.grid, combat.unitsHolder, large, { x: 7, y: 8 });
         // (9,8) is where THIS helper's projection lands for a 2x2 primary — its own long-standing

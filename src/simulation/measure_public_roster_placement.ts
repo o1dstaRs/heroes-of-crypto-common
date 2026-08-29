@@ -229,8 +229,8 @@ export interface IPublicRosterPlacementDraftSeat {
 
 export interface IPublicRosterPlacementDraftEvidence {
     pickSeed: number;
-    lower: IPublicRosterPlacementDraftSeat;
-    upper: IPublicRosterPlacementDraftSeat;
+    left: IPublicRosterPlacementDraftSeat;
+    right: IPublicRosterPlacementDraftSeat;
 }
 
 /** Inclusive public setup tags for one roster; melee-other deliberately remains the exact fallback cohort. */
@@ -255,8 +255,8 @@ export function publicRosterPlacementDraftEvidence(
     });
     return {
         pickSeed: board.pickSeed,
-        lower: evidenceForArmy(pick.lower),
-        upper: evidenceForArmy(pick.upper),
+        left: evidenceForArmy(pick.left),
+        right: evidenceForArmy(pick.right),
     };
 }
 
@@ -292,7 +292,7 @@ export function collectPublicRosterPlacementBoards(
             continue;
         }
         const pick = rankedPick(board);
-        if (armyMatchesTarget(pick.lower.creatureIds, target) || armyMatchesTarget(pick.upper.creatureIds, target)) {
+        if (armyMatchesTarget(pick.left.creatureIds, target) || armyMatchesTarget(pick.right.creatureIds, target)) {
             boards.push(board);
         }
     }
@@ -363,41 +363,36 @@ function resultForSide(result: IMatchResult, side: Side): "win" | "loss" | "draw
 function playPublicRosterPlacementGame(
     arm: PublicRosterPlacementArm,
     board: IPublicRosterPlacementBoard,
-    lower: IConditionalArmy,
-    upper: IConditionalArmy,
-    candidatePickedLower: boolean,
+    left: IConditionalArmy,
+    right: IConditionalArmy,
+    candidatePickedLeft: boolean,
     battleMirror: 0 | 1,
     maxLaps: number,
 ): IPublicRosterPlacementRecord {
-    const candidateArmy = candidatePickedLower ? lower : upper;
-    const baselineArmy = candidatePickedLower ? upper : lower;
+    const candidateArmy = candidatePickedLeft ? left : right;
+    const baselineArmy = candidatePickedLeft ? right : left;
     const candidateContext = publicRosterPlacementContext(
         arm,
         candidateArmy.creatureIds,
         baselineArmy.creatureIds,
         candidateArmy.revealedOpponentCreatures,
     );
-    const lowerSetup = armySetup(lower);
-    const upperSetup = armySetup(upper);
-    const lowerIsCandidate = candidatePickedLower;
-    const lowerContext = lowerIsCandidate
+    const leftSetup = armySetup(left);
+    const rightSetup = armySetup(right);
+    const leftIsCandidate = candidatePickedLeft;
+    const leftContext = leftIsCandidate
         ? candidateContext
-        : publicRosterPlacementContext(
-              "control",
-              lower.creatureIds,
-              upper.creatureIds,
-              lower.revealedOpponentCreatures,
-          );
-    const upperContext = lowerIsCandidate
-        ? publicRosterPlacementContext("control", upper.creatureIds, lower.creatureIds, upper.revealedOpponentCreatures)
+        : publicRosterPlacementContext("control", left.creatureIds, right.creatureIds, left.revealedOpponentCreatures);
+    const rightContext = leftIsCandidate
+        ? publicRosterPlacementContext("control", right.creatureIds, left.creatureIds, right.revealedOpponentCreatures)
         : candidateContext;
-    const greenArmy = battleMirror === 0 ? lower : upper;
-    const redArmy = battleMirror === 0 ? upper : lower;
-    const greenSetup = battleMirror === 0 ? lowerSetup : upperSetup;
-    const redSetup = battleMirror === 0 ? upperSetup : lowerSetup;
-    const greenContext = battleMirror === 0 ? lowerContext : upperContext;
-    const redContext = battleMirror === 0 ? upperContext : lowerContext;
-    const candidateIsGreen = battleMirror === 0 ? candidatePickedLower : !candidatePickedLower;
+    const greenArmy = battleMirror === 0 ? left : right;
+    const redArmy = battleMirror === 0 ? right : left;
+    const greenSetup = battleMirror === 0 ? leftSetup : rightSetup;
+    const redSetup = battleMirror === 0 ? rightSetup : leftSetup;
+    const greenContext = battleMirror === 0 ? leftContext : rightContext;
+    const redContext = battleMirror === 0 ? rightContext : leftContext;
+    const candidateIsGreen = battleMirror === 0 ? candidatePickedLeft : !candidatePickedLeft;
     const candidateSide: Side = candidateIsGreen ? "green" : "red";
     const config: IMatchConfig = {
         greenVersion: "v0.7",
@@ -433,12 +428,12 @@ function playPublicRosterPlacementGame(
     return {
         arm,
         boardIndex: board.index,
-        game: (candidatePickedLower ? 0 : 2) + battleMirror,
+        game: (candidatePickedLeft ? 0 : 2) + battleMirror,
         pairSeed: board.pairSeed,
         pickSeed: board.pickSeed,
         battleSeed: board.battleSeed,
         gridType: board.gridType,
-        pickSeat: candidatePickedLower ? "candidate-lower" : "candidate-upper",
+        pickSeat: candidatePickedLeft ? "candidate-lower" : "candidate-upper",
         battleMirror,
         candidateSide,
         candidateResult: resultForSide(result, candidateSide),
@@ -455,12 +450,12 @@ function playPublicRosterPlacementGame(
         endReason: result.endReason,
         decidedByArmageddon: result.attrition.decidedByArmageddon,
         setupFingerprint: sha256({
-            lower,
-            upper,
-            lowerSetup,
-            upperSetup,
-            lowerContext,
-            upperContext,
+            left,
+            right,
+            leftSetup,
+            rightSetup,
+            leftContext,
+            rightContext,
             grid: board.gridType,
         }),
         behaviorTraceSha256: rankedDraftBehaviorTraceSha256(result),
@@ -474,14 +469,14 @@ export function evaluatePublicRosterPlacementCluster(
     maxLaps: number = 60,
 ): IPublicRosterPlacementCluster {
     const pick = rankedPick(board);
-    const records = ([true, false] as const).flatMap((candidatePickedLower) =>
+    const records = ([true, false] as const).flatMap((candidatePickedLeft) =>
         ([0, 1] as const).map((battleMirror) =>
             playPublicRosterPlacementGame(
                 arm,
                 board,
-                pick.lower,
-                pick.upper,
-                candidatePickedLower,
+                pick.left,
+                pick.right,
+                candidatePickedLeft,
                 battleMirror,
                 maxLaps,
             ),

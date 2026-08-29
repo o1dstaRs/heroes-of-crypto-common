@@ -19,7 +19,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Unit } from "../../src/units/unit";
 import { createCombatTestContext, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
+const LEFT = PBTypes.TeamVals.LEFT;
 
 const createConfiguredUnit = (factionName: string, creatureName: string, team: PBTypes.TeamVals, amount: number) => {
     const effectFactory = new EffectFactory();
@@ -58,8 +58,8 @@ describe("aura coverage priced the way the engine stamps it", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
         // Wolf Rider is 2x1 and emits Wolf Trail (range 2, buff). Anchored at (5,5) its body is
         // {(5,5),(4,5)}, so the engine's zone spans x 2..7 while the anchor ball only reaches x 3..7.
-        const rider = createConfiguredUnit("Might", "Wolf Rider", LOWER, 10);
-        const nomad = createConfiguredUnit("Might", "Nomad", LOWER, 5);
+        const rider = createConfiguredUnit("Might", "Wolf Rider", LEFT, 10);
+        const nomad = createConfiguredUnit("Might", "Nomad", LEFT, 5);
         placeUnit(combat.grid, combat.unitsHolder, rider, { x: 5, y: 5 });
         // Anchor (2,5) sits in the engine's zone and outside the anchor ball — the whole disagreement.
         placeUnit(combat.grid, combat.unitsHolder, nomad, { x: 2, y: 5 });

@@ -18,20 +18,20 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { PathHelper } from "../../src/grid/path_helper";
 import { createCombatTestContext, createTestUnit, placeUnit, testGridSettings } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 
 function vineStridePair() {
     const combat = createCombatTestContext();
     const trent = createTestUnit({
-        team: LOWER,
+        team: LEFT,
         name: "Trent",
         attackType: PBTypes.AttackVals.MELEE,
         initiative: 3.3,
         abilities: ["In Its Own World"],
     });
     const enemy = createTestUnit({
-        team: UPPER,
+        team: RIGHT,
         name: "Distant enemy",
         attackType: PBTypes.AttackVals.MELEE,
     });

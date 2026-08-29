@@ -51,7 +51,7 @@ export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_IMPLEMENTATION_SOURCE =
 // replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
 // qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "0e2f6a5eab0cfa228754a6f76f394289833fc734f703f8444c6ad3463862a698" as const;
+    "25a195624d401fdd429722bdb209e0aff7b274576d5392c5944130cb1c94e37c" as const;
 
 /**
  * Browser-safe identity for the development-selected LOWER-only f184 opening. The profile pins both this
@@ -86,8 +86,8 @@ export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_POLICY_BINDING = Object.free
         unsupportedTeamFallback: "exact-incumbent" as const,
         openingIds: Object.freeze(["prod-f184-lower-roster", "prod-f184-upper-roster"] as const),
         rosterCreatureIds: Object.freeze({
-            lower: Object.freeze([3, 4, 6, 9, 33, 37] as const),
-            upper: Object.freeze([12, 27, 34, 43, 47, 55] as const),
+            left: Object.freeze([3, 4, 6, 9, 33, 37] as const),
+            right: Object.freeze([12, 27, 34, 43, 47, 55] as const),
         }),
     }),
 });
@@ -459,7 +459,7 @@ export const V08_A19_H64_FINALIST_V6_PLACEMENT_IMPLEMENTATION_SOURCE =
 // replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
 // qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H64_FINALIST_V6_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "1029d0775f231a92c32aaa7843d09b4bccdeac04b992e00d2c28f73a487c395c" as const;
+    "b73082e2aba6faaab326732e95df4e5f9d554238c1fbd03603bd54685abf7178" as const;
 export const V08_A19_H64_FINALIST_V6_COMPACT_PLACEMENT_IMPLEMENTATION_SOURCE =
     V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_IMPLEMENTATION_SOURCE;
 // Re-pinned for rectangular unit footprints (2026-08-24): the layout's hand-written 1x1-or-2x2 expansion was
@@ -469,7 +469,7 @@ export const V08_A19_H64_FINALIST_V6_COMPACT_PLACEMENT_IMPLEMENTATION_SHA256 =
     "52387ea4bc8d355403e4e74d8026431182ef6bf5430729e31f1e9511439a3629" as const;
 export const V08_A19_H64_FINALIST_V6_TOURNAMENT_ROUTING_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_H64_FINALIST_V6_TOURNAMENT_ROUTING_IMPLEMENTATION_SHA256 =
-    "afc6df1b4ca82e16a43ebc5bf2cce37ab0c761bec81f8ef5714c3d80c8b2d294" as const;
+    "330fcb06556c354310d76eb08faab4928bb8833434999fbc9cc6d37649f04014" as const;
 export const V08_A19_H64_FINALIST_V6_BATTLE_ENGINE_ROUTING_IMPLEMENTATION_SOURCE =
     "src/simulation/battle_engine.ts" as const;
 export const V08_A19_H64_FINALIST_V6_BATTLE_ENGINE_ROUTING_IMPLEMENTATION_SHA256 =

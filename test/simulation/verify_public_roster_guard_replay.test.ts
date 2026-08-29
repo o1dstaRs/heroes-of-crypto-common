@@ -51,9 +51,9 @@ function fixtureRecord(
     game: 0 | 1 | 2 | 3,
 ): IPublicRosterPlacementRecord {
     const draft = publicRosterPlacementDraftEvidence(board);
-    const pickedLower = game < 2;
-    const seat = pickedLower ? draft.lower : draft.upper;
-    const opponent = pickedLower ? draft.upper : draft.lower;
+    const pickedLeft = game < 2;
+    const seat = pickedLeft ? draft.left : draft.right;
+    const opponent = pickedLeft ? draft.right : draft.left;
     return {
         arm,
         boardIndex: board.index,
@@ -62,7 +62,7 @@ function fixtureRecord(
         pickSeed: board.pickSeed,
         battleSeed: board.battleSeed,
         gridType: board.gridType,
-        pickSeat: pickedLower ? "candidate-lower" : "candidate-upper",
+        pickSeat: pickedLeft ? "candidate-lower" : "candidate-upper",
         battleMirror: (game % 2) as 0 | 1,
         candidateSide: game === 0 || game === 3 ? "green" : "red",
         candidateResult: "win",

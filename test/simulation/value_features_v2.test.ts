@@ -28,8 +28,8 @@ import {
 } from "../../src/simulation/value_features";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const RANGE = PBTypes.AttackVals.RANGE;
 
 const rawAt = (raw: number[], name: string): number => raw[VALUE_FEATURE_NAMES_V2_RAW.indexOf(name)];
@@ -38,15 +38,15 @@ describe("value features V2 (Phase-B multi-cohort leaf basis)", () => {
     it("raw V2 prefixes the exact base-20 vector and appends the composition block", () => {
         const combat = createCombatTestContext();
         const fightProperties = FightStateManager.getInstance().getFightProperties();
-        const shooter = createTestUnit({ name: "Shooter", team: LOWER, attackType: RANGE, rangeShots: 8 });
-        const bruiser = createTestUnit({ name: "Bruiser", team: LOWER });
-        const enemy = createTestUnit({ name: "Enemy", team: UPPER });
+        const shooter = createTestUnit({ name: "Shooter", team: LEFT, attackType: RANGE, rangeShots: 8 });
+        const bruiser = createTestUnit({ name: "Bruiser", team: LEFT });
+        const enemy = createTestUnit({ name: "Enemy", team: RIGHT });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, bruiser, { x: 5, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 3, y: 10 });
 
-        const base = extractValueFeatures(combat.unitsHolder, fightProperties, LOWER);
-        const raw = extractValueFeaturesV2Raw(combat.unitsHolder, fightProperties, LOWER);
+        const base = extractValueFeatures(combat.unitsHolder, fightProperties, LEFT);
+        const raw = extractValueFeaturesV2Raw(combat.unitsHolder, fightProperties, LEFT);
         expect(raw).toHaveLength(VALUE_FEATURE_NAMES_V2_RAW.length);
         expect(raw.slice(0, VALUE_FEATURE_NAMES.length)).toEqual(base);
         expect(rawAt(raw, "ownRangedFrac")).toBe(0.5);
@@ -74,20 +74,20 @@ describe("value features V2 (Phase-B multi-cohort leaf basis)", () => {
     it("extractValueFeaturesV2 is the expanded raw extraction", () => {
         const combat = createCombatTestContext();
         const fightProperties = FightStateManager.getInstance().getFightProperties();
-        const shooter = createTestUnit({ name: "Shooter", team: LOWER, attackType: RANGE, rangeShots: 8 });
-        const enemy = createTestUnit({ name: "Enemy", team: UPPER });
+        const shooter = createTestUnit({ name: "Shooter", team: LEFT, attackType: RANGE, rangeShots: 8 });
+        const enemy = createTestUnit({ name: "Enemy", team: RIGHT });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 3, y: 10 });
-        const raw = extractValueFeaturesV2Raw(combat.unitsHolder, fightProperties, LOWER);
-        expect(extractValueFeaturesV2(combat.unitsHolder, fightProperties, LOWER)).toEqual(expandValueFeaturesV2(raw));
+        const raw = extractValueFeaturesV2Raw(combat.unitsHolder, fightProperties, LEFT);
+        expect(extractValueFeaturesV2(combat.unitsHolder, fightProperties, LEFT)).toEqual(expandValueFeaturesV2(raw));
     });
 
     it("fills reusable base, raw, and deployed buffers without changing feature values", () => {
         const combat = createCombatTestContext();
         const fightProperties = FightStateManager.getInstance().getFightProperties();
-        const shooter = createTestUnit({ name: "Shooter", team: LOWER, attackType: RANGE, rangeShots: 8 });
-        const bruiser = createTestUnit({ name: "Bruiser", team: LOWER });
-        const enemy = createTestUnit({ name: "Enemy", team: UPPER });
+        const shooter = createTestUnit({ name: "Shooter", team: LEFT, attackType: RANGE, rangeShots: 8 });
+        const bruiser = createTestUnit({ name: "Bruiser", team: LEFT });
+        const enemy = createTestUnit({ name: "Enemy", team: RIGHT });
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 3, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, bruiser, { x: 5, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, enemy, { x: 3, y: 10 });
@@ -97,16 +97,16 @@ describe("value features V2 (Phase-B multi-cohort leaf basis)", () => {
         const raw = new Array<number>(VALUE_FEATURE_NAMES_V2_RAW.length);
         const deployed = new Array<number>(VALUE_FEATURE_NAMES_V2.length);
 
-        expect(fillValueFeatures(base, combat.unitsHolder, fightProperties, LOWER, scratch)).toBe(base);
-        expect(base).toEqual(extractValueFeatures(combat.unitsHolder, fightProperties, LOWER));
-        expect(fillValueFeaturesV2Raw(raw, combat.unitsHolder, fightProperties, LOWER, scratch)).toBe(raw);
-        expect(raw).toEqual(extractValueFeaturesV2Raw(combat.unitsHolder, fightProperties, LOWER));
-        expect(fillValueFeaturesV2(deployed, combat.unitsHolder, fightProperties, LOWER, scratch)).toBe(deployed);
-        expect(deployed).toEqual(extractValueFeaturesV2(combat.unitsHolder, fightProperties, LOWER));
+        expect(fillValueFeatures(base, combat.unitsHolder, fightProperties, LEFT, scratch)).toBe(base);
+        expect(base).toEqual(extractValueFeatures(combat.unitsHolder, fightProperties, LEFT));
+        expect(fillValueFeaturesV2Raw(raw, combat.unitsHolder, fightProperties, LEFT, scratch)).toBe(raw);
+        expect(raw).toEqual(extractValueFeaturesV2Raw(combat.unitsHolder, fightProperties, LEFT));
+        expect(fillValueFeaturesV2(deployed, combat.unitsHolder, fightProperties, LEFT, scratch)).toBe(deployed);
+        expect(deployed).toEqual(extractValueFeaturesV2(combat.unitsHolder, fightProperties, LEFT));
 
-        const lower = [...deployed];
-        fillValueFeaturesV2(deployed, combat.unitsHolder, fightProperties, UPPER, scratch);
-        expect(lower).toEqual(extractValueFeaturesV2(combat.unitsHolder, fightProperties, LOWER));
-        expect(deployed).toEqual(extractValueFeaturesV2(combat.unitsHolder, fightProperties, UPPER));
+        const left = [...deployed];
+        fillValueFeaturesV2(deployed, combat.unitsHolder, fightProperties, RIGHT, scratch);
+        expect(left).toEqual(extractValueFeaturesV2(combat.unitsHolder, fightProperties, LEFT));
+        expect(deployed).toEqual(extractValueFeaturesV2(combat.unitsHolder, fightProperties, RIGHT));
     });
 });

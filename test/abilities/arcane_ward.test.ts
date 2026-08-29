@@ -20,7 +20,7 @@ beforeEach(() => FightStateManager.getInstance().reset());
 const squire = (stackPower: number, luck = 0) =>
     createTestUnit({
         name: "Squire",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         abilities: ["Arcane Ward Blessing"],
         stackPower,
         luck,
@@ -29,7 +29,7 @@ const squire = (stackPower: number, luck = 0) =>
 describe("Arcane Ward Blessing", () => {
     it("is a non-stack-powered mass buff with no aura effect or radius", () => {
         const ability = getAbilityConfig("Arcane Ward Blessing");
-        const creature = getCreatureConfig(PBTypes.TeamVals.LOWER, "Life", "Squire", "squire_512", 1);
+        const creature = getCreatureConfig(PBTypes.TeamVals.LEFT, "Life", "Squire", "squire_512", 1);
         const abilityIndex = creature.abilities.indexOf("Arcane Ward Blessing");
 
         expect(ability.type).toBe(AbilityType.MASS_BUFF);
@@ -58,10 +58,10 @@ describe("Arcane Ward Blessing", () => {
         const weakerCarrier = squire(5);
         const distantAlly = createTestUnit({
             name: "Distant Ally",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             magicResist: 20,
         });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.UPPER, magicResist: 20 });
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT, magicResist: 20 });
 
         placeUnit(grid, unitsHolder, strongerCarrier, { x: 1, y: 1 });
         placeUnit(grid, unitsHolder, weakerCarrier, { x: 2, y: 1 });
@@ -94,7 +94,7 @@ describe("Arcane Ward Blessing", () => {
     });
 
     it("prints the live projection on runtime-granted cards and uses the renamed icon key", () => {
-        const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LOWER, stackPower: 2, luck: 5 });
+        const bearer = createTestUnit({ name: "Bearer", team: PBTypes.TeamVals.LEFT, stackPower: 2, luck: 5 });
         bearer.grantAbility("Arcane Ward Blessing");
 
         const index = bearer.getUnitProperties().abilities.indexOf("Arcane Ward Blessing");

@@ -167,7 +167,7 @@ export function registerAuraRefreshMixedEventTraceShard(shardIndex: number): voi
                     const units: Unit[] = [
                         createTestUnit({
                             name: `Lower Aura ${seed}`,
-                            team: PBTypes.TeamVals.LOWER,
+                            team: PBTypes.TeamVals.LEFT,
                             stackPower: 2,
                             auraEffects: [
                                 "Luck",
@@ -180,18 +180,18 @@ export function registerAuraRefreshMixedEventTraceShard(shardIndex: number): voi
                         }),
                         createTestUnit({
                             name: `Lower Large ${seed}`,
-                            team: PBTypes.TeamVals.LOWER,
+                            team: PBTypes.TeamVals.LEFT,
                             size: PBTypes.UnitSizeVals.LARGE,
                             attackType: PBTypes.AttackVals.RANGE,
                             rangeShots: 3,
                         }),
                         createTestUnit({
                             name: `Lower Walker ${seed}`,
-                            team: PBTypes.TeamVals.LOWER,
+                            team: PBTypes.TeamVals.LEFT,
                         }),
                         createTestUnit({
                             name: `Upper Aura ${seed}`,
-                            team: PBTypes.TeamVals.UPPER,
+                            team: PBTypes.TeamVals.RIGHT,
                             size: PBTypes.UnitSizeVals.LARGE,
                             stackPower: 4,
                             auraEffects: [
@@ -205,12 +205,12 @@ export function registerAuraRefreshMixedEventTraceShard(shardIndex: number): voi
                         }),
                         createTestUnit({
                             name: `Upper Flyer ${seed}`,
-                            team: PBTypes.TeamVals.UPPER,
+                            team: PBTypes.TeamVals.RIGHT,
                             movementType: PBTypes.MovementVals.FLY,
                         }),
                         createTestUnit({
                             name: `Upper Ranged ${seed}`,
-                            team: PBTypes.TeamVals.UPPER,
+                            team: PBTypes.TeamVals.RIGHT,
                             attackType: PBTypes.AttackVals.RANGE,
                             rangeShots: 3,
                         }),

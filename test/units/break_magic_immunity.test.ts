@@ -18,7 +18,7 @@ import { createTestUnit } from "../helpers/combat";
 const makeBlackDragon = () =>
     createTestUnit({
         name: "Black Dragon",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         maxHp: 1000,
         amountAlive: 5,
         abilities: ["Fire Element", "Enchanted Skin", "Fire Breath"],
@@ -73,7 +73,7 @@ describe("Break-on-attack ignores magic immunity (Black Dragon / Enchanted Skin)
 
     it("applies Break identically to a plain (non-magic-immune) unit — behavior is target-agnostic", () => {
         const log = new SceneLogMock();
-        const orc = createTestUnit({ name: "Orc", team: PBTypes.TeamVals.UPPER, maxHp: 1000, amountAlive: 5 });
+        const orc = createTestUnit({ name: "Orc", team: PBTypes.TeamVals.RIGHT, maxHp: 1000, amountAlive: 5 });
         orc.applyDamage(10, 100, log, false);
         expect(orc.hasEffectActive("Break")).toBe(true);
     });

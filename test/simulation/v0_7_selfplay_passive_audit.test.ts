@@ -57,7 +57,7 @@ const candidate = (
     expectedKill: 0 | 1 = 0,
 ): IEnumeratedCandidate => ({ kind, actions, features: features(expectedDamage, expectedKill) });
 
-const fakeUnit = (id = "actor", name = "Healer", team = PBTypes.TeamVals.LOWER): Unit =>
+const fakeUnit = (id = "actor", name = "Healer", team = PBTypes.TeamVals.LEFT): Unit =>
     ({
         getId: () => id,
         getName: () => name,
@@ -237,7 +237,7 @@ describe("v0.7 self-play passive-turn audit", () => {
         const foreignSkip: GameEvent = {
             type: "unit_skipped",
             unitId: "other-unit",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             reason: "effect",
         };
         observeV07SelfplayTurnExecution(
@@ -264,16 +264,16 @@ describe("v0.7 self-play passive-turn audit", () => {
                         source: "defend",
                         completed: true,
                         action: { type: "defend_turn", unitId: "actor" },
-                        events: [{ type: "unit_defended", unitId: "actor", team: PBTypes.TeamVals.LOWER }],
+                        events: [{ type: "unit_defended", unitId: "actor", team: PBTypes.TeamVals.LEFT }],
                     },
                 ],
                 recovery: {
                     source: "defend",
                     completed: true,
                     action: { type: "defend_turn", unitId: "actor" },
-                    events: [{ type: "unit_defended", unitId: "actor", team: PBTypes.TeamVals.LOWER }],
+                    events: [{ type: "unit_defended", unitId: "actor", team: PBTypes.TeamVals.LEFT }],
                 },
-                events: [foreignSkip, { type: "unit_defended", unitId: "actor", team: PBTypes.TeamVals.LOWER }],
+                events: [foreignSkip, { type: "unit_defended", unitId: "actor", team: PBTypes.TeamVals.LEFT }],
             }),
             scope,
         );
@@ -325,7 +325,7 @@ describe("v0.7 self-play passive-turn audit", () => {
         expect(left.integrity.rejectedActions).toBe(1);
 
         let captured: IMatchConfig | undefined;
-        const unit = fakeUnit("actor", "Healer", PBTypes.TeamVals.LOWER);
+        const unit = fakeUnit("actor", "Healer", PBTypes.TeamVals.LEFT);
         const result = playV07SelfplayPassiveAuditGame(
             { template: "mage_frontline", game: 0, seed: 789 },
             {
@@ -341,10 +341,10 @@ describe("v0.7 self-play passive-turn audit", () => {
                                 {
                                     action: { type: "defend_turn", unitId: "actor" },
                                     completed: true,
-                                    events: [{ type: "unit_defended", unitId: "actor", team: PBTypes.TeamVals.LOWER }],
+                                    events: [{ type: "unit_defended", unitId: "actor", team: PBTypes.TeamVals.LEFT }],
                                 },
                             ],
-                            events: [{ type: "unit_defended", unitId: "actor", team: PBTypes.TeamVals.LOWER }],
+                            events: [{ type: "unit_defended", unitId: "actor", team: PBTypes.TeamVals.LEFT }],
                         }),
                     );
                     return fakeResult(config);

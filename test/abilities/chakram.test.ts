@@ -13,8 +13,8 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import { createCombatTestContext, createTestUnit, createVisibleDamage, placeUnit } from "../helpers/combat";
 
-const GREEN = PBTypes.TeamVals.LOWER;
-const RED = PBTypes.TeamVals.UPPER;
+const GREEN = PBTypes.TeamVals.LEFT;
+const RED = PBTypes.TeamVals.RIGHT;
 
 function setup(stackPower = 5) {
     const context = createCombatTestContext();

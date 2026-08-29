@@ -44,8 +44,8 @@ import {
     type TestUnitOptions,
 } from "../helpers/combat";
 
-const RED = PBTypes.TeamVals.UPPER;
-const GREEN = PBTypes.TeamVals.LOWER;
+const RED = PBTypes.TeamVals.RIGHT;
+const GREEN = PBTypes.TeamVals.LEFT;
 const RANGE = PBTypes.AttackVals.RANGE;
 
 /** See damage_projection.test.ts: a constant source of `offset / 2^32` pins every roll to min + offset%span. */

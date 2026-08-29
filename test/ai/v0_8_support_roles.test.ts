@@ -24,8 +24,8 @@ import {
     type CombatTestContext,
 } from "../helpers/combat";
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const MELEE = PBTypes.AttackVals.MELEE;
 const RANGE = PBTypes.AttackVals.RANGE;
 const savedNightmareScope = process.env[V08_NIGHTMARE_ROLE_VERSIONS_ENV];
@@ -68,8 +68,8 @@ const cast = (actions: readonly GameAction[]) =>
 function startEngine(combat: CombatTestContext, active: Unit, context: IDecisionContext): GameActionEngine {
     const fightProperties = context.fightProperties!;
     fightProperties.startFight();
-    fightProperties.setTeamUnitsAlive(LOWER, combat.unitsHolder.getAllAllies(LOWER).length);
-    fightProperties.setTeamUnitsAlive(UPPER, combat.unitsHolder.getAllAllies(UPPER).length);
+    fightProperties.setTeamUnitsAlive(LEFT, combat.unitsHolder.getAllAllies(LEFT).length);
+    fightProperties.setTeamUnitsAlive(RIGHT, combat.unitsHolder.getAllAllies(RIGHT).length);
     fightProperties.startTurn(active.getTeam(), 1_000);
     return new GameActionEngine({
         fightProperties,
@@ -86,10 +86,10 @@ function startEngine(combat: CombatTestContext, active: Unit, context: IDecision
 describe("v0.8 Wandering Mage anti-ranged role", () => {
     test("promotes a net-positive Smoke cloud to the native decision", () => {
         const combat = createCombatTestContext();
-        const moth = nativeUnit(LOWER, "Chaos", "Wandering Mage", 50);
-        const ally = createTestUnit({ team: LOWER, name: "Screened melee", attackType: MELEE, amountAlive: 30 });
+        const moth = nativeUnit(LEFT, "Chaos", "Wandering Mage", 50);
+        const ally = createTestUnit({ team: LEFT, name: "Screened melee", attackType: MELEE, amountAlive: 30 });
         const ranger = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Enemy ranger",
             attackType: RANGE,
             rangeShots: 8,
@@ -108,9 +108,9 @@ describe("v0.8 Wandering Mage anti-ranged role", () => {
 
     test("routes Smoke away from a stronger friendly firing line", () => {
         const combat = createCombatTestContext();
-        const moth = nativeUnit(LOWER, "Chaos", "Wandering Mage", 50);
+        const moth = nativeUnit(LEFT, "Chaos", "Wandering Mage", 50);
         const friendlyRanger = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Friendly ranger",
             attackType: RANGE,
             rangeShots: 12,
@@ -118,7 +118,7 @@ describe("v0.8 Wandering Mage anti-ranged role", () => {
             amountAlive: 30,
         });
         const enemyRanger = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Enemy ranger",
             attackType: RANGE,
             rangeShots: 4,
@@ -151,10 +151,10 @@ describe("v0.8 Wandering Mage anti-ranged role", () => {
 describe("v0.8 Nightmare roadblock role", () => {
     test("promotes and executes a threat-aware Fire Wall over a pure advance", () => {
         const combat = createCombatTestContext();
-        const nightmare = nativeUnit(LOWER, "Chaos", "Nightmare", 20);
+        const nightmare = nativeUnit(LEFT, "Chaos", "Nightmare", 20);
         nightmare.setStackPower(5);
         const threat = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Approaching threat",
             attackType: MELEE,
             initiative: 6,
@@ -183,9 +183,9 @@ describe("v0.8 Nightmare roadblock role", () => {
 
     test("keeps an immediate melee attack instead of spending the wall", () => {
         const combat = createCombatTestContext();
-        const nightmare = nativeUnit(LOWER, "Chaos", "Nightmare", 20);
+        const nightmare = nativeUnit(LEFT, "Chaos", "Nightmare", 20);
         nightmare.setStackPower(5);
-        const target = createTestUnit({ team: UPPER, name: "Reachable enemy", attackType: MELEE });
+        const target = createTestUnit({ team: RIGHT, name: "Reachable enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, nightmare, { x: 7, y: 3 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 7, y: 8 });
 
@@ -199,7 +199,7 @@ describe("v0.8 Healer durable-anchor role", () => {
     test("does not mistake a pre-damage lethal melee for a safe action over healing", () => {
         const combat = createCombatTestContext();
         const healer = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Healer",
             attackType: MELEE,
             damageMin: 10,
@@ -208,9 +208,9 @@ describe("v0.8 Healer durable-anchor role", () => {
             stackPower: 4,
             spells: ["Life:Heal"],
         });
-        const abomination = nativeUnit(LOWER, "Chaos", "Abomination", 1);
+        const abomination = nativeUnit(LEFT, "Chaos", "Abomination", 1);
         const target = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Fragile responder",
             attackType: MELEE,
             maxHp: 1,
@@ -240,17 +240,17 @@ describe("v0.8 Healer durable-anchor role", () => {
 
     test("heals a damaged Abomination before a more-wounded generic stack", () => {
         const combat = createCombatTestContext();
-        const healer = nativeUnit(LOWER, "Life", "Healer", 20);
-        const abomination = nativeUnit(LOWER, "Chaos", "Abomination", 1);
+        const healer = nativeUnit(LEFT, "Life", "Healer", 20);
+        const abomination = nativeUnit(LEFT, "Chaos", "Abomination", 1);
         const generic = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Generic fourth-level",
             attackType: MELEE,
             maxHp: 200,
             amountAlive: 1,
             level: PBTypes.UnitLevelVals.FOURTH,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, healer, { x: 3, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, abomination, { x: 6, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, generic, { x: 3, y: 6 });
@@ -269,17 +269,17 @@ describe("v0.8 Healer durable-anchor role", () => {
     ] as const) {
         test(`sustains ${anchorName} through the same durable-anchor contract`, () => {
             const combat = createCombatTestContext();
-            const healer = nativeUnit(LOWER, "Life", "Healer", 20);
-            const anchor = nativeUnit(LOWER, anchorFaction, anchorName, 1);
+            const healer = nativeUnit(LEFT, "Life", "Healer", 20);
+            const anchor = nativeUnit(LEFT, anchorFaction, anchorName, 1);
             const generic = createTestUnit({
-                team: LOWER,
+                team: LEFT,
                 name: "Generic target",
                 attackType: MELEE,
                 maxHp: 300,
                 amountAlive: 1,
                 level: PBTypes.UnitLevelVals.FOURTH,
             });
-            const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+            const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
             placeUnit(combat.grid, combat.unitsHolder, healer, { x: 3, y: 5 });
             placeUnit(combat.grid, combat.unitsHolder, anchor, { x: 6, y: 6 });
             placeUnit(combat.grid, combat.unitsHolder, generic, { x: 3, y: 6 });
@@ -295,10 +295,10 @@ describe("v0.8 Healer durable-anchor role", () => {
 
     test("treats Angel as a sustain anchor only while it screens a real firing line", () => {
         const combat = createCombatTestContext();
-        const healer = nativeUnit(LOWER, "Life", "Healer", 20);
-        const angel = nativeUnit(LOWER, "Life", "Angel", 1);
+        const healer = nativeUnit(LEFT, "Life", "Healer", 20);
+        const angel = nativeUnit(LEFT, "Life", "Angel", 1);
         const archer = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Archer",
             attackType: RANGE,
             rangeShots: 8,
@@ -306,14 +306,14 @@ describe("v0.8 Healer durable-anchor role", () => {
             amountAlive: 5,
         });
         const caster = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Mage",
             attackType: PBTypes.AttackVals.MELEE_MAGIC,
             spells: ["Life:Fire Strike"],
             amountAlive: 5,
         });
         const generic = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Generic fourth-level",
             attackType: MELEE,
             maxHp: 300,
@@ -321,7 +321,7 @@ describe("v0.8 Healer durable-anchor role", () => {
             level: PBTypes.UnitLevelVals.FOURTH,
         });
         const shooter = createTestUnit({
-            team: UPPER,
+            team: RIGHT,
             name: "Enemy shooter",
             attackType: RANGE,
             rangeShots: 8,
@@ -347,10 +347,10 @@ describe("v0.8 Healer durable-anchor role", () => {
 
     test("does not spend Mass Heal for an unhealable Mechanism", () => {
         const combat = createCombatTestContext();
-        const healer = nativeUnit(LOWER, "Life", "Healer", 20);
-        const abomination = nativeUnit(LOWER, "Chaos", "Abomination", 1);
+        const healer = nativeUnit(LEFT, "Life", "Healer", 20);
+        const abomination = nativeUnit(LEFT, "Chaos", "Abomination", 1);
         const mechanism = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Mechanism",
             attackType: RANGE,
             rangeShots: 4,
@@ -358,7 +358,7 @@ describe("v0.8 Healer durable-anchor role", () => {
             amountAlive: 1,
             abilities: ["Mechanism"],
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, healer, { x: 3, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, abomination, { x: 4, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, mechanism, { x: 5, y: 5 });
@@ -374,10 +374,10 @@ describe("v0.8 Healer durable-anchor role", () => {
 
     test("puts preventative Spiritual Armor on a healthy durable anchor", () => {
         const combat = createCombatTestContext();
-        const healer = nativeUnit(LOWER, "Life", "Healer", 20);
-        const abomination = nativeUnit(LOWER, "Chaos", "Abomination", 1);
+        const healer = nativeUnit(LEFT, "Life", "Healer", 20);
+        const abomination = nativeUnit(LEFT, "Chaos", "Abomination", 1);
         const damageDealer = createTestUnit({
-            team: LOWER,
+            team: LEFT,
             name: "Damage dealer",
             attackType: MELEE,
             damageMax: 100,
@@ -385,7 +385,7 @@ describe("v0.8 Healer durable-anchor role", () => {
             amountAlive: 1,
             level: PBTypes.UnitLevelVals.FOURTH,
         });
-        const enemy = createTestUnit({ team: UPPER, name: "Enemy", attackType: MELEE });
+        const enemy = createTestUnit({ team: RIGHT, name: "Enemy", attackType: MELEE });
         placeUnit(combat.grid, combat.unitsHolder, healer, { x: 3, y: 5 });
         placeUnit(combat.grid, combat.unitsHolder, abomination, { x: 6, y: 6 });
         placeUnit(combat.grid, combat.unitsHolder, damageDealer, { x: 3, y: 6 });

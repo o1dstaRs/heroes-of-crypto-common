@@ -95,8 +95,8 @@ describe("v0.8 A19-H18 f184 human-placement research profile", () => {
                 exactPublicMatchup: true,
                 openingIds: ["prod-f184-lower-roster", "prod-f184-upper-roster"],
                 rosterCreatureIds: {
-                    lower: [3, 4, 6, 9, 33, 37],
-                    upper: [12, 27, 34, 43, 47, 55],
+                    left: [3, 4, 6, 9, 33, 37],
+                    right: [12, 27, 34, 43, 47, 55],
                 },
             },
         });

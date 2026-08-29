@@ -43,7 +43,7 @@ const setupThrow = (options: { screenAt?: XY; terrainAt?: { cell: XY; marker: st
 
     const trent = createTestUnit({
         name: "Trent",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         spells: ["System:Vine Throw"],
         stackPower: 5,
         initiative: 5,
@@ -51,7 +51,7 @@ const setupThrow = (options: { screenAt?: XY; terrainAt?: { cell: XY; marker: st
     });
     const target = createTestUnit({
         name: "Target",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         maxHp: 1000,
         amountAlive: 1,
         magicResist: 0,
@@ -61,7 +61,7 @@ const setupThrow = (options: { screenAt?: XY; terrainAt?: { cell: XY; marker: st
     place(context.grid, context.unitsHolder, trent, { x: 2, y: 8 });
     place(context.grid, context.unitsHolder, target, { x: 8, y: 8 });
     if (options.screenAt) {
-        const screen = createTestUnit({ name: "Screen", team: PBTypes.TeamVals.UPPER, maxHp: 100, amountAlive: 1 });
+        const screen = createTestUnit({ name: "Screen", team: PBTypes.TeamVals.RIGHT, maxHp: 100, amountAlive: 1 });
         place(context.grid, context.unitsHolder, screen, options.screenAt);
     }
     if (options.terrainAt) {
@@ -75,9 +75,9 @@ const setupThrow = (options: { screenAt?: XY; terrainAt?: { cell: XY; marker: st
             ] = options.terrainAt.marker;
         }
     }
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 1);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 1);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const engine = new GameActionEngine({
         fightProperties,

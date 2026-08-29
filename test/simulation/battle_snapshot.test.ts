@@ -88,8 +88,8 @@ function buildBattle(seed: number, version = "v0.1"): Harness {
     const runtime = createDefaultGameRuntime();
     const { abilityFactory, effectFactory } = createCombatFactories();
 
-    const greenZone = new RectanglePlacement(gridSettings, PlacementPositionType.LOWER_LEFT, 3);
-    const redZone = new RectanglePlacement(gridSettings, PlacementPositionType.UPPER_RIGHT, 3);
+    const greenZone = new RectanglePlacement(gridSettings, PlacementPositionType.LEFT_BOTTOM, 3);
+    const redZone = new RectanglePlacement(gridSettings, PlacementPositionType.RIGHT_TOP, 3);
     const zoneHashesFor = (team: TeamType): Set<number> =>
         team === GREEN_TEAM ? greenZone.possibleCellHashes() : redZone.possibleCellHashes();
 
@@ -314,8 +314,8 @@ function dumpGrid(grid: Grid) {
     const clone = (m?: number[][]) => (m ? m.map((row) => [...row]) : m);
     return {
         matrix: grid.getMatrix(),
-        aggrUpper: clone(grid.getAggrMatrixByTeam(1)),
-        aggrLower: clone(grid.getAggrMatrixByTeam(2)),
+        aggrRight: clone(grid.getAggrMatrixByTeam(1)),
+        aggrLeft: clone(grid.getAggrMatrixByTeam(2)),
     };
 }
 

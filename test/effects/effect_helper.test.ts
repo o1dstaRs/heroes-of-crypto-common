@@ -76,11 +76,11 @@ describe("effect_helper", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const source = createTestUnit({
             name: "Absorber",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
         });
         const protectedAlly = createTestUnit({
             name: "Protected",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
         });
 
         placeUnit(grid, unitsHolder, source, { x: 3, y: 3 });
@@ -104,8 +104,8 @@ describe("effect_helper", () => {
 describe("Absorb Penalties announces itself", () => {
     it("logs which creature took the penalty, and stays silent when nothing is absorbed", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const source = createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.LOWER });
-        const protectedAlly = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LOWER });
+        const source = createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.LEFT });
+        const protectedAlly = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LEFT });
         placeUnit(grid, unitsHolder, source, { x: 3, y: 3 });
         placeUnit(grid, unitsHolder, protectedAlly, { x: 4, y: 3 });
 

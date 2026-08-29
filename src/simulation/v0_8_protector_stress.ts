@@ -312,7 +312,7 @@ export interface IV08ProtectorStressRecord {
     crash?: string;
 }
 
-const sideForUnit = (unit: Unit): Side => (unit.getTeam() === PBTypes.TeamVals.LOWER ? "green" : "red");
+const sideForUnit = (unit: Unit): Side => (unit.getTeam() === PBTypes.TeamVals.LEFT ? "green" : "red");
 
 const increment = (record: Record<string, number>, key: string, amount = 1): void => {
     record[key] = (record[key] ?? 0) + amount;

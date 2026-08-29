@@ -166,7 +166,7 @@ describe("AI v0.2 out-of-ammo handling", () => {
         const ctx = createCombatTestContext();
         const shooter = createTestUnit({
             name: "Shooter",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
             initiative: 5,
@@ -174,7 +174,7 @@ describe("AI v0.2 out-of-ammo handling", () => {
         });
         const enemy = createTestUnit({
             name: "Enemy",
-            team: PBTypes.TeamVals.UPPER,
+            team: PBTypes.TeamVals.RIGHT,
             attackType: PBTypes.AttackVals.MELEE,
             maxHp: 100,
             amountAlive: 1,
@@ -210,7 +210,7 @@ describe("AI v0.2 out-of-ammo handling", () => {
 
     it("deploys melee in front, range/casters behind, and the Sniper Arbalester in a back corner", () => {
         const mk = (name: string, type: number, abilities: string[] = []) =>
-            createTestUnit({ name, team: PBTypes.TeamVals.LOWER, attackType: type, abilities });
+            createTestUnit({ name, team: PBTypes.TeamVals.LEFT, attackType: type, abilities });
         const arbalester = mk("Arbalester", PBTypes.AttackVals.RANGE, ["Sniper"]);
         const beholder = mk("Beholder", PBTypes.AttackVals.RANGE);
         const crusader = mk("Crusader", PBTypes.AttackVals.MELEE);
@@ -219,9 +219,9 @@ describe("AI v0.2 out-of-ammo handling", () => {
         const satyr = mk("Satyr", PBTypes.AttackVals.MAGIC);
         const units = [arbalester, beholder, crusader, pikeman, healer, satyr];
 
-        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LOWER_LEFT, 3);
+        const zone = new RectanglePlacement(testGridSettings, PlacementPositionType.LEFT_BOTTOM, 3);
         const placed = getAIStrategy("v0.2").placeArmy(units, {
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             grid: undefined as never,
             unitsHolder: undefined as never,
             pathHelper: undefined as never,
@@ -248,7 +248,7 @@ describe("AI v0.2 out-of-ammo handling", () => {
         const ctx = createCombatTestContext();
         const shooter = createTestUnit({
             name: "Shooter",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 5,
             shotDistance: 16,
@@ -257,8 +257,8 @@ describe("AI v0.2 out-of-ammo handling", () => {
             damageMax: 12,
         });
         // A killable chip target vs a juicier high-HP stack, both in the open and in range.
-        const chip = createTestUnit({ name: "Chip", team: PBTypes.TeamVals.UPPER, maxHp: 5, amountAlive: 1 });
-        const juicy = createTestUnit({ name: "Juicy", team: PBTypes.TeamVals.UPPER, maxHp: 100, amountAlive: 30 });
+        const chip = createTestUnit({ name: "Chip", team: PBTypes.TeamVals.RIGHT, maxHp: 5, amountAlive: 1 });
+        const juicy = createTestUnit({ name: "Juicy", team: PBTypes.TeamVals.RIGHT, maxHp: 100, amountAlive: 30 });
         placeUnit(ctx.grid, ctx.unitsHolder, shooter, { x: 5, y: 8 });
         placeUnit(ctx.grid, ctx.unitsHolder, chip, { x: 9, y: 8 });
         placeUnit(ctx.grid, ctx.unitsHolder, juicy, { x: 5, y: 12 });

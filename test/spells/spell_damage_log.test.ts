@@ -43,7 +43,7 @@ const setup = (magicResist: number) => {
 
     const caster = createTestUnit({
         name: "Magic Dragon",
-        team: PBTypes.TeamVals.LOWER,
+        team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.MELEE_MAGIC,
         spells: ["Nature:Lightning Strike", "Nature:Ring of Fire"],
         amountAlive: 20,
@@ -55,7 +55,7 @@ const setup = (magicResist: number) => {
 
     const victim = createTestUnit({
         name: "Victim",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         maxHp: 100_000,
         magicResist,
         initiative: 3,
@@ -68,7 +68,7 @@ const setup = (magicResist: number) => {
     // resistance, so the number the log prints is still the resisted one this test is about.
     const ringVictim = createTestUnit({
         name: "Ring Victim",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         maxHp: 100_000,
         magicResist,
         initiative: 3,
@@ -76,9 +76,9 @@ const setup = (magicResist: number) => {
     });
     placeUnit(context.grid, context.unitsHolder, ringVictim, { x: 6, y: 4 });
 
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, 2);
-    fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+    fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 2);
+    fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const sceneLog = new RecordingSceneLog();
     const engine = new GameActionEngine({

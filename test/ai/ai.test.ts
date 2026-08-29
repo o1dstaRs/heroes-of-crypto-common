@@ -54,9 +54,9 @@ const generateUnits = (
     anotherUnitCell?: HoCMath.XY,
 ): UnitRepr => {
     const unitFrom = isSmallUnit
-        ? stubSmallUnit(PBTypes.TeamVals.UPPER, steps, baseCellFrom)
-        : stubBigUnit(PBTypes.TeamVals.UPPER, steps, baseCellFrom);
-    const unitTo = stubSmallUnit(PBTypes.TeamVals.LOWER, steps, baseCellTo);
+        ? stubSmallUnit(PBTypes.TeamVals.RIGHT, steps, baseCellFrom)
+        : stubBigUnit(PBTypes.TeamVals.RIGHT, steps, baseCellFrom);
+    const unitTo = stubSmallUnit(PBTypes.TeamVals.LEFT, steps, baseCellTo);
     grid.occupyCell(
         baseCellFrom,
         unitFrom.getId(),
@@ -74,7 +74,7 @@ const generateUnits = (
         unitTo.hasAbilityActive("Made of Water"),
     );
     if (anotherUnitCell) {
-        const unitEnemy = stubSmallUnit(PBTypes.TeamVals.LOWER, steps /* steps */, anotherUnitCell);
+        const unitEnemy = stubSmallUnit(PBTypes.TeamVals.LEFT, steps /* steps */, anotherUnitCell);
         grid.occupyCell(
             anotherUnitCell,
             unitEnemy.getId(),
@@ -485,7 +485,7 @@ describe("BigUnit", () => {
 });
 
 const placeEnemy = (grid: Grid, cell: HoCMath.XY): void => {
-    const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 1, cell);
+    const enemy = stubSmallUnit(PBTypes.TeamVals.LEFT, 1, cell);
     grid.occupyCell(
         cell,
         enemy.getId(),
@@ -500,7 +500,7 @@ describe("RangeAttack", () => {
     describe("Cyclops (Large Caliber)", () => {
         it("Returns RANGE_ATTACK when target is in range", () => {
             const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
-            const attacker = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 }, 8, 6.5, ["Large Caliber"], true);
+            const attacker = stubRangeUnit(PBTypes.TeamVals.RIGHT, 3, { x: 5, y: 5 }, 8, 6.5, ["Large Caliber"], true);
             grid.occupyCell(
                 { x: 5, y: 5 },
                 attacker.getId(),
@@ -519,7 +519,7 @@ describe("RangeAttack", () => {
 
         it("Prefers clustered target over isolated one (Large Caliber AOE)", () => {
             const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
-            const attacker = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 }, 8, 6.5, ["Large Caliber"], true);
+            const attacker = stubRangeUnit(PBTypes.TeamVals.RIGHT, 3, { x: 5, y: 5 }, 8, 6.5, ["Large Caliber"], true);
             grid.occupyCell(
                 { x: 5, y: 5 },
                 attacker.getId(),
@@ -545,7 +545,7 @@ describe("RangeAttack", () => {
         it("Prefers target with more enemies lined up beyond it", () => {
             const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
             const attacker = stubRangeUnit(
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
                 3,
                 { x: 1, y: 8 },
                 4,
@@ -578,7 +578,7 @@ describe("RangeAttack", () => {
         it("Prefers clustered target (Double Shot + Area Throw combo)", () => {
             const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
             const attacker = stubRangeUnit(
-                PBTypes.TeamVals.UPPER,
+                PBTypes.TeamVals.RIGHT,
                 3,
                 { x: 3, y: 3 },
                 14,
@@ -607,7 +607,7 @@ describe("RangeAttack", () => {
         it("Falls back to MOVE when no target is in range", () => {
             const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
             // Sniper-shot_distance of 1 with 1 shot: max range = 4 cells
-            const attacker = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 }, 1, 1, [], true);
+            const attacker = stubRangeUnit(PBTypes.TeamVals.RIGHT, 3, { x: 1, y: 1 }, 1, 1, [], true);
             grid.occupyCell(
                 { x: 1, y: 1 },
                 attacker.getId(),
@@ -636,7 +636,7 @@ describe("AI attack-cell helpers", () => {
     });
 
     it("returns adjacent free cells for a small attacker around a small target", () => {
-        const attacker = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 });
+        const attacker = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 1, y: 1 });
         const matrix = Array.from({ length: 6 }, () => new Array(6).fill(0));
 
         const cells = getCellsForAttacker({ x: 3, y: 3 }, matrix, attacker, true, true);
@@ -648,7 +648,7 @@ describe("AI attack-cell helpers", () => {
 
     it("expands legal attack cells for large targets and large attackers", () => {
         const matrix = Array.from({ length: 8 }, () => new Array(8).fill(0));
-        const smallAttacker = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 });
+        const smallAttacker = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 1, y: 1 });
 
         const cellsForLargeTarget = getCellsForAttacker({ x: 3, y: 3 }, matrix, smallAttacker, true, false);
 
@@ -656,7 +656,7 @@ describe("AI attack-cell helpers", () => {
         expect(cellsForLargeTarget).toContainEqual({ x: 5, y: 5 });
         expect(cellsForLargeTarget).toContainEqual({ x: 2, y: 5 });
 
-        const bigAttacker = stubBigUnit(PBTypes.TeamVals.UPPER, 3, { x: 2, y: 2 });
+        const bigAttacker = stubBigUnit(PBTypes.TeamVals.RIGHT, 3, { x: 2, y: 2 });
         const cellsForBigAttacker = getCellsForAttacker({ x: 4, y: 4 }, matrix, bigAttacker, false, true);
 
         expect(cellsForBigAttacker.length).toBeGreaterThan(0);
@@ -762,7 +762,7 @@ describe("countMeleeThreatsToCell", () => {
 describe("analyzeEngagement", () => {
     it("returns zeros when no allies exist", () => {
         const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
-        const unit = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 });
+        const unit = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 5, y: 5 });
         const holder = new UnitsHolder(grid);
         const result = analyzeEngagement(unit, grid.getMatrix(), holder);
         expect(result.totalAllies).toBe(0);
@@ -776,9 +776,9 @@ describe("analyzeEngagement", () => {
     it("counts melee and ranged allies correctly", () => {
         const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
         const holder = new UnitsHolder(grid);
-        const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 });
-        const melee1 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 6, y: 5 });
-        const ranged1 = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 7, y: 5 }, 3, 6);
+        const main = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 5, y: 5 });
+        const melee1 = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 6, y: 5 });
+        const ranged1 = stubRangeUnit(PBTypes.TeamVals.RIGHT, 3, { x: 7, y: 5 }, 3, 6);
         holder.addUnit(main as any);
         holder.addUnit(melee1 as any);
         holder.addUnit(ranged1 as any);
@@ -790,9 +790,9 @@ describe("analyzeEngagement", () => {
     it("detects enemies pressing when an enemy is within 3 cells of an ally", () => {
         const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
         const holder = new UnitsHolder(grid);
-        const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 });
-        const ally = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 7, y: 7 });
-        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 8, y: 7 });
+        const main = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 5, y: 5 });
+        const ally = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 7, y: 7 });
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LEFT, 3, { x: 8, y: 7 });
         grid.occupyCell({ x: 5, y: 5 }, main.getId(), main.getTeam(), 1, false, false);
         grid.occupyCell({ x: 7, y: 7 }, ally.getId(), ally.getTeam(), 1, false, false);
         grid.occupyCell({ x: 8, y: 7 }, enemy.getId(), enemy.getTeam(), 1, false, false);
@@ -806,8 +806,8 @@ describe("analyzeEngagement", () => {
     it("reports no pressing when enemies are far away", () => {
         const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
         const holder = new UnitsHolder(grid);
-        const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 });
-        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 14, y: 14 });
+        const main = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 1, y: 1 });
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LEFT, 3, { x: 14, y: 14 });
         holder.addUnit(main as any);
         holder.addUnit(enemy as any);
         const result = analyzeEngagement(main, grid.getMatrix(), holder);
@@ -817,9 +817,9 @@ describe("analyzeEngagement", () => {
     it("computes ally melee center", () => {
         const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
         const holder = new UnitsHolder(grid);
-        const main = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 5 });
-        const ally1 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 7, y: 5 });
-        const ally2 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 5, y: 7 });
+        const main = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 5, y: 5 });
+        const ally1 = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 7, y: 5 });
+        const ally2 = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 5, y: 7 });
         holder.addUnit(main as any);
         holder.addUnit(ally1 as any);
         holder.addUnit(ally2 as any);
@@ -891,12 +891,12 @@ describe("AI Strategy: ranged-heavy defense", () => {
         const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
         const holder = new UnitsHolder(grid);
         // One melee unit (the AI unit)
-        const melee = stubSmallUnit(PBTypes.TeamVals.UPPER, 5, { x: 5, y: 5 });
+        const melee = stubSmallUnit(PBTypes.TeamVals.RIGHT, 5, { x: 5, y: 5 });
         // Two ranged allies
-        const r1 = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 3, y: 3 }, 3, 8);
-        const r2 = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 3, y: 7 }, 3, 8);
+        const r1 = stubRangeUnit(PBTypes.TeamVals.RIGHT, 3, { x: 3, y: 3 }, 3, 8);
+        const r2 = stubRangeUnit(PBTypes.TeamVals.RIGHT, 3, { x: 3, y: 7 }, 3, 8);
         // Enemy far away
-        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 14, y: 14 });
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LEFT, 3, { x: 14, y: 14 });
         grid.occupyCell({ x: 5, y: 5 }, melee.getId(), melee.getTeam(), 1, false, false);
         grid.occupyCell({ x: 3, y: 3 }, r1.getId(), r1.getTeam(), 1, false, false);
         grid.occupyCell({ x: 3, y: 7 }, r2.getId(), r2.getTeam(), 1, false, false);
@@ -914,9 +914,9 @@ describe("AI Strategy: ranged-heavy defense", () => {
     it("melee unit advances when enemies are pressing even in ranged-heavy team", () => {
         const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
         const holder = new UnitsHolder(grid);
-        const melee = stubSmallUnit(PBTypes.TeamVals.UPPER, 5, { x: 5, y: 5 });
-        const r1 = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 3, y: 3 }, 3, 8);
-        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 7, y: 5 });
+        const melee = stubSmallUnit(PBTypes.TeamVals.RIGHT, 5, { x: 5, y: 5 });
+        const r1 = stubRangeUnit(PBTypes.TeamVals.RIGHT, 3, { x: 3, y: 3 }, 3, 8);
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LEFT, 3, { x: 7, y: 5 });
         grid.occupyCell({ x: 5, y: 5 }, melee.getId(), melee.getTeam(), 1, false, false);
         grid.occupyCell({ x: 3, y: 3 }, r1.getId(), r1.getTeam(), 1, false, false);
         grid.occupyCell({ x: 7, y: 5 }, enemy.getId(), enemy.getTeam(), 1, false, false);
@@ -934,8 +934,8 @@ describe("AI Strategy: ranged units avoid melee range", () => {
     it("ranged unit does not move to a cell adjacent to an enemy", () => {
         const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
         const holder = new UnitsHolder(grid);
-        const ranged = stubRangeUnit(PBTypes.TeamVals.UPPER, 3, { x: 1, y: 1 }, 1, 1, [], true);
-        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 10, y: 10 });
+        const ranged = stubRangeUnit(PBTypes.TeamVals.RIGHT, 3, { x: 1, y: 1 }, 1, 1, [], true);
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LEFT, 3, { x: 10, y: 10 });
         grid.occupyCell({ x: 1, y: 1 }, ranged.getId(), ranged.getTeam(), 1, false, false);
         grid.occupyCell({ x: 10, y: 10 }, enemy.getId(), enemy.getTeam(), 1, false, false);
         holder.addUnit(ranged as any);
@@ -945,7 +945,7 @@ describe("AI Strategy: ranged units avoid melee range", () => {
         // Out of range, so falls to MOVE. Check that destination is NOT adjacent to enemy.
         if (action && action.cellToMove()) {
             const dest = action.cellToMove()!;
-            const threats = countMeleeThreatsToCell(dest, grid.getMatrix(), PBTypes.TeamVals.LOWER);
+            const threats = countMeleeThreatsToCell(dest, grid.getMatrix(), PBTypes.TeamVals.LEFT);
             expect(threats).toBe(0);
         }
     });
@@ -955,10 +955,10 @@ describe("AI Strategy: group coordination", () => {
     it("isolated melee unit moves toward ally group center when no enemies pressing", () => {
         const grid = new Grid(gridSettings, PBTypes.GridVals.NORMAL);
         const holder = new UnitsHolder(grid);
-        const lone = stubSmallUnit(PBTypes.TeamVals.UPPER, 5, { x: 1, y: 1 });
-        const ally1 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 10, y: 10 });
-        const ally2 = stubSmallUnit(PBTypes.TeamVals.UPPER, 3, { x: 12, y: 10 });
-        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 14, y: 14 });
+        const lone = stubSmallUnit(PBTypes.TeamVals.RIGHT, 5, { x: 1, y: 1 });
+        const ally1 = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 10, y: 10 });
+        const ally2 = stubSmallUnit(PBTypes.TeamVals.RIGHT, 3, { x: 12, y: 10 });
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LEFT, 3, { x: 14, y: 14 });
         grid.occupyCell({ x: 1, y: 1 }, lone.getId(), lone.getTeam(), 1, false, false);
         grid.occupyCell({ x: 10, y: 10 }, ally1.getId(), ally1.getTeam(), 1, false, false);
         grid.occupyCell({ x: 12, y: 10 }, ally2.getId(), ally2.getTeam(), 1, false, false);
@@ -985,7 +985,7 @@ describe("AI: AOE units ignore mountain LOS", () => {
         const holder = new UnitsHolder(grid);
         // Cyclops is a large unit with Large Caliber
         const cyclops = stubRangeUnit(
-            PBTypes.TeamVals.UPPER,
+            PBTypes.TeamVals.RIGHT,
             3,
             { x: 3, y: 3 },
             3,
@@ -994,7 +994,7 @@ describe("AI: AOE units ignore mountain LOS", () => {
             false, // big unit
         );
         // Enemy on the other side of the mountain (center)
-        const enemy = stubSmallUnit(PBTypes.TeamVals.LOWER, 3, { x: 11, y: 11 });
+        const enemy = stubSmallUnit(PBTypes.TeamVals.LEFT, 3, { x: 11, y: 11 });
         grid.occupyCell({ x: 3, y: 3 }, cyclops.getId(), cyclops.getTeam(), 1, false, false);
         grid.occupyCell({ x: 11, y: 11 }, enemy.getId(), enemy.getTeam(), 1, false, false);
         holder.addUnit(cyclops as any);
@@ -1204,10 +1204,10 @@ describe("aura-aware AI positioning", () => {
 
     it("auraCoverageScore counts only allies inside a buff aura, ignoring far allies and enemies", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const auraUnit = createTestUnit({ team: TeamVals.UPPER, auraEffects: ["Sharpened Weapons"] }); // range 2 buff
-        const nearAlly = createTestUnit({ team: TeamVals.UPPER, name: "near-ally" });
-        const farAlly = createTestUnit({ team: TeamVals.UPPER, name: "far-ally" });
-        const enemy = createTestUnit({ team: TeamVals.LOWER, name: "enemy" });
+        const auraUnit = createTestUnit({ team: TeamVals.RIGHT, auraEffects: ["Sharpened Weapons"] }); // range 2 buff
+        const nearAlly = createTestUnit({ team: TeamVals.RIGHT, name: "near-ally" });
+        const farAlly = createTestUnit({ team: TeamVals.RIGHT, name: "far-ally" });
+        const enemy = createTestUnit({ team: TeamVals.LEFT, name: "enemy" });
         placeUnit(grid, unitsHolder, auraUnit, { x: 6, y: 6 });
         placeUnit(grid, unitsHolder, nearAlly, { x: 6, y: 8 }); // distance 2 -> covered
         placeUnit(grid, unitsHolder, farAlly, { x: 6, y: 13 }); // far -> not covered
@@ -1221,9 +1221,9 @@ describe("aura-aware AI positioning", () => {
 
     it("planAuraMove picks the reachable cell that covers the most allies", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const auraUnit = createTestUnit({ team: TeamVals.UPPER, auraEffects: ["Sharpened Weapons"] });
-        const allyA = createTestUnit({ team: TeamVals.UPPER, name: "ally-a" });
-        const allyB = createTestUnit({ team: TeamVals.UPPER, name: "ally-b" });
+        const auraUnit = createTestUnit({ team: TeamVals.RIGHT, auraEffects: ["Sharpened Weapons"] });
+        const allyA = createTestUnit({ team: TeamVals.RIGHT, name: "ally-a" });
+        const allyB = createTestUnit({ team: TeamVals.RIGHT, name: "ally-b" });
         const start = { x: 6, y: 6 };
         placeUnit(grid, unitsHolder, auraUnit, start);
         placeUnit(grid, unitsHolder, allyA, { x: 6, y: 9 });
@@ -1246,11 +1246,11 @@ describe("aura-aware AI positioning", () => {
 
     it("planAuraMove on a debuff aura maximizes enemies covered; returns undefined without auras", () => {
         const { grid, unitsHolder } = createCombatTestContext();
-        const debuffUnit = createTestUnit({ team: TeamVals.UPPER, auraEffects: ["Range Null Field"] }); // range 2 debuff
+        const debuffUnit = createTestUnit({ team: TeamVals.RIGHT, auraEffects: ["Range Null Field"] }); // range 2 debuff
         const start = { x: 6, y: 6 };
         placeUnit(grid, unitsHolder, debuffUnit, start);
-        placeUnit(grid, unitsHolder, createTestUnit({ team: TeamVals.LOWER, name: "enemy-a" }), { x: 6, y: 9 });
-        placeUnit(grid, unitsHolder, createTestUnit({ team: TeamVals.LOWER, name: "enemy-b" }), { x: 6, y: 11 });
+        placeUnit(grid, unitsHolder, createTestUnit({ team: TeamVals.LEFT, name: "enemy-a" }), { x: 6, y: 9 });
+        placeUnit(grid, unitsHolder, createTestUnit({ team: TeamVals.LEFT, name: "enemy-b" }), { x: 6, y: 11 });
         const between = { x: 6, y: 10 };
         const knownPaths = new Map<number, IWeightedRoute[]>([
             [cellKey(start), [routeTo(start, start)]],
@@ -1261,7 +1261,7 @@ describe("aura-aware AI positioning", () => {
         expect(plan!.bestCell).toEqual(between);
         expect(plan!.bestScore).toBe(2);
 
-        const noAura = createTestUnit({ team: TeamVals.UPPER, name: "plain" });
+        const noAura = createTestUnit({ team: TeamVals.RIGHT, name: "plain" });
         placeUnit(grid, unitsHolder, noAura, { x: 1, y: 1 });
         expect(planAuraMove(noAura, knownPaths, testGridSettings, grid.getMatrix(), unitsHolder)).toBeUndefined();
     });

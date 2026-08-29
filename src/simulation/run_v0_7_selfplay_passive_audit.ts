@@ -1064,11 +1064,11 @@ function bootstrapMetrics(tally: IBootstrapAccumulator): Record<V07SelfplayPassi
 function quantile(sorted: readonly number[], probability: number): number {
     if (!sorted.length) throw new Error("Cannot take a quantile of an empty sample");
     const position = (sorted.length - 1) * probability;
-    const lower = Math.floor(position);
-    const upper = Math.ceil(position);
-    if (lower === upper) return sorted[lower];
-    const weight = position - lower;
-    return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+    const left = Math.floor(position);
+    const right = Math.ceil(position);
+    if (left === right) return sorted[left];
+    const weight = position - left;
+    return sorted[left] * (1 - weight) + sorted[right] * weight;
 }
 
 function mulberry32(seed: number): () => number {

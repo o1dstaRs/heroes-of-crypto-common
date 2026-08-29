@@ -7,7 +7,7 @@ import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { GRID_SIZE } from "../grid/grid_constants";
 import type { UnitsHolder } from "../units/units_holder";
 
-const LOWER = PBTypes.TeamVals.LOWER;
+const LEFT = PBTypes.TeamVals.LEFT;
 const RANGE = PBTypes.AttackVals.RANGE;
 const MAGIC = PBTypes.AttackVals.MAGIC;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -177,7 +177,7 @@ export function fillValueFeatures(
         // allocation-free). With the wrong axis, dims 6-7 feed lateral noise into every learned
         // consumer (v0.7 leaf, wait scorer, IL, v0.9).
         const along = sideOrientedBoard ? cell.x : cell.y;
-        const adv = u.getTeam() === LOWER ? along / (GRID_SIZE - 1) : (GRID_SIZE - 1 - along) / (GRID_SIZE - 1);
+        const adv = u.getTeam() === LEFT ? along / (GRID_SIZE - 1) : (GRID_SIZE - 1 - along) / (GRID_SIZE - 1);
         // A unit "yet to act" this lap has neither made its turn nor parked on the hourglass.
         const yet =
             !fightProperties.hasAlreadyMadeTurn(u.getId()) && !fightProperties.hasAlreadyHourglass(u.getId()) ? 1 : 0;

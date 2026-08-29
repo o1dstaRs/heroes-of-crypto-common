@@ -27,7 +27,7 @@ import type { XY } from "../../src/utils/math";
 // the bot that "moves but does not attack". So each enumerator is checked against an independent brute
 // force over every anchor on the board, and the two shipped square shapes are checked to be untouched.
 
-const TEAM = PBTypes.TeamVals.LOWER;
+const TEAM = PBTypes.TeamVals.LEFT;
 const BOARD = 8;
 
 const newGrid = (): Grid =>

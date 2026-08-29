@@ -49,7 +49,7 @@ describe("Through Shot from a large (2x2) attacker", () => {
         // Large 2x2 Through Shot attacker; footprint cols {7,8} rows {1,2}, center vertex (0, 256).
         const attacker = createTestUnit({
             name: "Tsar Cannon",
-            team: PBTypes.TeamVals.LOWER,
+            team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             attack: 40,
             damageMin: 30,
@@ -74,7 +74,7 @@ describe("Through Shot from a large (2x2) attacker", () => {
         const enemies = enemyCells.map((cell, i) => {
             const e = createTestUnit({
                 name: `Enemy${i}`,
-                team: PBTypes.TeamVals.UPPER,
+                team: PBTypes.TeamVals.RIGHT,
                 maxHp: 200,
                 amountAlive: 10,
                 armor: 0,
@@ -83,9 +83,9 @@ describe("Through Shot from a large (2x2) attacker", () => {
             return e;
         });
 
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LOWER, 1);
-        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.UPPER, enemies.length);
-        fightProperties.startTurn(PBTypes.TeamVals.LOWER, 1000);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, 1);
+        fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, enemies.length);
+        fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
         const sceneLog = new SceneLogMock();
         const moveHandler = new MoveHandler(grid.getSettings(), grid, unitsHolder);

@@ -23,7 +23,7 @@ const vineThrow = (): Spell => new Spell({ spellProperties: getSpellConfig("Syst
 const caster = () =>
     createTestUnit({
         name: "Trent",
-        team: PBTypes.TeamVals.UPPER,
+        team: PBTypes.TeamVals.RIGHT,
         spells: ["System:Vine Throw"],
         stackPower: 4,
     });
@@ -44,20 +44,20 @@ const castAt = (target: ReturnType<typeof createTestUnit>, magicResist: number):
 
 describe("Vine Throw targeting", () => {
     it("refuses a target whose magic armor is total, and allows an ordinary one", () => {
-        const immune = createTestUnit({ name: "Black Dragon", team: PBTypes.TeamVals.LOWER, magicResist: 100 });
-        const ordinary = createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.LOWER, magicResist: 0 });
+        const immune = createTestUnit({ name: "Black Dragon", team: PBTypes.TeamVals.LEFT, magicResist: 100 });
+        const ordinary = createTestUnit({ name: "Peasant", team: PBTypes.TeamVals.LEFT, magicResist: 0 });
 
         expect(castAt(immune, 100)).toBe(false);
         expect(castAt(ordinary, 0)).toBe(true);
     });
 
     it("partial magic armor still allows the throw — only 100% is immunity", () => {
-        const resistant = createTestUnit({ name: "Resistant", team: PBTypes.TeamVals.LOWER, magicResist: 99 });
+        const resistant = createTestUnit({ name: "Resistant", team: PBTypes.TeamVals.LEFT, magicResist: 99 });
         expect(castAt(resistant, 99)).toBe(true);
     });
 
     it("never targets an ally, immune or not", () => {
-        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.UPPER, magicResist: 0 });
+        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.RIGHT, magicResist: 0 });
         expect(castAt(ally, 0)).toBe(false);
     });
 });

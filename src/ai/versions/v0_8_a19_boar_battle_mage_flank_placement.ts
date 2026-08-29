@@ -32,8 +32,8 @@ export const V08_A19_BOAR_BATTLE_MAGE_FLANK_PLACEMENT_POLICY = Object.freeze({
     }),
     expectedCompactOrigin: Object.freeze({
         x: 2 as const,
-        lowerY: 3 as const,
-        upperY: 13 as const,
+        leftY: 3 as const,
+        rightY: 13 as const,
     }),
     destination: Object.freeze({ x: 14 as const, preserveY: true as const }),
     treatment: V08_A19_BOAR_BATTLE_MAGE_FLANK_TREATMENT,
@@ -114,10 +114,10 @@ const evaluateBoarBattleMageFlankPlacement = (
 
     if (context.grid.getGridType() !== PBTypes.GridVals.NORMAL) return fallback("unsupported-map");
     const expectedY =
-        context.team === PBTypes.TeamVals.LOWER
-            ? V08_A19_BOAR_BATTLE_MAGE_FLANK_PLACEMENT_POLICY.expectedCompactOrigin.lowerY
-            : context.team === PBTypes.TeamVals.UPPER
-              ? V08_A19_BOAR_BATTLE_MAGE_FLANK_PLACEMENT_POLICY.expectedCompactOrigin.upperY
+        context.team === PBTypes.TeamVals.LEFT
+            ? V08_A19_BOAR_BATTLE_MAGE_FLANK_PLACEMENT_POLICY.expectedCompactOrigin.leftY
+            : context.team === PBTypes.TeamVals.RIGHT
+              ? V08_A19_BOAR_BATTLE_MAGE_FLANK_PLACEMENT_POLICY.expectedCompactOrigin.rightY
               : null;
     if (expectedY === null) return fallback("unsupported-team");
 

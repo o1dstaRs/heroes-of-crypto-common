@@ -29,15 +29,15 @@ export interface PureRangedTerminalState {
     readonly initialScale: number;
 }
 
-const LOWER = PBTypes.TeamVals.LOWER;
-const UPPER = PBTypes.TeamVals.UPPER;
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
 const RANGE = PBTypes.AttackVals.RANGE;
 
-function clamp(value: number, lower: number, upper: number): number {
+function clamp(value: number, left: number, right: number): number {
     if (Number.isNaN(value)) {
         return 0;
     }
-    return Math.min(upper, Math.max(lower, value));
+    return Math.min(right, Math.max(left, value));
 }
 
 function nonnegativeFinite(value: number): number {
@@ -81,12 +81,12 @@ export function pureRangedTerminalValue(unit: Unit, attackOpportunities: number)
 export function capturePureRangedTerminalState(unitsHolder: UnitsHolder, currentLap: number): PureRangedTerminalState {
     const originalUnits: PureRangedTerminalOriginalUnit[] = [];
     const initialByTeam = new Map<TeamType, number>([
-        [LOWER, 0],
-        [UPPER, 0],
+        [LEFT, 0],
+        [RIGHT, 0],
     ]);
     const countByTeam = new Map<TeamType, number>([
-        [LOWER, 0],
-        [UPPER, 0],
+        [LEFT, 0],
+        [RIGHT, 0],
     ]);
     const horizon = pureRangedAttackOpportunitiesToArmageddon(currentLap);
     let allRanged = true;
@@ -101,7 +101,7 @@ export function capturePureRangedTerminalState(unitsHolder: UnitsHolder, current
             team,
             activeAbilityNames: unit.getAbilities().map((ability) => ability.getName()),
         });
-        if (team !== LOWER && team !== UPPER) {
+        if (team !== LEFT && team !== RIGHT) {
             allRanged = false;
             continue;
         }
@@ -112,8 +112,8 @@ export function capturePureRangedTerminalState(unitsHolder: UnitsHolder, current
         initialByTeam.set(team, (initialByTeam.get(team) ?? 0) + pureRangedTerminalValue(unit, horizon));
     }
 
-    const eligible = allRanged && countByTeam.get(LOWER)! > 0 && countByTeam.get(UPPER)! > 0;
-    const averageInitialArmyBudget = ((initialByTeam.get(LOWER) ?? 0) + (initialByTeam.get(UPPER) ?? 0)) / 2;
+    const eligible = allRanged && countByTeam.get(LEFT)! > 0 && countByTeam.get(RIGHT)! > 0;
+    const averageInitialArmyBudget = ((initialByTeam.get(LEFT) ?? 0) + (initialByTeam.get(RIGHT) ?? 0)) / 2;
     return {
         originalUnits,
         eligible,
@@ -128,7 +128,7 @@ export function pureRangedTerminalAdvantage(
     side: TeamType,
     currentLap: number,
 ): number {
-    if (!state.eligible || (side !== LOWER && side !== UPPER)) {
+    if (!state.eligible || (side !== LEFT && side !== RIGHT)) {
         return 0;
     }
 

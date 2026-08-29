@@ -126,8 +126,8 @@ function valueDataCapture(config: IMatchConfig): IValueDataCapture | null {
 
 /** Green plays the LOWER team, red plays UPPER — matching the e2e/ranked convention. */
 export type Side = "green" | "red";
-export const GREEN_TEAM: TeamType = PBTypes.TeamVals.LOWER;
-export const RED_TEAM: TeamType = PBTypes.TeamVals.UPPER;
+export const GREEN_TEAM: TeamType = PBTypes.TeamVals.LEFT;
+export const RED_TEAM: TeamType = PBTypes.TeamVals.RIGHT;
 const sideForTeam = (team: TeamType): Side => (team === GREEN_TEAM ? "green" : "red");
 
 /** Mirrors GameActionEngine.resolveRangeTargetPosition for rejected-shot diagnostics. */
@@ -726,13 +726,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     }
     const greenZone = new RectanglePlacement(
         gridSettings,
-        PlacementPositionType.LOWER_LEFT,
+        PlacementPositionType.LEFT_BOTTOM,
         setupBeforePlacement ? fightProperties.getAugmentPlacement(GREEN_TEAM)[0] : 3,
         sideOriented,
     );
     const redZone = new RectanglePlacement(
         gridSettings,
-        PlacementPositionType.UPPER_RIGHT,
+        PlacementPositionType.RIGHT_TOP,
         setupBeforePlacement ? fightProperties.getAugmentPlacement(RED_TEAM)[0] : 3,
         sideOriented,
     );

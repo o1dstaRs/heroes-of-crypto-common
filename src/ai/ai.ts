@@ -211,7 +211,7 @@ export function findTarget(
     let selectedEnemy: Unit | undefined = undefined;
     const unitCell = unit.getBaseCell();
     const unitTeam = unit.getTeam();
-    const enemyTeam = unitTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const enemyTeam = unitTeam === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     // Apply the same target guards as the engine up front: the random fallback below must not select a
     // dead/Hidden/Cowardice-barred victim or violate a live Aggr target.
     const enemiesAround = unitsHolder
@@ -460,7 +460,7 @@ function findRangeAttackAction(
 
     const unitCell = unit.getBaseCell();
     const unitTeam = unit.getTeam();
-    const enemyTeam = unitTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const enemyTeam = unitTeam === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
 
     // Hoisted: getCells() rebuilds the footprint array on every call, and the friendly-screen check
     // below runs inside the full board scan.
@@ -815,7 +815,7 @@ export function isLineBlockedByFriendlyUnit(
     if (len <= 1) {
         return false;
     }
-    const enemyTeam = friendlyTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const enemyTeam = friendlyTeam === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     const stepX = dx / len;
     const stepY = dy / len;
     let curX = fromCell.x + stepX;
@@ -929,7 +929,7 @@ const GROUP_REGROUP_DIST = 4;
 
 export function analyzeEngagement(unit: IUnitAIRepr, matrix: number[][], unitsHolder: UnitsHolder): ITeamEngagement {
     const team = unit.getTeam();
-    const enemyTeam = team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const enemyTeam = team === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     const allies = unitsHolder.getAllAllies(team);
     const unitCell = unit.getBaseCell();
     const numCols = matrix[0]?.length ?? 0;
@@ -1052,7 +1052,7 @@ export function findMountainMeleeStrike(
         return undefined;
     }
     const unitCell = unit.getBaseCell();
-    const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     const mountainStrikeFootprint = footprintOf(unit);
     const movePath = pathHelper.getMovePath(
         unitCell,
@@ -1145,7 +1145,7 @@ function evaluateMountainStrategy(
     }
 
     const team = unit.getTeam();
-    const enemyTeam = team === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const enemyTeam = team === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
     const weOutRange = teamRangedFirepower(team, unitsHolder) > teamRangedFirepower(enemyTeam, unitsHolder);
 
     // Striking the mountain IN PLACE (already adjacent — no move, no change in exposure) is free progress
@@ -1176,7 +1176,7 @@ function evaluateMountainStrategy(
 function isBackstabCell(team: number, fromCell: HoCMath.XY, targetCell: HoCMath.XY, sideOriented: boolean): boolean {
     const along = sideOriented ? fromCell.x : fromCell.y;
     const targetAlong = sideOriented ? targetCell.x : targetCell.y;
-    if (team === PBTypes.TeamVals.LOWER) {
+    if (team === PBTypes.TeamVals.LEFT) {
         return along > targetAlong;
     }
     return along < targetAlong;
@@ -1592,7 +1592,7 @@ function doFindTarget(
         matrix,
         max_steps + unit.getSteps(),
         grid.getAggrMatrixByTeam(
-            unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER,
+            unit.getTeam() === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT,
         ),
         unit.canFly(),
         unit.isSmallSize(),
@@ -1610,7 +1610,7 @@ function doFindTarget(
                 matrix,
                 unit.getSteps(),
                 grid.getAggrMatrixByTeam(
-                    unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER,
+                    unit.getTeam() === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT,
                 ),
                 unit.canFly(),
                 unit.isSmallSize(),

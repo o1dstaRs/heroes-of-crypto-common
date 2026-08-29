@@ -19,8 +19,8 @@ import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
-const RED = PBTypes.TeamVals.UPPER;
-const GREEN = PBTypes.TeamVals.LOWER;
+const RED = PBTypes.TeamVals.RIGHT;
+const GREEN = PBTypes.TeamVals.LEFT;
 const RANGE = PBTypes.AttackVals.RANGE;
 const WINGSHIELD = "Arrows Wingshield Blessing";
 
