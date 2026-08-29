@@ -41,7 +41,12 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // pairs), so every v0.7-lineage seeded trace re-times its waits. Two isolated runs reproduced this
 // value byte-identically.
 // Previous approved digest: 3735bb4d7dd68666c98600f0d569dc2b9c8de1845cdfc54244b094d352b1ba50
-const EXPECTED_REPLAY_SHA256 = "16bdeb8e89b6705d7c08f18bc7c7fde614f47be7c57e3c64591571b8f07e8f7f";
+// Re-pinned 2026-08-29 for a Unicorn balance pass: armor 23 -> 24 (owner request). Unicorn is a Nature
+// level-3 mounted stack fielded across the seeded draws, and armor is read on every incoming hit, so a
+// trace holding one diverges from the first blow struck against it. Two isolated runs reproduced this
+// value byte-identically.
+// Previous approved digest: 16bdeb8e89b6705d7c08f18bc7c7fde614f47be7c57e3c64591571b8f07e8f7f
+const EXPECTED_REPLAY_SHA256 = "ebc718ae48eb24ad1ce2f7240b7c055a8dcc71058f1772b88d230d132d78492a";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
