@@ -19,6 +19,7 @@ import {
     type IArmyUnitSpec,
 } from "./army";
 import { runMatch, type IMatchResult, type IPlacementRecord, type ISetupAugment, type Side } from "./battle_engine";
+import { footprintCellsForRecord } from "./footprint";
 
 export const V08_A19_RANGED_CORNER_PLACEMENT_AB_SCHEMA = "hoc.v0_8_a19_ranged_corner_placement_ab.v3" as const;
 export const V08_A19_RANGED_CORNER_PLACEMENT_AB_MAP = PBTypes.GridVals.NORMAL;
@@ -187,15 +188,10 @@ const scoreForSide = (result: IMatchResult, side: Side): number =>
 const resultForScore = (score: number): "win" | "loss" | "draw" =>
     score === 1 ? "win" : score === 0 ? "loss" : "draw";
 
+// A placement record spells its footprint out only when the stack is not a square `size x size` block, so a
+// rectangle is measured on the shape it actually held rather than on the square its `size` implies.
 const footprintFor = (record: IPlacementRecord): { x: number; y: number }[] =>
-    record.size === 1
-        ? [record.cell]
-        : [
-              record.cell,
-              { x: record.cell.x - 1, y: record.cell.y },
-              { x: record.cell.x, y: record.cell.y - 1 },
-              { x: record.cell.x - 1, y: record.cell.y - 1 },
-          ];
+    footprintCellsForRecord(record.cell, record.size, record.footprintWidth, record.footprintHeight);
 
 const cellsAdjacent = (
     left: readonly { x: number; y: number }[],

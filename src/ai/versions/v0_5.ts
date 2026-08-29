@@ -39,7 +39,7 @@ import type { IDecisionContext, IAIStrategy, IPlacementContext } from "../ai_str
 import { decisionFireWalls } from "../decision_fight_state";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
 import { otherTeam, STRATEGY_V0_1 } from "./v0_1";
-import { StrategyV0_4 } from "./v0_4";
+import { fireBreathDepthAlong, StrategyV0_4 } from "./v0_4";
 import { loadV05Weights } from "./v0_5_weights";
 import { loadPlaceWeights, placeByPolicy } from "./v0_5_placement";
 
@@ -256,6 +256,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         if (!movePath.knownPaths.size) {
             return decision;
@@ -458,7 +460,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
             const targetCell = target.getBaseCell();
             const dx = Math.sign(targetCell.x - stand.x);
             const dy = Math.sign(targetCell.y - stand.y);
-            const depth = unit.hasAbilityActive("Fire Breath") && !unit.isSmallSize() ? 2 : 1;
+            // The breath carries as deep past the target as the BREATHER's own body is along the wave, which is
+            // an axis-dependent quantity: a 2x1 is two cells deep only sideways, a 1x2 only up and down. Both
+            // shipped shapes have W == H, so this is verbatim the old 1-or-2.
+            const depth = fireBreathDepthAlong(unit, dx, dy);
             const hitIds = new Set<string>([target.getId()]);
             for (let distance = 1; distance <= depth; distance += 1) {
                 const occupantId = grid.getOccupantUnitId({
@@ -648,7 +653,6 @@ export class StrategyV0_5 extends StrategyV0_4 {
             return enemies.filter((e) => e.getCells().some((ec) => fp.some((fc) => isAdjacentCell(ec, fc))));
         };
         // Directional hit-sets — mirror v0.4's aoeMeleeReposition (line) and chainLightningTarget (arc).
-        const depth = fireBreath ? (unit.isSmallSize() ? 1 : 2) : 1;
         const occupantEnemy = (cell: XY): Unit | undefined => {
             if (cell.x < 0 || cell.y < 0) {
                 return undefined;
@@ -663,6 +667,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
             const dy = Math.sign(tc.y - cell.y);
             const hit = [target];
             const seen = new Set<string>([target.getId()]);
+            const depth = fireBreathDepthAlong(unit, dx, dy);
             for (let k = 1; k <= depth; k += 1) {
                 const occ = occupantEnemy({ x: tc.x + dx * k, y: tc.y + dy * k });
                 if (occ && !seen.has(occ.getId())) {
@@ -702,6 +707,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const bc = unit.getBaseCell();
         const v4from = strike.attackFrom ?? bc;
@@ -923,6 +930,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         for (const routes of movePath.knownPaths.values()) {
             const route = routes[0];
@@ -1134,6 +1143,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const plan = planAuraMove(unit, movePath.knownPaths, gridSettings, matrix, unitsHolder, this.auraWeight);
         // 1) A reachable cell covers more allies -> reposition there (stay in support).
@@ -1341,6 +1352,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 unit.isSmallSize(),
                 unit.canTraverseLava(),
                 unit.hasAbilityActive("In Its Own World"),
+                unit.getFootprintWidth(),
+                unit.getFootprintHeight(),
             );
             for (const routes of movePath.knownPaths.values()) {
                 const route = routes[0];
@@ -1634,6 +1647,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         // A candidate's full footprint must be occupiable — getMovePath keys on the anchor, but a large
         // unit's footprint can still clip an occupied cell. Mirror v0.4's moveIsBlocked guard exactly so we

@@ -173,7 +173,7 @@ describe("v0.8 search measurement alias", () => {
 
         // Re-pinned after the hasUnactedTeammate wait gate changed these seeded action traces. Two isolated
         // runs produced the same hashes with no rejected actions or rejected waits for either version.
-        // Re-pinned again after enabling Ash Moth (Chaos L1) grew the L1 draft pool 15 -> 16, which shifts
+        // Re-pinned again after enabling Wandering Mage (Chaos L1) grew the L1 draft pool 15 -> 16, which shifts
         // every seeded roster draw and therefore both traces. Two isolated runs reproduced these hashes.
         // Re-pinned again after enabling Zena (Chaos L2) grew the L2 draft pool 12 -> 13, shifting the same
         // seeded draw. Two isolated runs reproduced these hashes.
@@ -195,7 +195,11 @@ describe("v0.8 search measurement alias", () => {
         // (the fractional shot_distance stat is floored on the board) measured in king moves, and a band's
         // last cell stays full strength, so every seeded trace diverges at its first shot. Two isolated
         // runs reproduced this digest byte-identically.
-        expect(digest("v0.7")).toBe("fbfd4d723a7ad85811c4d360f1229556db6f051816450e33fb62febf9720ada6");
+        // Re-pinned 2026-08-25 for the mounted class shipping 2x1 with the size-2 art tier (Point X3):
+        // the seeded rosters field mounted stacks, and a two-cell body changes placement, pathing and
+        // adjacency from the first lap, so both traces diverge from placement on. Two isolated runs
+        // reproduced this digest byte-identically.
+        expect(digest("v0.7")).toBe("925cb9623ec6ce7b78bbb50da749ae455e12bf6e65899808eff2a68dc274b137");
         // Re-pinned after a stack of ONE with its Resurrection charge started raising itself (floor(1/2) was
         // 0, so a lone Angel simply died). Only the v0.8 trace moves — the v0.7 line above still reproduces,
         // so the fights where it matters are v0.8's. Two isolated runs reproduced this hash.
@@ -217,7 +221,9 @@ describe("v0.8 search measurement alias", () => {
         // byte-identically. Two isolated runs reproduced this digest.
         // Re-pinned 2026-08-16 with the same squared-falloff change as the v0.7 control above; v0.8's own
         // ranged pricing mirrors the engine bands, so its trace moves too. Two isolated runs reproduced it.
-        expect(digest("v0.8")).toBe("6eecf371ef5b3c9d712d7b6a2a1ad20e2908be44234e4f1911707cf4ff88d3c9");
+        // Re-pinned 2026-08-25 with the same mounted-class 2x1 catalog change as the v0.7 control above.
+        // Two isolated runs reproduced it.
+        expect(digest("v0.8")).toBe("2dbda8a1af70c3aca424c75476cd4660bf2d2bc83d2941dfc04be961b1f716a7");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

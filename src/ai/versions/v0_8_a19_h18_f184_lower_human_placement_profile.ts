@@ -47,8 +47,11 @@ export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_CANDIDATE_ID =
 export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_BASE_VERSION = "v0.8" as const;
 export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_IMPLEMENTATION_SOURCE =
     "src/ai/versions/v0_8_a19_f184_lower_human_placement.ts" as const;
+// Re-pinned for rectangular unit footprints (2026-08-24): the layout's hand-written 1x1-or-2x2 expansion was
+// replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
+// qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "5f631b85dcc13fc1c0199d2a2aa6d2ac10f07dce903a8ba9120d5784a24c8464" as const;
+    "0e2f6a5eab0cfa228754a6f76f394289833fc734f703f8444c6ad3463862a698" as const;
 
 /**
  * Browser-safe identity for the development-selected LOWER-only f184 opening. The profile pins both this
@@ -452,19 +455,25 @@ export const V08_A19_H64_FINALIST_V6_ARMAGEDDON_ENDGAME_IMPLEMENTATION_SHA256 =
     "03c069c85fb2e010112cf29d9c6eed079cd221067352935558758606885c919e" as const;
 export const V08_A19_H64_FINALIST_V6_PLACEMENT_IMPLEMENTATION_SOURCE =
     "src/ai/versions/v0_8_a19_boar_battle_mage_flank_placement.ts" as const;
+// Re-pinned for rectangular unit footprints (2026-08-24): the layout's hand-written 1x1-or-2x2 expansion was
+// replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
+// qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H64_FINALIST_V6_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "8351dce5ee864227ee0438dc3020e2a7eabdee99ae2f86ac4d196df314904f07" as const;
+    "1029d0775f231a92c32aaa7843d09b4bccdeac04b992e00d2c28f73a487c395c" as const;
 export const V08_A19_H64_FINALIST_V6_COMPACT_PLACEMENT_IMPLEMENTATION_SOURCE =
     V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_IMPLEMENTATION_SOURCE;
+// Re-pinned for rectangular unit footprints (2026-08-24): the layout's hand-written 1x1-or-2x2 expansion was
+// replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
+// qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H64_FINALIST_V6_COMPACT_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "432353f62375db8ae85b6120036f7e1a31e607198eb4713c8edfbab5bcf41969" as const;
+    "52387ea4bc8d355403e4e74d8026431182ef6bf5430729e31f1e9511439a3629" as const;
 export const V08_A19_H64_FINALIST_V6_TOURNAMENT_ROUTING_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_H64_FINALIST_V6_TOURNAMENT_ROUTING_IMPLEMENTATION_SHA256 =
     "afc6df1b4ca82e16a43ebc5bf2cce37ab0c761bec81f8ef5714c3d80c8b2d294" as const;
 export const V08_A19_H64_FINALIST_V6_BATTLE_ENGINE_ROUTING_IMPLEMENTATION_SOURCE =
     "src/simulation/battle_engine.ts" as const;
 export const V08_A19_H64_FINALIST_V6_BATTLE_ENGINE_ROUTING_IMPLEMENTATION_SHA256 =
-    "aabbec00d051a1835011f44b1058a91c1528757a59bcca4d7a115fc13603308b" as const;
+    "5ee6b67d59cd94f6daa121e062dca910e2871765ccd09f586cb1bd4927a4bbb6" as const;
 
 /** Complete source-byte ledger for the v6 runtime delta, including entrant-A-only routing. */
 export const V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER = Object.freeze([

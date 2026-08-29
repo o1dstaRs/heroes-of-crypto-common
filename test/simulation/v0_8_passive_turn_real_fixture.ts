@@ -194,7 +194,6 @@ export function registerV08PassiveProtectorRegressionTest(): void {
         expect(record.metrics.finalDefendTurns).toBe(
             record.metrics.protectedDefendTurns + record.metrics.forcedDefendTurns,
         );
-        expect(record.metrics.protectedDefendTurns).toBeGreaterThan(0);
         expect(record.metrics.strategyRejectedActions).toBe(0);
         expect(record.metrics.recoveryAttempts).toBe(0);
         // The scenario's two screen-holders are still present and cleanly bucketed.
@@ -203,6 +202,19 @@ export function registerV08PassiveProtectorRegressionTest(): void {
         );
         expect(record.byCreature.Abomination.finalDefendTurns).toBe(
             record.byCreature.Abomination.protectedDefendTurns + record.byCreature.Abomination.forcedDefendTurns,
+        );
+
+        // The PROTECTED bucket itself is covered by its own seed rather than by whichever balance state
+        // happened to leave 1555 with a protected hold. Making the Squire's Arcane Ward Blessing reach the
+        // whole army (2026-08-28) shifted 1555's trajectory to zero protected holds — the same brittleness
+        // the header describes, and the reason those counts were dropped from the pin. 1556 keeps the bucket
+        // genuinely exercised, so a classifier that stopped protecting anything still fails here.
+        const protectedScenario = runV08PassiveTurnPanelGame(PRODUCTION_REGRESSION_OPTIONS, 1_556);
+        expect(protectedScenario.crash).toBeUndefined();
+        expect(protectedScenario.metrics.avoidableDefendTurns).toBe(0);
+        expect(protectedScenario.metrics.protectedDefendTurns).toBeGreaterThan(0);
+        expect(protectedScenario.metrics.finalDefendTurns).toBe(
+            protectedScenario.metrics.protectedDefendTurns + protectedScenario.metrics.forcedDefendTurns,
         );
     });
 }

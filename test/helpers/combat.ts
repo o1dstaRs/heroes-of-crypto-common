@@ -24,7 +24,7 @@ import type {
 } from "../../src/generated/protobuf/v1/types_gen";
 import { Grid } from "../../src/grid/grid";
 import { GRID_SIZE, MAX_X, MAX_Y, MIN_X, MIN_Y, MOVEMENT_DELTA, UNIT_SIZE_DELTA } from "../../src/grid/grid_constants";
-import { getPositionForCell } from "../../src/grid/grid_math";
+import { getPositionForFootprintAnchor } from "../../src/grid/grid_math";
 import { GridSettings } from "../../src/grid/grid_settings";
 import { AttackHandler } from "../../src/handlers/attack_handler";
 import type { IVisibleDamage } from "../../src/scene/animations";
@@ -193,16 +193,31 @@ export function createTestUnit(options: TestUnitOptions = {}): Unit {
     );
 }
 
+/**
+ * Stand a unit on the board with `cell` as its ANCHOR — the footprint's top-right cell, which is what
+ * `Unit.getBaseCell()` returns.
+ *
+ * This used to set the position to `getPositionForCell(cell)` and register a single cell, which produced an
+ * INCOHERENT multi-cell unit: at a cell centre a 2x2's `getCells()` is the block whose MINIMUM corner is
+ * `cell`, while its `getBaseCell()` is `cell` itself — so the body and its own anchor disagreed, and the
+ * grid held one cell of four. Nothing noticed because MoveHandler swallowed the occupancy refusal that
+ * followed. Both halves are fixed here: the position is the footprint's centre, and the whole body is
+ * registered.
+ */
 export function placeUnit(grid: Grid, unitsHolder: UnitsHolder, unit: Unit, cell: XY): void {
-    const position = getPositionForCell(
+    const position = getPositionForFootprintAnchor(
+        testGridSettings,
         cell,
-        testGridSettings.getMinX(),
-        testGridSettings.getStep(),
-        testGridSettings.getHalfStep(),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     );
     unit.setPosition(position.x, position.y);
-    grid.occupyCell(
-        cell,
+    // Register the unit's WHOLE body, not just `cell`. occupyCell writes a single cell, so a multi-cell test
+    // unit used to stand on a board that had only one of its cells marked — and Grid then refused the next
+    // occupancy write for it ("a unit may only be re-registered over a footprint of the same size"), a
+    // refusal MoveHandler used to swallow. Now that the refusal is loud, the harness has to be honest.
+    grid.occupyCells(
+        unit.getCells(),
         unit.getId(),
         unit.getTeam(),
         unit.getAttackRange(),

@@ -9,6 +9,8 @@
  * -----------------------------------------------------------------------------
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
 
 import abilitiesJson from "../../src/configuration/abilities.json";
@@ -18,6 +20,7 @@ import effectsJson from "../../src/configuration/effects.json";
 import spellsJson from "../../src/configuration/spells.json";
 import { AbilityPowerType } from "../../src/abilities/ability_properties";
 import {
+    MAX_VERIFIED_FOOTPRINT_SIDE,
     getAbilityConfig,
     getAuraEffectConfig,
     getCreatureConfig,
@@ -39,6 +42,39 @@ describe("config_provider", () => {
             expect(hero.attack_type).not.toBe(PBTypes.AttackVals.NO_ATTACK);
             expect(hero.movement_type).not.toBe(PBTypes.MovementVals.NO_MOVEMENT);
         }
+    });
+
+    /**
+     * A creature's catalog KEY and its `name` field are the same string, and the config layer relies on it:
+     * callers look a creature up by key and then read `name` back off the built properties.
+     *
+     * This is pinned because the invariant used to be patched around rather than held. A rename that landed
+     * in the code before the data (Ash Moth -> Wandering Mage) left `getCreatureConfig` carrying
+     * `creatureName === "Wandering Mage" ? creatureName : creatureConfig.name` — a branch that silently
+     * preferred the key for exactly one creature. The data was fixed later and the branch outlived it as a
+     * no-op, reading as though that creature were special when it was not.
+     *
+     * If this fails, the fix is the DATA: make the entry's `name` match its key. Do not reintroduce a
+     * per-creature branch — a mismatch is a catalog bug and should say so here rather than be absorbed
+     * silently at every call site.
+     */
+    it("names every creature exactly as its catalog key", () => {
+        const mismatches: string[] = [];
+        for (const [factionName, creatures] of objectEntries(creaturesJson)) {
+            if (factionName === "version" || !isRecord(creatures)) {
+                continue;
+            }
+
+            for (const [creatureName, creatureConfig] of Object.entries(creatures)) {
+                if (!isRecord(creatureConfig)) {
+                    continue;
+                }
+                if (creatureConfig.name !== creatureName) {
+                    mismatches.push(`${factionName}/${creatureName}: name=${String(creatureConfig.name)}`);
+                }
+            }
+        }
+        expect(mismatches).toEqual([]);
     });
 
     it("builds creature configs for every creature catalog entry", () => {
@@ -286,3 +322,128 @@ function objectEntries(value: unknown): [string, unknown][] {
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
+
+/**
+ * The engine generalises to an arbitrary W x H, but the bound states what has been MEASURED. Whole matches
+ * with 1x1, 2x2, 2x1, 1x2, 3x1, 1x3, 3x2, 2x3 and 3x3 stacks on the board produce zero engine-rejected
+ * actions across all four boards; side 4 has simply never been clashed.
+ *
+ * A 3x1 used to measure dozens of declined melee strikes — an earlier version of this comment said so in
+ * the present tense and was left behind when the bound moved from 2 to 3. The cause was never the side
+ * length: it was a family of call sites reading `getCellForPosition(unit.getPosition())` as the body's
+ * ANCHOR, which is only true while both sides are at most 2.
+ *
+ * The bound is enforced where a footprint is DECLARED, so an unsupported shape fails at configuration time
+ * instead of becoming an AI that proposes refused moves all match.
+ */
+describe("footprint sides are bounded to what the engine is verified for", () => {
+    const FOOTPRINT_OVERRIDE_ENV = "HOC_FOOTPRINT_OVERRIDES";
+
+    const withOverrides = <T>(value: string, body: () => T): T => {
+        const previous = process.env[FOOTPRINT_OVERRIDE_ENV];
+        process.env[FOOTPRINT_OVERRIDE_ENV] = value;
+        try {
+            return body();
+        } finally {
+            if (previous === undefined) {
+                delete process.env[FOOTPRINT_OVERRIDE_ENV];
+            } else {
+                process.env[FOOTPRINT_OVERRIDE_ENV] = previous;
+            }
+        }
+    };
+
+    const tiger = () => getCreatureConfig(PBTypes.TeamVals.LOWER, "Nature", "White Tiger", "white_tiger_512", 1);
+
+    it("accepts the shapes the clash proves — every side up to the verified bound", () => {
+        expect(MAX_VERIFIED_FOOTPRINT_SIDE).toBe(3);
+        for (const [width, height] of [
+            [1, 1],
+            [2, 1],
+            [1, 2],
+            [2, 2],
+            [3, 1],
+            [1, 3],
+            [3, 2],
+            [2, 3],
+            [3, 3],
+        ] as const) {
+            const properties = withOverrides(`White Tiger=${width}x${height}`, tiger);
+            expect([properties.footprint_width, properties.footprint_height]).toEqual([width, height]);
+        }
+    });
+
+    it("ignores a QA override the engine cannot honour rather than building a broken unit", () => {
+        // One past the bound, whatever the bound currently is — the point of the test is that an
+        // unverified shape is refused, not that any particular number is refused. Refusing it falls back
+        // to the SHIPPED shape, which for White Tiger is its declared 2x1.
+        const beyond = MAX_VERIFIED_FOOTPRINT_SIDE + 1;
+        const properties = withOverrides(`White Tiger=${beyond}x1`, tiger);
+        expect([properties.footprint_width, properties.footprint_height]).toEqual([2, 1]);
+    });
+});
+
+/**
+ * The mounted class ships 2x1 — two cells long, one tall (Point X3). This pin is the catalog's source of
+ * truth for WHICH creatures are rectangular; the engine-side behavior is proven by the clash harness and
+ * the footprint suites.
+ *
+ * If this test is failing because the declarations were removed from creatures.json to quiet the
+ * size === max(width, height) validator: the correct fix is `size: 2` alongside the footprint (size is the
+ * legacy ART tier and must read as the bigger square), NOT deleting the footprint. That deletion already
+ * happened once (common 1696372) and silently turned the whole mounted class back into squares.
+ */
+describe("the mounted class ships 2x1", () => {
+    const MOUNTED_2X1: ReadonlyArray<readonly [string, string]> = [
+        ["Life", "Griffin"],
+        ["Nature", "Wolf"],
+        ["Nature", "White Tiger"],
+        ["Nature", "Unicorn"],
+        ["Nature", "Mantis"],
+        ["Nature", "Pegasus"],
+        ["Chaos", "Manticore"],
+        ["Chaos", "Nightmare"],
+        ["Might", "Centaur"],
+        ["Might", "Wolf Rider"],
+        ["Might", "Nomad"],
+        ["Might", "Hyena"],
+        ["Might", "Wyvern"],
+    ];
+
+    it("every mounted creature declares 2x1 with the size-2 art tier", () => {
+        for (const [factionName, creatureName] of MOUNTED_2X1) {
+            const properties = getCreatureConfig(
+                PBTypes.TeamVals.LOWER,
+                factionName,
+                creatureName,
+                `${creatureName.toLowerCase().replace(/ /g, "_")}_512`,
+                1,
+            );
+            expect({
+                creatureName,
+                width: properties.footprint_width,
+                height: properties.footprint_height,
+                size: properties.size,
+            }).toEqual({ creatureName, width: 2, height: 1, size: 2 });
+        }
+    });
+
+    it("and no other creature declares a rectangle", () => {
+        const declared = new Set(MOUNTED_2X1.map(([, creatureName]) => creatureName));
+        const catalog = JSON.parse(
+            readFileSync(join(import.meta.dir, "..", "..", "src", "configuration", "creatures.json"), "utf8"),
+        ) as Record<string, Record<string, { footprint_width?: number; footprint_height?: number }>>;
+        for (const creatures of Object.values(catalog)) {
+            if (typeof creatures !== "object") continue;
+            for (const [creatureName, config] of Object.entries(creatures)) {
+                if (!config || typeof config !== "object") continue;
+                if (config.footprint_width !== undefined || config.footprint_height !== undefined) {
+                    expect({ creatureName, declared: declared.has(creatureName) }).toEqual({
+                        creatureName,
+                        declared: true,
+                    });
+                }
+            }
+        }
+    });
+});

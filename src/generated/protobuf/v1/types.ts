@@ -143,7 +143,7 @@ export namespace PBTypes {
         MERMAID = 46,
         DRYAD = 47,
         BLACKSMITH = 48,
-        ASH_MOTH = 49,
+        WANDERING_MAGE = 49,
         ZENA = 50,
         WYVERN = 51,
         TRENT = 52,

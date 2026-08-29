@@ -32,6 +32,7 @@ import {
     applyWaitScorerWeightsV2,
     applyWaitScorerWeightsV3,
     v07BakedWaitWeights,
+    v07WaitWeightsForTeam,
     v07WaitWeightsV2ForVersion,
     v07WaitWeightsV2SupportsGrid,
     v07WaitWeightsV3,
@@ -338,7 +339,13 @@ export class StrategyV0_7 extends StrategyV0_6 {
         ) {
             return applyWaitScorerWeightsV2(unit, context, decision, v2);
         }
-        return applyWaitScorerWeights(unit, context, decision, v07BakedWaitWeights());
+        const teamWaitOverride = v07WaitWeightsForTeam(unit.getTeam());
+        return applyWaitScorerWeights(
+            unit,
+            context,
+            decision,
+            teamWaitOverride !== undefined ? teamWaitOverride : v07BakedWaitWeights(),
+        );
     }
 }
 

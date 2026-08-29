@@ -140,6 +140,9 @@ export function fillValueFeatures(
     team: TeamType,
     scratch: IValueFeatureScratch = createValueFeatureScratch(),
 ): number[] {
+    // POLICY seam, not the raw board flag: a battery's legacy control seat keeps the shipped
+    // raw-Y features on a side board (see FightProperties.isSideAxisPolicyTeam).
+    const sideOrientedBoard = fightProperties.isSideAxisPolicyTeam(team);
     let ourHP = 0;
     let enemyHP = 0;
     let ourCnt = 0;
@@ -169,7 +172,12 @@ export function fillValueFeatures(
         const alive = u.getAmountAlive();
         const wounded = died + alive > 0 ? died / (died + alive) : 0;
         const cell = u.getBaseCell();
-        const adv = u.getTeam() === LOWER ? cell.y / (GRID_SIZE - 1) : (GRID_SIZE - 1 - cell.y) / (GRID_SIZE - 1);
+        // Advance is DEPTH toward the enemy, not raw Y: on the side-oriented ranked board the axis
+        // of advance is X (see grid_math.advanceDepthOfCell — inlined here to keep this loop
+        // allocation-free). With the wrong axis, dims 6-7 feed lateral noise into every learned
+        // consumer (v0.7 leaf, wait scorer, IL, v0.9).
+        const along = sideOrientedBoard ? cell.x : cell.y;
+        const adv = u.getTeam() === LOWER ? along / (GRID_SIZE - 1) : (GRID_SIZE - 1 - along) / (GRID_SIZE - 1);
         // A unit "yet to act" this lap has neither made its turn nor parked on the hourglass.
         const yet =
             !fightProperties.hasAlreadyMadeTurn(u.getId()) && !fightProperties.hasAlreadyHourglass(u.getId()) ? 1 : 0;

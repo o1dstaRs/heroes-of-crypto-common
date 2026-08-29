@@ -13,7 +13,6 @@ import { getAbilitiesWithPosisionCoefficient } from "../abilities/ability_helper
 import { hasAnyDeepWoundsAbility } from "../abilities/deep_wounds_ability";
 import type { GameAction } from "../engine/actions";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getCellsAroundPosition, getPositionForCell } from "../grid/grid_math";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import type { IDecisionContext } from "./ai_strategy";
@@ -38,16 +37,16 @@ export interface IPrimaryMeleeDamageEstimate {
 
 const clampChance = (chance: number): number => Math.min(100, Math.max(0, chance)) / 100;
 
-function standCells(unit: Unit, context: IDecisionContext, standCell: XY): XY[] {
-    if (unit.isSmallSize()) {
-        return [{ x: standCell.x, y: standCell.y }];
-    }
-    const settings = context.grid.getSettings();
-    const position = getPositionForCell(standCell, settings.getMinX(), settings.getStep(), settings.getHalfStep());
-    return getCellsAroundPosition(settings, {
-        x: position.x - settings.getHalfStep(),
-        y: position.y - settings.getHalfStep(),
-    });
+/**
+ * The cells the unit would stand on after moving to `standCell` — the aura pickup it is about to walk into.
+ *
+ * This used to rebuild a 2x2 by nudging the cell centre half a step down and left onto the block's corner,
+ * which is the same four cells the unit's own footprint gives back but only ever four. A 1x2 would have had
+ * its post-move War Anger measured over two cells it does not occupy, and the estimate feeds the Rapid
+ * Charge reservation, so the wrong shape here silently mis-prices the whole melee.
+ */
+function standCells(unit: Unit, standCell: XY): XY[] {
+    return unit.getFootprintCellsForAnchor(standCell);
 }
 
 function chargeDistance(actions: readonly GameAction[]): number {
@@ -97,7 +96,7 @@ export function estimatePrimaryMeleeDamage(
 
     const attackerAbilityPower = fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam());
     const defenderAbilityPower = fightProperties.getAdditionalAbilityPowerPerTeam(target.getTeam());
-    const futureAuraAttack = context.unitsHolder.getUnitAuraAttackMod(unit, standCells(unit, context, standCell));
+    const futureAuraAttack = context.unitsHolder.getUnitAuraAttackMod(unit, standCells(unit, standCell));
     const attackWithoutCurrentAura = Math.max(
         unit.getBaseAttack(),
         unit.getAttack() - unit.getCurrentAttackModIncrease(),
@@ -129,12 +128,20 @@ export function estimatePrimaryMeleeDamage(
     if (paralysis) {
         handlerMultiplier *= (100 - paralysis.getPower()) / 100;
     }
+    // Backstab's trigger is measured against the victim's extent ALONG THE AXIS OF ADVANCE (an UPPER-team
+    // attacker has to clear the whole body, not one cell of it) — height on the classic board, width on the
+    // side-oriented one. The boolean can only ever say 1 or 2, so passing the real sides leaves both shipped
+    // shapes at exactly the margin they had and stops a 2x1 target from being priced as if it had a second
+    // row. Both sides go in because this must price what the engine will actually do.
     for (const ability of getAbilitiesWithPosisionCoefficient(
         unit.getAbilities(),
         standCell,
         target.getBaseCell(),
         target.isSmallSize(),
         unit.getTeam(),
+        target.getFootprintHeight(),
+        fightProperties.isSideAxisPolicyTeam(unit.getTeam()),
+        target.getFootprintWidth(),
     )) {
         handlerMultiplier *= unit.calculateAbilityMultiplier(ability, attackerAbilityPower);
     }

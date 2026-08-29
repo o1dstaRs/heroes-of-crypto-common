@@ -83,7 +83,7 @@ describe("draft ship genome", () => {
         const nightmare = PBTypes.CreatureVals.NIGHTMARE;
         const satyr = PBTypes.CreatureVals.SATYR;
         const arbalester = PBTypes.CreatureVals.ARBALESTER;
-        const ashMoth = PBTypes.CreatureVals.ASH_MOTH;
+        const wanderingMage = PBTypes.CreatureVals.WANDERING_MAGE;
         const control = createLeagueGenome("control", LEAGUE_ANCHOR_GENOME);
         const candidate = createLeagueGenome("spell-ranged", LEAGUE_ANCHOR_GENOME, false, {
             draftSpellRangedPolicy: RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
@@ -92,7 +92,7 @@ describe("draft ship genome", () => {
         for (const creatureId of [magicDragon, battleMage, arbalester]) {
             expect(isRangedDamageCreature(creatureId)).toBe(true);
         }
-        for (const creatureId of [nightmare, satyr, ashMoth]) {
+        for (const creatureId of [nightmare, satyr, wanderingMage]) {
             expect(isRangedDamageCreature(creatureId)).toBe(false);
         }
         for (const creatureId of [magicDragon, battleMage, nightmare]) {
@@ -104,7 +104,7 @@ describe("draft ship genome", () => {
         expect(rankedSpellRangedCoPlayAffinity(magicDragon, [satyr])).toBeGreaterThan(0);
         expect(rankedSpellRangedCoPlayAffinity(nightmare, [magicDragon])).toBeGreaterThan(0);
         expect(rankedSpellRangedCoPlayAffinity(satyr, [magicDragon])).toBeGreaterThan(0);
-        expect(rankedSpellRangedCoPlayAffinity(magicDragon, [ashMoth])).toBe(0);
+        expect(rankedSpellRangedCoPlayAffinity(magicDragon, [wanderingMage])).toBe(0);
         expect(rankedSpellRangedCoPlayAffinity(magicDragon, [PBTypes.CreatureVals.PEASANT])).toBe(0);
         expect(projectDraftGenomeForShipping(candidate).draftSpellRangedPolicy).toBe(
             RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
@@ -186,12 +186,14 @@ describe("draft ship genome", () => {
         expect(applyCreatureRoleFitMultiplier(-30, 1)).toBe(-30);
 
         const negativeGenome = parseDraftGenome(LEAGUE_ROUND3_DRAFT_SPEC);
-        const ashMoth = PBTypes.CreatureVals.ASH_MOTH;
+        const wanderingMage = PBTypes.CreatureVals.WANDERING_MAGE;
         const squire = PBTypes.CreatureVals.SQUIRE;
-        const offer = [ashMoth, squire];
+        const offer = [wanderingMage, squire];
         expect(offer.every((creatureId) => draftGenomeCreatureScore(negativeGenome, creatureId) < 0)).toBe(true);
         expect(pickDraftGenomeCreature(negativeGenome, offer, [], [])).toBe(squire);
-        expect(pickDraftGenomeCreature(negativeGenome, offer, [], [PBTypes.CreatureVals.ARBALESTER])).toBe(ashMoth);
+        expect(pickDraftGenomeCreature(negativeGenome, offer, [], [PBTypes.CreatureVals.ARBALESTER])).toBe(
+            wanderingMage,
+        );
     });
 
     it("composes Healer sustain with Angel's active ranged-line screen only in the intended matchup", () => {

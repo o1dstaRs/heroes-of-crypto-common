@@ -13,6 +13,7 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import { PlacementAugment } from "../augments/augment_properties";
 import { MAX_UNITS_PER_TEAM } from "../constants";
 import { SpellPowerType, SpellTargetType } from "../spells/spell_properties";
+import { getFootprintCellsForAnchor } from "../grid/grid_math";
 import type { XY } from "../utils/math";
 
 export type TacticalSplitRole = "aura" | "support" | "shield" | "cover" | "bait";
@@ -43,6 +44,14 @@ export interface ITacticalSplitPlan {
 export interface ITacticalSplitPlacementUnit {
     readonly id: string;
     readonly small: boolean;
+    /**
+     * The real body, when the caller knows it. `small` can only ever say 1x1 or 2x2, so a rectangle read as
+     * a square here reserved cells the incumbent does not hold and left the ones it does hold free — the
+     * split then stacked a new unit onto an occupied cell. Optional so a caller that genuinely has only the
+     * boolean still describes both shipped squares exactly.
+     */
+    readonly footprintWidth?: number;
+    readonly footprintHeight?: number;
 }
 
 export interface ITacticalSplitStack {
@@ -56,6 +65,8 @@ export interface ITacticalSplitPlacementContext {
     readonly legalCellHashes: ReadonlySet<number>;
     /** New split stacks in planner priority order. Only the first becomes the isolated decoy. */
     readonly splitStacks: readonly ITacticalSplitStack[];
+    /** This team's POLICY reasons along the side-board advance axis (X). Absent = classic Y. */
+    readonly sideOrientedPlacement?: boolean;
 }
 
 /** Structural on purpose: server and client may temporarily consume different common package instances. */
@@ -233,15 +244,13 @@ export function tacticalSplitUnitFromUnit(unit: ITacticalSplitUnitSource): ITact
     };
 }
 
-const footprintFor = (unit: ITacticalSplitPlacementUnit, base: XY): XY[] =>
-    unit.small
-        ? [base]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+const footprintFor = (unit: ITacticalSplitPlacementUnit, base: XY): XY[] => {
+    const width = unit.footprintWidth ?? (unit.small ? 1 : 2);
+    const height = unit.footprintHeight ?? (unit.small ? 1 : 2);
+    // The 1x1 and 2x2 cases keep their exact cells and ORDER: the shared expansion walks -x then -y from
+    // the anchor, which is the order the two hand-written lists spelled out.
+    return getFootprintCellsForAnchor(base, width, height);
+};
 
 const chebyshev = (left: XY, right: XY): number => Math.max(Math.abs(left.x - right.x), Math.abs(left.y - right.y));
 
@@ -275,13 +284,20 @@ export function applyTacticalSplitPlacement(
         };
     };
     const centerX = 7.5;
+    // Axis of advance (X when this seat is side-oriented); lateral = the other axis. All the
+    // sorts below (frontness/backness, corridor/edge distance, side preference) run through
+    // these so the decoy/cover geometry rotates with the board.
+    const sideOriented = context.sideOrientedPlacement === true;
+    const along = (cell: XY): number => (sideOriented ? cell.x : cell.y);
+    const lateralOf = (cell: XY): number => (sideOriented ? cell.y : cell.x);
     const isolationFor = (cell: XY, alliedBases: readonly XY[]): number =>
         alliedBases.length ? Math.min(...alliedBases.map((base) => chebyshev(cell, base))) : 16;
     const decoy = context.splitStacks[0];
     const decoyUnit = decoy ? units.find((unit) => unit.id === decoy.unitId) : undefined;
     if (decoy && decoy.role !== "cover" && decoyUnit?.small) {
         const { candidates, alliedBases } = candidatesFor(decoy.unitId);
-        const frontness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cell.y : 15 - cell.y);
+        const frontness = (cell: XY): number =>
+            context.team === PBTypes.TeamVals.LOWER ? along(cell) : 15 - along(cell);
         const mountainUtility =
             context.gridType === PBTypes.GridVals.BLOCK_CENTER &&
             (decoy.role === "aura" || decoy.role === "support" || decoy.role === "shield");
@@ -289,14 +305,16 @@ export function applyTacticalSplitPlacement(
             const frontDelta = frontness(right) - frontness(left);
             if (frontDelta) return frontDelta;
             if (mountainUtility) {
-                const corridorDelta = Math.abs(left.x - centerX) - Math.abs(right.x - centerX);
+                const corridorDelta = Math.abs(lateralOf(left) - centerX) - Math.abs(lateralOf(right) - centerX);
                 if (corridorDelta) return corridorDelta;
             }
             const isolationDelta = isolationFor(right, alliedBases) - isolationFor(left, alliedBases);
             if (isolationDelta) return isolationDelta;
-            const edgeDelta = Math.abs(right.x - centerX) - Math.abs(left.x - centerX);
+            const edgeDelta = Math.abs(lateralOf(right) - centerX) - Math.abs(lateralOf(left) - centerX);
             if (edgeDelta) return edgeDelta;
-            return context.team === PBTypes.TeamVals.LOWER ? left.x - right.x : right.x - left.x;
+            return context.team === PBTypes.TeamVals.LOWER
+                ? lateralOf(left) - lateralOf(right)
+                : lateralOf(right) - lateralOf(left);
         });
         if (candidates[0]) result.set(decoy.unitId, candidates[0]);
     }
@@ -306,13 +324,14 @@ export function applyTacticalSplitPlacement(
         const coverUnit = units.find((unit) => unit.id === cover.unitId);
         if (!coverUnit?.small) continue;
         const { candidates, alliedBases } = candidatesFor(cover.unitId);
-        const backness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? 15 - cell.y : cell.y);
+        const backness = (cell: XY): number =>
+            context.team === PBTypes.TeamVals.LOWER ? 15 - along(cell) : along(cell);
         const preferLeft = context.team === PBTypes.TeamVals.LOWER ? coverIndex % 2 === 0 : coverIndex % 2 !== 0;
-        const sideDistance = (cell: XY): number => (preferLeft ? cell.x : 15 - cell.x);
+        const sideDistance = (cell: XY): number => (preferLeft ? lateralOf(cell) : 15 - lateralOf(cell));
         candidates.sort((left, right) => {
             const backDelta = backness(right) - backness(left);
             if (backDelta) return backDelta;
-            const edgeDelta = Math.abs(right.x - centerX) - Math.abs(left.x - centerX);
+            const edgeDelta = Math.abs(lateralOf(right) - centerX) - Math.abs(lateralOf(left) - centerX);
             if (edgeDelta) return edgeDelta;
             const sideDelta = sideDistance(left) - sideDistance(right);
             if (sideDelta) return sideDelta;

@@ -12,6 +12,7 @@
 import { hasDoubleShotAbility } from "../../abilities/ability_helper";
 import { evaluateAffectedUnits } from "../../abilities/aoe_range_ability";
 import type { GameAction } from "../../engine/actions";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { isSpellUsableByCaster } from "../../spells/spell_helper";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
@@ -45,6 +46,13 @@ export const V08_CRAFT_CLUSTER_MAGIC_AOE_ABILITIES: readonly string[] = ["Fire B
 export const V08_CRAFT_CLUSTER_MAGIC_AOE_CREATURES: readonly string[] = ["Battle Mage", "Magic Dragon", "Nightmare"];
 
 const key = (cell: XY): number => (cell.x << 4) | cell.y;
+/**
+ * `key` packs four bits per axis, so a coordinate outside 0..15 does not merely miss — it ALIASES. `y = 16`
+ * sets bit 4, which is the low bit of x's field, making `key(x, 16) === key(x | 1, 0)`. Any probe that walks
+ * off the board therefore has to be dropped BEFORE it is hashed, or it claims a real cell in row 0.
+ */
+const GRID_CELLS = 16;
+const onBoard = (cell: XY): boolean => cell.x >= 0 && cell.y >= 0 && cell.x < GRID_CELLS && cell.y < GRID_CELLS;
 const sameCell = (left: XY, right: XY): boolean => left.x === right.x && left.y === right.y;
 const finitePositive = (value: number): number => (Number.isFinite(value) ? Math.max(0, value) : 0);
 
@@ -55,15 +63,9 @@ const craftCells = (anchor: XY): XY[] => [
     { x: anchor.x + 1, y: anchor.y + 1 },
 ];
 
-const footprintForBase = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+// The unit's real body, from the one shared expansion — the same aura-coverage and fixed-cell reasoning as
+// the backline protector, which used to keep its own identical copy of this.
+const footprintForBase = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
 const footprintDistance = (left: readonly XY[], right: readonly XY[]): number => {
     let closest = Infinity;
@@ -319,7 +321,7 @@ const bestAssignment = (
     inherited: ReadonlyMap<string, XY>,
     protectedEdges: readonly IProtectedPlacementEdge[],
 ): IAssignment | undefined => {
-    const targetKeys = new Set(craftCells(anchor).map(key));
+    const targetKeys = new Set(craftCells(anchor).filter(onBoard).map(key));
     const legalBases = [...legal]
         .map((cellKey) => ({ x: cellKey >> 4, y: cellKey & 0xf }))
         .sort((left, right) => left.y - right.y || left.x - right.x);
@@ -429,7 +431,7 @@ export function v08BlacksmithCraftPlacement(
     const legal = context.placement.possibleCellHashes();
     const anchors = [...legal]
         .map((cellKey) => ({ x: cellKey >> 4, y: cellKey & 0xf }))
-        .filter((anchor) => craftCells(anchor).every((cell) => legal.has(key(cell))))
+        .filter((anchor) => craftCells(anchor).every((cell) => onBoard(cell) && legal.has(key(cell))))
         .sort((left, right) => left.y - right.y || left.x - right.x);
     const recipients = units
         .filter((unit) => !unit.isDead())

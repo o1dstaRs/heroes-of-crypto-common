@@ -15,8 +15,15 @@ export interface IPlacement {
     getType(): PlacementType;
     getSize(): number;
     isAllowed(v: XY): boolean;
+    /** Every cell of the deployment zone. Shape-independent: a unit may COVER any of these. */
     possibleCellHashes(): Set<number>;
-    possibleCellPositions(isSmallUnit?: boolean): XY[];
+    /**
+     * The anchors (top-right footprint cells) a `footprintWidth` x `footprintHeight` body may be placed on,
+     * i.e. those whose whole footprint stays inside the zone. The width/height live on the interface so that
+     * polymorphic callers can pass a unit's real footprint without casting the placement to a concrete class;
+     * they default to the legacy `isSmallUnit ? 1 : 2` square so existing call sites keep their meaning.
+     */
+    possibleCellPositions(isSmallUnit?: boolean, footprintWidth?: number, footprintHeight?: number): XY[];
 }
 
 export enum PlacementPositionType {

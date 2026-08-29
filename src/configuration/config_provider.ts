@@ -30,6 +30,7 @@ import {
     ToSpellPowerType,
     ToSpellTargetType,
 } from "../spells/spell_properties";
+import { normalizeFootprintSide } from "../grid/grid_math";
 import { ToAttackType, ToMovementType, UnitProperties } from "../units/unit_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
@@ -226,6 +227,159 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
     );
 };
 
+/**
+ * The optional rectangular footprint of a creature. `size` remains the LEGACY SQUARE size — it picks the art
+ * tier (_128 vs _256) and still feeds the wire's UnitSizeVals enum and every consumer this migration has not
+ * reached — while the footprint is what the engine reserves on the board.
+ *
+ * The two must agree on `size === max(width, height)`, enforced below. It is not derivable in either
+ * direction (2x1 and 1x2 both max to 2), so it is declared and checked rather than computed, and the
+ * direction of the rule is deliberate: an un-migrated `size === 2 ? large : small` branch then treats a
+ * rectangle as the BIGGER square, which over-reserves cells and refuses a legal placement. The opposite
+ * choice would have it under-reserve and let a second stack overlap the half of the body it forgot.
+ */
+interface ICreatureFootprintConfig {
+    footprint_width?: unknown;
+    footprint_height?: unknown;
+}
+
+/**
+ * Read one declared footprint side. A side is a count of whole cells, so anything that is not a positive
+ * integer is a configuration bug and throws like every other malformed field in this file — silently
+ * flooring it would hand the engine a unit whose body is a different shape than the board reserved for it.
+ */
+/**
+ * The largest footprint side the engine is VERIFIED for.
+ *
+ * This is a claim about what has been MEASURED, not about what the geometry can express — the helpers in
+ * grid_math generalise to any W x H, and the anchor round trip is exact well past this number. What bounds
+ * it is the clash: 1x1, 2x2, 2x1, 1x2, 3x1, 1x3, 3x2, 2x3 and 3x3 all play whole matches under every AI
+ * version with zero engine-rejected actions, across all four boards. Side 4 has simply never been run.
+ *
+ * Side 3 used to be genuinely broken — ~64 refused melee actions per 8 matches — and the cause was not the
+ * geometry but a family of call sites that read `getCellForPosition(unit.getPosition())` as "the unit's
+ * anchor". `position` is the body's CENTRE, and the two coincide only up to side 2 (for a 2x1 / 1x2 merely
+ * because the centre lands on a cell boundary and `floor` breaks the tie towards the anchor). Those sites
+ * now ask for the anchor, and the shapes above measure clean.
+ *
+ * The bound stays enforced rather than assumed: a configuration the engine has not been shown to honour
+ * should fail loudly where it is declared, not degrade into an AI that proposes moves the engine refuses
+ * all match. Raising it further means running the clash for that side first.
+ *
+ * Note this is not permission to ship a 3-cell creature. Art is authored per size tier and stops at two
+ * cells, and the deployment strips are shallow; a creature that ships deeper than 2 needs both addressed.
+ */
+export const MAX_VERIFIED_FOOTPRINT_SIDE = 3;
+
+const getCreatureFootprintSide = (
+    creatureName: string,
+    key: "footprint_width" | "footprint_height",
+    value: unknown,
+): number | undefined => {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+
+    if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+        throw new TypeError(`Invalid ${key} for creature ${creatureName} = ${value}`);
+    }
+
+    if (value > MAX_VERIFIED_FOOTPRINT_SIDE) {
+        throw new TypeError(
+            `Unsupported ${key} for creature ${creatureName} = ${value}: ` +
+                `footprint sides above ${MAX_VERIFIED_FOOTPRINT_SIDE} are not supported by the engine yet`,
+        );
+    }
+
+    return value;
+};
+
+/**
+ * QA/dev footprint overrides, so a rectangular body can be exercised end to end — headless sims, the server,
+ * and a real browser match — WITHOUT changing any shipped creature's data. Turning a creature rectangular is
+ * a balance and art decision, not an engineering one; this is the switch that lets the engineering be proven
+ * before that decision is made.
+ *
+ * Node/CI:  HOC_FOOTPRINT_OVERRIDES="White Tiger=2x1,Hyena=2x1"
+ * Browser:  globalThis.__hocFootprintOverrides = "White Tiger=2x1"   (before the first unit is built)
+ *
+ * Parsed on every read rather than cached, so a dev console can flip it mid-session. Malformed entries are
+ * ignored — this is a diagnostic lever, and an unparsable one must not take a real match down with it.
+ *
+ * An override deliberately leaves `size` alone and so skips the size === max(W, H) rule the JSON must obey:
+ * it exists to exercise the ENGINE, and re-tiering the art mid-session would only ask for a _256 texture the
+ * overridden creature does not have. A creature that ships rectangular declares both, and gets art to match.
+ */
+const readFootprintOverrideSource = (): string => {
+    const injected = (globalThis as { __hocFootprintOverrides?: unknown }).__hocFootprintOverrides;
+    if (typeof injected === "string" && injected) {
+        return injected;
+    }
+    // `process` is absent in the browser bundle and `env` can be absent in exotic hosts.
+    const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+    return env?.HOC_FOOTPRINT_OVERRIDES ?? "";
+};
+
+const getCreatureFootprintOverride = (creatureName: string): { width: number; height: number } | undefined => {
+    const source = readFootprintOverrideSource();
+    if (!source) {
+        return undefined;
+    }
+    for (const entry of source.split(",")) {
+        const separator = entry.lastIndexOf("=");
+        if (separator <= 0) {
+            continue;
+        }
+        if (entry.slice(0, separator).trim() !== creatureName) {
+            continue;
+        }
+        const shape = /^([0-9]+)x([0-9]+)$/.exec(entry.slice(separator + 1).trim());
+        if (!shape) {
+            continue;
+        }
+        const width = Number(shape[1]);
+        const height = Number(shape[2]);
+        // Same bound as the JSON path. This lever exists to exercise shapes the engine can actually honour;
+        // letting it conjure an unsupported one would only manufacture a broken match to debug.
+        if (width > 0 && height > 0 && width <= MAX_VERIFIED_FOOTPRINT_SIDE && height <= MAX_VERIFIED_FOOTPRINT_SIDE) {
+            return { width, height };
+        }
+    }
+    return undefined;
+};
+
+const creatureFootprintCache = new Map<string, { width: number; height: number }>();
+
+/**
+ * A creature's board footprint WITHOUT building its full UnitProperties.
+ *
+ * The AI has to know how big a summon is before it decides where to put it, and it asks once per candidate
+ * cell per summoner per turn — far too hot for `getCreatureConfig`, which parses abilities, spells and
+ * effects to answer. This reads the two keys that matter (honouring the QA override, so an overridden shape
+ * is seated the same way it is played) and memoises per creature, since creatures.json does not change
+ * within a process.
+ *
+ * Returns 1x1 for an unknown creature rather than throwing: the caller is choosing a hypothetical spot, and
+ * a bad name is the summon path's problem to report, not this lookup's.
+ */
+export const getCreatureFootprint = (factionName: string, creatureName: string): { width: number; height: number } => {
+    const key = `${factionName}/${creatureName}`;
+    const cached = creatureFootprintCache.get(key);
+    if (cached) {
+        return cached;
+    }
+    // @ts-ignore: the JSON shape is not typed here, exactly as in getCreatureConfig below
+    const creatureConfig = creaturesJson[factionName]?.[creatureName];
+    const override = getCreatureFootprintOverride(creatureName);
+    const size = normalizeFootprintSide(creatureConfig?.size, 1);
+    const resolved = override ?? {
+        width: normalizeFootprintSide(creatureConfig?.footprint_width, size),
+        height: normalizeFootprintSide(creatureConfig?.footprint_height, size),
+    };
+    creatureFootprintCache.set(key, resolved);
+    return resolved;
+};
+
 export const getCreatureConfig = (
     team: TeamType,
     factionName: string,
@@ -259,6 +413,25 @@ export const getCreatureConfig = (
             : undefined;
     if (movementType === undefined || movementType === PBTypes.MovementVals.NO_MOVEMENT) {
         throw new TypeError(`Invalid movement type for creature ${creatureName} = ${movementType}`);
+    }
+
+    const creatureFootprint = creatureConfig as ICreatureFootprintConfig;
+    const footprintWidth = getCreatureFootprintSide(creatureName, "footprint_width", creatureFootprint.footprint_width);
+    const footprintHeight = getCreatureFootprintSide(
+        creatureName,
+        "footprint_height",
+        creatureFootprint.footprint_height,
+    );
+    const footprintOverride = getCreatureFootprintOverride(creatureName);
+    if (footprintOverride === undefined && (footprintWidth !== undefined || footprintHeight !== undefined)) {
+        const declaredSize = creatureConfig.size;
+        const width = footprintWidth ?? declaredSize;
+        const height = footprintHeight ?? declaredSize;
+        if (Math.max(width, height) !== declaredSize) {
+            throw new TypeError(
+                `Invalid footprint for creature ${creatureName}: size ${declaredSize} must equal max(${width}, ${height})`,
+            );
+        }
     }
 
     const luck = DEFAULT_LUCK_PER_FACTION[factionName] ?? 0;
@@ -388,17 +561,23 @@ export const getCreatureConfig = (
         largeTextureName,
         MAX_UNIT_STACK_POWER,
         "",
+        [],
+        false,
+        footprintOverride?.width ?? footprintWidth,
+        footprintOverride?.height ?? footprintHeight,
     );
 };
 
-// Fire Strike and Meteorite moved from Life to Chaos with the Battle Mage spellbook redesign. Accept old
-// saved/replay payloads that still carry the former prefix, but resolve them to the real Chaos definition
-// (including its faction value, so the client renders Chaos corners rather than Life corners).
-const LEGACY_LIFE_TO_CHAOS_SPELLS: ReadonlySet<string> = new Set(["Fire Strike", "Meteorite"]);
+const LEGACY_SPELL_FACTION_REDIRECTS: Readonly<Record<string, string>> = {
+    "Life:Fire Strike": "Chaos",
+    "Life:Meteorite": "Chaos",
+    "Nature:Meteorite": "Chaos",
+};
 
 export const getSpellConfig = (factionName: string, spellName: string, laps?: number): SpellProperties => {
+    const requestedFactionName = factionName || "System";
     const resolvedFactionName =
-        factionName === "Life" && LEGACY_LIFE_TO_CHAOS_SPELLS.has(spellName) ? "Chaos" : factionName || "System";
+        LEGACY_SPELL_FACTION_REDIRECTS[`${requestedFactionName}:${spellName}`] ?? requestedFactionName;
     // @ts-ignore: we do not know the type here yet
     const raceSpells = spellsJson[resolvedFactionName];
     if (!raceSpells) {

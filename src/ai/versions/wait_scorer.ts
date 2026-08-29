@@ -13,6 +13,7 @@ import type { GameAction } from "../../engine/actions";
 import { canWaitOnHourglass } from "../../engine/hourglass";
 import type { FightProperties } from "../../fights/fight_properties";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import type { TeamType } from "../../generated/protobuf/v1/types_gen";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import { extractValueFeatures, VALUE_FEATURE_NAMES } from "../../simulation/value_features";
 import type { Unit } from "../../units/unit";
@@ -481,6 +482,26 @@ function loadWaitWeightsFrom(envVar: string): IWaitWeights | null {
 }
 
 /**
+ * The side-board 2x1-world wait refit (CEM on the hft node, 2026-08-26): the shipped distilled vector's
+ * TEMPO terms sharpened against the mounted-class catalog (initiative-hold and react-last deepened).
+ * CONFIRMED on 1,500 fresh-seed paired-seat pairs (seed 99000001, 2,892 decisive, both seats swapped,
+ * axis-aware candidate on the SHIPPED leaf vs shipped axis-blind v0.8): pooled 58.30% [56.49-60.08] —
+ * the Wilson floor clears the 55% ship bar; per map normal 59.2 / lava 61.2 / block 54.4. DEPLOYED
+ * (owner sign-off 2026-08-26): this vector IS the baked default. `V08_SIDE_WAIT_2X1=0` is the kill
+ * switch back to DISTILLED_WAIT_WEIGHTS_2026_07_10; an explicit V07_WAIT_WEIGHTS env still overrides
+ * both, and all-zero still disables the stage.
+ */
+export const SIDE_2X1_WAIT_WEIGHTS_2026_08_26: IWaitWeights = {
+    b: -0.66108,
+    w: [
+        -1.64024, -0.17362, 0.02142, 0.03505, -0.03155, -0.96937, -0.45262, -0.02098, 0.0029, -0.09882, -0.36499,
+        -0.17593, -0.01016, -0.32484, 0.41075, -0.06387, 0.85298, 0.74225, -0.18453, -0.29022, 1.45056, 2.0495, 0.04285,
+        -0.07706, -0.11349, 0.04071, -0.13763, 0.60739, -0.52451, 0.03304, -0.1691, 0.01468, 0.04242, -0.33417, 1.32892,
+        -0.01798, 0.21997, -0.11288, -0.49562, 0.01737, -0.12885,
+    ],
+};
+
+/**
  * v0.7 BAKED weight resolution (S1 sign-off): the committed DISTILLED_WAIT_WEIGHTS_2026_07_10 are the
  * BUILT-IN DEFAULT — no V07_WAIT_SCORER gate, no version scope: v0.7's scorer is always armed. An explicit
  * V07_WAIT_WEIGHTS env still overrides for experiments, and the scorer anchor is preserved: an ALL-ZERO
@@ -488,17 +509,24 @@ function loadWaitWeightsFrom(envVar: string): IWaitWeights | null {
  * or MALFORMED env falls back to the committed defaults — a bad env can never crash or silently de-bake live
  * play (loadV06Weights lineage). v0.6/v0.6s keep the env-gated waitWeightsForVersion path below untouched.
  */
-const bakedSlot: { raw: string | undefined | null; weights: IWaitWeights | null } = {
-    raw: null,
+const bakedSlot: { key: string | null; weights: IWaitWeights | null } = {
+    key: null,
     weights: DISTILLED_WAIT_WEIGHTS_2026_07_10,
 };
 export function v07BakedWaitWeights(): IWaitWeights | null {
     const raw = process.env.V07_WAIT_WEIGHTS;
-    if (raw !== bakedSlot.raw) {
-        bakedSlot.raw = raw;
+    const side2x1 = process.env.V08_SIDE_WAIT_2X1;
+    // Both envs key the cache: flipping either mid-process must re-resolve, exactly like the raw
+    // override always has.
+    const key = `${raw ?? "\u0000absent"}\u0001${side2x1 ?? ""}`;
+    if (key !== bakedSlot.key) {
+        bakedSlot.key = key;
+        // Deployed default (owner sign-off 2026-08-26): the 2x1-world refit, with "0" as the explicit
+        // kill switch back to the 2026-07-10 distillation.
+        const bakedDefault = side2x1 === "0" ? DISTILLED_WAIT_WEIGHTS_2026_07_10 : SIDE_2X1_WAIT_WEIGHTS_2026_08_26;
         const parsed = parseWaitWeights(raw);
         if (!parsed) {
-            bakedSlot.weights = DISTILLED_WAIT_WEIGHTS_2026_07_10;
+            bakedSlot.weights = bakedDefault;
         } else if (parsed.b === 0 && parsed.w.every((x) => x === 0)) {
             bakedSlot.weights = null;
         } else {
@@ -506,6 +534,25 @@ export function v07BakedWaitWeights(): IWaitWeights | null {
         }
     }
     return bakedSlot.weights;
+}
+
+/**
+ * Per-TEAM wait-weight override (battery/refit seam, mirrors the SearchDriver's per-team V2 leaf):
+ * `V07_WAIT_WEIGHTS_LOWER` / `V07_WAIT_WEIGHTS_UPPER`. Returns undefined when the seat has no
+ * override (caller falls through to the shared resolution), null for an explicit all-zero vector
+ * (scorer disabled for that seat), or the parsed weights. Read per call — the battery flips these
+ * between games in the same worker process.
+ */
+export function v07WaitWeightsForTeam(team: TeamType): IWaitWeights | null | undefined {
+    const raw = process.env[team === PBTypes.TeamVals.LOWER ? "V07_WAIT_WEIGHTS_LOWER" : "V07_WAIT_WEIGHTS_UPPER"];
+    if (raw === undefined) {
+        return undefined;
+    }
+    const parsed = parseWaitWeights(raw);
+    if (!parsed) {
+        return undefined;
+    }
+    return parsed.b === 0 && parsed.w.every((x) => x === 0) ? null : parsed;
 }
 
 /** Parse {b, w[WAIT_FEATURE_NAMES_V2.length]} — malformed/absent ⇒ null. */
@@ -772,6 +819,61 @@ export function applyWaitScorer(
  * stage (versions/v0_7.ts finalizeDecision with v07BakedWaitWeights()). `weights` null is the anchor: the
  * exact `incumbent` reference is returned, byte-identical incumbent hourglass behavior.
  */
+/**
+ * B2 side channel (collection-only, armed by B2_ORACLE=1): when the scorer REPLACES an action with a
+ * wait, remember exactly what it replaced, keyed by unit id and consumed once. The Gate-1 oracle's
+ * degenerate {wait, wait} points then become scoreable {wait, replaced-action} pairs precisely where
+ * the deployed scorer created the wait — the labeled half of the wait-cancellation (B2) question that
+ * Gate-1 deliberately left to "B2's job". In-process only; never serialized; inert unless the env is
+ * armed, so live play and every existing pin stay byte-identical.
+ */
+const waitReplacementByUnit = new Map<string, GameAction[]>();
+
+export function consumeWaitReplacement(unitId: string): GameAction[] | undefined {
+    const replaced = waitReplacementByUnit.get(unitId);
+    waitReplacementByUnit.delete(unitId);
+    return replaced;
+}
+
+/**
+ * B2 CANCELLATION GATE (env candidate, default absent = inert): a second linear model over the SAME
+ * 41-dim basis, fit on the B2 oracle's counterfactual-labeled scorer-wait points, that vetoes a
+ * scorer wait when its cancel score clears the fitted threshold. Scoped EXACTLY to scorer-created
+ * waits (the fit's support); the strategic-rule's own waits are untouched. JSON {b, w[41], t} via
+ * `V08_WAIT_CANCEL`, with per-team `V08_WAIT_CANCEL_LOWER`/`_UPPER` taking precedence so the A/B
+ * battery can arm one seat (the process-global-env lesson from the router ladder).
+ */
+export interface IWaitCancelWeights extends IWaitWeights {
+    t: number;
+}
+
+export function parseWaitCancelWeights(raw: string | undefined): IWaitCancelWeights | null {
+    if (!raw) return null;
+    try {
+        const m = JSON.parse(raw);
+        if (
+            m &&
+            typeof m.b === "number" &&
+            Number.isFinite(m.b) &&
+            typeof m.t === "number" &&
+            Number.isFinite(m.t) &&
+            Array.isArray(m.w) &&
+            m.w.length === WAIT_FEATURE_NAMES.length &&
+            m.w.every((x: unknown) => typeof x === "number" && Number.isFinite(x))
+        ) {
+            return { b: m.b, w: m.w as number[], t: m.t };
+        }
+    } catch {
+        /* malformed -> null */
+    }
+    return null;
+}
+
+function waitCancelWeightsForTeam(team: TeamType): IWaitCancelWeights | null {
+    const perTeam = process.env[team === PBTypes.TeamVals.LOWER ? "V08_WAIT_CANCEL_LOWER" : "V08_WAIT_CANCEL_UPPER"];
+    return parseWaitCancelWeights(perTeam) ?? parseWaitCancelWeights(process.env.V08_WAIT_CANCEL);
+}
+
 export function applyWaitScorerWeights(
     unit: Unit,
     context: IDecisionContext,
@@ -795,6 +897,13 @@ export function applyWaitScorerWeights(
     const score = waitScore(weights, features);
     if (!Number.isFinite(score) || score <= 0) {
         return incumbent;
+    }
+    const cancel = waitCancelWeightsForTeam(unit.getTeam());
+    if (cancel && waitScore(cancel, features) >= cancel.t) {
+        return incumbent; // B2 veto: this scorer wait profiles as a labeled mistake — act instead.
+    }
+    if (process.env.B2_ORACLE === "1") {
+        waitReplacementByUnit.set(unit.getId(), incumbent);
     }
     return [{ type: "wait_turn", unitId: unit.getId() }];
 }

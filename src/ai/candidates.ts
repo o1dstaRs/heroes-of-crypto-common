@@ -19,8 +19,9 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import {
     getCellsAroundCell,
     getCellsAroundFootprint,
-    getCellsAroundPosition,
+    getFootprintCellsForPosition,
     getPositionForCell,
+    getPositionForFootprintAnchor,
     getPositionForCells,
     getRangeAttackSideCenter,
     isCellWithinGrid,
@@ -28,10 +29,12 @@ import {
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
 } from "../grid/grid_math";
+import { getCreatureFootprint } from "../configuration/config_provider";
+import { ToFactionName } from "../factions/faction_type";
 import { AttackHandler, type IPreparedRangeAttackEvaluation } from "../handlers/attack_handler";
 import {
     canCastSpell,
-    canCastSummon,
+    firstSummonableAnchor,
     canMassCastSpell,
     thrownSpellReachesAimedTarget,
     isSpellUsableByCaster,
@@ -839,6 +842,8 @@ export function getEnemiesCellsWithinMovementRange(unit: Unit, context: IDecisio
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     ).cells;
     const out: XY[] = [];
     for (const c of moveCells) {
@@ -1099,17 +1104,30 @@ class CandidateGenerator {
                 this.unit.isSmallSize(),
                 this.unit.canTraverseLava(),
                 this.unit.hasAbilityActive("In Its Own World"),
+                this.unit.getFootprintWidth(),
+                this.unit.getFootprintHeight(),
             );
         }
         return this.movePathCache;
     }
+    /**
+     * The unit's real body at a candidate anchor. This is what becomes every generated candidate's
+     * `move_unit.targetCells`, so it is also the shape the engine will occupy — the round trip through
+     * `getPositionForCell(...) - halfStep` into `getCellsAroundPosition` it replaces could only ever describe
+     * a 2x2, and handed a rectangle a body two cells too tall that the engine then refused as `invalid_move`.
+     * Routed through the position so the two shipped shapes keep their exact legacy cell ORDER — this list is
+     * iterated by the mountain-strike search, where the order decides which of two equidistant mountains a
+     * large unit mines, and the ordering the generic anchor expansion produces is not the one that has always
+     * come out of getCellsAroundPosition.
+     */
     private footprintForCell(cell: XY): XY[] {
-        if (this.unit.isSmallSize()) {
-            return [{ x: cell.x, y: cell.y }];
-        }
         const gs = this.context.grid.getSettings();
-        const position = getPositionForCell(cell, gs.getMinX(), gs.getStep(), gs.getHalfStep());
-        return getCellsAroundPosition(gs, { x: position.x - gs.getHalfStep(), y: position.y - gs.getHalfStep() });
+        return getFootprintCellsForPosition(
+            gs,
+            getPositionForFootprintAnchor(gs, cell, this.unit.getFootprintWidth(), this.unit.getFootprintHeight()),
+            this.unit.getFootprintWidth(),
+            this.unit.getFootprintHeight(),
+        );
     }
     private footprintOk(cell: XY): boolean {
         const f = this.footprintForCell(cell);
@@ -1791,9 +1809,12 @@ class CandidateGenerator {
         // lands inside an enemy melee-aggression cell.
         if (
             !this.unit.isRangeCapable() ||
+            // The unit itself, not the legacy boolean: a rectangle's pin test must run on its REAL
+            // body — the 2x2 window read a 2x1 as pinned where it is safe, and missed a 1x3's far
+            // cell entirely (AI proposes, engine rejects).
             attackHandler.canBeAttackedByMelee(
                 origin,
-                this.unit.isSmallSize(),
+                this.unit,
                 this.context.grid.getEnemyAggrMatrixByUnitId(this.unit.getId()),
             ) ||
             this.unit.getRangeShots() <= 0 ||
@@ -2146,7 +2167,7 @@ class CandidateGenerator {
                 !origin ||
                 attackHandler.canBeAttackedByMelee(
                     origin,
-                    this.unit.isSmallSize(),
+                    this.unit,
                     grid.getEnemyAggrMatrixByUnitId(this.unit.getId()),
                 )
             ) {
@@ -2912,10 +2933,23 @@ class CandidateGenerator {
                 if (amount <= 0) {
                     continue;
                 }
-                // Deterministic (RNG-free) summon cell: the first empty cell around the caster in
-                // getCellsAroundCell order. The engine only validates emptiness (canCastSummon).
-                const cell = getCellsAroundCell(gs, this.unit.getBaseCell()).find((c) =>
-                    canCastSummon(spell, matrix, c),
+                // Deterministic (RNG-free) summon cell: the first anchor around the caster that the
+                // summoned creature actually FITS on. Asking only whether ONE cell is empty was right
+                // while every summon was a 1x1; now that the mounted class ships 2x1, a free cell is a
+                // coin flip on whether the body fits — and the engine refuses an EXPLICIT cell outright
+                // rather than re-routing it (only its own fallback retries), so the cast was simply lost.
+                // Ring the caster's whole FOOTPRINT too: from the base cell alone, a rectangular
+                // summoner offers spots that hug one end of its body.
+                const summonFootprint = getCreatureFootprint(
+                    ToFactionName[spell.getSummonUnitRace()],
+                    spell.getSummonUnitName(),
+                );
+                const cell = firstSummonableAnchor(
+                    spell,
+                    matrix,
+                    getCellsAroundFootprint(gs, this.unit.getCells()),
+                    summonFootprint.width,
+                    summonFootprint.height,
                 );
                 if (cell) {
                     this.pushSpell(spell, undefined, { x: cell.x, y: cell.y });

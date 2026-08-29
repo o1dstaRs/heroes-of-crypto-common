@@ -16,6 +16,7 @@ import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { creatureIdForName } from "../setup/creature_score";
+import { footprintCenterForAnchor } from "./v0_1";
 import {
     V08_A19_F184_HUMAN_PLACEMENT_FIXTURE_SHA256,
     V08_A19_F184_HUMAN_PLACEMENT_POLICY,
@@ -56,7 +57,9 @@ export interface IV08A19F184LowerHumanPlacementAudit {
     readonly selectedFingerprint: string;
 }
 
-const centerFor = (unit: Unit, base: XY): XY => (unit.isSmallSize() ? base : { x: base.x - 0.5, y: base.y - 0.5 });
+// Formations are compared by where the BODIES sit, so the anchor is pulled back half a cell per extra column
+// and row: unchanged for a 1x1 and a 2x2, and a rectangle now leans only along its long side.
+const centerFor = footprintCenterForAnchor;
 
 const normalizedPlacementFingerprint = (
     units: readonly Unit[],

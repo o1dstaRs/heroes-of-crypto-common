@@ -68,6 +68,12 @@ export interface IV08Level4CoverageOptions {
     amountMode?: StackAmountMode;
     /** Defaults true: both sides receive the shipped SEE_NONE + Armor/Might/Sniper setup. */
     liveSetup?: boolean;
+    /**
+     * Replace the search's wall-clock deadline with a deterministic work budget. Exact-game regression
+     * fixtures need this: under a loaded test runner the wall clock shortens the effective search and the
+     * "same" seeded game plays different actions.
+     */
+    searchOfflineDeterministicWork?: boolean;
 }
 
 export interface IV08Level4ActionAudit {
@@ -286,6 +292,7 @@ export function runV08Level4CoverageGame(options: IV08Level4CoverageOptions, gam
         redAugments: setup?.augments,
         turnExecutionObserver: (observation) =>
             auditV08Level4Turn(target, observation, plan.lane.unit, plan.targetSide),
+        searchOfflineDeterministicWork: options.searchOfflineDeterministicWork,
     };
     const result = runMatch(config);
     const winner = result.winner === "draw" ? "draw" : result.winner === plan.candidateSide ? "candidate" : "opponent";

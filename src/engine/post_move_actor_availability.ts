@@ -10,6 +10,7 @@
  */
 
 import { getSpellConfig } from "../configuration/config_provider";
+import { getFootprintCellsForAnchor, normalizeFootprintSide } from "../grid/grid_math";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import { fireWallBurnDamage, FireWalls } from "../spells/fire_walls";
 import { madeOfFireBoostedMaxHp } from "../units/movement_stat_modifiers";
@@ -56,7 +57,18 @@ export interface IPostMoveActorAvailability {
     readonly stack: IStackHpState;
 }
 
-const moveCellKey = (cell: XY): number => (cell.x << 4) | cell.y;
+/**
+ * An injective cell key over any coordinate a footprint can produce, not just the on-board ones.
+ *
+ * This used to be `(x << 4) | y`, which is only one-to-one while both coordinates sit inside [0, 15]. That
+ * held while every cell reaching this set came from the board, and it stopped holding with rectangles: a
+ * footprint list is deliberately UNCLIPPED, so a body anchored on the edge legitimately reports a cell at
+ * x === -1 or y === -1, and two different such cells could pack to the same number and compare equal. The
+ * offset multiply costs the same and cannot collide, so the comparison below means what it says for every
+ * shape. On-board cells are unaffected: the mapping is still one number per cell.
+ */
+const CELL_KEY_ORIGIN = 512;
+const moveCellKey = (cell: XY): number => (cell.x + CELL_KEY_ORIGIN) * 1024 + (cell.y + CELL_KEY_ORIGIN);
 
 /** Preserve GameActionEngine's exact set comparison, including its equal-length prerequisite. */
 export function moveCellsMatchAsSet(left: readonly XY[], right: readonly XY[]): boolean {
@@ -67,11 +79,19 @@ export function moveCellsMatchAsSet(left: readonly XY[], right: readonly XY[]): 
     return left.every((cell) => rightCells.has(moveCellKey(cell)));
 }
 
-/** Resolve the occupied destination exactly as GameActionEngine.moveUnit does. */
+/**
+ * Resolve the occupied destination exactly as GameActionEngine.moveUnit does.
+ *
+ * `footprintWidth` / `footprintHeight` describe the mover's body. They default to the square shape the
+ * boolean has always implied, so a caller that still passes only `isSmallSize` gets the legacy answer for
+ * both shipped shapes and nothing about an existing move changes.
+ */
 export function resolveMoveTargetCells(
     isSmallSize: boolean,
     path: readonly XY[],
     suppliedTargetCells?: readonly XY[],
+    footprintWidth: number = isSmallSize ? 1 : 2,
+    footprintHeight: number = isSmallSize ? 1 : 2,
 ): XY[] {
     if (suppliedTargetCells?.length) {
         return suppliedTargetCells.map((cell) => ({ ...cell }));
@@ -80,24 +100,76 @@ export function resolveMoveTargetCells(
     if (!destination) {
         return [];
     }
-    if (isSmallSize) {
+    const width = normalizeFootprintSide(footprintWidth);
+    const height = normalizeFootprintSide(footprintHeight);
+    if (width === 1 && height === 1) {
         return [{ ...destination }];
     }
-    return [
-        { x: destination.x, y: destination.y },
-        { x: destination.x + 1, y: destination.y },
-        { x: destination.x, y: destination.y + 1 },
-        { x: destination.x + 1, y: destination.y + 1 },
-    ];
+    // The route's last cell IS an anchor, so the body hangs off it towards -x / -y like every other footprint
+    // in the engine.
+    //
+    // This branch used to grow +dx / +dy for a 2x2, reading `destination` as the block's BOTTOM-LEFT cell —
+    // the opposite corner. That was never consistent even for a square: `moveUnit` hands the same cell to
+    // `resolveKnownMoveRoute`, which looks it up as a knownPaths KEY, and those keys are anchors. One of the
+    // two readings had to be wrong, and the pather is the authority on which. It stayed invisible because
+    // this is a FALLBACK: every move_unit producer in the engine, the AI, the server and the client supplies
+    // `targetCells` explicitly, so nothing live has ever taken this path with a multi-cell unit.
+    return getFootprintCellsForAnchor(destination, width, height);
 }
 
-/** Large legacy moves may encode only their final 2x2 footprint rather than an ordered route. */
+/**
+ * Large legacy moves may encode only their final footprint rather than an ordered route.
+ *
+ * The dimensions are taken so "is this body more than one cell" is asked of the real footprint instead of a
+ * boolean; they default to the square shape `isSmallSize` implies, so the verdict is unchanged for every
+ * existing caller.
+ *
+ * A LINE body (1xN or Nx1) makes the encoding genuinely ambiguous by SET alone: its destination footprint
+ * is a straight run of cells, which is also exactly what its N-1 step route along that axis looks like. The
+ * mover's current anchor separates them — a ROUTE starts there, a destination footprint does not — so
+ * callers that know the mover pass it, and a rectangle's one-step move stops being misread as
+ * footprint-only (which skipped its route modifiers and charged Fire Wall for the cell it was already
+ * standing on).
+ *
+ * That test is deliberately NOT applied to a body with both sides greater than one, and the reason is not
+ * caution — it is that such a body has no ambiguity to resolve. A 2x2's footprint is a BLOCK, and a block is
+ * not a walked route: reading one as a route invents three steps for a one-cell diagonal glide. The test
+ * would still fire on it, because the payload's first cell is not reliably the anchor. The engine's own
+ * expansion puts the anchor first, but the client's hover candidate builds the same list ascending from the
+ * MINIMUM corner (HoverManager.findLargeUnitMoveCandidate, whose comment says so, and Sandbox hands that one
+ * array in as both `path` and `targetCells`). For a 2x2 the minimum corner is anchor-(1,1), so a glide to
+ * anchor+(1,1) — one of the eight neighbours a 2x2 flyer picks constantly — put the mover's own current
+ * anchor at path[0] by coincidence and flipped the reading. Measured on that move: the stack passed through
+ * a Fire Wall cell without burning, lost its distance-morale tick, and priced its follow-up strike with a
+ * Rapid Charge distance of 2 instead of 1.
+ */
 export function isMovePathFootprintOnly(
     isSmallSize: boolean,
     path: readonly XY[],
     suppliedTargetCells?: readonly XY[],
+    footprintWidth: number = isSmallSize ? 1 : 2,
+    footprintHeight: number = isSmallSize ? 1 : 2,
+    currentAnchor?: Readonly<XY>,
 ): boolean {
-    return !isSmallSize && !!suppliedTargetCells?.length && moveCellsMatchAsSet(path, suppliedTargetCells);
+    const width = normalizeFootprintSide(footprintWidth);
+    const height = normalizeFootprintSide(footprintHeight);
+    const occupiesOneCell = width === 1 && height === 1;
+    if (occupiesOneCell || !suppliedTargetCells?.length || !moveCellsMatchAsSet(path, suppliedTargetCells)) {
+        return !occupiesOneCell && !!suppliedTargetCells?.length && moveCellsMatchAsSet(path, suppliedTargetCells);
+    }
+    // Only a LINE body can have a destination footprint that is also a legal route, so only a line body has
+    // anything to disambiguate. A block keeps the legacy set reading whatever order its payload arrives in.
+    const isLineBody = width === 1 || height === 1;
+    if (
+        isLineBody &&
+        currentAnchor &&
+        path.length > 1 &&
+        path[0].x === currentAnchor.x &&
+        path[0].y === currentAnchor.y
+    ) {
+        return false;
+    }
+    return true;
 }
 
 /** The route's initial base cell is an origin, not a cell the mover entered. No cell objects are copied. */
@@ -112,12 +184,25 @@ export function travelledMovePath(currentCell: Readonly<XY>, path: readonly Read
 }
 
 export function resolveMoveTraversal(
-    unit: Pick<Unit, "getBaseCell" | "isSmallSize">,
+    unit: Pick<Unit, "getBaseCell" | "isSmallSize" | "getFootprintWidth" | "getFootprintHeight">,
     action: MoveUnitAction,
     resolvedRoute?: IResolvedMoveRoute,
 ): IMoveTraversal {
-    const targetCells = resolveMoveTargetCells(unit.isSmallSize(), action.path, action.targetCells);
-    const pathIsFootprintOnly = isMovePathFootprintOnly(unit.isSmallSize(), action.path, action.targetCells);
+    // The mover's own dimensions, not a size bit: this projection has to land on exactly the cells the
+    // action engine will occupy, or the AI plans a follow-up attack from a body position that never happens.
+    const width = unit.getFootprintWidth();
+    const height = unit.getFootprintHeight();
+    const targetCells = resolveMoveTargetCells(unit.isSmallSize(), action.path, action.targetCells, width, height);
+    const pathIsFootprintOnly = isMovePathFootprintOnly(
+        unit.isSmallSize(),
+        action.path,
+        action.targetCells,
+        width,
+        height,
+        // The mover is right here, so hand over its anchor: without it this — the path every real move
+        // takes — silently fell back to the legacy set reading, and the separator above never ran.
+        unit.getBaseCell(),
+    );
     const travelledPath = pathIsFootprintOnly
         ? action.path
         : travelledMovePath(unit.getBaseCell(), resolvedRoute?.route ?? action.path);
@@ -138,6 +223,45 @@ export function resolveMoveTraversal(
 }
 
 /** Ordered, de-duplicated Fire Wall cells entered by the move. */
+/**
+ * Every cell a unit's BODY newly occupies along a walk — the cells a Fire Wall may charge it for.
+ *
+ * A large unit is not a point. The travelled route is a list of ANCHOR cells, and for anything bigger than
+ * 1x1 the anchor is only one corner of the block: a 2x2 Angel gliding onto a wall that sits under any of
+ * its other three cells crossed real fire and was charged nothing, because only the anchor cells were ever
+ * offered to the wall. (The footprint-only branch already passes the whole destination block, which is why
+ * a rectangle's one-step slide burned correctly and a walking Angel did not.)
+ *
+ * `startCells` are excluded, keeping the standing rule intact: a unit that BEGAN its turn in the flames is
+ * not charged for staying put, only for what it moves INTO. For a 1x1 this returns exactly the travelled
+ * anchors minus the start, i.e. the previous behaviour unchanged.
+ */
+export function bodyCellsEnteredAlongPath(
+    startCells: readonly XY[],
+    travelledAnchors: readonly XY[],
+    width: number,
+    height: number,
+): XY[] {
+    const started = new Set<number>();
+    for (const cell of startCells) {
+        started.add(FireWalls.key(cell));
+    }
+    const seen = new Set<number>();
+    const entered: XY[] = [];
+    for (const anchor of travelledAnchors) {
+        for (const cell of getFootprintCellsForAnchor(anchor, width, height)) {
+            const key = FireWalls.key(cell);
+            if (started.has(key) || seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            entered.push(cell);
+        }
+    }
+
+    return entered;
+}
+
 export function enteredFireWallCells(fireWalls: FireWalls | undefined, crossedCells: readonly XY[]): XY[] {
     if (!fireWalls?.size() || !crossedCells.length) {
         return [];

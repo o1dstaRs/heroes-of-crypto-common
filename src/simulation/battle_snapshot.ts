@@ -84,6 +84,12 @@ export function deepClone<T>(value: T): T {
 
 /** The mutable Unit fields captured by the snapshot. Shared/immutable refs are intentionally excluded. */
 const UNIT_FIELDS = [
+    // Captured wholesale, so every DATA field on UnitProperties rides along — the unit's GEOMETRY
+    // (footprint_width / footprint_height, and the `size` they default from) included. That is what makes a
+    // rectangular stack survive capture -> restore -> capture with its shape intact: a rollout that rebuilt
+    // the unit from a bag missing its width would resume the fight with a differently-shaped body on the
+    // board than the grid is registered for. It also means the footprint must STAY inside unitProperties:
+    // caching it as an own field on Unit would trip assertFieldCoverage below and break every AI search.
     "unitProperties",
     "initialUnitProperties",
     "buffs",
@@ -149,6 +155,11 @@ const FIGHT_FIELDS = [
     "currentLap",
     "gridType",
     "placementType",
+    // Board orientation (side-oriented ranked layout) + the battery's legacy-policy seat set.
+    // Both are immutable once the engine stamps them, but captured like every other field so the
+    // fail-closed census stays airtight.
+    "sideOrientedPlacement",
+    "legacyAxisPolicyTeams",
     "firstTurnMade",
     "fightStarted",
     "fightFinished",
@@ -191,7 +202,7 @@ const FIGHT_FIELDS = [
     "obstacleHitsLeftLeft",
     "obstacleHitsLeftRight",
     "additionalNarrowingLaps",
-    // Cell-resident Smoke clouds (Ash Moth's Book of Chaos). Mutable battle state like any other: the turn
+    // Cell-resident Smoke clouds (Wandering Mage's Book of Chaos). Mutable battle state like any other: the turn
     // engine decrements it per lap and the move handler dispels a cell when a creature steps on it. It MUST
     // be captured — a rollout that placed or expired smoke would otherwise leave it behind in the live
     // fight, which is exactly the leak the lookahead's "search does not mutate live state" test asserts.

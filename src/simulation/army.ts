@@ -15,6 +15,7 @@ import CREATURES_JSON from "../configuration/creatures.json";
 import { EffectFactory } from "../effects/effect_factory";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
+import { normalizeFootprintSide } from "../grid/grid_math";
 import type { GridSettings } from "../grid/grid_settings";
 import { Unit } from "../units/unit";
 import { uuidFromBytes } from "../utils/lib";
@@ -24,10 +25,17 @@ export interface IArmyUnitSpec {
     faction: string;
     creatureName: string;
     level: number;
-    /** 1 = small (1x1), 2 = large (2x2). */
+    /** The square shape's side: 1 = small (1x1), 2 = large (2x2). Rectangles carry width/height below. */
     size: number;
     /** Number of creatures in the stack. */
     amount: number;
+    /**
+     * The stack's footprint when it is NOT the square `size x size` block — e.g. 1x2 or 2x1. Absent for the
+     * two shipped shapes, so every roster artifact ever written (and every JSONL a trainer reads back) stays
+     * byte-identical; a spec that omits them rebuilds exactly the unit it always did.
+     */
+    footprintWidth?: number;
+    footprintHeight?: number;
 }
 
 /** How many stacks of each level make up a roster, e.g. 2×L1, 2×L2, 1×L3, 1×L4. */
@@ -154,6 +162,9 @@ interface ICatalogEntry {
     creatureName: string;
     level: number;
     size: number;
+    /** creatures.json footprint_width/footprint_height, present only for creatures that are not square. */
+    footprintWidth?: number;
+    footprintHeight?: number;
     /** creatures.json attack_type — "MELEE" | "RANGE" | "MELEE_MAGIC" | "MAGIC". */
     attackType: string;
     /** creatures.json movement_type — "WALK" | "FLY" (canFly cohort filter; same field creature_score.ts reads). */
@@ -187,7 +198,18 @@ function getCatalog(): ICatalogEntry[] {
     }
     const json = CREATURES_JSON as unknown as Record<
         string,
-        Record<string, { level?: number; size?: number; attack_type?: string; movement_type?: string; exp?: number }>
+        Record<
+            string,
+            {
+                level?: number;
+                size?: number;
+                attack_type?: string;
+                movement_type?: string;
+                exp?: number;
+                footprint_width?: number;
+                footprint_height?: number;
+            }
+        >
     >;
     const entries: ICatalogEntry[] = [];
     for (const faction of Object.keys(json)) {
@@ -203,11 +225,16 @@ function getCatalog(): ICatalogEntry[] {
                 typeof cfg.size === "number" &&
                 isCreatureEnabled(creatureName)
             ) {
+                // A rectangular creature spells its footprint out in creatures.json; a square one leaves both
+                // fields out and keeps deriving its shape from `size`, exactly as it always has.
+                const footprintWidth = normalizeFootprintSide(cfg.footprint_width, cfg.size);
+                const footprintHeight = normalizeFootprintSide(cfg.footprint_height, cfg.size);
                 entries.push({
                     faction,
                     creatureName,
                     level: cfg.level,
                     size: cfg.size,
+                    ...(footprintWidth === footprintHeight ? {} : { footprintWidth, footprintHeight }),
                     attackType: cfg.attack_type ?? "MELEE",
                     movementType: cfg.movement_type,
                     exp: typeof cfg.exp === "number" && cfg.exp > 0 ? cfg.exp : undefined,
@@ -346,6 +373,9 @@ export function buildRoster(
                     creatureName: pick.creatureName,
                     level: pick.level,
                     size: pick.size,
+                    ...(pick.footprintWidth === undefined || pick.footprintHeight === undefined
+                        ? {}
+                        : { footprintWidth: pick.footprintWidth, footprintHeight: pick.footprintHeight }),
                     amount: resolveStackAmount(pick.creatureName, level, amountByLevel, amountMode),
                 });
             }
@@ -403,6 +433,16 @@ export function createUnitFromSpec(
     const properties = getCreatureConfig(team, spec.faction, spec.creatureName, textureName, spec.amount);
     if (simulationId) {
         Object.defineProperty(properties, "id", { value: simulationId, enumerable: true });
+    }
+    // The roster spec is the sim's own description of an army, so it — not the creature catalog alone —
+    // decides the shape a stack fights in. Overriding here (the same trick the simulation id uses) keeps
+    // getCreatureConfig untouched and lets a harness field a rectangle the catalog does not yet ship. A spec
+    // without the fields leaves the config's own footprint alone, so nothing about 1x1 or 2x2 changes.
+    if (spec.footprintWidth !== undefined || spec.footprintHeight !== undefined) {
+        const width = normalizeFootprintSide(spec.footprintWidth, spec.size);
+        const height = normalizeFootprintSide(spec.footprintHeight, spec.size);
+        Object.defineProperty(properties, "footprint_width", { value: width, enumerable: true, writable: true });
+        Object.defineProperty(properties, "footprint_height", { value: height, enumerable: true, writable: true });
     }
     return Unit.createUnit(
         properties,

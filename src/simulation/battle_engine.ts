@@ -47,6 +47,7 @@ import {
 } from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { PathHelper } from "../grid/path_helper";
+import { scatteredMountainsForSeed } from "../grid/scattered_mountains";
 import { PlacementPositionType } from "../grid/placement_properties";
 import { RectanglePlacement } from "../grid/rectangle_placement";
 import { AttackHandler } from "../handlers/attack_handler";
@@ -93,6 +94,7 @@ import {
 } from "./search_driver";
 import { createV08A13SearchDriver, shouldUseDefaultV08A13Search, withScopedAIEnvironment } from "./v0_8_a13_search";
 import { createV08A19SearchDriver, shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
+import { footprintCellsForAnchor, footprintLabel } from "./footprint";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
 import { extractValueFeatures, extractValueFeaturesV2Raw } from "./value_features";
 
@@ -299,6 +301,13 @@ export interface IMatchConfig {
      * routing; research tournaments use a one-team scope when entrant and control share the same version label.
      */
     searchTeamScope?: readonly TeamType[];
+    /**
+     * Research: physical teams whose promoted-search decisions run through a SECOND A19 driver built
+     * with `V08_A19_SEARCH_ENV_OVERRIDES` merged into the hermetic profile; every other seat keeps the
+     * exact stock driver (constructed with the override withheld). Inert without both the teams and the
+     * env being set.
+     */
+    searchEnvOverrideTeams?: readonly TeamType[];
     /** Emit only lifecycle/destruction events required to drive an in-process simulation. */
     headlessEvents?: boolean;
     /** Board layout for this match. Defaults to NORMAL (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER). */
@@ -327,6 +336,19 @@ export interface IMatchConfig {
      * fight state is retained here, seeding accepted setup before the final strategy placement is equivalent.
      */
     placementAugmentTiming?: "current-live" | "setup-before-placement";
+    /**
+     * SIDE-oriented deployment (the ranked Point-X layout): armies deploy on the LEFT/RIGHT flanks
+     * (GREEN x-band on the left, RED on the right, full board height) and the axis of advance is X.
+     * Stamped onto fightProperties so every direction-sensitive engine/AI rule reads the same truth.
+     * Absent = the classic bottom/top board.
+     */
+    sideOrientedPlacement?: boolean;
+    /**
+     * Battery seam: teams whose POLICY must keep the shipped raw-Y heuristics even on a side board
+     * (the "previous v0.8" control seat). Board RULES still apply to them. Empty/absent = every
+     * seat is axis-aware.
+     */
+    legacyAxisPolicyTeams?: readonly TeamType[];
     /** Synergies per team ({faction, synergy, level}) — recorded on fightProperties; combat + adjustBaseStats
      * read them live. Effective level is composition-gated (needs enough units of the faction). */
     greenSynergies?: ISetupSynergy[];
@@ -434,6 +456,14 @@ export interface IPlacementRecord {
     size: number;
     amount: number;
     cell: XY;
+    /**
+     * The stack's footprint, present ONLY when it is not the square `size x size` block the `size` field
+     * already describes. A harness that rebuilds a board from these records must reconstruct the exact shape
+     * that was played, and a 1x2 recorded as `size: 2` would come back as a 2x2. Omitted for the two shipped
+     * shapes so every existing recorded match stays byte-identical.
+     */
+    footprintWidth?: number;
+    footprintHeight?: number;
 }
 
 export interface IRecordedAction {
@@ -569,15 +599,10 @@ const publicCreatureIdsFromRoster = (roster: readonly IArmyUnitSpec[]): number[]
     return [...ids];
 };
 
-const footprintCells = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+// The unit's real footprint, anchored on `base`. Delegated to the shared simulation helper so the sim, the
+// recovery net and the lookahead can never disagree about a stack's shape; the helper reproduces the legacy
+// 1x1 and 2x2 expansions (cell order included) verbatim.
+const footprintCells = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
 // --- Skip audit -------------------------------------------------------------
 // Env/flag-gated instrumentation to answer "why do units skip turns". Every acting turn is bucketed into
@@ -672,6 +697,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // Explicit simulation maps then replace that roll in both state holders so combat map checks agree.
     fightProperties.setGridType(effectiveGridType);
     const grid = new Grid(gridSettings, effectiveGridType);
+    // Live ranked BLOCK_CENTER on the side-oriented board plays SEEDED scattered stones (middle
+    // columns, scatteredMountainsForSeed) — not the classic central 2x2 pair. Mirror it here so
+    // training and measurement happen on the terrain the AI will actually face. Classic boards keep
+    // the classic pair: the seeded band is derived from the ranked side zones.
+    if (config.sideOrientedPlacement === true && effectiveGridType === PBTypes.GridVals.BLOCK_CENTER) {
+        grid.setScatteredMountains(scatteredMountainsForSeed(`sim-${config.seed}`).map((stone) => stone.cell));
+    }
     const unitsHolder = new UnitsHolder(grid);
     clearAITargetMemory(unitsHolder);
     const sceneLog = new SceneLogMock();
@@ -687,15 +719,22 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         seedAcceptedSetupForPlacement(fightProperties, GREEN_TEAM, config.greenDoctrine, config.greenAugments);
         seedAcceptedSetupForPlacement(fightProperties, RED_TEAM, config.redDoctrine, config.redAugments);
     }
+    const sideOriented = config.sideOrientedPlacement === true;
+    fightProperties.setSideOrientedPlacement(sideOriented);
+    if (config.legacyAxisPolicyTeams?.length) {
+        fightProperties.setLegacyAxisPolicyTeams(config.legacyAxisPolicyTeams);
+    }
     const greenZone = new RectanglePlacement(
         gridSettings,
         PlacementPositionType.LOWER_LEFT,
         setupBeforePlacement ? fightProperties.getAugmentPlacement(GREEN_TEAM)[0] : 3,
+        sideOriented,
     );
     const redZone = new RectanglePlacement(
         gridSettings,
         PlacementPositionType.UPPER_RIGHT,
         setupBeforePlacement ? fightProperties.getAugmentPlacement(RED_TEAM)[0] : 3,
+        sideOriented,
     );
     const zoneHashesFor = (team: TeamType): Set<number> =>
         team === GREEN_TEAM ? greenZone.possibleCellHashes() : redZone.possibleCellHashes();
@@ -927,6 +966,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // select rollout profiles and V07_SEARCH/Q2_* retain their isolated research modes. All paths share the
     // lookahead dependency seam; candidate enumeration, paired-seed rollouts, override gate and SEARCH_AUDIT
     // live in ./search_driver.ts.
+    // The STOCK driver must never absorb a research override aimed at the override arm below: withhold
+    // the env during its construction and restore it after, so the two arms differ by exactly the
+    // overridden knobs.
+    const withheldSearchEnvOverrides = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+    if (withheldSearchEnvOverrides !== undefined) {
+        delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+    }
     const search = config.searchScoredDecisionObserver
         ? new SearchDriver(
               driverDeps,
@@ -939,6 +985,18 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
           : shouldUseDefaultV08A19Search(searchMatch)
             ? createV08A19SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver)
             : new SearchDriver(driverDeps, searchMatch, undefined, config.searchPassiveProductiveProbeObserver);
+    if (withheldSearchEnvOverrides !== undefined) {
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = withheldSearchEnvOverrides;
+    }
+    const searchEnvOverrideTeams = new Set(config.searchEnvOverrideTeams ?? []);
+    const searchEnvOverrideSearch =
+        searchEnvOverrideTeams.size &&
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES &&
+        !config.searchScoredDecisionObserver &&
+        !a13Rollback &&
+        shouldUseDefaultV08A19Search(searchMatch)
+            ? createV08A19SearchDriver(driverDeps, searchMatch, config.searchPassiveProductiveProbeObserver)
+            : undefined;
     const v08A13TrajectoryTeams = new Set(config.searchV08A13TrajectoryTeams ?? []);
     const v08A13TrajectorySearch =
         config.searchScoredDecisionObserver && v08A13TrajectoryTeams.size
@@ -1291,13 +1349,18 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // The per-unit pin is an authoritative control invariant, not merely a version default. An
         // experimental `SEARCH_VERSIONS=v0.1` must not put a mindless live turn back through a generic
         // selector, and the separate trajectory driver must obey the same boundary.
-        const searchApplies = !mindlessUnit && search.appliesTo(strategy.version, unit.getTeam());
+        const envOverrideSearchApplies =
+            !mindlessUnit &&
+            searchEnvOverrideTeams.has(unit.getTeam()) &&
+            searchEnvOverrideSearch?.appliesTo(strategy.version, unit.getTeam()) === true;
+        const searchApplies =
+            !mindlessUnit && !envOverrideSearchApplies && search.appliesTo(strategy.version, unit.getTeam());
         const trajectorySearchApplies =
             !mindlessUnit &&
             v08A13TrajectoryTeams.has(unit.getTeam()) &&
             v08A13TrajectorySearch?.appliesTo(strategy.version, unit.getTeam()) === true;
         const decisionPathCatalog =
-            searchApplies || trajectorySearchApplies
+            searchApplies || envOverrideSearchApplies || trajectorySearchApplies
                 ? createDecisionPathCatalog(grid, pathHelper, unit, matrix, config.decisionObserver !== undefined)
                 : undefined;
         // Strategy policy events describe the incumbent before SearchDriver arbitration. Buffer them until
@@ -1325,7 +1388,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         };
         const lookaheadApplies = !mindlessUnit && lookahead.enabled && strategy.version === "v0.5";
         const targetMemoryBeforeDecision =
-            searchApplies || trajectorySearchApplies || lookaheadApplies
+            searchApplies || envOverrideSearchApplies || trajectorySearchApplies || lookaheadApplies
                 ? captureAITargetMemory(unitsHolder)
                 : undefined;
         const v09ServerPreflightStartedAt =
@@ -1333,7 +1396,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const decided0 = strategy.decideTurn(unit, decisionContext);
         let v09ServerPreflightObservation: IV09ServerPreflightTimingObservation | undefined;
         if (v09ServerPreflightStartedAt !== undefined) {
-            if (searchApplies || trajectorySearchApplies || lookaheadApplies) {
+            if (searchApplies || envOverrideSearchApplies || trajectorySearchApplies || lookaheadApplies) {
                 throw new Error("v0.9 server preflight timing requires a native policy decision without search");
             }
             const decisionCompletedAt = performance.now();
@@ -1359,11 +1422,13 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         // policy inside the simulation, but plays its real turns un-searched). Default OFF -> decided0.
         // The v0.7 SearchDriver gates by SEARCH_VERSIONS (default "v0.6s") the same way, so a
         // `v0.6s vs v0.6` mirror measures exactly "v0.6 + rollout search vs plain v0.6".
-        const shadowDecision = searchApplies
-            ? search.chooseDecision(unit, strategy.version, decided0, decisionContext)
-            : lookaheadApplies
-              ? lookahead.chooseDecision(unit, decided0)
-              : decided0;
+        const shadowDecision = envOverrideSearchApplies
+            ? searchEnvOverrideSearch!.chooseDecision(unit, strategy.version, decided0, decisionContext)
+            : searchApplies
+              ? search.chooseDecision(unit, strategy.version, decided0, decisionContext)
+              : lookaheadApplies
+                ? lookahead.chooseDecision(unit, decided0)
+                : decided0;
         if (config.searchShadowOnly && shadowDecision !== decided0) {
             throw new Error("offline v0.9 teacher SearchDriver escaped SEARCH_OBSERVE_ONLY shadow mode");
         }
@@ -1396,7 +1461,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 config.policyEventObserver(event);
             }
         }
-        if ((searchApplies || trajectorySearchApplies || lookaheadApplies) && decided !== decided0) {
+        if (
+            (searchApplies || envOverrideSearchApplies || trajectorySearchApplies || lookaheadApplies) &&
+            decided !== decided0
+        ) {
             restoreAITargetMemory(unitsHolder, targetMemoryBeforeDecision!);
             const executedAttack = [...decided]
                 .reverse()
@@ -1484,9 +1552,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                 } else if (action.type === "melee_attack") {
                     const tgt = unitsHolder.getAllUnits().get(action.targetId);
                     const af = action.attackFrom ?? unit.getBaseCell();
-                    const afCells = unit.isSmallSize()
-                        ? [af]
-                        : [af, { x: af.x, y: af.y - 1 }, { x: af.x - 1, y: af.y }, { x: af.x - 1, y: af.y - 1 }];
+                    const afCells = footprintCells(unit, af);
                     const bc = unit.getBaseCell();
                     const stationary = af.x === bc.x && af.y === bc.y;
                     const sel = unit.getAttackTypeSelection();
@@ -1676,7 +1742,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     // (client would skip, sim moves) or only defend (truly stuck), unit size, and re-up state.
                     const proposed = auditProposedAttack ? "atkrej" : auditProposedMove ? "movrej" : "idle";
                     const recovery = advanced ? "advance" : "defend";
-                    const size = unit.isSmallSize() ? "small" : "large";
+                    const size = footprintLabel(unit);
                     const reup = fightProperties.hasAlreadyHourglass(unit.getId()) ? "_reup" : "";
                     auditTurn(`skip_${proposed}_${recovery}_${size}${reup}`, unit.getName());
                 }
@@ -1785,6 +1851,7 @@ function placeArmy(
         unitsHolder,
         pathHelper,
         placement: zone,
+        sideOrientedPlacement: FightStateManager.getInstance().getFightProperties().isSideAxisPolicyTeam(team),
         ...(revealedOpponentCreatures?.length ? { revealedOpponentCreatures } : {}),
         ...(publicOpponentCreatureIds ? { publicOpponentCreatureIds } : {}),
         ...(setupPlacementPolicy ? { setupPlacementPolicy } : {}),
@@ -1797,11 +1864,19 @@ function placeArmy(
     const desired = splitStacks.length
         ? applyTacticalSplitPlacement(
               incumbent,
-              units.map((unit) => ({ id: unit.getId(), small: unit.isSmallSize() })),
+              units.map((unit) => ({
+                  id: unit.getId(),
+                  small: unit.isSmallSize(),
+                  footprintWidth: unit.getFootprintWidth(),
+                  footprintHeight: unit.getFootprintHeight(),
+              })),
               {
                   team,
                   gridType: grid.getGridType(),
                   legalCellHashes: legal,
+                  sideOrientedPlacement: FightStateManager.getInstance()
+                      .getFightProperties()
+                      .isSideAxisPolicyTeam(team),
                   splitStacks,
               },
           )
@@ -1843,6 +1918,8 @@ function placeArmy(
         }
         if (placed) {
             const spec = roster[units.indexOf(unit)];
+            const footprintWidth = unit.getFootprintWidth();
+            const footprintHeight = unit.getFootprintHeight();
             records.push({
                 unitId: unit.getId(),
                 creatureName: unit.getName(),
@@ -1850,6 +1927,8 @@ function placeArmy(
                 size: spec?.size ?? (unit.isSmallSize() ? 1 : 2),
                 amount: unit.getAmountAlive(),
                 cell: { ...unit.getBaseCell() },
+                // Only a rectangle needs its dimensions spelled out; see IPlacementRecord.
+                ...(footprintWidth === footprintHeight ? {} : { footprintWidth, footprintHeight }),
             });
         }
     }

@@ -20,6 +20,7 @@ import type { IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { estimatePrimaryMeleeDamage } from "../melee_damage_estimate";
 import { creatureInfo } from "../setup/creature_score";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { otherTeam } from "./v0_1";
 import { enemyFieldsSplashAoe, layoutRevealPlacement, opponentCreatureIdsForPlacement } from "./v0_7_placement_reveal";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
@@ -118,15 +119,10 @@ export function buildV08BacklineProtectorIntent(
     return { kind, ward: wards[0], wards, flyerThreats };
 }
 
-const footprintForBase = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [{ x: base.x, y: base.y }]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+// The unit's real body, from the one shared expansion. Abomination, Angel and Arachna Queen exist to cover a
+// ward at a fixed footprint DISTANCE, so a phantom 2x2 got the coverage test wrong on one axis, landed the
+// protector on cells it cannot occupy, and emitted `move_unit.targetCells` the engine then rejected.
+const footprintForBase = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
 const canLandOnFootprint = (unit: Unit, context: IDecisionContext, cells: XY[]): boolean =>
     context.grid.areAllCellsEmpty(cells, unit.getId()) ||
@@ -475,6 +471,8 @@ const followWard = (
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        unit.getFootprintWidth(),
+        unit.getFootprintHeight(),
     );
     let bestPreserving: IProtectorRoute | undefined;
     let bestValueSwap: IProtectorRoute | undefined;
@@ -725,10 +723,16 @@ const optimizeAbominationPlacement = (
     const legal = context.placement.possibleCellHashes();
     if (!legal.size || !wards.length) return placements;
     const legalCells = [...legal].map((hash) => ({ x: hash >> 4, y: hash & 0xf }));
-    const xs = legalCells.map((cell) => cell.x);
-    const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const frontness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cell.y : GRID_SIZE - 1 - cell.y);
-    const edgeness = (cell: XY): number => Math.abs(cell.x - centreX);
+    // Frontness runs along the axis of advance (X when this seat is side-oriented), edgeness along
+    // the LATERAL axis — the pair swaps together with the board orientation.
+    const sideOriented = context.sideOrientedPlacement === true;
+    const along = (cell: XY): number => (sideOriented ? cell.x : cell.y);
+    const lateral = (cell: XY): number => (sideOriented ? cell.y : cell.x);
+    const lats = legalCells.map(lateral);
+    const centreLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const frontness = (cell: XY): number =>
+        context.team === PBTypes.TeamVals.LOWER ? along(cell) : GRID_SIZE - 1 - along(cell);
+    const edgeness = (cell: XY): number => Math.abs(lateral(cell) - centreLat);
 
     for (const protector of units.filter((unit) => v08BacklineProtectorKind(unit) === "abomination")) {
         const current = placements.get(protector.getId());
@@ -882,10 +886,16 @@ const optimizeAngelPlacement = (
     const legal = context.placement.possibleCellHashes();
     if (!legal.size) return placements;
     const legalCells = [...legal].map((hash) => ({ x: hash >> 4, y: hash & 0xf }));
-    const xs = legalCells.map((cell) => cell.x);
-    const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const frontness = (cell: XY): number => (context.team === PBTypes.TeamVals.LOWER ? cell.y : GRID_SIZE - 1 - cell.y);
-    const edgeness = (cell: XY): number => Math.abs(cell.x - centreX);
+    // Frontness runs along the axis of advance (X when this seat is side-oriented), edgeness along
+    // the LATERAL axis — the pair swaps together with the board orientation.
+    const sideOriented = context.sideOrientedPlacement === true;
+    const along = (cell: XY): number => (sideOriented ? cell.x : cell.y);
+    const lateral = (cell: XY): number => (sideOriented ? cell.y : cell.x);
+    const lats = legalCells.map(lateral);
+    const centreLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const frontness = (cell: XY): number =>
+        context.team === PBTypes.TeamVals.LOWER ? along(cell) : GRID_SIZE - 1 - along(cell);
+    const edgeness = (cell: XY): number => Math.abs(lateral(cell) - centreLat);
 
     for (const angel of units.filter((unit) => v08BacklineProtectorKind(unit) === "angel")) {
         if (!placements.has(angel.getId())) continue;

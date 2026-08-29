@@ -27,8 +27,11 @@ export const V08_A19_H18_F184_HUMAN_PLACEMENT_CANDIDATE_ID = "a19-h18-prod-f184-
 export const V08_A19_H18_F184_HUMAN_PLACEMENT_BASE_VERSION = "v0.8" as const;
 export const V08_A19_H18_F184_HUMAN_PLACEMENT_IMPLEMENTATION_SOURCE =
     "src/ai/versions/v0_8_a19_f184_human_placement.ts" as const;
+// Re-pinned for rectangular unit footprints (2026-08-24): the layout's hand-written 1x1-or-2x2 expansion was
+// replaced by the shared simulation/footprint.ts one. Both shipped shapes keep their exact cells, so every
+// qualified 1x1/2x2 placement this profile was measured on is reproduced cell for cell; only the bytes moved.
 export const V08_A19_H18_F184_HUMAN_PLACEMENT_IMPLEMENTATION_SHA256 =
-    "b826c104264207a0d56de745d456441ccc56ba3e9903e96640ae1acf44edfee8" as const;
+    "2fec445be38a175f91b4832622f826c9f20dd6436c24cae1bf02aeef710410b2" as const;
 
 /**
  * Browser-safe identity for the exact production-replay opening. The source digest is

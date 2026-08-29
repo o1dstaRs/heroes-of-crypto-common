@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { advanceDeltaBetween } from "../../grid/grid_math";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { IDecisionContext } from "../ai_strategy";
@@ -197,7 +198,7 @@ function bestCastling(
     candidates: readonly IEnumeratedCandidate[],
 ): IEnumeratedCandidate | undefined {
     const current = caster.getBaseCell();
-    const direction = caster.getTeam() === LOWER ? 1 : -1;
+    const sideOrientedBoard = context.fightProperties?.isSideAxisPolicyTeam(caster.getTeam()) === true;
     const hasLocalSupport = context.unitsHolder
         .getAllAllies(caster.getTeam())
         .some(
@@ -222,7 +223,9 @@ function bestCastling(
         if (!target || (target.getAttackType() !== RANGE && target.getAttackType() !== MAGIC)) {
             continue;
         }
-        const forwardDelta = (target.getBaseCell().y - current.y) * direction;
+        // "Ahead" is measured along the axis of ADVANCE (X on the side-oriented ranked board), so
+        // Castling keeps pulling genuinely exposed backliners instead of units standing beside us.
+        const forwardDelta = advanceDeltaBetween(caster.getTeam(), current, target.getBaseCell(), sideOrientedBoard);
         if (forwardDelta < 2) {
             continue;
         }

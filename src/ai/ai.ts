@@ -197,7 +197,7 @@ export class BasicAIAction implements IAIAction {
 export function findTarget(
     unit: IUnitAIRepr,
     grid: Grid,
-    matrix: number[][], // matrix for big unit has 4 cells filled
+    matrix: number[][], // a unit fills every cell of its footprint here: one for a 1x1, four for a 2x2, two for a 1x2
     unitsHolder: UnitsHolder,
     pathHelper: IDecisionPathSource,
 ): BasicAIAction | undefined {
@@ -462,6 +462,9 @@ function findRangeAttackAction(
     const unitTeam = unit.getTeam();
     const enemyTeam = unitTeam === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
 
+    // Hoisted: getCells() rebuilds the footprint array on every call, and the friendly-screen check
+    // below runs inside the full board scan.
+    const unitBodyCells = unit.getCells();
     const isAOEAttacker = unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw");
     const isThroughShot = unit.hasAbilityActive("Through Shot");
     const isDoubleShot = hasDoubleShotAbility(unit);
@@ -511,7 +514,7 @@ function findRangeAttackAction(
             if (
                 !isAOEAttacker &&
                 !isThroughShot &&
-                isLineBlockedByFriendlyUnit(unitCell, targetCell, matrix, unitTeam)
+                isLineBlockedByFriendlyUnit(unitCell, targetCell, matrix, unitTeam, unitBodyCells)
             ) {
                 continue;
             }
@@ -791,12 +794,18 @@ export function isLineBlockedByObstacle(fromCell: HoCMath.XY, toCell: HoCMath.XY
  * team the shot deals no damage and the engine rejects it. An enemy first means the shot still strikes
  * an enemy (just a nearer one), so that is not "blocked". Terrain/obstacles are flown over here — the
  * mountain block is handled separately by isLineBlockedByObstacle.
+ *
+ * `ownCells` is the shooter's OWN body. The matrix stamps every footprint cell with the owner's team, so
+ * without this a multi-cell shooter screens itself: a 2x1 Centaur firing west walks straight through its
+ * own second cell and reads it as a friendly wall. Those cells are stepped OVER rather than treated as
+ * clear, so a genuine ally further down the same line still blocks.
  */
 export function isLineBlockedByFriendlyUnit(
     fromCell: HoCMath.XY,
     toCell: HoCMath.XY,
     matrix: number[][],
     friendlyTeam: number,
+    ownCells?: readonly HoCMath.XY[],
 ): boolean {
     const numRows = matrix.length;
     const numCols = matrix[0].length;
@@ -817,7 +826,18 @@ export function isLineBlockedByFriendlyUnit(
         if (cx >= 0 && cy >= 0 && cx < numCols && cy < numRows) {
             const v = matrix[cy][cx];
             if (v === friendlyTeam) {
-                return true;
+                let isOwnBody = false;
+                if (ownCells) {
+                    for (const oc of ownCells) {
+                        if (oc.x === cx && oc.y === cy) {
+                            isOwnBody = true;
+                            break;
+                        }
+                    }
+                }
+                if (!isOwnBody) {
+                    return true;
+                }
             }
             if (v === enemyTeam) {
                 return false;
@@ -851,19 +871,33 @@ export function countMeleeThreatsToCell(cell: HoCMath.XY, matrix: number[][], en
 }
 
 /**
+ * The acting unit's WxH footprint, for the geometry below that used to fork on `isSmallSize()`.
+ *
+ * The size read is defensive on purpose: `IUnitAIRepr` is routinely satisfied by hand-written stand-ins that
+ * implement only the handful of methods the caller exercises, and for those "small or large" is still the
+ * only shape they can express. A unit that does declare a footprint always wins, so a 1x2 is never rounded
+ * up to the 2x2 that `!isSmallSize()` used to imply.
+ */
+function footprintOf(unit: IUnitAIRepr): { height: number; width: number } {
+    const fallback = unit.isSmallSize() ? 1 : 2;
+    return {
+        height: GridMath.normalizeFootprintSide(unit.getFootprintHeight?.(), fallback),
+        width: GridMath.normalizeFootprintSide(unit.getFootprintWidth?.(), fallback),
+    };
+}
+
+/**
  * Whether the engine can place this unit's full footprint at `baseCell`. Pathfinding may route flyers
  * and Lava Striders across hazards they cannot finish a move on, so attack-from selection must apply
  * the execution-time landing rule separately without restricting transit.
  */
 export function canUnitLandAt(unit: IUnitAIRepr, grid: Grid, baseCell: HoCMath.XY): boolean {
-    const cells = [baseCell];
-    if (!unit.isSmallSize()) {
-        cells.push(
-            { x: baseCell.x, y: baseCell.y - 1 },
-            { x: baseCell.x - 1, y: baseCell.y },
-            { x: baseCell.x - 1, y: baseCell.y - 1 },
-        );
-    }
+    // Ask for the unit's OWN cells. The hand-written 2x2 block this replaces demanded four free cells of
+    // every unit that was not small, so a 1x2 was judged unable to stand anywhere it could actually stand —
+    // and it probed the (x - 1) column the body never occupies. getFootprintCellsForAnchor emits the same
+    // four cells in the same order for a 2x2 and the single cell for a 1x1.
+    const { width, height } = footprintOf(unit);
+    const cells = GridMath.getFootprintCellsForAnchor(baseCell, width, height);
     if (cells.some((cell) => !GridMath.isCellWithinGrid(grid.getSettings(), cell))) {
         return false;
     }
@@ -1019,6 +1053,7 @@ export function findMountainMeleeStrike(
     }
     const unitCell = unit.getBaseCell();
     const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LOWER ? PBTypes.TeamVals.UPPER : PBTypes.TeamVals.LOWER;
+    const mountainStrikeFootprint = footprintOf(unit);
     const movePath = pathHelper.getMovePath(
         unitCell,
         matrix,
@@ -1028,6 +1063,8 @@ export function findMountainMeleeStrike(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        mountainStrikeFootprint.width,
+        mountainStrikeFootprint.height,
     );
     const knownPaths = movePath.knownPaths;
 
@@ -1132,14 +1169,17 @@ function evaluateMountainStrategy(
 
 // ──────────────────────────────── Backstab positioning ────────────────────────────────
 // Backstab (Scavenger) deals bonus damage only when the attacker strikes from the target's far side.
-// Mirror the engine's trigger (getAbilitiesWithPosisionCoefficient): a LOWER-team attacker must stand
-// at a HIGHER y than the target, an UPPER-team attacker at a LOWER y. (Small targets only here, so no
-// large-unit margin.)
-function isBackstabCell(team: number, fromCell: HoCMath.XY, targetCell: HoCMath.XY): boolean {
+// Mirror the engine's trigger (getAbilitiesWithPosisionCoefficient) ALONG THE AXIS OF ADVANCE: Y on
+// the classic bottom/top board, X on the side-oriented ranked board. A LOWER-team attacker must
+// stand deeper along its advance than the target, an UPPER-team attacker shallower. (Small targets
+// only here, so no large-unit margin.)
+function isBackstabCell(team: number, fromCell: HoCMath.XY, targetCell: HoCMath.XY, sideOriented: boolean): boolean {
+    const along = sideOriented ? fromCell.x : fromCell.y;
+    const targetAlong = sideOriented ? targetCell.x : targetCell.y;
     if (team === PBTypes.TeamVals.LOWER) {
-        return fromCell.y > targetCell.y;
+        return along > targetAlong;
     }
-    return fromCell.y < targetCell.y;
+    return along < targetAlong;
 }
 
 /**
@@ -1160,6 +1200,11 @@ function preferBackstabAttackCell(
     if (type !== AIActionType.MELEE_ATTACK && type !== AIActionType.MOVE_AND_MELEE_ATTACK) {
         return action;
     }
+    // One-cell carriers only, as shipped. The eight cells around the victim are attack anchors for ANY body
+    // (an anchor is one of its own cells), so the scan stays legal for a rectangle — but the bonus itself is
+    // priced by the engine against the victim's footprint HEIGHT, and widening the gate here would also
+    // change which cell a 2x2 Scavenger picks today. Both belong to the balance pass that gives a creature a
+    // rectangular footprint, not to the geometry one.
     if (!unit.isSmallSize() || !unit.hasAbilityActive("Backstab")) {
         return action;
     }
@@ -1183,7 +1228,8 @@ function preferBackstabAttackCell(
     }
 
     const team = unit.getTeam();
-    if (isBackstabCell(team, currentFromCell, targetCell)) {
+    const sideOrientedBoard = FightStateManager.getInstance().getFightProperties().isSideAxisPolicyTeam(team);
+    if (isBackstabCell(team, currentFromCell, targetCell, sideOrientedBoard)) {
         return action; // already striking from the backstab side
     }
 
@@ -1193,6 +1239,7 @@ function preferBackstabAttackCell(
     // there this turn. Recompute reachability with a zero aggression matrix to get true raw-movement
     // reach (the Scavenger accepts the slightly riskier step in exchange for the damage bonus).
     const zeroAggr = matrix.map((row) => row.map(() => 0));
+    const backstabFootprint = footprintOf(unit);
     const knownPaths = pathHelper.getMovePath(
         unitCell,
         matrix,
@@ -1202,6 +1249,8 @@ function preferBackstabAttackCell(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        backstabFootprint.width,
+        backstabFootprint.height,
     ).knownPaths;
 
     // Among the cells adjacent to the target on the backstab side, pick the cheapest reachable one.
@@ -1213,7 +1262,7 @@ function preferBackstabAttackCell(
                 continue;
             }
             const cell = { x: targetCell.x + dx, y: targetCell.y + dy };
-            if (!isBackstabCell(team, cell, targetCell)) {
+            if (!isBackstabCell(team, cell, targetCell, sideOrientedBoard)) {
                 continue;
             }
             let weight: number;
@@ -1330,6 +1379,20 @@ export const auraRelevanceWeight: AuraWeightFn = (target, aura) => {
     return 1;
 };
 
+/**
+ * Price an aura the way the ENGINE stamps it, rather than as one ball at the emitter's anchor.
+ *
+ * `UnitsHolder.refreshAuraEffectsForAllUnits` unions the per-cell ball over the emitter's whole body and
+ * applies the aura when ANY cell of the recipient's body is covered. The scoring below asks a single ball
+ * at the anchor and tests only the recipient's anchor, which is a strict under-count for every multi-cell
+ * emitter — 5 of a 2x1's 30 cells at range 2, 11 of a 2x2's 36.
+ *
+ * Default OFF. This is not a rectangle repair: 2x2 emitters have been priced this way since long before
+ * the mounted class, so turning it on moves decisions for shipped squares too and the learned weights
+ * above it were fitted against the current answer. It ships measurable, not flipped.
+ */
+const useExactAuraZone = (): boolean => process.env.AI_AURA_ZONE_EXACT === "1";
+
 export function auraCoverageScore(
     unit: Unit,
     fromCell: HoCMath.XY,
@@ -1355,9 +1418,33 @@ export function auraCoverageScore(
         }
         // Geometry and membership are cached together. Candidate scoring revisits the same cell/range pairs many
         // times during rollouts, so it pays the Set construction once instead of once per scoring call.
-        const cellKeys = EffectHelper.getAuraCellKeyMembershipView(gridSettings, fromCell, range);
+        const exact = useExactAuraZone();
+        const body = exact ? footprintOf(unit) : undefined;
+        const cellKeys =
+            exact && body
+                ? EffectHelper.getAuraCellKeyMembershipForBody(
+                      gridSettings,
+                      GridMath.getFootprintCellsForAnchor(fromCell, body.width, body.height),
+                      range,
+                  )
+                : EffectHelper.getAuraCellKeyMembershipView(gridSettings, fromCell, range);
         const targets = aura.getProperties().is_buff ? allies : enemies;
         for (const t of targets) {
+            if (exact) {
+                // The engine applies an aura when ANY cell of the recipient's body is covered, so a 2x1
+                // whose far cell is inside the zone counts — its anchor alone does not decide.
+                let covered = false;
+                for (const c of t.getCells()) {
+                    if (cellKeys.has((c.x << 4) | c.y)) {
+                        covered = true;
+                        break;
+                    }
+                }
+                if (covered) {
+                    score += weight(t, aura);
+                }
+                continue;
+            }
             const bc = t.getBaseCell();
             if (cellKeys.has((bc.x << 4) | bc.y)) {
                 score += weight(t, aura);
@@ -1497,6 +1584,9 @@ function doFindTarget(
     // to see grid use grid.print(unit.getId());
 
     const max_steps = 100; // unit.steps
+    // Both walks below are the SAME body, so they take the same footprint: reachability belongs to the
+    // whole block, and an anchor whose 1x2 body does not fit is not a place this unit can end its turn.
+    const { width: footprintWidth, height: footprintHeight } = footprintOf(unit);
     const infiniteMovePath = pathHelper.getMovePath(
         unitCell,
         matrix,
@@ -1508,6 +1598,8 @@ function doFindTarget(
         unit.isSmallSize(),
         unit.canTraverseLava(),
         unit.hasAbilityActive("In Its Own World"),
+        footprintWidth,
+        footprintHeight,
     );
 
     let actualMovePath: IReadonlyMovePath | undefined;
@@ -1524,6 +1616,8 @@ function doFindTarget(
                 unit.isSmallSize(),
                 unit.canTraverseLava(),
                 unit.hasAbilityActive("In Its Own World"),
+                footprintWidth,
+                footprintHeight,
             );
         }
         return actualMovePath;
@@ -1545,7 +1639,8 @@ function doFindTarget(
 
     /*
     Note:
-    any big unit in matrix occupies 4 cells, the current unit is provided by upper right cell:
+    a unit occupies its whole W x H block in the matrix and is named by the block's upper right cell,
+    so the body hangs towards -x and -y (below, a 2x2 named by (2,2) and a 1x2 named by (6,2)):
     3 ---- 0 0 0 0 0 0 0
     2 ---- 0 2 2 0 0 - x
     1 ---- 0 2 2 0 0 - -
@@ -2010,6 +2105,54 @@ function cellKey(xy: HoCMath.XY): number {
     return (xy.x << 4) | xy.y;
 }
 
+/**
+ * Every anchor a WxH attacker can strike a WxH target from, as a set operation instead of a case table.
+ *
+ * Ring each of the target's own cells with the attacker's per-axis border, drop the anchors whose body would
+ * stand ON the target, and keep whatever the board leaves free. That is the same question the quadrant table
+ * below answers for two squares, but the table cannot be generalised term by term: its literal 2 is the
+ * attacker's width and its height at once, so on a 1x2 one of the two axes is always wrong — and an
+ * attack-from cell that is not really adjacent is an action the engine refuses.
+ */
+function getFootprintCellsForAttacker(
+    cellToAttack: HoCMath.XY,
+    matrix: number[][],
+    attacker: IUnitAIRepr,
+    isCurrentUnitSmall: boolean,
+    attackerWidth: number,
+    attackerHeight: number,
+    targetWidth: number,
+    targetHeight: number,
+): HoCMath.XY[] {
+    const targetCells = GridMath.getFootprintCellsForAnchor(cellToAttack, targetWidth, targetHeight);
+    const targetXMin = cellToAttack.x - targetWidth + 1;
+    const targetYMin = cellToAttack.y - targetHeight + 1;
+    const anchors: HoCMath.XY[] = [];
+    // Cells reached from two different target cells are the common case, and the ring around one target cell
+    // can well contain an anchor that overlaps another one. Keyed as text because an anchor may sit off the
+    // board on either axis here, and the packed (x << 4) | y key aliases every negative coordinate together.
+    const seen = new Set<string>();
+    for (const targetCell of targetCells) {
+        for (const anchor of getFootprintBorderCells(targetCell, 1, attackerWidth, attackerHeight)) {
+            const standsOnTarget =
+                anchor.x >= targetXMin &&
+                anchor.x - attackerWidth + 1 <= cellToAttack.x &&
+                anchor.y >= targetYMin &&
+                anchor.y - attackerHeight + 1 <= cellToAttack.y;
+            if (standsOnTarget) {
+                continue;
+            }
+            const key = `${anchor.x},${anchor.y}`;
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            anchors.push(anchor);
+        }
+    }
+    return filterCells(anchors, matrix, isCurrentUnitSmall, attacker, attackerWidth, attackerHeight);
+}
+
 /*
 find cells for the given cell that attacker can stand at
 
@@ -2047,7 +2190,31 @@ export function getCellsForAttacker(
     attacker: IUnitAIRepr,
     isCurrentUnitSmall = true,
     isTargetUnitSmall = true,
+    targetWidth = isTargetUnitSmall ? 1 : 2,
+    targetHeight = isTargetUnitSmall ? 1 : 2,
 ): HoCMath.XY[] {
+    // The quadrant table below is exact for the two squares and is left untouched for them, order included.
+    // As soon as either body is a rectangle it stops meaning anything, so both shapes are read for real and
+    // the whole question is asked again as geometry.
+    const { width: attackerWidth, height: attackerHeight } = footprintOf(attacker);
+    // The legacy quadrant table is 1x1/2x2 geometry written out longhand. Dispatching on
+    // width !== height sent a SQUARE body of side 3 into it (same bug melee_target_layers fixed);
+    // only the two shipped squares may keep the hand-written path. NOTE: a caller that describes a
+    // rectangular TARGET with only `isTargetUnitSmall` gets the 2x2 default — pass real target dims.
+    const legacySquare = (width: number, height: number): boolean =>
+        (width === 1 && height === 1) || (width === 2 && height === 2);
+    if (!legacySquare(attackerWidth, attackerHeight) || !legacySquare(targetWidth, targetHeight)) {
+        return getFootprintCellsForAttacker(
+            cellToAttack,
+            matrix,
+            attacker,
+            isCurrentUnitSmall,
+            attackerWidth,
+            attackerHeight,
+            targetWidth,
+            targetHeight,
+        );
+    }
     const borderCells = filterCells(
         getBorderCells(cellToAttack, isCurrentUnitSmall),
         matrix,
@@ -2105,12 +2272,17 @@ function getLayersForAttacker(
     isTargetUnitSmall = true,
 ): HoCMath.XY[][] {
     const result: HoCMath.XY[][] = [];
+    // The debug print has to show the ring the decision path actually walks, so it reads the same footprint
+    // buildMeleeTargetLayers does rather than the caller's small/large flag.
+    const { width, height } = footprintOf(attacker);
     for (let i = 1; i < matrix.length / 2; i++) {
         const borderCells = filterCells(
-            getBorderCells(cellToAttack, isCurrentUnitSmall, i),
+            getBorderCells(cellToAttack, isCurrentUnitSmall, i, width, height),
             matrix,
             isCurrentUnitSmall,
             attacker,
+            width,
+            height,
         );
         result[i - 1] = borderCells;
     }
@@ -2121,8 +2293,56 @@ function getLayersForAttacker(
     }
 }
 
+/**
+ * The anchors of a WxH body standing exactly `distance` cells from `currentCell`.
+ *
+ * The body hangs down and to the LEFT of its anchor, so the anchors form the perimeter of the box
+ * `[x - d, x + d + (W - 1)] x [y - d, y + d + (H - 1)]` — the same `distance + 1` extension the 2x2 branch
+ * below spells out, but taken one axis at a time. A 1x2 has no left column and a 2x1 no bottom row, so the
+ * legacy both-axes extension would offer anchors whose body never reaches the target: the AI would then
+ * propose an attack from a cell that is not adjacent to anything, and the engine would reject it.
+ */
+function getFootprintBorderCells(
+    currentCell: HoCMath.XY,
+    distance: number,
+    width: number,
+    height: number,
+): HoCMath.XY[] {
+    const xMin = currentCell.x - distance;
+    const xMax = currentCell.x + distance + width - 1;
+    const yMin = currentCell.y - distance;
+    const yMax = currentCell.y + distance + height - 1;
+    const borderCells: HoCMath.XY[] = [];
+    for (let x = xMin; x <= xMax; x++) {
+        borderCells.push({ x, y: yMin });
+    }
+    for (let x = xMin; x <= xMax; x++) {
+        borderCells.push({ x, y: yMax });
+    }
+    // The rows already carried the corners out, so the columns walk their interior only.
+    for (let y = yMin + 1; y < yMax; y++) {
+        borderCells.push({ x: xMin, y });
+        borderCells.push({ x: xMax, y });
+    }
+    return borderCells;
+}
+
 // return border cells that the small or big unit has
-function getBorderCells(currentCell: HoCMath.XY, isSmallUnit = true, distance = 1): HoCMath.XY[] {
+function getBorderCells(
+    currentCell: HoCMath.XY,
+    isSmallUnit = true,
+    distance = 1,
+    width = isSmallUnit ? 1 : 2,
+    height = isSmallUnit ? 1 : 2,
+): HoCMath.XY[] {
+    // Only the two shipped squares keep their hand-written ring, which decides not just WHICH
+    // anchors are offered but in which ORDER — and that order picks the winner among equal-cost
+    // stand cells further down. Every other shape (rectangles AND larger squares such as 3x3)
+    // takes the per-axis path: the literal ring is 2x2 geometry and comes up one cell short per
+    // side for a side-3 body.
+    if (!((width === 1 && height === 1) || (width === 2 && height === 2))) {
+        return getFootprintBorderCells(currentCell, distance, width, height);
+    }
     const borderCells = [];
     borderCells.push({ x: currentCell.x - distance, y: currentCell.y + distance });
     borderCells.push({ x: currentCell.x - distance, y: currentCell.y });
@@ -2159,11 +2379,26 @@ function filterCells(
     matrix: number[][],
     isAttackerSmall = true,
     attacker: IUnitAIRepr,
+    width = isAttackerSmall ? 1 : 2,
+    height = isAttackerSmall ? 1 : 2,
 ): HoCMath.XY[] {
     const filtered = [];
+    // As above, the two shipped squares keep their literal clearance probes. The three extra cells
+    // they test are the 2x2 body written out; every other shape — rectangles and larger squares —
+    // has to be asked about its own body, or a 1x2 anchor is refused because the column to its left
+    // (which it never occupies) happens to be taken, and a 3x3 is cleared on 4 of its 9 cells.
+    const isRectangularBody = !((width === 1 && height === 1) || (width === 2 && height === 2));
     for (const cell of cells) {
         if (isFree(cell, matrix, attacker)) {
-            if (isAttackerSmall) {
+            if (isRectangularBody) {
+                if (
+                    GridMath.getFootprintCellsForAnchor(cell, width, height).every((bodyCell) =>
+                        isFree(bodyCell, matrix, attacker),
+                    )
+                ) {
+                    filtered.push(cell);
+                }
+            } else if (isAttackerSmall) {
                 filtered.push(cell);
             } else if (
                 isFree({ x: cell.x - 1, y: cell.y }, matrix, attacker) &&

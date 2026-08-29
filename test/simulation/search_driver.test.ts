@@ -1422,12 +1422,12 @@ describe("search driver — gating, hygiene, determinism", () => {
         );
 
         const smokeHarness = buildBattle(925, "v0.8s", undefined, [
-            { faction: "Chaos", creatureName: "Ash Moth", level: 1, size: 1, amount: 50 },
+            { faction: "Chaos", creatureName: "Wandering Mage", level: 1, size: 1, amount: 50 },
             { faction: "Life", creatureName: "Squire", level: 1, size: 1, amount: 50 },
         ]);
         const smokeCaster = smokeHarness.unitsHolder
             .getAllAllies(GREEN_TEAM)
-            .find((candidate) => candidate.getName() === "Ash Moth")!;
+            .find((candidate) => candidate.getName() === "Wandering Mage")!;
         smokeHarness.setActiveUnitId(smokeCaster.getId());
         const smoke: IEnumeratedCandidate = {
             kind: "incumbent",

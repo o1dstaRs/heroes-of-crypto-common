@@ -31,6 +31,10 @@ const EXACT_FAILURE_OPTIONS: IV08Level4CoverageOptions = {
     opponentVersion: "v0.7",
     pairsPerLane: 16,
     baseSeed: 2026072601,
+    // Deterministic search work, not wall-clock: under the parallel suite's CPU contention the wall
+    // clock shortens the search and this exact seeded game stops being the same game (observed as
+    // phantom rejections after the mounted-class catalog change re-rolled the trajectory).
+    searchOfflineDeterministicWork: true,
 };
 
 export function registerV08Level4CoverageRegression(game: Level4RegressionGame): void {

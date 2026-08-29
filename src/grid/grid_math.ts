@@ -184,6 +184,143 @@ export function getCellsAroundPosition(gridSettings: GridSettings, position: XY)
     return cells;
 }
 
+/**
+ * Footprint geometry — the ONE place the WxH rectangle rule lives.
+ *
+ * A unit occupies a `width` x `height` block of cells. Its ANCHOR (what `Unit.getBaseCell()` returns) is
+ * the block's TOP-RIGHT cell, so the block extends towards -x and -y. That is not a new convention: it is
+ * the one the 2x2 code already used everywhere (`getCellsAroundPosition` off a corner position, the
+ * `cur.x - 1 / cur.y - 1` occupancy probes in PathHelper, `attackerBodyCellTopRight` here). 1x1 and 2x2 are
+ * simply the W == H instances of it.
+ *
+ * The unit's continuous `position` is the block's geometric CENTRE, which is what makes
+ * `getCellForPosition(position)` land on the anchor for every W and H (for an even side the centre sits
+ * exactly on the grid line and `floor` picks the upper cell; for an odd side it sits mid-cell).
+ */
+export function normalizeFootprintSide(side: number | undefined, fallback = 1): number {
+    if (!Number.isFinite(side)) {
+        return Math.max(1, Math.floor(fallback));
+    }
+    return Math.max(1, Math.floor(side as number));
+}
+
+/** The cells of a `width` x `height` footprint anchored (top-right) at `anchor`. Not clipped to the grid. */
+export function getFootprintCellsForAnchor(anchor: XY, width: number, height: number): XY[] {
+    const w = normalizeFootprintSide(width);
+    const h = normalizeFootprintSide(height);
+    if (w === 1 && h === 1) {
+        return [{ x: anchor.x, y: anchor.y }];
+    }
+    const cells: XY[] = new Array(w * h);
+    let index = 0;
+    for (let dx = 0; dx < w; dx++) {
+        for (let dy = 0; dy < h; dy++) {
+            cells[index++] = { x: anchor.x - dx, y: anchor.y - dy };
+        }
+    }
+    return cells;
+}
+
+/** The centre position of a `width` x `height` footprint anchored (top-right) at `anchor`. */
+export function getPositionForFootprintAnchor(
+    gridSettings: GridSettings,
+    anchor: XY,
+    width: number,
+    height: number,
+): XY {
+    const anchorPosition = getPositionForCell(
+        anchor,
+        gridSettings.getMinX(),
+        gridSettings.getStep(),
+        gridSettings.getHalfStep(),
+    );
+    const halfStep = gridSettings.getHalfStep();
+    return {
+        x: anchorPosition.x - (normalizeFootprintSide(width) - 1) * halfStep,
+        y: anchorPosition.y - (normalizeFootprintSide(height) - 1) * halfStep,
+    };
+}
+
+/** Whether the whole `width` x `height` footprint anchored at `anchor` lies on the board. */
+export function isFootprintWithinGrid(gridSettings: GridSettings, anchor: XY, width: number, height: number): boolean {
+    const gridSize = gridSettings.getGridSize();
+    return (
+        anchor.x >= normalizeFootprintSide(width) - 1 &&
+        anchor.x < gridSize &&
+        anchor.y >= normalizeFootprintSide(height) - 1 &&
+        anchor.y < gridSize
+    );
+}
+
+/** The anchor (top-right cell) of an arbitrary set of footprint cells. */
+export function getFootprintAnchorForCells(cells: readonly XY[]): XY | undefined {
+    if (!cells?.length) {
+        return undefined;
+    }
+    let x = Number.MIN_SAFE_INTEGER;
+    let y = Number.MIN_SAFE_INTEGER;
+    for (const cell of cells) {
+        if (cell.x > x) {
+            x = cell.x;
+        }
+        if (cell.y > y) {
+            y = cell.y;
+        }
+    }
+    return { x, y };
+}
+
+/**
+ * The anchor (top-right cell) of the footprint whose CENTRE is `position`.
+ *
+ * For a side of 1 or 2 this is just `getCellForPosition(position)` — a 1-wide footprint centres mid-cell and
+ * a 2-wide one centres exactly on the grid line, where `floor` picks the upper cell. It stops being true at
+ * side 3, where the centre falls back into the middle cell, so derive the minimum corner from the centre
+ * instead of leaning on `floor`: `position = min*step + (side/2)*step`, hence `min = position/step - side/2`.
+ * The rounding only absorbs float noise; the division is exact for every shape.
+ */
+export function getFootprintAnchorForPosition(
+    gridSettings: GridSettings,
+    position: XY,
+    width: number,
+    height: number,
+): XY {
+    const w = normalizeFootprintSide(width);
+    const h = normalizeFootprintSide(height);
+    if (w <= 2 && h <= 2) {
+        return getCellForPosition(gridSettings, position);
+    }
+    const step = gridSettings.getStep();
+    return {
+        x: Math.round((position.x - gridSettings.getMinX()) / step - w / 2) + w - 1,
+        y: Math.round(position.y / step - h / 2) + h - 1,
+    };
+}
+
+export function getFootprintCellsForPosition(
+    gridSettings: GridSettings,
+    position: XY,
+    width: number,
+    height: number,
+): XY[] {
+    const w = normalizeFootprintSide(width);
+    const h = normalizeFootprintSide(height);
+    // Byte-identical legacy paths for the two shipped shapes, including cell ORDER, which callers such as
+    // getPositionForCells and the renderers have always seen.
+    if (w === 2 && h === 2) {
+        return getCellsAroundPosition(gridSettings, position);
+    }
+    const anchor = getFootprintAnchorForPosition(gridSettings, position, w, h);
+    if (w === 1 && h === 1) {
+        return anchor ? [anchor] : [];
+    }
+    // Deliberately UNCLIPPED, like the 1x1 branch above. A footprint is W*H cells or it is not a footprint:
+    // dropping the off-board ones would make a rectangle standing on the board edge indistinguishable from a
+    // genuinely smaller unit to every `cells.length` check in Grid. Callers that need "is this on the board"
+    // ask isFootprintWithinGrid, and anything that packs a cell into an (x << 4) | y key must ask first.
+    return getFootprintCellsForAnchor(anchor, w, h);
+}
+
 export function isPositionWithinGrid(gridSettings: GridSettings, position: XY): boolean {
     if (!position) {
         return false;
@@ -219,33 +356,65 @@ export function getPositionForCell(cell: XY, minX: number, step: number, halfSte
     return { x: minX + (1 + cell.x) * step - halfStep, y: cell.y * step + halfStep };
 }
 
+/**
+ * The centre position of a set of footprint cells. Any axis-aligned rectangle is accepted (1x1, 2x2 and
+ * every rectangular shape in between), which is what lets a WxH stack round-trip
+ * cells -> position -> cells. A non-rectangular or empty set is rejected.
+ */
 export function getPositionForCells(gridSettings: GridSettings, cells: XY[]): XY | undefined {
     if (cells.length === 1) {
         return getPositionForCell(cells[0], gridSettings.getMinX(), gridSettings.getStep(), gridSettings.getHalfStep());
     }
 
-    if (cells.length !== 4) {
+    if (!cells.length) {
         return undefined;
     }
 
-    let xMin = Number.MAX_SAFE_INTEGER;
-    let xMax = Number.MIN_SAFE_INTEGER;
-    let yMin = Number.MAX_SAFE_INTEGER;
-    let yMax = Number.MIN_SAFE_INTEGER;
-
+    // ONE branch for every count. The 4-cell case used to skip the tiling check and return a
+    // bounding-box centre for ANY four cells — the last shape-validation hole in the position round
+    // trip. A 2x2 block and a 1x4 line both tile their box and pass; an L/T tetromino now fails
+    // closed instead of centring somewhere its body is not.
+    let rxMin = Number.MAX_SAFE_INTEGER;
+    let rxMax = Number.MIN_SAFE_INTEGER;
+    let ryMin = Number.MAX_SAFE_INTEGER;
+    let ryMax = Number.MIN_SAFE_INTEGER;
     for (const c of cells) {
-        xMin = Math.min(xMin, c.x);
-        xMax = Math.max(xMax, c.x);
-        yMin = Math.min(yMin, c.y);
-        yMax = Math.max(yMax, c.y);
+        rxMin = Math.min(rxMin, c.x);
+        rxMax = Math.max(rxMax, c.x);
+        ryMin = Math.min(ryMin, c.y);
+        ryMax = Math.max(ryMax, c.y);
     }
-
+    if ((rxMax - rxMin + 1) * (ryMax - ryMin + 1) !== cells.length) {
+        return undefined;
+    }
     return getPositionForCell(
-        { x: xMin + (xMax - xMin) / 2, y: yMin + (yMax - yMin) / 2 },
+        { x: rxMin + (rxMax - rxMin) / 2, y: ryMin + (ryMax - ryMin) / 2 },
         gridSettings.getMinX(),
         gridSettings.getStep(),
         gridSettings.getHalfStep(),
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Axis of advance. Classic boards deploy bottom/top (LOWER advances +y); SIDE-oriented boards
+// (the ranked Point-X layout) deploy left/right (LOWER advances +x). These two helpers are THE
+// switch every direction-sensitive rule routes through — Backstab geometry, advance/depth
+// features, forward-looking routers, placement frontness. Never compare raw .y by team again.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * How deep into the board a cell sits for `team`, in cells: 0 = the team's own back edge,
+ * gridSize-1 = the enemy's back edge.
+ */
+export function advanceDepthOfCell(team: TeamType, cell: XY, sideOriented: boolean, gridSize = 16): number {
+    const along = sideOriented ? cell.x : cell.y;
+    return team === PBTypes.TeamVals.LOWER ? along : gridSize - 1 - along;
+}
+
+/** Signed advance from `from` to `to` for `team`, in cells: positive = toward the enemy. */
+export function advanceDeltaBetween(team: TeamType, from: XY, to: XY, sideOriented: boolean): number {
+    const delta = sideOriented ? to.x - from.x : to.y - from.y;
+    return team === PBTypes.TeamVals.LOWER ? delta : -delta;
 }
 
 export function getRandomGridCellAroundPosition(
@@ -336,6 +505,8 @@ export function getLargeUnitAttackCells(
     enemyCell: XY,
     currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
     fromPathHashes?: Set<number>,
+    footprintWidth = 2,
+    footprintHeight = 2,
 ): XY[] {
     const attackCells: XY[] = [];
 
@@ -343,16 +514,19 @@ export function getLargeUnitAttackCells(
         return attackCells;
     }
 
+    const width = normalizeFootprintSide(footprintWidth, 2);
+    const height = normalizeFootprintSide(footprintHeight, 2);
+
     const verifyAndPush = (cell: XY) => {
-        const cellsToCheck: XY[] = [cell];
         const isSelfCell = cell.x === attackerBodyCellTopRight.x && cell.y === attackerBodyCellTopRight.y;
         if (!isSelfCell && !currentActiveKnownPaths?.has((cell.x << 4) | cell.y)) {
             return;
         }
 
-        cellsToCheck.push({ x: cell.x - 1, y: cell.y });
-        cellsToCheck.push({ x: cell.x - 1, y: cell.y - 1 });
-        cellsToCheck.push({ x: cell.x, y: cell.y - 1 });
+        const cellsToCheck: XY[] =
+            width === 2 && height === 2
+                ? [cell, { x: cell.x - 1, y: cell.y }, { x: cell.x - 1, y: cell.y - 1 }, { x: cell.x, y: cell.y - 1 }]
+                : getFootprintCellsForAnchor(cell, width, height);
 
         let allCellsCompliant = true;
         for (const ctc of cellsToCheck) {
@@ -375,6 +549,21 @@ export function getLargeUnitAttackCells(
             attackCells.push(cell);
         }
     };
+
+    // A WxH attacker can strike from any anchor whose footprint COVERS `attackFromCell` (that is what makes
+    // the body adjacent to the enemy). The anchor is the block's top-right cell, so those anchors are
+    // attackFromCell + [0..W-1] x [0..H-1]. verifyAndPush then drops the ones that overlap the enemy, leave
+    // the board, or are unreachable. The hand-written quadrant branches below are exactly this rule for the
+    // 2x2 case; they are kept verbatim so the shipped shapes also keep their exact candidate ORDER, which
+    // decides which attack-from anchor a caller picks first.
+    if (width !== 2 || height !== 2) {
+        for (let dx = 0; dx < width; dx++) {
+            for (let dy = 0; dy < height; dy++) {
+                verifyAndPush({ x: attackFromCell.x + dx, y: attackFromCell.y + dy });
+            }
+        }
+        return attackCells;
+    }
 
     if (attackFromCell.x < enemyCell.x && attackFromCell.y < enemyCell.y) {
         verifyAndPush(attackFromCell);
@@ -586,13 +775,14 @@ export function getWholeCellShotDistance(shotDistance: number): number {
  *
  * The target is snapped to its cell first, so an aim point nudged onto a cell EDGE (the side centers
  * a real shot resolves to - see getRangeAttackSideCenter) measures the same as that cell's center.
- * The attacker keeps its raw position because large units are centered on a grid intersection; their
- * half-footprint is subtracted instead, which is what makes the square hug the unit's own cells.
+ * The attacker keeps its raw position because a multi-cell body is centred between cells; its own
+ * half-footprint is subtracted per axis instead, which is what makes the square hug the unit's cells.
  */
 export function getShotCellDistance(
     gridSettings: GridSettings,
     attackerPosition: XY,
-    attackerSize: number,
+    attackerFootprintWidth: number,
+    attackerFootprintHeight: number,
     targetPosition: XY,
 ): number {
     const step = gridSettings.getStep();
@@ -602,11 +792,15 @@ export function getShotCellDistance(
         step,
         gridSettings.getHalfStep(),
     );
-    // Half the attacker's own footprint, in pixels: 0 for a 1x1 (centered on its cell), half a cell
-    // for a 2x2 (centered on the intersection of its four cells).
-    const halfFootprint = ((Math.max(1, attackerSize) - 1) / 2) * step;
-    const dx = Math.abs(targetCellPosition.x - attackerPosition.x) - halfFootprint;
-    const dy = Math.abs(targetCellPosition.y - attackerPosition.y) - halfFootprint;
+    // Half the attacker's own footprint, in pixels, PER AXIS: 0 for a side of 1 (centered on its cell),
+    // half a cell for a side of 2 (centered on a grid line), a whole cell for a side of 3. One scalar
+    // cannot describe a rectangle, and the shipped `size` is the square ART tier, not board geometry —
+    // it survived only because Math.round rounds a half up, which cancels the 0.5 error a 2x1 introduces
+    // on its 1-cell axis. This is bit-identical for 1x1, 2x2, 2x1 and 1x2, and right for the rest.
+    const halfFootprintX = ((normalizeFootprintSide(attackerFootprintWidth) - 1) / 2) * step;
+    const halfFootprintY = ((normalizeFootprintSide(attackerFootprintHeight) - 1) / 2) * step;
+    const dx = Math.abs(targetCellPosition.x - attackerPosition.x) - halfFootprintX;
+    const dy = Math.abs(targetCellPosition.y - attackerPosition.y) - halfFootprintY;
 
     return Math.max(0, Math.round(Math.max(dx, dy) / step));
 }
@@ -618,6 +812,27 @@ export function getShotCellDistance(
  */
 export function getFullDamageSquareHalfExtent(shotDistance: number, unitSize: number, step: number): number {
     return (getWholeCellShotDistance(shotDistance) + Math.max(1, unitSize) / 2) * step;
+}
+
+/**
+ * The same half-extents, per axis.
+ *
+ * The band reaches the same number of whole cells out from the BODY on both axes, so a body that is not
+ * square does not cover a square: a 2x1 shooter reaches half a cell further on x than on y. Collapsing that
+ * to one number (which is all the scalar form above can express) paints the overlay half a cell past the
+ * band the engine actually enforces on the thin axis. Identical to the scalar form whenever W === H.
+ */
+export function getFullDamageHalfExtents(
+    shotDistance: number,
+    footprintWidth: number,
+    footprintHeight: number,
+    step: number,
+): XY {
+    const wholeCells = getWholeCellShotDistance(shotDistance);
+    return {
+        x: (wholeCells + normalizeFootprintSide(footprintWidth) / 2) * step,
+        y: (wholeCells + normalizeFootprintSide(footprintHeight) / 2) * step,
+    };
 }
 
 /**

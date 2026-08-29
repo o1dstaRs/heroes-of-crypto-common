@@ -21,9 +21,13 @@ import {
     isRangeAttackSideObservable,
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
+    getCellsAroundFootprint,
 } from "../../grid/grid_math";
 import type { AttackHandler } from "../../handlers/attack_handler";
-import { canCastSpell, canCastSummon, canMassCastSpell } from "../../spells/spell_helper";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
+import { getCreatureFootprint } from "../../configuration/config_provider";
+import { ToFactionName } from "../../factions/faction_type";
+import { canCastSpell, canCastSummon, canMassCastSpell, firstSummonableAnchor } from "../../spells/spell_helper";
 import type { Spell } from "../../spells/spell";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
@@ -32,7 +36,7 @@ import { getDistance, type XY } from "../../utils/math";
 import { auraCoverageScore, planAuraMove } from "../ai";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
-import { otherTeam, StrategyV0_1 } from "./v0_1";
+import { byFootprintAreaLargestFirst, otherTeam, StrategyV0_1 } from "./v0_1";
 
 const isAdjacent = (a: XY, b: XY): boolean => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
 const cellKey = (cell: XY): number => (cell.x << 4) | cell.y;
@@ -173,15 +177,10 @@ export class StrategyV0_2 extends StrategyV0_1 {
         const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
         const edgeness = (c: XY): number => Math.abs(c.x - centreX);
 
-        const footprintFor = (unit: Unit, base: XY): XY[] =>
-            unit.isSmallSize()
-                ? [base]
-                : [
-                      { x: base.x, y: base.y },
-                      { x: base.x - 1, y: base.y },
-                      { x: base.x, y: base.y - 1 },
-                      { x: base.x - 1, y: base.y - 1 },
-                  ];
+        // The unit's real body, not a presumed 2x2: `placeBy` both rejects a cell whose footprint leaves the
+        // zone and reserves that footprint against later stacks, so a wrong shape simultaneously refuses legal
+        // anchors (the sniper corner is the narrow end of the zone) and blocks cells nobody stands on.
+        const footprintFor = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
         const placeBy = (unit: Unit, compare: (a: XY, b: XY) => number): void => {
             for (const base of [...baseCells].sort(compare)) {
@@ -199,11 +198,11 @@ export class StrategyV0_2 extends StrategyV0_1 {
 
         const isSniperRange = (u: Unit): boolean => u.getAttackType() === RANGE && u.hasAbilityActive("Sniper");
         const isMelee = (u: Unit): boolean => u.getAttackType() === MELEE;
-        const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1); // large units are harder to fit, place them first
-
-        const snipers = units.filter(isSniperRange).sort(bySizeLargeFirst);
-        const melee = units.filter(isMelee).sort(bySizeLargeFirst);
-        const backline = units.filter((u) => !isSniperRange(u) && !isMelee(u)).sort(bySizeLargeFirst); // range + magic/support
+        // Biggest body first within each role — the shared comparator, which is the old small/large flag for
+        // the two shipped shapes and additionally ranks a rectangle between them.
+        const snipers = units.filter(isSniperRange).sort(byFootprintAreaLargestFirst);
+        const melee = units.filter(isMelee).sort(byFootprintAreaLargestFirst);
+        const backline = units.filter((u) => !isSniperRange(u) && !isMelee(u)).sort(byFootprintAreaLargestFirst); // range + magic/support
 
         // 1. Snipers (Arbalester) -> deepest, most-cornered cell, away from the clash.
         for (const u of snipers) {
@@ -330,8 +329,31 @@ export class StrategyV0_2 extends StrategyV0_1 {
             // Summon Wolves: strongly preferred when our ranged army is stronger (stand and shoot), else low.
             if (spell.isSummon() && targetType === SpellTargetType.RANDOM_CLOSE_TO_CASTER) {
                 const amount = Math.floor(unit.getAmountAlive() * spell.getPower());
-                const cell = getRandomGridCellAroundPosition(gridSettings, matrix, team, unit.getPosition());
-                if (amount > 0 && cell && canCastSummon(spell, matrix, cell)) {
+                // Ask whether the summoned BODY fits, not just whether one cell is free: now that the
+                // mounted class ships 2x1, a free cell is a coin flip on whether the summon seats there,
+                // and the engine refuses an EXPLICIT cell outright instead of re-routing it.
+                //
+                // The RNG cell is still tried FIRST, so every 1x1 summon keeps the exact spot — and
+                // therefore the exact decision — it always had. Only when that spot cannot hold the body
+                // does this walk the ring around the caster's footprint for one that can, which keeps the
+                // summon available rather than silently dropping it.
+                const summonFootprint = getCreatureFootprint(
+                    ToFactionName[spell.getSummonUnitRace()],
+                    spell.getSummonUnitName(),
+                );
+                const randomCell = getRandomGridCellAroundPosition(gridSettings, matrix, team, unit.getPosition());
+                const cell =
+                    randomCell &&
+                    canCastSummon(spell, matrix, randomCell, summonFootprint.width, summonFootprint.height)
+                        ? randomCell
+                        : firstSummonableAnchor(
+                              spell,
+                              matrix,
+                              getCellsAroundFootprint(gridSettings, unit.getCells()),
+                              summonFootprint.width,
+                              summonFootprint.height,
+                          );
+                if (amount > 0 && cell) {
                     consider(amount * (rangedSuperior ? 60 : 3), spell, undefined, cell);
                 }
                 continue;
@@ -423,6 +445,8 @@ export class StrategyV0_2 extends StrategyV0_1 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const plan = planAuraMove(unit, movePath.knownPaths, gridSettings, matrix, unitsHolder);
         if (!plan) {
@@ -1016,6 +1040,8 @@ export class StrategyV0_2 extends StrategyV0_1 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const coverage = (cell: XY): number =>
             enemyRanged.filter((r) => getDistance(cell, r.getBaseCell()) <= auraR).length;
@@ -1110,6 +1136,8 @@ export class StrategyV0_2 extends StrategyV0_1 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         if (!movePath.knownPaths.size) {
             return undefined;

@@ -33,7 +33,13 @@ import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effec
 import type { FightProperties } from "../fights/fight_properties";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
-import { getCellsAroundCell, getPositionForCell, isCellWithinGrid, isPositionWithinGrid } from "../grid/grid_math";
+import {
+    getCellsAroundCell,
+    getPositionForCell,
+    isCellWithinGrid,
+    isFootprintWithinGrid,
+    isPositionWithinGrid,
+} from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import { AppliedSpell } from "../spells/applied_spell";
 import { getDistance, type XY } from "../utils/math";
@@ -86,6 +92,30 @@ export class UnitsHolder {
 
         return allies;
     }
+    /**
+     * Whether `cells` is the unit's WHOLE footprint. getCells() CLIPS to the board, so a stack parked off
+     * the grid (an unplaced one on the bench, one dragged past the edge) reports fewer cells than it
+     * occupies — and every "are all of my cells legal?" loop then answers yes for a unit that is not
+     * really placed at all, an empty list being vacuously fine.
+     *
+     * Only rectangles are judged. A 1x1 never clips (its single cell is returned even off-board, so the
+     * per-cell checks catch it), and a 2x2 has always been allowed to answer from whichever of its four
+     * cells survived clipping; both shapes are shipped and must stay bit-identical.
+     */
+    private isWholeFootprintOnBoard(unit: Unit, cells: readonly XY[]): boolean {
+        const width = unit.getFootprintWidth();
+        const height = unit.getFootprintHeight();
+        if (width === height) {
+            // Both shipped shapes answer from whatever survived clipping, and must keep doing so.
+            return true;
+        }
+        // A rectangle's cell list is built unclipped, so a short list means the caller assembled it by hand
+        // from something other than getCells() — treat that as not-really-placed rather than letting an
+        // "are all of my cells legal?" loop pass vacuously on a partial body.
+        return (
+            cells.length === width * height && cells.every((cell) => isCellWithinGrid(this.grid.getSettings(), cell))
+        );
+    }
     public getAllAlliesPlaced(
         teamType: TeamType,
         lowerLeftPlacement: IPlacement,
@@ -98,6 +128,9 @@ export class UnitsHolder {
         for (const unit of this.allUnits.values()) {
             if (unit.getTeam() === teamType) {
                 const unitCells = unit.getCells();
+                if (!this.isWholeFootprintOnBoard(unit, unitCells)) {
+                    continue;
+                }
                 let allCellsAllowed = true;
 
                 for (const c of unitCells) {
@@ -840,9 +873,15 @@ export class UnitsHolder {
             // depending on the action type (attack vs response)
             checkCells = getCellsAroundCell(this.gridSettings, firstCheckCell);
         } else {
+            // firstCheckCell is the footprint's ANCHOR (its top-right cell), so the body covers
+            // [x-W+1..x] x [y-H+1..y] and the cells that touch it run one further out in each direction:
+            // [x-W..x+1] x [y-H..y+1]. For a 2x2 that is verbatim the -2..1 box this has always walked,
+            // in the same order; for a 1x2 it is the 3x4 box, where the old constants would have missed
+            // a whole rank of neighbours on the long side.
+            const { width, height } = this.footprintSidesOf(attacker);
             checkCells = [];
-            for (let i = -2; i <= 1; i++) {
-                for (let j = -2; j <= 1; j++) {
+            for (let i = -width; i <= 1; i++) {
+                for (let j = -height; j <= 1; j++) {
                     checkCells.push({ x: firstCheckCell.x + i, y: firstCheckCell.y + j });
                 }
             }
@@ -864,6 +903,21 @@ export class UnitsHolder {
         }
 
         return enemyList;
+    }
+    /**
+     * The footprint of an AI-facing unit view, in cells.
+     *
+     * IUnitAIRepr gained its footprint accessors along with rectangular bodies. The narrower stand-ins
+     * that implement the interface by hand — AI test doubles, tooling that only ever described squares —
+     * still know nothing but getSize(), and for every one of those W == H == size by construction.
+     * Reading an absent accessor would collapse the body to nothing, so fall back to the square size.
+     */
+    private footprintSidesOf(unit: IUnitAIRepr): { width: number; height: number } {
+        const size = Math.max(1, Math.floor(unit.getSize()));
+        return {
+            width: typeof unit.getFootprintWidth === "function" ? unit.getFootprintWidth() : size,
+            height: typeof unit.getFootprintHeight === "function" ? unit.getFootprintHeight() : size,
+        };
     }
     private refreshAngelicHostForAllUnits(): void {
         const powerPerTeam: Map<TeamType, number> = new Map();
@@ -1320,7 +1374,17 @@ export class UnitsHolder {
         // produces the same final arrays as the old append-everything-then-squash pass without allocating and
         // walking the duplicate AppliedAuraEffectProperties entries created by overlapping source footprints.
         for (const u of this.getAllUnitsIterator()) {
-            if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
+            // The WHOLE body must be on the board, not just the anchor: a 2x1 dragged half off the
+            // edge still radiated an aura from ground nobody can stand on, and its negative-x cell
+            // keys de-optimised the aura index into string properties.
+            if (
+                !isFootprintWithinGrid(
+                    this.gridSettings,
+                    u.getBaseCell(),
+                    u.getFootprintWidth(),
+                    u.getFootprintHeight(),
+                )
+            ) {
                 continue;
             }
 
@@ -1412,7 +1476,28 @@ export class UnitsHolder {
                 continue;
             }
 
-            const unitAuraNamesToApply: string[] = [];
+            // One entry per aura NAME for the WHOLE body, strongest wins.
+            //
+            // The emission loop above deliberately keeps the strongest source per aura name PER CELL, and a
+            // body wider than one cell can straddle two rims — so its cells can legitimately hold
+            // different-strength copies of the same aura. Nothing reconciled them: the guard here compared
+            // the BARE effect name against a list it filled with the SUFFIXED one (`${name} Aura`), and no
+            // aura effect is named with that suffix, so the test was never true. Every covering cell applied
+            // the aura again, and `Unit.applyAuraEffect` deletes-then-pushes, so the value that survived was
+            // whichever cell came LAST in getCells() — the left cell of a 2x1, the lower cell of a 1x2.
+            //
+            // Measured before this change: a 2x1 standing in one aura received `applyAuraEffect` TWICE for
+            // the same aura. That made the outcome positional rather than strongest-wins, and it is why the
+            // choice below is a MAX rather than a first-seen guard — simply comparing the same string would
+            // restore "apply once" while leaving the winner just as arbitrary.
+            //
+            // The whole AppliedAuraEffectProperties is carried, never a power lifted off one entry and a
+            // source off another: the source cell rides out in the buff description and consumers resolve
+            // the aura's owner from it.
+            //
+            // NOTE this also changes 2x2 creatures, which had the same positional behaviour long before any
+            // rectangle shipped. That is the correct direction, and deliberate.
+            const strongestAuraPerName = new Map<string, AppliedAuraEffectProperties>();
             for (const c of u.getCells()) {
                 const cellKey = (c.x << 4) | c.y;
                 const appliedAuraEffects = teamAuraEffects.get(cellKey);
@@ -1422,11 +1507,16 @@ export class UnitsHolder {
 
                 for (const aae of appliedAuraEffects) {
                     const auraEffectProperties = aae.getAuraEffectProperties();
-                    if (!unitAuraNamesToApply.includes(auraEffectProperties.name)) {
-                        unitAuraNamesToApply.push(`${auraEffectProperties.name} Aura`);
-                        this.applyAuraEffectToUnit(u, aae);
+                    const strongest = strongestAuraPerName.get(auraEffectProperties.name);
+                    // Strictly greater, so equal powers keep the first cell's entry and the order stays
+                    // deterministic for the zero-power auras (Luck, Disguise, Web) that always tie.
+                    if (!strongest || auraEffectProperties.power > strongest.getAuraEffectProperties().power) {
+                        strongestAuraPerName.set(auraEffectProperties.name, aae);
                     }
                 }
+            }
+            for (const aae of strongestAuraPerName.values()) {
+                this.applyAuraEffectToUnit(u, aae);
             }
         }
         this.auraRefreshKnownEmpty = this.isAuraStateProvablyEmpty();
@@ -1509,6 +1599,13 @@ export class UnitsHolder {
         const unitCells = unit.getCells();
         const teamType = unit.getTeam();
         const enemyTeamType = unit.getOppositeTeam();
+
+        // A footprint that came back clipped is hanging off the board, which is exactly what
+        // verifyWithinGridPosition rejects below — but the per-cell loop can no longer see it, because
+        // the offending cells were the ones dropped.
+        if (verifyWithinGridPosition && !this.isWholeFootprintOnBoard(unit, unitCells)) {
+            return this.deleteUnitById(unitId);
+        }
 
         for (const c of unitCells) {
             const cellPosition = getPositionForCell(

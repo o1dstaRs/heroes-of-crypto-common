@@ -230,7 +230,9 @@
             "magic_resist": 10,
             "movement_type": "FLY",
             "exp": 118.5,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 3,
             "spells": [],
             "abilities": ["Range Null Field Aura", "Sky Runner", "Deep Wounds Level 2"]
@@ -379,7 +381,9 @@
             "magic_resist": 0,
             "movement_type": "WALK",
             "exp": 8.1,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 1,
             "spells": [],
             "abilities": ["Double Punch", "Deep Wounds Level 1"]
@@ -421,7 +425,9 @@
             "magic_resist": 5,
             "movement_type": "WALK",
             "exp": 40.5,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 2,
             "spells": [],
             "abilities": ["Disguise Aura", "Deep Wounds Level 2"]
@@ -512,7 +518,9 @@
             "magic_resist": 10,
             "movement_type": "WALK",
             "exp": 98,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 3,
             "spells": [],
             "abilities": ["One in the Field", "Blindness"]
@@ -533,7 +541,9 @@
             "magic_resist": 10,
             "movement_type": "FLY",
             "exp": 85,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 3,
             "spells": [],
             "abilities": ["Paralysis"]
@@ -554,7 +564,9 @@
             "magic_resist": 10,
             "movement_type": "FLY",
             "exp": 97,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 3,
             "spells": [],
             "abilities": ["Pegasus Might Aura", "Pegasus Light"]
@@ -927,8 +939,8 @@
             "spells": [],
             "abilities": ["Dense Flesh", "Flesh Shield Aura", "Stun Aura"]
         },
-        "Ash Moth": {
-            "name": "Ash Moth",
+        "Wandering Mage": {
+            "name": "Wandering Mage",
             "hp": 6,
             "steps": 7.5,
             "initiative": 5.6,
@@ -964,7 +976,9 @@
             "magic_resist": 5,
             "movement_type": "FLY",
             "exp": 38.4,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 2,
             "spells": [],
             "abilities": ["Warding Mane Aura", "Terrifying Gaze", "Deep Wounds Level 2"]
@@ -985,7 +999,9 @@
             "magic_resist": 12,
             "movement_type": "WALK",
             "exp": 102,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 3,
             "spells": ["Chaos:Fire Wall", "Chaos:Empower"],
             "abilities": ["Book of Nightmares", "Time Denial"]
@@ -1136,7 +1152,9 @@
             "magic_resist": 0,
             "movement_type": "WALK",
             "exp": 13.8,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 1,
             "spells": [],
             "abilities": ["Handyman", "Piercing Spear", "Boost Health"]
@@ -1157,7 +1175,9 @@
             "magic_resist": 0,
             "movement_type": "WALK",
             "exp": 12.4,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 1,
             "spells": [],
             "abilities": ["Wolf Trail Aura", "Rapid Charge"]
@@ -1178,7 +1198,9 @@
             "magic_resist": 5,
             "movement_type": "WALK",
             "exp": 39.5,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 2,
             "spells": [],
             "abilities": ["Shatter Armor", "Rapid Charge"]
@@ -1220,7 +1242,9 @@
             "magic_resist": 5,
             "movement_type": "WALK",
             "exp": 39.6,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 2,
             "spells": [],
             "abilities": ["Penetrating Bite"]
@@ -1241,7 +1265,9 @@
             "magic_resist": 5,
             "movement_type": "FLY",
             "exp": 33,
-            "size": 1,
+            "size": 2,
+            "footprint_width": 2,
+            "footprint_height": 1,
             "level": 2,
             "spells": [],
             "abilities": ["Venom Cloud Aura", "Wardguard"]

@@ -354,7 +354,7 @@ describe("AI meta cohort generation", () => {
     });
 
     it("replays the ranked pair that exposed size-incompatible stolen Castling", async () => {
-        // Re-pinned 1013 -> 29 after Ash Moth grew the L1 pool 15 -> 16, then 29 -> 104 after Trent grew the
+        // Re-pinned 1013 -> 29 after Wandering Mage grew the L1 pool 15 -> 16, then 29 -> 104 after Trent grew the
         // Nature L2 pool, then 104 -> 53 after Monk grew the Life L3 pool, then 53 -> 11 after
         // Battle Mage / Nightmare / Magic Dragon landed and Zena moved L2 -> L3 — each change reshuffles
         // every seeded draft again.

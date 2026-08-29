@@ -382,9 +382,9 @@ describe("ranked A19 caster-empower replay candidate", () => {
         expect(
             rankedA19CasterEmpowerEligible([PBTypes.CreatureVals.MAGIC_DRAGON, PBTypes.CreatureVals.MAGIC_DRAGON]),
         ).toBe(false);
-        expect(rankedA19CasterEmpowerEligible([PBTypes.CreatureVals.MAGIC_DRAGON, PBTypes.CreatureVals.ASH_MOTH])).toBe(
-            false,
-        );
+        expect(
+            rankedA19CasterEmpowerEligible([PBTypes.CreatureVals.MAGIC_DRAGON, PBTypes.CreatureVals.WANDERING_MAGE]),
+        ).toBe(false);
         expect(
             rankedA19CasterEmpowerEligible([PBTypes.CreatureVals.MAGIC_DRAGON, PBTypes.CreatureVals.NIGHTMARE]),
         ).toBe(true);

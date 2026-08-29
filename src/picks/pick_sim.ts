@@ -142,6 +142,7 @@ export interface IPickSimState {
 
 export type PickAction =
     | { type: "select_doctrine"; team: PickTeam; doctrine: Doctrine }
+    | { type: "select_doctrine"; team: PickTeam; doctrine: Doctrine }
     | { type: "propose_ban"; team: PickTeam; creatureId: number }
     | { type: "select_bundle"; team: PickTeam; bundleIndex: number }
     | { type: "pick_creature"; team: PickTeam; creatureId: number }
@@ -640,6 +641,12 @@ export function transitionPickSim(state: IPickSimState, action: PickAction, rng:
     switch (action.type) {
         case "select_doctrine":
             return applyDoctrine(state, action, rng);
+        case "select_doctrine":
+            return applyDoctrine(
+                state,
+                { type: "select_doctrine", team: action.team, doctrine: action.doctrine as unknown as Doctrine },
+                rng,
+            );
         case "propose_ban":
             return applyProposedBan(state, action);
         case "select_bundle":

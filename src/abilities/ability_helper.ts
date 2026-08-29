@@ -15,6 +15,7 @@ import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
+import { getFootprintCellsForAnchor, normalizeFootprintSide } from "../grid/grid_math";
 import { getDistance, type XY } from "../utils/math";
 import { Ability } from "./ability";
 import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "./double_shot_names";
@@ -25,22 +26,47 @@ export function getAbilitiesWithPosisionCoefficient(
     toCell?: XY,
     toUnitSmallSize?: boolean,
     fromUnitTeam?: TeamType,
+    toFootprintHeight?: number,
+    sideOrientedBoard = false,
+    toFootprintWidth?: number,
 ): Ability[] {
     const abilities: Ability[] = [];
     if (!unitAbilities?.length || !fromCell || !toCell) {
         return abilities;
     }
 
+    // Both arguments are ANCHOR cells — the top-right corner of a footprint — so the anchor names the FAR
+    // edge along each axis while the body reaches back to `anchor - (extent - 1)`. An UPPER-team attacker
+    // stabs from below, so it has to clear the whole body rather than a single cell of it: the margin is
+    // the target's extent, minus one, ALONG THE AXIS OF ADVANCE. That axis is Y on the classic board and X
+    // on the side-oriented ranked board, so the margin has to switch with it — reading the height on a side
+    // board measures the body across the advance instead of along it, and a rectangle then earns or loses
+    // Backstab a cell early. `toUnitSmallSize` could only ever say 1 or 2, which is why the shipped code
+    // spelled the margin as a literal 0-or-1; callers that still pass only the boolean get the same number
+    // back, and a square target is unaffected by the axis choice. The LOWER-team test has no margin at all
+    // and gains none here — its comparison already reads the target's near edge.
+    const targetAlongExtent = normalizeFootprintSide(
+        sideOrientedBoard ? toFootprintWidth : toFootprintHeight,
+        toUnitSmallSize ? 1 : 2,
+    );
+
     for (const a of unitAbilities) {
         if (a.getName() === "Backstab") {
-            const aY = fromCell.y;
-            const tY = toCell.y;
+            // "Behind" is measured along the axis of ADVANCE: Y on the classic bottom/top board,
+            // X on the side-oriented ranked board. The large-target adjustment mirrors the 2x2
+            // anchor convention (base cell = far corner along the axis) exactly as it always did
+            // for Y — comparing raw Y on a side board awarded Backstab for standing BESIDE the
+            // victim and never for standing behind it.
+            const along = sideOrientedBoard ? fromCell.x : fromCell.y;
+            const targetAlong = sideOrientedBoard ? toCell.x : toCell.y;
 
-            if (fromUnitTeam === PBTypes.TeamVals.LOWER && aY > tY) {
+            if (fromUnitTeam === PBTypes.TeamVals.LOWER && along > targetAlong) {
                 abilities.push(a);
             }
 
-            if (fromUnitTeam === PBTypes.TeamVals.UPPER && aY < tY - (toUnitSmallSize ? 0 : 1)) {
+            // The footprint margin follows the axis too: along the advance axis the anchor names the
+            // FAR edge, so the UPPER attacker must clear the body's full extent along that axis.
+            if (fromUnitTeam === PBTypes.TeamVals.UPPER && along < targetAlong - (targetAlongExtent - 1)) {
                 abilities.push(a);
             }
         }
@@ -231,12 +257,22 @@ export function nextStandingTargets(
     let attackerBaseCell = attackFromBaseCell;
 
     if (!attackerUnit.isSmallSize()) {
-        const attackerCells = [
-            attackerBaseCell,
-            { x: attackerBaseCell.x - 1, y: attackerBaseCell.y },
-            { x: attackerBaseCell.x, y: attackerBaseCell.y - 1 },
-            { x: attackerBaseCell.x - 1, y: attackerBaseCell.y - 1 },
-        ];
+        // The attacker's REAL body. The hand-written 2x2 list below is kept verbatim for that shape because
+        // the search seeds its tie-break with `attackerCells[0]` and then takes the first strictly-closer
+        // cell, so the ORDER decides which cell wins when two are equidistant. Any other shape takes the
+        // shared expansion; the old list gave a 2x1 two cells it does not stand on, which could pick a
+        // phantom cell as the attack origin and aim the whole chain from the wrong place.
+        const width = attackerUnit.getFootprintWidth();
+        const height = attackerUnit.getFootprintHeight();
+        const attackerCells =
+            width === 2 && height === 2
+                ? [
+                      attackerBaseCell,
+                      { x: attackerBaseCell.x - 1, y: attackerBaseCell.y },
+                      { x: attackerBaseCell.x, y: attackerBaseCell.y - 1 },
+                      { x: attackerBaseCell.x - 1, y: attackerBaseCell.y - 1 },
+                  ]
+                : getFootprintCellsForAnchor(attackerBaseCell, width, height);
         let closestCell = attackerCells[0];
         let minDistance = getDistance(closestCell, targetBaseCell);
 
@@ -271,20 +307,42 @@ export function nextStandingTargets(
     let xCoefficient = 0;
     let yCoefficient = 0;
     if (!targetUnit.isSmallSize()) {
+        // How far the wave steps PAST the target, per axis: a body absorbs its own depth, so the step is the
+        // target's own extent on that axis and nothing more.
+        //
+        // This used to test the gap against a literal 2 on BOTH axes, which is the target's depth only when
+        // it is 2x2. A 1x2 or 2x1 is not small (isSmallSize is W===1 && H===1), so it entered here too and,
+        // on the axis where its side is 1, the wave stepped a full cell too far — skipping whoever stood in
+        // contact behind the body and burning a unit two cells away across an empty cell. The shipped 2x2
+        // resolves to exactly the old numbers, since its width and height are both 2.
+        const targetWidth = targetUnit.getFootprintWidth();
+        const targetHeight = targetUnit.getFootprintHeight();
         const baseCellDiffX = tbs.x - attackFromBaseCell.x;
         const baseCellDiffY = tbs.y - attackFromBaseCell.y;
-        if (baseCellDiffX === 2) {
-            xCoefficient = 1;
-        } else if (baseCellDiffX === -2) {
-            xCoefficient = -1;
+        if (targetWidth === 2 && targetHeight === 2) {
+            // The shipped 2x2 keeps its exact arithmetic, including for gaps this never anticipated.
+            if (baseCellDiffX === 2) {
+                xCoefficient = 1;
+            } else if (baseCellDiffX === -2) {
+                xCoefficient = -1;
+            }
+            if (baseCellDiffY === 2) {
+                yCoefficient = 1;
+            } else if (baseCellDiffY === -2) {
+                yCoefficient = -1;
+            }
+            xCoefficient = baseCellDiffX - xCoefficient;
+            yCoefficient = baseCellDiffY - yCoefficient;
+        } else {
+            // The wave is pushed back by the target's own DEPTH on each axis, one cell per cell of body
+            // beyond the first — which is what the 2x2 branch above works out to, and is 0 on an axis the
+            // target is only one cell thick. Reading a literal 2 there (a 1x2 or 2x1 is not "small", so it
+            // fell into that branch) pushed the wave a full cell too far on the thin axis: it skipped
+            // whoever stood in contact behind the body and burned a unit two cells away across an empty
+            // cell. Verified against the 2x2 case, which this expression reproduces exactly.
+            xCoefficient = Math.sign(baseCellDiffX) * (targetWidth - 1);
+            yCoefficient = Math.sign(baseCellDiffY) * (targetHeight - 1);
         }
-        if (baseCellDiffY === 2) {
-            yCoefficient = 1;
-        } else if (baseCellDiffY === -2) {
-            yCoefficient = -1;
-        }
-        xCoefficient = tbs.x - attackFromBaseCell.x - xCoefficient;
-        yCoefficient = tbs.y - attackFromBaseCell.y - yCoefficient;
     }
 
     if (targetBaseCell && attackerBaseCell) {

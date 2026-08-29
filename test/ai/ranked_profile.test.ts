@@ -81,7 +81,7 @@ describe("full-ranked AI profiles", () => {
             3,
             creatureOffer,
             [PBTypes.CreatureVals.ORC, PBTypes.CreatureVals.HEALER],
-            [PBTypes.CreatureVals.ASH_MOTH],
+            [PBTypes.CreatureVals.WANDERING_MAGE],
             bundles[bundleIndex][2],
         );
         expect(creatureOffer).toContain(creature);

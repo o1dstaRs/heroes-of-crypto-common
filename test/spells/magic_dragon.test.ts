@@ -421,13 +421,15 @@ describe("action engine — Ring of Fire", () => {
     });
 
     // Size-scaling: a 2x2 target is ringed by the 12 cells around its whole block, not the 8 around its base
-    // cell. (7,4) touches the block's top-right corner and would fall OUTSIDE a base-cell-only ring, so it is
-    // the cell that actually distinguishes the two shapes.
+    // cell. The base cell is the block's TOP-RIGHT corner, so aiming at (6,3) puts the body on
+    // (5,2)-(6,3); (4,2) then touches the block's left column while sitting two cells from the base cell in
+    // x — i.e. OUTSIDE a base-cell-only ring. It is the cell that actually distinguishes the two shapes, and
+    // it is off the caster's (3,3) sight line to the target, which (4,3) would have blocked.
     it("rings a large target's whole 2x2 block rather than just its base cell", () => {
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
-            enemies: [{ cell: { x: 6, y: 3 }, large: true }, { cell: { x: 8, y: 4 } }, { cell: { x: 9, y: 9 } }],
+            enemies: [{ cell: { x: 6, y: 3 }, large: true }, { cell: { x: 4, y: 2 } }, { cell: { x: 9, y: 9 } }],
         });
         const before = setup.enemies.map((unit) => unit.getHp());
 

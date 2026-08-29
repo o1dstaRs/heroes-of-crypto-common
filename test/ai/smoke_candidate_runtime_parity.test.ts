@@ -41,10 +41,10 @@ const LOWER = PBTypes.TeamVals.LOWER;
 const UPPER = PBTypes.TeamVals.UPPER;
 const RANGE = PBTypes.AttackVals.RANGE;
 
-function nativeAshMoth(): Unit {
+function nativeWanderingMage(): Unit {
     const effectFactory = new EffectFactory();
     return Unit.createUnit(
-        getCreatureConfig(LOWER, "Chaos", "Ash Moth", "", 50),
+        getCreatureConfig(LOWER, "Chaos", "Wandering Mage", "", 50),
         testGridSettings,
         LOWER,
         PBTypes.UnitVals.CREATURE,
@@ -88,7 +88,7 @@ function smokeHarness(
     enemyCell: XY = { x: 13, y: 8 },
 ): ISmokeHarness {
     const combat = createCombatTestContext(gridType);
-    const caster = nativeAshMoth();
+    const caster = nativeWanderingMage();
     const enemy = createTestUnit({
         team: UPPER,
         name: "Enemy Ranger",
@@ -129,7 +129,7 @@ function smokeCandidates(harness: ISmokeHarness) {
 describe("Smoke cell legality oracle", () => {
     test("rejects off-grid, units, mountains, holes, and caster occupancy while allowing ground and fluids", () => {
         const normal = createCombatTestContext();
-        const caster = nativeAshMoth();
+        const caster = nativeWanderingMage();
         const other = createTestUnit({ team: UPPER, name: "Occupant" });
         placeUnit(normal.grid, normal.unitsHolder, caster, { x: 2, y: 8 });
         placeUnit(normal.grid, normal.unitsHolder, other, { x: 3, y: 8 });
@@ -791,7 +791,7 @@ describe("Smoke candidate/runtime parity", () => {
 
         for (let iteration = 0; iteration < 32; iteration += 1) {
             const combat = createCombatTestContext(gridTypes[iteration % gridTypes.length]!);
-            const caster = nativeAshMoth();
+            const caster = nativeWanderingMage();
             const pickEmptyCell = (): XY => {
                 for (let attempt = 0; attempt < 512; attempt += 1) {
                     const cell = { x: next(16), y: next(16) };
@@ -869,7 +869,7 @@ describe("Smoke candidate/runtime parity", () => {
 
     test("stores exact enemy prevention minus friendly prevention after both sides retarget", () => {
         const combat = createCombatTestContext();
-        const caster = nativeAshMoth();
+        const caster = nativeWanderingMage();
         const friendlyRanger = createTestUnit({
             team: LOWER,
             name: "Friendly ranger",
@@ -953,7 +953,7 @@ describe("Smoke candidate/runtime parity", () => {
         ).toBe(chargesBefore - 1);
     });
 
-    test("never emits the legacy candidate that overlaps its own Ash Moth caster", () => {
+    test("never emits the legacy candidate that overlaps its own Wandering Mage caster", () => {
         const harness = smokeHarness(PBTypes.GridVals.NORMAL, { x: 2, y: 8 }, { x: 4, y: 8 });
         const casterOverlap = smokeCells({ x: 2, y: 8 });
 

@@ -14,7 +14,13 @@ import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { getRandomInt } from "../utils/lib";
 import { getDistance, type IXYDistance, matrixElementOrDefault, type XY } from "../utils/math";
-import { getCellForPosition, getPositionForCell, isCellWithinGrid, isPositionWithinGrid } from "./grid_math";
+import {
+    getCellForPosition,
+    getPositionForCell,
+    isCellWithinGrid,
+    isPositionWithinGrid,
+    normalizeFootprintSide,
+} from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import type { IMovePath, IWeightedRoute } from "./path_definitions";
 import { TeamVals } from "../generated/protobuf/v1";
@@ -32,25 +38,37 @@ export class PathHelper {
     public constructor(gridSettings: GridSettings) {
         this.gridSettings = gridSettings;
     }
+    /**
+     * The anchor cells a body of `footprintWidth` x `footprintHeight` may step onto from `currentCell`.
+     *
+     * An anchor is the footprint's TOP-RIGHT cell, so the body needs W-1 cells to its left and H-1 cells
+     * below it to stay on the board. The legacy `isSmallUnit ? 0 : 1` bounds are exactly those two
+     * expressions at 1x1 and 2x2; spelling them out per axis is what finally gives a 2x1 the whole
+     * y === 0 row (and a 1x2 the whole x === 0 column) it used to be refused.
+     */
     public getNeighborCells(
         currentCell: XY,
         visited: Set<number> = new Set(),
         isSmallUnit = true,
         getDiag = true,
         includeLeftRightEdges = false,
+        footprintWidth = isSmallUnit ? 1 : 2,
+        footprintHeight = isSmallUnit ? 1 : 2,
     ): XY[] {
         const neighborsLine = [];
         const neighborsDiag = [];
+        const width = normalizeFootprintSide(footprintWidth, isSmallUnit ? 1 : 2);
+        const height = normalizeFootprintSide(footprintHeight, isSmallUnit ? 1 : 2);
         const diff = includeLeftRightEdges ? 2 : 0;
-        const canGoLeft = currentCell.x > (isSmallUnit ? 0 : 1) - diff;
+        const canGoLeft = currentCell.x > width - 1 - diff;
         const canGoRight = currentCell.x < this.gridSettings.getGridSize() - 1 + diff;
         let canGoDown;
         if (currentCell.x < 0) {
+            // The off-board staging columns (the faction icons) are not board geometry, so the body rule
+            // does not apply there; keep the legacy floor.
             canGoDown = currentCell.y > 2;
-        } else if (isSmallUnit) {
-            canGoDown = currentCell.y > 0;
         } else {
-            canGoDown = currentCell.y > 1;
+            canGoDown = currentCell.y > height - 1;
         }
         const canGoUp = currentCell.y < this.gridSettings.getGridSize() - 1;
 
@@ -877,8 +895,22 @@ export class PathHelper {
 
         return undefined;
     }
+    /** A 2x2 block is the W === H === 2 instance of the footprint rule, so it is checked by the same code. */
     public areCellsFormingSquare(cells?: XY[]): boolean {
-        if (!cells || cells.length !== 4) {
+        return this.areCellsFormingFootprint(cells, 2, 2);
+    }
+    /**
+     * Whether `cells` is exactly the `width` x `height` block of on-board cells a unit of that size occupies.
+     *
+     * Counting the cells and measuring the extents is not enough on its own: [(3,5), (3,5), (4,5), (4,6)]
+     * has four entries and 1x1 extents while covering only three cells, so a repeated cell used to pass as a
+     * square. W*H DISTINCT in-grid cells inside a bounding box of exactly W*H cells can only be the full
+     * rectangle, which is why the three checks together are the whole rule.
+     */
+    public areCellsFormingFootprint(cells: XY[] | undefined, width: number, height: number): boolean {
+        const w = normalizeFootprintSide(width);
+        const h = normalizeFootprintSide(height);
+        if (!cells || cells.length !== w * h) {
             return false;
         }
 
@@ -899,6 +931,7 @@ export class PathHelper {
                 return false;
             }
 
+            // String keys, not the packed (x << 4) | y ones: those collide once a board is wider than 16.
             const key = `${c.x}:${c.y}`;
             if (knownHashes.has(key)) {
                 return false;
@@ -910,8 +943,13 @@ export class PathHelper {
             yMax = Math.max(yMax, c.y);
         }
 
-        return xMax - xMin === 1 && yMax - yMin === 1;
+        return xMax - xMin === w - 1 && yMax - yMin === h - 1;
     }
+    /**
+     * The cells under the cursor a `footprintWidth` x `footprintHeight` body would stand on, or undefined
+     * when the cursor is nowhere near a legal block. Named for the 2x2 square it was written for, which is
+     * still the default; a 1x2 or 2x1 simply grows the block along one axis instead of both.
+     */
     public getClosestSquareCellIndices(
         mousePosition: XY,
         allowedPlacementCellHashes?: ReadonlySet<number>,
@@ -919,7 +957,12 @@ export class PathHelper {
         unitCells?: XY[],
         allowedToMoveThere?: Set<number>,
         currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+        footprintWidth = 2,
+        footprintHeight = 2,
     ): XY[] | undefined {
+        const width = normalizeFootprintSide(footprintWidth, 2);
+        const height = normalizeFootprintSide(footprintHeight, 2);
+        const footprintCellCount = width * height;
         const squareCells: XY[] = [];
         const mouseCell = getCellForPosition(this.gridSettings, mousePosition);
         const neightborCells: IXYDistance[] = [];
@@ -965,7 +1008,7 @@ export class PathHelper {
                 // need to make sure that top right corner is reachable
                 if (
                     currentActiveKnownPaths &&
-                    squareCells.length === 4 &&
+                    squareCells.length === footprintCellCount &&
                     c.x === maxX &&
                     c.y === maxY &&
                     !currentActiveKnownPaths.has((c.x << 4) | c.y)
@@ -1071,13 +1114,15 @@ export class PathHelper {
                 }
                 let needToAdd = false;
                 for (const sc of squareCells) {
+                    // Two cells of one body are at most W-1 apart on x and H-1 apart on y, so a 1x2 accepts
+                    // only its own column while a 2x2 keeps the legacy 1-cell slack on both axes.
                     const absX = Math.abs(sc.x - nc.xy.x);
-                    if (absX > 1) {
+                    if (absX > width - 1) {
                         needToAdd = false;
                         break;
                     }
                     const absY = Math.abs(sc.y - nc.xy.y);
-                    if (absY > 1) {
+                    if (absY > height - 1) {
                         needToAdd = false;
                         break;
                     }
@@ -1099,7 +1144,7 @@ export class PathHelper {
                         squareCells.push(nc.xy);
                     }
                 }
-                if (squareCells.length >= 4) {
+                if (squareCells.length >= footprintCellCount) {
                     break;
                 }
             }
@@ -1164,12 +1209,14 @@ export class PathHelper {
 
         const isInPlacementAndAllowedCount = isInTeamPlacement && (canPlaceMore || isInsideGridAtOwnPosition);
 
-        // --- for large units, if we have a candidate square selection, validate that shape
+        // --- for multi-cell units, if we have a candidate block selection, validate that shape. Asking for
+        // the unit's own WxH rather than a square is what lets a 1x2 be placed at all: its two cells could
+        // never satisfy the square check, so every pre-fight position was refused.
         if (!isInPlacementAndAllowedCount || unit.isSmallSize()) {
             return isInPlacementAndAllowedCount;
         }
 
-        return this.areCellsFormingSquare(cells);
+        return this.areCellsFormingFootprint(cells, unit.getFootprintWidth(), unit.getFootprintHeight());
     }
     public getMovePath(
         currentCell: XY,
@@ -1180,7 +1227,29 @@ export class PathHelper {
         isSmallUnit = true,
         isMadeOfFire = false,
         hasVineStride = false,
+        footprintWidth = isSmallUnit ? 1 : 2,
+        footprintHeight = isSmallUnit ? 1 : 2,
     ): IMovePath {
+        // From here on the body is read off W/H, never off isSmallUnit — that flag now only supplies their
+        // defaults. A 1x1 IS the legacy small unit and a 2x2 IS the legacy large one, but a 1x2 is neither,
+        // and asking "is it small?" about it gives the wrong answer whichever way it is answered.
+        const width = normalizeFootprintSide(footprintWidth, isSmallUnit ? 1 : 2);
+        const height = normalizeFootprintSide(footprintHeight, isSmallUnit ? 1 : 2);
+        const isSmallFootprint = width === 1 && height === 1;
+        // The two shipped shapes keep their hand-written branches below so their cell ORDER, their float
+        // accumulation order in aggr() and their exact matrix probe order cannot drift. Every other
+        // rectangle walks the generic path driven by these offsets, computed once here because they are
+        // read for every neighbour of every visited cell.
+        const usesLegacySquareFootprint = width === 2 && height === 2;
+        const footprintOffsetsX: number[] = [];
+        const footprintOffsetsY: number[] = [];
+        for (let dx = 0; dx < width; dx++) {
+            for (let dy = 0; dy < height; dy++) {
+                footprintOffsetsX.push(dx);
+                footprintOffsetsY.push(dy);
+            }
+        }
+        const footprintCellCount = footprintOffsetsX.length;
         const knownPaths: Map<number, IWeightedRoute[]> = new Map();
         const allowed: XY[] = [];
         // Packed keys are collision-free 0..255 on the production board. Keep every custom/malformed case on
@@ -1195,20 +1264,27 @@ export class PathHelper {
             Number.isInteger(currentCell.y) &&
             !Object.is(currentCell.x, -0) &&
             !Object.is(currentCell.y, -0) &&
-            currentCell.x >= (isSmallUnit ? 0 : 1) &&
+            currentCell.x >= width - 1 &&
             currentCell.x < 16 &&
-            currentCell.y >= (isSmallUnit ? 0 : 1) &&
+            currentCell.y >= height - 1 &&
             currentCell.y < 16;
         let currentCellKeys: number[];
-        if (isSmallUnit) {
+        if (isSmallFootprint) {
             currentCellKeys = [(currentCell.x << 4) | currentCell.y];
-        } else {
+        } else if (usesLegacySquareFootprint) {
             currentCellKeys = [
                 ((currentCell.x - 1) << 4) | currentCell.y,
                 (currentCell.x << 4) | (currentCell.y - 1),
                 ((currentCell.x - 1) << 4) | (currentCell.y - 1),
                 (currentCell.x << 4) | currentCell.y,
             ];
+        } else {
+            currentCellKeys = [];
+            for (let i = 0; i < footprintCellCount; i++) {
+                currentCellKeys.push(
+                    ((currentCell.x - footprintOffsetsX[i]) << 4) | (currentCell.y - footprintOffsetsY[i]),
+                );
+            }
         }
         const initialCellKeys: Set<number> = new Set(currentCellKeys);
         const currentCellKey = (currentCell.x << 4) | currentCell.y;
@@ -1263,16 +1339,22 @@ export class PathHelper {
             let cellCount: number;
             if (usesDirectAggression) {
                 sumAggr += aggrBoard[cell.x][cell.y] || 1;
-                if (isSmallUnit) {
+                if (isSmallFootprint) {
                     cellCount = 1;
-                } else {
+                } else if (usesLegacySquareFootprint) {
                     sumAggr += aggrBoard[cell.x - 1][cell.y] || 1;
                     sumAggr += aggrBoard[cell.x - 1][cell.y - 1] || 1;
                     sumAggr += aggrBoard[cell.x][cell.y - 1] || 1;
                     cellCount = 4;
+                } else {
+                    // Offset 0 is the anchor, already summed above.
+                    for (let i = 1; i < footprintCellCount; i++) {
+                        sumAggr += aggrBoard[cell.x - footprintOffsetsX[i]][cell.y - footprintOffsetsY[i]] || 1;
+                    }
+                    cellCount = footprintCellCount;
                 }
-            } else {
-                const cells = isSmallUnit
+            } else if (isSmallFootprint || usesLegacySquareFootprint) {
+                const cells = isSmallFootprint
                     ? [cell]
                     : [
                           cell,
@@ -1284,6 +1366,11 @@ export class PathHelper {
                     sumAggr += aggrBoard[cell.x][cell.y] || 1;
                 }
                 cellCount = cells.length;
+            } else {
+                for (let i = 0; i < footprintCellCount; i++) {
+                    sumAggr += aggrBoard[cell.x - footprintOffsetsX[i]][cell.y - footprintOffsetsY[i]] || 1;
+                }
+                cellCount = footprintCellCount;
             }
 
             const aggrValue = sumAggr / cellCount;
@@ -1294,6 +1381,65 @@ export class PathHelper {
                 }
             }
             return aggrValue;
+        };
+
+        // The occupancy predicate the legacy 1x1/2x2 branches spell out inline four times over: a walker is
+        // stopped by anything standing on the cell (lava included, unless it is made of fire), a flyer only
+        // by what it cannot fly over.
+        const blocksBody = (el: number): boolean =>
+            (!!el && !canFly && !(isMadeOfFire && el === ObstacleType.LAVA)) ||
+            (canFly && !!el && el !== ObstacleType.LAVA && el !== ObstacleType.WATER);
+
+        // Whether `anchor`'s footprint contains a cell — plain rectangle arithmetic, because the anchor is
+        // the block's top-right cell and the body extends towards -x/-y.
+        const footprintCovers = (anchor: XY, x: number, y: number): boolean =>
+            x <= anchor.x && x > anchor.x - width && y <= anchor.y && y > anchor.y - height;
+
+        /**
+         * Whether a diagonal step would shear the body through a blocked cell.
+         *
+         * A body does not teleport across the diagonal: it has to pass along one of the two L routes (x
+         * first, then y — or y first, then x), and every cell either route sweeps that the body is not
+         * already standing on and does not end up standing on has to be free. For a 2x2 that is precisely
+         * the four hand-written cases kept below (down-left, for example, reduces to "(x-2, y) and
+         * (x, y-2) must both be free"), which is why the shipped large unit still takes the legacy branch
+         * and this one only ever runs for the new shapes.
+         */
+        const shearsThroughBlockedCell = (from: XY, to: XY): boolean => {
+            const stepX = to.x - from.x;
+            const stepY = to.y - from.y;
+            for (let route = 0; route < 2; route++) {
+                const viaX = route === 0 ? from.x + stepX : from.x;
+                const viaY = route === 0 ? from.y : from.y + stepY;
+                for (let i = 0; i < footprintCellCount; i++) {
+                    const cx = viaX - footprintOffsetsX[i];
+                    const cy = viaY - footprintOffsetsY[i];
+                    if (footprintCovers(from, cx, cy) || footprintCovers(to, cx, cy)) {
+                        continue;
+                    }
+                    if (matrixElementOrDefault(matrix, cx, cy, 0)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+
+        // A destination is a whole body, not just its anchor, so every cell of the footprint has to be
+        // marked movable — otherwise the board offers a WxH unit a landing spot it only half fits on.
+        const markFootprintAllowed = (anchor: XY): void => {
+            // Offset 0 is the anchor itself, which the caller has already pushed.
+            for (let i = 1; i < footprintCellCount; i++) {
+                const cx = anchor.x - footprintOffsetsX[i];
+                const cy = anchor.y - footprintOffsetsY[i];
+                const footprintKey = (cx << 4) | cy;
+                if (indexedAllowed ? indexedAllowed[footprintKey] : allowedToMoveThere!.has(footprintKey)) {
+                    continue;
+                }
+                if (indexedAllowed) indexedAllowed[footprintKey] = 1;
+                else allowedToMoveThere!.add(footprintKey);
+                allowed.push({ x: cx, y: cy });
+            }
         };
 
         // Vine Throw terrain. Read off the live fight the same way attack_handler reads smoke clouds — the
@@ -1342,9 +1488,9 @@ export class PathHelper {
             let neighbors: XY[];
             if (indexedNeighbors) {
                 indexedNeighbors.length = 0;
-                const canGoLeft = cur.x > (isSmallUnit ? 0 : 1);
+                const canGoLeft = cur.x > width - 1;
                 const canGoRight = cur.x < 15;
-                const canGoDown = cur.y > (isSmallUnit ? 0 : 1);
+                const canGoDown = cur.y > height - 1;
                 const canGoUp = cur.y < 15;
                 if (canGoLeft) {
                     const x = cur.x - 1;
@@ -1384,20 +1530,24 @@ export class PathHelper {
                 }
                 neighbors = indexedNeighbors;
             } else {
-                neighbors = this.getNeighborCells(cur, visited!, isSmallUnit);
+                neighbors = this.getNeighborCells(cur, visited!, isSmallUnit, true, false, width, height);
             }
             for (const n of neighbors) {
                 const keyNeighbor = (n.x << 4) | n.y;
-                // A legal large-unit anchor is the upper-right cell of its 2x2 footprint, so x/y must both
-                // stay at least 1. Keep malformed state (for example, a size-unsafe position swap) from
-                // evaluating occupancy or aggro outside the board while recovery finds a valid re-entry.
-                if (!isSmallUnit && (n.x < 1 || n.y < 1 || !isCellWithinGrid(this.gridSettings, n))) {
+                // A legal anchor is the upper-right cell of its WxH footprint, so x must stay at least W-1
+                // and y at least H-1 (the legacy "at least 1" is that rule at 2x2). Keep malformed state
+                // (for example, a size-unsafe position swap) from evaluating occupancy or aggro outside the
+                // board while recovery finds a valid re-entry.
+                if (
+                    !isSmallFootprint &&
+                    (n.x < width - 1 || n.y < height - 1 || !isCellWithinGrid(this.gridSettings, n))
+                ) {
                     if (indexedVisited) indexedVisited[keyNeighbor] = 1;
                     else visited!.add(keyNeighbor);
                     continue;
                 }
                 const el1 = matrixElementOrDefault(matrix, n.x, n.y, 0);
-                if (isSmallUnit) {
+                if (isSmallFootprint) {
                     if (
                         ((el1 && !canFly && !(isMadeOfFire && el1 === ObstacleType.LAVA)) ||
                             (canFly && el1 && el1 !== ObstacleType.LAVA && el1 !== ObstacleType.WATER)) &&
@@ -1407,7 +1557,7 @@ export class PathHelper {
                         else visited!.add(keyNeighbor);
                         continue;
                     }
-                } else {
+                } else if (usesLegacySquareFootprint) {
                     const unitKeyLeft = ((n.x - 1) << 4) | n.y;
                     const unitKeyLeftDown = ((n.x - 1) << 4) | (n.y - 1);
                     const unitKeyDown = (n.x << 4) | (n.y - 1);
@@ -1428,6 +1578,23 @@ export class PathHelper {
                             (canFly && el4 && el4 !== ObstacleType.LAVA && el4 !== ObstacleType.WATER)) &&
                             !initialCellKeys.has(unitKeyDown))
                     ) {
+                        if (indexedVisited) indexedVisited[keyNeighbor] = 1;
+                        else visited!.add(keyNeighbor);
+                        continue;
+                    }
+                } else {
+                    // Same probe as the 2x2 branch above, over however many cells the body actually has.
+                    let footprintBlocked = false;
+                    for (let i = 0; i < footprintCellCount; i++) {
+                        const fx = n.x - footprintOffsetsX[i];
+                        const fy = n.y - footprintOffsetsY[i];
+                        const el = i === 0 ? el1 : matrixElementOrDefault(matrix, fx, fy, 0);
+                        if (blocksBody(el) && !initialCellKeys.has((fx << 4) | fy)) {
+                            footprintBlocked = true;
+                            break;
+                        }
+                    }
+                    if (footprintBlocked) {
                         if (indexedVisited) indexedVisited[keyNeighbor] = 1;
                         else visited!.add(keyNeighbor);
                         continue;
@@ -1456,8 +1623,12 @@ export class PathHelper {
                             const yA = cur.y - 1;
                             const xB = cur.x + 1;
                             const yB = cur.y + 1;
-                            if (xA === n.x && yA === n.y) {
-                                if (isSmallUnit) {
+                            if (!isSmallFootprint && !usesLegacySquareFootprint) {
+                                if (shearsThroughBlockedCell(cur, n)) {
+                                    continue;
+                                }
+                            } else if (xA === n.x && yA === n.y) {
+                                if (isSmallFootprint) {
                                     if (
                                         matrixElementOrDefault(matrix, xA, cur.y, 0) &&
                                         matrixElementOrDefault(matrix, cur.x, yA, 0)
@@ -1471,7 +1642,7 @@ export class PathHelper {
                                     continue;
                                 }
                             } else if (xB === n.x && yB === n.y) {
-                                if (isSmallUnit) {
+                                if (isSmallFootprint) {
                                     if (
                                         matrixElementOrDefault(matrix, xB, cur.y, 0) &&
                                         matrixElementOrDefault(matrix, cur.x, yB, 0)
@@ -1485,7 +1656,7 @@ export class PathHelper {
                                     continue;
                                 }
                             } else if (xA === n.x && yB === n.y) {
-                                if (isSmallUnit) {
+                                if (isSmallFootprint) {
                                     if (
                                         matrixElementOrDefault(matrix, xA, cur.y, 0) &&
                                         matrixElementOrDefault(matrix, cur.x, yB, 0)
@@ -1499,7 +1670,7 @@ export class PathHelper {
                                     continue;
                                 }
                             } else if (xB === n.x && yA === n.y) {
-                                if (isSmallUnit) {
+                                if (isSmallFootprint) {
                                     if (
                                         matrixElementOrDefault(matrix, xB, cur.y, 0) &&
                                         matrixElementOrDefault(matrix, cur.x, yA, 0)
@@ -1536,7 +1707,7 @@ export class PathHelper {
                                 else allowedToMoveThere!.add(keyNeighbor);
                                 allowed.push({ x: n.x, y: n.y });
                             }
-                            if (!isSmallUnit) {
+                            if (usesLegacySquareFootprint) {
                                 const unitKeyLeft = ((n.x - 1) << 4) | n.y;
                                 if (
                                     !(indexedAllowed
@@ -1567,6 +1738,8 @@ export class PathHelper {
                                     else allowedToMoveThere!.add(unitKeyDown);
                                     allowed.push({ x: n.x, y: n.y - 1 });
                                 }
+                            } else if (!isSmallFootprint) {
+                                markFootprintAllowed(n);
                             }
                         }
                         queue.push(weightedRoute);
@@ -1604,7 +1777,7 @@ export class PathHelper {
                                 else allowedToMoveThere!.add(keyNeighbor);
                                 allowed.push({ x: n.x, y: n.y });
                             }
-                            if (!isSmallUnit) {
+                            if (usesLegacySquareFootprint) {
                                 const unitKeyLeft = ((n.x - 1) << 4) | n.y;
                                 if (
                                     !(indexedAllowed
@@ -1635,6 +1808,8 @@ export class PathHelper {
                                     else allowedToMoveThere!.add(unitKeyDown);
                                     allowed.push({ x: n.x, y: n.y - 1 });
                                 }
+                            } else if (!isSmallFootprint) {
+                                markFootprintAllowed(n);
                             }
                         }
                         queue.push(weightedRoute);
@@ -1650,11 +1825,14 @@ export class PathHelper {
             new Set([(currentCell.x << 4) | currentCell.y]),
             isSmallUnit,
             false,
+            false,
+            width,
+            height,
         );
         for (const c of closestMoves) {
             const pos = { x: c.x, y: c.y };
             const key = (c.x << 4) | c.y;
-            if (isSmallUnit) {
+            if (isSmallFootprint) {
                 const me1 = matrixElementOrDefault(matrix, c.x, c.y, 0);
                 if (
                     (me1 && !(isMadeOfFire && me1 === ObstacleType.LAVA)) ||
@@ -1677,6 +1855,57 @@ export class PathHelper {
                         hasWaterCell: me1 === ObstacleType.WATER,
                     },
                 ]);
+            } else if (!usesLegacySquareFootprint) {
+                // One straight step slides the body by a single cell, so only its LEADING EDGE — the cells
+                // of the new footprint it is not already standing on — can stop it or has to be marked.
+                // That is exactly what each 2x2 branch below does with its hand-written pair of cells.
+                let edgeBlocked = false;
+                let hasLavaCell = false;
+                let hasWaterCell = false;
+                for (let i = 0; i < footprintCellCount; i++) {
+                    const cx = c.x - footprintOffsetsX[i];
+                    const cy = c.y - footprintOffsetsY[i];
+                    if (footprintCovers(currentCell, cx, cy)) {
+                        continue;
+                    }
+                    const el = matrixElementOrDefault(matrix, cx, cy, 0);
+                    const edgeKey = (cx << 4) | cy;
+                    if (
+                        (indexedAllowed ? indexedAllowed[edgeKey] : allowedToMoveThere!.has(edgeKey)) ||
+                        (el && !(isMadeOfFire && el === ObstacleType.LAVA))
+                    ) {
+                        edgeBlocked = true;
+                        break;
+                    }
+                    hasLavaCell = hasLavaCell || el === ObstacleType.LAVA;
+                    hasWaterCell = hasWaterCell || el === ObstacleType.WATER;
+                }
+                if (!edgeBlocked) {
+                    // Second pass on purpose: the legacy branches also clear every cell of the edge before
+                    // marking any of them, so a half-blocked step leaves no trace behind.
+                    for (let i = 0; i < footprintCellCount; i++) {
+                        const cx = c.x - footprintOffsetsX[i];
+                        const cy = c.y - footprintOffsetsY[i];
+                        if (footprintCovers(currentCell, cx, cy)) {
+                            continue;
+                        }
+                        const edgeKey = (cx << 4) | cy;
+                        if (indexedAllowed) indexedAllowed[edgeKey] = 1;
+                        else allowedToMoveThere!.add(edgeKey);
+                        allowed.push({ x: cx, y: cy });
+                    }
+
+                    knownPaths.set(key, [
+                        {
+                            cell: c,
+                            route: [currentCell, pos],
+                            weight: 1,
+                            firstAggrMet: false,
+                            hasLavaCell,
+                            hasWaterCell,
+                        },
+                    ]);
+                }
             } else if (c.x < currentCell.x) {
                 const unitKeyLeft = ((c.x - 1) << 4) | c.y;
                 const unitKeyLeftDown = ((c.x - 1) << 4) | (c.y - 1);
@@ -1805,7 +2034,7 @@ export class PathHelper {
                 knownPaths,
             },
             matrix,
-            isSmallUnit,
+            isSmallFootprint,
             isMadeOfFire,
         );
     }

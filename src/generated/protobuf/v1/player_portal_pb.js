@@ -857,7 +857,8 @@ mmrBefore: jspb.Message.getFieldWithDefault(msg, 21, 0),
 mmrAfter: jspb.Message.getFieldWithDefault(msg, 22, 0),
 mmrDelta: jspb.Message.getFieldWithDefault(msg, 23, 0),
 goldEarned: jspb.Message.getFieldWithDefault(msg, 24, 0),
-opponentPlayerId: jspb.Message.getFieldWithDefault(msg, 25, "")
+opponentPlayerId: jspb.Message.getFieldWithDefault(msg, 25, ""),
+outcomeReason: jspb.Message.getFieldWithDefault(msg, 26, "")
   };
 
   if (includeInstance) {
@@ -1001,6 +1002,10 @@ proto.PBTypes.PortalMatch.deserializeBinaryFromReader = function(msg, reader) {
     case 25:
       var value = /** @type {string} */ (reader.readString());
       msg.setOpponentPlayerId(value);
+      break;
+    case 26:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setOutcomeReason(value);
       break;
     default:
       reader.skipField();
@@ -1207,6 +1212,13 @@ proto.PBTypes.PortalMatch.serializeBinaryToWriter = function(message, writer) {
   if (f.length > 0) {
     writer.writeString(
       25,
+      f
+    );
+  }
+  f = message.getOutcomeReason();
+  if (f.length > 0) {
+    writer.writeString(
+      26,
       f
     );
   }
@@ -1776,6 +1788,24 @@ proto.PBTypes.PortalMatch.prototype.getOpponentPlayerId = function() {
  */
 proto.PBTypes.PortalMatch.prototype.setOpponentPlayerId = function(value) {
   return jspb.Message.setProto3StringField(this, 25, value);
+};
+
+
+/**
+ * optional string outcome_reason = 26;
+ * @return {string}
+ */
+proto.PBTypes.PortalMatch.prototype.getOutcomeReason = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 26, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.PBTypes.PortalMatch} returns this
+ */
+proto.PBTypes.PortalMatch.prototype.setOutcomeReason = function(value) {
+  return jspb.Message.setProto3StringField(this, 26, value);
 };
 
 

@@ -28,7 +28,9 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import { getDistance, type XY } from "../../utils/math";
 import type { Unit } from "../../units/unit";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import type { IPlacementContext } from "../ai_strategy";
+import { byFootprintAreaLargestFirst } from "./v0_1";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
@@ -124,23 +126,18 @@ export function placeByPolicy(
     const maxEdge = Math.max(1, ...baseCells.map((c) => Math.abs(c.x - centreX)));
     const diag = Math.max(1, GRID_SIZE);
 
-    const footprintFor = (u: Unit, base: XY): XY[] =>
-        u.isSmallSize()
-            ? [base]
-            : [
-                  { x: base.x, y: base.y },
-                  { x: base.x - 1, y: base.y },
-                  { x: base.x, y: base.y - 1 },
-                  { x: base.x - 1, y: base.y - 1 },
-              ];
+    // The unit's real body. `fits` below is the ONLY feasibility filter the argmax runs over, so a presumed
+    // 2x2 does not merely mis-place one stack: it takes the learned argmax over a wrong candidate set, and can
+    // judge the incumbent-anchor fallback itself infeasible. The weights are untouched — this fixes which
+    // cells they are allowed to score, not how they score them.
+    const footprintFor = (u: Unit, base: XY): XY[] => footprintCellsForAnchor(u, base);
     const fits = (u: Unit, base: XY, occ: Set<number>): boolean =>
         footprintFor(u, base).every((c) => legal.has(placeCellKey(c)) && !occ.has(placeCellKey(c)));
 
     const occupied = new Set<number>();
     const placed: XY[] = [];
-    const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1);
     const order: Unit[] = (["melee", "flyer", "ranged", "support"] as Role[]).flatMap((r) =>
-        units.filter((u) => roleOf(u) === r).sort(bySizeLargeFirst),
+        units.filter((u) => roleOf(u) === r).sort(byFootprintAreaLargestFirst),
     );
 
     for (const u of order) {

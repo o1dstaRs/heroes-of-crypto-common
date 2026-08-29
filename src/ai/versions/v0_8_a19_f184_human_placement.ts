@@ -13,10 +13,12 @@ import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import { PlacementType } from "../../grid/placement_properties";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { creatureIdForName, creatureInfo } from "../setup/creature_score";
+import { footprintCenterForAnchor } from "./v0_1";
 
 // Re-pinned for the perk -> doctrine rename; same anchor bytes as V08_A19_PROD_F184_FIXTURE_SHA256,
 // whose values did not move — only the field name did.
@@ -76,6 +78,15 @@ interface IOpeningUnit {
     readonly name: string;
     readonly level: number;
     readonly size: number;
+    /**
+     * The template's recorded BODY, defaulting to the square `size` implies. Every opening in this file was
+     * recorded from real games in which the only shapes were 1x1 and 2x2, so leaving these unset states that
+     * fact rather than guessing: a creature that later becomes a rectangle no longer matches the entry, the
+     * roster guard says `own-unit-shape-mismatch`, and the treatment falls back instead of stamping cells the
+     * unit does not occupy.
+     */
+    readonly footprintWidth?: number;
+    readonly footprintHeight?: number;
     readonly faction: number;
     /** Base cell normalized to LOWER. Large units use the engine's upper-right footprint anchor. */
     readonly lowerBase: Readonly<XY>;
@@ -222,17 +233,14 @@ const idsEqual = (left: readonly number[], right: readonly number[]): boolean =>
 const openingIds = (opening: IOpeningRecipe): number[] =>
     sortedIds(opening.ownUnits.map(({ creatureId }) => creatureId));
 
-const footprintFor = (unit: Unit, base: XY): XY[] =>
-    unit.isSmallSize()
-        ? [base]
-        : [
-              { x: base.x, y: base.y },
-              { x: base.x - 1, y: base.y },
-              { x: base.x, y: base.y - 1 },
-              { x: base.x - 1, y: base.y - 1 },
-          ];
+// The unit's real body, from the one shared expansion. This feeds the treatment's own legality gate, so the
+// 1x1-or-2x2 copy this replaced made a rectangle report `candidate-incomplete-or-illegal` and silently
+// disabled the whole treatment (or, worse, validated a layout whose real footprint overlaps a neighbour).
+const footprintFor = (unit: Unit, base: XY): XY[] => footprintCellsForAnchor(unit, base);
 
-const centerFor = (unit: Unit, base: XY): XY => (unit.isSmallSize() ? base : { x: base.x - 0.5, y: base.y - 0.5 });
+// Formations are compared by where the BODIES sit, so the anchor is pulled back half a cell per extra column
+// and row: unchanged for a 1x1 and a 2x2, and a rectangle now leans only along its long side.
+const centerFor = footprintCenterForAnchor;
 
 const exactLegalZoneForTeam = (team: IPlacementContext["team"]): Set<number> => {
     const legal = new Set<number>();
@@ -293,11 +301,19 @@ const normalizedPlacementFingerprint = (
     return JSON.stringify(rows);
 };
 
+/**
+ * Mirror a template anchor recorded for LOWER onto UPPER.
+ *
+ * A row `r` mirrors to `GRID_SIZE - 1 - r`, which reverses the body's rows — so the anchor, being the body's
+ * MAX row, moves to what used to be its minimum: hence the `+ (H - 1)` correction. The old form spelled that
+ * as `+ (isSmallSize() ? 1 : 2) - 2`, i.e. `+H - 2`, which is the same expression only for a square. There
+ * is no x term because these templates are never mirrored horizontally; a rectangle's width would need one.
+ */
 const baseForTeam = (unit: Unit, lowerBase: XY, team: IPlacementContext["team"]): XY => {
     if (team === PBTypes.TeamVals.LOWER) return { ...lowerBase };
     return {
         x: lowerBase.x,
-        y: GRID_SIZE + (unit.isSmallSize() ? 1 : 2) - 2 - lowerBase.y,
+        y: GRID_SIZE - 1 - lowerBase.y + (unit.getFootprintHeight() - 1),
     };
 };
 
@@ -364,6 +380,8 @@ const evaluateV08A19F184HumanPlacement = (
             unit.getName() !== expected.name ||
             unit.getLevel() !== expected.level ||
             unit.getSize() !== expected.size ||
+            unit.getFootprintWidth() !== (expected.footprintWidth ?? expected.size) ||
+            unit.getFootprintHeight() !== (expected.footprintHeight ?? expected.size) ||
             unit.getFaction() !== expected.faction ||
             unit.getUnitType() !== PBTypes.UnitVals.CREATURE
         ) {

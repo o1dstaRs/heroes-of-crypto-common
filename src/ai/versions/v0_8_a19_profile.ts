@@ -28,10 +28,18 @@ export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SOURCE = "src/simu
 export const V08_A19_PRODUCTION_SEARCH_FACTORY_IMPLEMENTATION_SHA256 =
     "9c1d70f719c8f6db786a0d00b04a40e4bfa9b90b22c0f22d1ae4374905faf134" as const;
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simulation/battle_engine.ts" as const;
-// Re-pinned with the aura-refresh/battle-engine working-tree batch (2026-08-14): only the source
-// bytes moved with that edit; the routing decision itself is unchanged.
+// Re-pinned for rectangular unit footprints (2026-08-24): placeArmy now records a stack's width/height when
+// it is not square, the three hand-written 2x2 expansions were routed through simulation/footprint.ts, and
+// the tactical-split placement payload now carries the real footprint instead of only a small/large boolean.
+// Both shipped shapes keep their exact cells, so the routing decision and every 1x1/2x2 rollout are unchanged
+// — held to the square-only outcome fingerprint across v0.1..v0.8 and all four grid types.
+// Re-pinned again for the promoted-search knob A/B (2026-08-27, 494a2e8): runMatchInner gained the
+// `searchEnvOverrideTeams` arm, which routes only the LISTED teams through a second A19 driver built with
+// V08_A19_SEARCH_ENV_OVERRIDES merged in. Production routing is untouched — the seam is inert unless both
+// the teams and the env are set, and the stock driver is deliberately constructed with that env withheld
+// and restored afterwards, so an override aimed at the research arm cannot leak into it.
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "28a263a4df97a55e4f03021ed17ffd98510bdef20c51ab48b7b9da5b888a9ea5" as const;
+    "a99ab2b77ae9367850f2a855e9d0799848fa26ee8b39ff0ec12662637e7ba4fa" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
     "afc6df1b4ca82e16a43ebc5bf2cce37ab0c761bec81f8ef5714c3d80c8b2d294" as const;
@@ -81,8 +89,34 @@ export const V08_A19_PROFILE = Object.freeze({
 });
 
 /** Build the complete sealed A19 environment used by default v0.8 rollout-search runtimes. */
+/**
+ * Research override seam for the hermetic promoted-search environment. `V08_A19_SEARCH_ENV_OVERRIDES`
+ * (a JSON object of env-key -> string) merges LAST, so a measurement can vary individual knobs
+ * (SEARCH_ROLLOUTS, SEARCH_SHORTLIST, SEARCH_MAX_MELEE, ...) while everything else stays the exact
+ * promoted profile. Absent (production) the environment is byte-identical; a malformed value THROWS —
+ * a silently ignored override would fake the A/B (SEARCH_OPP_MODEL precedent).
+ */
 export function buildV08A19SearchEnvironment(): Readonly<Record<string, string | undefined>> {
-    return buildV08A19H64FinalistV6SearchEnvironment();
+    const base = buildV08A19H64FinalistV6SearchEnvironment();
+    const raw = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+    if (!raw) {
+        return base;
+    }
+    let overrides: unknown;
+    try {
+        overrides = JSON.parse(raw);
+    } catch {
+        throw new Error(`V08_A19_SEARCH_ENV_OVERRIDES is not valid JSON: ${raw}`);
+    }
+    if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
+        throw new Error("V08_A19_SEARCH_ENV_OVERRIDES must be a JSON object of env-key -> string");
+    }
+    for (const [key, value] of Object.entries(overrides)) {
+        if (typeof value !== "string") {
+            throw new Error(`V08_A19_SEARCH_ENV_OVERRIDES.${key} must be a string`);
+        }
+    }
+    return Object.freeze({ ...base, ...(overrides as Record<string, string>) });
 }
 
 /** Create fresh match-local placement state around the native v0.8 combat strategy. */

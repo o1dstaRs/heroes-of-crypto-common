@@ -13,12 +13,13 @@ import type { GameAction } from "../../engine/actions";
 import { FightStateManager } from "../../fights/fight_state_manager";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { AttackHandler } from "../../handlers/attack_handler";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import type { Unit } from "../../units/unit";
 import { GRID_SIZE } from "../../grid/grid_constants";
 import { getDistance, type XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_path_catalog";
-import { otherTeam } from "./v0_1";
+import { byFootprintAreaLargestFirst, otherTeam } from "./v0_1";
 import { StrategyV0_2 } from "./v0_2";
 
 const RANGE = PBTypes.AttackVals.RANGE;
@@ -136,6 +137,8 @@ export class StrategyV0_3 extends StrategyV0_2 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         let bestCell = base;
         let bestRoute: IReadonlyWeightedRoute | undefined;
@@ -208,6 +211,8 @@ export class StrategyV0_3 extends StrategyV0_2 {
             unit.isSmallSize(),
             unit.canTraverseLava(),
             unit.hasAbilityActive("In Its Own World"),
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
         );
         const meleeAllies = unitsHolder
             .getAllAllies(unit.getTeam())
@@ -353,15 +358,10 @@ export class StrategyV0_3 extends StrategyV0_2 {
         const xs = baseCells.map((cc) => cc.x);
         const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
         const edgeness = (cc: XY): number => Math.abs(cc.x - centreX);
-        const footprintFor = (u: Unit, base: XY): XY[] =>
-            u.isSmallSize()
-                ? [base]
-                : [
-                      { x: base.x, y: base.y },
-                      { x: base.x - 1, y: base.y },
-                      { x: base.x, y: base.y - 1 },
-                      { x: base.x - 1, y: base.y - 1 },
-                  ];
+        // The unit's real body. v0.3 tucks EVERY shooter into the deepest, most-cornered cells, which is
+        // exactly where a presumed 2x2 costs the most: the corner is where a rectangle's narrow axis would
+        // have fitted and the phantom cells would have refused it.
+        const footprintFor = (u: Unit, base: XY): XY[] => footprintCellsForAnchor(u, base);
         const placeBy = (u: Unit, compare: (a: XY, b: XY) => number): void => {
             for (const base of [...baseCells].sort(compare)) {
                 const footprint = footprintFor(u, base);
@@ -375,12 +375,11 @@ export class StrategyV0_3 extends StrategyV0_2 {
                 return;
             }
         };
-        const bySizeLargeFirst = (a: Unit, b: Unit): number => (b.isSmallSize() ? 0 : 1) - (a.isSmallSize() ? 0 : 1);
         const isRange = (u: Unit): boolean => u.getAttackType() === RANGE;
         const isMeleeU = (u: Unit): boolean => u.getAttackType() === MELEE;
-        const ranged = units.filter(isRange).sort(bySizeLargeFirst);
-        const melee = units.filter(isMeleeU).sort(bySizeLargeFirst);
-        const support = units.filter((u) => !isRange(u) && !isMeleeU(u)).sort(bySizeLargeFirst);
+        const ranged = units.filter(isRange).sort(byFootprintAreaLargestFirst);
+        const melee = units.filter(isMeleeU).sort(byFootprintAreaLargestFirst);
+        const support = units.filter((u) => !isRange(u) && !isMeleeU(u)).sort(byFootprintAreaLargestFirst);
         for (const u of ranged) {
             placeBy(u, (a, b) => frontness(a) - frontness(b) || edgeness(b) - edgeness(a)); // deep + cornered
         }

@@ -108,8 +108,8 @@ describe("v0.8 A19 production f184 placement anchor", () => {
         const combat = createCombatTestContext(PBTypes.GridVals.NORMAL);
         const factories = createCombatFactories();
         const build = (team: TeamType, prefix: string, roster: typeof prepared.armyA.roster): Unit[] =>
-            roster.map((spec, index) =>
-                createUnitFromSpec(
+            roster.map((spec, index) => {
+                const unit = createUnitFromSpec(
                     spec,
                     team,
                     testGridSettings,
@@ -117,8 +117,20 @@ describe("v0.8 A19 production f184 placement anchor", () => {
                     factories.effectFactory,
                     false,
                     `${prefix}-${index}`,
-                ),
-            );
+                );
+                // Fight 184 predates the mounted class shipping 2x1: restore each stack's RECORDED shape so
+                // the replay stays a replay. The live-catalog behavior (shape gate disables the treatment)
+                // is pinned by the policy suites.
+                const recordedProperties = (
+                    unit as unknown as {
+                        unitProperties: { size: number; footprint_width: number; footprint_height: number };
+                    }
+                ).unitProperties;
+                recordedProperties.size = spec.size;
+                recordedProperties.footprint_width = spec.footprintWidth ?? spec.size;
+                recordedProperties.footprint_height = spec.footprintHeight ?? spec.size;
+                return unit;
+            });
         const lower = build(LOWER, "prod-lower", prepared.armyA.roster);
         const upper = build(UPPER, "prod-upper", prepared.armyB.roster);
         [...lower, ...upper].forEach((unit) => combat.unitsHolder.addUnit(unit));

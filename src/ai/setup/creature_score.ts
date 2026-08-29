@@ -12,9 +12,10 @@
 import CREATURES_JSON from "../../configuration/creatures.json";
 import { AbilityPowerType } from "../../abilities/ability_properties";
 import { DOUBLE_SHOT_ABILITY_NAMES } from "../../abilities/double_shot_names";
-import { getAbilityConfig, getSpellConfig } from "../../configuration/config_provider";
+import { getAbilityConfig, getCreatureConfig, getSpellConfig } from "../../configuration/config_provider";
 import { CreatureFactions, CreatureLevels } from "../../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../generated/protobuf/v1/types";
+import { normalizeFootprintSide } from "../../grid/grid_math";
 import { isOffensiveSpellMultiplier } from "../../spells/spell_damage";
 import { SpellPowerType } from "../../spells/spell_properties";
 
@@ -74,6 +75,22 @@ export interface ICreatureInfo {
     castsAmplifiableBuff: boolean;
     /** Buffs allied magic damage through Nightmare's Empower or an ADDITIONAL_MAGIC_DAMAGE_PERCENTAGE aura. */
     magicDamageAmplifier: boolean;
+    /**
+     * The board rectangle this creature's stack occupies, in cells: `footprintWidth` columns (x) by
+     * `footprintHeight` rows (y). Draft and the reveal-conditioned placement policies only ever hold a
+     * creature ID — there is no Unit to ask before the army exists — so shape has to travel with the
+     * identity, or a policy that reserves zone depth, screens a firing line or measures a gap has to guess.
+     *
+     * This is the shape the engine will actually build the stack with, resolved through the engine's own
+     * creature config rather than read off the catalog row — see resolveCreatureFootprint below for why the
+     * two are not the same thing. The shipped roster is entirely square, so every creature reports 1x1 or 2x2.
+     *
+     * Descriptive ONLY. These are deliberately absent from DRAFT_FEATURE_NAMES: the baked DRAFT_ANCHOR_W /
+     * DEFAULT_DRAFT_W vectors are fit on that fixed basis, and pricing a footprint as cost or value is a
+     * balance decision rather than a geometry fix.
+     */
+    footprintWidth: number;
+    footprintHeight: number;
 }
 
 const CreatureJsonShape = CREATURES_JSON as unknown as Record<
@@ -93,11 +110,31 @@ const CreatureJsonShape = CREATURES_JSON as unknown as Record<
             spells?: string[];
             abilities?: string[];
             movement_type?: string;
+            size?: number;
+            footprint_width?: number;
+            footprint_height?: number;
         }
     >
 >;
 
 const CREATURE_IDS_BY_ENUM_KEY = PBTypes.CreatureVals as unknown as Readonly<Record<string, number>>;
+
+/**
+ * Whether an ability actually projects an aura effect, asked of the config rather than of its NAME.
+ *
+ * This used to test `name.includes("Aura")`, which held only while every aura ability happened to be
+ * called one. Renaming the Squire's to "Arcane Ward Blessing" — it reaches the whole army now, so the word
+ * was a lie — silently dropped the Squire from auraCount, and with it the "aura-heavy" cohort tag that the
+ * setup search, the draft evaluator and the placement panels all key off. The declaration is the fact; the
+ * name is decoration.
+ */
+const carriesAuraEffect = (abilityName: string): boolean => {
+    try {
+        return !!getAbilityConfig(abilityName)?.aura_effect;
+    } catch {
+        return false;
+    }
+};
 
 const isAmplifiableBuffSpell = (faction: string, name: string): boolean => {
     try {
@@ -125,7 +162,7 @@ const isRangedDamageSpellbookEntry = (entry: string): boolean => {
     try {
         const spell = getSpellConfig(entry.slice(0, separator), entry.slice(separator + 1));
         // This is the same contract used by the engine and tactical AI before they call calculateSpellDamage.
-        // Target shape alone is not damage: Ash Moth's Smoke and Misfortune both target at range, but neither
+        // Target shape alone is not damage: Wandering Mage's Smoke and Misfortune both target at range, but neither
         // is an offensive magic hit and neither should make an army look like a mage battery.
         return !spell.is_buff && isOffensiveSpellMultiplier(spell.multiplier_type);
     } catch {
@@ -175,11 +212,47 @@ export const creatureIdForName = (name: string): number | undefined => {
     return typeof id === "number" && id > 0 ? id : undefined;
 };
 
-/** id -> creature info, built once by inverting the CreatureVals enum against creatures.json (enum key =
+/**
+ * The footprint the ENGINE will give this creature's stack, which is not always the one its catalog row
+ * declares: HOC_FOOTPRINT_OVERRIDES (and its browser twin `globalThis.__hocFootprintOverrides`) can reshape a
+ * creature without touching creatures.json, and today that override is the ONLY way a rectangle reaches the
+ * board at all. Reading the row directly would therefore leave the draft and the reveal-conditioned placement
+ * policies planning around a 1x1 body that the engine then places as a 2x1 — and an anchor chosen for the
+ * wrong shape is not a weak move, it is an action the engine rejects.
+ *
+ * Asking getCreatureConfig keeps the resolution order (override, then declared footprint, then the legacy
+ * square `size`) in the one place that owns it instead of copying it here, where it could drift. The cost is
+ * paid once per index build. A catalog row too malformed to build full UnitProperties from falls back to the
+ * declared shape: this index is a draft convenience, and it must not be the thing that takes a match down.
+ */
+const resolveCreatureFootprint = (
+    factionName: string,
+    creatureName: string,
+    cfg: { size?: number; footprint_width?: number; footprint_height?: number },
+): { width: number; height: number } => {
+    try {
+        const properties = getCreatureConfig(
+            PBTypes.TeamVals.LOWER,
+            factionName,
+            creatureName,
+            // Only the art tier is derived from this name, and nothing here looks at textures.
+            `${creatureName.replace(/ /g, "_")}_512`,
+            1,
+        );
+        return { width: properties.footprint_width, height: properties.footprint_height };
+    } catch {
+        return {
+            width: normalizeFootprintSide(cfg.footprint_width, cfg.size ?? 1),
+            height: normalizeFootprintSide(cfg.footprint_height, cfg.size ?? 1),
+        };
+    }
+};
+
+/** id -> creature info, built by inverting the CreatureVals enum against creatures.json (enum key =
  * NAME_UPPER_SNAKE, e.g. "Black Dragon" -> BLACK_DRAGON). Only creatures with a real enum id are indexed. */
 const buildIndex = (): Map<number, ICreatureInfo> => {
     const index = new Map<number, ICreatureInfo>();
-    for (const [, creatures] of Object.entries(CreatureJsonShape)) {
+    for (const [factionName, creatures] of Object.entries(CreatureJsonShape)) {
         if (!creatures || typeof creatures !== "object") {
             continue;
         }
@@ -193,6 +266,7 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
             }
             const abilityList = cfg.abilities ?? [];
             const spellList = cfg.spells ?? [];
+            const footprint = resolveCreatureFootprint(factionName, name, cfg);
             index.set(id, {
                 id,
                 name,
@@ -213,23 +287,46 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 abilities: abilityList.join(" "),
                 canFly: cfg.movement_type === "FLY",
                 melee: (cfg.attack_type ?? "").includes("MELEE"),
-                auraCount: abilityList.filter((a) => a.includes("Aura")).length,
-                abilityCount: abilityList.filter((a) => !a.includes("Aura")).length,
+                auraCount: abilityList.filter(carriesAuraEffect).length,
+                abilityCount: abilityList.filter((a) => !carriesAuraEffect(a)).length,
                 castsAmplifiableBuff:
                     spellList.some(isAmplifiableSpellbookEntry) || abilityList.some(isAmplifiableCastableAbility),
                 magicDamageAmplifier:
                     spellList.some(isMagicDamageAmplifyingSpellbookEntry) ||
                     abilityList.some(isMagicDamageAmplifyingAbility),
+                footprintWidth: footprint.width,
+                footprintHeight: footprint.height,
             });
         }
     }
     return index;
 };
 
+/**
+ * The raw override string, read only to notice that it CHANGED — the grammar stays in config_provider, this
+ * is a cache key and not a second parser. config_provider deliberately re-reads the overrides on every unit
+ * build so a shape can be flipped mid-session; an index cached for the life of the process would keep
+ * answering with the shape from before the flip, which is exactly the engine/AI disagreement the resolution
+ * above exists to remove. Reading it is free in the runtimes the sims and the server use, and the index is
+ * only ever rebuilt when the string actually differs.
+ */
+const footprintOverrideSource = (): string => {
+    const injected = (globalThis as { __hocFootprintOverrides?: unknown }).__hocFootprintOverrides;
+    if (typeof injected === "string" && injected) {
+        return injected;
+    }
+    // `process` is absent in the browser bundle and `env` can be absent in exotic hosts.
+    const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+    return env?.HOC_FOOTPRINT_OVERRIDES ?? "";
+};
+
 let indexCache: Map<number, ICreatureInfo> | undefined;
+let indexCacheFootprintOverrides: string | undefined;
 const creatureIndex = (): Map<number, ICreatureInfo> => {
-    if (!indexCache) {
+    const footprintOverrides = footprintOverrideSource();
+    if (!indexCache || indexCacheFootprintOverrides !== footprintOverrides) {
         indexCache = buildIndex();
+        indexCacheFootprintOverrides = footprintOverrides;
     }
     return indexCache;
 };
@@ -281,7 +378,7 @@ const hasNamedCreature = (creatureIds: readonly number[], names: ReadonlySet<str
 /**
  * Fair, public-context role fit layered over either the hand heuristic or a shipped intrinsic genome. The
  * multiplier deliberately does not inspect positions or hidden picks:
- *  - Ash Moth becomes a real counter-pick only after enemy shooters are revealed.
+ *  - Wandering Mage becomes a real counter-pick only after enemy shooters are revealed.
  *  - A Healer and its durable anchor reinforce each other in whichever one is selected later.
  *  - Angel is preferred as a ranged-line screen when both armies actually field a firing line.
  *
@@ -310,7 +407,7 @@ export const creatureRoleFitMultiplier = (
         hasNamedCreature(ownCreatureIds, ALWAYS_DURABLE_HEAL_ANCHOR_NAMES) || ownAngelHasActiveScreen;
     const candidateAngelHasActiveScreen = info.name === "Angel" && ownBackline >= 2 && knownEnemyShooters > 0;
 
-    if (info.name === "Ash Moth" && knownEnemyShooters > 0) {
+    if (info.name === "Wandering Mage" && knownEnemyShooters > 0) {
         return knownEnemyShooters >= 2 ? 3 : 2.25;
     }
 
