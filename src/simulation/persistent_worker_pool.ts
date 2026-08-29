@@ -261,6 +261,13 @@ export class PersistentWorkerPool<TRequest, TResult> {
                 slot.stopping = true;
                 slot.intentionalStop = true;
                 slot.worker.postMessage({ type: "stop" } satisfies IPersistentWorkerStop);
+                // The stop message is the graceful half; this is the half that actually ends the
+                // thread. A worker answers stop with port.close(), which under Node lets the loop
+                // drain and the thread exit — under Bun it closes the port and leaves the thread
+                // alive, so "exit" never fires, workerExited() never drops the slot, and
+                // finishCloseIfPossible() blocks on slots.size forever. The slot is idle by
+                // construction in this branch (no task, empty queue), so nothing is lost.
+                void slot.worker.terminate();
             }
         }
     }
