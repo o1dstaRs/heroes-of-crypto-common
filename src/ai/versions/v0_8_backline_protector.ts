@@ -140,17 +140,19 @@ const footprintDistance = (left: readonly XY[], right: readonly XY[]): number =>
     return closest;
 };
 
+/**
+ * The Angel's Arrows Wingshield is a board-wide BLESSING, not an aura, so there is no configured range to read
+ * for it. Its SCREEN is still positional though — the Angel's own body stops through-shots, halts AOE range
+ * propagation and ends a chakram flight — so the placement logic keeps the radius it was trained against
+ * instead of collapsing to the generic `?? 1` fallback the missing aura config would otherwise produce.
+ */
+export const V08_ANGEL_SCREEN_RANGE = 2;
+
 export const v08BacklineProtectorCoverageRange = (unit: Unit, context: IDecisionContext): number => {
     const kind = v08BacklineProtectorKind(unit);
-    const auraName =
-        kind === "abomination"
-            ? "Flesh Shield"
-            : kind === "angel"
-              ? "Arrows Wingshield"
-              : kind === "arachna_queen"
-                ? "Web"
-                : undefined;
-    const baseRange = auraName ? (unit.getAuraEffect(auraName)?.getRange() ?? 1) : 0;
+    const auraName = kind === "abomination" ? "Flesh Shield" : kind === "arachna_queen" ? "Web" : undefined;
+    const baseRange =
+        kind === "angel" ? V08_ANGEL_SCREEN_RANGE : auraName ? (unit.getAuraEffect(auraName)?.getRange() ?? 1) : 0;
     const synergyRange = context.fightProperties?.getAdditionalAuraRangePerTeam(unit.getTeam()) ?? 0;
     return Math.max(0, Math.floor(baseRange + synergyRange));
 };
@@ -832,13 +834,10 @@ const existingProtectorPlacementEdges = (
         if (!protectorBase) continue;
         const protectorCells = footprintForBase(protector, protectorBase);
         const kind = v08BacklineProtectorKind(protector);
-        const range = Math.max(
-            0,
-            Math.floor(
-                protector.getAuraEffect(kind === "abomination" ? "Flesh Shield" : "Arrows Wingshield")?.getRange() ??
-                    (kind === "angel" ? 2 : 1),
-            ),
-        );
+        const range =
+            kind === "angel"
+                ? V08_ANGEL_SCREEN_RANGE
+                : Math.max(0, Math.floor(protector.getAuraEffect("Flesh Shield")?.getRange() ?? 1));
         for (const beneficiary of wards) {
             if (beneficiary.getId() === protector.getId()) continue;
             const beneficiaryBase = placements.get(beneficiary.getId());
@@ -925,7 +924,7 @@ const optimizeAngelPlacement = (
             if (!base) continue;
             for (const cell of footprintForBase(placedUnit, base)) occupied.add(placementCellKey(cell));
         }
-        const range = Math.max(0, Math.floor(angel.getAuraEffect("Arrows Wingshield")?.getRange() ?? 2));
+        const range = V08_ANGEL_SCREEN_RANGE;
         const footprintIsFree = (cells: readonly XY[], extraOccupied: ReadonlySet<number> = occupied): boolean =>
             cells.every((cell) => legal.has(placementCellKey(cell)) && !extraOccupied.has(placementCellKey(cell)));
         let best: IAngelPlacementCandidate | undefined;

@@ -301,7 +301,7 @@ describe("Zena's Chakram — separation chain", () => {
     it("the Arrows Wingshield owner is never struck and stops the chain", () => {
         const context = setup();
         const primary = enemy(context, "Primary", { x: 8, y: 8 });
-        const angel = createTestUnit({ name: "Angel", team: RED, abilities: ["Arrows Wingshield Aura"] });
+        const angel = createTestUnit({ name: "Angel", team: RED, abilities: ["Arrows Wingshield Blessing"] });
         placeUnit(context.grid, context.unitsHolder, angel, { x: 8, y: 10 }); // nearest bounce = the shield
         enemy(context, "BehindAngel", { x: 8, y: 12 });
         void angel;

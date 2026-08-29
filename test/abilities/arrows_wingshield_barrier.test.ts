@@ -22,10 +22,10 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 const RED = PBTypes.TeamVals.UPPER;
 const GREEN = PBTypes.TeamVals.LOWER;
 const RANGE = PBTypes.AttackVals.RANGE;
-const WINGSHIELD = "Arrows Wingshield Aura";
+const WINGSHIELD = "Arrows Wingshield Blessing";
 
 /**
- * The Angel's card promises two things beyond its buff aura: "The owner is immune to being shot through
+ * The Angel's card promises two things beyond its army-wide buff: "The owner is immune to being shot through
  * and does not propagate AOE range damage." Both were written on the card long before anything enforced
  * them — a Gargantuan blast splashed straight past the Angel and a Tsar Cannon shot pierced clean
  * through him.

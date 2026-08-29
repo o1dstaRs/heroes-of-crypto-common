@@ -726,6 +726,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (ability.getName() === "Arcane Ward Blessing") {
             return ability.getDesc().join("\n").replace(/\{\}/g, this.calculateArcaneWardBlessingPower().toString());
         }
+        if (ability.getName() === "Arrows Wingshield Blessing") {
+            return ability
+                .getDesc()
+                .join("\n")
+                .replace(/\{\}/g, this.calculateArrowsWingshieldBlessingPower().toString());
+        }
         if (ability.getName() === "Magic Reflection") {
             // The Magic Dragon's passive: stack-scaled 15/30/45/60/75 at power 75, shifted by luck — the exact
             // figure getMagicMirrorAbilityChance rolls, so the card matches the rebound the engine performs.
@@ -2102,6 +2108,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     /** Board-wide Manticore projection: 5/10/15/20/25 by stack, scaled by the living source's luck %. */
     public calculateWardingManeBlessingPower(): number {
         const ability = this.getAbility("Warding Mane Blessing");
+        if (!ability) {
+            return 0;
+        }
+
+        const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, this.getStackPower()));
+        const stackScaledPower = (ability.getPower() / MAX_UNIT_STACK_POWER) * stackPower;
+        const luckMultiplier = Math.max(0, 1 + this.getLuck() / 100);
+        return Number((stackScaledPower * luckMultiplier).toFixed(2));
+    }
+    /**
+     * Board-wide Angel projection: 5/10/15/20/25 by stack, scaled by the living source's luck %. Mirrors
+     * calculateWardingManeBlessingPower — the Angel now blesses the WHOLE army instead of painting a range-2
+     * aura, so a ward no longer has to stand next to it to be shielded against arrows.
+     */
+    public calculateArrowsWingshieldBlessingPower(): number {
+        const ability = this.getAbility("Arrows Wingshield Blessing");
         if (!ability) {
             return 0;
         }
@@ -3508,7 +3530,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.armor_mod = roundUnitStat(this.unitProperties.armor_mod + titanPlateArmorBonus, 2);
         }
 
-        const angelicHostBuff = statBuffs["Angelic Host"];
+        const angelicHostBuff = statBuffs["Angelic Host Blessing"];
         if (angelicHostBuff) {
             this.unitProperties.armor_mod = roundUnitStat(
                 this.unitProperties.armor_mod + angelicHostBuff.getPower(),
@@ -3536,9 +3558,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         leatherArmorAbility = getStatAbility(leatherArmorAbility, "Leather Armor");
         let rangeArmorMultiplier = leatherArmorAbility ? leatherArmorAbility.getPower() / 100 : 1;
 
-        const arrowsWingshieldAura = this.getAppliedAuraEffect("Arrows Wingshield Aura");
-        if (arrowsWingshieldAura) {
-            rangeArmorMultiplier = rangeArmorMultiplier * (1 + arrowsWingshieldAura.getPower() / 100);
+        // Arrows Wingshield Blessing (Angel): the strongest living allied Angel projects this board-wide. Its
+        // marker carries the source's already stack- and luck-scaled percentage, so every ally reads the same
+        // figure no matter where it stands — this used to be a range-2 aura painted around the Angel.
+        const arrowsWingshieldBlessing = statBuffs["Arrows Wingshield Blessing"];
+        if (arrowsWingshieldBlessing) {
+            rangeArmorMultiplier = rangeArmorMultiplier * (1 + Math.max(0, arrowsWingshieldBlessing.getPower()) / 100);
         }
 
         // MDEF

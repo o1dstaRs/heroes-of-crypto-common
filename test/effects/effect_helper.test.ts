@@ -42,7 +42,6 @@ describe("effect_helper", () => {
         expect(canApplyAuraEffect(disguised, getAuraEffectConfig("Disguise")!)).toBe(true);
         expect(canApplyAuraEffect(ranged, getAuraEffectConfig("Luck")!)).toBe(true);
         expect(canApplyAuraEffect(ranged, getAuraEffectConfig("Absorb Penalties")!)).toBe(true);
-        expect(canApplyAuraEffect(ranged, getAuraEffectConfig("Arrows Wingshield")!)).toBe(true);
         expect(canApplyAuraEffect(melee, getAuraEffectConfig("Pegasus Might")!)).toBe(true);
         expect(canApplyAuraEffect(melee, getAuraEffectConfig("Wolf Trail")!)).toBe(true);
         expect(canApplyAuraEffect(melee, getAuraEffectConfig("Tie up the Horses")!)).toBe(true);

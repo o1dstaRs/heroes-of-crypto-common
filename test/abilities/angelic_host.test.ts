@@ -17,11 +17,11 @@ import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/c
 
 beforeEach(() => FightStateManager.getInstance().reset());
 
-describe("Angelic Host configuration", () => {
+describe("Angelic Host Blessing configuration", () => {
     it("assigns the non-stacking army passive to Angel without an aura radius", () => {
-        const ability = getAbilityConfig("Angelic Host");
+        const ability = getAbilityConfig("Angelic Host Blessing");
         const angel = getCreatureConfig(PBTypes.TeamVals.LOWER, "Life", "Angel", "angel_512", 1);
-        const abilityIndex = angel.abilities.indexOf("Angelic Host");
+        const abilityIndex = angel.abilities.indexOf("Angelic Host Blessing");
 
         expect(ability.type).toBe(AbilityType.MASS_BUFF);
         expect(ability.power).toBe(1);
@@ -35,19 +35,19 @@ describe("Angelic Host configuration", () => {
     });
 });
 
-describe("Angelic Host army passive", () => {
+describe("Angelic Host Blessing army passive", () => {
     it("buffs the living carrier and every allied flyer, without range or stacking", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const firstCarrier = createTestUnit({
             name: "Angel",
             team: PBTypes.TeamVals.LOWER,
-            abilities: ["Angelic Host"],
+            abilities: ["Angelic Host Blessing"],
             movementType: PBTypes.MovementVals.FLY,
         });
         const secondCarrier = createTestUnit({
             name: "Second Carrier",
             team: PBTypes.TeamVals.LOWER,
-            abilities: ["Angelic Host"],
+            abilities: ["Angelic Host Blessing"],
             movementType: PBTypes.MovementVals.FLY,
         });
         const distantAlliedFlyer = createTestUnit({
@@ -76,31 +76,33 @@ describe("Angelic Host army passive", () => {
             expect(flyer.getArmor()).toBe(11);
             expect(flyer.getRangeArmor()).toBe(11);
             expect(flyer.getSteps()).toBe(4);
-            expect(flyer.getAllProperties().applied_buffs.filter((name) => name === "Angelic Host")).toHaveLength(1);
-            expect(flyer.getBuff("Angelic Host")?.getPower()).toBe(1);
+            expect(
+                flyer.getAllProperties().applied_buffs.filter((name) => name === "Angelic Host Blessing"),
+            ).toHaveLength(1);
+            expect(flyer.getBuff("Angelic Host Blessing")?.getPower()).toBe(1);
         }
 
-        expect(alliedWalker.hasBuffActive("Angelic Host")).toBe(false);
+        expect(alliedWalker.hasBuffActive("Angelic Host Blessing")).toBe(false);
         expect(alliedWalker.getAttack()).toBe(10);
         expect(alliedWalker.getArmor()).toBe(10);
         expect(alliedWalker.getSteps()).toBe(3);
-        expect(enemyFlyer.hasBuffActive("Angelic Host")).toBe(false);
+        expect(enemyFlyer.hasBuffActive("Angelic Host Blessing")).toBe(false);
         expect(enemyFlyer.getAttack()).toBe(10);
         expect(enemyFlyer.getArmor()).toBe(10);
         expect(enemyFlyer.getSteps()).toBe(3);
 
         const serialized = distantAlliedFlyer.getAllProperties();
-        const markerIndex = serialized.applied_buffs.indexOf("Angelic Host");
+        const markerIndex = serialized.applied_buffs.indexOf("Angelic Host Blessing");
         expect(serialized.applied_buffs_powers[markerIndex]).toBe(1);
         expect(serialized.applied_buffs_descriptions[markerIndex]).toContain(
-            "Angelic Host grants +1 attack, +1 defense and +1 movement distance.",
+            "Angelic Host Blessing grants +1 attack, +1 defense and +1 movement distance.",
         );
 
         firstCarrier.applyDamage(1_000, 0, new SceneLogMock());
         unitsHolder.refreshStackPowerForAllUnits();
         expect(distantAlliedFlyer.getAttack()).toBe(11);
         expect(
-            distantAlliedFlyer.getAllProperties().applied_buffs.filter((name) => name === "Angelic Host"),
+            distantAlliedFlyer.getAllProperties().applied_buffs.filter((name) => name === "Angelic Host Blessing"),
         ).toHaveLength(1);
 
         secondCarrier.applyDamage(1_000, 0, new SceneLogMock());
@@ -108,7 +110,7 @@ describe("Angelic Host army passive", () => {
         expect(distantAlliedFlyer.getAttack()).toBe(10);
         expect(distantAlliedFlyer.getArmor()).toBe(10);
         expect(distantAlliedFlyer.getSteps()).toBe(3);
-        expect(distantAlliedFlyer.hasBuffActive("Angelic Host")).toBe(false);
+        expect(distantAlliedFlyer.hasBuffActive("Angelic Host Blessing")).toBe(false);
     });
 
     it("applies exactly +1 after percentage attack, defense and movement effects", () => {
@@ -116,7 +118,7 @@ describe("Angelic Host army passive", () => {
         const carrier = createTestUnit({
             name: "Angel",
             team: PBTypes.TeamVals.LOWER,
-            abilities: ["Angelic Host"],
+            abilities: ["Angelic Host Blessing"],
             movementType: PBTypes.MovementVals.FLY,
         });
         const hostedFlyer = createTestUnit({
@@ -153,7 +155,7 @@ describe("Angelic Host army passive", () => {
         const carrier = createTestUnit({
             name: "Angel",
             team: PBTypes.TeamVals.LOWER,
-            abilities: ["Angelic Host"],
+            abilities: ["Angelic Host Blessing"],
             movementType: PBTypes.MovementVals.FLY,
         });
         const alliedFlyer = createTestUnit({
@@ -170,13 +172,13 @@ describe("Angelic Host army passive", () => {
             expect(flyer.getArmor()).toBe(11);
             expect(flyer.getRangeArmor()).toBe(11);
             expect(flyer.getSteps()).toBe(4);
-            expect(flyer.hasBuffActive("Angelic Host")).toBe(true);
+            expect(flyer.hasBuffActive("Angelic Host Blessing")).toBe(true);
         }
 
         const breakEffect = new EffectFactory().makeEffect("Break");
         expect(breakEffect).toBeDefined();
         expect(carrier.applyEffect(breakEffect!)).toBe(true);
-        expect(carrier.hasAbilityActive("Angelic Host")).toBe(false);
+        expect(carrier.hasAbilityActive("Angelic Host Blessing")).toBe(false);
         unitsHolder.refreshStackPowerForAllUnits();
 
         for (const flyer of [carrier, alliedFlyer]) {
@@ -184,13 +186,13 @@ describe("Angelic Host army passive", () => {
             expect(flyer.getArmor()).toBe(10);
             expect(flyer.getRangeArmor()).toBe(10);
             expect(flyer.getSteps()).toBe(3);
-            expect(flyer.hasBuffActive("Angelic Host")).toBe(false);
+            expect(flyer.hasBuffActive("Angelic Host Blessing")).toBe(false);
         }
 
         // Break lasts two laps, so the army bonus is still suppressed after the first one.
         carrier.minusLap();
         expect(carrier.hasEffectActive("Break")).toBe(true);
-        expect(carrier.hasAbilityActive("Angelic Host")).toBe(false);
+        expect(carrier.hasAbilityActive("Angelic Host Blessing")).toBe(false);
         unitsHolder.refreshStackPowerForAllUnits();
 
         for (const flyer of [carrier, alliedFlyer]) {
@@ -198,12 +200,12 @@ describe("Angelic Host army passive", () => {
             expect(flyer.getArmor()).toBe(10);
             expect(flyer.getRangeArmor()).toBe(10);
             expect(flyer.getSteps()).toBe(3);
-            expect(flyer.hasBuffActive("Angelic Host")).toBe(false);
+            expect(flyer.hasBuffActive("Angelic Host Blessing")).toBe(false);
         }
 
         carrier.minusLap();
         expect(carrier.hasEffectActive("Break")).toBe(false);
-        expect(carrier.hasAbilityActive("Angelic Host")).toBe(true);
+        expect(carrier.hasAbilityActive("Angelic Host Blessing")).toBe(true);
         unitsHolder.refreshStackPowerForAllUnits();
 
         for (const flyer of [carrier, alliedFlyer]) {
@@ -211,7 +213,7 @@ describe("Angelic Host army passive", () => {
             expect(flyer.getArmor()).toBe(11);
             expect(flyer.getRangeArmor()).toBe(11);
             expect(flyer.getSteps()).toBe(4);
-            expect(flyer.hasBuffActive("Angelic Host")).toBe(true);
+            expect(flyer.hasBuffActive("Angelic Host Blessing")).toBe(true);
         }
     });
 
@@ -220,7 +222,7 @@ describe("Angelic Host army passive", () => {
         const carrier = createTestUnit({
             name: "Angel",
             team: PBTypes.TeamVals.LOWER,
-            abilities: ["Angelic Host", "Resurrection"],
+            abilities: ["Angelic Host Blessing", "Resurrection"],
             spells: [":Resurrection"],
             amountAlive: 2,
             movementType: PBTypes.MovementVals.FLY,
@@ -239,7 +241,7 @@ describe("Angelic Host army passive", () => {
         carrier.applyDamage(1_000, 0, new SceneLogMock());
         unitsHolder.refreshStackPowerForAllUnits();
         expect(carrier.isDead()).toBe(true);
-        expect(alliedFlyer.hasBuffActive("Angelic Host")).toBe(false);
+        expect(alliedFlyer.hasBuffActive("Angelic Host Blessing")).toBe(false);
         expect(alliedFlyer.getAttack()).toBe(10);
         expect(alliedFlyer.getArmor()).toBe(10);
         expect(alliedFlyer.getSteps()).toBe(3);
@@ -251,7 +253,9 @@ describe("Angelic Host army passive", () => {
         expect(alliedFlyer.getAttack()).toBe(11);
         expect(alliedFlyer.getArmor()).toBe(11);
         expect(alliedFlyer.getSteps()).toBe(4);
-        expect(alliedFlyer.getAllProperties().applied_buffs.filter((name) => name === "Angelic Host")).toHaveLength(1);
+        expect(
+            alliedFlyer.getAllProperties().applied_buffs.filter((name) => name === "Angelic Host Blessing"),
+        ).toHaveLength(1);
     });
 
     it("follows the active ability when Predatory Assimilation steals it", () => {
@@ -259,7 +263,7 @@ describe("Angelic Host army passive", () => {
         const originalCarrier = createTestUnit({
             name: "Angel",
             team: PBTypes.TeamVals.LOWER,
-            abilities: ["Angelic Host"],
+            abilities: ["Angelic Host Blessing"],
             movementType: PBTypes.MovementVals.FLY,
         });
         const lowerFlyer = createTestUnit({
@@ -287,14 +291,14 @@ describe("Angelic Host army passive", () => {
         expect(lowerFlyer.getAttack()).toBe(11);
         expect(upperFlyer.getAttack()).toBe(10);
 
-        expect(originalCarrier.disableAbilityAsStolen("Angelic Host")).toBeDefined();
-        thief.grantStolenAbility("Angelic Host");
+        expect(originalCarrier.disableAbilityAsStolen("Angelic Host Blessing")).toBeDefined();
+        thief.grantStolenAbility("Angelic Host Blessing");
         unitsHolder.refreshStackPowerForAllUnits();
 
-        expect(originalCarrier.hasAbilityActive("Angelic Host")).toBe(false);
-        expect(thief.hasAbilityActive("Angelic Host")).toBe(true);
+        expect(originalCarrier.hasAbilityActive("Angelic Host Blessing")).toBe(false);
+        expect(thief.hasAbilityActive("Angelic Host Blessing")).toBe(true);
         expect(lowerFlyer.getAttack()).toBe(10);
-        expect(lowerFlyer.hasBuffActive("Angelic Host")).toBe(false);
+        expect(lowerFlyer.hasBuffActive("Angelic Host Blessing")).toBe(false);
         expect(thief.getAttack()).toBe(11);
         expect(upperFlyer.getAttack()).toBe(11);
     });

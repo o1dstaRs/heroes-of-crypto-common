@@ -435,19 +435,20 @@
         "aura_effect": "Luck",
         "can_be_cast": false
     },
-    "Arrows Wingshield Aura": {
-        "name": "Arrows Wingshield Aura",
-        "type": "BUFF_AURA",
+    "Arrows Wingshield Blessing": {
+        "name": "Arrows Wingshield Blessing",
+        "type": "MASS_BUFF",
         "desc": [
-            "Allies in range receive a +{}% defense bonus against ranged attacks",
+            "While this unit is alive, all allies on the board gain a +{}% defense bonus against ranged attacks.",
+            "Power scales 5/10/15/20/25 with stack size, then scales by this unit's Luck percentage.",
             "The owner is immune to being shot through and does not propagate AOE range damage"
         ],
-        "power": 30,
+        "power": 25,
         "power_type": "ADDITIONAL_RANGE_ARMOR_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,
-        "aura_effect": "Arrows Wingshield",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Rallying Volley Aura": {
@@ -462,8 +463,8 @@
         "aura_effect": "Rallying Volley",
         "can_be_cast": false
     },
-    "Angelic Host": {
-        "name": "Angelic Host",
+    "Angelic Host Blessing": {
+        "name": "Angelic Host Blessing",
         "type": "MASS_BUFF",
         "desc": [
             "While this unit is alive, all allied flying units gain +{} attack, +{} defense and +{} movement distance"

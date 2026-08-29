@@ -530,9 +530,6 @@ describe("v0.8 Blacksmith Craft placement", () => {
             team: LOWER,
             name: "Angel",
             size: PBTypes.UnitSizeVals.LARGE,
-            auraEffects: ["Arrows Wingshield"],
-            auraRanges: [2],
-            auraIsBuff: [true],
         });
         fixture.units.push(angel);
         fixture.context.unitsHolder.addUnit(angel);

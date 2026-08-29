@@ -858,9 +858,6 @@ describe("v0.8 back-line protector intent", () => {
                 name: "Angel",
                 attackType: MELEE_MAGIC,
                 movementType: FLY,
-                auraEffects: ["Arrows Wingshield"],
-                auraRanges: [2],
-                auraIsBuff: [true],
             });
             const primary = createTestUnit({
                 team: LOWER,
@@ -935,9 +932,6 @@ describe("v0.8 back-line protector intent", () => {
             movementType: FLY,
             size: PBTypes.UnitSizeVals.LARGE,
             initiative: 3,
-            auraEffects: ["Arrows Wingshield"],
-            auraRanges: [2],
-            auraIsBuff: [true],
         });
         const primary = createTestUnit({
             team: LOWER,
@@ -1145,9 +1139,6 @@ describe("v0.8 back-line protector placement", () => {
                 attackType: MELEE_MAGIC,
                 movementType: FLY,
                 size: PBTypes.UnitSizeVals.LARGE,
-                auraEffects: ["Arrows Wingshield"],
-                auraRanges: [2],
-                auraIsBuff: [true],
             });
             const primary = createTestUnit({
                 team: LOWER,
@@ -1213,9 +1204,6 @@ describe("v0.8 back-line protector placement", () => {
             attackType: MELEE_MAGIC,
             movementType: FLY,
             size: PBTypes.UnitSizeVals.LARGE,
-            auraEffects: ["Arrows Wingshield"],
-            auraRanges: [2],
-            auraIsBuff: [true],
         });
         const primary = createTestUnit({
             team: LOWER,
@@ -1275,9 +1263,6 @@ describe("v0.8 back-line protector placement", () => {
                 attackType: MELEE_MAGIC,
                 movementType: FLY,
                 size: PBTypes.UnitSizeVals.LARGE,
-                auraEffects: ["Arrows Wingshield"],
-                auraRanges: [2],
-                auraIsBuff: [true],
             }),
         );
         const wards = [

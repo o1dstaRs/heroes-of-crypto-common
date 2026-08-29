@@ -20,7 +20,11 @@ import type { IDecisionContext, IPlacementContext } from "../ai_strategy";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../candidates";
 import { creatureInfo } from "../setup/creature_score";
 import { opponentCreatureIdsForPlacement } from "./v0_7_placement_reveal";
-import { isV08BacklineProtectionBeneficiary, v08BacklineProtectorKind } from "./v0_8_backline_protector";
+import {
+    isV08BacklineProtectionBeneficiary,
+    v08BacklineProtectorKind,
+    V08_ANGEL_SCREEN_RANGE,
+} from "./v0_8_backline_protector";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
 
 export const V08_BLACKSMITH_CRAFT_SPELL = "Craft";
@@ -253,14 +257,12 @@ interface IProtectedPlacementEdge {
 
 const placementProtectionRange = (protector: Unit): number => {
     const kind = v08BacklineProtectorKind(protector);
-    const auraName =
-        kind === "abomination"
-            ? "Flesh Shield"
-            : kind === "angel"
-              ? "Arrows Wingshield"
-              : kind === "arachna_queen"
-                ? "Web"
-                : undefined;
+    // Angel: board-wide blessing, no aura config to read — keep the trained screen radius (see
+    // V08_ANGEL_SCREEN_RANGE). The other protectors still project real auras.
+    if (kind === "angel") {
+        return V08_ANGEL_SCREEN_RANGE;
+    }
+    const auraName = kind === "abomination" ? "Flesh Shield" : kind === "arachna_queen" ? "Web" : undefined;
     return Math.max(0, Math.floor((auraName ? protector.getAuraEffect(auraName)?.getRange() : undefined) ?? 1));
 };
 

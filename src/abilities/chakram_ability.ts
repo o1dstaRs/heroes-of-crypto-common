@@ -284,7 +284,7 @@ function lineCells(from: XY, to: XY): XY[] {
  *    Reach is still governed by separation (a 1- or 2-cell gap of open air); clockwise only decides
  *    WHICH of the reachable enemies comes next. Two enemies on the exact same bearing break the tie by
  *    the nearer one first, then by unit id.
- *  - Angel's "Arrows Wingshield Aura" owner is never struck and STOPS the whole flight when it is the
+ *  - Angel's "Arrows Wingshield Blessing" owner is never struck and STOPS the whole flight when it is the
  *    next bounce clockwise — the shield catches the disc.
  */
 export function resolveChakramTrajectory(
@@ -359,7 +359,7 @@ export function resolveChakramTrajectory(
 
         const fromCell = last.getBaseCell();
         const toCell = next.getBaseCell();
-        if (next.hasAbilityActive("Arrows Wingshield Aura")) {
+        if (next.hasAbilityActive("Arrows Wingshield Blessing")) {
             // The shield catches the disc: the hop flies (for the visual) but lands no hit, and the
             // flight ends here — the disc drops and returns to Zena.
             steps.push({

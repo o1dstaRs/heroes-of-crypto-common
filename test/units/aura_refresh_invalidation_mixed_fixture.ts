@@ -198,7 +198,6 @@ export function registerAuraRefreshMixedEventTraceShard(shardIndex: number): voi
                                 "Range Null Field",
                                 "Venom Cloud",
                                 "Web",
-                                "Arrows Wingshield",
                                 "Absorb Penalties",
                                 "Pegasus Might",
                                 "Wolf Trail",

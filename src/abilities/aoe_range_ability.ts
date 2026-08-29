@@ -351,12 +351,12 @@ export function evaluateAffectedUnits(
         unitIds.push(occupantId);
     }
 
-    // ABILITY Arrows Wingshield Aura (Angel): "the owner ... does not propagate AOE range damage".
+    // ABILITY Arrows Wingshield Blessing (Angel): "the owner ... does not propagate AOE range damage".
     // A blast that catches the Angel stops at him — he soaks it and nobody around him is splashed.
     // Applied HERE rather than in processRangeAOEAbility because the client's hover preview calls this
     // same function to outline and price the victims, so what is highlighted is what actually gets hit.
     // Two Angels in one blast both soak it; neither passes it on.
-    const shieldBearers = affectedUnits.filter((unit) => unit.hasAbilityActive("Arrows Wingshield Aura"));
+    const shieldBearers = affectedUnits.filter((unit) => unit.hasAbilityActive("Arrows Wingshield Blessing"));
     if (shieldBearers.length) {
         return [shieldBearers, shieldBearers];
     }

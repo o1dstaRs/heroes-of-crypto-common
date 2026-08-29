@@ -124,6 +124,17 @@ const V07_CATALOG_MAX_CREATURE_ID: number = PBTypes.CreatureVals.ANGEL;
  */
 const POST_V07_FREEZE_ABILITIES: ReadonlySet<string> = new Set(["Sylvan Focus Aura"]);
 
+/**
+ * The mirror of POST_V07_FREEZE_ABILITIES: abilities that DID project an aura at the v0.7 preregistration and
+ * have since been redone as something else. They stay visible to the trait classification for exactly the same
+ * reason the set above stays hidden from it — the preregistered taxonomy, and the manifest sha256 attested over
+ * it, must describe the roster the battery actually ran, and the manifest cannot be re-pinned.
+ *
+ * Listed by their CURRENT config name, since that is what a frozen creature's ability list now holds. Angel's
+ * Arrows Wingshield was a range-2 aura when this battery ran; it is a board-wide MASS_BUFF blessing today.
+ */
+const PRE_V07_FREEZE_AURA_ABILITIES: ReadonlySet<string> = new Set(["Arrows Wingshield Blessing"]);
+
 const creatureEnumId = (creatureName: string): number =>
     (PBTypes.CreatureVals as unknown as Record<string, number>)[creatureName.toUpperCase().replace(/ /g, "_")] ?? 0;
 
@@ -147,7 +158,8 @@ export function classifyEnabledV07ArchetypeCreatures(): IV07ArchetypeTaxonomy {
                 .filter((ability) => !POST_V07_FREEZE_ABILITIES.has(ability))
                 .some(
                     (ability) =>
-                        abilities[ability]?.aura_effect !== null && abilities[ability]?.aura_effect !== undefined,
+                        PRE_V07_FREEZE_AURA_ABILITIES.has(ability) ||
+                        (abilities[ability]?.aura_effect !== null && abilities[ability]?.aura_effect !== undefined),
                 ),
         ),
         ranged: names((entry) => entry.attackType === "RANGE"),

@@ -143,10 +143,18 @@ export function dualStrikeCharmPercent(unit: Unit): number {
     return unit.getBuff(DUAL_STRIKE_CHARM_BUFF)?.getPower() ?? 0;
 }
 
+/**
+ * Abilities renamed to " Blessing" when they stopped being auras keep their ORIGINAL art: the icon files are
+ * still named after the aura, so mapping the new name straight through would ask for a texture nobody shipped.
+ */
+const ABILITY_TEXTURE_OVERRIDES: ReadonlyMap<string, string> = new Map([
+    ["Warding Mane Blessing", "warding_mane_aura_256"],
+    ["Arrows Wingshield Blessing", "arrows_wingshield_aura_256"],
+    ["Angelic Host Blessing", "angelic_host_256"],
+]);
+
 export const abilityToTextureName = (abilityName: string): string =>
-    abilityName === "Warding Mane Blessing"
-        ? "warding_mane_aura_256"
-        : `${abilityName.toLowerCase().replace(/ /g, "_")}_256`;
+    ABILITY_TEXTURE_OVERRIDES.get(abilityName) ?? `${abilityName.toLowerCase().replace(/ /g, "_")}_256`;
 
 /**
  * Buffs and debuffs that are NOT a cast blessing or a landed curse: army equipment (artifacts, augments)
@@ -178,9 +186,10 @@ const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
     "Dismorale",
     "Hidden",
     "Visible",
-    "Angelic Host",
+    "Angelic Host Blessing",
     "Arcane Ward Blessing",
     "Warding Mane Blessing",
+    "Arrows Wingshield Blessing",
     "Water Shield",
 ]);
 

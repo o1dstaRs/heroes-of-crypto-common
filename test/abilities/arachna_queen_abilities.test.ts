@@ -392,28 +392,30 @@ describe("Predatory Assimilation", () => {
     });
 
     it("keeps ability-aligned aura slots stable and restores the configured range on an explicit stolen grant", () => {
-        const angel = createTestUnit({
-            name: "Angel",
-            abilities: ["Resurrection", "Arrows Wingshield Aura"],
-            auraEffects: ["Arrows Wingshield"],
+        // Any ability that still projects an aura works as the carrier here — the Angel used to play this
+        // part, but its Arrows Wingshield is a board-wide blessing now and owns no aura slot to restore.
+        const carrier = createTestUnit({
+            name: "Elf",
+            abilities: ["Resurrection", "Rallying Volley Aura"],
+            auraEffects: ["Rallying Volley"],
             auraRanges: [0, 2],
             auraIsBuff: [true, true],
             spells: [":Resurrection"],
         });
 
-        expect(angel.disableAbilityAsStolen("Arrows Wingshield Aura")).toBeDefined();
-        expect(angel.getAllProperties().abilities).toEqual(["Resurrection", "Arrows Wingshield Aura"]);
-        expect(angel.getAllProperties().aura_ranges).toEqual([0, 0]);
-        expect(angel.getAuraEffects()).toHaveLength(0);
+        expect(carrier.disableAbilityAsStolen("Rallying Volley Aura")).toBeDefined();
+        expect(carrier.getAllProperties().abilities).toEqual(["Resurrection", "Rallying Volley Aura"]);
+        expect(carrier.getAllProperties().aura_ranges).toEqual([0, 0]);
+        expect(carrier.getAuraEffects()).toHaveLength(0);
 
-        angel.grantAbility("Arrows Wingshield Aura");
-        expect(angel.hasAbilityActive("Arrows Wingshield Aura")).toBe(false);
-        expect(angel.getAllProperties().aura_ranges).toEqual([0, 0]);
+        carrier.grantAbility("Rallying Volley Aura");
+        expect(carrier.hasAbilityActive("Rallying Volley Aura")).toBe(false);
+        expect(carrier.getAllProperties().aura_ranges).toEqual([0, 0]);
 
-        angel.grantStolenAbility("Arrows Wingshield Aura");
-        expect(angel.hasAbilityActive("Arrows Wingshield Aura")).toBe(true);
-        expect(angel.getAllProperties().aura_ranges).toEqual([0, 2]);
-        expect(angel.getAuraEffects().map((aura) => aura.getName())).toEqual(["Arrows Wingshield"]);
+        carrier.grantStolenAbility("Rallying Volley Aura");
+        expect(carrier.hasAbilityActive("Rallying Volley Aura")).toBe(true);
+        expect(carrier.getAllProperties().aura_ranges).toEqual([0, 2]);
+        expect(carrier.getAuraEffects().map((aura) => aura.getName())).toEqual(["Rallying Volley"]);
     });
 });
 

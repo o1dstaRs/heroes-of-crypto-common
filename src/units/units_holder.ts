@@ -927,7 +927,7 @@ export class UnitsHolder {
                 continue;
             }
 
-            const angelicHostAbility = unit.getAbility("Angelic Host");
+            const angelicHostAbility = unit.getAbility("Angelic Host Blessing");
             if (angelicHostAbility) {
                 powerPerTeam.set(
                     unit.getTeam(),
@@ -937,7 +937,7 @@ export class UnitsHolder {
         }
 
         for (const unit of this.getAllUnitsIterator()) {
-            unit.deleteBuff("Angelic Host");
+            unit.deleteBuff("Angelic Host Blessing");
 
             const power = powerPerTeam.get(unit.getTeam()) ?? 0;
             if (
@@ -950,7 +950,7 @@ export class UnitsHolder {
             }
 
             const buff = new Spell({
-                spellProperties: getSpellConfig("System", "Angelic Host", NUMBER_OF_LAPS_TOTAL),
+                spellProperties: getSpellConfig("System", "Angelic Host Blessing", NUMBER_OF_LAPS_TOTAL),
                 amount: 1,
             });
             buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
@@ -1024,6 +1024,39 @@ export class UnitsHolder {
             unit.applyBuff(buff, power);
         }
     }
+    private refreshArrowsWingshieldBlessingForAllUnits(): void {
+        const powerPerTeam: Map<TeamType, number> = new Map();
+
+        for (const unit of this.getAllUnitsIterator()) {
+            if (
+                unit.isDead() ||
+                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
+                !unit.getAbility("Arrows Wingshield Blessing")
+            ) {
+                continue;
+            }
+
+            const power = unit.calculateArrowsWingshieldBlessingPower();
+            powerPerTeam.set(unit.getTeam(), Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, power));
+        }
+
+        for (const unit of this.getAllUnitsIterator()) {
+            unit.deleteBuff("Arrows Wingshield Blessing");
+
+            const power = powerPerTeam.get(unit.getTeam()) ?? 0;
+            if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
+                continue;
+            }
+
+            const buff = new Spell({
+                spellProperties: getSpellConfig("System", "Arrows Wingshield Blessing", NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            });
+            buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
+            buff.setPower(power);
+            unit.applyBuff(buff, power);
+        }
+    }
     public refreshWaterShieldForAllUnits(): void {
         // Seed the innate one-per-battle Water Shield buff for any unit that owns the ability. trySeedWaterShield
         // is idempotent and refuses to re-grant a shield that has already been consumed, so it is safe to call on
@@ -1048,6 +1081,7 @@ export class UnitsHolder {
         this.refreshAngelicHostForAllUnits();
         this.refreshArcaneWardBlessingForAllUnits();
         this.refreshWardingManeBlessingForAllUnits();
+        this.refreshArrowsWingshieldBlessingForAllUnits();
         this.refreshWaterShieldForAllUnits();
         for (const u of this.getAllUnitsIterator()) {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {

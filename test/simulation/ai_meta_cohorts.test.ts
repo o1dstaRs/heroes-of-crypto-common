@@ -168,13 +168,20 @@ describe("AI meta cohort generation", () => {
             { faction: "Chaos", creatureName: "Ogre Mage", level: 3, size: 1, amount: 1 },
             { faction: "Life", creatureName: "Valkyrie", level: 2, size: 1, amount: 1 },
         ]);
+        // Angel buffs its army through Arrows Wingshield / Angelic Host, but both are passive blessings it
+        // never casts — and neither is an aura any more, so it carries no radius for placement to cluster on.
         const passiveFeatures = armyFeatures([
             { faction: "Life", creatureName: "Angel", level: 4, size: 2, amount: 1 },
+        ]);
+        const auraFeatures = armyFeatures([
+            { faction: "Nature", creatureName: "Pegasus", level: 3, size: 2, amount: 1 },
         ]);
 
         expect(castableFeatures.buffers).toBe(3);
         expect(passiveFeatures.buffers).toBe(0);
-        expect(passiveFeatures.auraCarriers).toBe(1);
+        expect(passiveFeatures.auraCarriers).toBe(0);
+        expect(auraFeatures.buffers).toBe(0);
+        expect(auraFeatures.auraCarriers).toBe(1);
     });
 
     it("generates two globally exclusive, non-mirrored armies in every cohort", () => {

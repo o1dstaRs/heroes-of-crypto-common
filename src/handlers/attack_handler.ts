@@ -3238,7 +3238,7 @@ export class AttackHandler {
 
             if (
                 (attackerUnit.hasAbilityActive("Large Caliber") || attackerUnit.hasAbilityActive("Area Throw")) &&
-                !possibleUnit.hasAbilityActive("Arrows Wingshield Aura")
+                !possibleUnit.hasAbilityActive("Arrows Wingshield Blessing")
             ) {
                 const unitIds: string[] = [possibleUnitId];
 
@@ -3298,7 +3298,7 @@ export class AttackHandler {
             }
             rangeAttackDivisors.push(divisor);
 
-            if (isThroughShot && possibleUnit.hasAbilityActive("Arrows Wingshield Aura")) {
+            if (isThroughShot && possibleUnit.hasAbilityActive("Arrows Wingshield Blessing")) {
                 break;
             }
         }

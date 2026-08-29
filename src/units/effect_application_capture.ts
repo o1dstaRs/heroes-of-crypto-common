@@ -36,7 +36,7 @@ const MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
     "Dismorale",
     "Hidden",
     "Visible",
-    "Angelic Host",
+    "Angelic Host Blessing",
     "Water Shield",
 ]);
 
