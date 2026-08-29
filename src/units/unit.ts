@@ -2099,7 +2099,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return Number((ability.getPower() + this.getLuck()).toFixed(2));
     }
-    /** Board-wide Manticore projection: 5/10/15/20/25 by stack, plus the living source's luck. */
+    /** Board-wide Manticore projection: 5/10/15/20/25 by stack, scaled by the living source's luck %. */
     public calculateWardingManeBlessingPower(): number {
         const ability = this.getAbility("Warding Mane Blessing");
         if (!ability) {
@@ -2107,9 +2107,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, this.getStackPower()));
-        return Number(
-            Math.max(0, (ability.getPower() / MAX_UNIT_STACK_POWER) * stackPower + this.getLuck()).toFixed(2),
-        );
+        const stackScaledPower = (ability.getPower() / MAX_UNIT_STACK_POWER) * stackPower;
+        const luckMultiplier = Math.max(0, 1 + this.getLuck() / 100);
+        return Number((stackScaledPower * luckMultiplier).toFixed(2));
     }
     public calculateEffectMultiplier(effect: Effect, synergyAbilityPowerIncrease: number): number {
         let calculatedCoeff = 1;

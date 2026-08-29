@@ -1,7 +1,7 @@
 /*
  * -----------------------------------------------------------------------------
  * Warding Mane Blessing (Manticore): board-wide magic defence while a source is
- * alive, scaled 5/10/15/20/25 by stack and then shifted by that source's Luck.
+ * alive, scaled 5/10/15/20/25 by stack and then multiplied by that source's Luck.
  * -----------------------------------------------------------------------------
  */
 
@@ -44,13 +44,13 @@ describe("Warding Mane Blessing", () => {
         expect(creature.aura_ranges[abilityIndex]).toBe(0);
     });
 
-    it("runs 5/10/15/20/25 across the stack and adds the source's luck", () => {
+    it("runs 5/10/15/20/25 across the stack and scales that value by the source's luck percentage", () => {
         expect([1, 2, 3, 4, 5].map((stack) => manticore(stack).calculateWardingManeBlessingPower())).toEqual([
             5, 10, 15, 20, 25,
         ]);
-        expect(manticore(3, 10).calculateWardingManeBlessingPower()).toBe(25);
-        expect(manticore(3, -10).calculateWardingManeBlessingPower()).toBe(5);
-        expect(manticore(1, -10).calculateWardingManeBlessingPower()).toBe(0);
+        expect(manticore(3, 10).calculateWardingManeBlessingPower()).toBe(16.5);
+        expect(manticore(3, -10).calculateWardingManeBlessingPower()).toBe(13.5);
+        expect(manticore(1, -10).calculateWardingManeBlessingPower()).toBe(4.5);
     });
 
     it("affects every living ally, uses the strongest source and ends when the last source dies", () => {
@@ -73,12 +73,12 @@ describe("Warding Mane Blessing", () => {
         unitsHolder.refreshStackPowerForAllUnits();
 
         for (const ally of [luckyCarrier, fullStackCarrier, distantAlly]) {
-            expect(ally.getBuff("Warding Mane Blessing")?.getPower()).toBe(35);
+            expect(ally.getBuff("Warding Mane Blessing")?.getPower()).toBe(27.5);
             expect(
                 ally.getAllProperties().applied_buffs.filter((name) => name === "Warding Mane Blessing"),
             ).toHaveLength(1);
         }
-        expect(distantAlly.getMagicResist()).toBe(48);
+        expect(distantAlly.getMagicResist()).toBe(42);
         expect(enemy.hasBuffActive("Warding Mane Blessing")).toBe(false);
         expect(enemy.getMagicResist()).toBe(20);
 
@@ -101,7 +101,7 @@ describe("Warding Mane Blessing", () => {
         const index = bearer.getUnitProperties().abilities.indexOf("Warding Mane Blessing");
         const description = bearer.getUnitProperties().abilities_descriptions[index];
 
-        expect(description).toContain("15%");
+        expect(description).toContain("10.5%");
         expect(description).toContain("all allies on the board");
         expect(abilityToTextureName("Warding Mane Blessing")).toBe("warding_mane_aura_256");
         expect(isEquipmentOrMarkerSpellName("Warding Mane Blessing")).toBe(true);

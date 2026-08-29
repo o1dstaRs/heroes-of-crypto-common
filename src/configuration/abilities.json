@@ -1395,7 +1395,7 @@
         "type": "MASS_BUFF",
         "desc": [
             "While this unit is alive, all allies on the board gain {}% magic defence.",
-            "Power scales 5/10/15/20/25 with stack size, plus this unit's Luck."
+            "Power scales 5/10/15/20/25 with stack size, then scales by this unit's Luck percentage."
         ],
         "power": 25,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE",
