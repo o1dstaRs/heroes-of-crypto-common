@@ -58,10 +58,10 @@ describe("v0.7 public-roster setup search", () => {
         expect(publicSetupOwnGroup([C.SATYR, C.PEASANT])).toBe("mage");
         expect(publicSetupOwnGroup([C.ANGEL, C.PEASANT])).toBe("melee-magic");
         expect(publicSetupOwnGroup([C.PEASANT])).toBe("aura-heavy");
+        expect(publicSetupOwnGroup([C.SQUIRE])).toBe("melee-other");
         expect(publicSetupOwnGroup([C.SCAVENGER])).toBe("melee-other");
-        // Scavenger supplies melee-other here: Squire used to, but it gained Arcane Ward Blessing and so reads
-        // as an aura unit now. Kept a melee-other member in the roster rather than dropping the tag, since
-        // the point of this case is that all five cohorts surface in precedence order.
+        // The point of this case is that all five cohorts surface in precedence order; both Squire and
+        // Scavenger now qualify for the exact melee-other fallback.
         expect(publicSetupDiagnosticTags([C.ARBALESTER, C.SATYR, C.ANGEL, C.PEASANT, C.SQUIRE, C.SCAVENGER])).toEqual([
             "ranged",
             "mage",

@@ -83,7 +83,7 @@ describe("public-roster placement measurement", () => {
     });
 
     test("cohort-safe arm shares the runtime visibility rule and excludes only exact melee-other", () => {
-        const taggedRosters = [[C.ARBALESTER], [C.SATYR], [C.ANGEL], [C.PEASANT], [C.SQUIRE]];
+        const taggedRosters = [[C.ARBALESTER], [C.SATYR], [C.ANGEL], [C.PEASANT]];
         for (const ownRoster of taggedRosters) {
             const context = publicRosterPlacementContext(
                 "cohort-safe",
@@ -96,11 +96,11 @@ describe("public-roster placement measurement", () => {
             expect(context.addedPublicCreatureIds).toEqual([C.BLACK_DRAGON, C.NOMAD]);
         }
 
-        // Scavenger, not Squire: Squire gained Arcane Ward Blessing and so no longer reads as exact melee-other,
-        // which is the whole condition this case exercises.
+        // Arcane Ward Blessing is board-wide but deliberately not an aura, so Squire now belongs to the exact
+        // melee-other fallback cohort that keeps public opponent identities hidden.
         const meleeOther = publicRosterPlacementContext(
             "cohort-safe",
-            [C.SCAVENGER],
+            [C.SQUIRE],
             [C.GRIFFIN, C.BLACK_DRAGON, C.NOMAD],
             [C.GRIFFIN],
         );
@@ -139,7 +139,7 @@ describe("public-roster placement measurement", () => {
             "melee-magic",
             "aura-heavy",
         ]);
-        expect(publicRosterPlacementRosterTargets([C.SQUIRE])).toEqual(["natural", "aura-heavy"]);
+        expect(publicRosterPlacementRosterTargets([C.SQUIRE])).toEqual(["natural", "melee-other"]);
         expect(publicRosterPlacementRosterTargets([C.SCAVENGER])).toEqual(["natural", "melee-other"]);
     });
 

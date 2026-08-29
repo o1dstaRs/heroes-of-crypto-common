@@ -148,7 +148,7 @@ describe("v0.8 protector stress summary", () => {
 });
 
 describe("v0.8 protector production regressions", () => {
-    // Game indices were re-curated after Squire gained Arcane Ward Blessing, then again after Abomination's
+    // Game indices were re-curated after Squire gained Arcane Ward (now Blessing), then again after Abomination's
     // 500-HP / 44-armor rebalance and Frenzied Boar's 220-HP / 40-armor rebalance. The tests keep their exact
     // meaning: only the deterministic cases that currently exhibit each condition changed, while every safety
     // metric remains asserted.

@@ -1404,14 +1404,14 @@
     },
     "Arcane Ward Blessing": {
         "name": "Arcane Ward Blessing",
-        "type": "BUFF_AURA",
-        "desc": ["Every ally gains {}% magic defence, wherever they stand"],
+        "type": "MASS_BUFF",
+        "desc": ["While this unit is alive, all allies on the board gain {}% magic defence"],
         "power": 10,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE",
         "skip_reponse": false,
         "stack_powered": true,
         "effect": null,
-        "aura_effect": "Arcane Ward",
+        "aura_effect": null,
         "can_be_cast": false
     },
     "Terrifying Gaze": {

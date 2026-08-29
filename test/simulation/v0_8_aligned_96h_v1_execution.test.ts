@@ -208,7 +208,9 @@ describe("v0.8 aligned execution and map integrity", () => {
     });
 
     it("records seeded BLOCK_CENTER tactical waits while v0.8 removes mountain turns", () => {
-        const record = playV08AlignedV1Task(fixedTask(3), searchOffBinding());
+        // Arcane Ward's board-wide reach changed this deterministic fight's action trace; ordinal 11 is the
+        // first BLOCK_CENTER case that still exercises the exact wait-vs-obstacle conditions guarded here.
+        const record = playV08AlignedV1Task(fixedTask(11), searchOffBinding());
         const wait = record.execution.candidatePassiveAlternatives.explicitWait;
         const mountain = record.execution.candidatePassiveAlternatives.obstacleAttack;
         expect(record.gridType).toBe(PBTypes.GridVals.BLOCK_CENTER);

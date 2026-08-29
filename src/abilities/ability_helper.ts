@@ -169,7 +169,7 @@ const ARTIFACT_BUFF_NAMES: ReadonlySet<string> = new Set(
     [...TIER1_ARTIFACT_LIST, ...TIER2_ARTIFACT_LIST].map((artifact) => artifact.buffName).filter((name) => !!name),
 );
 
-// Morale/Dismorale are lap-scoped turn state; Hidden/Visible, Angelic Host and Water Shield are re-seeded
+// Morale/Dismorale are lap-scoped turn state; Hidden/Visible, army passives and Water Shield are re-seeded
 // by UnitsHolder on every refresh, so taking or lifting one would either do nothing or desync the seeder.
 const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
     "Morale",
@@ -177,6 +177,7 @@ const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
     "Hidden",
     "Visible",
     "Angelic Host",
+    "Arcane Ward Blessing",
     "Water Shield",
 ]);
 

@@ -31,7 +31,7 @@ describe("tactical stack splitting", () => {
             createTestUnit({
                 name: "Utility",
                 amountAlive: 5,
-                abilities: ["Arcane Ward Blessing"],
+                abilities: ["Warding Mane Aura"],
                 spells: ["Life:Heal"],
             }),
         );
