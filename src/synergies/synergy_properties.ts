@@ -33,9 +33,9 @@ export const SynergyKeysToPower: { [key: string]: number[] } = {
     "Nature:1:1": [2],
     "Nature:2:1": [15],
     "Nature:1:2": [3],
-    "Nature:2:2": [30],
+    "Nature:2:2": [24],
     "Nature:1:3": [4],
-    "Nature:2:3": [50],
+    "Nature:2:3": [35],
 };
 
 export enum LifeSynergy {

@@ -140,6 +140,10 @@ describe("rectangular footprints end to end", () => {
      * stand-still check compared that against an anchor. Zero here is what raised
      * MAX_VERIFIED_FOOTPRINT_SIDE from 2 to 3, so it belongs in the gate rather than in a one-off script.
      */
+    // Budgeted like its siblings below rather than left on the 5s default: it plays two whole 24-lap
+    // matches, which lands around 5s on an idle machine and over it whenever the suite's worker-backed
+    // cohort simulations are running alongside. That made it fail as a TIMEOUT, which reads exactly like
+    // a rejection regression in the log and cost a real investigation to tell apart.
     test("a body three cells deep is played out with no illegal action either", () => {
         const previous = process.env[FOOTPRINT_OVERRIDE_ENV];
         process.env[FOOTPRINT_OVERRIDE_ENV] = "White Tiger=3x1,Hyena=1x3";
@@ -163,7 +167,7 @@ describe("rectangular footprints end to end", () => {
                 process.env[FOOTPRINT_OVERRIDE_ENV] = previous;
             }
         }
-    });
+    }, 60_000);
 
     /**
      * The same three-deep bodies under the A19 SEARCH driver — the production configuration, and a

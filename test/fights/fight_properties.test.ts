@@ -387,7 +387,7 @@ describe("FightProperties", () => {
                     SynergyLevel.LEVEL_3,
                 ),
             ).toBe(true);
-            expect(fightProperties.getAdditionalFlyArmorPerTeam(team)).toBe(50);
+            expect(fightProperties.getAdditionalFlyArmorPerTeam(team)).toBe(35);
 
             expect(
                 fightProperties.updateSynergyPerTeam(

@@ -456,6 +456,9 @@ describe("projectAttackDamage reproduces Unit.calculateAttackDamage exactly", ()
         expect(outOfShotsCases).toBeGreaterThan(50);
     });
 
+    // Over 20,000 compared cases, so it sits right on the 5s default and tips over it whenever the suite's
+    // worker-backed simulations run alongside — surfacing as a timeout that reads like a real byte-identity
+    // regression. The budget states the cost instead of leaving it to the machine's mood.
     it("keeps the engine byte-identical to its pre-refactor body over the same sweep", () => {
         let compared = 0;
         for (const testCase of sweepCases()) {
@@ -487,7 +490,7 @@ describe("projectAttackDamage reproduces Unit.calculateAttackDamage exactly", ()
             }
         }
         expect(compared).toBeGreaterThan(20000);
-    });
+    }, 60_000);
 });
 
 describe("the projected top of the band is REACHABLE (getRandomInt is max-exclusive)", () => {
