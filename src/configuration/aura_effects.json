@@ -146,8 +146,8 @@
     },
     "Arcane Ward": {
         "name": "Arcane Ward",
-        "range": 2,
-        "desc": "Affected allies gain {}% magic defence.",
+        "range": 16,
+        "desc": "Every ally gains {}% magic defence, wherever they stand.",
         "power": 10,
         "is_buff": true,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE"

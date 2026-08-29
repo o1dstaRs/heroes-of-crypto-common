@@ -1402,10 +1402,10 @@
         "aura_effect": "Warding Mane",
         "can_be_cast": false
     },
-    "Arcane Ward Aura": {
-        "name": "Arcane Ward Aura",
+    "Arcane Ward Blessing": {
+        "name": "Arcane Ward Blessing",
         "type": "BUFF_AURA",
-        "desc": ["Allies within 2 cells gain {}% magic defence"],
+        "desc": ["Every ally gains {}% magic defence, wherever they stand"],
         "power": 10,
         "power_type": "ADDITIONAL_MAGIC_RESIST_PERCENTAGE",
         "skip_reponse": false,

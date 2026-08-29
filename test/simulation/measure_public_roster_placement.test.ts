@@ -96,7 +96,7 @@ describe("public-roster placement measurement", () => {
             expect(context.addedPublicCreatureIds).toEqual([C.BLACK_DRAGON, C.NOMAD]);
         }
 
-        // Scavenger, not Squire: Squire gained Arcane Ward Aura and so no longer reads as exact melee-other,
+        // Scavenger, not Squire: Squire gained Arcane Ward Blessing and so no longer reads as exact melee-other,
         // which is the whole condition this case exercises.
         const meleeOther = publicRosterPlacementContext(
             "cohort-safe",

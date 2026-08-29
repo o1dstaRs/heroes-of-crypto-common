@@ -707,7 +707,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (
             ability.getName() === "Stun Aura" ||
             ability.getName() === "Warding Mane Aura" ||
-            ability.getName() === "Arcane Ward Aura" ||
+            ability.getName() === "Arcane Ward Blessing" ||
             ability.getName() === "Guiding Winds Aura" ||
             ability.getName() === "Sylvan Focus Aura"
         ) {
@@ -3560,7 +3560,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
             // AURA Arcane Ward (Squire): magic defence for every ally within 2 cells, folded in as one more
             // INDEPENDENT resistance roll exactly like Warding Mane above (already stack-powered as a percentage).
-            const arcaneWardAura = this.getAppliedAuraEffect("Arcane Ward Aura");
+            const arcaneWardAura = this.getAppliedAuraEffect("Arcane Ward Blessing");
             if (arcaneWardAura) {
                 magicResists.push(Math.max(0, arcaneWardAura.getPower()) / 100);
             }

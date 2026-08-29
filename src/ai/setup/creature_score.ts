@@ -119,6 +119,23 @@ const CreatureJsonShape = CREATURES_JSON as unknown as Record<
 
 const CREATURE_IDS_BY_ENUM_KEY = PBTypes.CreatureVals as unknown as Readonly<Record<string, number>>;
 
+/**
+ * Whether an ability actually projects an aura effect, asked of the config rather than of its NAME.
+ *
+ * This used to test `name.includes("Aura")`, which held only while every aura ability happened to be
+ * called one. Renaming the Squire's to "Arcane Ward Blessing" — it reaches the whole army now, so the word
+ * was a lie — silently dropped the Squire from auraCount, and with it the "aura-heavy" cohort tag that the
+ * setup search, the draft evaluator and the placement panels all key off. The declaration is the fact; the
+ * name is decoration.
+ */
+const carriesAuraEffect = (abilityName: string): boolean => {
+    try {
+        return !!getAbilityConfig(abilityName)?.aura_effect;
+    } catch {
+        return false;
+    }
+};
+
 const isAmplifiableBuffSpell = (faction: string, name: string): boolean => {
     try {
         const spell = getSpellConfig(faction, name);
@@ -270,8 +287,8 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 abilities: abilityList.join(" "),
                 canFly: cfg.movement_type === "FLY",
                 melee: (cfg.attack_type ?? "").includes("MELEE"),
-                auraCount: abilityList.filter((a) => a.includes("Aura")).length,
-                abilityCount: abilityList.filter((a) => !a.includes("Aura")).length,
+                auraCount: abilityList.filter(carriesAuraEffect).length,
+                abilityCount: abilityList.filter((a) => !carriesAuraEffect(a)).length,
                 castsAmplifiableBuff:
                     spellList.some(isAmplifiableSpellbookEntry) || abilityList.some(isAmplifiableCastableAbility),
                 magicDamageAmplifier:

@@ -122,7 +122,7 @@ const V07_CATALOG_MAX_CREATURE_ID: number = PBTypes.CreatureVals.ANGEL;
  * move it between trait sets (auras are the usual case, since `aura` is the one set derived from abilities
  * rather than from attack type).
  */
-const POST_V07_FREEZE_ABILITIES: ReadonlySet<string> = new Set(["Sylvan Focus Aura", "Arcane Ward Aura"]);
+const POST_V07_FREEZE_ABILITIES: ReadonlySet<string> = new Set(["Sylvan Focus Aura", "Arcane Ward Blessing"]);
 
 const creatureEnumId = (creatureName: string): number =>
     (PBTypes.CreatureVals as unknown as Record<string, number>)[creatureName.toUpperCase().replace(/ /g, "_")] ?? 0;
