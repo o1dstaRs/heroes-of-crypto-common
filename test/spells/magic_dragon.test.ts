@@ -681,13 +681,13 @@ describe("action engine — Whirlpool", () => {
 
 describe("Magic Mirror spell buffs", () => {
     for (const [spellName, expectedRebound] of [
-        ["Magic Mirror", 45],
-        ["Mass Magic Mirror", 37],
+        ["Magic Mirror", 60],
+        ["Mass Magic Mirror", 48],
     ] as const) {
         it(`${spellName} always returns its configured share of landed magical damage`, () => {
             // A high roll proves this is the spell buff's guaranteed damage return, not the Magic Dragon
-            // passive's chance-based rebound. Lightning Strike lands for 150; the two buffs return 30% and
-            // 25% respectively, floored before the caster's own defences are applied.
+            // passive's chance-based rebound. Lightning Strike lands for 150; the two buffs return 40% and
+            // 32% respectively, floored before the caster's own defences are applied.
             alwaysRoll(99);
             const setup = setupDragonFight({
                 casterAmountAlive: 1,

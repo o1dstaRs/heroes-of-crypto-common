@@ -86,8 +86,8 @@ describe("cast buffs no longer show a raw placeholder", () => {
     // Every buff a unit can CAST whose description carries a placeholder. These reach a player as a hover
     // card on the buffed unit, which is where the literal "{}" was reported.
     for (const [faction, name, power] of [
-        ["Chaos", "Mass Magic Mirror", 25],
-        ["Chaos", "Magic Mirror", 30],
+        ["Chaos", "Mass Magic Mirror", 32],
+        ["Chaos", "Magic Mirror", 40],
         ["Chaos", "Empower", 25],
         ["Chaos", "Fireforged Sword", 10],
     ] as const) {
@@ -115,6 +115,6 @@ describe("cast buffs no longer show a raw placeholder", () => {
             .join(" ");
 
         const filled = fillEffectPowerPlaceholders(body, spell.getPower(), 0);
-        expect(filled.match(/30%/g)?.length).toBe(2);
+        expect(filled.match(/40%/g)?.length).toBe(2);
     });
 });

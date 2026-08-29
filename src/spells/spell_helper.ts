@@ -938,7 +938,7 @@ export const getMagicMirrorPower = (targetUnit: Unit): number => {
         mirrorPower = Math.max(mirrorPower, massMagicMirrorPower);
     }
     // FLAT and stable: the Ogre Mage's Magic Mirror / Mass Magic Mirror reflect exactly their configured
-    // percentage (30 / 25) — NOT stack-scaled and NOT moved by luck (unlike the Magic Dragon's ability). The
+    // percentage (40 / 32) — NOT stack-scaled and NOT moved by luck (unlike the Magic Dragon's ability). The
     // buff's own power is the whole answer; an unbuffed unit still reflects nothing (mirrorPower stays 0).
     if (mirrorPower > 100) {
         mirrorPower = 100;

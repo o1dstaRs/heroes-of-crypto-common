@@ -282,12 +282,12 @@ describe("action engine — Fire Strike", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(casterHpBefore - setup.caster.getHp()).toBe(68); // floor((38 * 6) * 30%)
+        expect(casterHpBefore - setup.caster.getHp()).toBe(91); // floor((38 * 6) * 40%)
         const cast = result.events.find((event) => event.type === "spell_cast");
         expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toEqual([
             expect.objectContaining({
                 unitId: setup.caster.getId(),
-                amount: 68,
+                amount: 91,
                 reboundedFromUnitId: setup.enemies[0].getId(),
             }),
         ]);
@@ -547,12 +547,12 @@ describe("action engine — Meteorite", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(casterHpBefore - setup.caster.getHp()).toBe(38); // floor((38 * 4) * 25%)
+        expect(casterHpBefore - setup.caster.getHp()).toBe(48); // floor((38 * 4) * 32%)
         const cast = result.events.find((event) => event.type === "spell_cast");
         expect(cast?.type === "spell_cast" ? cast.damaged?.filter((entry) => entry.rebounded) : []).toEqual([
             expect.objectContaining({
                 unitId: setup.caster.getId(),
-                amount: 38,
+                amount: 48,
                 reboundedFromUnitId: setup.enemies[0].getId(),
             }),
         ]);
