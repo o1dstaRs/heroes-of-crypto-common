@@ -874,7 +874,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Heavy Armor", "Dulling Defense"]
+            "abilities": ["Heavy Armor", "Dulling Defense", "Wardguard"]
         },
         "Black Dragon": {
             "name": "Black Dragon",
