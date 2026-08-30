@@ -13,7 +13,6 @@ import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import { arch, availableParallelism, cpus, platform, release, totalmem } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
-import { fileURLToPath } from "node:url";
 import { createGzip, type Gzip } from "node:zlib";
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
@@ -58,7 +57,6 @@ import {
     AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
     type AiMetaStrategyProfileId,
 } from "./ai_meta_strategy_profile";
-import { type AiMetaProcessResponse, type IAiMetaProcessTask } from "./ai_meta_cohorts_process_protocol";
 import {
     AI_META_UNIT_INTERACTION_SCHEMA,
     AiMetaUnitInteractionCollector,
@@ -1008,185 +1006,6 @@ export async function runAiMetaWorkerPool(
             });
         };
         for (let index = 0; index < poolSize; index += 1) startWorker();
-    });
-}
-
-interface IAiMetaProcessPoolOptions {
-    recycleAfterPairs?: number;
-    beforeProcessStart?: () => void;
-    /** Alternate process entry used by lifecycle tests; production always uses the real cohort process worker. */
-    processUrl?: URL;
-}
-
-interface IAiMetaProcessPoolSlot {
-    readonly process: ReturnType<typeof Bun.spawn>;
-    ready: boolean;
-    stopping: boolean;
-    recycleOnExit: boolean;
-    task: { readonly id: number; readonly value: IAiMetaProcessTask } | null;
-    pairsHandled: number;
-}
-
-/**
- * Run pair tasks through independent long-lived Bun processes. Unlike worker_threads, these isolates do not
- * share one JSC process and any idle process can accept the next cohort's pair from the global queue.
- */
-export async function runAiMetaProcessPool(
-    tasks: readonly IAiMetaProcessTask[],
-    concurrency: number,
-    fightProfile: IAiMetaFightProfile,
-    onRecord: (record: IAiMetaPairRecord, completed: number, total: number) => void,
-    processPoolOptions: IAiMetaProcessPoolOptions = {},
-): Promise<IAiMetaWorkerPoolStats> {
-    const recycleAfterPairs = processPoolOptions.recycleAfterPairs ?? AI_META_WORKER_RECYCLE_PAIRS;
-    if (!Number.isSafeInteger(recycleAfterPairs) || recycleAfterPairs < 1) {
-        throw new RangeError(`recycleAfterPairs must be a positive safe integer; got ${recycleAfterPairs}`);
-    }
-    if (!tasks.length) return { workersStarted: 0, workersRecycled: 0 };
-    const poolSize = Math.max(1, Math.min(Math.floor(concurrency), tasks.length));
-    const processUrl = processPoolOptions.processUrl ?? new URL("./ai_meta_cohorts_process_worker.ts", import.meta.url);
-    const workerEnvironment = sanitizedAiMetaEnvironment(process.env, fightProfile);
-    return new Promise<IAiMetaWorkerPoolStats>((resolvePromise, rejectPromise) => {
-        const slots = new Set<IAiMetaProcessPoolSlot>();
-        let dispatched = 0;
-        let completed = 0;
-        let settled = false;
-        let workersStarted = 0;
-        let workersRecycled = 0;
-        const stats = (): IAiMetaWorkerPoolStats => ({ workersStarted, workersRecycled });
-        const cleanup = (): void => {
-            for (const slot of slots) {
-                slot.stopping = true;
-                slot.process.kill();
-            }
-            slots.clear();
-        };
-        const fail = (error: unknown): void => {
-            if (settled) return;
-            settled = true;
-            cleanup();
-            rejectPromise(error instanceof Error ? error : new Error(String(error)));
-        };
-        const finishIfExited = (): void => {
-            if (settled && completed === tasks.length && slots.size === 0) resolvePromise(stats());
-        };
-        const dispatch = (slot: IAiMetaProcessPoolSlot): void => {
-            if (settled || slot.stopping || !slot.ready || slot.task) return;
-            if (dispatched >= tasks.length) {
-                slot.stopping = true;
-                slot.process.send({ type: "stop" });
-                return;
-            }
-            const id = dispatched;
-            const value = tasks[dispatched]!;
-            dispatched += 1;
-            slot.task = { id, value };
-            slot.process.send({ type: "pair", taskId: id, task: value });
-        };
-        const startProcess = (recycled = false): void => {
-            if (settled) return;
-            try {
-                processPoolOptions.beforeProcessStart?.();
-            } catch (error) {
-                fail(error);
-                return;
-            }
-            const pendingMessages: AiMetaProcessResponse[] = [];
-            let slot: IAiMetaProcessPoolSlot | undefined;
-            const subprocess = Bun.spawn({
-                cmd: [process.execPath, fileURLToPath(processUrl)],
-                cwd: process.cwd(),
-                env: workerEnvironment,
-                stdin: "ignore",
-                stdout: "inherit",
-                stderr: "inherit",
-                ipc: (message) => {
-                    const reply = message as AiMetaProcessResponse;
-                    if (!slot) pendingMessages.push(reply);
-                    else receive(slot, reply);
-                },
-            });
-            slot = {
-                process: subprocess,
-                ready: false,
-                stopping: false,
-                recycleOnExit: false,
-                task: null,
-                pairsHandled: 0,
-            };
-            slots.add(slot);
-            workersStarted += 1;
-            workersRecycled += Number(recycled);
-            for (const message of pendingMessages) receive(slot, message);
-            void subprocess.exited.then((code) => processExited(slot!, code)).catch(fail);
-        };
-        const stop = (slot: IAiMetaProcessPoolSlot, recycle = false): void => {
-            if (slot.stopping) return;
-            slot.stopping = true;
-            slot.recycleOnExit = recycle;
-            try {
-                slot.process.send({ type: "stop" });
-            } catch {
-                slot.process.kill();
-            }
-        };
-        const receive = (slot: IAiMetaProcessPoolSlot, message: AiMetaProcessResponse): void => {
-            if (settled || !slots.has(slot) || slot.stopping) return;
-            if (message.type === "ready") {
-                if (slot.ready) {
-                    fail(new Error("AI meta process worker sent ready more than once"));
-                    return;
-                }
-                slot.ready = true;
-                dispatch(slot);
-                return;
-            }
-            const task = slot.task;
-            if (!task || task.id !== message.taskId) {
-                fail(
-                    new Error(
-                        `AI meta process worker returned unexpected task ${message.taskId}; active=${task?.id ?? "none"}`,
-                    ),
-                );
-                return;
-            }
-            slot.task = null;
-            if (message.type === "error") {
-                fail(new Error(message.error));
-                return;
-            }
-            completed += 1;
-            slot.pairsHandled += 1;
-            try {
-                onRecord(message.record, completed, tasks.length);
-            } catch (error) {
-                fail(error);
-                return;
-            }
-            if (completed === tasks.length) {
-                settled = true;
-                for (const active of slots) stop(active);
-            } else if (slot.pairsHandled >= recycleAfterPairs && dispatched < tasks.length) {
-                stop(slot, true);
-            } else {
-                dispatch(slot);
-            }
-        };
-        const processExited = (slot: IAiMetaProcessPoolSlot, code: number): void => {
-            if (!slots.delete(slot)) return;
-            if (settled) {
-                if (completed !== tasks.length && code !== 0) fail(new Error(`AI meta process exited ${code}`));
-                finishIfExited();
-                return;
-            }
-            if (!slot.stopping) {
-                fail(new Error(`AI meta process exited unexpectedly with code ${code}`));
-                return;
-            }
-            if (slot.recycleOnExit && dispatched < tasks.length) startProcess(true);
-            finishIfExited();
-        };
-        for (let index = 0; index < poolSize; index += 1) startProcess();
     });
 }
 
