@@ -135,6 +135,8 @@ export interface IUnitPropertiesProvider {
 
     getMorale(): number;
 
+    getAttackMultiplier(): number;
+
     getLuck(): number;
 
     getInitiative(): number;
@@ -1224,6 +1226,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         return morale;
+    }
+    public getAttackMultiplier(): number {
+        return this.unitProperties.attack_multiplier;
     }
     public getLuck(): number {
         // Round: luck feeds HoCLib.getRandomInt (throws on non-safe-integer args). Artifact/augment buffs can

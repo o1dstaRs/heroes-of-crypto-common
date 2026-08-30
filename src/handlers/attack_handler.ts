@@ -17,6 +17,7 @@ import { GridSettings } from "../grid/grid_settings";
 import { Grid } from "../grid/grid";
 import { traceGridRayCells } from "../grid/ray_traversal";
 import { amplifyCastBuffForTarget } from "../spells/castable_buff";
+import { getSpellMoraleMultiplier } from "../spells/spell_damage";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellPowerType } from "../spells/spell_properties";
 import type { IWeightedRoute } from "../grid/path_definitions";
@@ -552,6 +553,10 @@ export class AttackHandler {
             // (e.g. the Troll's Wild Regeneration) instead of consuming it on cast.
             const holyCrossBuff = attackerUnit.getBuff("Holy Cross");
             const holyCrossFactor = holyCrossBuff ? 1 + holyCrossBuff.getPower() / 100 : 1;
+            const moraleFactor = getSpellMoraleMultiplier(
+                currentActiveSpell.getName(),
+                attackerUnit.getAttackMultiplier(),
+            );
             if (currentActiveSpell.isBuff()) {
                 if (currentActiveSpell.getPowerType() === SpellPowerType.HEAL) {
                     if (currentActiveSpell.isGiftable()) {
@@ -583,7 +588,12 @@ export class AttackHandler {
                         clarifyingStr = holyCrossBuff ? `=> copied` : `=> gifted`;
                     } else {
                         const healPower = targetUnit.applyHeal(
-                            Math.floor(currentActiveSpell.getPower() * attackerUnit.getAmountAlive() * holyCrossFactor),
+                            Math.floor(
+                                currentActiveSpell.getPower() *
+                                    attackerUnit.getAmountAlive() *
+                                    holyCrossFactor *
+                                    moraleFactor,
+                            ),
                         );
                         clarifyingStr = `for ${healPower} hp`;
                         if (healPower) {
@@ -593,7 +603,12 @@ export class AttackHandler {
                 } else if (currentActiveSpell.getPowerType() === SpellPowerType.RESURRECT) {
                     const wasHp = targetUnit.getHp();
                     const resurrectedAmount = targetUnit.applyResurrection(
-                        Math.floor(attackerUnit.getCumulativeMaxHp() * RESURRECTION_POWER_FACTOR * holyCrossFactor),
+                        Math.floor(
+                            attackerUnit.getCumulativeMaxHp() *
+                                RESURRECTION_POWER_FACTOR *
+                                holyCrossFactor *
+                                moraleFactor,
+                        ),
                     );
                     const restoredHp = targetUnit.getHp() - wasHp;
                     if (resurrectedAmount) {

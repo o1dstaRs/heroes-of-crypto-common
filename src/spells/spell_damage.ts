@@ -18,6 +18,24 @@ interface IEmpowerableCaster {
     getBuff(name: string): { getPower(): number } | undefined;
 }
 
+const MORALE_SCALED_SPELLS: ReadonlySet<string> = new Set([
+    "Lightning Strike",
+    "Ring of Fire",
+    "Meteor Shower",
+    "Meteorite",
+    "Fire Strike",
+    "Heal",
+    "Resurrection",
+]);
+
+/** Morale and Dismorale scale only the explicitly supported combat and recovery spells. */
+export function getSpellMoraleMultiplier(spellName: string, attackMultiplier: number): number {
+    if (!MORALE_SCALED_SPELLS.has(spellName)) {
+        return 1;
+    }
+    return Number.isFinite(attackMultiplier) ? Math.max(0, attackMultiplier) : 1;
+}
+
 /**
  * The team's Empower Augment percentage, read off the unit that is about to deal the damage.
  *
@@ -77,13 +95,16 @@ export function calculateStackPoweredSpellDamage(
     casterAmountAlive: number,
     casterStackPower: number,
     magicDamageBonusPercentage = 0,
+    moraleMultiplier = 1,
 ): number {
     const amountAlive = Math.max(0, Math.floor(casterAmountAlive));
     const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, Math.floor(casterStackPower)));
 
     return Math.max(
         0,
-        Math.floor(amountAlive * stackPower * spellPower * empowerMultiplier(magicDamageBonusPercentage)),
+        Math.floor(
+            amountAlive * stackPower * spellPower * empowerMultiplier(magicDamageBonusPercentage) * moraleMultiplier,
+        ),
     );
 }
 
@@ -129,10 +150,14 @@ export function calculateSpellDamage(
     casterAmountAlive: number,
     casterStackPower: number,
     magicDamageBonusPercentage = 0,
+    moraleMultiplier = 1,
 ): number {
     if (multiplierType === SpellMultiplierType.UNIT_AMOUNT_DAMAGE) {
         const amountAlive = Math.max(0, Math.floor(casterAmountAlive));
-        return Math.max(0, Math.floor(amountAlive * spellPower * empowerMultiplier(magicDamageBonusPercentage)));
+        return Math.max(
+            0,
+            Math.floor(amountAlive * spellPower * empowerMultiplier(magicDamageBonusPercentage) * moraleMultiplier),
+        );
     }
     if (multiplierType === SpellMultiplierType.UNIT_AMOUNT_STACK_POWER) {
         return calculateStackPoweredSpellDamage(
@@ -140,6 +165,7 @@ export function calculateSpellDamage(
             casterAmountAlive,
             casterStackPower,
             magicDamageBonusPercentage,
+            moraleMultiplier,
         );
     }
     return 0;

@@ -11,6 +11,7 @@
 
 import type { GameAction } from "../../engine/actions";
 import { advanceDeltaBetween } from "../../grid/grid_math";
+import { getSpellMoraleMultiplier } from "../../spells/spell_damage";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { IDecisionContext } from "../ai_strategy";
@@ -99,7 +100,9 @@ function incumbentCommitsTurnAgainstResurrection(actions: readonly GameAction[],
 /** Effective HP this cast would restore, matching AttackHandler.applyResurrection's power cap. */
 function resurrectionRecovery(caster: Unit, target: Unit): number {
     const holyCross = caster.getBuff("Holy Cross");
-    const powerFactor = holyCross ? 1 + holyCross.getPower() / 100 : 1;
+    const powerFactor =
+        (holyCross ? 1 + holyCross.getPower() / 100 : 1) *
+        getSpellMoraleMultiplier("Resurrection", caster.getAttackMultiplier());
     const castPower = Math.floor(caster.getCumulativeMaxHp() * powerFactor);
     const targetMissingHp =
         target.getAmountDied() * target.getMaxHp() + Math.max(0, target.getMaxHp() - target.getHp());

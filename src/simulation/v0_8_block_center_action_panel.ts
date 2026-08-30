@@ -66,6 +66,7 @@ import type { Spell } from "../spells/spell";
 import {
     applyMagicResistToSpellDamage,
     calculateSpellDamage,
+    getSpellMoraleMultiplier,
     isOffensiveSpellMultiplier,
 } from "../spells/spell_damage";
 import { SpellTargetType } from "../spells/spell_properties";
@@ -1044,6 +1045,7 @@ const spellDamage = (caster: Unit, spell: Spell, target: Unit): number =>
             caster.getAmountAlive(),
             caster.getStackPower(),
             caster.getMagicDamageBonusPercentage(),
+            getSpellMoraleMultiplier(spell.getName(), caster.getAttackMultiplier()),
         ),
         target.getMagicResist(),
     );

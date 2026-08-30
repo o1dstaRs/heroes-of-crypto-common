@@ -10,6 +10,7 @@
  */
 
 import type { GameAction } from "../../engine/actions";
+import { getSpellMoraleMultiplier } from "../../spells/spell_damage";
 import type { Unit } from "../../units/unit";
 import type { IDecisionContext } from "../ai_strategy";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../candidates";
@@ -172,7 +173,11 @@ const bestSingleHeal = (
     context: IDecisionContext,
     candidates: readonly IEnumeratedCandidate[],
 ): { candidate: IEnumeratedCandidate; value: number } | undefined => {
-    const rawPower = spellPower(unit, HEAL) * Math.max(0, unit.getAmountAlive());
+    const rawPower = Math.floor(
+        spellPower(unit, HEAL) *
+            Math.max(0, unit.getAmountAlive()) *
+            getSpellMoraleMultiplier(HEAL, unit.getAttackMultiplier()),
+    );
     let best: { candidate: IEnumeratedCandidate; value: number } | undefined;
     for (const candidate of candidates) {
         // Candidate zero keeps kind="incumbent" even when its metadata identifies an exact legal spell.

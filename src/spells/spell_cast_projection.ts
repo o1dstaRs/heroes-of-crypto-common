@@ -12,7 +12,12 @@
 import type { Unit } from "../units/unit";
 import { projectMagicMirrorDamage, type IMagicMirrorDamageProjection } from "./magic_mirror_damage";
 import type { Spell } from "./spell";
-import { applyElementAndResistToSpellDamage, calculateSpellDamage, elementalSpellMultiplier } from "./spell_damage";
+import {
+    applyElementAndResistToSpellDamage,
+    calculateSpellDamage,
+    elementalSpellMultiplier,
+    getSpellMoraleMultiplier,
+} from "./spell_damage";
 import { getMagicMirrorAbilityShare, getMagicMirrorPower } from "./spell_helper";
 
 /**
@@ -97,6 +102,7 @@ export function spellRawDamage(spell: Spell, caster: Unit): number {
         caster.getAmountAlive(),
         caster.getStackPower(),
         caster.getMagicDamageBonusPercentage(),
+        getSpellMoraleMultiplier(spell.getName(), caster.getAttackMultiplier()),
     );
 }
 
