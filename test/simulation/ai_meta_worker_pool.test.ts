@@ -1,7 +1,12 @@
 import { expect, it } from "bun:test";
 
 import type { IAiMetaRunOptions } from "../../src/simulation/ai_meta_cohorts_core";
-import { resolveAiMetaFightProfile, runAiMetaWorkerPool } from "../../src/simulation/measure_ai_meta_cohorts";
+import type { IAiMetaProcessTask } from "../../src/simulation/ai_meta_cohorts_process_protocol";
+import {
+    resolveAiMetaFightProfile,
+    runAiMetaProcessPool,
+    runAiMetaWorkerPool,
+} from "../../src/simulation/measure_ai_meta_cohorts";
 
 const options: IAiMetaRunOptions = {
     cohort: "ranked-draft",
@@ -37,4 +42,48 @@ it("recycles long-lived AI-meta workers without losing pair records", async () =
     expect(totals).toContain(2);
     expect(stats).toEqual({ workersStarted: 2, workersRecycled: 1 });
     expect(workerStarts).toBe(2);
+}, 60_000);
+
+it("dispatches a disjoint global pair window without renumbering seeds", async () => {
+    const windowOptions: IAiMetaRunOptions = { ...options, games: 12 };
+    const pairs: number[] = [];
+    await runAiMetaWorkerPool(windowOptions, 2, resolveAiMetaFightProfile("a13"), (record) => pairs.push(record.pair), {
+        pairStart: 2,
+        pairCount: 3,
+        workerUrl: new URL("../fixtures/ai_meta_worker_pool_fixture.ts", import.meta.url),
+    });
+
+    expect(pairs.sort((left, right) => left - right)).toEqual([2, 3, 4]);
+}, 60_000);
+
+it("recycles isolated AI-meta processes while preserving a global task queue", async () => {
+    const tasks: IAiMetaProcessTask[] = Array.from({ length: 4 }, (_, pair) => ({
+        options,
+        pair,
+        strategyProfileId: "registered-version",
+    }));
+    const pairs: number[] = [];
+    const processIds = new Set<number>();
+    let processStarts = 0;
+    const stats = await runAiMetaProcessPool(
+        tasks,
+        1,
+        resolveAiMetaFightProfile("a13"),
+        (record) => {
+            pairs.push(record.pair);
+            processIds.add((record as typeof record & { processId: number }).processId);
+        },
+        {
+            beforeProcessStart: () => {
+                processStarts += 1;
+            },
+            recycleAfterPairs: 1,
+            processUrl: new URL("../fixtures/ai_meta_process_pool_fixture.ts", import.meta.url),
+        },
+    );
+
+    expect(pairs).toEqual([0, 1, 2, 3]);
+    expect(processIds.size).toBe(4);
+    expect(stats).toEqual({ workersStarted: 4, workersRecycled: 3 });
+    expect(processStarts).toBe(4);
 }, 60_000);

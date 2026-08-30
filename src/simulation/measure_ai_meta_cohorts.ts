@@ -13,6 +13,7 @@ import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import { arch, availableParallelism, cpus, platform, release, totalmem } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { Worker } from "node:worker_threads";
+import { fileURLToPath } from "node:url";
 import { createGzip, type Gzip } from "node:zlib";
 
 import { TIER1_ARTIFACT_LIST, TIER2_ARTIFACT_LIST } from "../artifacts/artifact_properties";
@@ -57,6 +58,7 @@ import {
     AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
     type AiMetaStrategyProfileId,
 } from "./ai_meta_strategy_profile";
+import { type AiMetaProcessResponse, type IAiMetaProcessTask } from "./ai_meta_cohorts_process_protocol";
 import {
     AI_META_UNIT_INTERACTION_SCHEMA,
     AiMetaUnitInteractionCollector,
@@ -880,6 +882,10 @@ export interface IAiMetaWorkerPoolStats {
 export interface IAiMetaWorkerPoolOptions {
     recycleAfterPairs?: number;
     beforeWorkerStart?: () => void;
+    /** Inclusive global pair index. Used by process-level cohort sharding without changing pair seeds. */
+    pairStart?: number;
+    /** Number of global pair indexes to dispatch. Defaults to the remainder of the cohort. */
+    pairCount?: number;
     /** Alternate worker entry used by lifecycle tests; production always uses the real cohort worker. */
     workerUrl?: URL;
 }
@@ -895,7 +901,20 @@ export async function runAiMetaWorkerPool(
     if (!Number.isSafeInteger(recycleAfterPairs) || recycleAfterPairs < 1) {
         throw new RangeError(`recycleAfterPairs must be a positive safe integer; got ${recycleAfterPairs}`);
     }
-    const total = options.games / AI_META_GAMES_PER_MATCHUP;
+    const fullPairCount = options.games / AI_META_GAMES_PER_MATCHUP;
+    const pairStart = workerPoolOptions.pairStart ?? 0;
+    const total = workerPoolOptions.pairCount ?? fullPairCount - pairStart;
+    if (
+        !Number.isSafeInteger(pairStart) ||
+        pairStart < 0 ||
+        !Number.isSafeInteger(total) ||
+        total < 1 ||
+        pairStart + total > fullPairCount
+    ) {
+        throw new RangeError(
+            `pair window must be inside [0, ${fullPairCount}); got start ${pairStart}, count ${total}`,
+        );
+    }
     const poolSize = Math.max(1, Math.min(Math.floor(concurrency), total));
     const workerUrl = workerPoolOptions.workerUrl ?? new URL("./ai_meta_cohorts_worker.ts", import.meta.url);
     const workerEnvironment = sanitizedAiMetaEnvironment(process.env, fightProfile);
@@ -946,7 +965,7 @@ export async function runAiMetaWorkerPool(
                     stop();
                     return;
                 }
-                worker.postMessage({ type: "pair", pair: dispatched });
+                worker.postMessage({ type: "pair", pair: pairStart + dispatched });
                 dispatched += 1;
             };
             worker.on("message", (message: WorkerReply) => {
@@ -989,6 +1008,185 @@ export async function runAiMetaWorkerPool(
             });
         };
         for (let index = 0; index < poolSize; index += 1) startWorker();
+    });
+}
+
+interface IAiMetaProcessPoolOptions {
+    recycleAfterPairs?: number;
+    beforeProcessStart?: () => void;
+    /** Alternate process entry used by lifecycle tests; production always uses the real cohort process worker. */
+    processUrl?: URL;
+}
+
+interface IAiMetaProcessPoolSlot {
+    readonly process: ReturnType<typeof Bun.spawn>;
+    ready: boolean;
+    stopping: boolean;
+    recycleOnExit: boolean;
+    task: { readonly id: number; readonly value: IAiMetaProcessTask } | null;
+    pairsHandled: number;
+}
+
+/**
+ * Run pair tasks through independent long-lived Bun processes. Unlike worker_threads, these isolates do not
+ * share one JSC process and any idle process can accept the next cohort's pair from the global queue.
+ */
+export async function runAiMetaProcessPool(
+    tasks: readonly IAiMetaProcessTask[],
+    concurrency: number,
+    fightProfile: IAiMetaFightProfile,
+    onRecord: (record: IAiMetaPairRecord, completed: number, total: number) => void,
+    processPoolOptions: IAiMetaProcessPoolOptions = {},
+): Promise<IAiMetaWorkerPoolStats> {
+    const recycleAfterPairs = processPoolOptions.recycleAfterPairs ?? AI_META_WORKER_RECYCLE_PAIRS;
+    if (!Number.isSafeInteger(recycleAfterPairs) || recycleAfterPairs < 1) {
+        throw new RangeError(`recycleAfterPairs must be a positive safe integer; got ${recycleAfterPairs}`);
+    }
+    if (!tasks.length) return { workersStarted: 0, workersRecycled: 0 };
+    const poolSize = Math.max(1, Math.min(Math.floor(concurrency), tasks.length));
+    const processUrl = processPoolOptions.processUrl ?? new URL("./ai_meta_cohorts_process_worker.ts", import.meta.url);
+    const workerEnvironment = sanitizedAiMetaEnvironment(process.env, fightProfile);
+    return new Promise<IAiMetaWorkerPoolStats>((resolvePromise, rejectPromise) => {
+        const slots = new Set<IAiMetaProcessPoolSlot>();
+        let dispatched = 0;
+        let completed = 0;
+        let settled = false;
+        let workersStarted = 0;
+        let workersRecycled = 0;
+        const stats = (): IAiMetaWorkerPoolStats => ({ workersStarted, workersRecycled });
+        const cleanup = (): void => {
+            for (const slot of slots) {
+                slot.stopping = true;
+                slot.process.kill();
+            }
+            slots.clear();
+        };
+        const fail = (error: unknown): void => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            rejectPromise(error instanceof Error ? error : new Error(String(error)));
+        };
+        const finishIfExited = (): void => {
+            if (settled && completed === tasks.length && slots.size === 0) resolvePromise(stats());
+        };
+        const dispatch = (slot: IAiMetaProcessPoolSlot): void => {
+            if (settled || slot.stopping || !slot.ready || slot.task) return;
+            if (dispatched >= tasks.length) {
+                slot.stopping = true;
+                slot.process.send({ type: "stop" });
+                return;
+            }
+            const id = dispatched;
+            const value = tasks[dispatched]!;
+            dispatched += 1;
+            slot.task = { id, value };
+            slot.process.send({ type: "pair", taskId: id, task: value });
+        };
+        const startProcess = (recycled = false): void => {
+            if (settled) return;
+            try {
+                processPoolOptions.beforeProcessStart?.();
+            } catch (error) {
+                fail(error);
+                return;
+            }
+            const pendingMessages: AiMetaProcessResponse[] = [];
+            let slot: IAiMetaProcessPoolSlot | undefined;
+            const subprocess = Bun.spawn({
+                cmd: [process.execPath, fileURLToPath(processUrl)],
+                cwd: process.cwd(),
+                env: workerEnvironment,
+                stdin: "ignore",
+                stdout: "inherit",
+                stderr: "inherit",
+                ipc: (message) => {
+                    const reply = message as AiMetaProcessResponse;
+                    if (!slot) pendingMessages.push(reply);
+                    else receive(slot, reply);
+                },
+            });
+            slot = {
+                process: subprocess,
+                ready: false,
+                stopping: false,
+                recycleOnExit: false,
+                task: null,
+                pairsHandled: 0,
+            };
+            slots.add(slot);
+            workersStarted += 1;
+            workersRecycled += Number(recycled);
+            for (const message of pendingMessages) receive(slot, message);
+            void subprocess.exited.then((code) => processExited(slot!, code)).catch(fail);
+        };
+        const stop = (slot: IAiMetaProcessPoolSlot, recycle = false): void => {
+            if (slot.stopping) return;
+            slot.stopping = true;
+            slot.recycleOnExit = recycle;
+            try {
+                slot.process.send({ type: "stop" });
+            } catch {
+                slot.process.kill();
+            }
+        };
+        const receive = (slot: IAiMetaProcessPoolSlot, message: AiMetaProcessResponse): void => {
+            if (settled || !slots.has(slot) || slot.stopping) return;
+            if (message.type === "ready") {
+                if (slot.ready) {
+                    fail(new Error("AI meta process worker sent ready more than once"));
+                    return;
+                }
+                slot.ready = true;
+                dispatch(slot);
+                return;
+            }
+            const task = slot.task;
+            if (!task || task.id !== message.taskId) {
+                fail(
+                    new Error(
+                        `AI meta process worker returned unexpected task ${message.taskId}; active=${task?.id ?? "none"}`,
+                    ),
+                );
+                return;
+            }
+            slot.task = null;
+            if (message.type === "error") {
+                fail(new Error(message.error));
+                return;
+            }
+            completed += 1;
+            slot.pairsHandled += 1;
+            try {
+                onRecord(message.record, completed, tasks.length);
+            } catch (error) {
+                fail(error);
+                return;
+            }
+            if (completed === tasks.length) {
+                settled = true;
+                for (const active of slots) stop(active);
+            } else if (slot.pairsHandled >= recycleAfterPairs && dispatched < tasks.length) {
+                stop(slot, true);
+            } else {
+                dispatch(slot);
+            }
+        };
+        const processExited = (slot: IAiMetaProcessPoolSlot, code: number): void => {
+            if (!slots.delete(slot)) return;
+            if (settled) {
+                if (completed !== tasks.length && code !== 0) fail(new Error(`AI meta process exited ${code}`));
+                finishIfExited();
+                return;
+            }
+            if (!slot.stopping) {
+                fail(new Error(`AI meta process exited unexpectedly with code ${code}`));
+                return;
+            }
+            if (slot.recycleOnExit && dispatched < tasks.length) startProcess(true);
+            finishIfExited();
+        };
+        for (let index = 0; index < poolSize; index += 1) startProcess();
     });
 }
 
@@ -1079,6 +1277,8 @@ function writeSummary(
     startedAt: string,
     requestedCohorts: readonly AiMetaCohort[],
     gamesPerCohort: number,
+    pairStart: number,
+    pairCount: number,
     baseSeed: number,
     concurrency: number,
     parallelCohorts: number,
@@ -1095,6 +1295,11 @@ function writeSummary(
             title: fightProfile.title,
             startedAt,
             gamesPerCohort,
+            pairWindow: {
+                start: pairStart,
+                count: pairCount,
+                fullPairCount: gamesPerCohort / AI_META_GAMES_PER_MATCHUP,
+            },
             requestedCohorts,
             totalGames: qualities.reduce((sum, quality) => sum + quality.games, 0),
             totalPairs: qualities.reduce((sum, quality) => sum + quality.pairs, 0),
@@ -1150,6 +1355,8 @@ async function runCohort(
     cohort: AiMetaCohort,
     gamesPerCohort: number,
     baseSeed: number,
+    pairStart: number,
+    pairCount: number,
     workers: number,
     fightProfile: IAiMetaFightProfile,
     outDir: string,
@@ -1163,6 +1370,7 @@ async function runCohort(
     const gzip = createGzip({ level: 6 });
     gzip.pipe(output);
     const cohortStarted = Date.now();
+    const windowGames = pairCount * AI_META_GAMES_PER_MATCHUP;
     let lastPrinted = 0;
     console.log(`\n[${cohort}] ${AI_META_COHORT_DESCRIPTIONS[cohort]} (${workers} workers)`);
     await runAiMetaWorkerPool(
@@ -1178,13 +1386,17 @@ async function runCohort(
                 const games = completed * AI_META_GAMES_PER_MATCHUP;
                 const elapsed = Math.max(0.001, (now - cohortStarted) / 1000);
                 console.log(
-                    `  [${cohort}] ${games.toLocaleString()}/${gamesPerCohort.toLocaleString()} games ` +
+                    `  [${cohort}] ${games.toLocaleString()}/${windowGames.toLocaleString()} games ` +
                         `(${(games / elapsed).toFixed(1)}/s, ${Math.floor((100 * completed) / total)}%)`,
                 );
                 lastPrinted = now;
             }
         },
-        { beforeWorkerStart: () => assertAiMetaSourceIdentity(runIdentity) },
+        {
+            beforeWorkerStart: () => assertAiMetaSourceIdentity(runIdentity),
+            pairStart,
+            pairCount,
+        },
     );
     await finishGzip(gzip, output);
     const seconds = (Date.now() - cohortStarted) / 1000;
@@ -1217,7 +1429,7 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "<fight-profile=a13|a19|a19-h18|a19-h18-ranked-placement>";
+    "<fight-profile=a13|a19|a19-h18|a19-h18-ranked-placement> [pair-start=0] [pair-count=all]";
 
 export function validateAiMetaGamesPerCohort(games: number): void {
     const mapCycleGames = AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;
@@ -1238,10 +1450,10 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
     const baseSeed = Number(argv[1] ?? 85_000_717);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const outDir = resolve(argv[2] ?? join(process.cwd(), "sim-out", `ai-meta-${stamp}`));
-    const concurrency = Math.min(
-        Number(argv[3] ?? Math.min(12, availableParallelism())),
-        Math.max(1, gamesPerCohort / 2),
-    );
+    const fullPairCount = gamesPerCohort / AI_META_GAMES_PER_MATCHUP;
+    const pairStart = Number(argv[7] ?? 0);
+    const pairCount = Number(argv[8] ?? fullPairCount - pairStart);
+    const concurrency = Math.min(Number(argv[3] ?? Math.min(12, availableParallelism())), Math.max(1, pairCount));
     const requested = (argv[4] ? argv[4].split(",") : [...AI_META_COHORTS]).map((value) => value.trim());
     const cohorts = requested.map((value) => {
         if (!AI_META_COHORTS.includes(value as AiMetaCohort)) {
@@ -1251,12 +1463,27 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
     });
     const parallelCohorts = Math.min(Number(argv[5] ?? Math.min(3, cohorts.length)), cohorts.length, concurrency);
     const fightProfile = resolveAiMetaFightProfile(argv[6]);
+    const completePairWindow = pairStart === 0 && pairCount === fullPairCount;
     if (!Number.isSafeInteger(baseSeed)) throw new RangeError(`baseSeed must be a safe integer; got ${baseSeed}`);
+    if (
+        !Number.isSafeInteger(pairStart) ||
+        pairStart < 0 ||
+        !Number.isSafeInteger(pairCount) ||
+        pairCount < 1 ||
+        pairStart + pairCount > fullPairCount
+    ) {
+        throw new RangeError(
+            `pair window must be inside [0, ${fullPairCount}); got start ${pairStart}, count ${pairCount}`,
+        );
+    }
     if (!Number.isInteger(concurrency) || concurrency < 1) {
         throw new RangeError(`concurrency must be a positive integer; got ${concurrency}`);
     }
     if (!Number.isInteger(parallelCohorts) || parallelCohorts < 1) {
         throw new RangeError(`parallelCohorts must be a positive integer; got ${parallelCohorts}`);
+    }
+    if (!completePairWindow && (cohorts.length !== 1 || parallelCohorts !== 1)) {
+        throw new Error("A sliced AI-meta invocation must contain exactly one cohort and parallelCohorts=1");
     }
     mkdirSync(outDir, { recursive: true });
     const summaryPath = join(outDir, "ai-meta.summary.json");
@@ -1272,6 +1499,12 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
             `${concurrency} total workers across ${parallelCohorts} parallel cohorts, seed ${baseSeed}, ` +
             `profile ${fightProfile.id} -> ${outDir}`,
     );
+    if (!completePairWindow) {
+        console.log(
+            `Pair window [${pairStart.toLocaleString()}, ${(pairStart + pairCount).toLocaleString()}) of ` +
+                `${fullPairCount.toLocaleString()} (${(pairCount * AI_META_GAMES_PER_MATCHUP).toLocaleString()} fights).`,
+        );
+    }
     console.log(
         `Policy ${AI_META_POLICY}; exploration ${(AI_META_EXPLORATION_RATE * 100).toFixed(0)}% per setup component.`,
     );
@@ -1287,6 +1520,8 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
                     cohort,
                     gamesPerCohort,
                     baseSeed,
+                    pairStart,
+                    pairCount,
                     workersBase + Number(index < extraWorkers),
                     fightProfile,
                     outDir,
@@ -1304,6 +1539,8 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
             startedAt,
             cohorts,
             gamesPerCohort,
+            pairStart,
+            pairCount,
             baseSeed,
             concurrency,
             parallelCohorts,
@@ -1316,10 +1553,12 @@ async function main(argv: readonly string[] = process.argv.slice(2)): Promise<vo
 
     writeSummary(
         summaryPath,
-        true,
+        completePairWindow,
         startedAt,
         cohorts,
         gamesPerCohort,
+        pairStart,
+        pairCount,
         baseSeed,
         concurrency,
         parallelCohorts,
