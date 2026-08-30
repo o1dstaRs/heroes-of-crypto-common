@@ -96,13 +96,16 @@ export function spellDamageAgainstUnit(spell: Spell, rawDamage: number, unit: Un
  * computes and the spellbook card prints.
  */
 export function spellRawDamage(spell: Spell, caster: Unit): number {
+    // Some read-only previews use a lightweight Unit-shaped adapter. Older adapters predate the
+    // per-lap attack multiplier, so they represent the neutral state rather than making aim fail.
+    const attackMultiplier = caster.getAttackMultiplier?.() ?? 1;
     return calculateSpellDamage(
         spell.getMultiplierType(),
         spell.getPower(),
         caster.getAmountAlive(),
         caster.getStackPower(),
         caster.getMagicDamageBonusPercentage(),
-        getSpellMoraleMultiplier(spell.getName(), caster.getAttackMultiplier()),
+        getSpellMoraleMultiplier(spell.getName(), attackMultiplier),
     );
 }
 

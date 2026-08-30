@@ -5,6 +5,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Spell } from "../../src/spells/spell";
 import { spellRawDamage } from "../../src/spells/spell_cast_projection";
 import { getSpellMoraleMultiplier } from "../../src/spells/spell_damage";
+import type { Unit } from "../../src/units/unit";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
 type MoraleState = "neutral" | "morale" | "dismorale";
@@ -46,6 +47,18 @@ describe("Morale-scaled spells", () => {
             expect(rawDamage("dismorale")).toBe(Math.floor(neutral * 0.8));
         });
     }
+
+    it("treats legacy projection adapters without an attack multiplier as neutral", () => {
+        const spell = configuredSpell("Nature", "Lightning Strike");
+        const caster = createTestUnit({ amountAlive: 10, stackPower: 5 });
+        const adapter = {
+            getAmountAlive: () => caster.getAmountAlive(),
+            getStackPower: () => caster.getStackPower(),
+            getMagicDamageBonusPercentage: () => caster.getMagicDamageBonusPercentage(),
+        } as Unit;
+
+        expect(spellRawDamage(spell, adapter)).toBe(spellRawDamage(spell, caster));
+    });
 
     it("scales Heal by Morale and Dismorale without changing unrelated healing spells", () => {
         const healed = (state: MoraleState): number => {
