@@ -14,6 +14,13 @@ import { resolve } from "node:path";
 
 export const MAX_TEST_WORKERS = 12;
 export const MAX_CI_TEST_WORKERS = 2;
+export const DEFAULT_TEST_TIMINGS_PATH = resolve(import.meta.dir, "test_timings.json");
+
+/** Let Bun start the historically slow files first while still allowing callers to benchmark another profile. */
+export function defaultTestTimingArgs(args: readonly string[]): string[] {
+    const hasExplicitTimings = args.some((arg) => arg === "--timings" || arg.startsWith("--timings="));
+    return hasExplicitTimings ? [] : ["--timings", DEFAULT_TEST_TIMINGS_PATH];
+}
 
 export function testWorkerCount(availableWorkers: number, isCi = false): number {
     if (!Number.isSafeInteger(availableWorkers) || availableWorkers < 1) {
@@ -29,6 +36,7 @@ export function testWorkerCount(availableWorkers: number, isCi = false): number 
 if (import.meta.main) {
     const repositoryRoot = resolve(import.meta.dir, "..");
     const workers = testWorkerCount(availableParallelism(), process.env.CI === "true");
+    const forwardedArgs = process.argv.slice(2);
     const result = Bun.spawnSync({
         cmd: [
             process.execPath,
@@ -37,7 +45,8 @@ if (import.meta.main) {
             "--timeout",
             "90000",
             "--reporter=dots",
-            ...process.argv.slice(2),
+            ...defaultTestTimingArgs(forwardedArgs),
+            ...forwardedArgs,
         ],
         cwd: repositoryRoot,
         env: { ...process.env },
