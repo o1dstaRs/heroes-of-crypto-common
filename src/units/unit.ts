@@ -955,7 +955,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
     }
     public deleteBuff(buffName: string): void {
-        this.buffs = this.buffs.filter((b) => b.getName() !== buffName);
+        // Global aura refreshes probe several blessing names on every unit. Most are absent; avoid allocating
+        // and filtering a replacement array for that no-op case. Do not return early: ranked mirrors may carry
+        // the same buff only in the parallel applied_buffs display arrays, which still need cleanup below.
+        let hasBuffObject = false;
+        for (const buff of this.buffs) {
+            if (buff.getName() === buffName) {
+                hasBuffObject = true;
+                break;
+            }
+        }
+        if (hasBuffObject) {
+            this.buffs = this.buffs.filter((b) => b.getName() !== buffName);
+        }
 
         if (
             this.unitProperties.applied_buffs.length === this.unitProperties.applied_buffs_laps.length &&

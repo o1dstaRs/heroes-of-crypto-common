@@ -207,6 +207,31 @@ describe("Unit", () => {
             expect(unit.getDebuffs()).toEqual([]);
         });
 
+        it("skips absent buff-object allocation while still clearing ranked display-only state", () => {
+            const unit = createTestUnit();
+            const originalBuffs = unit.getBuffs();
+            const state = unit as unknown as {
+                unitProperties: {
+                    applied_buffs: string[];
+                    applied_buffs_descriptions: string[];
+                    applied_buffs_laps: number[];
+                    applied_buffs_powers: number[];
+                };
+            };
+            state.unitProperties.applied_buffs = ["Display Only"];
+            state.unitProperties.applied_buffs_descriptions = ["authoritative"];
+            state.unitProperties.applied_buffs_laps = [1];
+            state.unitProperties.applied_buffs_powers = [2];
+
+            unit.deleteBuff("Display Only");
+
+            expect(unit.getBuffs()).toBe(originalBuffs);
+            expect(state.unitProperties.applied_buffs).toEqual([]);
+            expect(state.unitProperties.applied_buffs_descriptions).toEqual([]);
+            expect(state.unitProperties.applied_buffs_laps).toEqual([]);
+            expect(state.unitProperties.applied_buffs_powers).toEqual([]);
+        });
+
         it("forces min damage to max from a Blessing DISPLAY label alone (ranked mirror has no buff object)", () => {
             // Ranked mirrors buff NAMES into applied_buffs but never rebuilds the buff OBJECTS, so
             // getBuff("Blessing") is empty there. The blessed unit kept showing its base 2-3 range (the

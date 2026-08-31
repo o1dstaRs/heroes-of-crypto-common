@@ -1130,16 +1130,13 @@ class CandidateGenerator {
         );
     }
     private footprintOk(cell: XY): boolean {
-        const f = this.footprintForCell(cell);
-        return (
-            f.length > 0 &&
-            (this.context.grid.areAllCellsEmpty(f, this.unit.getId()) ||
-                this.context.grid.canOccupyCells(
-                    f,
-                    this.unit.canTraverseLava(),
-                    this.unit.hasAbilityActive("Made of Water"),
-                    this.unit.getId(),
-                ))
+        return this.context.grid.canOccupyFootprintAt(
+            cell,
+            this.unit.getFootprintWidth(),
+            this.unit.getFootprintHeight(),
+            this.unit.canTraverseLava(),
+            this.unit.hasAbilityActive("Made of Water"),
+            this.unit.getId(),
         );
     }
     private moveAction(route: IReadonlyWeightedRoute): Extract<GameAction, { type: "move_unit" }> {

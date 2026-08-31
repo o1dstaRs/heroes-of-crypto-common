@@ -12,7 +12,7 @@
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { GridType } from "../generated/protobuf/v1/types_gen";
-import { getCellsAroundFootprint, isCellWithinGrid } from "./grid_math";
+import { getCellsAroundFootprint, isCellWithinGrid, normalizeFootprintSide } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { type XY, updateMatrixElementIfExists } from "../utils/math";
 import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } from "./grid_constants";
@@ -426,6 +426,44 @@ export class Grid {
             }
         }
 
+        return true;
+    }
+    /**
+     * Allocation-free equivalent of canOccupyCells(getFootprintCellsForAnchor(...)). The AI landing probe calls
+     * this for every candidate target cell, so materializing and walking the same tiny XY array several times
+     * is measurable inside long rollouts. Keep the canonical dx-then-dy footprint order even though the answer
+     * is order-independent: malformed/custom coordinates retain the same first rejecting cell as the array path.
+     */
+    public canOccupyFootprintAt(
+        anchor: XY,
+        width: number,
+        height: number,
+        canOccupyLava: boolean,
+        canOccupyWater: boolean,
+        ownUnitId?: string,
+    ): boolean {
+        const w = normalizeFootprintSide(width);
+        const h = normalizeFootprintSide(height);
+        const gridSize = this.gridSettings.getGridSize();
+        for (let dx = 0; dx < w; dx++) {
+            const x = anchor.x - dx;
+            for (let dy = 0; dy < h; dy++) {
+                const y = anchor.y - dy;
+                // Written positively to match isCellWithinGrid for NaN and other malformed coordinates.
+                if (!(x >= 0 && x < gridSize && y >= 0 && y < gridSize)) {
+                    return false;
+                }
+                const occupantUnitId = this.boardCoord[x]?.[y];
+                if (
+                    occupantUnitId &&
+                    occupantUnitId !== ownUnitId &&
+                    (occupantUnitId !== "L" || !canOccupyLava) &&
+                    (occupantUnitId !== "W" || !canOccupyWater)
+                ) {
+                    return false;
+                }
+            }
+        }
         return true;
     }
     public areAllCellsEmpty(cells: XY[], unitId?: string) {

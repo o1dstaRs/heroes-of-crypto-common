@@ -892,18 +892,17 @@ function footprintOf(unit: IUnitAIRepr): { height: number; width: number } {
  * the execution-time landing rule separately without restricting transit.
  */
 export function canUnitLandAt(unit: IUnitAIRepr, grid: Grid, baseCell: HoCMath.XY): boolean {
-    // Ask for the unit's OWN cells. The hand-written 2x2 block this replaces demanded four free cells of
-    // every unit that was not small, so a 1x2 was judged unable to stand anywhere it could actually stand —
-    // and it probed the (x - 1) column the body never occupies. getFootprintCellsForAnchor emits the same
-    // four cells in the same order for a 2x2 and the single cell for a 1x1.
+    // Ask for the unit's OWN footprint. The hand-written 2x2 block this replaces demanded four free cells of
+    // every unit that was not small, so a 1x2 was judged unable to stand anywhere it could actually stand.
+    // Grid performs the same dx-then-dy probes as getFootprintCellsForAnchor without allocating XY objects.
     const { width, height } = footprintOf(unit);
-    const cells = GridMath.getFootprintCellsForAnchor(baseCell, width, height);
-    if (cells.some((cell) => !GridMath.isCellWithinGrid(grid.getSettings(), cell))) {
-        return false;
-    }
-    return (
-        grid.areAllCellsEmpty(cells, unit.getId()) ||
-        grid.canOccupyCells(cells, unit.canTraverseLava(), unit.hasAbilityActive("Made of Water"), unit.getId())
+    return grid.canOccupyFootprintAt(
+        baseCell,
+        width,
+        height,
+        unit.canTraverseLava(),
+        unit.hasAbilityActive("Made of Water"),
+        unit.getId(),
     );
 }
 

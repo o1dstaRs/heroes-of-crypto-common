@@ -194,6 +194,51 @@ describe("footprint occupancy — aggro parity for the shipped shapes", () => {
 });
 
 describe("footprint occupancy — rectangular bodies", () => {
+    it("the scalar footprint probe is exactly equivalent to the array occupancy oracle", () => {
+        const grid = newGrid();
+        expect(
+            grid.occupyCells(
+                [
+                    { x: 7, y: 7 },
+                    { x: 8, y: 7 },
+                ],
+                "unit",
+                TEAM,
+                ATTACK_RANGE,
+                false,
+                false,
+            ),
+        ).toBe(true);
+        grid.occupyByHole({ x: 9, y: 9 });
+        expect(grid.occupyCell({ x: 10, y: 10 }, "L", TEAM, 0, false, false)).toBe(true);
+        expect(grid.occupyCell({ x: 11, y: 11 }, "W", TEAM, 0, false, false)).toBe(true);
+
+        for (const [width, height] of [
+            [1, 1],
+            [2, 2],
+            [1, 2],
+            [2, 1],
+            [3, 2],
+        ]) {
+            for (let x = -1; x <= GRID_SIZE; x++) {
+                for (let y = -1; y <= GRID_SIZE; y++) {
+                    const anchor = { x, y };
+                    const cells = getFootprintCellsForAnchor(anchor, width, height);
+                    for (const [canOccupyLava, canOccupyWater, ownUnitId] of [
+                        [false, false, undefined],
+                        [true, false, undefined],
+                        [false, true, undefined],
+                        [true, true, "unit"],
+                    ] as const) {
+                        expect(
+                            grid.canOccupyFootprintAt(anchor, width, height, canOccupyLava, canOccupyWater, ownUnitId),
+                        ).toBe(grid.canOccupyCells(cells, canOccupyLava, canOccupyWater, ownUnitId));
+                    }
+                }
+            }
+        }
+    });
+
     it("a 1x2 occupies both its cells, slides over its own footprint and vacates cleanly", () => {
         const grid = newGrid();
         const cells = getFootprintCellsForAnchor({ x: 5, y: 6 }, 1, 2);
