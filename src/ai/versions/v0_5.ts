@@ -1288,6 +1288,10 @@ export class StrategyV0_5 extends StrategyV0_4 {
             .filter((a) => !a.isDead() && a.getId() !== unit.getId());
         const allyFootprints = myAllies.map((ally) => ally.getCells());
         const fp = context.fightProperties;
+        const fireWalls = decisionFireWalls(context);
+        // With no Fire Wall, moving cannot remove a living actor. Avoid constructing and cloning a temporary
+        // move action for every reachable route merely to ask the projection for that invariant answer.
+        const actorCannotDieWhileMoving = !fireWalls.size() && unit.getAmountAlive() > 0;
         const v4target = strike.targetId;
         const v4from = strike.attackFrom ?? base;
         const cowardlyVs = (e: Unit): boolean =>
@@ -1360,19 +1364,18 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 if (!route?.route.length || !footprintOk(route.cell)) {
                     continue;
                 }
-                const move: Extract<GameAction, { type: "move_unit" }> = {
-                    type: "move_unit",
-                    unitId: unit.getId(),
-                    path: route.route.map((cell) => ({ ...cell })),
-                    targetCells: footprintAt(route.cell),
-                    hasLavaCell: route.hasLavaCell,
-                    hasWaterCell: route.hasWaterCell,
-                };
-                if (
-                    (route.cell.x !== base.x || route.cell.y !== base.y) &&
-                    !projectPostMoveActorAvailability(unit, decisionFireWalls(context), move).availableAfterMove
-                ) {
-                    continue;
+                if ((route.cell.x !== base.x || route.cell.y !== base.y) && !actorCannotDieWhileMoving) {
+                    const move: Extract<GameAction, { type: "move_unit" }> = {
+                        type: "move_unit",
+                        unitId: unit.getId(),
+                        path: route.route.map((cell) => ({ ...cell })),
+                        targetCells: footprintAt(route.cell),
+                        hasLavaCell: route.hasLavaCell,
+                        hasWaterCell: route.hasWaterCell,
+                    };
+                    if (!projectPostMoveActorAvailability(unit, fireWalls, move).availableAfterMove) {
+                        continue;
+                    }
                 }
                 for (const e of enemies) {
                     if (adjacentFrom(route.cell, e)) {

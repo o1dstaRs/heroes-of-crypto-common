@@ -491,7 +491,9 @@ describe("v0.9 training protocol", () => {
         );
         initializeV09Campaign(directory, manifest, ledger);
         const priorHorizon = process.env.SEARCH_HORIZON;
+        const priorGridMatrixCache = process.env.SIM_GRID_MATRIX_CACHE;
         process.env.SEARCH_HORIZON = "777";
+        process.env.SIM_GRID_MATRIX_CACHE = "sentinel";
         try {
             const args = {
                 campaignDirectory: directory,
@@ -508,6 +510,7 @@ describe("v0.9 training protocol", () => {
             const second = runV09TeacherActor(args);
             expect(second).toEqual({ completed: 0, resumed: 1, decisions: first.decisions });
             expect(process.env.SEARCH_HORIZON).toBe("777");
+            expect(process.env.SIM_GRID_MATRIX_CACHE).toBe("sentinel");
             const shardDirectory = join(directory, "il-smoke", "wide_teacher_train", "v0.8-a13");
             const files = readdirSync(shardDirectory).filter((name) => name.endsWith(".jsonl"));
             expect(files).toHaveLength(1);
@@ -516,6 +519,8 @@ describe("v0.9 training protocol", () => {
         } finally {
             if (priorHorizon === undefined) delete process.env.SEARCH_HORIZON;
             else process.env.SEARCH_HORIZON = priorHorizon;
+            if (priorGridMatrixCache === undefined) delete process.env.SIM_GRID_MATRIX_CACHE;
+            else process.env.SIM_GRID_MATRIX_CACHE = priorGridMatrixCache;
         }
     });
 

@@ -180,6 +180,7 @@ function configureTeacherSearch(phase: V09CorpusPhase, smoke: boolean): () => vo
         "V08_AGGRESSIVE",
         "V07_VALUE_WEIGHTS_V2",
         "SIM_NO_ACTIONS",
+        "SIM_GRID_MATRIX_CACHE",
         "SEARCH_SHORTLIST",
         "SEARCH_DECISION_DEADLINE_MS",
         "SEARCH_CIRCUIT_BREAKER_MS",
@@ -210,6 +211,7 @@ function configureTeacherSearch(phase: V09CorpusPhase, smoke: boolean): () => vo
     process.env.V08_AGGRESSIVE = "1";
     process.env.V07_VALUE_WEIGHTS_V2 = JSON.stringify(V08_A13_VALUE_LEAF);
     process.env.SIM_NO_ACTIONS = "1";
+    process.env.SIM_GRID_MATRIX_CACHE = "1";
     delete process.env.SEARCH_SHORTLIST;
     delete process.env.SEARCH_DECISION_DEADLINE_MS;
     delete process.env.SEARCH_CIRCUIT_BREAKER_MS;
