@@ -657,6 +657,18 @@ export class Grid {
         }
         return subArray[cell.y];
     }
+    /** Actual board cells carrying this id, including ghosts left by an interrupted move registration. */
+    public getOccupiedCells(unitId: string): XY[] {
+        const cells: XY[] = [];
+        for (let x = 0; x < this.gridSettings.getGridSize(); x += 1) {
+            for (let y = 0; y < this.gridSettings.getGridSize(); y += 1) {
+                if (this.boardCoord[x][y] === unitId) {
+                    cells.push({ x, y });
+                }
+            }
+        }
+        return cells;
+    }
     public print(unitId: string, printAggrGrids = true) {
         let msg = "";
         for (let column = this.gridSettings.getGridSize() - 1; column >= 0; column--) {
