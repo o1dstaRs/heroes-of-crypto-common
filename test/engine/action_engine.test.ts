@@ -1746,10 +1746,7 @@ describe("GameActionEngine", () => {
         expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
     });
 
-    it("projects an area throw onto the first enemy standing on the trajectory", () => {
-        // Attacker at {3,3}; an enemy sits at {5,3} directly between it and the empty aimed cell
-        // {7,3}. The throw must be intercepted by (project onto) that enemy instead of passing
-        // through to the empty cell behind it.
+    it("keeps an area throw centered behind a unit on the trajectory", () => {
         const setup = setupActionFight({
             leftAttackType: PBTypes.AttackVals.RANGE,
             leftAttack: 20,
@@ -1775,12 +1772,12 @@ describe("GameActionEngine", () => {
                 type: "area_attacked",
                 attackType: "area_throw",
                 attackerId: setup.left.getId(),
-                // Projected from the aimed {7,3} onto the intercepting enemy at {5,3}.
-                targetCell: { x: 5, y: 3 },
-                affectedUnitIds: [setup.right.getId()],
+                // The selected cell remains the center even with a unit in front.
+                targetCell: { x: 7, y: 3 },
+                affectedUnitIds: [],
             }),
         );
-        expect(setup.right.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.right.getCumulativeHp()).toBe(hpBefore);
     });
 
     it("rejects area throws without range selection or available shots", () => {
@@ -1822,7 +1819,7 @@ describe("GameActionEngine", () => {
         expect(noShots.fightProperties.hasAlreadyMadeTurn(noShots.left.getId())).toBe(false);
     });
 
-    it("rejects area throws aimed at occupied unit cells", () => {
+    it("lands area throws aimed at occupied unit cells", () => {
         const setup = setupActionFight({
             leftAttackType: PBTypes.AttackVals.RANGE,
             leftAbilities: ["Area Throw"],
@@ -1839,12 +1836,78 @@ describe("GameActionEngine", () => {
             targetCell: setup.right.getBaseCell(),
         });
 
-        expect(result.completed).toBe(false);
-        expect(result.rejectionReason).toBe("attack_not_available");
-        expect(setup.left.getRangeShots()).toBe(shotsBefore);
-        expect(setup.right.getCumulativeHp()).toBe(setup.right.getCumulativeMaxHp());
-        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
+        expect(result.completed).toBe(true);
+        expect(setup.left.getRangeShots()).toBeLessThan(shotsBefore);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(setup.right.getCumulativeMaxHp());
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
+
+    for (const hit of [true, false]) {
+        it(`fires a free Through Shot ${hit ? "through a stack" : "into empty ground"}`, () => {
+            const setup = setupActionFight({
+                leftAttackType: PBTypes.AttackVals.RANGE,
+                leftAbilities: ["Through Shot"],
+                leftRangeShots: 3,
+                leftAttack: 20,
+                leftDamageMin: 10,
+                leftDamageMax: 10,
+                rightCell: { x: 9, y: 3 },
+                supportCell: { x: 2, y: 8 },
+                rightMaxHp: 500,
+                rightAmountAlive: 10,
+            });
+            setup.left.refreshPossibleAttackTypes(true);
+            const gs = setup.grid.getSettings();
+            const endpoint = getPositionForCell(
+                { x: 14, y: hit ? 3 : 12 },
+                gs.getMinX(),
+                gs.getStep(),
+                gs.getHalfStep(),
+            );
+            const before = setup.right.getCumulativeHp();
+            const shots = setup.left.getRangeShots();
+            const result = setup.engine.apply({
+                type: "range_attack",
+                attackerId: setup.left.getId(),
+                targetId: "",
+                targetPosition: endpoint,
+            });
+            expect(result.completed).toBe(true);
+            expect(setup.left.getRangeShots()).toBeLessThan(shots);
+            expect(result.events.some((event) => event.type === "unit_attacked")).toBe(true);
+            if (hit) expect(setup.right.getCumulativeHp()).toBeLessThan(before);
+            else expect(setup.right.getCumulativeHp()).toBe(before);
+        });
+    }
+    for (const invalid of ["ordinary", "out-of-bounds", "nan", "origin"] as const) {
+        it(`rejects invalid free ranged intent: ${invalid}`, () => {
+            const setup = setupActionFight({
+                leftAttackType: PBTypes.AttackVals.RANGE,
+                leftAbilities: invalid === "ordinary" ? [] : ["Through Shot"],
+                leftRangeShots: 3,
+                supportCell: { x: 2, y: 8 },
+            });
+            setup.left.refreshPossibleAttackTypes(true);
+            const endpoint =
+                invalid === "origin"
+                    ? setup.left.getPosition()
+                    : invalid === "nan"
+                      ? { x: NaN, y: 100 }
+                      : invalid === "out-of-bounds"
+                        ? { x: 1e9, y: 1e9 }
+                        : setup.right.getPosition();
+            const shots = setup.left.getRangeShots();
+            const result = setup.engine.apply({
+                type: "range_attack",
+                attackerId: setup.left.getId(),
+                targetId: "",
+                targetPosition: endpoint,
+            });
+            expect(result.completed).toBe(false);
+            expect(setup.left.getRangeShots()).toBe(shots);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
+        });
+    }
 
     it("casts a single-target spell and completes the active unit turn", () => {
         const setup = setupActionFight({ leftSpells: ["Death:Weakness"] });

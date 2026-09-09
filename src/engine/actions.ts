@@ -45,6 +45,9 @@ export type GameAction =
           // position. It may be omitted to ask the engine for its deterministic default edge.
           aimCell?: XY;
           aimSide?: number;
+          // Through Shot may be aimed freely at any in-bounds world point. The engine accepts this only
+          // from a unit that currently owns Through Shot; ordinary ranged attacks still require targetId.
+          targetPosition?: XY;
       }
     | {
           type: "obstacle_attack";

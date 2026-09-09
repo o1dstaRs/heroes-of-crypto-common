@@ -31,6 +31,7 @@ import {
     getPositionForCells,
     isCellWithinGrid,
     isFootprintWithinGrid,
+    isPositionWithinGrid,
     resolveRangeAttackAimEdge,
 } from "../grid/grid_math";
 import type { IWeightedRoute } from "../grid/path_definitions";
@@ -714,7 +715,18 @@ export class GameActionEngine {
             return this.reject(attacker.message as GameActionRejectionReason);
         }
         const target = this.context.unitsHolder.getAllUnits().get(action.targetId);
-        if (!target) {
+        const freeAim = action.targetPosition;
+        if (
+            freeAim !== undefined &&
+            (!attacker.hasAbilityActive("Through Shot") ||
+                !Number.isFinite(freeAim.x) ||
+                !Number.isFinite(freeAim.y) ||
+                !isPositionWithinGrid(this.context.grid.getSettings(), freeAim) ||
+                (freeAim.x === attacker.getPosition().x && freeAim.y === attacker.getPosition().y))
+        ) {
+            return this.reject("attack_not_available");
+        }
+        if (!target && !freeAim) {
             return this.reject("unit_not_found");
         }
         if (!this.context.attackHandler) {
@@ -734,7 +746,9 @@ export class GameActionEngine {
         // a legal edge, so the server geometry can never be compromised. No visible edge at all means
         // the target is fully screened by its own side and there is nothing legal to aim at — reject
         // rather than aim at its center.
-        const toPosition = this.resolveRangeTargetPosition(attacker, target, action.aimCell, action.aimSide);
+        const toPosition =
+            freeAim ??
+            (target ? this.resolveRangeTargetPosition(attacker, target, action.aimCell, action.aimSide) : undefined);
         if (!toPosition) {
             return this.reject("attack_not_available");
         }
@@ -748,6 +762,43 @@ export class GameActionEngine {
             false,
             attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
         );
+        if (freeAim && evalResult.affectedUnits.length === 0) {
+            if (
+                !this.context.attackHandler.canLandRangeAttack(
+                    attacker,
+                    this.context.grid.getEnemyAggrMatrixByUnitId(attacker.getId()),
+                )
+            ) {
+                return this.reject("attack_not_available");
+            }
+            const forcedTarget = this.context.unitsHolder.getAllUnits().get(attacker.getTarget());
+            if (forcedTarget && !forcedTarget.isDead()) {
+                return this.reject("attack_not_available");
+            }
+            if (evalResult.attackObstacle) {
+                return this.obstacleAttack({
+                    type: "obstacle_attack",
+                    attackerId: attacker.getId(),
+                    targetPosition: evalResult.attackObstacle.position,
+                });
+            }
+            attacker.decreaseNumberOfShots();
+            const events: GameEvent[] = this.headlessEvents
+                ? []
+                : [
+                      {
+                          type: "unit_attacked",
+                          attackType: "range",
+                          attackerId: attacker.getId(),
+                          targetId: "",
+                          unitIdsDied: [],
+                          damage: this.cloneVisibleDamage(this.createVisibleDamage()),
+                          animations: [],
+                      },
+                  ];
+            events.push(...this.turnEngine.completeTurn(attacker));
+            return { completed: true, events };
+        }
         const destroyedScatteredCells: XY[] = [];
         const doubleShot = AbilityHelper.getDoubleShotAbility(attacker);
         // "Ranged attacks ignore structures" (Large Caliber, Area Throw) outranks the Double Shot stone rule.
@@ -869,7 +920,7 @@ export class GameActionEngine {
                 type: "unit_attacked",
                 attackType: "range",
                 attackerId: attacker.getId(),
-                targetId: target.getId(),
+                targetId: target?.getId() ?? primaryRangeTarget?.getId() ?? "",
                 unitIdsDied,
                 damage: this.cloneVisibleDamage(damage),
                 animations: this.serializeAnimations(result.animationData ?? []),
@@ -1074,25 +1125,7 @@ export class GameActionEngine {
         ) {
             return this.reject("attack_not_available");
         }
-        const occupantId = this.context.grid.getOccupantUnitId(action.targetCell);
-        if (
-            occupantId &&
-            occupantId !== "L" &&
-            occupantId !== "W" &&
-            !(occupantId === "B" && this.context.grid.hasScatteredMountains())
-        ) {
-            return this.reject("attack_not_available");
-        }
-
-        // Project the throw onto the first enemy standing on the trajectory between the attacker and
-        // the aimed (empty) cell. A unit on the line intercepts the throw instead of it passing
-        // through to the cell behind — matching legacy test_heroes.ts. With a clear path the aimed
-        // cell is used unchanged.
-        const targetCell = this.context.attackHandler.projectAreaThrowTargetCell(
-            this.context.unitsHolder.getAllUnits(),
-            attacker,
-            action.targetCell,
-        );
+        const targetCell = { ...action.targetCell };
         const targetPosition = getPositionForCell(
             targetCell,
             this.context.grid.getSettings().getMinX(),
