@@ -25,6 +25,7 @@ import {
     getPositionForCells,
     getRangeAttackSideCenter,
     isCellWithinGrid,
+    isPositionWithinGrid,
     isRangeAttackSideObservable,
     RANGE_ATTACK_CELL_SIDES,
     type RangeAttackCellSide,
@@ -78,6 +79,14 @@ const haveAdjacentCells = (left: readonly XY[], right: readonly XY[]): boolean =
     return false;
 };
 const isHidden = (u: Unit): boolean => u.hasBuffActive("Hidden") || u.hasAbilityActive("Hidden");
+/** (divisor, stack ids) per pierced group in ray order: the identity of a shot line however it was aimed. */
+const lineSignatureOf = (evaluation: { affectedUnits: Array<Unit[]>; rangeAttackDivisors: number[] }): string =>
+    evaluation.affectedUnits
+        .map(
+            (group, index) =>
+                `${evaluation.rangeAttackDivisors[index] ?? 1}:${group.map((unit) => unit.getId()).join(",")}`,
+        )
+        .join(";");
 
 /**
  * F4 — THE shared enumerated candidate generator (v0.7 roadmap).
@@ -748,6 +757,12 @@ export interface IEnumerateOptions {
      * Default false; actions, ordering, deduplication, and challenger caps are unchanged.
      */
     enrichIncumbentMetadata?: boolean;
+    /**
+     * Through Shot free aim: also enumerate `range_attack` candidates aimed at a free world point (targetId
+     * "" + targetPosition), one per line whose pierced set no visible-edge aim already reaches. Opt-in so the
+     * catalog every historical consumer sees stays byte-identical; v0.8's line policy and the v0.8 search opt in.
+     */
+    throughShotFreeAim?: boolean;
 }
 
 interface IAttackCapView<T> {
@@ -998,6 +1013,10 @@ class CandidateGenerator {
                     break;
                 case "range_attack":
                     part = `rg:${action.targetId}@${cell(action.aimCell)}/${action.aimSide ?? "-"}`;
+                    // A free Through Shot line is identified by its aim point; edge aims keep their exact key.
+                    if (action.targetPosition) {
+                        part += `~${action.targetPosition.x},${action.targetPosition.y}`;
+                    }
                     break;
                 case "area_throw_attack":
                     part = `at:${cell(action.targetCell)}`;
@@ -1960,12 +1979,17 @@ class CandidateGenerator {
             targetId: string;
             /** Unit whose visible cell edge anchors the exact trajectory sent to the action engine. */
             aimTargetId: string;
-            aimCell: XY;
-            aimSide: RangeAttackCellSide;
+            /** Visible-edge aim; absent for a free Through Shot line. */
+            aimCell?: XY;
+            aimSide?: RangeAttackCellSide;
+            /** Free world point a Through Shot line is aimed at (targetId "" on the wire). */
+            freeAimPosition?: XY;
             value: number;
             kill: 0 | 1;
             shotFeatures: IShotCandidateFeatures;
             hitUnitSignature: string;
+            /** The line's identity regardless of which edge or point produced it (see lineSignatureOf). */
+            lineSignature: string;
         }
         const found: IShot[] = [];
         const hitSetSeen = new Set<string>();
@@ -2024,15 +2048,8 @@ class CandidateGenerator {
                     }
                     // Alternative aims are only interesting when they change WHAT the shot hits: dedupe
                     // aims resolving to the identical (unit set, divisors) outcome per target.
-                    const hitSig =
-                        enemy.getId() +
-                        "#" +
-                        evaluation.affectedUnits
-                            .map(
-                                (g, i) =>
-                                    `${evaluation.rangeAttackDivisors[i] ?? 1}:${g.map((u) => u.getId()).join(",")}`,
-                            )
-                            .join(";");
+                    const line = lineSignatureOf(evaluation);
+                    const hitSig = enemy.getId() + "#" + line;
                     if (hitSetSeen.has(hitSig)) {
                         continue;
                     }
@@ -2050,7 +2067,79 @@ class CandidateGenerator {
                         hitUnitSignature: evaluation.affectedUnits
                             .map((group) => group.map((unit) => unit.getId()).join(","))
                             .join(";"),
+                        lineSignature: line,
                     });
+                }
+            }
+        }
+        // ---- Through Shot free aim -------------------------------------------------------------
+        // A Through Shot may be aimed at any world point (engine: targetId "" + targetPosition), and its ray
+        // is projected to the field edge, so only the DIRECTION matters: the shot pierces every enemy on the
+        // line and passes through allies. The edge aims above give one direction per visible side; the
+        // grazing lines that cross two bodies through their corners are not among them. Sample a 3x3
+        // sub-grid inside every enemy cell (centre, corners, edge midpoints — a 5x5 finds nothing more on 600
+        // random boards) and keep only the lines whose pierced set no edge aim already reaches, so the catalog
+        // grows by the genuinely new geometry only (+0.5 lines per board; a strictly better line on ~3% of
+        // boards). Opt-in: the catalog every historical consumer sees stays byte-identical.
+        if (isThroughShot && this.options.throughShotFreeAim) {
+            const lineSeen = new Set(found.map((shot) => shot.lineSignature));
+            const inset = gs.getHalfStep() - 1;
+            for (const enemy of this.enemies) {
+                if (isHidden(enemy) || this.unit.cannotAttackUnitId(enemy.getId())) {
+                    continue;
+                }
+                for (const cell of enemy.getCells()) {
+                    const centre = getPositionForCell(cell, gs.getMinX(), gs.getStep(), gs.getHalfStep());
+                    for (const dx of [-inset, 0, inset]) {
+                        for (const dy of [-inset, 0, inset]) {
+                            const to = { x: Math.round(centre.x + dx), y: Math.round(centre.y + dy) };
+                            if (!isPositionWithinGrid(gs, to)) {
+                                continue;
+                            }
+                            const evaluation = attackHandler.evaluateRangeAttack(
+                                allUnits,
+                                this.unit,
+                                from,
+                                to,
+                                true,
+                                false,
+                                isAOE,
+                            );
+                            const primaryHit = evaluation.affectedUnits[0]?.[0];
+                            // The same legality mirror as the edge aims: the engine judges a free line by the
+                            // first stack its ray actually crosses.
+                            if (
+                                !primaryHit ||
+                                evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length ||
+                                primaryHit.isDead() ||
+                                primaryHit.getTeam() !== this.enemyTeam ||
+                                isHidden(primaryHit) ||
+                                this.unit.cannotAttackUnitId(primaryHit.getId()) ||
+                                (forcedTargetId !== undefined && primaryHit.getId() !== forcedTargetId)
+                            ) {
+                                continue;
+                            }
+                            const line = lineSignatureOf(evaluation);
+                            if (lineSeen.has(line)) {
+                                continue;
+                            }
+                            lineSeen.add(line);
+                            const damage = this.shotDamage(evaluation, primaryHit.getId(), shots, isAOE);
+                            found.push({
+                                target: primaryHit,
+                                targetId: primaryHit.getId(),
+                                aimTargetId: primaryHit.getId(),
+                                freeAimPosition: to,
+                                value: damage.value,
+                                kill: damage.kill,
+                                shotFeatures: this.shotFeatures(primaryHit, damage),
+                                hitUnitSignature: evaluation.affectedUnits
+                                    .map((group) => group.map((unit) => unit.getId()).join(","))
+                                    .join(";"),
+                                lineSignature: line,
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -2072,13 +2161,21 @@ class CandidateGenerator {
             kind: "shot",
             actions: [
                 ...prefix,
-                {
-                    type: "range_attack",
-                    attackerId: this.unit.getId(),
-                    targetId: s.aimTargetId,
-                    aimCell: s.aimCell,
-                    aimSide: s.aimSide,
-                },
+                s.freeAimPosition
+                    ? {
+                          type: "range_attack",
+                          attackerId: this.unit.getId(),
+                          // A free line names no stack: the engine resolves its victims from the ray itself.
+                          targetId: "",
+                          targetPosition: { x: s.freeAimPosition.x, y: s.freeAimPosition.y },
+                      }
+                    : {
+                          type: "range_attack",
+                          attackerId: this.unit.getId(),
+                          targetId: s.aimTargetId,
+                          aimCell: s.aimCell,
+                          aimSide: s.aimSide,
+                      },
             ],
             targetId: s.targetId,
             shotFeatures: s.shotFeatures,
@@ -2229,6 +2326,7 @@ class CandidateGenerator {
                                     kill: 0,
                                     shotFeatures: this.shotFeatures(primaryHit, damage),
                                     hitUnitSignature,
+                                    lineSignature: lineSignatureOf(evaluation),
                                 },
                                 route,
                                 value: damage.value,
@@ -2248,6 +2346,9 @@ class CandidateGenerator {
                     (this.unit.hasStatusApplied("Cowardice") && postMoveCumulativeHp < shot.target.getCumulativeHp())
                 ) {
                     continue;
+                }
+                if (!shot.aimCell || shot.aimSide === undefined) {
+                    continue; // a free line has no edge to re-aim from a new origin
                 }
                 const to = getRangeAttackSideCenter(gs, shot.aimCell, shot.aimSide, origin);
                 const evaluation = attackHandler.evaluateRangeAttack(

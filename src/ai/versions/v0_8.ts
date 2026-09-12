@@ -42,6 +42,7 @@ import {
     prioritizeV08NightmareFireWall,
 } from "./v0_8_support_roles";
 import { prioritizeV08A13FinishDecision } from "./v0_8s_finish";
+import { throughShotLineEnabled } from "../through_shot_line";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const V08_DIRECT_COMBAT_KINDS = new Set<CandidateKind>(["melee", "shot", "area_throw"]);
@@ -207,13 +208,22 @@ export function selectV08SplashRangedCandidate(
 const isV08SplashRangedDecision = (decision: readonly GameAction[]): boolean =>
     decision.some((action) => action.type === "range_attack" || action.type === "area_throw_attack");
 
+/**
+ * Splash (Area Throw / Large Caliber) and LINE (Through Shot) ranged units take the shot with the highest
+ * priced damage across every legal aim: for the splash pair the strongest impact ring, for a Through Shot the
+ * line that pierces the most valuable set of enemies — including a FREE line aimed at a world point rather
+ * than a visible edge, the only way to reach some grazing multi-stack lines (see IEnumerateOptions.
+ * throughShotFreeAim). Strictly better only, so an already-best decision is kept exactly as decided. The
+ * Through Shot leg answers to V08_THROUGH_SHOT_LINE (throughShotLineEnabled) for kill-switch and seat A/Bs.
+ */
 export function prioritizeV08SplashRangedDecision(
     unit: Unit,
     context: IDecisionContext,
     decision: GameAction[],
 ): GameAction[] {
+    const throughShotLine = unit.hasAbilityActive("Through Shot") && throughShotLineEnabled(unit);
     if (
-        (!unit.hasAbilityActive("Area Throw") && !unit.hasAbilityActive("Large Caliber")) ||
+        (!unit.hasAbilityActive("Area Throw") && !unit.hasAbilityActive("Large Caliber") && !throughShotLine) ||
         !isV08SplashRangedDecision(decision)
     ) {
         return decision;
@@ -222,6 +232,7 @@ export function prioritizeV08SplashRangedDecision(
         maxMoveDestinations: 1,
         maxMeleePairs: 1,
         enrichIncumbentMetadata: true,
+        throughShotFreeAim: throughShotLine,
     }).candidates;
     const incumbent = candidates[0];
     if (!incumbent?.targetId || !Number.isFinite(incumbent.features.expectedDamage)) {

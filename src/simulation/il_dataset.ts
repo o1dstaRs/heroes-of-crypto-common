@@ -116,7 +116,7 @@ const IL_ACTION_FIELDS = Object.freeze({
     select_attack_type: ["type", "unitId", "attackType"],
     move_unit: ["type", "unitId", "path", "targetCells", "hasLavaCell", "hasWaterCell"],
     melee_attack: ["type", "attackerId", "targetId", "attackFrom", "path", "hasLavaCell", "hasWaterCell"],
-    range_attack: ["type", "attackerId", "targetId", "aimCell", "aimSide"],
+    range_attack: ["type", "attackerId", "targetId", "aimCell", "aimSide", "targetPosition"],
     obstacle_attack: ["type", "attackerId", "targetPosition", "attackFrom", "path", "hasLavaCell", "hasWaterCell"],
     area_throw_attack: ["type", "attackerId", "targetCell"],
     cast_spell: ["type", "casterId", "spellName", "targetId", "targetCell", "targetOrientation"],

@@ -20,6 +20,7 @@ import {
     type IDecisionContext,
     type IEnumeratedCandidate,
 } from "../ai";
+import { throughShotLineEnabled } from "../ai/through_shot_line";
 import { isMindlessAiUnit, MINDLESS_AI_VERSION } from "../ai/unit_ai_overrides";
 import {
     consumeWaitReplacement,
@@ -2315,6 +2316,9 @@ export class SearchDriver {
                 ...this.caps,
                 maxMoveShotComposites: this.moveShotCapForVersion(version),
                 includeMountainAttacks: isV08Search,
+                // v0.8 search rolls out the free Through Shot lines its native policy can take (V08_THROUGH_SHOT_LINE
+                // scopes both together, so a seat A/B compares whole seats); older versions keep their exact catalog.
+                throughShotFreeAim: isV08Search && throughShotLineEnabled(unit),
                 enrichIncumbentMetadata:
                     isV08Search || this.ilPath !== undefined || this.scoredDecisionObserver !== undefined,
                 retainMoveCandidateBeforeCap:
