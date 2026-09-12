@@ -156,6 +156,27 @@ describe("free-aim Through Shot (server/common engine)", () => {
         expect(result.completed).toBe(false);
     });
 
+    it("refuses a malformed free aim", () => {
+        const setup = setupFreeAimFight({ victimCells: [{ x: 8, y: 5 }] });
+        const hpBefore = setup.victims[0]!.getCumulativeHp();
+
+        // targetPosition arrives over the wire from a client; NaN must not slip past the bounds check and
+        // reach the ray tracer. isPositionWithinGrid is written positively so NaN fails every comparison.
+        for (const aim of [
+            { x: Number.NaN, y: Number.NaN },
+            { x: 0, y: Number.POSITIVE_INFINITY },
+        ]) {
+            const result = setup.engine.apply({
+                type: "range_attack",
+                attackerId: setup.attacker.getId(),
+                targetId: "",
+                targetPosition: aim,
+            });
+            expect(result.completed).toBe(false);
+        }
+        expect(setup.victims[0]!.getCumulativeHp()).toBe(hpBefore);
+    });
+
     it("still requires a declared target for an ordinary ranged attack", () => {
         const setup = setupFreeAimFight({ shooterAbilities: [], victimCells: [{ x: 8, y: 5 }] });
 
