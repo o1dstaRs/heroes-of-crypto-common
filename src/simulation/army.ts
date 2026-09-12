@@ -262,21 +262,32 @@ export function creaturesByLevel(level: number, faction?: string): ICatalogEntry
  * copy of this list, so the only difference between the sides is the AI driving them.
  */
 /**
- * Diagnostic-only: force specific creatures into a level's first slot via FORCE_CREATURES, e.g.
+ * Diagnostic-only: force specific creatures into a level's first slots via FORCE_CREATURES, e.g.
  * `FORCE_CREATURES="2:Pikeman,4:Black Dragon"`. Lets an A/B target a specific matchup without changing
  * the random rng sequence (the pick is still rolled, then overridden), so runs stay reproducible.
+ *
+ * Repeating a level fills successive slots of it, so a roster can be loaded with more than one named
+ * creature of the same level — `FORCE_CREATURES="4:Gargantuan,4:Tsar Cannon"` with two L4 slots fields
+ * both. Both splash shooters are level 4, and pinning only one of them could never exercise the pair
+ * together. A single entry per level behaves exactly as before.
  */
-function forcedByLevel(): Record<number, string> {
+function forcedByLevel(): Record<number, string[]> {
     const raw = process.env.FORCE_CREATURES;
     if (!raw) {
         return {};
     }
-    const out: Record<number, string> = {};
+    const out: Record<number, string[]> = {};
     for (const part of raw.split(",")) {
-        const [lvl, name] = part.split(":");
-        if (lvl && name) {
-            out[Number(lvl)] = name.trim();
+        const separator = part.indexOf(":");
+        if (separator <= 0) {
+            continue;
         }
+        const level = Number(part.slice(0, separator));
+        const name = part.slice(separator + 1).trim();
+        if (!Number.isFinite(level) || !name) {
+            continue;
+        }
+        (out[level] ??= []).push(name);
     }
     return out;
 }
@@ -353,8 +364,9 @@ export function buildRoster(
             }
             for (let i = 0; i < count; i += 1) {
                 let pick = pool[Math.floor(rng() * pool.length)];
-                if (i === 0 && forced[level]) {
-                    const forcedPick = pool.find((p) => p.creatureName === forced[level]);
+                const forcedName = forced[level]?.[i];
+                if (forcedName) {
+                    const forcedPick = pool.find((p) => p.creatureName === forcedName);
                     if (forcedPick) {
                         pick = forcedPick;
                     }

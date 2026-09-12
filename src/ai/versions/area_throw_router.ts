@@ -13,7 +13,7 @@ import type { GameAction } from "../../engine/actions";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
-import type { IDecisionContext } from "../ai_strategy";
+import type { IAIStrategy, IDecisionContext } from "../ai_strategy";
 import {
     enumerateCandidates,
     type ICandidateSet,
@@ -184,3 +184,41 @@ export function routeAreaThrow(
 
     return best.features.expectedDamage > incumbentExpectedDamage ? best.actions : incumbent;
 }
+
+/**
+ * Give EVERY registered version access to Area Throw.
+ *
+ * Gargantuan's whole identity is the splash, and most versions could never fire one: only the shared
+ * candidate generator builds an `area_throw_attack`, and v0.1-v0.5 never enumerate candidates at all.
+ * routeAreaThrow is already version-agnostic — it enumerates, takes the best splash, and swaps only when
+ * it strictly beats what the version decided — so the capability belongs here, at the one point every
+ * profile passes through, rather than copied into six strategy files.
+ *
+ * It stays behind the SAME env gate it always had, off by default. v0.1-v0.5 are frozen research
+ * baselines (v0.6's fight is byte-for-byte v0.5, CEM trains against a frozen v0.4, and seeded traces are
+ * pinned to their exact decisions) — silently changing what they do would invalidate every A/B the AI
+ * program rests on. Gate off, routeAreaThrow returns the incumbent array before enumerating, so those
+ * versions stay bit-identical; gate on (V06_AREA_THROW), they can all finally use the ability.
+ *
+ * Re-routing a version that already routes internally (v0.6) is harmless: the comparison is strict, so a
+ * decision that is already the best splash is preserved rather than swapped for itself.
+ *
+ * SCOPE: this reaches the LIVE bot only — ranked_profile.createAIStrategy, which the server's
+ * ranked_ai_profile.ts calls. The simulation resolves through ai/index.ts getAIStrategy instead, whose
+ * registry is deliberately identity- and byte-pinned (rollout drivers compare strategy identity, and a
+ * profile test pins the registry bytes), so wrapping it there breaks that research infrastructure —
+ * measured, 12 failures. The consequence is real and worth stating: this behaviour cannot currently be
+ * A/B'd by the sim harness, so flipping its gate on for live play needs evidence from somewhere else.
+ */
+export const withAreaThrow = (strategy: IAIStrategy): IAIStrategy => {
+    const decideTurn = strategy.decideTurn.bind(strategy);
+    return new Proxy(strategy, {
+        get(target, property, receiver) {
+            if (property !== "decideTurn") {
+                return Reflect.get(target, property, receiver);
+            }
+            return (unit: Unit, context: IDecisionContext): GameAction[] =>
+                routeAreaThrow(unit, context, decideTurn(unit, context), undefined, target.version);
+        },
+    });
+};
