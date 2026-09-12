@@ -1823,6 +1823,10 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     // SEARCH_AUDIT: flush the per-game search/ablation counters (no-op unless the driver is enabled).
     search.onMatchEnd(matchResult.winner, matchResult.endReason);
     v08A13TrajectorySearch?.onMatchEnd(matchResult.winner, matchResult.endReason);
+    // The env-override research arm buffers its audit / IL rows per game and appends them ONLY here.
+    // Until this call existed the arm ran every decision and then discarded every row at match end, so a
+    // SEARCH_AUDIT or SEARCH_IL_DATASET aimed at it produced nothing at all — silently.
+    searchEnvOverrideSearch?.onMatchEnd(matchResult.winner, matchResult.endReason);
     return matchResult;
 }
 

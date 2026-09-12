@@ -10,6 +10,7 @@
  */
 
 import type { IAIStrategy } from "./ai_strategy";
+import { withAreaThrow } from "./versions/area_throw_router";
 import { scoreCreature } from "./setup/creature_score";
 import {
     SETUP_POLICY_V0_RESOLVED,
@@ -133,7 +134,7 @@ const checkedFactory =
         if (strategy.version !== version) {
             throw new Error(`AI strategy factory for "${version}" created "${strategy.version}"`);
         }
-        return strategy;
+        return withAreaThrow(strategy);
     };
 
 const rankedProfile = (version: string, factory: StrategyFactory): Readonly<IRankedAIProfile> => {
