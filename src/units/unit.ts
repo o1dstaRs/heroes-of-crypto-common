@@ -3078,6 +3078,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const authoritativeBaseAttack = this.unitProperties.base_attack_authoritative
             ? this.unitProperties.base_attack
             : undefined;
+        // Probed at four sites below and pushed only at the very end, so one read serves the whole refresh.
+        const lapAlreadyAdjusted = this.adjustedBaseStatsLaps.includes(currentLap);
 
         // Stat refresh probes the same compact buff list dozens of times. Index it once for this refresh,
         // preserving getBuff's first-match behavior for defensive compatibility with malformed duplicate rows.
@@ -3280,7 +3282,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 );
             }
 
-            if (hasFightStarted && hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+            if (hasFightStarted && hasUnyieldingPower && !lapAlreadyAdjusted) {
                 this.unitProperties.hp += 5;
             }
 
@@ -3321,7 +3323,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 if (this.unitProperties.luck !== this.initialUnitProperties.luck) {
                     this.unitProperties.luck = this.initialUnitProperties.luck;
                 }
-                if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+                if (hasFightStarted && !lapAlreadyAdjusted) {
                     this.randomizeLuckPerTurn();
                 }
 
@@ -3670,7 +3672,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.steps_mod =
             roundUnitStat(stepsMoraleMultiplier * this.getMorale(), 1) + synergyMovementStepsIncrease;
         skyRunnerAbility = getStatAbility(skyRunnerAbility, "Sky Runner");
-        if (hasFightStarted && hasUnyieldingPower && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+        if (hasFightStarted && hasUnyieldingPower && !lapAlreadyAdjusted) {
             this.initialUnitProperties.steps += 1;
         }
 
@@ -3756,7 +3758,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         // ATTACK
-        if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+        if (hasFightStarted && !lapAlreadyAdjusted) {
             if (hasUnyieldingPower) {
                 this.initialUnitProperties.base_attack += 2;
             }
@@ -3951,7 +3953,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         this.unitProperties.range_armor = roundUnitStat(this.unitProperties.base_armor * rangeArmorMultiplier, 2);
 
-        if (hasFightStarted && !this.adjustedBaseStatsLaps.includes(currentLap)) {
+        if (hasFightStarted && !lapAlreadyAdjusted) {
             this.adjustedBaseStatsLaps.push(currentLap);
         }
 
@@ -4233,27 +4235,74 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return spellAdded;
     }
     protected refreshAbilitiesDescriptions(_synergyAbilityPowerIncrease: number): void {
+        // One pass over the unit's ability names decides which cards below can possibly change. Every
+        // rewriter opens with an `abilities.indexOf(name)` probe and returns on a miss, so a unit without
+        // the ability sees exactly the same result whether the rewriter runs or not — and this refresh runs
+        // for every unit after every engine action, where a dozen probing calls per unit were most of the
+        // cost. The rewriters still run in their original order.
+        let hasBlindFury = false;
+        let hasStunAura = false;
+        let hasChakram = false;
+        let hasMiner = false;
+        let hasDoubleShot = false;
+        let hasMaulAoe = false;
+        for (const abilityName of this.unitProperties.abilities) {
+            switch (abilityName) {
+                case BLIND_FURY_ABILITY_NAME:
+                    hasBlindFury = true;
+                    break;
+                case "Stun Aura":
+                    hasStunAura = true;
+                    break;
+                case CHAKRAM_ABILITY_NAME:
+                    hasChakram = true;
+                    break;
+                case "Miner":
+                    hasMiner = true;
+                    break;
+                default:
+                    if (DOUBLE_SHOT_ABILITY_NAMES.includes(abilityName)) {
+                        hasDoubleShot = true;
+                    } else if (Unit.GIANTS_MAUL_AOE_DESCRIPTION_ABILITIES.includes(abilityName)) {
+                        hasMaulAoe = true;
+                    }
+                    break;
+            }
+        }
+
         // Blind Fury's card has to be refreshed HERE, in common, and not only in the client's override:
         // its power is the share of the stack already lost, so it changes with every casualty, and in a
         // ranked fight the card text a player reads is the one the SERVER put in the snapshot
         // (RankedPlayScene reads abilities_descriptions straight off the base properties). With the refresh
         // living only in RenderableUnit, the sandbox showed the live number while every ranked player kept
         // reading the seeded "0%" for the whole fight.
-        this.refreshBlindFuryDescription();
+        if (hasBlindFury) {
+            this.refreshBlindFuryDescription();
+        }
         // The Stun Aura card is a live chance: stack-scaled power plus the owner's CURRENT luck.
-        this.refreshStunAuraDescription(_synergyAbilityPowerIncrease);
+        if (hasStunAura) {
+            this.refreshStunAuraDescription(_synergyAbilityPowerIncrease);
+        }
         // Chakram's maximum TOTAL victims follows the live stack tier, which can change after casualties.
-        this.refreshChakramDescription();
+        if (hasChakram) {
+            this.refreshChakramDescription();
+        }
         // Miner scales with stack power, luck and Might synergy. Keep the shared/server-owned description
         // aligned with the amount processMinerAbility actually transfers, including sane decimal rounding.
-        this.refreshMinerDescription(_synergyAbilityPowerIncrease);
+        if (hasMiner) {
+            this.refreshMinerDescription(_synergyAbilityPowerIncrease);
+        }
         // The second-shot cards are a live percentage too: the ability's power plus the owner's CURRENT
         // luck, and for the stack-powered members its current stack tier on top.
-        this.refreshDoubleShotDescriptions(_synergyAbilityPowerIncrease);
+        if (hasDoubleShot) {
+            this.refreshDoubleShotDescriptions(_synergyAbilityPowerIncrease);
+        }
         // The non-magical AOE damage cards: the live percentage the fight applies — the owner's luck, Might
         // synergy and stack scaling through calculateAbilityMultiplier, then ARTIFACT Giant's Maul on top
         // while its buff is up. Runs LAST, so it is the figure every surface ends up showing.
-        this.refreshGiantsMaulAoeDescriptions(_synergyAbilityPowerIncrease);
+        if (hasMaulAoe) {
+            this.refreshGiantsMaulAoeDescriptions(_synergyAbilityPowerIncrease);
+        }
     }
     /**
      * The non-magical AOE damage abilities Giant's Maul boosts (the same set that reads its buff in the

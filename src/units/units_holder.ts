@@ -1134,63 +1134,73 @@ export class UnitsHolder {
             }
         }
     }
-    public getNumberOfEnemiesWithinRange(unit: Unit, range: number): number {
-        const enemyIdsSpotted: string[] = [];
-        const enemyIds: string[] = [];
+    /**
+     * Distinct enemy stacks standing anywhere in the union of the aura balls around `cells`.
+     *
+     * The same count as walking EffectHelper.getAuraCells per body cell — the oracle this used to call on
+     * every stack-power refresh, rebuilding the ball cell by cell with linear `includes` scans. The shared
+     * key view is that oracle's exact cell list (identical per cell AND in order, checked for every cell
+     * and range on the 16x16 board), and a count of distinct ids does not care which order the cells are
+     * visited in. Any cell the view cannot pack (off-board, non-integer, a custom board) keeps the oracle.
+     */
+    private countEnemiesWithinRange(unit: Unit, cells: readonly XY[], range: number): number {
+        const enemyIds = new Set<string>();
         for (const e of this.getAllEnemyUnits(unit.getTeam())) {
-            enemyIds.push(e.getId());
+            enemyIds.add(e.getId());
         }
 
-        for (const c of unit.getCells()) {
-            const auraCells = EffectHelper.getAuraCells(this.gridSettings, c, range);
-            for (const ac of auraCells) {
-                const occupantId = this.grid.getOccupantUnitId(ac);
-                if (!occupantId) {
-                    continue;
+        const spotted = new Set<string>();
+        const packable = this.gridSettings.getGridSize() === 16 && Number.isSafeInteger(range) && range >= 0;
+        const probe: XY = { x: 0, y: 0 };
+        for (const c of cells) {
+            if (
+                packable &&
+                Number.isSafeInteger(c.x) &&
+                Number.isSafeInteger(c.y) &&
+                c.x >= 0 &&
+                c.y >= 0 &&
+                c.x < 16 &&
+                c.y < 16
+            ) {
+                const keys = EffectHelper.getAuraCellKeyBuffer(this.gridSettings, c, range);
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
+                    probe.x = key >>> 4;
+                    probe.y = key & 0xf;
+                    const occupantId = this.grid.getOccupantUnitId(probe);
+                    if (occupantId && enemyIds.has(occupantId)) {
+                        spotted.add(occupantId);
+                    }
                 }
+                continue;
+            }
 
-                if (enemyIds.includes(occupantId) && !enemyIdsSpotted.includes(occupantId)) {
-                    enemyIdsSpotted.push(occupantId);
+            for (const ac of EffectHelper.getAuraCells(this.gridSettings, c, range)) {
+                const occupantId = this.grid.getOccupantUnitId(ac);
+                if (occupantId && enemyIds.has(occupantId)) {
+                    spotted.add(occupantId);
                 }
             }
         }
 
-        return enemyIdsSpotted.length;
+        return spotted.size;
+    }
+    public getNumberOfEnemiesWithinRange(unit: Unit, range: number): number {
+        return this.countEnemiesWithinRange(unit, unit.getCells(), range);
     }
     public getUnitAuraAttackMod(unit: Unit, cells?: XY[]): number {
         let auraAttackMod = 0;
         const warAngerAuraEffect = unit.getAuraEffect("War Anger");
         if (warAngerAuraEffect) {
-            const enemyIdsSpotted: string[] = [];
-            const enemyIds: string[] = [];
-            for (const e of this.getAllEnemyUnits(unit.getTeam())) {
-                enemyIds.push(e.getId());
-            }
-
             const unitCells = cells?.length ? cells : unit.getCells();
+            const enemiesSpotted = this.countEnemiesWithinRange(
+                unit,
+                unitCells,
+                warAngerAuraEffect.getRange() +
+                    FightStateManager.getInstance().getFightProperties().getAdditionalAuraRangePerTeam(unit.getTeam()),
+            );
 
-            for (const c of unitCells) {
-                const auraCells = EffectHelper.getAuraCells(
-                    this.gridSettings,
-                    c,
-                    warAngerAuraEffect.getRange() +
-                        FightStateManager.getInstance()
-                            .getFightProperties()
-                            .getAdditionalAuraRangePerTeam(unit.getTeam()),
-                );
-                for (const ac of auraCells) {
-                    const occupantId = this.grid.getOccupantUnitId(ac);
-                    if (!occupantId) {
-                        continue;
-                    }
-
-                    if (enemyIds.includes(occupantId) && !enemyIdsSpotted.includes(occupantId)) {
-                        enemyIdsSpotted.push(occupantId);
-                    }
-                }
-            }
-
-            return unit.getBaseAttack() * ((warAngerAuraEffect.getPower() * enemyIdsSpotted.length) / 100);
+            return unit.getBaseAttack() * ((warAngerAuraEffect.getPower() * enemiesSpotted) / 100);
         }
 
         return auraAttackMod;
@@ -1431,13 +1441,19 @@ export class UnitsHolder {
             [PBTypes.TeamVals.RIGHT, rightAuraEffects],
             [PBTypes.TeamVals.LEFT, leftAuraEffects],
         ]);
-        const rightAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
-        const leftAuraEffectIndexes: Array<Map<string, number> | undefined> = [];
-
-        // Fill each cell with its strongest aura of each name as sources are visited. The companion indexes
-        // retain first-seen order while allowing a stronger later source to replace the value in-place. This
-        // produces the same final arrays as the old append-everything-then-squash pass without allocating and
-        // walking the duplicate AppliedAuraEffectProperties entries created by overlapping source footprints.
+        // Fill each cell with its strongest aura of each name as sources are visited. A cell's list keeps
+        // first-seen name order while a stronger later source replaces its entry in place, which produces
+        // the same final arrays as the old append-everything-then-squash pass without allocating and walking
+        // the duplicate AppliedAuraEffectProperties entries created by overlapping source footprints.
+        //
+        // A cell's list holds one entry per aura NAME, and a board carries only a handful of aura names, so
+        // the name lookup is a short linear scan of that list rather than a per-cell Map: allocating one Map
+        // per covered cell per refresh was the single hottest line of the A19 rollout search, and this
+        // refresh runs after every engine action. The stamp skips the cells a multi-cell body's per-cell
+        // balls cover more than once — a source revisiting its own cell can never win the strictly-greater
+        // power test below, so skipping it changes nothing; keys outside the 16x16 pack are never stamped.
+        const coverageStamp = new Uint32Array(256);
+        let coverageGeneration = 0;
         for (const u of this.getAllUnitsIterator()) {
             // The WHOLE body must be on the board, not just the anchor: a 2x1 dragged half off the
             // edge still radiated an aura from ground nobody can stand on, and its negative-x cell
@@ -1488,35 +1504,38 @@ export class UnitsHolder {
                         : recipientTeam === PBTypes.TeamVals.LEFT
                           ? leftAuraEffects
                           : undefined;
-                const teamAuraEffectIndexes =
-                    recipientTeam === PBTypes.TeamVals.RIGHT
-                        ? rightAuraEffectIndexes
-                        : recipientTeam === PBTypes.TeamVals.LEFT
-                          ? leftAuraEffectIndexes
-                          : undefined;
 
-                if (!teamAuraEffects || !teamAuraEffectIndexes) {
+                if (!teamAuraEffects) {
                     continue;
                 }
 
+                coverageGeneration += 1;
+                const auraName = unitAuraEffectProperties.name;
                 for (const c of unitCells) {
-                    const affectedCellKeys = EffectHelper.getAuraCellKeysView(this.gridSettings, c, auraRange);
-                    for (const ack of affectedCellKeys) {
+                    const affectedCellKeys = EffectHelper.getAuraCellKeyBuffer(this.gridSettings, c, auraRange);
+                    for (let k = 0; k < affectedCellKeys.length; k++) {
+                        const ack = affectedCellKeys[k];
+                        if (ack >= 0 && ack < 256) {
+                            if (coverageStamp[ack] === coverageGeneration) {
+                                continue;
+                            }
+                            coverageStamp[ack] = coverageGeneration;
+                        }
+
                         let teamAuraEffectsPerCell = teamAuraEffects.get(ack);
                         if (!teamAuraEffectsPerCell) {
                             teamAuraEffectsPerCell = [];
                             teamAuraEffects.set(ack, teamAuraEffectsPerCell);
                         }
 
-                        let auraEffectIndexes = teamAuraEffectIndexes[ack];
-                        if (!auraEffectIndexes) {
-                            auraEffectIndexes = new Map();
-                            teamAuraEffectIndexes[ack] = auraEffectIndexes;
+                        let existingIndex = -1;
+                        for (let i = 0; i < teamAuraEffectsPerCell.length; i++) {
+                            if (teamAuraEffectsPerCell[i].getAuraEffectProperties().name === auraName) {
+                                existingIndex = i;
+                                break;
+                            }
                         }
-
-                        const existingIndex = auraEffectIndexes.get(unitAuraEffectProperties.name);
-                        if (existingIndex === undefined) {
-                            auraEffectIndexes.set(unitAuraEffectProperties.name, teamAuraEffectsPerCell.length);
+                        if (existingIndex < 0) {
                             teamAuraEffectsPerCell.push(
                                 new AppliedAuraEffectProperties(unitAuraEffectProperties, baseCell),
                             );
