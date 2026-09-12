@@ -31,6 +31,7 @@ import {
     getPositionForCells,
     isCellWithinGrid,
     isFootprintWithinGrid,
+    isPositionWithinGrid,
     resolveRangeAttackAimEdge,
 } from "../grid/grid_math";
 import type { IWeightedRoute } from "../grid/path_definitions";
@@ -713,8 +714,20 @@ export class GameActionEngine {
         if (attacker instanceof Error) {
             return this.reject(attacker.message as GameActionRejectionReason);
         }
-        const target = this.context.unitsHolder.getAllUnits().get(action.targetId);
-        if (!target) {
+        // Through Shot may be aimed at a free world point instead of a declared stack: the shot pierces,
+        // so its victims are whatever the ray actually crosses rather than one nominated target. Every
+        // other ranged attack still has to name one — honouring a bare position from them would let a
+        // client fabricate a trajectory no legal aim could ever produce.
+        const freeAimPosition = action.targetPosition;
+        const isFreeAim = freeAimPosition !== undefined && !action.targetId;
+        if (isFreeAim && !attacker.hasAbilityActive("Through Shot")) {
+            return this.reject("attack_not_available");
+        }
+        if (isFreeAim && !isPositionWithinGrid(this.context.grid.getSettings(), freeAimPosition)) {
+            return this.reject("attack_not_available");
+        }
+        const target = isFreeAim ? undefined : this.context.unitsHolder.getAllUnits().get(action.targetId);
+        if (!isFreeAim && !target) {
             return this.reject("unit_not_found");
         }
         if (!this.context.attackHandler) {
@@ -734,7 +747,11 @@ export class GameActionEngine {
         // a legal edge, so the server geometry can never be compromised. No visible edge at all means
         // the target is fully screened by its own side and there is nothing legal to aim at — reject
         // rather than aim at its center.
-        const toPosition = this.resolveRangeTargetPosition(attacker, target, action.aimCell, action.aimSide);
+        // A free shot already carries its own endpoint; only a declared target needs its visible
+        // edge reconstructed.
+        const toPosition = target
+            ? this.resolveRangeTargetPosition(attacker, target, action.aimCell, action.aimSide)
+            : freeAimPosition;
         if (!toPosition) {
             return this.reject("attack_not_available");
         }
@@ -869,7 +886,8 @@ export class GameActionEngine {
                 type: "unit_attacked",
                 attackType: "range",
                 attackerId: attacker.getId(),
-                targetId: target.getId(),
+                // A free shot names no target, so the event reports whoever the ray actually hit first.
+                targetId: target?.getId() ?? primaryRangeTarget?.getId() ?? "",
                 unitIdsDied,
                 damage: this.cloneVisibleDamage(damage),
                 animations: this.serializeAnimations(result.animationData ?? []),
