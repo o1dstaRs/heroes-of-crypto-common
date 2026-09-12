@@ -9,7 +9,10 @@
  * -----------------------------------------------------------------------------
  */
 
-import type { IAIStrategy } from "./ai_strategy";
+import type { GameAction } from "../engine/actions";
+import type { Unit } from "../units/unit";
+import type { IAIStrategy, IDecisionContext } from "./ai_strategy";
+import { routeAreaThrow } from "./versions/area_throw_router";
 import { scoreCreature } from "./setup/creature_score";
 import {
     SETUP_POLICY_V0_RESOLVED,
@@ -133,8 +136,39 @@ const checkedFactory =
         if (strategy.version !== version) {
             throw new Error(`AI strategy factory for "${version}" created "${strategy.version}"`);
         }
-        return strategy;
+        return withAreaThrow(strategy);
     };
+
+/**
+ * Give EVERY registered version access to Area Throw.
+ *
+ * Gargantuan's whole identity is the splash, and most versions could never fire one: only the shared
+ * candidate generator builds an `area_throw_attack`, and v0.1-v0.5 never enumerate candidates at all.
+ * routeAreaThrow is already version-agnostic — it enumerates, takes the best splash, and swaps only when
+ * it strictly beats what the version decided — so the capability belongs here, at the one point every
+ * profile passes through, rather than copied into six strategy files.
+ *
+ * It stays behind the SAME env gate it always had, off by default. v0.1-v0.5 are frozen research
+ * baselines (v0.6's fight is byte-for-byte v0.5, CEM trains against a frozen v0.4, and seeded traces are
+ * pinned to their exact decisions) — silently changing what they do would invalidate every A/B the AI
+ * program rests on. Gate off, routeAreaThrow returns the incumbent array before enumerating, so those
+ * versions stay bit-identical; gate on (V06_AREA_THROW), they can all finally use the ability.
+ *
+ * Re-routing a version that already routes internally (v0.6) is harmless: the comparison is strict, so a
+ * decision that is already the best splash is preserved rather than swapped for itself.
+ */
+const withAreaThrow = (strategy: IAIStrategy): IAIStrategy => {
+    const decideTurn = strategy.decideTurn.bind(strategy);
+    return new Proxy(strategy, {
+        get(target, property, receiver) {
+            if (property !== "decideTurn") {
+                return Reflect.get(target, property, receiver);
+            }
+            return (unit: Unit, context: IDecisionContext): GameAction[] =>
+                routeAreaThrow(unit, context, decideTurn(unit, context), undefined, target.version);
+        },
+    });
+};
 
 const rankedProfile = (version: string, factory: StrategyFactory): Readonly<IRankedAIProfile> => {
     const createStrategy = checkedFactory(version, factory);
