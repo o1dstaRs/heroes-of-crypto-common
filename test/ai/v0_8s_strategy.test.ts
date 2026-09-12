@@ -227,7 +227,12 @@ describe("v0.8 search measurement alias", () => {
         // Two isolated runs reproduced it.
         // Re-pinned 2026-08-29 with the same Warding Mane Blessing change as the v0.7 control above.
         // Two isolated runs reproduced it.
-        expect(digest("v0.8")).toBe("df27e9e232957eadeedcc54bdec2be538fcc79dc5d124573a394c646bfc77ae5");
+        // Re-pinned 2026-09-12 for the Through Shot LINE policy: v0.8 now takes the shot that pierces the most
+        // valuable set of enemies, including a free line aimed at a world point (test/ai/through_shot_free_aim).
+        // The seeded rosters field Tsar Cannons, so the v0.8 trace diverges at its first such shot; the v0.7
+        // digest above is untouched (the frozen versions only gain the line behind V06_THROUGH_SHOT). Two
+        // isolated runs reproduced this digest byte-identically.
+        expect(digest("v0.8")).toBe("1cdb22ac528b1f021a3806645307d68ba0d04adad8371f63a95c5ef59903abc3");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {
