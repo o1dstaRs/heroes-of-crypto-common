@@ -23,6 +23,7 @@ import { decisionPathSource, type IReadonlyWeightedRoute } from "../decision_pat
 import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { otherTeam } from "./v0_1";
 import { enemyFieldsSplashAoe, layoutRevealPlacement, opponentCreatureIdsForPlacement } from "./v0_7_placement_reveal";
+import { assertNoLegacySeatEnv, seatEnvName } from "../seat_env";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
 
 export type V08BacklineProtectorKind = "abomination" | "angel" | "arachna_queen";
@@ -38,6 +39,18 @@ export interface IV08BacklineWardIntent {
     readonly protector: Unit;
     readonly protectorIntent: IV08BacklineProtectorIntent;
 }
+
+/**
+ * Research seam, off by default: `V08_ABOMINATION_RELEASE_<LEFT|RIGHT>=1` gives that seat's Abomination no
+ * protector intent, so native v0.8 and the a19 search both play it as an ordinary melee unit. It exists to measure
+ * the protector contract against releasing it on the same drafted matchups.
+ */
+export const V08_ABOMINATION_RELEASE_ENV = "V08_ABOMINATION_RELEASE";
+
+const abominationReleasedForTeam = (team: number): boolean => {
+    assertNoLegacySeatEnv(V08_ABOMINATION_RELEASE_ENV);
+    return process.env[seatEnvName(V08_ABOMINATION_RELEASE_ENV, team)] === "1";
+};
 
 export const v08BacklineProtectorKind = (unit: Unit): V08BacklineProtectorKind | undefined => {
     if (unit.getName() === "Abomination") return "abomination";
@@ -105,6 +118,7 @@ export function buildV08BacklineProtectorIntent(
 ): IV08BacklineProtectorIntent | undefined {
     const kind = v08BacklineProtectorKind(unit);
     if (!kind || (kind === "arachna_queen" && unit.isSummoned())) return undefined;
+    if (kind === "abomination" && abominationReleasedForTeam(unit.getTeam())) return undefined;
     const wards = sortedWards(unit, context);
     if (!wards.length) return undefined;
     if (kind === "angel" && (wards.length < 2 || !liveEnemyShooters(unit, context).length)) return undefined;
