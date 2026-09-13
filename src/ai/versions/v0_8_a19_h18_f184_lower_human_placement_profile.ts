@@ -605,9 +605,17 @@ export const V08_A19_H64_FINALIST_V7_ROLLOUTS = 2 as const;
 export const V08_A19_H64_FINALIST_V7_BEHAVIOR_ENVIRONMENT_SHA256 =
     "f6d75aa9a3054948f980685d0c89435558fc28442bbfdcbe684efc3f3c1ff6bd" as const;
 export const V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SOURCE = "src/simulation/search_driver.ts" as const;
-/** Source bytes of the driver that introduced the adaptive budget (the pooled-bank knob is also in these bytes). */
+/**
+ * Source bytes of the driver that introduced the adaptive budget (the pooled-bank knob is also in these bytes).
+ *
+ * Re-pinned 2026-09-13: the per-team V2 value-leaf reader now builds its env names through ai/seat_env
+ * (`V07_VALUE_WEIGHTS_V2_<LEFT|RIGHT>`, LEFT/RIGHT team system) and refuses pre-rename LOWER/UPPER names
+ * loudly. v7 behaviour is untouched: its sealed environment never sets these research variables, and the
+ * self-play decision fingerprint is unchanged (src/simulation/prof_search.ts).
+ * Previous approved digest: bc3d07db3f84d486264d6f800e1beadeb0a1b85301e1b78daa4f7f12eecb25a9
+ */
 export const V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SHA256 =
-    "bc3d07db3f84d486264d6f800e1beadeb0a1b85301e1b78daa4f7f12eecb25a9" as const;
+    "fa805d8d3d25fd7008ddefe88b0e9848a4436c7cefd820c26136a343a551d682" as const;
 
 export const V08_A19_H64_FINALIST_V7_SEARCH = Object.freeze({
     ...V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_SEARCH,

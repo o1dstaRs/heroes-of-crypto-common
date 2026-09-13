@@ -142,6 +142,7 @@ import {
     VALUE_FEATURE_NAMES,
     VALUE_FEATURE_NAMES_V2,
 } from "./value_features";
+import { assertNoLegacySeatEnv, seatEnvName } from "../ai/seat_env";
 
 export const V08_RAPID_CHARGE_RESERVATION_ENV = "SEARCH_V08_RAPID_CHARGE_RESERVATION";
 export const V08_RAPID_CHARGE_RESERVATION_VERSIONS_ENV = "SEARCH_V08_RAPID_CHARGE_RESERVATION_VERSIONS";
@@ -1897,8 +1898,10 @@ export class SearchDriver {
             const parsed = parseLearnedValueWidth(raw, VALUE_FEATURE_NAMES_V2.length);
             return parsed && (parsed.b !== 0 || parsed.w.some((weight) => weight !== 0)) ? parsed : null;
         };
-        this.learnedV2ByTeam.set(PBTypes.TeamVals.LEFT, parseTeamLeaf(process.env.V07_VALUE_WEIGHTS_V2_LOWER));
-        this.learnedV2ByTeam.set(PBTypes.TeamVals.RIGHT, parseTeamLeaf(process.env.V07_VALUE_WEIGHTS_V2_UPPER));
+        assertNoLegacySeatEnv("V07_VALUE_WEIGHTS_V2");
+        for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
+            this.learnedV2ByTeam.set(team, parseTeamLeaf(process.env[seatEnvName("V07_VALUE_WEIGHTS_V2", team)]));
+        }
         const rawOppModel = this.enabled ? process.env.SEARCH_OPP_MODEL?.trim() : undefined;
         this.oppModel = rawOppModel ? getAIStrategy(rawOppModel) : null; // throws on an unknown version
         const rawAudit = process.env.SEARCH_AUDIT;
