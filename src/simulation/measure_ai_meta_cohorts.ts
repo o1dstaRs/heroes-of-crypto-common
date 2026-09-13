@@ -714,7 +714,7 @@ interface IWorkerError {
 
 type WorkerReply = IWorkerReady | IWorkerResult | IWorkerError;
 
-export type AiMetaFightProfileId = "a13" | "a19" | "a19-h18" | "a19-h18-ranked-placement";
+export type AiMetaFightProfileId = "a13" | "a19" | "a19-work" | "a19-h18" | "a19-h18-ranked-placement";
 
 export interface IAiMetaFightProfile {
     id: AiMetaFightProfileId;
@@ -722,6 +722,8 @@ export interface IAiMetaFightProfile {
     provenance: Readonly<Record<string, unknown>>;
     workerEnvironment: Readonly<Record<string, string>>;
     strategyProfileId: AiMetaStrategyProfileId;
+    /** Finite search operation budgets decide every move instead of wall-clock deadlines (host-independent). */
+    offlineDeterministicWork?: boolean;
 }
 
 const definedEnvironment = (
@@ -774,6 +776,32 @@ const AI_META_FIGHT_PROFILES: Readonly<Record<AiMetaFightProfileId, IAiMetaFight
             V08_A19_SEARCH: "1",
         }),
         strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+    }),
+    "a19-work": Object.freeze({
+        id: "a19-work",
+        title: "Heroes of Crypto — v0.8+a19 Full-Search AI Meta Balance Cohorts",
+        provenance: Object.freeze({
+            name: "v0.8+a19-work",
+            schema: V08_A19_PROFILE.schema,
+            candidateId: V08_A19_PROFILE.candidateId,
+            researchOnly: true,
+            productionVersion: V08_A19_PROFILE.productionVersion,
+            promotedFrom: V08_A19_PROFILE.promotedFrom,
+            genomeSha256: V08_A19_PROFILE.genomeSha256,
+            behaviorEnvironmentSha256: V08_A19_PROFILE.behaviorEnvironmentSha256,
+            search: V08_A19_PROFILE.search,
+            policy: V08_A19_PROFILE.policy,
+            searchPolicy: V08_A19_PROFILE.searchPolicy,
+            placementPolicy: V08_A19_PROFILE.placementPolicy,
+            searchBudget: "offline-deterministic-work",
+            workerOverride: "V08_A19_SEARCH=1; searchOfflineDeterministicWork=true",
+        }),
+        workerEnvironment: definedEnvironment({
+            ...buildV08A19SearchEnvironment(),
+            V08_A19_SEARCH: "1",
+        }),
+        strategyProfileId: AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
+        offlineDeterministicWork: true,
     }),
     "a19-h18": Object.freeze({
         id: "a19-h18",
@@ -943,7 +971,11 @@ export async function runAiMetaWorkerPool(
                 return;
             }
             const worker = new Worker(workerUrl, {
-                workerData: { options, strategyProfileId: fightProfile.strategyProfileId },
+                workerData: {
+                    options,
+                    strategyProfileId: fightProfile.strategyProfileId,
+                    offlineDeterministicWork: fightProfile.offlineDeterministicWork === true,
+                },
                 env: workerEnvironment,
             });
             workers.add(worker);
@@ -1248,7 +1280,7 @@ async function runCohort(
 const AI_META_USAGE =
     "Usage: bun src/simulation/measure_ai_meta_cohorts.ts " +
     "[games-per-cohort=150000] [base-seed=85000717] [out-dir] [concurrency] [cohorts-csv] [parallel-cohorts] " +
-    "<fight-profile=a13|a19|a19-h18|a19-h18-ranked-placement> [pair-start=0] [pair-count=all]";
+    "<fight-profile=a13|a19|a19-work|a19-h18|a19-h18-ranked-placement> [pair-start=0] [pair-count=all]";
 
 export function validateAiMetaGamesPerCohort(games: number): void {
     const mapCycleGames = AI_META_GAMES_PER_MATCHUP * AI_META_MAPS.length;

@@ -342,6 +342,20 @@ describe("AI meta cohort generation", () => {
             V08_A19_SEARCH: "1",
         });
         expect(productionEnvironment.V08_A13_SEARCH).toBeUndefined();
+        expect(productionProfile.offlineDeterministicWork).toBeUndefined();
+
+        const workProfile = resolveAiMetaFightProfile("a19-work");
+        expect(workProfile.offlineDeterministicWork).toBe(true);
+        expect(workProfile.strategyProfileId).toBe(productionProfile.strategyProfileId);
+        expect(workProfile.workerEnvironment).toEqual(productionProfile.workerEnvironment);
+        expect(workProfile.provenance).toMatchObject({
+            name: "v0.8+a19-work",
+            candidateId: "a19",
+            researchOnly: true,
+            searchBudget: "offline-deterministic-work",
+            genomeSha256: productionProfile.provenance.genomeSha256,
+            search: productionProfile.provenance.search,
+        });
 
         expect(() => resolveAiMetaFightProfile(undefined)).toThrow("AI meta fight profile is required");
         expect(() => resolveAiMetaFightProfile("   ")).toThrow("AI meta fight profile is required");

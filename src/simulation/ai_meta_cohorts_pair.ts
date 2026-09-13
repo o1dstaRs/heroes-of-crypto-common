@@ -92,12 +92,15 @@ export function playMetaPair(
     options: IAiMetaRunOptions,
     pair: number,
     strategyProfileId: AiMetaStrategyProfileId,
+    offlineDeterministicWork = false,
 ): IAiMetaPairRecord {
     const prepared = prepareMetaPair(options, pair);
     const synergyVariants = aiMetaSynergyVariantsForPair(prepared.setupSeed, prepared.combatSeed);
+    // Finite search budgets replace the live move deadline, so outcomes stop depending on host speed and load.
+    const searchBudget = offlineDeterministicWork ? { searchOfflineDeterministicWork: true } : {};
     FightStateManager.getInstance();
-    const aGreen = runMatch(
-        configFor(
+    const aGreen = runMatch({
+        ...configFor(
             prepared.armyA,
             prepared.armyB,
             prepared.combatSeed,
@@ -105,9 +108,10 @@ export function playMetaPair(
             strategyProfileId,
             synergyVariants,
         ),
-    );
-    const bGreen = runMatch(
-        configFor(
+        ...searchBudget,
+    });
+    const bGreen = runMatch({
+        ...configFor(
             prepared.armyB,
             prepared.armyA,
             prepared.combatSeed,
@@ -115,7 +119,8 @@ export function playMetaPair(
             strategyProfileId,
             synergyVariants,
         ),
-    );
+        ...searchBudget,
+    });
     return {
         ...prepared,
         games: [gameOutcome(aGreen, true), gameOutcome(bGreen, false)],
