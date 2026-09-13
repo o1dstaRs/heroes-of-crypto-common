@@ -1008,6 +1008,16 @@ export class GameActionEngine {
             removedCells.push(removed);
             removedByKey.delete(key);
         }
+        // A piercing melee strike (Skewer Strike / Fire Breath) takes the barrel BEHIND the aimed one as well,
+        // and the melee path carries no per-impact animation to order by — so the aimed stone leads and the
+        // pierced one follows, which is the order the client's strike sequence lands them in.
+        const aimedCell = getCellForPosition(this.context.grid.getSettings(), action.targetPosition);
+        const aimedKey = `${aimedCell.x}:${aimedCell.y}`;
+        const aimedRemoved = removedByKey.get(aimedKey);
+        if (aimedRemoved) {
+            removedCells.push(aimedRemoved);
+            removedByKey.delete(aimedKey);
+        }
         removedCells.push(...removedByKey.values());
         const serializedAnimations = this.serializeAnimations(result.animationData ?? []);
         const events: GameEvent[] = [];

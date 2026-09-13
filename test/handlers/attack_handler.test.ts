@@ -1163,6 +1163,125 @@ describe("AttackHandler", () => {
             expect(attacker.getRangeShots()).toBe(2);
         });
 
+        // Skewer Strike (Pikeman) and Fire Breath (Black Dragon) strike the cell BEHIND a one-cell target, so
+        // the cemetery barrel standing directly behind the struck one goes down with it — straight or diagonal
+        // along the strike line. Cells sit off the classic 2x2 mountain footprint so the scattered layout is
+        // the only obstacle in play.
+        describe("piercing melee passives through scattered tombstones", () => {
+            const strikeBarrels = (opts: {
+                layout: { x: number; y: number }[];
+                target: { x: number; y: number };
+                standCell: { x: number; y: number };
+                abilities?: string[];
+                size?: PBTypes.UnitSizeVals;
+            }) => {
+                const ctx = setupMountainFight();
+                ctx.grid.setScatteredMountains(opts.layout);
+                const attacker = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: opts.abilities,
+                    size: opts.size,
+                });
+                placeUnit(ctx.grid, ctx.unitsHolder, attacker, opts.standCell);
+                // Stationary strike: attackFrom is the unit's own anchor, so no movement paths are needed.
+                const result = ctx.attackHandler.handleObstacleAttack(
+                    positionForCell(opts.target),
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    attacker,
+                    opts.standCell,
+                    undefined,
+                );
+                return { ...ctx, attacker, result };
+            };
+
+            it("Skewer Strike knocks out the barrel directly behind the struck one", () => {
+                const behind = { x: 4, y: 3 };
+                const survivor = { x: 10, y: 3 };
+                const { grid, result } = strikeBarrels({
+                    layout: [{ x: 3, y: 3 }, behind, survivor],
+                    target: { x: 3, y: 3 },
+                    standCell: { x: 2, y: 3 },
+                    abilities: ["Skewer Strike"],
+                });
+                expect(result.completed).toBe(true);
+                expect(grid.getScatteredMountainsStanding()).toEqual([survivor]);
+                expect(grid.getOccupantUnitId(behind)).toBe("");
+            });
+
+            it("a diagonal strike pierces diagonally and spares the orthogonal neighbour", () => {
+                const diagonal = { x: 4, y: 4 };
+                const orthogonal = { x: 4, y: 3 };
+                const { grid, result } = strikeBarrels({
+                    layout: [{ x: 3, y: 3 }, orthogonal, diagonal],
+                    target: { x: 3, y: 3 },
+                    standCell: { x: 2, y: 2 },
+                    abilities: ["Skewer Strike"],
+                });
+                expect(result.completed).toBe(true);
+                expect(grid.getScatteredMountainsStanding()).toEqual([orthogonal]);
+            });
+
+            it("Fire Breath from a 2x2 body aims the pierce from its cell closest to the barrel", () => {
+                const behind = { x: 4, y: 3 };
+                // Anchor (2,3) = body cells (2,3) (1,3) (2,2) (1,2); (2,3) is the one touching the barrel.
+                const { grid, result } = strikeBarrels({
+                    layout: [{ x: 3, y: 3 }, behind],
+                    target: { x: 3, y: 3 },
+                    standCell: { x: 2, y: 3 },
+                    abilities: ["Fire Breath"],
+                    size: PBTypes.UnitSizeVals.LARGE,
+                });
+                expect(result.completed).toBe(true);
+                expect(grid.getScatteredMountainsStanding()).toEqual([]);
+            });
+
+            it("does not jump a gap: an empty cell behind the barrel ends the sweep", () => {
+                const farther = { x: 5, y: 3 };
+                const { grid, result } = strikeBarrels({
+                    layout: [{ x: 3, y: 3 }, farther],
+                    target: { x: 3, y: 3 },
+                    standCell: { x: 2, y: 3 },
+                    abilities: ["Skewer Strike"],
+                });
+                expect(result.completed).toBe(true);
+                expect(grid.getScatteredMountainsStanding()).toEqual([farther]);
+            });
+
+            it("a plain melee strike still breaks only the barrel it hits", () => {
+                const behind = { x: 4, y: 3 };
+                const { grid, result } = strikeBarrels({
+                    layout: [{ x: 3, y: 3 }, behind],
+                    target: { x: 3, y: 3 },
+                    standCell: { x: 2, y: 3 },
+                });
+                expect(result.completed).toBe(true);
+                expect(grid.getScatteredMountainsStanding()).toEqual([behind]);
+            });
+
+            it("leaves the classic 2x2 mountains to their own hit counters", () => {
+                const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
+                const attacker = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Skewer Strike"],
+                });
+                placeUnit(grid, unitsHolder, attacker, { x: 4, y: 7 });
+                const result = attackHandler.handleObstacleAttack(
+                    positionForCell({ x: 5, y: 7 }),
+                    unitsHolder,
+                    moveHandler,
+                    attacker,
+                    { x: 4, y: 7 },
+                    undefined,
+                );
+                expect(result.completed).toBe(true);
+                expect(fightProperties.getObstacleHitsLeftLeft()).toBe(HITS_PER_MOUNTAIN - 1);
+                expect(fightProperties.getObstacleHitsLeftRight()).toBe(HITS_PER_MOUNTAIN);
+            });
+        });
+
         it("small melee unit strikes the left mountain from an outer (non-corridor) cell", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
             const attacker = createTestUnit({ team: PBTypes.TeamVals.RIGHT, attackType: PBTypes.AttackVals.MELEE });

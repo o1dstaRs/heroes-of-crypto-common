@@ -1228,6 +1228,39 @@ describe("GameActionEngine", () => {
         expect(result.events.filter((event) => event.type === "unit_attacked")).toHaveLength(0);
     });
 
+    it("Skewer Strike melee strike destroys the barrel behind the struck one, aimed stone first", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            leftAbilities: ["Skewer Strike"],
+            leftCell: { x: 2, y: 3 },
+            supportCell: { x: 2, y: 5 },
+            rightCell: { x: 12, y: 9 },
+        });
+        const aimed = { x: 3, y: 3 };
+        const behind = { x: 4, y: 3 };
+        const survivor = { x: 10, y: 8 };
+        // The pierced stone comes FIRST in layout order, so the events prove strike order, not layout order.
+        setup.grid.setScatteredMountains([behind, aimed, survivor]);
+        const settings = setup.grid.getSettings();
+        const worldOf = (cell: { x: number; y: number }) =>
+            getPositionForCell(cell, settings.getMinX(), settings.getStep(), settings.getHalfStep());
+
+        const result = setup.engine.apply({
+            type: "obstacle_attack",
+            attackerId: setup.left.getId(),
+            targetPosition: worldOf(aimed),
+            attackFrom: { x: 2, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        const obstacleEvents = result.events.filter((event) => event.type === "obstacle_attacked");
+        expect(obstacleEvents).toHaveLength(2);
+        expect(obstacleEvents[0]).toMatchObject({ targetPosition: worldOf(aimed) });
+        expect(obstacleEvents[1]).toMatchObject({ targetPosition: worldOf(behind) });
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([survivor]);
+        expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
+    });
+
     it("Large Caliber ignores scattered stones on its trajectory and destroys every stone in its 3x3 blast", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,

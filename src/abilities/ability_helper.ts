@@ -248,6 +248,48 @@ function getTargetList(
     return targetList;
 }
 
+/**
+ * The one cell a piercing melee sweep carries on to past a SINGLE-CELL target — the step `nextStandingTargets`
+ * takes past a small unit, expressed for a bare cell so the obstacle path can run Skewer Strike / Fire Breath
+ * on through a cemetery barrel to the barrel standing behind it.
+ *
+ * Same geometry as the unit sweep: a large attacker aims from the cell of its body closest to the target (a
+ * 2x2 keeps the hand-written order the search tie-breaks on, see nextStandingTargets), and the sweep steps
+ * exactly one cell further along the attacker→target line — straight or diagonal. A target the attacker is
+ * not in contact with yields nothing: a pierce only ever runs on from a contact strike.
+ */
+export function pierceCellBehind(attackerUnit: Unit, attackFromCell: XY, targetCell: XY): XY | undefined {
+    let attackerCell = attackFromCell;
+    if (!attackerUnit.isSmallSize()) {
+        const width = attackerUnit.getFootprintWidth();
+        const height = attackerUnit.getFootprintHeight();
+        const attackerCells =
+            width === 2 && height === 2
+                ? [
+                      attackFromCell,
+                      { x: attackFromCell.x - 1, y: attackFromCell.y },
+                      { x: attackFromCell.x, y: attackFromCell.y - 1 },
+                      { x: attackFromCell.x - 1, y: attackFromCell.y - 1 },
+                  ]
+                : getFootprintCellsForAnchor(attackFromCell, width, height);
+        attackerCell = attackerCells[0];
+        let minDistance = getDistance(attackerCell, targetCell);
+        for (const cell of attackerCells) {
+            const distance = getDistance(cell, targetCell);
+            if (distance < minDistance) {
+                attackerCell = cell;
+                minDistance = distance;
+            }
+        }
+    }
+    const dx = targetCell.x - attackerCell.x;
+    const dy = targetCell.y - attackerCell.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== 1) {
+        return undefined;
+    }
+    return { x: targetCell.x + dx, y: targetCell.y + dy };
+}
+
 export function nextStandingTargets(
     attackerUnit: Unit,
     targetUnit: Unit,

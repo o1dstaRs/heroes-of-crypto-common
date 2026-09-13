@@ -2911,6 +2911,35 @@ export class AttackHandler {
         }
         FightStateManager.getInstance().getFightProperties().encounterObstacleHit(isRightMountain);
     }
+    /**
+     * A piercing melee passive runs on THROUGH a cemetery barrel. Skewer Strike (Pikeman) and Fire Breath
+     * (Black Dragon) both strike the cell behind a one-cell target, so the barrel standing directly behind the
+     * struck one — straight or diagonal along the attacker→barrel line — goes down with it. Scattered layouts
+     * only: the classic 2x2 mountains absorb the whole strike in their own hit counters. An empty cell, a
+     * unit or the board edge behind the barrel simply gives the sweep nothing to break.
+     */
+    private pierceScatteredObstacleBehind(
+        attackerUnit: Unit,
+        attackFromCell: HoCMath.XY,
+        targetCell: HoCMath.XY,
+    ): void {
+        if (
+            !this.grid.hasScatteredMountains() ||
+            (!attackerUnit.hasAbilityActive("Skewer Strike") && !attackerUnit.hasAbilityActive("Fire Breath"))
+        ) {
+            return;
+        }
+        const behindCell = AbilityHelper.pierceCellBehind(attackerUnit, attackFromCell, targetCell);
+        if (
+            !behindCell ||
+            !GridMath.isCellWithinGrid(this.gridSettings, behindCell) ||
+            this.grid.getOccupantUnitId(behindCell) !== "B"
+        ) {
+            return;
+        }
+        this.spendObstacleHit(behindCell, behindCell.x >= this.gridSettings.getGridSize() >> 1);
+        this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+    }
     public handleObstacleAttack(
         targetPosition: HoCMath.XY,
         unitsHolder: UnitsHolder,
@@ -3075,6 +3104,7 @@ export class AttackHandler {
 
                     this.spendObstacleHit(targetCell, isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+                    this.pierceScatteredObstacleBehind(attackerUnit, attackFromCell, targetCell);
                     if (
                         this.obstacleStillStands() &&
                         (attackerUnit.getAbility("Double Punch") ?? attackerUnit.getAbility("Crafted Double Punch"))
@@ -3151,6 +3181,7 @@ export class AttackHandler {
 
                     this.spendObstacleHit(targetCell, isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+                    this.pierceScatteredObstacleBehind(attackerUnit, attackFromCell, targetCell);
 
                     if (
                         this.obstacleStillStands() &&
