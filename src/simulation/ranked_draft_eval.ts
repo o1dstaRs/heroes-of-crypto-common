@@ -19,6 +19,7 @@ import {
     LEAGUE_ROUND3_DRAFT_SPEC,
     parseDraftGenome,
     pickDraftGenomeCreature,
+    pickRankedLiveDraftCreature,
     projectDraftGenomeForShipping,
     RANKED_VERSATILE_DRAFT_SPEC,
 } from "../ai/setup/draft_ship";
@@ -89,6 +90,8 @@ const SEED_CHANNELS_PER_BOARD = 3;
 export const RANKED_DRAFT_INTRINSIC_OFFSET = LEAGUE_GENOME_LAYOUT.draftIntrinsic.offset;
 export const RANKED_DRAFT_INTRINSIC_DIM = LEAGUE_GENOME_LAYOUT.draftIntrinsic.length;
 export const RANKED_DRAFT_CURRENT_INCUMBENT_ID = CURRENT_INCUMBENT_ID;
+/** The draft the ranked server runs today (HOC_DRAFT_WEIGHTS unset), under this panel's own id. */
+export const RANKED_DRAFT_LIVE_INCUMBENT_ID = "ranked-live-incumbent";
 export const RANKED_DRAFT_INTERACTION_PRIOR_CANDIDATE_ID = "ranked-interactions-a19-ranked-draft-10008-v1";
 export const RANKED_DRAFT_VERSATILE_CANDIDATE_ID = RANKED_VERSATILE_DRAFT_SPEC;
 export const RANKED_DRAFT_A19_CALIBRATED_CANDIDATE_ID = RANKED_A19_DRAFT_CANDIDATE_ID;
@@ -147,6 +150,14 @@ export interface IRankedDraftGameRecord {
     decidedByArmageddon: boolean;
     rejectedCandidate: number;
     rejectedOpponent: number;
+    /** Only when the panel records armies: what each seat drafted, for unit-strength fitting. */
+    armies?: { candidate: IRankedDraftRecordedArmy; opponent: IRankedDraftRecordedArmy };
+}
+
+export interface IRankedDraftRecordedArmy {
+    creatureIds: number[];
+    tier1Artifact: number;
+    tier2Artifact: number;
 }
 
 export interface IRankedDraftOpponentSummary {
@@ -219,6 +230,10 @@ export interface IRankedDraftEvaluationReport {
         commonBattleSeed: true;
         behaviorTrace: "canonical-sha256-v1";
         executedActionsRecorded: true;
+        liveDraftRules: boolean;
+        sideBoard: boolean;
+        deterministicSearch: boolean;
+        explorationRate: number;
     };
     opponents: IRankedDraftOpponentSummary[];
     maps: IRankedDraftMapSummary[];
@@ -247,6 +262,16 @@ export interface IRankedDraftEvaluationOptions {
     fightProfile?: RankedDraftFightProfileId;
     candidateSetupPolicySpec?: string;
     opponentSetupPolicySpec?: string;
+    /** Draft creatures with the live server's rules (faction-diversity tax), not the League-era argmax. */
+    liveDraftRules?: boolean;
+    /** Fight on the side-oriented ranked board (side zones, seeded stones) instead of the classic board. */
+    sideBoard?: boolean;
+    /** Deterministic search work budgets, so results do not depend on host load or concurrency. */
+    deterministicSearch?: boolean;
+    /** Chance each bundle/creature decision becomes a uniform legal choice instead (data collection only). */
+    explorationRate?: number;
+    /** Keep both seats' drafted armies on every record. */
+    recordArmies?: boolean;
 }
 
 interface INormalizedOptions {
@@ -258,6 +283,11 @@ interface INormalizedOptions {
     fightProfile: RankedDraftFightProfileId;
     candidateSetupPolicySpec: string;
     opponentSetupPolicySpec: string;
+    liveDraftRules: boolean;
+    sideBoard: boolean;
+    deterministicSearch: boolean;
+    explorationRate: number;
+    recordArmies: boolean;
 }
 
 interface IRankedDraftGameDependencies {
@@ -357,6 +387,11 @@ export function rankedDraftVersatileCandidate(): ILeagueGenome {
     });
 }
 
+/** The ranked server's deployed draft genome. Only a faithful live draft when paired with liveDraftRules. */
+export function rankedDraftLiveIncumbent(): ILeagueGenome {
+    return normalizeRankedDraftGenome(parseDraftGenome(RANKED_VERSATILE_DRAFT_SPEC), RANKED_DRAFT_LIVE_INCUMBENT_ID);
+}
+
 export function rankedDraftA19CalibratedCandidate(): ILeagueGenome {
     return normalizeRankedDraftGenome(RANKED_A19_DRAFT_CANDIDATE, RANKED_DRAFT_A19_CALIBRATED_CANDIDATE_ID);
 }
@@ -382,6 +417,7 @@ export function defaultRankedDraftPool(): IRankedDraftPoolEntry[] {
 
 export function loadRankedDraftPool(specifier?: string, cwd: string = process.cwd()): IRankedDraftPoolEntry[] {
     if (!specifier || specifier === "default") return defaultRankedDraftPool();
+    if (specifier === "live") return [{ ...rankedDraftLiveIncumbent(), prior: 1 }];
     const parsed = JSON.parse(readFileSync(resolve(cwd, specifier), "utf8")) as unknown;
     const entries = Array.isArray(parsed)
         ? parsed
@@ -463,6 +499,10 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
     const opponentSetupPolicySpec = resolveSetupPolicy(
         options.opponentSetupPolicySpec ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC,
     ).spec;
+    const explorationRate = options.explorationRate ?? 0;
+    if (!Number.isFinite(explorationRate) || explorationRate < 0 || explorationRate >= 1) {
+        throw new RangeError("explorationRate must be in [0, 1)");
+    }
     return {
         gamesPerOpponent: options.gamesPerOpponent,
         baseSeed: options.baseSeed >>> 0,
@@ -472,6 +512,11 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
         fightProfile,
         candidateSetupPolicySpec,
         opponentSetupPolicySpec,
+        liveDraftRules: options.liveDraftRules === true,
+        sideBoard: options.sideBoard === true,
+        deterministicSearch: options.deterministicSearch === true,
+        explorationRate,
+        recordArmies: options.recordArmies === true,
     };
 }
 
@@ -566,14 +611,33 @@ export interface IRankedDraftSetupPolicySpecs {
     right?: string;
 }
 
+export interface IRankedDraftPickRules {
+    /** Pick creatures exactly as the ranked server does (faction-diversity tax included). */
+    liveDraftRules?: boolean;
+    /** Replace each bundle/creature decision with a uniform legal choice at this rate. */
+    explorationRate?: number;
+}
+
 export function resolveRankedDraftPick(
     seed: number,
     leftInput: ILeagueGenome,
     rightInput: ILeagueGenome,
     setupPolicySpecs: IRankedDraftSetupPolicySpecs = {},
+    rules: IRankedDraftPickRules = {},
 ): IPickSimState {
     const leftGenome = normalizeRankedDraftGenome(leftInput);
     const rightGenome = normalizeRankedDraftGenome(rightInput);
+    const pickCreature = rules.liveDraftRules ? pickRankedLiveDraftCreature : pickDraftGenomeCreature;
+    const explorationRate = rules.explorationRate ?? 0;
+    // Exploration draws from its own stream so the reducer's bans, offers and collisions stay on their seeds, and
+    // a zero rate reproduces the policy draft exactly. Both draws are taken every time to keep the stream aligned.
+    const explorationRng = makeRng((seed ^ 0x6a09e667) >>> 0);
+    const explore = (choices: number): number | undefined => {
+        if (explorationRate <= 0 || choices <= 0) return undefined;
+        const roll = explorationRng();
+        const index = Math.floor(explorationRng() * choices);
+        return roll < explorationRate ? index : undefined;
+    };
     const leftSetupPolicy = resolveSetupPolicy(setupPolicySpecs.left ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC);
     const rightSetupPolicy = resolveSetupPolicy(setupPolicySpecs.right ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC);
     const rng = randomInt(seed);
@@ -585,24 +649,30 @@ export function resolveRankedDraftPick(
     state = applyAccepted(state, { type: "select_doctrine", team: RIGHT, doctrine }, rng);
 
     // Both simultaneous policies decide from the same pre-commit state.
-    const leftBundle = pickCoherentDraftBundle(
-        state.left.bundles,
-        (creatureId) => draftGenomeCreatureScore(leftGenome, creatureId),
-        (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
-        {
-            ...(leftGenome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: leftGenome.draftSpellRangedPolicy } : {}),
-        },
-    );
-    const rightBundle = pickCoherentDraftBundle(
-        state.right.bundles,
-        (creatureId) => draftGenomeCreatureScore(rightGenome, creatureId),
-        (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
-        {
-            ...(rightGenome.draftSpellRangedPolicy
-                ? { draftSpellRangedPolicy: rightGenome.draftSpellRangedPolicy }
-                : {}),
-        },
-    );
+    const leftBundle =
+        explore(state.left.bundles.length) ??
+        pickCoherentDraftBundle(
+            state.left.bundles,
+            (creatureId) => draftGenomeCreatureScore(leftGenome, creatureId),
+            (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+            {
+                ...(leftGenome.draftSpellRangedPolicy
+                    ? { draftSpellRangedPolicy: leftGenome.draftSpellRangedPolicy }
+                    : {}),
+            },
+        );
+    const rightBundle =
+        explore(state.right.bundles.length) ??
+        pickCoherentDraftBundle(
+            state.right.bundles,
+            (creatureId) => draftGenomeCreatureScore(rightGenome, creatureId),
+            (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+            {
+                ...(rightGenome.draftSpellRangedPolicy
+                    ? { draftSpellRangedPolicy: rightGenome.draftSpellRangedPolicy }
+                    : {}),
+            },
+        );
     state = applyAccepted(state, { type: "select_bundle", team: LEFT, bundleIndex: leftBundle }, rng);
     state = applyAccepted(state, { type: "select_bundle", team: RIGHT, bundleIndex: rightBundle }, rng);
 
@@ -624,13 +694,18 @@ export function resolveRankedDraftPick(
         }
         const team = phase.actors[0];
         const own = teamState(team);
-        const creatureId = pickDraftGenomeCreature(
-            team === LEFT ? leftGenome : rightGenome,
-            getVisibleCreatureChoices(state, team),
-            own.creatures,
-            getKnownOpponentCreatures(state, team),
-            own.tier1Artifact,
-        );
+        const visible = getVisibleCreatureChoices(state, team);
+        const explored = explore(visible.length);
+        const creatureId =
+            explored !== undefined
+                ? visible[explored]
+                : pickCreature(
+                      team === LEFT ? leftGenome : rightGenome,
+                      visible,
+                      own.creatures,
+                      getKnownOpponentCreatures(state, team),
+                      own.tier1Artifact,
+                  );
         if (creatureId === undefined) {
             throw new Error(`Ranked draft creature policy found no visible L${phase.creatureLevel} creature`);
         }
@@ -705,9 +780,9 @@ function matchConfig(
     red: IRankedDraftArmy,
     seed: number,
     gridType: number,
-    maxLaps: number,
-    fightProfile: RankedDraftFightProfileId,
+    options: Pick<INormalizedOptions, "maxLaps" | "fightProfile" | "sideBoard" | "deterministicSearch">,
 ): IMatchConfig {
+    const { maxLaps, fightProfile } = options;
     return {
         greenVersion: fightProfile === "a19" ? "v0.8" : "v0.7",
         redVersion: fightProfile === "a19" ? "v0.8" : "v0.7",
@@ -716,6 +791,8 @@ function matchConfig(
         seed,
         gridType,
         maxLaps,
+        ...(options.sideBoard ? { sideOrientedPlacement: true } : {}),
+        ...(options.deterministicSearch ? { searchOfflineDeterministicWork: true } : {}),
         greenDoctrine: green.doctrine,
         redDoctrine: red.doctrine,
         greenAugments: green.augments,
@@ -730,6 +807,17 @@ function matchConfig(
         redRevealedCreatures: red.revealedOpponentCreatures,
     };
 }
+
+const rankedDraftPickRules = (options: INormalizedOptions): IRankedDraftPickRules => ({
+    liveDraftRules: options.liveDraftRules,
+    explorationRate: options.explorationRate,
+});
+
+const recordedArmy = (army: IRankedDraftArmy): IRankedDraftRecordedArmy => ({
+    creatureIds: [...army.creatureIds],
+    tier1Artifact: army.tier1Artifact,
+    tier2Artifact: army.tier2Artifact,
+});
 
 export function playRankedDraftGame(
     candidateInput: ILeagueGenome,
@@ -770,10 +858,13 @@ export function playRankedDraftGame(
         : options.candidateSetupPolicySpec;
     const leftSetupPolicy = resolveSetupPolicy(leftSetupPolicySpec);
     const rightSetupPolicy = resolveSetupPolicy(rightSetupPolicySpec);
-    const pick = resolveRankedDraftPick(pickSeed, leftGenome, rightGenome, {
-        left: leftSetupPolicy.spec,
-        right: rightSetupPolicy.spec,
-    });
+    const pick = resolveRankedDraftPick(
+        pickSeed,
+        leftGenome,
+        rightGenome,
+        { left: leftSetupPolicy.spec, right: rightSetupPolicy.spec },
+        rankedDraftPickRules(options),
+    );
     const left = materializeArmy(pick.left, getKnownOpponentCreatures(pick, LEFT), leftSetupPolicy);
     const right = materializeArmy(pick.right, getKnownOpponentCreatures(pick, RIGHT), rightSetupPolicy);
     const green = battleMirror ? right : left;
@@ -782,7 +873,7 @@ export function playRankedDraftGame(
     const candidateArmy = candidatePickedLeft ? left : right;
     const gridType = options.mapTypes[(offerBoard + seedLaneIndex) % options.mapTypes.length];
     const result = (dependencies.matchRunner ?? DEFAULT_DEPENDENCIES.matchRunner)(
-        matchConfig(green, red, battleSeed, gridType, options.maxLaps, options.fightProfile),
+        matchConfig(green, red, battleSeed, gridType, options),
     );
     const candidateSide: Side = candidateIsGreen ? "green" : "red";
     const candidateResult = result.winner === "draw" ? "draw" : result.winner === candidateSide ? "win" : "loss";
@@ -808,6 +899,14 @@ export function playRankedDraftGame(
         decidedByArmageddon: result.attrition.decidedByArmageddon,
         rejectedCandidate: (candidateIsGreen ? result.rejectedGreen : result.rejectedRed) ?? 0,
         rejectedOpponent: (candidateIsGreen ? result.rejectedRed : result.rejectedGreen) ?? 0,
+        ...(options.recordArmies
+            ? {
+                  armies: {
+                      candidate: recordedArmy(candidateArmy),
+                      opponent: recordedArmy(candidatePickedLeft ? right : left),
+                  },
+              }
+            : {}),
     };
 }
 
@@ -833,10 +932,16 @@ export function inspectRankedDraftBoard(
     const assignments = ([true, false] as const).map((candidatePickedLeft) => {
         const leftGenome = candidatePickedLeft ? candidate : opponent;
         const rightGenome = candidatePickedLeft ? opponent : candidate;
-        const pick = resolveRankedDraftPick(pickSeed, leftGenome, rightGenome, {
-            left: candidatePickedLeft ? options.candidateSetupPolicySpec : options.opponentSetupPolicySpec,
-            right: candidatePickedLeft ? options.opponentSetupPolicySpec : options.candidateSetupPolicySpec,
-        });
+        const pick = resolveRankedDraftPick(
+            pickSeed,
+            leftGenome,
+            rightGenome,
+            {
+                left: candidatePickedLeft ? options.candidateSetupPolicySpec : options.opponentSetupPolicySpec,
+                right: candidatePickedLeft ? options.opponentSetupPolicySpec : options.candidateSetupPolicySpec,
+            },
+            rankedDraftPickRules(options),
+        );
         const candidateTeam = candidatePickedLeft ? pick.left : pick.right;
         return {
             candidatePickedLeft,
@@ -1075,6 +1180,10 @@ export function summarizeRankedDraftRecords(
             commonBattleSeed: true,
             behaviorTrace: "canonical-sha256-v1",
             executedActionsRecorded: true,
+            liveDraftRules: options.liveDraftRules,
+            sideBoard: options.sideBoard,
+            deterministicSearch: options.deterministicSearch,
+            explorationRate: options.explorationRate,
         },
         opponents,
         maps,
@@ -1130,6 +1239,7 @@ export function evaluateRankedDraftTasks(
     poolInput: readonly IRankedDraftPoolEntry[],
     optionsInput: IRankedDraftEvaluationOptions,
     tasksInput: readonly IRankedDraftEvaluationTask[],
+    onProgress?: (completed: number, total: number) => void,
 ): Promise<IRankedDraftGameRecord[]> {
     const candidate = normalizeRankedDraftGenome(candidateInput);
     const pool = poolInput.map((opponent) => ({ ...normalizeRankedDraftGenome(opponent), prior: opponent.prior }));
@@ -1196,6 +1306,7 @@ export function evaluateRankedDraftTasks(
                 }
                 records.push(message.record);
                 completed += 1;
+                onProgress?.(completed, tasks.length);
                 if (completed === tasks.length) {
                     settled = true;
                     cleanup();
@@ -1225,6 +1336,16 @@ export async function evaluateRankedDraftCandidate(
     poolInput: readonly IRankedDraftPoolEntry[],
     optionsInput: IRankedDraftEvaluationOptions,
 ): Promise<IRankedDraftEvaluationReport> {
+    return (await evaluateRankedDraftPanel(candidateInput, poolInput, optionsInput)).report;
+}
+
+/** Run a whole panel and keep its per-game records next to the summary. */
+export async function evaluateRankedDraftPanel(
+    candidateInput: ILeagueGenome,
+    poolInput: readonly IRankedDraftPoolEntry[],
+    optionsInput: IRankedDraftEvaluationOptions,
+    onProgress?: (completed: number, total: number) => void,
+): Promise<{ records: IRankedDraftGameRecord[]; report: IRankedDraftEvaluationReport }> {
     const candidate = normalizeRankedDraftGenome(candidateInput);
     const pool = poolInput.map((opponent) => ({ ...normalizeRankedDraftGenome(opponent), prior: opponent.prior }));
     validateEntrants(candidate, pool);
@@ -1233,14 +1354,15 @@ export async function evaluateRankedDraftCandidate(
         opponentIndex: Math.floor(index / options.gamesPerOpponent),
         game: index % options.gamesPerOpponent,
     }));
-    const records = await evaluateRankedDraftTasks(candidate, pool, options, tasks);
-    return summarizeRankedDraftRecords(candidate, pool, options, records);
+    const records = await evaluateRankedDraftTasks(candidate, pool, options, tasks, onProgress);
+    return { records, report: summarizeRankedDraftRecords(candidate, pool, options, records) };
 }
 
 interface ICliOptions extends IRankedDraftEvaluationOptions {
     candidate: ILeagueGenome;
     pool: IRankedDraftPoolEntry[];
     outputPath?: string;
+    recordsPath?: string;
 }
 
 function parseCli(argv: readonly string[]): ICliOptions {
@@ -1257,6 +1379,12 @@ function parseCli(argv: readonly string[]): ICliOptions {
         "candidate-setup",
         "opponent-setup",
         "output",
+        "live-draft-rules",
+        "side-board",
+        "deterministic-search",
+        "exploration",
+        "record-armies",
+        "records",
     ]);
     for (let index = 0; index < argv.length; index += 1) {
         const argument = argv[index];
@@ -1271,6 +1399,12 @@ function parseCli(argv: readonly string[]): ICliOptions {
     const candidateSpec = candidateJson ?? values.get("candidate");
     if (!candidateSpec) throw new Error("--candidate or --candidate-json is required");
     const candidate = normalizeRankedDraftGenome(parseDraftGenome(candidateSpec, "ranked-draft-candidate"));
+    const flag = (key: string): boolean => {
+        const value = values.get(key);
+        if (value === undefined || value === "false" || value === "0") return false;
+        if (value === "true" || value === "1") return true;
+        throw new Error(`--${key} expects true or false`);
+    };
     return {
         candidate,
         pool: loadRankedDraftPool(values.get("pool")),
@@ -1284,12 +1418,38 @@ function parseCli(argv: readonly string[]): ICliOptions {
         ...(values.get("candidate-setup") ? { candidateSetupPolicySpec: values.get("candidate-setup") } : {}),
         ...(values.get("opponent-setup") ? { opponentSetupPolicySpec: values.get("opponent-setup") } : {}),
         ...(values.get("output") ? { outputPath: resolve(values.get("output")!) } : {}),
+        liveDraftRules: flag("live-draft-rules"),
+        sideBoard: flag("side-board"),
+        deterministicSearch: flag("deterministic-search"),
+        explorationRate: Number(values.get("exploration") ?? 0),
+        recordArmies: flag("record-armies"),
+        ...(values.get("records") ? { recordsPath: resolve(values.get("records")!) } : {}),
     };
 }
 
 async function cliMain(): Promise<void> {
     const options = parseCli(process.argv.slice(2));
-    const report = await evaluateRankedDraftCandidate(options.candidate, options.pool, options);
+    const startedAt = Date.now();
+    let lastProgressAt = startedAt;
+    const { records, report } = await evaluateRankedDraftPanel(
+        options.candidate,
+        options.pool,
+        options,
+        (completed, total) => {
+            const now = Date.now();
+            if (completed !== total && now - lastProgressAt < 30_000) return;
+            lastProgressAt = now;
+            const perSecond = completed / Math.max(1, (now - startedAt) / 1000);
+            const etaMinutes = Math.round((total - completed) / Math.max(perSecond, 1e-9) / 60);
+            process.stderr.write(
+                `[ranked-draft] ${completed}/${total} games (${perSecond.toFixed(2)}/s, eta ${etaMinutes}m)\n`,
+            );
+        },
+    );
+    if (options.recordsPath) {
+        mkdirSync(dirname(options.recordsPath), { recursive: true });
+        writeFileSync(options.recordsPath, `${records.map((record) => JSON.stringify(record)).join("\n")}\n`);
+    }
     const json = `${JSON.stringify(report, null, 2)}\n`;
     if (options.outputPath) {
         mkdirSync(dirname(options.outputPath), { recursive: true });

@@ -27,6 +27,7 @@ import {
 import {
     DRAFT_FEATURE_DIM,
     applyCreatureRoleFitMultiplier,
+    creatureInfo,
     creatureRoleFitMultiplier,
     eligibleBacklineProtectorChoices,
 } from "./creature_score";
@@ -270,6 +271,74 @@ export function pickDraftGenomeCreature(
                 draftGenomeCreatureScore(genome, creatureId),
                 creatureRoleFitMultiplier(creatureId, ownCreatureIds, knownOpponentCreatureIds),
             ),
+        {
+            ownCreatureIds,
+            tier1ArtifactId,
+            knownOpponentCreatureIds,
+            ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
+            ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
+            ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
+        },
+    );
+}
+
+/**
+ * Faction-diversity tax, per already-drafted same-faction stack, in the offer's own base-score scale. The ranked
+ * counter-draft interaction prior sums anti-opponent lift across every revealed enemy with no own-roster
+ * diversity term, so against a ubiquitous opponent every level's argmax used to be dragged onto the same counter
+ * faction until the army was mono-faction. The tax grows with same-faction stacks already on the roster, so a
+ * strong counter still wins the first pick or two while a runaway monoculture is stopped.
+ *
+ * It lived only in the server's draft_policy.ts, which left every simulated "live" draft one rule short of the
+ * bot. Both now share this definition.
+ */
+export const RANKED_FACTION_DIVERSITY_PENALTY = 0.16;
+export const RANKED_FACTION_DIVERSITY_MAX_STACKS = 3;
+/** A single same-faction pairing is legitimate coherence (e.g. an ELF ward for an anti-flyer Arachna Queen). */
+export const RANKED_FACTION_DIVERSITY_FREE_STACKS = 1;
+
+/** Tax units a pick pays: same-faction stacks already drafted, less the free one, capped. */
+export function rankedFactionDiversityTaxUnits(creatureId: number, ownCreatureIds: readonly number[]): number {
+    const faction = creatureInfo(creatureId)?.faction ?? 0;
+    if (!faction) {
+        return 0;
+    }
+    const sameFaction = ownCreatureIds.reduce(
+        (count, ownCreatureId) => count + (creatureInfo(ownCreatureId)?.faction === faction ? 1 : 0),
+        0,
+    );
+    return Math.min(
+        RANKED_FACTION_DIVERSITY_MAX_STACKS,
+        Math.max(0, sameFaction - RANKED_FACTION_DIVERSITY_FREE_STACKS),
+    );
+}
+
+/**
+ * The live ranked bot's creature pick: the role-safety gate and role-fit multiplier of pickDraftGenomeCreature,
+ * then the faction-diversity tax scaled to the eligible offer's largest role-fit score, then the coherence,
+ * interaction and variety overlays the genome carries.
+ */
+export function pickRankedLiveDraftCreature(
+    genome: ILeagueGenome,
+    available: readonly number[],
+    ownCreatureIds: readonly number[],
+    knownOpponentCreatureIds: readonly number[],
+    tier1ArtifactId?: number,
+): number | undefined {
+    const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
+    const roleFitScore = (creatureId: number): number =>
+        applyCreatureRoleFitMultiplier(
+            draftGenomeCreatureScore(genome, creatureId),
+            creatureRoleFitMultiplier(creatureId, ownCreatureIds, knownOpponentCreatureIds),
+        );
+    const baseScoreScale = Math.max(1, ...eligible.map((creatureId) => Math.abs(roleFitScore(creatureId))));
+    return pickCoherentDraftCreature(
+        eligible,
+        (creatureId) =>
+            roleFitScore(creatureId) -
+            RANKED_FACTION_DIVERSITY_PENALTY *
+                rankedFactionDiversityTaxUnits(creatureId, ownCreatureIds) *
+                baseScoreScale,
         {
             ownCreatureIds,
             tier1ArtifactId,
