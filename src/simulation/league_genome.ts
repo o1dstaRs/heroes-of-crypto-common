@@ -37,6 +37,7 @@ import {
     pickRankedDraftVarietyCreature,
     type RankedDraftVarietyPolicyId,
 } from "../ai/setup/draft_variety";
+import { isRankedDraftStrengthPolicy, type RankedDraftStrengthPolicyId } from "../ai/setup/draft_strength_prior";
 import { TIER1_ARTIFACT_WINRATE, TIER2_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import {
     getKnownOpponentCreatures,
@@ -179,6 +180,8 @@ export interface ILeagueGenome {
     draftVarietyPolicy?: RankedDraftVarietyPolicyId;
     /** Optional caster-DPS feature interpretation. Omitted retains the historical projectile-only semantics. */
     draftSpellRangedPolicy?: RankedSpellRangedDraftPolicyId;
+    /** Optional battle-fitted unit-strength overlay (weight is part of the id). Omitted keeps the historical scorer. */
+    draftStrengthPolicy?: RankedDraftStrengthPolicyId;
 }
 
 export interface ILeagueGenomeOptions {
@@ -186,6 +189,7 @@ export interface ILeagueGenomeOptions {
     draftInteractionPrior?: RankedDraftInteractionPriorId;
     draftVarietyPolicy?: RankedDraftVarietyPolicyId;
     draftSpellRangedPolicy?: RankedSpellRangedDraftPolicyId;
+    draftStrengthPolicy?: RankedDraftStrengthPolicyId;
 }
 
 export interface ILeagueAugment {
@@ -232,6 +236,9 @@ export function createLeagueGenome(
     ) {
         throw new TypeError(`Unsupported ranked spell-ranged draft policy ${String(options.draftSpellRangedPolicy)}`);
     }
+    if (options.draftStrengthPolicy !== undefined && !isRankedDraftStrengthPolicy(options.draftStrengthPolicy)) {
+        throw new TypeError(`Unsupported ranked draft strength policy ${String(options.draftStrengthPolicy)}`);
+    }
     return {
         schemaVersion: LEAGUE_SCHEMA_VERSION,
         id,
@@ -241,6 +248,7 @@ export function createLeagueGenome(
         ...(options.draftInteractionPrior ? { draftInteractionPrior: options.draftInteractionPrior } : {}),
         ...(options.draftVarietyPolicy ? { draftVarietyPolicy: options.draftVarietyPolicy } : {}),
         ...(options.draftSpellRangedPolicy ? { draftSpellRangedPolicy: options.draftSpellRangedPolicy } : {}),
+        ...(options.draftStrengthPolicy ? { draftStrengthPolicy: options.draftStrengthPolicy } : {}),
     };
 }
 

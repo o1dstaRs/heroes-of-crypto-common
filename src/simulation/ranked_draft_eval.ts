@@ -27,6 +27,7 @@ import { RANKED_A19_DRAFT_CANDIDATE, RANKED_A19_DRAFT_CANDIDATE_ID } from "../ai
 import { pickCoherentDraftBundle } from "../ai/setup/draft_coherence";
 import { isRankedDraftInteractionPrior, RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../ai/setup/draft_interaction_prior";
 import { isRankedDraftVarietyPolicy, RANKED_DRAFT_VARIETY_POLICY_ID } from "../ai/setup/draft_variety";
+import { isRankedDraftStrengthPolicy, type RankedDraftStrengthPolicyId } from "../ai/setup/draft_strength_prior";
 import { resolveSetupPolicy, type IResolvedSetupPolicy } from "../ai/setup/setup_ship";
 import { creatureInfo } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
@@ -363,6 +364,7 @@ export function normalizeRankedDraftGenome(genome: ILeagueGenome, id: string = g
         ...(projected.draftInteractionPrior ? { draftInteractionPrior: projected.draftInteractionPrior } : {}),
         ...(projected.draftVarietyPolicy ? { draftVarietyPolicy: projected.draftVarietyPolicy } : {}),
         ...(projected.draftSpellRangedPolicy ? { draftSpellRangedPolicy: projected.draftSpellRangedPolicy } : {}),
+        ...(projected.draftStrengthPolicy ? { draftStrengthPolicy: projected.draftStrengthPolicy } : {}),
     });
 }
 
@@ -392,6 +394,11 @@ export function rankedDraftLiveIncumbent(): ILeagueGenome {
     return normalizeRankedDraftGenome(parseDraftGenome(RANKED_VERSATILE_DRAFT_SPEC), RANKED_DRAFT_LIVE_INCUMBENT_ID);
 }
 
+/** The live draft plus a battle-fitted unit-strength overlay at the weight the policy id names. */
+export function rankedDraftStrengthCandidate(policy: RankedDraftStrengthPolicyId): ILeagueGenome {
+    return normalizeRankedDraftGenome(parseDraftGenome(policy), policy);
+}
+
 export function rankedDraftA19CalibratedCandidate(): ILeagueGenome {
     return normalizeRankedDraftGenome(RANKED_A19_DRAFT_CANDIDATE, RANKED_DRAFT_A19_CALIBRATED_CANDIDATE_ID);
 }
@@ -418,6 +425,11 @@ export function defaultRankedDraftPool(): IRankedDraftPoolEntry[] {
 export function loadRankedDraftPool(specifier?: string, cwd: string = process.cwd()): IRankedDraftPoolEntry[] {
     if (!specifier || specifier === "default") return defaultRankedDraftPool();
     if (specifier === "live") return [{ ...rankedDraftLiveIncumbent(), prior: 1 }];
+    // Fixed references for robustness checks: the untrained fallback and the League exploiter that punishes
+    // hard-countering drafts. Candidate and incumbent face them on identical seeds.
+    if (specifier === "reference") {
+        return defaultRankedDraftPool().filter((entry) => entry.id === HEURISTIC_ID || entry.id === ROUND3_ID);
+    }
     const parsed = JSON.parse(readFileSync(resolve(cwd, specifier), "utf8")) as unknown;
     const entries = Array.isArray(parsed)
         ? parsed
@@ -434,8 +446,12 @@ export function loadRankedDraftPool(specifier?: string, cwd: string = process.cw
             draftInteractionPrior?: unknown;
             draftVarietyPolicy?: unknown;
             draftSpellRangedPolicy?: unknown;
+            draftStrengthPolicy?: unknown;
         };
         const id = typeof value.id === "string" && value.id.trim() ? value.id : `opponent-${index}`;
+        if (value.draftStrengthPolicy !== undefined && !isRankedDraftStrengthPolicy(value.draftStrengthPolicy)) {
+            throw new TypeError(`Ranked draft pool entry ${id} has an unsupported strength policy`);
+        }
         if (!Array.isArray(value.weights)) throw new TypeError(`Ranked draft pool entry ${id} omitted weights`);
         if (value.draftInteractionPrior !== undefined && !isRankedDraftInteractionPrior(value.draftInteractionPrior)) {
             throw new TypeError(`Ranked draft pool entry ${id} has an unsupported interaction prior`);
@@ -455,6 +471,7 @@ export function loadRankedDraftPool(specifier?: string, cwd: string = process.cw
                     ...(value.draftInteractionPrior ? { draftInteractionPrior: value.draftInteractionPrior } : {}),
                     ...(value.draftVarietyPolicy ? { draftVarietyPolicy: value.draftVarietyPolicy } : {}),
                     ...(value.draftSpellRangedPolicy ? { draftSpellRangedPolicy: value.draftSpellRangedPolicy } : {}),
+                    ...(value.draftStrengthPolicy ? { draftStrengthPolicy: value.draftStrengthPolicy } : {}),
                 }),
                 id,
             ),
@@ -659,6 +676,7 @@ export function resolveRankedDraftPick(
                 ...(leftGenome.draftSpellRangedPolicy
                     ? { draftSpellRangedPolicy: leftGenome.draftSpellRangedPolicy }
                     : {}),
+                ...(leftGenome.draftStrengthPolicy ? { draftStrengthPolicy: leftGenome.draftStrengthPolicy } : {}),
             },
         );
     const rightBundle =
@@ -671,6 +689,7 @@ export function resolveRankedDraftPick(
                 ...(rightGenome.draftSpellRangedPolicy
                     ? { draftSpellRangedPolicy: rightGenome.draftSpellRangedPolicy }
                     : {}),
+                ...(rightGenome.draftStrengthPolicy ? { draftStrengthPolicy: rightGenome.draftStrengthPolicy } : {}),
             },
         );
     state = applyAccepted(state, { type: "select_bundle", team: LEFT, bundleIndex: leftBundle }, rng);

@@ -330,6 +330,10 @@ describe("exact ranked draft evaluator", () => {
         expect(live.draftInteractionPrior).toBe(versatile.draftInteractionPrior);
         expect(live.draftVarietyPolicy).toBe(versatile.draftVarietyPolicy);
         expect(loadRankedDraftPool("live").map((entry) => entry.id)).toEqual([RANKED_DRAFT_LIVE_INCUMBENT_ID]);
+        expect(loadRankedDraftPool("reference").map((entry) => entry.id)).toEqual([
+            "untrained-heuristic",
+            "league-round3-exploiter",
+        ]);
 
         const byFaction = new Map<number, number[]>();
         for (const creatureId of Object.values(PBTypes.CreatureVals)) {

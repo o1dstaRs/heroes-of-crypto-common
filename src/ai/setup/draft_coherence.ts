@@ -28,6 +28,7 @@ import {
     pickRankedDraftVarietyCreature,
     type RankedDraftVarietyPolicyId,
 } from "./draft_variety";
+import { rankedDraftStrengthScore, type RankedDraftStrengthPolicyId } from "./draft_strength_prior";
 
 export type DraftBundle = readonly [number, number, number];
 
@@ -44,6 +45,8 @@ export interface IDraftCoherenceContext {
     draftVarietyPolicy?: RankedDraftVarietyPolicyId;
     /** Candidate-only offensive-spell co-play selector; omitted preserves the existing coherence policy exactly. */
     draftSpellRangedPolicy?: RankedSpellRangedDraftPolicyId;
+    /** Candidate-only battle-fitted unit strength; omitted preserves the existing coherence policy exactly. */
+    draftStrengthPolicy?: RankedDraftStrengthPolicyId;
 }
 
 /** Keep replay-derived build fit influential without making it lexicographically stronger than the genome. */
@@ -165,7 +168,9 @@ export function pickCoherentDraftCreature(
             draftCreatureCoherenceAffinity(creatureId, context) +
             (isRankedDraftInteractionPrior(context.draftInteractionPrior)
                 ? rankedDraftInteractionAffinity(creatureId, context) * INTERACTION_TO_COHERENCE_SCALE
-                : 0),
+                : 0) +
+            // Divided back out of the overlay weight so the final score moves by exactly weight x lift.
+            rankedDraftStrengthScore(creatureId, context.draftStrengthPolicy) / DRAFT_COHERENCE_WEIGHT,
     );
     const scores = applyDraftCoherenceOverlay(baseScores, affinities);
     if (isRankedDraftVarietyPolicy(context.draftVarietyPolicy)) {
@@ -177,7 +182,7 @@ export function pickCoherentDraftCreature(
 /** Build-plan fit available at bundle time, before later creature offers have resolved. */
 export function draftBundleCoherenceAffinity(
     [level1, level2, artifactId]: DraftBundle,
-    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy"> = {},
+    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy" | "draftStrengthPolicy"> = {},
 ): number {
     const creatures = [level1, level2] as const;
     const planSeed =
@@ -203,12 +208,19 @@ export function pickCoherentDraftBundle(
     bundles: readonly DraftBundle[],
     creatureScore: (creatureId: number) => number,
     artifactScore: (artifactId: number) => number,
-    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy"> = {},
+    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy" | "draftStrengthPolicy"> = {},
 ): number {
     if (!bundles.length) return 0;
     const baseScores = bundles.map(
         ([level1, level2, artifactId]) => creatureScore(level1) + creatureScore(level2) + artifactScore(artifactId),
     );
-    const affinities = bundles.map((bundle) => draftBundleCoherenceAffinity(bundle, options));
+    const affinities = bundles.map(
+        (bundle) =>
+            draftBundleCoherenceAffinity(bundle, options) +
+            // A bundle drafts both creatures, so both strengths count in full.
+            (rankedDraftStrengthScore(bundle[0], options.draftStrengthPolicy) +
+                rankedDraftStrengthScore(bundle[1], options.draftStrengthPolicy)) /
+                DRAFT_COHERENCE_WEIGHT,
+    );
     return bestScoreIndex(applyDraftCoherenceOverlay(baseScores, affinities));
 }
