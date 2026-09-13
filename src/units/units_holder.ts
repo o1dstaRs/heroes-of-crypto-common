@@ -860,34 +860,8 @@ export class UnitsHolder {
     }
     public allEnemiesAroundUnit(attacker: IUnitAIRepr, isAttack: boolean, attackFromCell?: XY): Unit[] {
         const enemyList: Unit[] = [];
-        const firstCheckCell = isAttack ? attackFromCell : attacker.getBaseCell();
 
-        if (!firstCheckCell) {
-            return enemyList;
-        }
-
-        let checkCells: XY[];
-
-        if (attacker.isSmallSize()) {
-            // use either target move position on current
-            // depending on the action type (attack vs response)
-            checkCells = getCellsAroundCell(this.gridSettings, firstCheckCell);
-        } else {
-            // firstCheckCell is the footprint's ANCHOR (its top-right cell), so the body covers
-            // [x-W+1..x] x [y-H+1..y] and the cells that touch it run one further out in each direction:
-            // [x-W..x+1] x [y-H..y+1]. For a 2x2 that is verbatim the -2..1 box this has always walked,
-            // in the same order; for a 1x2 it is the 3x4 box, where the old constants would have missed
-            // a whole rank of neighbours on the long side.
-            const { width, height } = this.footprintSidesOf(attacker);
-            checkCells = [];
-            for (let i = -width; i <= 1; i++) {
-                for (let j = -height; j <= 1; j++) {
-                    checkCells.push({ x: firstCheckCell.x + i, y: firstCheckCell.y + j });
-                }
-            }
-        }
-
-        for (const c of checkCells) {
+        for (const c of this.cellsAroundUnit(attacker, isAttack, attackFromCell)) {
             const checkUnitId = this.grid.getOccupantUnitId(c);
             if (checkUnitId) {
                 const addUnit = this.getAllUnits().get(checkUnitId);
@@ -903,6 +877,39 @@ export class UnitsHolder {
         }
 
         return enemyList;
+    }
+    /**
+     * The ring a radial melee strike sweeps (Lightning Spin): every cell touching the unit's body — at the
+     * attack-from anchor for an attack, where it stands for a response. Enemies (allEnemiesAroundUnit) and
+     * cemetery barrels (lightningSpinObstacleCells) are both read off this one ring, so the spin can never
+     * disagree with itself about what "around" means. Cells may fall outside the grid at a board edge.
+     */
+    public cellsAroundUnit(attacker: IUnitAIRepr, isAttack: boolean, attackFromCell?: XY): XY[] {
+        const firstCheckCell = isAttack ? attackFromCell : attacker.getBaseCell();
+
+        if (!firstCheckCell) {
+            return [];
+        }
+
+        if (attacker.isSmallSize()) {
+            // use either target move position on current
+            // depending on the action type (attack vs response)
+            return getCellsAroundCell(this.gridSettings, firstCheckCell);
+        }
+
+        // firstCheckCell is the footprint's ANCHOR (its top-right cell), so the body covers
+        // [x-W+1..x] x [y-H+1..y] and the cells that touch it run one further out in each direction:
+        // [x-W..x+1] x [y-H..y+1]. For a 2x2 that is verbatim the -2..1 box this has always walked,
+        // in the same order; for a 1x2 it is the 3x4 box, where the old constants would have missed
+        // a whole rank of neighbours on the long side.
+        const { width, height } = this.footprintSidesOf(attacker);
+        const checkCells: XY[] = [];
+        for (let i = -width; i <= 1; i++) {
+            for (let j = -height; j <= 1; j++) {
+                checkCells.push({ x: firstCheckCell.x + i, y: firstCheckCell.y + j });
+            }
+        }
+        return checkCells;
     }
     /**
      * The footprint of an AI-facing unit view, in cells.

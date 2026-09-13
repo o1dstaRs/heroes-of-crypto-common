@@ -11,6 +11,7 @@
 
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { Grid } from "../grid/grid";
+import { isCellWithinGrid } from "../grid/grid_math";
 import * as HoCLib from "../utils/lib";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
@@ -46,6 +47,28 @@ import { processPoisonAuraAbility } from "./poison_aura_ability";
 export interface ILightningSpinResult {
     landed: boolean;
     unitIdsDied: string[];
+}
+
+/**
+ * The cemetery barrels a Lightning Spin knocks down: every standing scattered stone in the ring the spin sweeps
+ * for enemies (UnitsHolder.cellsAroundUnit, attack geometry), in ring order. The spin is one radial impact, so a
+ * barrel beside the attacker breaks whether the blow itself was aimed at a unit or at a barrel — the aimed
+ * barrel is in the ring too, the caller decides what to report it as. Classic 2x2 mountains keep their own hit
+ * counters and are never swept.
+ */
+export function lightningSpinObstacleCells(
+    fromUnit: Unit,
+    unitsHolder: UnitsHolder,
+    grid: Grid,
+    attackFromCell: HoCMath.XY,
+): HoCMath.XY[] {
+    if (!grid.hasScatteredMountains() || !fromUnit.hasAbilityActive("Lightning Spin")) {
+        return [];
+    }
+    const settings = grid.getSettings();
+    return unitsHolder
+        .cellsAroundUnit(fromUnit, true, attackFromCell)
+        .filter((cell) => isCellWithinGrid(settings, cell) && grid.getOccupantUnitId(cell) === "B");
 }
 
 export function processLightningSpinAbility(

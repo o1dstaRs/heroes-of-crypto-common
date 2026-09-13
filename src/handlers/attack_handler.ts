@@ -107,6 +107,8 @@ export interface IAttackResult {
     resurrected?: { unitId: string; amount: number; hp: number; position: HoCMath.XY }[];
     /** Ability cards a giftable cast actually delivered, for authoritative replay/log/VFX. */
     abilityTransfers?: IAbilityTransfer[];
+    /** Cemetery barrels a Lightning Spin knocked down in this strike, beyond the one a blow was aimed at. */
+    spunObstacleCells?: HoCMath.XY[];
 }
 
 export interface IAttackObstacle {
@@ -2059,26 +2061,14 @@ export class AttackHandler {
         }
 
         let abilityMultiplier = 1;
-        let rapidChargeCellsNumber = 1;
-        let hasRapidChargePath = false;
-        const movedRouteCells =
-            stationaryAttack && attackerUnit.hasMovedThisTurn() ? attackerUnit.getMovedRouteCellsThisTurn() : 0;
-        if (movedRouteCells > 0) {
-            // An explicit move followed by a stationary strike must use the route that the authoritative move
-            // actually resolved. Ranked recomputes currentActiveKnownPaths after the move, where the attacker's
-            // current cell is represented by a one-cell route; preferring that map would silently erase Rapid
-            // Charge distance. The recorded value was populated only after move validation and is reset with
-            // movedThisTurn, so clients cannot use this precedence to spoof a longer charge.
-            hasRapidChargePath = true;
-            rapidChargeCellsNumber = movedRouteCells;
-        } else if (currentActiveKnownPaths) {
-            hasRapidChargePath = true;
-            const paths = currentActiveKnownPaths.get((attackFromCell.x << 4) | attackFromCell.y);
-            if (paths?.length) {
-                rapidChargeCellsNumber = paths[0].route.length;
-            }
-        }
-        if (hasRapidChargePath) {
+        const chargedRouteCells = this.chargedRouteCells(
+            attackerUnit,
+            attackFromCell,
+            stationaryAttack,
+            currentActiveKnownPaths,
+        );
+        const rapidChargeCellsNumber = chargedRouteCells ?? 1;
+        if (chargedRouteCells !== undefined) {
             abilityMultiplier = AllAbilities.processRapidChargeAbility(attackerUnit, rapidChargeCellsNumber);
         }
 
@@ -2161,6 +2151,8 @@ export class AttackHandler {
         );
         const hasLightningSpinAttackLanded = lightningSpinAttackResult.landed;
         updateUnitsDied(lightningSpinAttackResult.unitIdsDied);
+        // The same radial impact knocks down every cemetery barrel standing in the spin's ring.
+        const spunObstacleCells = this.spinScatteredObstaclesAround(attackerUnit, unitsHolder, attackFromCell);
 
         const fireBreathAttackResult = AllAbilities.processFireBreathAbility(
             attackerUnit,
@@ -2882,7 +2874,33 @@ export class AttackHandler {
             (damageForAnimation.secondary ??= []),
         );
 
-        return { completed: true, unitIdsDied, animationData, abilityStolen };
+        return { completed: true, unitIdsDied, animationData, abilityStolen, spunObstacleCells };
+    }
+    /**
+     * How far a melee charge ran to reach `attackFromCell`, for Rapid Charge — undefined when the strike carries
+     * no route to measure at all.
+     *
+     * An explicit move followed by a stationary strike must use the route that the authoritative move actually
+     * resolved. Ranked recomputes currentActiveKnownPaths after the move, where the attacker's current cell is
+     * represented by a one-cell route; preferring that map would silently erase Rapid Charge distance. The
+     * recorded value was populated only after move validation and is reset with movedThisTurn, so clients cannot
+     * use this precedence to spoof a longer charge.
+     */
+    private chargedRouteCells(
+        attackerUnit: Unit,
+        attackFromCell: HoCMath.XY,
+        stationaryAttack: boolean,
+        currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+    ): number | undefined {
+        const movedRouteCells =
+            stationaryAttack && attackerUnit.hasMovedThisTurn() ? attackerUnit.getMovedRouteCellsThisTurn() : 0;
+        if (movedRouteCells > 0) {
+            return movedRouteCells;
+        }
+        if (!currentActiveKnownPaths) {
+            return undefined;
+        }
+        return currentActiveKnownPaths.get((attackFromCell.x << 4) | attackFromCell.y)?.[0]?.route.length ?? 1;
     }
     /**
      * Does anything still stand to be hit?
@@ -2940,6 +2958,63 @@ export class AttackHandler {
         this.spendObstacleHit(behindCell, behindCell.x >= this.gridSettings.getGridSize() >> 1);
         this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
     }
+    /**
+     * Hydra's Lightning Spin is one radial impact, so the cemetery barrels standing around her go down with it
+     * exactly like the enemies do — see lightningSpinObstacleCells for the ring. Returns the barrels it broke.
+     */
+    private spinScatteredObstaclesAround(
+        attackerUnit: Unit,
+        unitsHolder: UnitsHolder,
+        attackFromCell: HoCMath.XY,
+    ): HoCMath.XY[] {
+        const cells = AllAbilities.lightningSpinObstacleCells(attackerUnit, unitsHolder, this.grid, attackFromCell);
+        for (const cell of cells) {
+            this.spendObstacleHit(cell, cell.x >= this.gridSettings.getGridSize() >> 1);
+            this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+        }
+        return cells;
+    }
+    /**
+     * Lightning Spin off a blow aimed at an obstacle. The spin does not care what the blow was aimed at: it
+     * lands exactly as it does off a unit strike, hitting every enemy around the attacker's body and breaking
+     * every barrel in the same ring. Its kills feed Devour Essence the way a unit strike's do.
+     */
+    private spinAroundObstacleStrike(
+        attackerUnit: Unit,
+        unitsHolder: UnitsHolder,
+        attackFromCell: HoCMath.XY,
+        stationaryAttack: boolean,
+        currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+        damageForAnimation?: IVisibleDamage,
+    ): { unitIdsDied: string[]; spunObstacleCells: HoCMath.XY[] } {
+        if (!attackerUnit.hasAbilityActive("Lightning Spin")) {
+            return { unitIdsDied: [], spunObstacleCells: [] };
+        }
+        const secondaryDamage = damageForAnimation ? (damageForAnimation.secondary ??= []) : [];
+        const spinResult = AllAbilities.processLightningSpinAbility(
+            attackerUnit,
+            this.sceneLog,
+            unitsHolder,
+            this.chargedRouteCells(attackerUnit, attackFromCell, stationaryAttack, currentActiveKnownPaths) ?? 1,
+            this.damageStatisticHolder,
+            attackFromCell,
+            true,
+            secondaryDamage,
+            this.grid,
+        );
+        const spunObstacleCells = this.spinScatteredObstaclesAround(attackerUnit, unitsHolder, attackFromCell);
+        if (spinResult.unitIdsDied.length) {
+            unitsHolder.refreshStackPowerForAllUnits();
+            AllAbilities.processDevourEssenceAbility(
+                attackerUnit,
+                spinResult.unitIdsDied,
+                unitsHolder,
+                this.sceneLog,
+                secondaryDamage,
+            );
+        }
+        return { unitIdsDied: spinResult.unitIdsDied, spunObstacleCells };
+    }
     public handleObstacleAttack(
         targetPosition: HoCMath.XY,
         unitsHolder: UnitsHolder,
@@ -2947,6 +3022,7 @@ export class AttackHandler {
         attackerUnit?: Unit,
         attackFromCell?: HoCMath.XY,
         currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+        damageForAnimation?: IVisibleDamage,
     ): IAttackResult {
         const targetCell = GridMath.getCellForPosition(this.gridSettings, targetPosition);
         // Which of the two 2x2 mountains was struck (left columns vs right columns), so only its own hit
@@ -3194,6 +3270,22 @@ export class AttackHandler {
                     return { completed: rangeLanded, unitIdsDied: [], animationData };
                 }
             }
+
+            // Both body-size branches above either landed the melee blow or returned, so the spin goes off here.
+            const spin = this.spinAroundObstacleStrike(
+                attackerUnit,
+                unitsHolder,
+                attackFromCell,
+                stationaryAttack,
+                currentActiveKnownPaths,
+                damageForAnimation,
+            );
+            return {
+                completed: true,
+                unitIdsDied: spin.unitIdsDied,
+                animationData,
+                spunObstacleCells: spin.spunObstacleCells,
+            };
         }
 
         return { completed: true, unitIdsDied: [], animationData };

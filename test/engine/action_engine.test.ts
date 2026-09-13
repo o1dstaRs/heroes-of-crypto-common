@@ -16,6 +16,7 @@ import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } 
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine, type IGameActionEngineContext } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
+import type { GameEvent } from "../../src/engine/events";
 import { createSequenceGameRuntime } from "../../src/engine/runtime";
 import { EffectFactory } from "../../src/effects/effect_factory";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
@@ -1259,6 +1260,92 @@ describe("GameActionEngine", () => {
         expect(obstacleEvents[1]).toMatchObject({ targetPosition: worldOf(behind) });
         expect(setup.grid.getScatteredMountainsStanding()).toEqual([survivor]);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
+    });
+
+    it("Lightning Spin barrel strike: aimed stone first, spun stones tagged, the spin's unit kill rides the first event", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            leftAbilities: ["Lightning Spin"],
+            leftAttack: 50,
+            leftDamageMin: 100,
+            leftDamageMax: 100,
+            leftCell: { x: 2, y: 3 },
+            supportCell: { x: 2, y: 6 },
+            // Standing right beside the spinner: the spin catches it although the blow is aimed at a barrel.
+            rightCell: { x: 2, y: 4 },
+            rightMaxHp: 10,
+            rightAmountAlive: 1,
+        });
+        const aimed = { x: 3, y: 3 };
+        const spun = { x: 1, y: 2 };
+        const survivor = { x: 10, y: 12 };
+        // The spun stone comes FIRST in layout order, so the events prove impact order, not layout order.
+        setup.grid.setScatteredMountains([spun, aimed, survivor]);
+        const settings = setup.grid.getSettings();
+        const worldOf = (cell: { x: number; y: number }) =>
+            getPositionForCell(cell, settings.getMinX(), settings.getStep(), settings.getHalfStep());
+
+        const result = setup.engine.apply({
+            type: "obstacle_attack",
+            attackerId: setup.left.getId(),
+            targetPosition: worldOf(aimed),
+            attackFrom: { x: 2, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        const obstacleEvents = result.events.filter(
+            (event): event is Extract<GameEvent, { type: "obstacle_attacked" }> => event.type === "obstacle_attacked",
+        );
+        expect(obstacleEvents).toHaveLength(2);
+        expect(obstacleEvents[0]).toMatchObject({
+            targetPosition: worldOf(aimed),
+            unitIdsDied: [setup.right.getId()],
+        });
+        expect(obstacleEvents[0].source).toBeUndefined();
+        expect(obstacleEvents[0].damage?.secondary).toContainEqual(
+            expect.objectContaining({ source: "lightning_spin", unitId: setup.right.getId(), unitsDied: 1 }),
+        );
+        expect(obstacleEvents[1]).toMatchObject({ targetPosition: worldOf(spun), source: "lightning_spin" });
+        expect(obstacleEvents[1].damage).toBeUndefined();
+        expect(result.events).toContainEqual({
+            type: "unit_destroyed",
+            unitId: setup.right.getId(),
+            reason: "dead_cleanup",
+        });
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([survivor]);
+    });
+
+    it("Lightning Spin unit strike reports every barrel it broke around the attacker after the attack", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            leftAbilities: ["Lightning Spin"],
+            leftCell: { x: 2, y: 3 },
+            supportCell: { x: 2, y: 6 },
+            rightCell: { x: 3, y: 3 },
+            rightMaxHp: 1000,
+        });
+        const beside = { x: 2, y: 4 };
+        const diagonal = { x: 1, y: 2 };
+        const survivor = { x: 10, y: 12 };
+        setup.grid.setScatteredMountains([survivor, beside, diagonal]);
+
+        const result = setup.engine.apply({
+            type: "melee_attack",
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
+            attackFrom: { x: 2, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        const attackIndex = result.events.findIndex((event) => event.type === "unit_attacked");
+        expect(attackIndex).toBeGreaterThanOrEqual(0);
+        const obstacleEvents = result.events.filter(
+            (event): event is Extract<GameEvent, { type: "obstacle_attacked" }> => event.type === "obstacle_attacked",
+        );
+        expect(obstacleEvents).toHaveLength(2);
+        expect(obstacleEvents.every((event) => event.source === "lightning_spin")).toBe(true);
+        expect(result.events.indexOf(obstacleEvents[0])).toBeGreaterThan(attackIndex);
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([survivor]);
     });
 
     it("Large Caliber ignores scattered stones on its trajectory and destroys every stone in its 3x3 blast", () => {

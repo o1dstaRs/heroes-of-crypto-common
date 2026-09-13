@@ -1282,6 +1282,135 @@ describe("AttackHandler", () => {
             });
         });
 
+        // Hydra's Lightning Spin is one radial impact: every barrel AND every enemy around her body is hit, whether
+        // the blow that set it off was aimed at a barrel or at a unit.
+        describe("Lightning Spin through scattered tombstones", () => {
+            it("a 2x2 spinner aiming at one barrel breaks every barrel around her body, and nothing further out", () => {
+                const ctx = setupMountainFight();
+                // Anchor (3,4) = body (3,4) (2,4) (3,3) (2,3); the ring is x 1..4, y 2..5 minus the body.
+                const aimed = { x: 4, y: 4 };
+                const corner = { x: 1, y: 2 };
+                const above = { x: 2, y: 5 };
+                const outside = { x: 5, y: 4 };
+                ctx.grid.setScatteredMountains([outside, above, aimed, corner]);
+                const hydra = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Lightning Spin"],
+                    size: PBTypes.UnitSizeVals.LARGE,
+                });
+                placeUnit(ctx.grid, ctx.unitsHolder, hydra, { x: 3, y: 4 });
+
+                const result = ctx.attackHandler.handleObstacleAttack(
+                    positionForCell(aimed),
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    hydra,
+                    { x: 3, y: 4 },
+                    undefined,
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([outside]);
+                // The aimed stone fell to the blow itself; the spin reports only the ones it swept, in ring order.
+                expect(result.spunObstacleCells).toEqual([corner, above]);
+            });
+
+            it("a barrel strike spins into the enemies around the attacker as well", () => {
+                const ctx = setupMountainFight();
+                const aimed = { x: 3, y: 3 };
+                ctx.grid.setScatteredMountains([aimed]);
+                const hydra = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Lightning Spin"],
+                    attack: 50,
+                    damageMin: 100,
+                    damageMax: 100,
+                });
+                const adjacent = createTestUnit({ name: "Adjacent", team: PBTypes.TeamVals.LEFT, maxHp: 10 });
+                const distant = createTestUnit({ name: "Distant", team: PBTypes.TeamVals.LEFT, maxHp: 10 });
+                placeUnit(ctx.grid, ctx.unitsHolder, hydra, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, adjacent, { x: 2, y: 4 });
+                placeUnit(ctx.grid, ctx.unitsHolder, distant, { x: 12, y: 3 });
+                const damage = createVisibleDamage(hydra);
+
+                const result = ctx.attackHandler.handleObstacleAttack(
+                    positionForCell(aimed),
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    hydra,
+                    { x: 2, y: 3 },
+                    undefined,
+                    damage,
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([]);
+                expect(adjacent.isDead()).toBe(true);
+                expect(result.unitIdsDied).toEqual([adjacent.getId()]);
+                expect(damage.secondary).toContainEqual(
+                    expect.objectContaining({ source: "lightning_spin", unitId: adjacent.getId() }),
+                );
+                expect(distant.getCumulativeHp()).toBe(distant.getMaxHp());
+            });
+
+            it("a unit strike breaks the barrels around the attacker in the same spin", () => {
+                const ctx = setupMountainFight();
+                const beside = { x: 2, y: 4 };
+                const diagonal = { x: 1, y: 2 };
+                const outside = { x: 5, y: 3 };
+                ctx.grid.setScatteredMountains([beside, outside, diagonal]);
+                const hydra = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Lightning Spin"],
+                });
+                const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, maxHp: 1000 });
+                placeUnit(ctx.grid, ctx.unitsHolder, hydra, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, target, { x: 3, y: 3 });
+
+                const result = ctx.attackHandler.handleMeleeAttack(
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    createVisibleDamage(target),
+                    undefined,
+                    hydra,
+                    target,
+                    { x: 2, y: 3 },
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([outside]);
+                expect(result.spunObstacleCells).toHaveLength(2);
+                expect(result.spunObstacleCells).toEqual(expect.arrayContaining([beside, diagonal]));
+            });
+
+            it("a plain unit strike leaves the barrels beside the attacker standing", () => {
+                const ctx = setupMountainFight();
+                const beside = { x: 2, y: 4 };
+                ctx.grid.setScatteredMountains([beside]);
+                const attacker = createTestUnit({ team: PBTypes.TeamVals.RIGHT, attackType: PBTypes.AttackVals.MELEE });
+                const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, maxHp: 1000 });
+                placeUnit(ctx.grid, ctx.unitsHolder, attacker, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, target, { x: 3, y: 3 });
+
+                const result = ctx.attackHandler.handleMeleeAttack(
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    createVisibleDamage(target),
+                    undefined,
+                    attacker,
+                    target,
+                    { x: 2, y: 3 },
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([beside]);
+                expect(result.spunObstacleCells).toEqual([]);
+            });
+        });
+
         it("small melee unit strikes the left mountain from an outer (non-corridor) cell", () => {
             const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
             const attacker = createTestUnit({ team: PBTypes.TeamVals.RIGHT, attackType: PBTypes.AttackVals.MELEE });

@@ -705,6 +705,10 @@ export class GameActionEngine {
                 damage: this.cloneVisibleDamage(damage),
                 animations: this.serializeAnimations(result.animationData ?? []),
             });
+            // Lightning Spin broke the cemetery barrels around the attacker in the same impact as the strike.
+            events.push(
+                ...this.scatteredObstacleDestroyedEvents(attacker, result.spunObstacleCells ?? [], "lightning_spin"),
+            );
         }
         events.push(...this.createAbilityStolenEvents(result.abilityStolen));
         events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
@@ -968,6 +972,8 @@ export class GameActionEngine {
         const knownPaths = action.attackFrom
             ? this.resolveKnownPaths(attacker, action.attackFrom, action.path, action.hasLavaCell, action.hasWaterCell)
             : undefined;
+        // A Lightning Spin off the blow hits the enemies around the attacker, so this strike can deal unit damage.
+        const damage = this.createVisibleDamage();
         const result = this.context.attackHandler.handleObstacleAttack(
             action.targetPosition,
             this.context.unitsHolder,
@@ -975,6 +981,7 @@ export class GameActionEngine {
             attacker,
             action.attackFrom,
             knownPaths,
+            damage,
         );
         const hitsAfter = this.context.fightProperties.getObstacleHitsLeft();
         const standingAfter = scattered ? this.context.grid.getScatteredMountainsStanding().length : 0;
@@ -1018,16 +1025,37 @@ export class GameActionEngine {
             removedCells.push(aimedRemoved);
             removedByKey.delete(aimedKey);
         }
+        // A Lightning Spin's barrels fall in the SAME impact as the aimed blow rather than on strikes of their own,
+        // so they trail everything else, in the ring order the spin swept them.
+        const spunCells: XY[] = [];
+        for (const cell of result.spunObstacleCells ?? []) {
+            const key = `${cell.x}:${cell.y}`;
+            const removed = removedByKey.get(key);
+            if (removed) {
+                spunCells.push(removed);
+                removedByKey.delete(key);
+            }
+        }
         removedCells.push(...removedByKey.values());
+        const unitIdsDied = [...new Set(result.unitIdsDied)];
+        // The spin's unit hits have no unit target to ride on, so the action's first obstacle event carries them.
+        const unitDamage =
+            unitIdsDied.length || damage.secondary?.length
+                ? { damage: this.cloneVisibleDamage(damage), unitIdsDied }
+                : {};
         const serializedAnimations = this.serializeAnimations(result.animationData ?? []);
         const events: GameEvent[] = [];
         if (!this.headlessEvents) {
             if (scattered) {
                 events.push(
-                    ...this.scatteredObstacleDestroyedEvents(attacker, removedCells).map((event, index) => ({
+                    ...[
+                        ...this.scatteredObstacleDestroyedEvents(attacker, removedCells),
+                        ...this.scatteredObstacleDestroyedEvents(attacker, spunCells, "lightning_spin"),
+                    ].map((event, index) => ({
                         ...event,
                         attackFrom: action.attackFrom ? { ...action.attackFrom } : undefined,
                         animations: serializedAnimations[index] ? [serializedAnimations[index]] : [],
+                        ...(index === 0 ? unitDamage : {}),
                     })),
                 );
             } else {
@@ -1041,9 +1069,11 @@ export class GameActionEngine {
                     hitsAfterLeft: this.context.fightProperties.getObstacleHitsLeftLeft(),
                     hitsAfterRight: this.context.fightProperties.getObstacleHitsLeftRight(),
                     animations: serializedAnimations,
+                    ...unitDamage,
                 });
             }
         }
+        events.push(...this.cleanupDeadUnits(unitIdsDied));
         // Destroy whichever 2x2 mountain just ran out of hits (each is independent). clearMountainSide is
         // idempotent, so checking both after every obstacle attack is safe and cheap.
         let clearedMountain = false;
@@ -1070,7 +1100,11 @@ export class GameActionEngine {
         events.push(...this.turnEngine.completeTurn(attacker));
         return { completed: true, events };
     }
-    private scatteredObstacleDestroyedEvents(attacker: Unit, cells: readonly XY[]): GameEvent[] {
+    private scatteredObstacleDestroyedEvents(
+        attacker: Unit,
+        cells: readonly XY[],
+        source?: "lightning_spin",
+    ): Extract<GameEvent, { type: "obstacle_attacked" }>[] {
         if (!cells.length) {
             return [];
         }
@@ -1086,6 +1120,7 @@ export class GameActionEngine {
             hitsAfterLeft: fightProperties.getObstacleHitsLeftLeft(),
             hitsAfterRight: fightProperties.getObstacleHitsLeftRight(),
             animations: [],
+            ...(source ? { source } : {}),
         }));
     }
     private areaThrowAttack(action: Extract<GameAction, { type: "area_throw_attack" }>): IGameActionResult {
