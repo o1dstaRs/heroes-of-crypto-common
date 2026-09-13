@@ -50,6 +50,52 @@ import { UnitProperties } from "./unit_properties";
 
 type AuraRefreshFingerprintValue = boolean | number | string | undefined;
 
+/** Reused detail scratch for auraRefreshFingerprintStillMatches; the refresh is never re-entered. */
+const AURA_REFRESH_FINGERPRINT_SEGMENT: AuraRefreshFingerprintValue[] = [];
+/** Values in a unit's fixed fingerprint header, after its segment-length slot. */
+const AURA_REFRESH_FINGERPRINT_HEADER_LENGTH = 15;
+
+const ANGELIC_HOST_BLESSING_BIT = 1;
+const ARCANE_WARD_BLESSING_BIT = 2;
+const WARDING_MANE_BLESSING_BIT = 4;
+const ARROWS_WINGSHIELD_BLESSING_BIT = 8;
+
+/** The four board-wide blessings as seen at the start of one stack-power refresh. */
+interface IBlessingCensus {
+    angelicHost: Map<TeamType, number>;
+    arcaneWard: Map<TeamType, number>;
+    wardingMane: Map<TeamType, number>;
+    arrowsWingshield: Map<TeamType, number>;
+    /** Per unit, in allUnits order: the blessing bits it carries as a buff object or a display entry. */
+    carriers: number[];
+    /** Every blessing bit carried by any unit. */
+    carried: number;
+}
+
+function blessingBit(name: string): number {
+    switch (name) {
+        case "Angelic Host Blessing":
+            return ANGELIC_HOST_BLESSING_BIT;
+        case "Arcane Ward Blessing":
+            return ARCANE_WARD_BLESSING_BIT;
+        case "Warding Mane Blessing":
+            return WARDING_MANE_BLESSING_BIT;
+        case "Arrows Wingshield Blessing":
+            return ARROWS_WINGSHIELD_BLESSING_BIT;
+        default:
+            return 0;
+    }
+}
+
+function hasPositivePower(powerPerTeam: ReadonlyMap<TeamType, number>): boolean {
+    for (const power of powerPerTeam.values()) {
+        if (power > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 export class UnitsHolder {
     private readonly grid: Grid;
     private readonly allUnits: Map<string, Unit> = new Map();
@@ -926,25 +972,80 @@ export class UnitsHolder {
             height: typeof unit.getFootprintHeight === "function" ? unit.getFootprintHeight() : size,
         };
     }
-    private refreshAngelicHostForAllUnits(): void {
-        const powerPerTeam: Map<TeamType, number> = new Map();
+    /**
+     * One pass over the army for all four board-wide blessings: each team's strongest living source and which
+     * units already carry each blessing. Everything it reads — death, board position, abilities, Break, luck,
+     * stack power — is untouched by the blessing buffs the four refreshes delete and re-apply, so reading it once
+     * equals re-reading it before each refresh. Each refresh used to walk the army twice and probe every unit
+     * with deleteBuff, although most boards carry one blessing at most and most units carry none.
+     */
+    private captureBlessingCensus(): IBlessingCensus {
+        const census: IBlessingCensus = {
+            angelicHost: new Map(),
+            arcaneWard: new Map(),
+            wardingMane: new Map(),
+            arrowsWingshield: new Map(),
+            carriers: [],
+            carried: 0,
+        };
 
         for (const unit of this.getAllUnitsIterator()) {
+            let carried = 0;
+            for (const buff of unit.getBuffs()) {
+                carried |= blessingBit(buff.getName());
+            }
+            for (const name of unit.getUnitProperties().applied_buffs) {
+                carried |= blessingBit(name);
+            }
+            census.carriers.push(carried);
+            census.carried |= carried;
+
             if (unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
                 continue;
             }
 
+            const team = unit.getTeam();
             const angelicHostAbility = unit.getAbility("Angelic Host Blessing");
             if (angelicHostAbility) {
-                powerPerTeam.set(
-                    unit.getTeam(),
-                    Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, angelicHostAbility.getPower()),
+                census.angelicHost.set(
+                    team,
+                    Math.max(census.angelicHost.get(team) ?? 0, angelicHostAbility.getPower()),
+                );
+            }
+            if (unit.getAbility("Arcane Ward Blessing")) {
+                census.arcaneWard.set(
+                    team,
+                    Math.max(census.arcaneWard.get(team) ?? 0, unit.calculateArcaneWardBlessingPower()),
+                );
+            }
+            if (unit.getAbility("Warding Mane Blessing")) {
+                census.wardingMane.set(
+                    team,
+                    Math.max(census.wardingMane.get(team) ?? 0, unit.calculateWardingManeBlessingPower()),
+                );
+            }
+            if (unit.getAbility("Arrows Wingshield Blessing")) {
+                census.arrowsWingshield.set(
+                    team,
+                    Math.max(census.arrowsWingshield.get(team) ?? 0, unit.calculateArrowsWingshieldBlessingPower()),
                 );
             }
         }
 
+        return census;
+    }
+    private refreshAngelicHostForAllUnits(census: IBlessingCensus = this.captureBlessingCensus()): void {
+        const powerPerTeam = census.angelicHost;
+        // No source and no carrier: every deleteBuff below would be a no-op and every unit would skip the apply.
+        if (!(census.carried & ANGELIC_HOST_BLESSING_BIT) && !hasPositivePower(powerPerTeam)) {
+            return;
+        }
+
+        let index = 0;
         for (const unit of this.getAllUnitsIterator()) {
-            unit.deleteBuff("Angelic Host Blessing");
+            if (census.carriers[index++] & ANGELIC_HOST_BLESSING_BIT) {
+                unit.deleteBuff("Angelic Host Blessing");
+            }
 
             const power = powerPerTeam.get(unit.getTeam()) ?? 0;
             if (
@@ -965,90 +1066,36 @@ export class UnitsHolder {
             unit.applyBuff(buff, power);
         }
     }
-    private refreshArcaneWardBlessingForAllUnits(): void {
-        const powerPerTeam: Map<TeamType, number> = new Map();
-
-        for (const unit of this.getAllUnitsIterator()) {
-            if (
-                unit.isDead() ||
-                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
-                !unit.getAbility("Arcane Ward Blessing")
-            ) {
-                continue;
-            }
-
-            const power = unit.calculateArcaneWardBlessingPower();
-            powerPerTeam.set(unit.getTeam(), Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, power));
-        }
-
-        for (const unit of this.getAllUnitsIterator()) {
-            unit.deleteBuff("Arcane Ward Blessing");
-
-            const power = powerPerTeam.get(unit.getTeam()) ?? 0;
-            if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
-                continue;
-            }
-
-            const buff = new Spell({
-                spellProperties: getSpellConfig("System", "Arcane Ward Blessing", NUMBER_OF_LAPS_TOTAL),
-                amount: 1,
-            });
-            buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
-            buff.setPower(power);
-            unit.applyBuff(buff, power);
-        }
+    private refreshArcaneWardBlessingForAllUnits(census: IBlessingCensus = this.captureBlessingCensus()): void {
+        this.reapplyTeamBlessing(census, census.arcaneWard, ARCANE_WARD_BLESSING_BIT, "Arcane Ward Blessing");
     }
-    private refreshWardingManeBlessingForAllUnits(): void {
-        const powerPerTeam: Map<TeamType, number> = new Map();
-
-        for (const unit of this.getAllUnitsIterator()) {
-            if (
-                unit.isDead() ||
-                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
-                !unit.getAbility("Warding Mane Blessing")
-            ) {
-                continue;
-            }
-
-            const power = unit.calculateWardingManeBlessingPower();
-            powerPerTeam.set(unit.getTeam(), Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, power));
-        }
-
-        for (const unit of this.getAllUnitsIterator()) {
-            unit.deleteBuff("Warding Mane Blessing");
-
-            const power = powerPerTeam.get(unit.getTeam()) ?? 0;
-            if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
-                continue;
-            }
-
-            const buff = new Spell({
-                spellProperties: getSpellConfig("System", "Warding Mane Blessing", NUMBER_OF_LAPS_TOTAL),
-                amount: 1,
-            });
-            buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
-            buff.setPower(power);
-            unit.applyBuff(buff, power);
-        }
+    private refreshWardingManeBlessingForAllUnits(census: IBlessingCensus = this.captureBlessingCensus()): void {
+        this.reapplyTeamBlessing(census, census.wardingMane, WARDING_MANE_BLESSING_BIT, "Warding Mane Blessing");
     }
-    private refreshArrowsWingshieldBlessingForAllUnits(): void {
-        const powerPerTeam: Map<TeamType, number> = new Map();
-
-        for (const unit of this.getAllUnitsIterator()) {
-            if (
-                unit.isDead() ||
-                !isCellWithinGrid(this.gridSettings, unit.getBaseCell()) ||
-                !unit.getAbility("Arrows Wingshield Blessing")
-            ) {
-                continue;
-            }
-
-            const power = unit.calculateArrowsWingshieldBlessingPower();
-            powerPerTeam.set(unit.getTeam(), Math.max(powerPerTeam.get(unit.getTeam()) ?? 0, power));
+    private refreshArrowsWingshieldBlessingForAllUnits(census: IBlessingCensus = this.captureBlessingCensus()): void {
+        this.reapplyTeamBlessing(
+            census,
+            census.arrowsWingshield,
+            ARROWS_WINGSHIELD_BLESSING_BIT,
+            "Arrows Wingshield Blessing",
+        );
+    }
+    /** Strip `blessingName` from its carriers, then grant every living on-board unit its team's strongest power. */
+    private reapplyTeamBlessing(
+        census: IBlessingCensus,
+        powerPerTeam: ReadonlyMap<TeamType, number>,
+        bit: number,
+        blessingName: string,
+    ): void {
+        if (!(census.carried & bit) && !hasPositivePower(powerPerTeam)) {
+            return;
         }
 
+        let index = 0;
         for (const unit of this.getAllUnitsIterator()) {
-            unit.deleteBuff("Arrows Wingshield Blessing");
+            if (census.carriers[index++] & bit) {
+                unit.deleteBuff(blessingName);
+            }
 
             const power = powerPerTeam.get(unit.getTeam()) ?? 0;
             if (power <= 0 || unit.isDead() || !isCellWithinGrid(this.gridSettings, unit.getBaseCell())) {
@@ -1056,7 +1103,7 @@ export class UnitsHolder {
             }
 
             const buff = new Spell({
-                spellProperties: getSpellConfig("System", "Arrows Wingshield Blessing", NUMBER_OF_LAPS_TOTAL),
+                spellProperties: getSpellConfig("System", blessingName, NUMBER_OF_LAPS_TOTAL),
                 amount: 1,
             });
             buff.setDesc(buff.getDesc().map((description) => description.replace(/\{\}/g, power.toString())));
@@ -1085,10 +1132,11 @@ export class UnitsHolder {
         // buff-style auras were silently inactive in ranked; pairing them here matches the sandbox,
         // whose refreshUnits() has always run both. cleanAuraEffects() makes this idempotent.
         this.refreshAuraEffectsIfNeeded();
-        this.refreshAngelicHostForAllUnits();
-        this.refreshArcaneWardBlessingForAllUnits();
-        this.refreshWardingManeBlessingForAllUnits();
-        this.refreshArrowsWingshieldBlessingForAllUnits();
+        const blessingCensus = this.captureBlessingCensus();
+        this.refreshAngelicHostForAllUnits(blessingCensus);
+        this.refreshArcaneWardBlessingForAllUnits(blessingCensus);
+        this.refreshWardingManeBlessingForAllUnits(blessingCensus);
+        this.refreshArrowsWingshieldBlessingForAllUnits(blessingCensus);
         this.refreshWaterShieldForAllUnits();
         // This loop runs after EVERY engine action, so a19 rollouts walk it millions of times. The fight
         // scalars are the same for every unit, and the per-team modifiers are the same for every unit on a
@@ -1301,114 +1349,195 @@ export class UnitsHolder {
         );
         return true;
     }
+    /**
+     * Appends one unit's segment of the aura-refresh fingerprint — its length, a fixed header of
+     * AURA_REFRESH_FINGERPRINT_HEADER_LENGTH values, then the detail — and returns false when the unit's aura
+     * state is malformed. The length slot is derived from the content, so two segments are equal exactly when
+     * their values are.
+     */
+    private appendUnitAuraRefreshFingerprint(
+        fingerprint: AuraRefreshFingerprintValue[],
+        unit: Unit,
+        fightProperties: FightProperties,
+    ): boolean {
+        const lengthIndex = fingerprint.length;
+        fingerprint.push(0);
+        // The body's cells and anchor are a pure function of the position and the footprint dimensions
+        // (grid_math), so those four scalars carry exactly the same information as listing every cell —
+        // without allocating the cell list for every unit on every stack-power refresh.
+        const position = unit.getPosition();
+        const auraEffects = unit.getAuraEffects();
+        const madeOfFire = unit.getBuff("Made of Fire");
+
+        fingerprint.push(
+            "unit",
+            unit.getId(),
+            unit.getTeam(),
+            position.x,
+            position.y,
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
+            unit.getAttackType(),
+            unit.canFly(),
+            unit.getLuck(),
+            unit.hasEffectActive("Break"),
+            unit.hasAuraEffect("Disguise"),
+            unit.hasAbilityActive("Disguise Aura"),
+            madeOfFire?.getPower(),
+            auraEffects.length,
+        );
+        if (!this.appendUnitAuraRefreshDetail(fingerprint, unit, auraEffects, fightProperties)) {
+            return false;
+        }
+        fingerprint[lengthIndex] = fingerprint.length - lengthIndex - 1;
+        return true;
+    }
+    /** A unit's fingerprint after its header: aura power inputs, aura definitions, and applied aura state. */
+    private appendUnitAuraRefreshDetail(
+        fingerprint: AuraRefreshFingerprintValue[],
+        unit: Unit,
+        auraEffects: ReturnType<Unit["getAuraEffects"]>,
+        fightProperties: FightProperties,
+    ): boolean {
+        if (auraEffects.length) {
+            fingerprint.push(
+                unit.getStackPower(),
+                fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam()),
+                fightProperties.getAdditionalAuraRangePerTeam(unit.getTeam()),
+            );
+        }
+        for (const auraEffect of auraEffects) {
+            const defaultProperties = auraEffect.defaultProperties;
+            const currentProperties = auraEffect.getProperties();
+            if (
+                !this.appendAuraDefinition(fingerprint, defaultProperties) ||
+                !this.appendAuraDefinition(fingerprint, currentProperties)
+            ) {
+                return false;
+            }
+        }
+
+        const properties = unit.getUnitProperties();
+        if (
+            !this.appendAppliedAuraState(
+                fingerprint,
+                "buff-properties",
+                properties.applied_buffs,
+                properties.applied_buffs_laps,
+                properties.applied_buffs_descriptions,
+                properties.applied_buffs_powers,
+            ) ||
+            !this.appendAppliedAuraState(
+                fingerprint,
+                "debuff-properties",
+                properties.applied_debuffs,
+                properties.applied_debuffs_laps,
+                properties.applied_debuffs_descriptions,
+                properties.applied_debuffs_powers,
+            )
+        ) {
+            return false;
+        }
+
+        for (const [channel, spells] of [
+            ["buff-objects", unit.getBuffs()],
+            ["debuff-objects", unit.getDebuffs()],
+        ] as const) {
+            fingerprint.push(channel, spells.length);
+            for (let i = 0; i < spells.length; i++) {
+                const spell = spells[i];
+                const name = spell.getName();
+                if (spell.getLaps() === Number.MAX_SAFE_INTEGER || name.endsWith(" Aura") || name === "Made of Fire") {
+                    fingerprint.push(
+                        i,
+                        name,
+                        spell.getPower(),
+                        spell.getLaps(),
+                        spell.getFirstSpellProperty(),
+                        spell.getSecondSpellProperty(),
+                    );
+                }
+            }
+        }
+        return true;
+    }
     private captureAuraRefreshFingerprint(): AuraRefreshFingerprintValue[] | undefined {
         const fingerprint: AuraRefreshFingerprintValue[] = [];
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         for (const unit of this.getAllUnitsIterator()) {
-            // The body's cells and anchor are a pure function of the position and the footprint dimensions
-            // (grid_math), so those four scalars carry exactly the same information as listing every cell —
-            // without allocating the cell list for every unit on every stack-power refresh.
-            const position = unit.getPosition();
-            const auraEffects = unit.getAuraEffects();
-            const madeOfFire = unit.getBuff("Made of Fire");
-
-            fingerprint.push(
-                "unit",
-                unit.getId(),
-                unit.getTeam(),
-                position.x,
-                position.y,
-                unit.getFootprintWidth(),
-                unit.getFootprintHeight(),
-                unit.getAttackType(),
-                unit.canFly(),
-                unit.getLuck(),
-                unit.hasEffectActive("Break"),
-                unit.hasAuraEffect("Disguise"),
-                unit.hasAbilityActive("Disguise Aura"),
-                madeOfFire?.getPower(),
-                auraEffects.length,
-            );
-
-            if (auraEffects.length) {
-                fingerprint.push(
-                    unit.getStackPower(),
-                    fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam()),
-                    fightProperties.getAdditionalAuraRangePerTeam(unit.getTeam()),
-                );
-            }
-            for (const auraEffect of auraEffects) {
-                const defaultProperties = auraEffect.defaultProperties;
-                const currentProperties = auraEffect.getProperties();
-                if (
-                    !this.appendAuraDefinition(fingerprint, defaultProperties) ||
-                    !this.appendAuraDefinition(fingerprint, currentProperties)
-                ) {
-                    return undefined;
-                }
-            }
-
-            const properties = unit.getUnitProperties();
-            if (
-                !this.appendAppliedAuraState(
-                    fingerprint,
-                    "buff-properties",
-                    properties.applied_buffs,
-                    properties.applied_buffs_laps,
-                    properties.applied_buffs_descriptions,
-                    properties.applied_buffs_powers,
-                ) ||
-                !this.appendAppliedAuraState(
-                    fingerprint,
-                    "debuff-properties",
-                    properties.applied_debuffs,
-                    properties.applied_debuffs_laps,
-                    properties.applied_debuffs_descriptions,
-                    properties.applied_debuffs_powers,
-                )
-            ) {
+            if (!this.appendUnitAuraRefreshFingerprint(fingerprint, unit, fightProperties)) {
                 return undefined;
-            }
-
-            for (const [channel, spells] of [
-                ["buff-objects", unit.getBuffs()],
-                ["debuff-objects", unit.getDebuffs()],
-            ] as const) {
-                fingerprint.push(channel, spells.length);
-                for (let i = 0; i < spells.length; i++) {
-                    const spell = spells[i];
-                    const name = spell.getName();
-                    if (
-                        spell.getLaps() === Number.MAX_SAFE_INTEGER ||
-                        name.endsWith(" Aura") ||
-                        name === "Made of Fire"
-                    ) {
-                        fingerprint.push(
-                            i,
-                            name,
-                            spell.getPower(),
-                            spell.getLaps(),
-                            spell.getFirstSpellProperty(),
-                            spell.getSecondSpellProperty(),
-                        );
-                    }
-                }
             }
         }
 
         return fingerprint;
     }
-    private auraRefreshFingerprintMatches(candidate: readonly AuraRefreshFingerprintValue[]): boolean {
+    /**
+     * The same verdict as capturing a fresh fingerprint and comparing it with the stored one, in two passes.
+     *
+     * The stored fingerprint differs on almost nine in ten a19 refreshes, and what differs is nearly always a
+     * header value: a unit moved, rolled luck, or gained Break. So the first pass reads only each unit's header
+     * straight against the stored values, hopping segment to segment by the stored lengths and building nothing.
+     * Only when every header and the unit count match does the second pass rebuild and compare the details.
+     * Every read is a pure getter, so stopping early has no side effect.
+     */
+    private auraRefreshFingerprintStillMatches(): boolean {
         const current = this.auraRefreshFingerprint;
-        if (!current || current.length !== candidate.length) {
+        if (!current) {
             return false;
         }
 
-        for (let i = 0; i < current.length; i++) {
-            if (!Object.is(current[i], candidate[i])) {
+        let offset = 0;
+        for (const unit of this.getAllUnitsIterator()) {
+            if (offset + 1 + AURA_REFRESH_FINGERPRINT_HEADER_LENGTH > current.length) {
                 return false;
             }
+            const position = unit.getPosition();
+            if (
+                !Object.is(current[offset + 4], position.x) ||
+                !Object.is(current[offset + 5], position.y) ||
+                !Object.is(current[offset + 10], unit.getLuck()) ||
+                current[offset + 1] !== "unit" ||
+                !Object.is(current[offset + 2], unit.getId()) ||
+                !Object.is(current[offset + 3], unit.getTeam()) ||
+                !Object.is(current[offset + 6], unit.getFootprintWidth()) ||
+                !Object.is(current[offset + 7], unit.getFootprintHeight()) ||
+                !Object.is(current[offset + 8], unit.getAttackType()) ||
+                !Object.is(current[offset + 9], unit.canFly()) ||
+                !Object.is(current[offset + 11], unit.hasEffectActive("Break")) ||
+                !Object.is(current[offset + 12], unit.hasAuraEffect("Disguise")) ||
+                !Object.is(current[offset + 13], unit.hasAbilityActive("Disguise Aura")) ||
+                !Object.is(current[offset + 14], unit.getBuff("Made of Fire")?.getPower()) ||
+                !Object.is(current[offset + 15], unit.getAuraEffects().length)
+            ) {
+                return false;
+            }
+            offset += 1 + (current[offset] as number);
+        }
+        if (offset !== current.length) {
+            return false;
+        }
+
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        const detail = AURA_REFRESH_FINGERPRINT_SEGMENT;
+        offset = 0;
+        for (const unit of this.getAllUnitsIterator()) {
+            detail.length = 0;
+            if (!this.appendUnitAuraRefreshDetail(detail, unit, unit.getAuraEffects(), fightProperties)) {
+                return false;
+            }
+            const segmentLength = current[offset] as number;
+            if (segmentLength !== AURA_REFRESH_FINGERPRINT_HEADER_LENGTH + detail.length) {
+                return false;
+            }
+            const detailStart = offset + 1 + AURA_REFRESH_FINGERPRINT_HEADER_LENGTH;
+            for (let i = 0; i < detail.length; i++) {
+                if (!Object.is(current[detailStart + i], detail[i])) {
+                    return false;
+                }
+            }
+            offset += 1 + segmentLength;
         }
         return true;
     }
@@ -1456,8 +1585,7 @@ export class UnitsHolder {
             return true;
         }
 
-        const before = this.captureAuraRefreshFingerprint();
-        if (before && this.auraRefreshFingerprintMatches(before)) {
+        if (this.auraRefreshFingerprintStillMatches()) {
             return false;
         }
 
