@@ -53,7 +53,7 @@ export enum Tier2Artifact {
     GIANTS_MAUL = 6, // +50% non-magical (physical) AOE damage, resisted by status resistance
     PENDANT_OF_VITALITY = 7, // +25% HP (all) / -20% attack
     FARSIGHT_QUIVER = 8, // all allied archers shoot at full arrow (no range falloff)
-    BERSERKERS_BOND = 9, // +3 attack / -2 defense (flat)
+    BERSERKERS_BOND = 9, // +3 attack / -1 defense (flat)
     TOME_OF_AMPLIFICATION = 10, // +50% power to non-healing castable buffs allied units apply to allies
     RIME_CHARM = 11, // 30% chance to apply a 3-turn slow on any attack
     LAVA_STRIDERS = 12, // all units may move over lava
@@ -113,7 +113,7 @@ export const ARTIFACT_POWER = {
     KEEN_BLADE_FLAT: 0.7,
     IRON_PLATE_FLAT: 1,
     BERSERKERS_BOND_ATTACK: 3,
-    BERSERKERS_BOND_DEFENSE_PENALTY: 2,
+    BERSERKERS_BOND_DEFENSE_PENALTY: 1,
     PENDANT_HP_PERCENT: 25,
     PENDANT_ATTACK_PENALTY_PERCENT: 12.5,
     CURSED_WARD_LUCK: 3,
