@@ -425,6 +425,12 @@ export function defaultRankedDraftPool(): IRankedDraftPoolEntry[] {
 export function loadRankedDraftPool(specifier?: string, cwd: string = process.cwd()): IRankedDraftPoolEntry[] {
     if (!specifier || specifier === "default") return defaultRankedDraftPool();
     if (specifier === "live") return [{ ...rankedDraftLiveIncumbent(), prior: 1 }];
+    // A strength policy as the incumbent, e.g. "policy:ranked-unit-strength-a19-side-v1-w1" once it has shipped.
+    if (specifier.startsWith("policy:")) {
+        const policy = specifier.slice("policy:".length);
+        if (!isRankedDraftStrengthPolicy(policy)) throw new TypeError(`Unknown ranked draft strength policy ${policy}`);
+        return [{ ...normalizeRankedDraftGenome(parseDraftGenome(policy), `incumbent:${policy}`), prior: 1 }];
+    }
     // Fixed references for robustness checks: the untrained fallback and the League exploiter that punishes
     // hard-countering drafts. Candidate and incumbent face them on identical seeds.
     if (specifier === "reference") {
@@ -633,6 +639,8 @@ export interface IRankedDraftPickRules {
     liveDraftRules?: boolean;
     /** Replace each bundle/creature decision with a uniform legal choice at this rate. */
     explorationRate?: number;
+    /** The board's map. Creature decisions see it from level 3 on, when the live pick phase reveals it. */
+    gridType?: number;
 }
 
 export function resolveRankedDraftPick(
@@ -724,6 +732,7 @@ export function resolveRankedDraftPick(
                       own.creatures,
                       getKnownOpponentCreatures(state, team),
                       own.tier1Artifact,
+                      phase.creatureLevel >= 3 ? rules.gridType : undefined,
                   );
         if (creatureId === undefined) {
             throw new Error(`Ranked draft creature policy found no visible L${phase.creatureLevel} creature`);
@@ -827,9 +836,10 @@ function matchConfig(
     };
 }
 
-const rankedDraftPickRules = (options: INormalizedOptions): IRankedDraftPickRules => ({
+const rankedDraftPickRules = (options: INormalizedOptions, gridType: number): IRankedDraftPickRules => ({
     liveDraftRules: options.liveDraftRules,
     explorationRate: options.explorationRate,
+    gridType,
 });
 
 const recordedArmy = (army: IRankedDraftArmy): IRankedDraftRecordedArmy => ({
@@ -877,12 +887,14 @@ export function playRankedDraftGame(
         : options.candidateSetupPolicySpec;
     const leftSetupPolicy = resolveSetupPolicy(leftSetupPolicySpec);
     const rightSetupPolicy = resolveSetupPolicy(rightSetupPolicySpec);
+    // The map is fixed when the pick is created, and revealed to the draft before the level-3 picks.
+    const gridType = options.mapTypes[(offerBoard + seedLaneIndex) % options.mapTypes.length];
     const pick = resolveRankedDraftPick(
         pickSeed,
         leftGenome,
         rightGenome,
         { left: leftSetupPolicy.spec, right: rightSetupPolicy.spec },
-        rankedDraftPickRules(options),
+        rankedDraftPickRules(options, gridType),
     );
     const left = materializeArmy(pick.left, getKnownOpponentCreatures(pick, LEFT), leftSetupPolicy);
     const right = materializeArmy(pick.right, getKnownOpponentCreatures(pick, RIGHT), rightSetupPolicy);
@@ -890,7 +902,6 @@ export function playRankedDraftGame(
     const red = battleMirror ? left : right;
     const candidateIsGreen = battleMirror ? !candidatePickedLeft : candidatePickedLeft;
     const candidateArmy = candidatePickedLeft ? left : right;
-    const gridType = options.mapTypes[(offerBoard + seedLaneIndex) % options.mapTypes.length];
     const result = (dependencies.matchRunner ?? DEFAULT_DEPENDENCIES.matchRunner)(
         matchConfig(green, red, battleSeed, gridType, options),
     );
@@ -948,6 +959,7 @@ export function inspectRankedDraftBoard(
         throw new RangeError(`offerBoard must be in [0, ${boards})`);
     }
     const { pairSeed, pickSeed } = rankedDraftBoardSeeds(options, seedLaneIndex, offerBoard);
+    const gridType = options.mapTypes[(offerBoard + seedLaneIndex) % options.mapTypes.length];
     const assignments = ([true, false] as const).map((candidatePickedLeft) => {
         const leftGenome = candidatePickedLeft ? candidate : opponent;
         const rightGenome = candidatePickedLeft ? opponent : candidate;
@@ -959,7 +971,7 @@ export function inspectRankedDraftBoard(
                 left: candidatePickedLeft ? options.candidateSetupPolicySpec : options.opponentSetupPolicySpec,
                 right: candidatePickedLeft ? options.opponentSetupPolicySpec : options.candidateSetupPolicySpec,
             },
-            rankedDraftPickRules(options),
+            rankedDraftPickRules(options, gridType),
         );
         const candidateTeam = candidatePickedLeft ? pick.left : pick.right;
         return {

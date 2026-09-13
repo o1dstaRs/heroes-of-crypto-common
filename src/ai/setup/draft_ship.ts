@@ -32,7 +32,12 @@ import {
     eligibleBacklineProtectorChoices,
 } from "./creature_score";
 import { pickCoherentDraftBundle, pickCoherentDraftCreature, type DraftBundle } from "./draft_coherence";
-import { isRankedDraftStrengthPolicy, type RankedDraftStrengthPolicyId } from "./draft_strength_prior";
+import {
+    isRankedDraftStrengthPolicy,
+    RANKED_DRAFT_RELAXED_FACTION_TAX_FREE_STACKS,
+    rankedDraftStrengthRelaxesFactionTax,
+    type RankedDraftStrengthPolicyId,
+} from "./draft_strength_prior";
 import { TIER1_ARTIFACT_WINRATE } from "./setup_strategy";
 import {
     isRankedDraftInteractionPrior,
@@ -286,6 +291,7 @@ export function pickDraftGenomeCreature(
     ownCreatureIds: readonly number[],
     knownOpponentCreatureIds: readonly number[],
     tier1ArtifactId?: number,
+    revealedGridType?: number,
 ): number | undefined {
     const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
     return pickCoherentDraftCreature(
@@ -299,6 +305,7 @@ export function pickDraftGenomeCreature(
             ownCreatureIds,
             tier1ArtifactId,
             knownOpponentCreatureIds,
+            ...(revealedGridType === undefined ? {} : { revealedGridType }),
             ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
             ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
             ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
@@ -322,8 +329,12 @@ export const RANKED_FACTION_DIVERSITY_MAX_STACKS = 3;
 /** A single same-faction pairing is legitimate coherence (e.g. an ELF ward for an anti-flyer Arachna Queen). */
 export const RANKED_FACTION_DIVERSITY_FREE_STACKS = 1;
 
-/** Tax units a pick pays: same-faction stacks already drafted, less the free one, capped. */
-export function rankedFactionDiversityTaxUnits(creatureId: number, ownCreatureIds: readonly number[]): number {
+/** Tax units a pick pays: same-faction stacks already drafted, less the free ones, capped. */
+export function rankedFactionDiversityTaxUnits(
+    creatureId: number,
+    ownCreatureIds: readonly number[],
+    freeStacks: number = RANKED_FACTION_DIVERSITY_FREE_STACKS,
+): number {
     const faction = creatureInfo(creatureId)?.faction ?? 0;
     if (!faction) {
         return 0;
@@ -332,10 +343,7 @@ export function rankedFactionDiversityTaxUnits(creatureId: number, ownCreatureId
         (count, ownCreatureId) => count + (creatureInfo(ownCreatureId)?.faction === faction ? 1 : 0),
         0,
     );
-    return Math.min(
-        RANKED_FACTION_DIVERSITY_MAX_STACKS,
-        Math.max(0, sameFaction - RANKED_FACTION_DIVERSITY_FREE_STACKS),
-    );
+    return Math.min(RANKED_FACTION_DIVERSITY_MAX_STACKS, Math.max(0, sameFaction - freeStacks));
 }
 
 /**
@@ -349,6 +357,7 @@ export function pickRankedLiveDraftCreature(
     ownCreatureIds: readonly number[],
     knownOpponentCreatureIds: readonly number[],
     tier1ArtifactId?: number,
+    revealedGridType?: number,
 ): number | undefined {
     const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
     const roleFitScore = (creatureId: number): number =>
@@ -357,17 +366,21 @@ export function pickRankedLiveDraftCreature(
             creatureRoleFitMultiplier(creatureId, ownCreatureIds, knownOpponentCreatureIds),
         );
     const baseScoreScale = Math.max(1, ...eligible.map((creatureId) => Math.abs(roleFitScore(creatureId))));
+    const freeStacks = rankedDraftStrengthRelaxesFactionTax(genome.draftStrengthPolicy)
+        ? RANKED_DRAFT_RELAXED_FACTION_TAX_FREE_STACKS
+        : RANKED_FACTION_DIVERSITY_FREE_STACKS;
     return pickCoherentDraftCreature(
         eligible,
         (creatureId) =>
             roleFitScore(creatureId) -
             RANKED_FACTION_DIVERSITY_PENALTY *
-                rankedFactionDiversityTaxUnits(creatureId, ownCreatureIds) *
+                rankedFactionDiversityTaxUnits(creatureId, ownCreatureIds, freeStacks) *
                 baseScoreScale,
         {
             ownCreatureIds,
             tier1ArtifactId,
             knownOpponentCreatureIds,
+            ...(revealedGridType === undefined ? {} : { revealedGridType }),
             ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
             ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
             ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),

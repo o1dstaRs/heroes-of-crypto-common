@@ -22,6 +22,7 @@ import {
 import { RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../../src/ai/setup/draft_interaction_prior";
 import { RANKED_DRAFT_VARIETY_POLICY_ID } from "../../src/ai/setup/draft_variety";
 import {
+    parseDraftGenome,
     pickDraftGenomeCreature,
     pickRankedLiveDraftCreature,
     rankedFactionDiversityTaxUnits,
@@ -334,6 +335,10 @@ describe("exact ranked draft evaluator", () => {
             "untrained-heuristic",
             "league-round3-exploiter",
         ]);
+        const [policyIncumbent] = loadRankedDraftPool("policy:ranked-unit-strength-a19-side-v1-w1");
+        expect(policyIncumbent.id).toBe("incumbent:ranked-unit-strength-a19-side-v1-w1");
+        expect(policyIncumbent.draftStrengthPolicy).toBe("ranked-unit-strength-a19-side-v1-w1");
+        expect(() => loadRankedDraftPool("policy:not-a-policy")).toThrow("Unknown ranked draft strength policy");
 
         const byFaction = new Map<number, number[]>();
         for (const creatureId of Object.values(PBTypes.CreatureVals)) {
@@ -403,6 +408,24 @@ describe("exact ranked draft evaluator", () => {
                 0,
             ),
         ).toThrow("explorationRate");
+    });
+
+    it("shows the map to creature picks only from level 3 on, as the live pick phase reveals it", () => {
+        const mapAware = normalizeRankedDraftGenome(parseDraftGenome("ranked-unit-synergy-a19-side-v2-w4"));
+        const live = rankedDraftLiveIncumbent();
+        const picksAt = (state: ReturnType<typeof resolveRankedDraftPick>, levels: readonly number[]): number[] =>
+            state.transcript.flatMap((entry) =>
+                entry.type === "creature_picked" && levels.includes(entry.creatureLevel) ? [entry.creatureId] : [],
+            );
+        let lateDifferences = 0;
+        for (let seed = 0; seed < 40; seed += 1) {
+            const normal = resolveRankedDraftPick(seed, mapAware, live, {}, { liveDraftRules: true, gridType: 1 });
+            const block = resolveRankedDraftPick(seed, mapAware, live, {}, { liveDraftRules: true, gridType: 4 });
+            expect(picksAt(block, [1, 2])).toEqual(picksAt(normal, [1, 2]));
+            if (JSON.stringify(picksAt(block, [3, 4])) !== JSON.stringify(picksAt(normal, [3, 4])))
+                lateDifferences += 1;
+        }
+        expect(lateDifferences).toBeGreaterThan(0);
     });
 
     it("fights live-board, deterministic-search games and records both drafted armies", () => {

@@ -47,6 +47,8 @@ export interface IDraftCoherenceContext {
     draftSpellRangedPolicy?: RankedSpellRangedDraftPolicyId;
     /** Candidate-only battle-fitted unit strength; omitted preserves the existing coherence policy exactly. */
     draftStrengthPolicy?: RankedDraftStrengthPolicyId;
+    /** The map, only once the live pick phase has revealed it (right before the level-3 picks). */
+    revealedGridType?: number;
 }
 
 /** Keep replay-derived build fit influential without making it lexicographically stronger than the genome. */
@@ -170,7 +172,7 @@ export function pickCoherentDraftCreature(
                 ? rankedDraftInteractionAffinity(creatureId, context) * INTERACTION_TO_COHERENCE_SCALE
                 : 0) +
             // Divided back out of the overlay weight so the final score moves by exactly weight x lift.
-            rankedDraftStrengthScore(creatureId, context.draftStrengthPolicy) / DRAFT_COHERENCE_WEIGHT,
+            rankedDraftStrengthScore(creatureId, context.draftStrengthPolicy, context) / DRAFT_COHERENCE_WEIGHT,
     );
     const scores = applyDraftCoherenceOverlay(baseScores, affinities);
     if (isRankedDraftVarietyPolicy(context.draftVarietyPolicy)) {
@@ -217,9 +219,9 @@ export function pickCoherentDraftBundle(
     const affinities = bundles.map(
         (bundle) =>
             draftBundleCoherenceAffinity(bundle, options) +
-            // A bundle drafts both creatures, so both strengths count in full.
-            (rankedDraftStrengthScore(bundle[0], options.draftStrengthPolicy) +
-                rankedDraftStrengthScore(bundle[1], options.draftStrengthPolicy)) /
+            // A bundle drafts both creatures, so both count in full; the second joins the first's roster.
+            (rankedDraftStrengthScore(bundle[0], options.draftStrengthPolicy, { ownCreatureIds: [] }) +
+                rankedDraftStrengthScore(bundle[1], options.draftStrengthPolicy, { ownCreatureIds: [bundle[0]] })) /
                 DRAFT_COHERENCE_WEIGHT,
     );
     return bestScoreIndex(applyDraftCoherenceOverlay(baseScores, affinities));
