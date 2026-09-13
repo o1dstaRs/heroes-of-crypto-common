@@ -428,6 +428,9 @@ export namespace PBTypes {
             gold_earned?: number;
             opponent_player_id?: string;
             outcome_reason?: string;
+            exit_recorded?: boolean;
+            exit_casualty_bp?: number;
+            exit_leaver?: string;
         }) {
             super();
             pb_1.Message.initialize(this, Array.isArray(data) ? data : [], 0, -1, [7, 8, 14, 15], this.#one_of_decls);
@@ -509,6 +512,15 @@ export namespace PBTypes {
                 }
                 if ("outcome_reason" in data && data.outcome_reason != undefined) {
                     this.outcome_reason = data.outcome_reason;
+                }
+                if ("exit_recorded" in data && data.exit_recorded != undefined) {
+                    this.exit_recorded = data.exit_recorded;
+                }
+                if ("exit_casualty_bp" in data && data.exit_casualty_bp != undefined) {
+                    this.exit_casualty_bp = data.exit_casualty_bp;
+                }
+                if ("exit_leaver" in data && data.exit_leaver != undefined) {
+                    this.exit_leaver = data.exit_leaver;
                 }
             }
         }
@@ -674,6 +686,24 @@ export namespace PBTypes {
         set outcome_reason(value: string) {
             pb_1.Message.setField(this, 26, value);
         }
+        get exit_recorded() {
+            return pb_1.Message.getFieldWithDefault(this, 27, false) as boolean;
+        }
+        set exit_recorded(value: boolean) {
+            pb_1.Message.setField(this, 27, value);
+        }
+        get exit_casualty_bp() {
+            return pb_1.Message.getFieldWithDefault(this, 28, 0) as number;
+        }
+        set exit_casualty_bp(value: number) {
+            pb_1.Message.setField(this, 28, value);
+        }
+        get exit_leaver() {
+            return pb_1.Message.getFieldWithDefault(this, 29, "") as string;
+        }
+        set exit_leaver(value: string) {
+            pb_1.Message.setField(this, 29, value);
+        }
         static fromObject(data: {
             game_id?: string;
             won?: boolean;
@@ -701,6 +731,9 @@ export namespace PBTypes {
             gold_earned?: number;
             opponent_player_id?: string;
             outcome_reason?: string;
+            exit_recorded?: boolean;
+            exit_casualty_bp?: number;
+            exit_leaver?: string;
         }): PortalMatch {
             const message = new PortalMatch({});
             if (data.game_id != null) {
@@ -781,6 +814,15 @@ export namespace PBTypes {
             if (data.outcome_reason != null) {
                 message.outcome_reason = data.outcome_reason;
             }
+            if (data.exit_recorded != null) {
+                message.exit_recorded = data.exit_recorded;
+            }
+            if (data.exit_casualty_bp != null) {
+                message.exit_casualty_bp = data.exit_casualty_bp;
+            }
+            if (data.exit_leaver != null) {
+                message.exit_leaver = data.exit_leaver;
+            }
             return message;
         }
         toObject() {
@@ -811,6 +853,9 @@ export namespace PBTypes {
                 gold_earned?: number;
                 opponent_player_id?: string;
                 outcome_reason?: string;
+                exit_recorded?: boolean;
+                exit_casualty_bp?: number;
+                exit_leaver?: string;
             } = {};
             if (this.game_id != null) {
                 data.game_id = this.game_id;
@@ -890,6 +935,15 @@ export namespace PBTypes {
             if (this.outcome_reason != null) {
                 data.outcome_reason = this.outcome_reason;
             }
+            if (this.exit_recorded != null) {
+                data.exit_recorded = this.exit_recorded;
+            }
+            if (this.exit_casualty_bp != null) {
+                data.exit_casualty_bp = this.exit_casualty_bp;
+            }
+            if (this.exit_leaver != null) {
+                data.exit_leaver = this.exit_leaver;
+            }
             return data;
         }
         serialize(): Uint8Array;
@@ -948,6 +1002,12 @@ export namespace PBTypes {
                 writer.writeString(25, this.opponent_player_id);
             if (this.outcome_reason.length)
                 writer.writeString(26, this.outcome_reason);
+            if (this.exit_recorded != false)
+                writer.writeBool(27, this.exit_recorded);
+            if (this.exit_casualty_bp != 0)
+                writer.writeInt32(28, this.exit_casualty_bp);
+            if (this.exit_leaver.length)
+                writer.writeString(29, this.exit_leaver);
             if (!w)
                 return writer.getResultBuffer();
         }
@@ -1034,6 +1094,15 @@ export namespace PBTypes {
                         break;
                     case 26:
                         message.outcome_reason = reader.readString();
+                        break;
+                    case 27:
+                        message.exit_recorded = reader.readBool();
+                        break;
+                    case 28:
+                        message.exit_casualty_bp = reader.readInt32();
+                        break;
+                    case 29:
+                        message.exit_leaver = reader.readString();
                         break;
                     default: reader.skipField();
                 }

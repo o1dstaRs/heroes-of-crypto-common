@@ -76,6 +76,9 @@ const portalMatch = {
     mmr_delta: 18,
     gold_earned: 18,
     opponent_player_id: "22222222-2222-4222-8222-222222222222",
+    exit_recorded: true,
+    exit_casualty_bp: 4870,
+    exit_leaver: "opponent",
 };
 const portalCombo = { creature_ids: [7, 8], games: 12, wins: 9 };
 const portalCreature = { creature_id: 5, games: 20, wins: 14 };
