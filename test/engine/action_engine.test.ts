@@ -1494,6 +1494,50 @@ describe("GameActionEngine", () => {
         expect(setup.left.getRangeShots()).toBe(shotsBefore - 1);
     });
 
+    it("a Large Caliber shot at a barrel lands there: its 3x3 breaks the barrels and hits the unit inside, no response", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Large Caliber"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 2,
+            leftCell: { x: 3, y: 7 },
+            supportCell: { x: 3, y: 6 },
+            rightCell: { x: 8, y: 8 },
+            rightAttackType: PBTypes.AttackVals.RANGE,
+            rightRangeShots: 5,
+        });
+        const aimed = { x: 8, y: 7 };
+        const inBlast = { x: 7, y: 6 };
+        const outsideBlast = { x: 11, y: 11 };
+        setup.grid.setScatteredMountains([outsideBlast, inBlast, aimed]);
+        setup.left.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.right.getCumulativeHp();
+        const shooterHpBefore = setup.left.getCumulativeHp();
+        const shotsBefore = setup.left.getRangeShots();
+        const settings = setup.grid.getSettings();
+
+        const result = setup.engine.apply({
+            type: "obstacle_attack",
+            attackerId: setup.left.getId(),
+            targetPosition: getPositionForCell(aimed, settings.getMinX(), settings.getStep(), settings.getHalfStep()),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({ type: "area_attacked", attackerId: setup.left.getId(), targetCell: aimed }),
+        );
+        expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([outsideBlast]);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore - 1);
+        // The shot was aimed at a barrel, not at the shooter behind it: nothing shoots back.
+        expect(setup.left.getCumulativeHp()).toBe(shooterHpBefore);
+        expect(setup.right.getRangeShots()).toBe(5);
+    });
+
     it("an Area Throw that only breaks barrels still spends its shot", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,

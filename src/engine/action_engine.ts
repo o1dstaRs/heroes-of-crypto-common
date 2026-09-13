@@ -973,15 +973,23 @@ export class GameActionEngine {
         if (!canLandRangeHit && !action.attackFrom) {
             return this.reject("attack_not_available");
         }
-        // A Gargantuan's rock aimed at a cemetery barrel is simply an Area Throw at that cell: it lands on the barrel
-        // and its 3x3 breaks every barrel and hits every unit there, exactly like a throw anywhere else. The
-        // stone-by-stone projectile rule below is for shooters whose shots stop at structures.
-        if (scattered && canLandRangeHit && attacker.hasAbilityActive("Area Throw")) {
-            return this.areaThrowAttack({
-                type: "area_throw_attack",
-                attackerId: attacker.getId(),
-                targetCell: getCellForPosition(this.context.grid.getSettings(), action.targetPosition),
-            });
+        // A splash shooter aimed at a cemetery barrel lands its shot ON that barrel: a Gargantuan's Area Throw and a
+        // Cyclops' Large Caliber both ignore structures on the way, and their 3x3 breaks every barrel and hits every
+        // unit there, exactly like a throw anywhere else. The stone-by-stone projectile rule below is for shooters
+        // whose shots stop at structures.
+        if (
+            scattered &&
+            canLandRangeHit &&
+            (attacker.hasAbilityActive("Area Throw") || attacker.hasAbilityActive("Large Caliber"))
+        ) {
+            const aimedCell = getCellForPosition(this.context.grid.getSettings(), action.targetPosition);
+            if (
+                !isCellWithinGrid(this.context.grid.getSettings(), aimedCell) ||
+                this.context.grid.getOccupantUnitId(aimedCell) !== "B"
+            ) {
+                return this.reject("attack_not_available");
+            }
+            return this.areaStrikeAtCell(attacker, aimedCell);
         }
 
         const hitsBefore = this.context.fightProperties.getObstacleHitsLeft();
@@ -1164,7 +1172,17 @@ export class GameActionEngine {
         ) {
             return this.reject("attack_not_available");
         }
-
+        return this.areaStrikeAtCell(attacker, action.targetCell);
+    }
+    /**
+     * A ranged splash landing on one cell: a Gargantuan's Area Throw at any cell, or an Area Throw / Large Caliber shot
+     * aimed at a cemetery barrel. Its 3x3 hits every unit there and, once the shot is accepted, breaks every barrel.
+     * Nothing was aimed at a unit, so there is no retaliation.
+     */
+    private areaStrikeAtCell(attacker: Unit, aimedCell: XY): IGameActionResult {
+        if (!this.context.attackHandler) {
+            return this.reject("attack_handler_missing");
+        }
         // Project the throw onto the first enemy standing on the trajectory between the attacker and
         // the aimed (empty) cell. A unit on the line intercepts the throw instead of it passing
         // through to the cell behind — matching legacy test_heroes.ts. With a clear path the aimed
@@ -1172,7 +1190,7 @@ export class GameActionEngine {
         const targetCell = this.context.attackHandler.projectAreaThrowTargetCell(
             this.context.unitsHolder.getAllUnits(),
             attacker,
-            action.targetCell,
+            aimedCell,
         );
         const targetPosition = getPositionForCell(
             targetCell,
