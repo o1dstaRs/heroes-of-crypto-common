@@ -11,6 +11,7 @@
 
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { Grid } from "../grid/grid";
+import { isCellWithinGrid } from "../grid/grid_math";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
 import * as HoCLib from "../utils/lib";
@@ -42,6 +43,32 @@ export function processFireBreathAbility(
     targetMovePosition?: HoCMath.XY,
     secondaryDamage?: ISecondaryDamage[],
 ): IFireBreathResult {
+    if (!fromUnit.getAbility("Fire Breath")) {
+        return { increaseMorale: 0, moraleDecreaseForTheUnitTeam: {}, unitIdsDied: [] };
+    }
+
+    const targets = AbilityHelper.nextStandingTargets(fromUnit, toUnit, grid, unitsHolder, targetMovePosition);
+    return breatheFireOnTargets(fromUnit, targets, sceneLog, attackTypeString, damageStatisticHolder, secondaryDamage);
+}
+
+/** A FULLY fire-immune unit (Fire Element, e.g. Efreet / Black Dragon, or 100% magic resist) takes no breath damage. */
+function isFullyFireImmune(unit: Unit): boolean {
+    return unit.getMagicResist() >= 100 || unit.hasAbilityActive("Fire Element");
+}
+
+/**
+ * Land a Fire Breath on units that have already been chosen, in sweep order: damage, Magic Mirror, kills and morale.
+ * processFireBreathAbility picks them past a unit target; a breath aimed at a cemetery barrel picks the unit behind
+ * the barrel (fireBreathUnitBehindObstacle).
+ */
+export function breatheFireOnTargets(
+    fromUnit: Unit,
+    targets: readonly Unit[],
+    sceneLog: ISceneLog,
+    attackTypeString: string,
+    damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
+    secondaryDamage?: ISecondaryDamage[],
+): IFireBreathResult {
     const unitIdsDied: string[] = [];
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
     const fireBreathAbility = fromUnit.getAbility("Fire Breath");
@@ -56,17 +83,15 @@ export function processFireBreathAbility(
     }
 
     const unitsDead: Unit[] = [];
-    const targets = AbilityHelper.nextStandingTargets(fromUnit, toUnit, grid, unitsHolder, targetMovePosition);
 
     for (const nextStandingTarget of targets) {
         // A dead unit doesn't block the wave — the fire passes through its (about-to-be-emptied) cell.
         if (nextStandingTarget.isDead()) {
             continue;
         }
-        // A FULLY fire-immune unit (Fire Element, e.g. Efreet / Black Dragon, or 100% magic resist) takes no
-        // damage AND acts as a fire wall: it shields every unit behind it in the wave's path. Stop the sweep
-        // here — do not carry the breath through to further targets.
-        if (nextStandingTarget.getMagicResist() >= 100 || nextStandingTarget.hasAbilityActive("Fire Element")) {
+        // A fully fire-immune unit takes no damage AND acts as a fire wall: it shields every unit behind it in the
+        // wave's path. Stop the sweep here — do not carry the breath through to further targets.
+        if (isFullyFireImmune(nextStandingTarget)) {
             break;
         }
 
@@ -177,4 +202,50 @@ export function processFireBreathAbility(
         moraleDecreaseForTheUnitTeam,
         unitIdsDied,
     };
+}
+
+/**
+ * The cemetery barrels a unit-aimed Fire Breath burns: every scattered barrel standing in the band the breath sweeps
+ * behind its target (AbilityHelper.pierceSweepCells — one cell behind a small target, the target's own depth behind a
+ * large one). Every barrel standing in that band burns.
+ */
+export function fireBreathObstacleCells(
+    fromUnit: Unit,
+    grid: Grid,
+    attackFromCell: HoCMath.XY,
+    target: Unit,
+): HoCMath.XY[] {
+    if (!grid.hasScatteredMountains() || !fromUnit.hasAbilityActive("Fire Breath")) {
+        return [];
+    }
+    const settings = grid.getSettings();
+    return AbilityHelper.pierceSweepCells(fromUnit, target, attackFromCell).filter(
+        (cell) => isCellWithinGrid(settings, cell) && grid.getOccupantUnitId(cell) === "B",
+    );
+}
+
+/**
+ * The unit a barrel-aimed Fire Breath burns: whoever stands in the one cell behind the struck barrel on the strike
+ * line (a barrel is a single-cell target). Like the unit sweep, the breath spares nobody for being an ally — only a
+ * fully fire-immune unit, which takes no damage at all.
+ */
+export function fireBreathUnitBehindObstacle(
+    fromUnit: Unit,
+    grid: Grid,
+    unitsHolder: UnitsHolder,
+    attackFromCell: HoCMath.XY,
+    obstacleCell: HoCMath.XY,
+): Unit | undefined {
+    if (!fromUnit.hasAbilityActive("Fire Breath")) {
+        return undefined;
+    }
+    const behindCell = AbilityHelper.pierceCellBehind(fromUnit, attackFromCell, obstacleCell);
+    if (!behindCell || !isCellWithinGrid(grid.getSettings(), behindCell)) {
+        return undefined;
+    }
+    const occupantId = grid.getOccupantUnitId(behindCell);
+    const occupant = occupantId ? unitsHolder.getAllUnits().get(occupantId) : undefined;
+    return occupant && !occupant.isDead() && occupant.getId() !== fromUnit.getId() && !isFullyFireImmune(occupant)
+        ? occupant
+        : undefined;
 }

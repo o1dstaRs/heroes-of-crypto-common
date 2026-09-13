@@ -118,11 +118,13 @@ export type GameEvent =
           hitsAfterLeft?: number;
           hitsAfterRight?: number;
           animations: IGameAnimationEvent[];
-          // Set when the stone did not fall to a blow of its own: Hydra's Lightning Spin broke it in the SAME
-          // radial impact as the strike that set the spin off, whether that strike was aimed at a barrel or at a
-          // unit. Clients land it on that impact instead of animating a strike for it. Absent for the aimed
-          // stone, a projectile impact and a Skewer Strike / Fire Breath pierce — each lands on a strike of its own.
-          source?: "lightning_spin";
+          // Set when the stone did not fall to a blow of its own. "lightning_spin": Hydra's Lightning Spin broke it
+          // in the SAME radial impact as the strike that set the spin off, whether that strike was aimed at a
+          // barrel or at a unit — clients land it on that impact instead of animating a strike for it.
+          // "skewer_strike" / "fire_breath": a unit strike's Skewer Strike ran on into the barrel behind its small
+          // target, or its Fire Breath burned a barrel in the band behind its target. Absent for the aimed stone, a
+          // projectile impact and a pierce past a barrel — each lands on a strike of its own.
+          source?: "lightning_spin" | "skewer_strike" | "fire_breath";
           // Unit damage dealt by the same obstacle strike. Lightning Spin catches every enemy around the attacker
           // even when the blow was aimed at a barrel, and a barrel is no unit to hang an attack payload on, so
           // the action's FIRST obstacle_attacked carries it: `damage.secondary` holds the spin's hits (plus any

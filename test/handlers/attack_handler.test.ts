@@ -1260,6 +1260,214 @@ describe("AttackHandler", () => {
                 expect(grid.getScatteredMountainsStanding()).toEqual([behind]);
             });
 
+            it("a Skewer Strike aimed at a barrel runs on into the enemy standing behind it", () => {
+                const ctx = setupMountainFight();
+                const aimed = { x: 3, y: 3 };
+                ctx.grid.setScatteredMountains([aimed]);
+                const pikeman = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Skewer Strike"],
+                    attack: 50,
+                    damageMin: 100,
+                    damageMax: 100,
+                });
+                const behind = createTestUnit({ name: "Behind", team: PBTypes.TeamVals.LEFT, maxHp: 10 });
+                placeUnit(ctx.grid, ctx.unitsHolder, pikeman, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, behind, { x: 4, y: 3 });
+                const damage = createVisibleDamage(pikeman);
+
+                const result = ctx.attackHandler.handleObstacleAttack(
+                    positionForCell(aimed),
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    pikeman,
+                    { x: 2, y: 3 },
+                    undefined,
+                    damage,
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([]);
+                expect(behind.isDead()).toBe(true);
+                expect(result.unitIdsDied).toEqual([behind.getId()]);
+                expect(damage.secondary).toContainEqual(
+                    expect.objectContaining({ source: "skewer_strike", unitId: behind.getId(), unitsDied: 1 }),
+                );
+            });
+
+            // A barrel strike with a unit standing right behind the barrel (attacker (2,3), barrel (3,3), unit (4,3)).
+            const strikeBarrelWithUnitBehind = (
+                abilities: string[],
+                behindOptions: Parameters<typeof createTestUnit>[0],
+            ) => {
+                const ctx = setupMountainFight();
+                ctx.grid.setScatteredMountains([{ x: 3, y: 3 }]);
+                const attacker = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities,
+                    attack: 50,
+                    damageMin: 100,
+                    damageMax: 100,
+                });
+                const behind = createTestUnit({ name: "Behind", maxHp: 10, ...behindOptions });
+                placeUnit(ctx.grid, ctx.unitsHolder, attacker, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, behind, { x: 4, y: 3 });
+                const damage = createVisibleDamage(attacker);
+                const result = ctx.attackHandler.handleObstacleAttack(
+                    positionForCell({ x: 3, y: 3 }),
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    attacker,
+                    { x: 2, y: 3 },
+                    undefined,
+                    damage,
+                );
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([]);
+                return { behind, damage, result };
+            };
+
+            it("the barrel strike's skewer spares an ally behind the barrel", () => {
+                const { behind, damage, result } = strikeBarrelWithUnitBehind(["Skewer Strike"], {
+                    team: PBTypes.TeamVals.RIGHT,
+                });
+                expect(behind.getCumulativeHp()).toBe(behind.getMaxHp());
+                expect(result.unitIdsDied).toEqual([]);
+                expect(damage.secondary ?? []).toEqual([]);
+            });
+
+            it("a Fire Breath aimed at a barrel burns whoever stands behind it, ally or enemy", () => {
+                for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
+                    const { behind, damage, result } = strikeBarrelWithUnitBehind(["Fire Breath"], { team });
+                    expect(behind.isDead()).toBe(true);
+                    expect(result.unitIdsDied).toEqual([behind.getId()]);
+                    expect(damage.secondary).toContainEqual(
+                        expect.objectContaining({ source: "fire_breath", unitId: behind.getId() }),
+                    );
+                }
+            });
+
+            it("a Fire Breath aimed at a barrel leaves a fire-immune unit behind it untouched", () => {
+                const { behind, damage, result } = strikeBarrelWithUnitBehind(["Fire Breath"], {
+                    team: PBTypes.TeamVals.LEFT,
+                    abilities: ["Fire Element"],
+                });
+                expect(behind.getCumulativeHp()).toBe(behind.getMaxHp());
+                expect(result.unitIdsDied).toEqual([]);
+                expect(damage.secondary ?? []).toEqual([]);
+            });
+
+            it("a unit strike's Fire Breath burns every barrel in its band behind a 2x2 target", () => {
+                const ctx = setupMountainFight();
+                // Dragon anchor (3,4) = body x 2..3, y 3..4; target anchor (5,4) = body x 4..5, y 3..4. The breath's
+                // band is the target's own 2x2 depth straight behind it: x 6..7, y 3..4.
+                const inBand = [
+                    { x: 6, y: 4 },
+                    { x: 7, y: 3 },
+                ];
+                const pastBand = { x: 8, y: 4 };
+                ctx.grid.setScatteredMountains([pastBand, ...inBand]);
+                const dragon = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Fire Breath"],
+                    size: PBTypes.UnitSizeVals.LARGE,
+                });
+                const target = createTestUnit({
+                    name: "Target",
+                    team: PBTypes.TeamVals.LEFT,
+                    maxHp: 1000,
+                    size: PBTypes.UnitSizeVals.LARGE,
+                });
+                placeUnit(ctx.grid, ctx.unitsHolder, dragon, { x: 3, y: 4 });
+                placeUnit(ctx.grid, ctx.unitsHolder, target, { x: 5, y: 4 });
+
+                const result = ctx.attackHandler.handleMeleeAttack(
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    createVisibleDamage(target),
+                    undefined,
+                    dragon,
+                    target,
+                    { x: 3, y: 4 },
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([pastBand]);
+                expect(result.piercedObstacles).toHaveLength(2);
+                expect(result.piercedObstacles).toEqual(
+                    expect.arrayContaining(inBand.map((cell) => ({ cell, source: "fire_breath" }))),
+                );
+            });
+
+            it("a unit strike's Skewer Strike breaks the barrel behind its small target", () => {
+                const ctx = setupMountainFight();
+                const behind = { x: 4, y: 3 };
+                const aside = { x: 4, y: 4 };
+                ctx.grid.setScatteredMountains([aside, behind]);
+                const pikeman = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Skewer Strike"],
+                });
+                const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, maxHp: 1000 });
+                placeUnit(ctx.grid, ctx.unitsHolder, pikeman, { x: 2, y: 3 });
+                placeUnit(ctx.grid, ctx.unitsHolder, target, { x: 3, y: 3 });
+
+                const result = ctx.attackHandler.handleMeleeAttack(
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    createVisibleDamage(target),
+                    undefined,
+                    pikeman,
+                    target,
+                    { x: 2, y: 3 },
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual([aside]);
+                expect(result.piercedObstacles).toEqual([{ cell: behind, source: "skewer_strike" }]);
+            });
+
+            it("a Skewer Strike into a large target breaks no barrel behind it", () => {
+                const ctx = setupMountainFight();
+                const behindBody = [
+                    { x: 5, y: 3 },
+                    { x: 5, y: 4 },
+                ];
+                ctx.grid.setScatteredMountains(behindBody);
+                const pikeman = createTestUnit({
+                    team: PBTypes.TeamVals.RIGHT,
+                    attackType: PBTypes.AttackVals.MELEE,
+                    abilities: ["Skewer Strike"],
+                });
+                const target = createTestUnit({
+                    name: "Target",
+                    team: PBTypes.TeamVals.LEFT,
+                    maxHp: 1000,
+                    size: PBTypes.UnitSizeVals.LARGE,
+                });
+                placeUnit(ctx.grid, ctx.unitsHolder, pikeman, { x: 2, y: 3 });
+                // Anchor (4,4) = body (4,4) (3,4) (4,3) (3,3), touching the Pikeman at (3,3).
+                placeUnit(ctx.grid, ctx.unitsHolder, target, { x: 4, y: 4 });
+
+                const result = ctx.attackHandler.handleMeleeAttack(
+                    ctx.unitsHolder,
+                    ctx.moveHandler,
+                    createVisibleDamage(target),
+                    undefined,
+                    pikeman,
+                    target,
+                    { x: 2, y: 3 },
+                );
+
+                expect(result.completed).toBe(true);
+                expect(ctx.grid.getScatteredMountainsStanding()).toEqual(behindBody);
+                expect(result.piercedObstacles).toEqual([]);
+            });
+
             it("leaves the classic 2x2 mountains to their own hit counters", () => {
                 const { grid, unitsHolder, attackHandler, moveHandler, fightProperties } = setupMountainFight();
                 const attacker = createTestUnit({

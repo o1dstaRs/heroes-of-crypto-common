@@ -219,35 +219,6 @@ function addToTargetList(
     return targetList;
 }
 
-function getTargetList(
-    startingPos: XY[],
-    cellsDiff: XY,
-    target: Unit,
-    attacker: Unit,
-    grid: Grid,
-    unitsHolder: UnitsHolder,
-    onlyOppositeTeam: boolean,
-): Unit[] {
-    let targetList: Unit[] = [];
-    const signX = Math.sign(cellsDiff.x);
-    const signY = Math.sign(cellsDiff.y);
-    const bX = Math.floor(Math.abs(cellsDiff.x));
-    const bY = Math.floor(Math.abs(cellsDiff.y));
-    for (const startingCell of startingPos) {
-        targetList = addToTargetList(
-            startingCell.x + bX * signX,
-            startingCell.y + bY * signY,
-            targetList,
-            target,
-            attacker,
-            grid,
-            unitsHolder,
-            onlyOppositeTeam,
-        );
-    }
-    return targetList;
-}
-
 /**
  * The one cell a piercing melee sweep carries on to past a SINGLE-CELL target — the step `nextStandingTargets`
  * takes past a small unit, expressed for a bare cell so the obstacle path can run Skewer Strike / Fire Breath
@@ -300,12 +271,39 @@ export function nextStandingTargets(
     onlyOppositeTeam = false,
 ): Unit[] {
     let targetList: Unit[] = [];
+    for (const cell of pierceSweepCells(attackerUnit, targetUnit, attackFromCell, pierceLargeUnits)) {
+        targetList = addToTargetList(
+            cell.x,
+            cell.y,
+            targetList,
+            targetUnit,
+            attackerUnit,
+            grid,
+            unitsHolder,
+            onlyOppositeTeam,
+        );
+    }
+    return targetList;
+}
+
+/**
+ * The cells a piercing melee sweep (Fire Breath, Skewer Strike) runs on into behind `targetUnit`, in the order the
+ * sweep visits them. nextStandingTargets reads the units off exactly these cells and the cemetery-barrel rules read
+ * the barrels off them, so the wave can never hit a unit in a cell whose barrel it spared. Empty when the sweep does
+ * not pierce this target (a large body with `pierceLargeUnits` off). Cells may lie off the board.
+ */
+export function pierceSweepCells(
+    attackerUnit: Unit,
+    targetUnit: Unit,
+    attackFromCell?: XY,
+    pierceLargeUnits = true,
+): XY[] {
     let targetBaseCell = targetUnit.getBaseCell();
 
     const attackFromBaseCell = attackFromCell ? attackFromCell : attackerUnit.getBaseCell();
 
     if (!attackFromBaseCell || !targetBaseCell) {
-        return targetList;
+        return [];
     }
 
     let attackerBaseCell = attackFromBaseCell;
@@ -399,23 +397,16 @@ export function nextStandingTargets(
         }
     }
 
-    if (targetBaseCell && attackerBaseCell) {
-        const cellsDiff = {
-            x: targetBaseCell.x - attackerBaseCell.x + xCoefficient,
-            y: targetBaseCell.y - attackerBaseCell.y + yCoefficient,
-        };
-        if (targetUnit.isSmallSize() || pierceLargeUnits) {
-            targetList = getTargetList(
-                targetUnit.getCells(),
-                cellsDiff,
-                targetUnit,
-                attackerUnit,
-                grid,
-                unitsHolder,
-                onlyOppositeTeam,
-            );
-        }
+    if (!targetBaseCell || !attackerBaseCell || (!targetUnit.isSmallSize() && !pierceLargeUnits)) {
+        return [];
     }
-
-    return targetList;
+    const cellsDiff = {
+        x: targetBaseCell.x - attackerBaseCell.x + xCoefficient,
+        y: targetBaseCell.y - attackerBaseCell.y + yCoefficient,
+    };
+    const signX = Math.sign(cellsDiff.x);
+    const signY = Math.sign(cellsDiff.y);
+    const bX = Math.floor(Math.abs(cellsDiff.x));
+    const bY = Math.floor(Math.abs(cellsDiff.y));
+    return targetUnit.getCells().map((cell) => ({ x: cell.x + bX * signX, y: cell.y + bY * signY }));
 }

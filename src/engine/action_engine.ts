@@ -705,9 +705,13 @@ export class GameActionEngine {
                 damage: this.cloneVisibleDamage(damage),
                 animations: this.serializeAnimations(result.animationData ?? []),
             });
-            // Lightning Spin broke the cemetery barrels around the attacker in the same impact as the strike.
+            // Lightning Spin broke the cemetery barrels around the attacker in the same impact as the strike, and a
+            // Skewer Strike / Fire Breath the ones it ran on into behind the target.
             events.push(
                 ...this.scatteredObstacleDestroyedEvents(attacker, result.spunObstacleCells ?? [], "lightning_spin"),
+                ...(result.piercedObstacles ?? []).flatMap((pierced) =>
+                    this.scatteredObstacleDestroyedEvents(attacker, [pierced.cell], pierced.source),
+                ),
             );
         }
         events.push(...this.createAbilityStolenEvents(result.abilityStolen));
@@ -821,11 +825,6 @@ export class GameActionEngine {
                 attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
             );
         }
-        if (this.context.grid.hasScatteredMountains() && ignoresStructures) {
-            destroyedScatteredCells.push(
-                ...this.context.grid.clearScatteredMountainsInCells(evalResult.affectedCells.flat()),
-            );
-        }
         // `target` is the declared aim anchor used to reconstruct the trajectory. Special shots may legally
         // aim at a rear stack while the authoritative first intersection is a different front stack. Response
         // ownership must follow that actual primary, exactly as damage does; using the aim anchor can suppress
@@ -877,6 +876,13 @@ export class GameActionEngine {
         );
         if (!result.completed) {
             return this.reject("attack_not_available");
+        }
+        // A shot that ignores structures breaks every barrel in its blast — once the shot has been accepted, so a
+        // refused shot never knocks stones out of the authoritative board.
+        if (this.context.grid.hasScatteredMountains() && ignoresStructures) {
+            destroyedScatteredCells.push(
+                ...this.context.grid.clearScatteredMountainsInCells(evalResult.affectedCells.flat()),
+            );
         }
 
         const unitIdsDied = [...new Set(result.unitIdsDied)];
@@ -966,6 +972,16 @@ export class GameActionEngine {
             );
         if (!canLandRangeHit && !action.attackFrom) {
             return this.reject("attack_not_available");
+        }
+        // A Gargantuan's rock aimed at a cemetery barrel is simply an Area Throw at that cell: it lands on the barrel
+        // and its 3x3 breaks every barrel and hits every unit there, exactly like a throw anywhere else. The
+        // stone-by-stone projectile rule below is for shooters whose shots stop at structures.
+        if (scattered && canLandRangeHit && attacker.hasAbilityActive("Area Throw")) {
+            return this.areaThrowAttack({
+                type: "area_throw_attack",
+                attackerId: attacker.getId(),
+                targetCell: getCellForPosition(this.context.grid.getSettings(), action.targetPosition),
+            });
         }
 
         const hitsBefore = this.context.fightProperties.getObstacleHitsLeft();
@@ -1103,7 +1119,7 @@ export class GameActionEngine {
     private scatteredObstacleDestroyedEvents(
         attacker: Unit,
         cells: readonly XY[],
-        source?: "lightning_spin",
+        source?: Extract<GameEvent, { type: "obstacle_attacked" }>["source"],
     ): Extract<GameEvent, { type: "obstacle_attacked" }>[] {
         if (!cells.length) {
             return [];
@@ -1166,9 +1182,6 @@ export class GameActionEngine {
         );
         const affectedCells = [...getCellsAroundCell(this.context.grid.getSettings(), targetCell), targetCell];
         const affectedUnits = evaluateAffectedUnits(affectedCells, this.context.unitsHolder, this.context.grid);
-        const destroyedScatteredCells = this.context.grid.hasScatteredMountains()
-            ? this.context.grid.clearScatteredMountainsInCells(affectedCells)
-            : [];
         const divisor = this.context.attackHandler.getRangeAttackDivisor(attacker, targetPosition);
         const damage = this.createVisibleDamage();
         const result = this.context.attackHandler.handleRangeAttack(
@@ -1185,6 +1198,15 @@ export class GameActionEngine {
         );
         if (!result.completed) {
             return this.reject("attack_not_available");
+        }
+        // Every barrel in the 3x3 breaks — once the throw has been accepted, so a refused throw leaves the board as it was.
+        const destroyedScatteredCells = this.context.grid.hasScatteredMountains()
+            ? this.context.grid.clearScatteredMountainsInCells(affectedCells)
+            : [];
+        // A blast that catches no unit resolves as a "miss" before the range handler ever spends the shot. Breaking
+        // barrels is no miss: the rock landed, so it costs the shot a throw at units would.
+        if (!affectedUnits && destroyedScatteredCells.length) {
+            attacker.decreaseNumberOfShots();
         }
 
         const affectedUnitIds = affectedUnits?.[0]?.map((unit) => unit.getId()) ?? [];

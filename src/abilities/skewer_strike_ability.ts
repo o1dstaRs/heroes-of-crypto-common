@@ -11,6 +11,7 @@
 
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { Grid } from "../grid/grid";
+import { isCellWithinGrid } from "../grid/grid_math";
 import * as HoCMath from "../utils/math";
 import * as HoCConstants from "../constants";
 import type { ISceneLog } from "../scene/scene_log_interface";
@@ -65,6 +66,46 @@ export function processSkewerStrikeAbility(
     isAttack = true,
     secondaryDamage?: ISecondaryDamage[],
 ): ISkewerStrikeResult {
+    if (!fromUnit.getAbility("Skewer Strike")) {
+        return { increaseMorale: 0, unitIdsDied: [], moraleDecreaseForTheUnitTeam: {}, secondaryDamages: [] };
+    }
+
+    const targets = AbilityHelper.nextStandingTargets(
+        fromUnit,
+        toUnit,
+        grid,
+        unitsHolder,
+        targetMovePosition,
+        false,
+        true,
+    );
+    return strikeSkewerTargets(
+        fromUnit,
+        targets,
+        sceneLog,
+        unitsHolder,
+        grid,
+        damageStatisticHolder,
+        isAttack,
+        secondaryDamage,
+    );
+}
+
+/**
+ * Land a Skewer Strike's pierce on units that have already been chosen: the miss roll, damage, Flesh Shield,
+ * on-hit riders, kills and morale for each. processSkewerStrikeAbility picks them past a unit target; a strike
+ * aimed at a cemetery barrel picks the enemy behind the barrel (skewerStrikeUnitBehindObstacle).
+ */
+export function strikeSkewerTargets(
+    fromUnit: Unit,
+    targets: readonly Unit[],
+    sceneLog: ISceneLog,
+    unitsHolder: UnitsHolder,
+    grid: Grid,
+    damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
+    isAttack = true,
+    secondaryDamage?: ISecondaryDamage[],
+): ISkewerStrikeResult {
     const unitIdsDied: string[] = [];
     const skewerStrikeAbility = fromUnit.getAbility("Skewer Strike");
     const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
@@ -76,15 +117,6 @@ export function processSkewerStrikeAbility(
 
     const unitsDead: Unit[] = [];
     const secondaryDamages: ISkewerStrikeDamage[] = [];
-    const targets = AbilityHelper.nextStandingTargets(
-        fromUnit,
-        toUnit,
-        grid,
-        unitsHolder,
-        targetMovePosition,
-        false,
-        true,
-    );
 
     for (const nextStandingTarget of targets) {
         if (nextStandingTarget.isDead()) {
@@ -244,4 +276,49 @@ export function processSkewerStrikeAbility(
     }
 
     return { increaseMorale: increaseMoraleTotal, unitIdsDied, moraleDecreaseForTheUnitTeam, secondaryDamages };
+}
+
+/**
+ * The cemetery barrel a unit-aimed Skewer Strike runs on into: the one cell the skewer reaches behind a
+ * SINGLE-CELL target (AbilityHelper.pierceCellBehind — the same step nextStandingTargets takes past a small unit),
+ * when a scattered barrel stands there. The skewer pierces nothing behind a large body, so a large target never
+ * breaks a barrel.
+ */
+export function skewerStrikeObstacleCell(
+    fromUnit: Unit,
+    grid: Grid,
+    attackFromCell: HoCMath.XY,
+    target: Pick<Unit, "isSmallSize" | "getBaseCell">,
+): HoCMath.XY | undefined {
+    if (!target.isSmallSize() || !grid.hasScatteredMountains() || !fromUnit.hasAbilityActive("Skewer Strike")) {
+        return undefined;
+    }
+    const behindCell = AbilityHelper.pierceCellBehind(fromUnit, attackFromCell, target.getBaseCell());
+    return behindCell && isCellWithinGrid(grid.getSettings(), behindCell) && grid.getOccupantUnitId(behindCell) === "B"
+        ? behindCell
+        : undefined;
+}
+
+/**
+ * The enemy a barrel-aimed Skewer Strike runs on into: whoever stands in the one cell behind the struck barrel on
+ * the strike line. A barrel is a single-cell target, so a body of any size standing there is caught — the rule
+ * nextStandingTargets applies past a small unit — and, as always with the skewer, only an enemy.
+ */
+export function skewerStrikeUnitBehindObstacle(
+    fromUnit: Unit,
+    grid: Grid,
+    unitsHolder: UnitsHolder,
+    attackFromCell: HoCMath.XY,
+    obstacleCell: HoCMath.XY,
+): Unit | undefined {
+    if (!fromUnit.hasAbilityActive("Skewer Strike")) {
+        return undefined;
+    }
+    const behindCell = AbilityHelper.pierceCellBehind(fromUnit, attackFromCell, obstacleCell);
+    if (!behindCell || !isCellWithinGrid(grid.getSettings(), behindCell)) {
+        return undefined;
+    }
+    const occupantId = grid.getOccupantUnitId(behindCell);
+    const occupant = occupantId ? unitsHolder.getAllUnits().get(occupantId) : undefined;
+    return occupant && !occupant.isDead() && occupant.getTeam() !== fromUnit.getTeam() ? occupant : undefined;
 }

@@ -1348,6 +1348,216 @@ describe("GameActionEngine", () => {
         expect(setup.grid.getScatteredMountainsStanding()).toEqual([survivor]);
     });
 
+    it("Skewer Strike unit strike reports the barrel behind its small target, tagged skewer_strike", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            leftAbilities: ["Skewer Strike"],
+            leftCell: { x: 2, y: 3 },
+            supportCell: { x: 2, y: 6 },
+            rightCell: { x: 3, y: 3 },
+            rightMaxHp: 1000,
+        });
+        const behind = { x: 4, y: 3 };
+        const survivor = { x: 10, y: 12 };
+        setup.grid.setScatteredMountains([survivor, behind]);
+        const settings = setup.grid.getSettings();
+
+        const result = setup.engine.apply({
+            type: "melee_attack",
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
+            attackFrom: { x: 2, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        const obstacleEvents = result.events.filter(
+            (event): event is Extract<GameEvent, { type: "obstacle_attacked" }> => event.type === "obstacle_attacked",
+        );
+        expect(obstacleEvents).toHaveLength(1);
+        expect(obstacleEvents[0]).toMatchObject({
+            source: "skewer_strike",
+            targetPosition: getPositionForCell(behind, settings.getMinX(), settings.getStep(), settings.getHalfStep()),
+        });
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([survivor]);
+    });
+
+    it("Fire Breath unit strike reports the barrel it burned behind a small target, tagged fire_breath", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            leftAbilities: ["Fire Breath"],
+            leftCell: { x: 2, y: 3 },
+            supportCell: { x: 2, y: 6 },
+            rightCell: { x: 3, y: 3 },
+            rightMaxHp: 1000,
+        });
+        const behind = { x: 4, y: 3 };
+        const survivor = { x: 10, y: 12 };
+        setup.grid.setScatteredMountains([survivor, behind]);
+        const settings = setup.grid.getSettings();
+
+        const result = setup.engine.apply({
+            type: "melee_attack",
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
+            attackFrom: { x: 2, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        const obstacleEvents = result.events.filter(
+            (event): event is Extract<GameEvent, { type: "obstacle_attacked" }> => event.type === "obstacle_attacked",
+        );
+        expect(obstacleEvents).toHaveLength(1);
+        expect(obstacleEvents[0]).toMatchObject({
+            source: "fire_breath",
+            targetPosition: getPositionForCell(behind, settings.getMinX(), settings.getStep(), settings.getHalfStep()),
+        });
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([survivor]);
+    });
+
+    it("Skewer Strike barrel strike carries the skewer's kill of the enemy behind the barrel", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            leftAbilities: ["Skewer Strike"],
+            leftAttack: 50,
+            leftDamageMin: 100,
+            leftDamageMax: 100,
+            leftCell: { x: 2, y: 3 },
+            supportCell: { x: 2, y: 6 },
+            rightCell: { x: 4, y: 3 },
+            rightMaxHp: 10,
+            rightAmountAlive: 1,
+        });
+        const aimed = { x: 3, y: 3 };
+        const survivor = { x: 10, y: 12 };
+        setup.grid.setScatteredMountains([survivor, aimed]);
+        const settings = setup.grid.getSettings();
+
+        const result = setup.engine.apply({
+            type: "obstacle_attack",
+            attackerId: setup.left.getId(),
+            targetPosition: getPositionForCell(aimed, settings.getMinX(), settings.getStep(), settings.getHalfStep()),
+            attackFrom: { x: 2, y: 3 },
+        });
+
+        expect(result.completed).toBe(true);
+        const obstacleEvents = result.events.filter(
+            (event): event is Extract<GameEvent, { type: "obstacle_attacked" }> => event.type === "obstacle_attacked",
+        );
+        expect(obstacleEvents).toHaveLength(1);
+        expect(obstacleEvents[0].unitIdsDied).toEqual([setup.right.getId()]);
+        expect(obstacleEvents[0].damage?.secondary).toContainEqual(
+            expect.objectContaining({ source: "skewer_strike", unitId: setup.right.getId(), unitsDied: 1 }),
+        );
+        expect(result.events).toContainEqual({
+            type: "unit_destroyed",
+            unitId: setup.right.getId(),
+            reason: "dead_cleanup",
+        });
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([survivor]);
+    });
+
+    it("an Area Throw unit's shot at a barrel is an Area Throw there: 3x3 barrels and units, one shot", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Area Throw"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 2,
+            leftCell: { x: 3, y: 7 },
+            supportCell: { x: 3, y: 6 },
+            rightCell: { x: 8, y: 8 },
+        });
+        const aimed = { x: 8, y: 7 };
+        const inBlast = { x: 7, y: 6 };
+        const outsideBlast = { x: 11, y: 11 };
+        setup.grid.setScatteredMountains([outsideBlast, inBlast, aimed]);
+        setup.left.refreshPossibleAttackTypes(true);
+        const hpBefore = setup.right.getCumulativeHp();
+        const shotsBefore = setup.left.getRangeShots();
+        const settings = setup.grid.getSettings();
+
+        const result = setup.engine.apply({
+            type: "obstacle_attack",
+            attackerId: setup.left.getId(),
+            targetPosition: getPositionForCell(aimed, settings.getMinX(), settings.getStep(), settings.getHalfStep()),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({ type: "area_attacked", attackerId: setup.left.getId(), targetCell: aimed }),
+        );
+        expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(2);
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([outsideBlast]);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(hpBefore);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore - 1);
+    });
+
+    it("an Area Throw that only breaks barrels still spends its shot", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Area Throw"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 2,
+            leftCell: { x: 3, y: 7 },
+            supportCell: { x: 3, y: 6 },
+            rightCell: { x: 14, y: 1 },
+        });
+        const blast = [
+            { x: 8, y: 12 },
+            { x: 9, y: 13 },
+        ];
+        const outsideBlast = { x: 1, y: 14 };
+        setup.grid.setScatteredMountains([...blast, outsideBlast]);
+        setup.left.refreshPossibleAttackTypes(true);
+        const shotsBefore = setup.left.getRangeShots();
+
+        const result = setup.engine.apply({
+            type: "area_throw_attack",
+            attackerId: setup.left.getId(),
+            targetCell: { x: 8, y: 12 },
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual([outsideBlast]);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore - 1);
+    });
+
+    it("a refused Area Throw leaves the barrels in its blast standing", () => {
+        const setup = setupActionFight({
+            gridType: PBTypes.GridVals.BLOCK_CENTER,
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Area Throw"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 2,
+            leftCell: { x: 3, y: 7 },
+            supportCell: { x: 3, y: 6 },
+            // Standing right beside the thrower: a unit in melee contact cannot shoot, so the throw is refused.
+            rightCell: { x: 4, y: 7 },
+        });
+        const blast = [
+            { x: 8, y: 7 },
+            { x: 7, y: 6 },
+        ];
+        setup.grid.setScatteredMountains(blast);
+        setup.left.refreshPossibleAttackTypes(true);
+
+        const result = setup.engine.apply({
+            type: "area_throw_attack",
+            attackerId: setup.left.getId(),
+            targetCell: { x: 8, y: 7 },
+        });
+
+        expect(result.completed).toBe(false);
+        expect(setup.grid.getScatteredMountainsStanding()).toEqual(blast);
+    });
+
     it("Large Caliber ignores scattered stones on its trajectory and destroys every stone in its 3x3 blast", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,

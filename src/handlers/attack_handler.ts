@@ -109,6 +109,13 @@ export interface IAttackResult {
     abilityTransfers?: IAbilityTransfer[];
     /** Cemetery barrels a Lightning Spin knocked down in this strike, beyond the one a blow was aimed at. */
     spunObstacleCells?: HoCMath.XY[];
+    /** Cemetery barrels a unit strike's piercing passive ran on into behind its target, tagged with that passive. */
+    piercedObstacles?: IPiercedObstacle[];
+}
+
+export interface IPiercedObstacle {
+    cell: HoCMath.XY;
+    source: "fire_breath" | "skewer_strike";
 }
 
 export interface IAttackObstacle {
@@ -2171,6 +2178,12 @@ export class AttackHandler {
             fireBreathAttackResult.moraleDecreaseForTheUnitTeam,
         );
         attackerUnitPlusMorale += fireBreathAttackResult.increaseMorale;
+        // The breath burns the cemetery barrels standing in its band behind the target just as the units there.
+        const piercedObstacles = this.spendPiercedObstacles(
+            attackerUnit,
+            AllAbilities.fireBreathObstacleCells(attackerUnit, this.grid, attackFromCell, targetUnit),
+            "fire_breath",
+        );
 
         const skewerStrikeAttackResult = AllAbilities.processSkewerStrikeAbility(
             attackerUnit,
@@ -2198,6 +2211,20 @@ export class AttackHandler {
                 unitsDied: sd.unitsDied,
             });
         }
+        // Past a small target the skewer runs on into a cemetery barrel standing behind it just as into a unit.
+        const skeweredObstacleCell = AllAbilities.skewerStrikeObstacleCell(
+            attackerUnit,
+            this.grid,
+            attackFromCell,
+            targetUnit,
+        );
+        piercedObstacles.push(
+            ...this.spendPiercedObstacles(
+                attackerUnit,
+                skeweredObstacleCell ? [skeweredObstacleCell] : [],
+                "skewer_strike",
+            ),
+        );
 
         // Petrifying Gaze is resolved from the landed melee impact before Flesh Shield redirects any of
         // its base damage. The effect remains on target even when the aura absorbs the whole base hit.
@@ -2874,7 +2901,26 @@ export class AttackHandler {
             (damageForAnimation.secondary ??= []),
         );
 
-        return { completed: true, unitIdsDied, animationData, abilityStolen, spunObstacleCells };
+        return {
+            completed: true,
+            unitIdsDied,
+            animationData,
+            abilityStolen,
+            spunObstacleCells,
+            piercedObstacles,
+        };
+    }
+    /** Break the barrels a unit strike's piercing passive ran on into, and report them tagged with that passive. */
+    private spendPiercedObstacles(
+        attackerUnit: Unit,
+        cells: readonly HoCMath.XY[],
+        source: IPiercedObstacle["source"],
+    ): IPiercedObstacle[] {
+        return cells.map((cell) => {
+            this.spendObstacleHit(cell, cell.x >= this.gridSettings.getGridSize() >> 1);
+            this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+            return { cell, source };
+        });
     }
     /**
      * How far a melee charge ran to reach `attackFromCell`, for Rapid Charge — undefined when the strike carries
@@ -2932,31 +2978,102 @@ export class AttackHandler {
     /**
      * A piercing melee passive runs on THROUGH a cemetery barrel. Skewer Strike (Pikeman) and Fire Breath
      * (Black Dragon) both strike the cell behind a one-cell target, so the barrel standing directly behind the
-     * struck one — straight or diagonal along the attacker→barrel line — goes down with it. Scattered layouts
-     * only: the classic 2x2 mountains absorb the whole strike in their own hit counters. An empty cell, a
-     * unit or the board edge behind the barrel simply gives the sweep nothing to break.
+     * struck one — straight or diagonal along the attacker→barrel line — goes down with it. A unit standing there
+     * is hit exactly as it would be past a small unit: the skewer runs on into an enemy
+     * (skewerStrikeUnitBehindObstacle), the breath burns anyone not fire-immune (fireBreathUnitBehindObstacle).
+     * Scattered layouts only: the classic 2x2 mountains absorb the whole strike in their own hit counters. An empty
+     * cell or the board edge behind the barrel gives the sweep nothing. Returns the stacks the pierce killed.
      */
     private pierceScatteredObstacleBehind(
         attackerUnit: Unit,
+        unitsHolder: UnitsHolder,
         attackFromCell: HoCMath.XY,
         targetCell: HoCMath.XY,
-    ): void {
+        damageForAnimation?: IVisibleDamage,
+    ): string[] {
         if (
             !this.grid.hasScatteredMountains() ||
             (!attackerUnit.hasAbilityActive("Skewer Strike") && !attackerUnit.hasAbilityActive("Fire Breath"))
         ) {
-            return;
+            return [];
         }
         const behindCell = AbilityHelper.pierceCellBehind(attackerUnit, attackFromCell, targetCell);
-        if (
-            !behindCell ||
-            !GridMath.isCellWithinGrid(this.gridSettings, behindCell) ||
-            this.grid.getOccupantUnitId(behindCell) !== "B"
-        ) {
-            return;
+        if (!behindCell || !GridMath.isCellWithinGrid(this.gridSettings, behindCell)) {
+            return [];
         }
-        this.spendObstacleHit(behindCell, behindCell.x >= this.gridSettings.getGridSize() >> 1);
-        this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+        if (this.grid.getOccupantUnitId(behindCell) === "B") {
+            this.spendObstacleHit(behindCell, behindCell.x >= this.gridSettings.getGridSize() >> 1);
+            this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
+            return [];
+        }
+        const unitIdsDied: string[] = [];
+        const secondaryDamage = damageForAnimation ? (damageForAnimation.secondary ??= []) : [];
+        const settleMorale = (result: {
+            increaseMorale: number;
+            moraleDecreaseForTheUnitTeam: Record<string, number>;
+        }): void => {
+            if (!attackerUnit.isDead()) {
+                attackerUnit.increaseMorale(
+                    result.increaseMorale,
+                    FightStateManager.getInstance()
+                        .getFightProperties()
+                        .getAdditionalMoralePerTeam(attackerUnit.getTeam()),
+                );
+            }
+            unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(result.moraleDecreaseForTheUnitTeam);
+        };
+
+        const skewered = AllAbilities.skewerStrikeUnitBehindObstacle(
+            attackerUnit,
+            this.grid,
+            unitsHolder,
+            attackFromCell,
+            targetCell,
+        );
+        if (skewered) {
+            const skewerResult = AllAbilities.strikeSkewerTargets(
+                attackerUnit,
+                [skewered],
+                this.sceneLog,
+                unitsHolder,
+                this.grid,
+                this.damageStatisticHolder,
+                true,
+                secondaryDamage,
+            );
+            for (const sd of skewerResult.secondaryDamages) {
+                secondaryDamage.push({
+                    source: "skewer_strike",
+                    unitId: sd.unitId,
+                    position: sd.unitPosition,
+                    amount: sd.damage,
+                    unitsDied: sd.unitsDied,
+                });
+            }
+            settleMorale(skewerResult);
+            unitIdsDied.push(...skewerResult.unitIdsDied);
+        }
+
+        const burned = AllAbilities.fireBreathUnitBehindObstacle(
+            attackerUnit,
+            this.grid,
+            unitsHolder,
+            attackFromCell,
+            targetCell,
+        );
+        if (burned) {
+            const breathResult = AllAbilities.breatheFireOnTargets(
+                attackerUnit,
+                [burned],
+                this.sceneLog,
+                "attk",
+                this.damageStatisticHolder,
+                secondaryDamage,
+            );
+            settleMorale(breathResult);
+            unitIdsDied.push(...breathResult.unitIdsDied.filter((unitId) => !unitIdsDied.includes(unitId)));
+        }
+        return unitIdsDied;
     }
     /**
      * Hydra's Lightning Spin is one radial impact, so the cemetery barrels standing around her go down with it
@@ -2977,7 +3094,7 @@ export class AttackHandler {
     /**
      * Lightning Spin off a blow aimed at an obstacle. The spin does not care what the blow was aimed at: it
      * lands exactly as it does off a unit strike, hitting every enemy around the attacker's body and breaking
-     * every barrel in the same ring. Its kills feed Devour Essence the way a unit strike's do.
+     * every barrel in the same ring.
      */
     private spinAroundObstacleStrike(
         attackerUnit: Unit,
@@ -3003,16 +3120,6 @@ export class AttackHandler {
             this.grid,
         );
         const spunObstacleCells = this.spinScatteredObstaclesAround(attackerUnit, unitsHolder, attackFromCell);
-        if (spinResult.unitIdsDied.length) {
-            unitsHolder.refreshStackPowerForAllUnits();
-            AllAbilities.processDevourEssenceAbility(
-                attackerUnit,
-                spinResult.unitIdsDied,
-                unitsHolder,
-                this.sceneLog,
-                secondaryDamage,
-            );
-        }
         return { unitIdsDied: spinResult.unitIdsDied, spunObstacleCells };
     }
     public handleObstacleAttack(
@@ -3125,6 +3232,8 @@ export class AttackHandler {
             }
 
             const stationaryAttack = currentCell.x === attackFromCell.x && currentCell.y === attackFromCell.y;
+            // Stacks a Skewer Strike killed running on through the struck barrel.
+            let piercedUnitIdsDied: string[] = [];
 
             if (attackerUnit.isSmallSize()) {
                 if (
@@ -3180,7 +3289,13 @@ export class AttackHandler {
 
                     this.spendObstacleHit(targetCell, isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
-                    this.pierceScatteredObstacleBehind(attackerUnit, attackFromCell, targetCell);
+                    piercedUnitIdsDied = this.pierceScatteredObstacleBehind(
+                        attackerUnit,
+                        unitsHolder,
+                        attackFromCell,
+                        targetCell,
+                        damageForAnimation,
+                    );
                     if (
                         this.obstacleStillStands() &&
                         (attackerUnit.getAbility("Double Punch") ?? attackerUnit.getAbility("Crafted Double Punch"))
@@ -3257,7 +3372,13 @@ export class AttackHandler {
 
                     this.spendObstacleHit(targetCell, isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
-                    this.pierceScatteredObstacleBehind(attackerUnit, attackFromCell, targetCell);
+                    piercedUnitIdsDied = this.pierceScatteredObstacleBehind(
+                        attackerUnit,
+                        unitsHolder,
+                        attackFromCell,
+                        targetCell,
+                        damageForAnimation,
+                    );
 
                     if (
                         this.obstacleStillStands() &&
@@ -3280,9 +3401,21 @@ export class AttackHandler {
                 currentActiveKnownPaths,
                 damageForAnimation,
             );
+            const unitIdsDied = [...piercedUnitIdsDied, ...spin.unitIdsDied];
+            // Kills off an obstacle strike feed Devour Essence the way a unit strike's do.
+            if (unitIdsDied.length) {
+                unitsHolder.refreshStackPowerForAllUnits();
+                AllAbilities.processDevourEssenceAbility(
+                    attackerUnit,
+                    unitIdsDied,
+                    unitsHolder,
+                    this.sceneLog,
+                    damageForAnimation ? (damageForAnimation.secondary ??= []) : [],
+                );
+            }
             return {
                 completed: true,
-                unitIdsDied: spin.unitIdsDied,
+                unitIdsDied,
                 animationData,
                 spunObstacleCells: spin.spunObstacleCells,
             };
