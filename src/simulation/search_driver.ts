@@ -871,6 +871,8 @@ interface ISearchCounters {
     scoredCandidatesTotal: number;
     /** Searches abandoned before every shortlisted candidate received a comparable full score. */
     deadlineFallbacks: number;
+    /** Decisions searched at the reduced adaptive budget (1 rollout, shortlist 2) after a breaker trip. */
+    degradedDecisions: number;
     /** H18 opening decisions where at least one move-only fast-flyer solo dive was removed from the catalog. */
     isolatingFastFlyerMoveRejects: number;
     /** Late Abomination turns that admitted defend into exact-terminal rollout arbitration. */
@@ -1052,6 +1054,7 @@ const emptyCounters = (): ISearchCounters => ({
     candidatesTotal: 0,
     scoredCandidatesTotal: 0,
     deadlineFallbacks: 0,
+    degradedDecisions: 0,
     isolatingFastFlyerMoveRejects: 0,
     armageddonDefendOpportunities: 0,
     soleAbominationArmageddonDefends: 0,
@@ -1306,6 +1309,19 @@ export class SearchDriver {
      * without the bank itself.
      */
     private readonly pooledOverrideValidation: boolean;
+    /**
+     * Per-decision budget degradation instead of the match-sticky circuit breaker. Measured on the live host
+     * (2 shared vCPU): the stock breaker tripped in most games and, because `circuitOpen` never resets, the
+     * seat then played the rest of the match without any search (39% of searched turns skipped). With
+     * `SEARCH_A19_ADAPTIVE_BUDGET=1` a decision that overruns the breaker only degrades the NEXT few decisions
+     * to one rollout and a shortlist of two (no re-score bank), and a decision that finishes under the breaker
+     * counts the degradation back down. Wall-clock mode only; offline deterministic work never trips either.
+     */
+    private readonly adaptiveBudget: boolean;
+    private degradedRemaining = 0;
+    private static readonly DEGRADED_DECISIONS = 3;
+    private static readonly DEGRADED_ROLLOUTS = 1;
+    private static readonly DEGRADED_SHORTLIST = 2;
     private readonly horizon: number;
     private readonly researchHorizon: number | null;
     private readonly researchHorizonVersions: ReadonlySet<string>;
@@ -1542,6 +1558,16 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_POOLED_OVERRIDE_VALIDATION must be 0 or 1");
         }
         this.pooledOverrideValidation = this.nonregressiveOverrideValidation && rawPooledOverrideValidation === "1";
+        const rawAdaptiveBudget = process.env.SEARCH_A19_ADAPTIVE_BUDGET;
+        if (
+            rawAdaptiveBudget !== undefined &&
+            rawAdaptiveBudget !== "" &&
+            rawAdaptiveBudget !== "0" &&
+            rawAdaptiveBudget !== "1"
+        ) {
+            throw new Error("SEARCH_A19_ADAPTIVE_BUDGET must be 0 or 1");
+        }
+        this.adaptiveBudget = this.mode === "search" && rawAdaptiveBudget === "1";
         this.horizon = Math.floor(envNum("SEARCH_HORIZON", 12, 1));
         const researchHorizon = parseSearchResearchHorizon(this.mode, this.versions);
         this.researchHorizon = researchHorizon?.horizon ?? null;
@@ -1956,6 +1982,24 @@ export class SearchDriver {
         return this.researchShortlist !== null && this.researchShortlistVersions.has(version)
             ? this.researchShortlist
             : this.shortlist;
+    }
+    /** True while the adaptive budget is degraded after a breaker overrun (see `adaptiveBudget`). */
+    private isDegraded(): boolean {
+        return this.adaptiveBudget && this.degradedRemaining > 0;
+    }
+    /** Full-horizon rollouts per shortlisted candidate for this decision. */
+    private effectiveRollouts(): number {
+        return this.isDegraded() ? SearchDriver.DEGRADED_ROLLOUTS : this.rollouts;
+    }
+    /** Shortlist size for this decision; a degraded decision compares the incumbent with one challenger. */
+    private effectiveShortlist(version: string): number | null {
+        const shortlist = this.shortlistForVersion(version);
+        if (!this.isDegraded()) {
+            return shortlist;
+        }
+        return shortlist === null
+            ? SearchDriver.DEGRADED_SHORTLIST
+            : Math.min(shortlist, SearchDriver.DEGRADED_SHORTLIST);
     }
     /** Normal-turn rollout cap for one acting seat; fixed leaf/lap/reply modes do not consult this value. */
     private turnHorizonForVersion(version: string, actingTeam: TeamType): number {
@@ -3098,7 +3142,13 @@ export class SearchDriver {
                 this.circuitBreakerMs !== null &&
                 (behaviorElapsedMs ?? performance.now() - t0) > this.circuitBreakerMs
             ) {
-                this.circuitOpen = true;
+                if (this.adaptiveBudget) {
+                    this.degradedRemaining = SearchDriver.DEGRADED_DECISIONS;
+                } else {
+                    this.circuitOpen = true;
+                }
+            } else if (this.isDegraded() && !this.match.offlineDeterministicWork) {
+                this.degradedRemaining -= 1;
             }
             const cleanupErrors: unknown[] = [];
             try {
@@ -3227,6 +3277,8 @@ export class SearchDriver {
             shortlist: this.shortlist,
             decisionDeadlineMs: this.decisionDeadlineMs,
             deadlineFallbacks: c.deadlineFallbacks,
+            degradedDecisions: c.degradedDecisions,
+            adaptiveBudget: this.adaptiveBudget,
             offlineDeterministicWork: this.match.offlineDeterministicWork === true,
             isolatingFastFlyerMoveRejects: c.isolatingFastFlyerMoveRejects,
             armageddonDefendOpportunities: c.armageddonDefendOpportunities,
@@ -3614,6 +3666,9 @@ export class SearchDriver {
         let nonregressiveOverrideValidationDelta: number | null = null;
         let validationMeans: number[] | null = null;
         const turnHorizon = this.turnHorizonForVersion(version, unit.getTeam());
+        if (this.isDegraded()) {
+            this.counters.degradedDecisions += 1;
+        }
         try {
             scoredCandidates = this.shortlistCandidates(
                 unit,
@@ -3631,7 +3686,7 @@ export class SearchDriver {
                 scoredCandidates,
                 seedBase,
                 "turns",
-                this.rollouts,
+                this.effectiveRollouts(),
                 deadlineAt,
                 turnHorizon,
             );
@@ -3822,7 +3877,12 @@ export class SearchDriver {
                                     ? means[bestIdx] > means[0]
                                     : means[bestIdx] >= means[0])))) ||
                     means[bestIdx] - means[0] >= this.gate);
-            if (this.nonregressiveOverrideValidation && provisionalWouldOverride && means[0] !== -Infinity) {
+            if (
+                this.nonregressiveOverrideValidation &&
+                !this.isDegraded() &&
+                provisionalWouldOverride &&
+                means[0] !== -Infinity
+            ) {
                 this.counters.nonregressiveOverrideValidationAttempts += 1;
                 const validationRollouts = 2;
                 const pairedMeans = this.scoreCandidates(
@@ -3841,11 +3901,12 @@ export class SearchDriver {
                 if (this.pooledOverrideValidation && validationDelta !== null) {
                     // Same rollouts, one estimate: the shortlist means already average `this.rollouts` samples
                     // per candidate on the same horizon mode, so the fresh pair simply extends that sample.
-                    const weight = this.rollouts + validationRollouts;
+                    const shortlistRollouts = this.effectiveRollouts();
+                    const weight = shortlistRollouts + validationRollouts;
                     validationDelta =
-                        (means[bestIdx] * this.rollouts +
+                        (means[bestIdx] * shortlistRollouts +
                             pairedMeans[1] * validationRollouts -
-                            (means[0] * this.rollouts + pairedMeans[0] * validationRollouts)) /
+                            (means[0] * shortlistRollouts + pairedMeans[0] * validationRollouts)) /
                         weight;
                 }
                 nonregressiveOverrideValidationDelta = validationDelta;
@@ -4273,7 +4334,7 @@ export class SearchDriver {
         prioritizeV08STargetPressure = false,
         prioritizeV08SUrgency = false,
     ): readonly IEnumeratedCandidate[] {
-        const shortlist = this.shortlistForVersion(version);
+        const shortlist = this.effectiveShortlist(version);
         if (shortlist === null || candidates.length <= shortlist) {
             return candidates;
         }

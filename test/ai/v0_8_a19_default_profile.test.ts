@@ -50,7 +50,7 @@ beforeEach(() => {
 afterEach(restoreEnvironment);
 
 describe("v0.8+A19 production profile", () => {
-    it("promotes the qualified v6 identity and its sealed H64 search environment", () => {
+    it("promotes the v7 search-budget identity and its sealed H64 search environment", () => {
         const environment = buildV08A19SearchEnvironment();
 
         expect(V08_A19_PROFILE).toMatchObject({
@@ -59,10 +59,16 @@ describe("v0.8+A19 production profile", () => {
             researchOnly: false,
         });
         expect(V08_A19_PROFILE.promotedFrom.candidateId).toContain("a19-h64");
+        expect(V08_A19_PROFILE.promotedFrom.candidateId).toContain("v7");
         expect(environment.SEARCH_VERSIONS).toBe("v0.8");
         expect(environment.SEARCH_HORIZON).toBe("64");
         expect(environment.SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY).toBe("1");
-        expect(environment.SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION).toBe("1");
+        // The v7 budget delta (2026-09-13): the re-score bank measured null twice and is dropped, and per-decision
+        // degradation replaces the match-sticky breaker on slow hosts. Rollouts stay 2 until the host is faster.
+        expect(environment.SEARCH_ROLLOUTS).toBe("2");
+        expect(environment.SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION).toBe("0");
+        expect(environment.SEARCH_A19_ADAPTIVE_BUDGET).toBe("1");
+        expect(environment.SEARCH_A19_POOLED_OVERRIDE_VALIDATION).toBeUndefined();
     });
 
     it("pins the current registry, default-search, and historical-control routing bytes", () => {

@@ -580,3 +580,98 @@ export function createV08A19H64FinalistV6Strategy(): V08A19F184LowerHumanPlaceme
         ),
     );
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// v7: the search BUDGET candidate (2026-09-13). Same placement stack and policy as v6; only the search env
+// moves, on three measured facts (seat-alternated a19-vs-a19 A/Bs through the override seam, offline
+// deterministic caps, 95% CIs):
+//   - the nonregressive re-score bank vetoed 78% of proposed overrides with a median re-score delta of
+//     0.000, switching it off measured 50.5% ± 2.9 (1,158 decisive) and pooling it into the shortlist
+//     estimate 50.5% ± 1.9 (2,633): a wash either way that costs ~10% of all rollout work — removed;
+//   - SEARCH_ROLLOUTS 4 measured 52.8% ± 1.3 (6,005 decisive, z 4.4) and 3 measured 51.9% ± 2.0 (2,317),
+//     but a 3-rollout v7 vs v6 re-measured only +0.2 ± 2.0 (2,308) and cost 10.4% deadline fallbacks on
+//     the live host: the search is sample-starved in its PRIMARY scoring, and the extra samples are
+//     deferred until the host can afford them (rollouts stay 2 here);
+//   - on the live host (2 shared vCPU) the 275 ms breaker tripped in most games and, being match-sticky,
+//     skipped 39% of searched turns — replaced by per-decision degradation (SEARCH_A19_ADAPTIVE_BUDGET).
+//     Probed with this exact env on that host: p50 77 ms (stock 90), 2.8% deadline fallbacks (5.3%), 0%
+//     skipped (39%).
+// ---------------------------------------------------------------------------------------------------------
+export const V08_A19_H64_FINALIST_V7_PROFILE_SCHEMA =
+    "hoc.v0_8_a19_h64_finalist_v6_search_budget_research_profile.v7" as const;
+export const V08_A19_H64_FINALIST_V7_CANDIDATE_ID = "a19-h64-finalist-v6-adaptive-budget-no-bank-v7-research" as const;
+export const V08_A19_H64_FINALIST_V7_ADAPTIVE_BUDGET_ENV = "SEARCH_A19_ADAPTIVE_BUDGET" as const;
+export const V08_A19_H64_FINALIST_V7_ROLLOUTS = 2 as const;
+export const V08_A19_H64_FINALIST_V7_BEHAVIOR_ENVIRONMENT_SHA256 =
+    "f6d75aa9a3054948f980685d0c89435558fc28442bbfdcbe684efc3f3c1ff6bd" as const;
+export const V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SOURCE = "src/simulation/search_driver.ts" as const;
+/** Source bytes of the driver that introduced the adaptive budget (the pooled-bank knob is also in these bytes). */
+export const V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SHA256 =
+    "bc3d07db3f84d486264d6f800e1beadeb0a1b85301e1b78daa4f7f12eecb25a9" as const;
+
+export const V08_A19_H64_FINALIST_V7_SEARCH = Object.freeze({
+    ...V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_SEARCH,
+    rollouts: V08_A19_H64_FINALIST_V7_ROLLOUTS,
+});
+
+/** v6 plus the budget delta: no re-score bank and per-decision degradation instead of the breaker (rollouts stay 2). */
+export function buildV08A19H64FinalistV7SearchEnvironment(): Readonly<Record<string, string | undefined>> {
+    return Object.freeze({
+        ...buildV08A19H64FinalistV6SearchEnvironment(),
+        SEARCH_ROLLOUTS: String(V08_A19_H64_FINALIST_V7_ROLLOUTS),
+        [V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_ENV]: "0",
+        [V08_A19_H64_FINALIST_V7_ADAPTIVE_BUDGET_ENV]: "1",
+    });
+}
+
+/** Runtime ledger for v7: the driver bytes moved; every other v6 pin is carried unchanged. */
+export const V08_A19_H64_FINALIST_V7_RUNTIME_SOURCE_LEDGER = Object.freeze([
+    Object.freeze({
+        role: "search-driver" as const,
+        source: V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SOURCE,
+        sha256: V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SHA256,
+    }),
+    ...V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER.filter((pin) => pin.role !== "search-driver"),
+] as const);
+
+export const V08_A19_H64_FINALIST_V7_SEARCH_POLICY_BINDING = Object.freeze({
+    schema: "hoc.v0_8_a19_search_budget.v1" as const,
+    policyId: "a19-search-budget-adaptive-no-bank-v1" as const,
+    derivesFrom: V08_A19_H64_FINALIST_V6_SEARCH_POLICY_BINDING,
+    environmentControls: Object.freeze({
+        rollouts: "SEARCH_ROLLOUTS" as const,
+        nonregressiveOverrideValidation: V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_COMPACT_VALIDATED_ENV,
+        adaptiveBudget: V08_A19_H64_FINALIST_V7_ADAPTIVE_BUDGET_ENV,
+    }),
+    implementationSource: V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SOURCE,
+    implementationSha256: V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SHA256,
+    budget: Object.freeze({
+        rollouts: V08_A19_H64_FINALIST_V7_ROLLOUTS,
+        degradedRollouts: 1 as const,
+        degradedShortlist: 2 as const,
+        degradedDecisions: 3 as const,
+        nonregressiveOverrideValidation: false as const,
+    }),
+});
+
+/** v7 research identity: the v6 finalist with the measured search-budget delta. */
+export const V08_A19_H64_FINALIST_V7_PROFILE = Object.freeze({
+    schema: V08_A19_H64_FINALIST_V7_PROFILE_SCHEMA,
+    candidateId: V08_A19_H64_FINALIST_V7_CANDIDATE_ID,
+    researchOnly: true as const,
+    baseVersion: V08_A19_H18_F184_LOWER_HUMAN_PLACEMENT_BASE_VERSION,
+    derivesFrom: V08_A19_H64_FINALIST_V6_PROFILE,
+    genomeSha256: V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_GENOME_SHA256,
+    behaviorEnvironmentSha256: V08_A19_H64_FINALIST_V7_BEHAVIOR_ENVIRONMENT_SHA256,
+    genome: V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_GENOME,
+    search: V08_A19_H64_FINALIST_V7_SEARCH,
+    policy: V08_A19_H18_PROFILE.policy,
+    searchPolicy: V08_A19_H64_FINALIST_V7_SEARCH_POLICY_BINDING,
+    placementPolicy: V08_A19_H64_FINALIST_V6_PLACEMENT_POLICY_BINDING,
+    runtimeSourceLedger: V08_A19_H64_FINALIST_V7_RUNTIME_SOURCE_LEDGER,
+});
+
+/** Same strategy stack as v6: exact -> Boar/Battle-Mage flank -> scoped compact -> generic ranked -> plain v0.8. */
+export function createV08A19H64FinalistV7Strategy(): V08A19F184LowerHumanPlacementStrategy {
+    return createV08A19H64FinalistV6Strategy();
+}

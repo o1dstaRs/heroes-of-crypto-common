@@ -10,9 +10,9 @@
  */
 
 import {
-    buildV08A19H64FinalistV6SearchEnvironment,
-    createV08A19H64FinalistV6Strategy,
-    V08_A19_H64_FINALIST_V6_PROFILE,
+    buildV08A19H64FinalistV7SearchEnvironment,
+    createV08A19H64FinalistV7Strategy,
+    V08_A19_H64_FINALIST_V7_PROFILE,
 } from "./v0_8_a19_h18_f184_lower_human_placement_profile";
 
 /** Stable production identity for the qualified A19 finalist shipped behind the v0.8 wire version. */
@@ -73,22 +73,24 @@ export const V08_A19_PRODUCTION_ROUTING_SOURCE_LEDGER = Object.freeze([
 ] as const);
 
 /**
- * Promote the qualified A19 v6 finalist without mutating its frozen research evidence. Saved games and AI
- * seats continue to use `v0.8`; this profile identifies the placement and rollout-search composition behind it.
+ * Promote the A19 v7 candidate (the v6 finalist with the measured search-budget delta: 3 rollouts, no re-score
+ * bank, per-decision degradation instead of the match-sticky breaker) without mutating the frozen research
+ * evidence. Saved games and AI seats continue to use `v0.8`; this profile identifies the placement and
+ * rollout-search composition behind it. v6 remains reachable as the tournament research entrant.
  */
 export const V08_A19_PROFILE = Object.freeze({
     schema: V08_A19_PROFILE_SCHEMA,
     candidateId: V08_A19_CANDIDATE_ID,
     researchOnly: false as const,
     productionVersion: V08_A19_PRODUCTION_VERSION,
-    promotedFrom: V08_A19_H64_FINALIST_V6_PROFILE,
-    genomeSha256: V08_A19_H64_FINALIST_V6_PROFILE.genomeSha256,
-    behaviorEnvironmentSha256: V08_A19_H64_FINALIST_V6_PROFILE.behaviorEnvironmentSha256,
-    genome: V08_A19_H64_FINALIST_V6_PROFILE.genome,
-    search: V08_A19_H64_FINALIST_V6_PROFILE.search,
-    policy: V08_A19_H64_FINALIST_V6_PROFILE.policy,
-    searchPolicy: V08_A19_H64_FINALIST_V6_PROFILE.searchPolicy,
-    placementPolicy: V08_A19_H64_FINALIST_V6_PROFILE.placementPolicy,
+    promotedFrom: V08_A19_H64_FINALIST_V7_PROFILE,
+    genomeSha256: V08_A19_H64_FINALIST_V7_PROFILE.genomeSha256,
+    behaviorEnvironmentSha256: V08_A19_H64_FINALIST_V7_PROFILE.behaviorEnvironmentSha256,
+    genome: V08_A19_H64_FINALIST_V7_PROFILE.genome,
+    search: V08_A19_H64_FINALIST_V7_PROFILE.search,
+    policy: V08_A19_H64_FINALIST_V7_PROFILE.policy,
+    searchPolicy: V08_A19_H64_FINALIST_V7_PROFILE.searchPolicy,
+    placementPolicy: V08_A19_H64_FINALIST_V7_PROFILE.placementPolicy,
     promotionSourceLedger: V08_A19_PRODUCTION_ROUTING_SOURCE_LEDGER,
 });
 
@@ -101,7 +103,7 @@ export const V08_A19_PROFILE = Object.freeze({
  * a silently ignored override would fake the A/B (SEARCH_OPP_MODEL precedent).
  */
 export function buildV08A19SearchEnvironment(): Readonly<Record<string, string | undefined>> {
-    const base = buildV08A19H64FinalistV6SearchEnvironment();
+    const base = buildV08A19H64FinalistV7SearchEnvironment();
     const raw = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
     if (!raw) {
         return base;
@@ -124,6 +126,6 @@ export function buildV08A19SearchEnvironment(): Readonly<Record<string, string |
 }
 
 /** Create fresh match-local placement state around the native v0.8 combat strategy. */
-export function createV08A19Strategy(): ReturnType<typeof createV08A19H64FinalistV6Strategy> {
-    return createV08A19H64FinalistV6Strategy();
+export function createV08A19Strategy(): ReturnType<typeof createV08A19H64FinalistV7Strategy> {
+    return createV08A19H64FinalistV7Strategy();
 }

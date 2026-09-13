@@ -54,6 +54,16 @@ import {
     V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER,
     V08_A19_H64_FINALIST_V6_SEARCH_POLICY_BINDING,
     V08_A19_H64_FINALIST_V6_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_ENV,
+    buildV08A19H64FinalistV7SearchEnvironment,
+    createV08A19H64FinalistV7Strategy,
+    V08_A19_H64_FINALIST_V7_ADAPTIVE_BUDGET_ENV,
+    V08_A19_H64_FINALIST_V7_BEHAVIOR_ENVIRONMENT_SHA256,
+    V08_A19_H64_FINALIST_V7_CANDIDATE_ID,
+    V08_A19_H64_FINALIST_V7_PROFILE,
+    V08_A19_H64_FINALIST_V7_PROFILE_SCHEMA,
+    V08_A19_H64_FINALIST_V7_RUNTIME_SOURCE_LEDGER,
+    V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SHA256,
+    V08_A19_H64_FINALIST_V7_SEARCH_POLICY_BINDING,
     V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_ABOMINATION_MIRROR_RELEASE_ENV,
     V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_ARMAGEDDON_DEFEND_CANDIDATE_ENV,
     V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_BEHAVIOR_ENVIRONMENT_SHA256,
@@ -615,6 +625,83 @@ describe("v0.8 A19-H18 f184 LEFT-only human-placement research profile", () => {
         }
         expect(Object.isFrozen(V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER)).toBe(true);
         expect(V08_A19_H64_FINALIST_V6_RUNTIME_SOURCE_LEDGER.every((pin) => Object.isFrozen(pin))).toBe(true);
+    });
+
+    it("pins the v7 search-budget environment, its driver bytes and the carried v6 ledger", () => {
+        const v6Environment = buildV08A19H64FinalistV6SearchEnvironment();
+        const v7Environment = buildV08A19H64FinalistV7SearchEnvironment();
+        const changedKeys = [...new Set([...Object.keys(v6Environment), ...Object.keys(v7Environment)])]
+            .filter((key) => v6Environment[key] !== v7Environment[key])
+            .sort();
+
+        expect(changedKeys).toEqual([
+            V08_A19_H64_FINALIST_V7_ADAPTIVE_BUDGET_ENV,
+            "SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION",
+        ]);
+        expect(v7Environment).toMatchObject({
+            SEARCH_ROLLOUTS: "2",
+            SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "0",
+            [V08_A19_H64_FINALIST_V7_ADAPTIVE_BUDGET_ENV]: "1",
+            [V08_A19_H64_FINALIST_V6_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_ENV]: "1",
+        });
+        expect(fingerprintV08AlignedV1(v7Environment)).toBe(V08_A19_H64_FINALIST_V7_BEHAVIOR_ENVIRONMENT_SHA256);
+        expect(Object.isFrozen(v7Environment)).toBe(true);
+
+        // The driver that introduced the adaptive budget is pinned by its current bytes; every other v6 pin is
+        // carried unchanged (the same historical-provenance rule as the v6 ledger applies to them).
+        expect(V08_A19_H64_FINALIST_V7_RUNTIME_SOURCE_LEDGER.map(({ role }) => role)).toEqual([
+            "search-driver",
+            "armageddon-endgame",
+            "boar-battle-mage-flank-placement",
+            "compact-placement",
+            "tournament-entrant-a-router",
+            "battle-engine-search-team-scope",
+        ]);
+        const currentImplementationRoles = new Set([
+            "search-driver",
+            "armageddon-endgame",
+            "boar-battle-mage-flank-placement",
+            "compact-placement",
+        ]);
+        for (const { role, source, sha256 } of V08_A19_H64_FINALIST_V7_RUNTIME_SOURCE_LEDGER) {
+            if (!currentImplementationRoles.has(role)) continue;
+            const bytes = readFileSync(new URL(`../../${source}`, import.meta.url));
+            expect(createHash("sha256").update(bytes).digest("hex")).toBe(sha256);
+        }
+        expect(V08_A19_H64_FINALIST_V7_SEARCH_POLICY_BINDING.implementationSha256).toBe(
+            V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SHA256,
+        );
+        expect(V08_A19_H64_FINALIST_V7_SEARCH_POLICY_BINDING.budget).toEqual({
+            rollouts: 2,
+            degradedRollouts: 1,
+            degradedShortlist: 2,
+            degradedDecisions: 3,
+            nonregressiveOverrideValidation: false,
+        });
+        expect(Object.isFrozen(V08_A19_H64_FINALIST_V7_RUNTIME_SOURCE_LEDGER)).toBe(true);
+    });
+
+    it("pins v7 as a distinct immutable candidate over v6 with the same placement stack", () => {
+        expect(V08_A19_H64_FINALIST_V7_PROFILE).toMatchObject({
+            schema: V08_A19_H64_FINALIST_V7_PROFILE_SCHEMA,
+            candidateId: V08_A19_H64_FINALIST_V7_CANDIDATE_ID,
+            researchOnly: true,
+            baseVersion: "v0.8",
+            behaviorEnvironmentSha256: V08_A19_H64_FINALIST_V7_BEHAVIOR_ENVIRONMENT_SHA256,
+            searchPolicy: V08_A19_H64_FINALIST_V7_SEARCH_POLICY_BINDING,
+            placementPolicy: V08_A19_H64_FINALIST_V6_PLACEMENT_POLICY_BINDING,
+        });
+        expect(V08_A19_H64_FINALIST_V7_PROFILE.derivesFrom).toBe(V08_A19_H64_FINALIST_V6_PROFILE);
+        expect(V08_A19_H64_FINALIST_V7_PROFILE.search.rollouts).toBe(2);
+        expect(V08_A19_H64_FINALIST_V7_PROFILE.search.horizon).toBe(64);
+        expect(V08_A19_H64_FINALIST_V7_BEHAVIOR_ENVIRONMENT_SHA256).not.toBe(
+            V08_A19_H64_FINALIST_V6_BEHAVIOR_ENVIRONMENT_SHA256,
+        );
+        // Same four placement layers as v6, fresh per call.
+        const first = createV08A19H64FinalistV7Strategy();
+        const second = createV08A19H64FinalistV7Strategy();
+        expect(first).not.toBe(second);
+        expect(Object.getPrototypeOf(first)).toBe(Object.getPrototypeOf(createV08A19H64FinalistV6Strategy()));
     });
 
     it("pins v6 as a distinct immutable finalist over v5", () => {

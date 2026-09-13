@@ -107,6 +107,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_A19_EXACT_TERMINAL_RESULTS",
     "SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION",
     "SEARCH_A19_POOLED_OVERRIDE_VALIDATION",
+    "SEARCH_A19_ADAPTIVE_BUDGET",
     "SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE",
     "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY",
     "SEARCH_A19_FAST_FLYER_COHESION",
@@ -1015,6 +1016,112 @@ describe("search driver — gating, hygiene, determinism", () => {
 
         setEnv({ SEARCH_A19_POOLED_OVERRIDE_VALIDATION: "2" });
         expect(() => harness.makeDriver()).toThrow("SEARCH_A19_POOLED_OVERRIDE_VALIDATION must be 0 or 1");
+    });
+
+    it("A19 adaptive budget degrades the next decisions after a breaker overrun instead of opening the circuit", () => {
+        // A breaker of 0.001 ms makes every decision an overrun. Stock: the first overrun opens the circuit for
+        // the rest of the match and every later decision skips search. Adaptive: the next decisions still search,
+        // with one rollout and a shortlist of two, and the re-score bank is skipped while degraded.
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "0.03",
+            SEARCH_ROLLOUTS: "3",
+            SEARCH_SHORTLIST: "3",
+            SEARCH_DECISION_DEADLINE_MS: undefined,
+            SEARCH_CIRCUIT_BREAKER_MS: "0.001",
+            SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "1",
+            SEARCH_A19_ADAPTIVE_BUDGET: "1",
+        });
+        const harness = buildBattle(92, "v0.8");
+        const unit = harness.activeUnit()!;
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        type Driver = {
+            circuitOpen: boolean;
+            degradedRemaining: number;
+            counters: {
+                degradedDecisions: number;
+                circuitSkipped: number;
+                nonregressiveOverrideValidationAttempts: number;
+            };
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                horizonMode: string,
+                rolloutCount?: number,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        const driver = harness.makeDriver() as unknown as Driver;
+        const rolloutCounts: number[] = [];
+        driver.scoreCandidates = (_unit, scored, _seed, mode, rolloutCount) => {
+            if (mode === "turns") rolloutCounts.push(rolloutCount ?? -1);
+            return scored.map((_candidate, index) => (index === 0 ? 0.4 : 0.8));
+        };
+
+        // Decision 1 runs at the full budget (3 rollouts, then the 2-rollout re-score) and overruns the breaker.
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).not.toBe(incumbent);
+        expect(driver.circuitOpen).toBe(false);
+        expect(driver.degradedRemaining).toBe(3);
+        expect(rolloutCounts).toEqual([3, 2]);
+
+        // Decision 2 is degraded: one rollout, no re-score bank — and it still searches rather than skipping.
+        rolloutCounts.length = 0;
+        expect(driver.chooseDecision(unit, "v0.8", incumbent)).not.toBe(incumbent);
+        expect(rolloutCounts).toEqual([1]);
+        expect(driver.counters.degradedDecisions).toBe(1);
+        expect(driver.counters.circuitSkipped).toBe(0);
+        expect(driver.counters.nonregressiveOverrideValidationAttempts).toBe(1);
+        // Every decision overruns this breaker, so the degradation is re-armed rather than counted down.
+        expect(driver.degradedRemaining).toBe(3);
+    });
+
+    it("A19 adaptive budget counts the degradation down and restores the full budget", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "0.03",
+            SEARCH_ROLLOUTS: "3",
+            SEARCH_DECISION_DEADLINE_MS: "100000",
+            SEARCH_CIRCUIT_BREAKER_MS: "200000",
+            SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "0",
+            SEARCH_A19_ADAPTIVE_BUDGET: "1",
+        });
+        const harness = buildBattle(92, "v0.8");
+        const unit = harness.activeUnit()!;
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        type Driver = {
+            degradedRemaining: number;
+            counters: { degradedDecisions: number };
+            scoreCandidates(
+                unit: Unit,
+                candidates: readonly IEnumeratedCandidate[],
+                seedBase: number,
+                horizonMode: string,
+                rolloutCount?: number,
+            ): number[];
+            chooseDecision(unit: Unit, version: string, incumbent: GameAction[]): GameAction[];
+        };
+        const driver = harness.makeDriver() as unknown as Driver;
+        const rolloutCounts: number[] = [];
+        driver.scoreCandidates = (_unit, scored, _seed, mode, rolloutCount) => {
+            if (mode === "turns") rolloutCounts.push(rolloutCount ?? -1);
+            return scored.map((_candidate, index) => (index === 0 ? 0.4 : 0.8));
+        };
+
+        driver.degradedRemaining = 2;
+        driver.chooseDecision(unit, "v0.8", incumbent);
+        driver.chooseDecision(unit, "v0.8", incumbent);
+        expect(rolloutCounts).toEqual([1, 1]);
+        expect(driver.degradedRemaining).toBe(0);
+        expect(driver.counters.degradedDecisions).toBe(2);
+
+        driver.chooseDecision(unit, "v0.8", incumbent);
+        expect(rolloutCounts).toEqual([1, 1, 3]);
+
+        setEnv({ SEARCH_A19_ADAPTIVE_BUDGET: "2" });
+        expect(() => harness.makeDriver()).toThrow("SEARCH_A19_ADAPTIVE_BUDGET must be 0 or 1");
     });
 
     it("does not treat a move-then-mountain incumbent as productive", () => {
