@@ -201,7 +201,8 @@ describe("config_provider", () => {
         expect(creature.max_hp).toBe(500);
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(3.3);
-        expect(creature.base_armor).toBe(49);
+        // Owner balance pass 2026-09-13: armor 49 -> 45.
+        expect(creature.base_armor).toBe(45);
         expect(creature.base_attack).toBe(22);
         expect(creature.exp).toBe(1000);
         expect(creature.amount_alive).toBe(1);
