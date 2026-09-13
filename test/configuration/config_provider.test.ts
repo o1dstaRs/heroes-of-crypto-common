@@ -196,8 +196,9 @@ describe("config_provider", () => {
     it("loads the one-unit Abomination balance and stack-powered Flesh Shield metadata", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Abomination", "abomination_512", 0, 1000);
 
-        // The requested one-unit tank profile: a 1,000-XP stack is exactly one 550-HP creature.
-        expect(creature.max_hp).toBe(550);
+        // The requested one-unit tank profile: a 1,000-XP stack is exactly one 500-HP creature
+        // (owner balance pass 2026-09-13: 550 -> 500).
+        expect(creature.max_hp).toBe(500);
         expect(creature.steps).toBe(4.2);
         expect(creature.initiative).toBe(3.3);
         expect(creature.base_armor).toBe(49);

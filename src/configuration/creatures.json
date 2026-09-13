@@ -920,7 +920,7 @@
         },
         "Abomination": {
             "name": "Abomination",
-            "hp": 550,
+            "hp": 500,
             "steps": 4.2,
             "initiative": 3.3,
             "armor": 49,

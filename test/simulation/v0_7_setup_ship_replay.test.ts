@@ -46,7 +46,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // trace holding one diverges from the first blow struck against it. Two isolated runs reproduced this
 // value byte-identically.
 // Previous approved digest: 16bdeb8e89b6705d7c08f18bc7c7fde614f47be7c57e3c64591571b8f07e8f7f
-const EXPECTED_REPLAY_SHA256 = "ebc718ae48eb24ad1ce2f7240b7c055a8dcc71058f1772b88d230d132d78492a";
+// Previous approved digest: ebc718ae48eb24ad1ce2f7240b7c055a8dcc71058f1772b88d230d132d78492a
+// Re-pinned 2026-09-13 for an Abomination balance pass: hp 550 -> 500 (owner request). Abomination is
+// fielded across the seeded draws and its hp decides when each wound kills, so any trace holding one
+// diverges from its first wound on. Two isolated runs reproduced this value byte-identically.
+const EXPECTED_REPLAY_SHA256 = "c10760dc2f4cd31ad40a58886582fe10e6f856ae024c9dcf3b77732ceef7b061";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
