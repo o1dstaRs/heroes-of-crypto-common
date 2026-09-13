@@ -608,14 +608,15 @@ export const V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SOURCE = "src/simulat
 /**
  * Source bytes of the driver that introduced the adaptive budget (the pooled-bank knob is also in these bytes).
  *
- * Re-pinned 2026-09-13: the per-team V2 value-leaf reader now builds its env names through ai/seat_env
- * (`V07_VALUE_WEIGHTS_V2_<LEFT|RIGHT>`, LEFT/RIGHT team system) and refuses pre-rename LOWER/UPPER names
- * loudly. v7 behaviour is untouched: its sealed environment never sets these research variables, and the
- * self-play decision fingerprint is unchanged (src/simulation/prof_search.ts).
- * Previous approved digest: bc3d07db3f84d486264d6f800e1beadeb0a1b85301e1b78daa4f7f12eecb25a9
+ * Re-pinned 2026-09-13 (second time): chooseDecision now hands its result to the melee-flyer backline-priority
+ * research seam (`V08_FLYER_BACKLINE_PRIORITY_<LEFT|RIGHT>`, off by default) before returning. With the seam off the
+ * result is returned by reference and the self-play decision fingerprint is unchanged (prof_search.ts 3 games:
+ * d60784dd before and after).
+ * Earlier the same day: the per-team V2 value-leaf reader moved to ai/seat_env LEFT/RIGHT names (bc3d07db → fa805d8d).
+ * Previous approved digest: fa805d8d3d25fd7008ddefe88b0e9848a4436c7cefd820c26136a343a551d682
  */
 export const V08_A19_H64_FINALIST_V7_SEARCH_IMPLEMENTATION_SHA256 =
-    "fa805d8d3d25fd7008ddefe88b0e9848a4436c7cefd820c26136a343a551d682" as const;
+    "b2e2ba3bf3919a1dd8ad847fb0c1261f6ea61fa4cf66c513a9b917684c372d31" as const;
 
 export const V08_A19_H64_FINALIST_V7_SEARCH = Object.freeze({
     ...V08_A19_H64_F184_LOWER_HUMAN_RANKED_FALLBACK_SCORE_SAFE_SEARCH,

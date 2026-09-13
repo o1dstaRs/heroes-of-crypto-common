@@ -46,6 +46,7 @@ import {
     preservesV08BacklineWardIntent,
 } from "../ai/versions/v0_8_backline_protector";
 import { v08ArmageddonPreservationOpportunity } from "../ai/versions/v0_8_armageddon_endgame";
+import { applyV08FlyerBacklinePriority } from "../ai/versions/v0_8_flyer_backline_priority";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
 import {
     reserveV08ReplayLeafChallenger,
@@ -2057,6 +2058,17 @@ export class SearchDriver {
      * incumbent unchanged (ablation mode).
      */
     public chooseDecision(
+        unit: Unit,
+        version: string,
+        incumbent: GameAction[],
+        rootDecisionContext?: IDecisionContext,
+    ): GameAction[] {
+        const chosen = this.chooseSearchDecision(unit, version, incumbent, rootDecisionContext);
+        // Research seam (off by default): the one decision step the simulator and the ranked server share.
+        if (!this.enabled || !this.versions.has(version)) return chosen;
+        return applyV08FlyerBacklinePriority(unit, rootDecisionContext, chosen);
+    }
+    private chooseSearchDecision(
         unit: Unit,
         version: string,
         incumbent: GameAction[],
