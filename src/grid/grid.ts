@@ -482,11 +482,22 @@ export class Grid {
 
         return true;
     }
-    public occupyByHole(cell: XY) {
-        if (isCellWithinGrid(this.gridSettings, cell)) {
-            this.boardCoord[cell.x][cell.y] = "H";
-            this.invalidateMatrixCache();
+    /**
+     * Narrowing turns a cell into a hole, and a scattered stone standing there falls in with it. The board
+     * already read "H" on that cell, so keeping the stone in the standing set left a phantom that no shot or
+     * strike could reach: shooters kept aiming at it (engine-rejected obstacle_attack) and ranked snapshots
+     * still reported it standing.
+     *
+     * @returns true when a standing scattered stone was swallowed, so a renderer can drop its art.
+     */
+    public occupyByHole(cell: XY): boolean {
+        if (!isCellWithinGrid(this.gridSettings, cell)) {
+            return false;
         }
+        const swallowedStone = this.scatteredMountainsStanding.delete(Grid.packCell(cell.x, cell.y));
+        this.boardCoord[cell.x][cell.y] = "H";
+        this.invalidateMatrixCache();
+        return swallowedStone;
     }
     public getAggrMatrixByTeam(team: number): number[][] | undefined {
         return this.boardAggrPerTeam.get(team);
