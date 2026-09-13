@@ -1083,34 +1083,65 @@ export class UnitsHolder {
         this.refreshWardingManeBlessingForAllUnits();
         this.refreshArrowsWingshieldBlessingForAllUnits();
         this.refreshWaterShieldForAllUnits();
+        // This loop runs after EVERY engine action, so a19 rollouts walk it millions of times. The fight
+        // scalars are the same for every unit, and the per-team modifiers are the same for every unit on a
+        // side — resolving the singleton and those seven lookups per UNIT (eleven chained calls) was pure
+        // repetition. Hoist the fight-wide values and memoize the per-team block for the two sides.
+        // Nothing inside the loop writes these: adjustBaseStats / increaseAttackMod / setSynergies and the
+        // Disguise buff swap all mutate the UNIT, never FightProperties. The decision fingerprint pins it.
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        const fightStarted = fightProperties.hasFightStarted();
+        const currentLap = fightProperties.getCurrentLap();
+        const stepsMoraleMultiplier = fightProperties.getStepsMoraleMultiplier();
+        const teamModifiers = new Map<
+            TeamType,
+            {
+                abilityPower: number;
+                movementSteps: number;
+                flyArmor: number;
+                morale: number;
+                luck: number;
+                auraRange: number;
+                synergies: ReturnType<FightProperties["getSynergiesPerTeam"]>;
+            }
+        >();
+        const modifiersForTeam = (team: TeamType) => {
+            let modifiers = teamModifiers.get(team);
+            if (!modifiers) {
+                modifiers = {
+                    abilityPower: fightProperties.getAdditionalAbilityPowerPerTeam(team),
+                    movementSteps: fightProperties.getAdditionalMovementStepsPerTeam(team),
+                    flyArmor: fightProperties.getAdditionalFlyArmorPerTeam(team),
+                    morale: fightProperties.getAdditionalMoralePerTeam(team),
+                    luck: fightProperties.getAdditionalLuckPerTeam(team),
+                    auraRange: fightProperties.getAdditionalAuraRangePerTeam(team),
+                    synergies: fightProperties.getSynergiesPerTeam(team),
+                };
+                teamModifiers.set(team, modifiers);
+            }
+            return modifiers;
+        };
         for (const u of this.getAllUnitsIterator()) {
             if (!isCellWithinGrid(this.gridSettings, u.getBaseCell())) {
                 continue;
             }
+            const modifiers = modifiersForTeam(u.getTeam());
             u.adjustBaseStats(
-                FightStateManager.getInstance().getFightProperties().hasFightStarted(),
-                FightStateManager.getInstance().getFightProperties().getCurrentLap(),
-                FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(u.getTeam()),
-                FightStateManager.getInstance().getFightProperties().getAdditionalMovementStepsPerTeam(u.getTeam()),
-                FightStateManager.getInstance().getFightProperties().getAdditionalFlyArmorPerTeam(u.getTeam()),
-                FightStateManager.getInstance().getFightProperties().getAdditionalMoralePerTeam(u.getTeam()),
-                FightStateManager.getInstance().getFightProperties().getAdditionalLuckPerTeam(u.getTeam()),
-                FightStateManager.getInstance().getFightProperties().getStepsMoraleMultiplier(),
+                fightStarted,
+                currentLap,
+                modifiers.abilityPower,
+                modifiers.movementSteps,
+                modifiers.flyArmor,
+                modifiers.morale,
+                modifiers.luck,
+                stepsMoraleMultiplier,
             );
             u.increaseAttackMod(this.getUnitAuraAttackMod(u));
-            u.setSynergies(FightStateManager.getInstance().getFightProperties().getSynergiesPerTeam(u.getTeam()));
+            u.setSynergies(modifiers.synergies);
 
             const disguiseAura = u.getAppliedAuraEffect("Disguise Aura");
             if (disguiseAura) {
-                if (
-                    this.getNumberOfEnemiesWithinRange(
-                        u,
-                        disguiseAura.getRange() +
-                            FightStateManager.getInstance()
-                                .getFightProperties()
-                                .getAdditionalAuraRangePerTeam(u.getTeam()),
-                    )
-                ) {
+                if (this.getNumberOfEnemiesWithinRange(u, disguiseAura.getRange() + modifiers.auraRange)) {
                     u.deleteBuff("Hidden");
                     if (!u.hasDebuffActive("Visible")) {
                         u.applyDebuff(
