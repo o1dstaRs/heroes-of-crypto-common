@@ -184,7 +184,7 @@ export function travelledMovePath(currentCell: Readonly<XY>, path: readonly Read
 }
 
 export function resolveMoveTraversal(
-    unit: Pick<Unit, "getBaseCell" | "isSmallSize" | "getFootprintWidth" | "getFootprintHeight">,
+    unit: Pick<Unit, "getBaseCell" | "getCells" | "isSmallSize" | "getFootprintWidth" | "getFootprintHeight">,
     action: MoveUnitAction,
     resolvedRoute?: IResolvedMoveRoute,
 ): IMoveTraversal {
@@ -217,8 +217,12 @@ export function resolveMoveTraversal(
         travelledPath,
         routeModifierPath,
         // A footprint-only move has no ordered route. The engine treats its final
-        // footprint as the set of cells entered for Fire Wall purposes.
-        crossedCells: pathIsFootprintOnly ? targetCells : travelledPath,
+        // footprint as the set of cells entered for Fire Wall purposes. A walk charges every cell the BODY
+        // enters, exactly as ActionEngine.moveUnit burns it; the bare anchor route under-priced any body
+        // larger than 1x1, so the AI planned strikes after a traversal that killed or thinned the mover.
+        crossedCells: pathIsFootprintOnly
+            ? targetCells
+            : bodyCellsEnteredAlongPath(unit.getCells(), travelledPath, width, height),
     };
 }
 

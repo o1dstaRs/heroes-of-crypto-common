@@ -19,6 +19,7 @@ import {
     bodyCellsEnteredAlongPath,
     enteredFireWallCells,
     projectPostMoveActorAvailability,
+    repairUnavailableMovePrefixedAttack,
     resolveMoveTraversal,
 } from "../../src/engine/post_move_actor_availability";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
@@ -400,6 +401,66 @@ describe("post-move actor availability projection", () => {
         expect(projected.madeOfFireApplied).toBe(false);
         expect(projected.stack.maxHp).toBe(20);
         expect(setup.unit.hasBuffActive("Made of Fire")).toBe(false);
+    });
+
+    /**
+     * The engine has charged a walk for every cell the BODY enters since the Angel fix, but the projection kept
+     * reading the bare anchor route. A 2x2 stepping right from (3,3) enters {(4,3),(4,2)} while its anchor route
+     * is only (4,3), so a wall on (4,2) burned for real and was projected as free: the AI planned a follow-up
+     * strike after a traversal that killed or thinned the mover (a19 deadline fallbacks, ranged-heavy 63).
+     */
+    it("charges a walking LARGE body for a wall under a non-anchor cell exactly as the engine does", () => {
+        const setup = activatedMover(
+            { amountAlive: 3, maxHp: 20, size: PBTypes.UnitSizeVals.LARGE },
+            PBTypes.GridVals.NORMAL,
+            { x: 3, y: 3 },
+        );
+        const wall = { x: 4, y: 2 };
+        FightStateManager.getInstance().getFightProperties().getFireWalls().add(wall, 3, 25);
+        const action = {
+            type: "move_unit" as const,
+            unitId: setup.unit.getId(),
+            path: [
+                { x: 3, y: 3 },
+                { x: 4, y: 3 },
+            ],
+            targetCells: getFootprintCellsForAnchor({ x: 4, y: 3 }, 2, 2),
+        };
+
+        const traversal = resolveMoveTraversal(setup.unit, action);
+        expect(traversal.pathIsFootprintOnly).toBe(false);
+        expect(traversal.travelledPath).toEqual([{ x: 4, y: 3 }]);
+        const projected = applyAndCompare(setup, action);
+        expect(projected.burningCells).toEqual([wall]);
+        expect(projected.totalAppliedDamage).toBeGreaterThan(0);
+    });
+
+    it("drops the planned strike when a non-anchor body burn kills the LARGE mover", () => {
+        const setup = activatedMover(
+            { amountAlive: 1, maxHp: 10, size: PBTypes.UnitSizeVals.LARGE },
+            PBTypes.GridVals.NORMAL,
+            { x: 3, y: 3 },
+        );
+        const fireWalls = FightStateManager.getInstance().getFightProperties().getFireWalls();
+        fireWalls.add({ x: 4, y: 2 }, 3, 100);
+        const move = {
+            type: "move_unit" as const,
+            unitId: setup.unit.getId(),
+            path: [
+                { x: 3, y: 3 },
+                { x: 4, y: 3 },
+            ],
+            targetCells: getFootprintCellsForAnchor({ x: 4, y: 3 }, 2, 2),
+        };
+        const strike: GameAction = {
+            type: "melee_attack",
+            attackerId: setup.unit.getId(),
+            targetId: "projection-witness",
+            attackFrom: { x: 4, y: 3 },
+        };
+
+        expect(repairUnavailableMovePrefixedAttack(setup.unit, fireWalls, [move, strike])).toEqual([move]);
+        expect(applyAndCompare(setup, move).availableAfterMove).toBe(false);
     });
 });
 
