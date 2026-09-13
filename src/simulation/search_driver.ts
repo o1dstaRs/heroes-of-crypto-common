@@ -1297,6 +1297,15 @@ export class SearchDriver {
     private readonly nonregressiveProductiveOverride: boolean;
     private readonly exactTerminalResults: boolean;
     private readonly nonregressiveOverrideValidation: boolean;
+    /**
+     * Research: pool the nonregressive re-score with the shortlist rollouts into ONE estimate per candidate
+     * (rollouts + 2 samples) and test that against the gate once, instead of asking the 2-rollout re-score to
+     * clear the gate on its own. The stock bank vetoes 78% of proposals with a median re-score delta of
+     * 0.000 (coin-flips), and switching it off measured null — the samples are the constraint, and this
+     * spends the same samples with twice the power. `SEARCH_A19_POOLED_OVERRIDE_VALIDATION=1`; inert
+     * without the bank itself.
+     */
+    private readonly pooledOverrideValidation: boolean;
     private readonly horizon: number;
     private readonly researchHorizon: number | null;
     private readonly researchHorizonVersions: ReadonlySet<string>;
@@ -1523,6 +1532,16 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION must be 0 or 1");
         }
         this.nonregressiveOverrideValidation = this.mode === "search" && rawNonregressiveOverrideValidation === "1";
+        const rawPooledOverrideValidation = process.env.SEARCH_A19_POOLED_OVERRIDE_VALIDATION;
+        if (
+            rawPooledOverrideValidation !== undefined &&
+            rawPooledOverrideValidation !== "" &&
+            rawPooledOverrideValidation !== "0" &&
+            rawPooledOverrideValidation !== "1"
+        ) {
+            throw new Error("SEARCH_A19_POOLED_OVERRIDE_VALIDATION must be 0 or 1");
+        }
+        this.pooledOverrideValidation = this.nonregressiveOverrideValidation && rawPooledOverrideValidation === "1";
         this.horizon = Math.floor(envNum("SEARCH_HORIZON", 12, 1));
         const researchHorizon = parseSearchResearchHorizon(this.mode, this.versions);
         this.researchHorizon = researchHorizon?.horizon ?? null;
@@ -3805,24 +3824,32 @@ export class SearchDriver {
                     means[bestIdx] - means[0] >= this.gate);
             if (this.nonregressiveOverrideValidation && provisionalWouldOverride && means[0] !== -Infinity) {
                 this.counters.nonregressiveOverrideValidationAttempts += 1;
+                const validationRollouts = 2;
                 const pairedMeans = this.scoreCandidates(
                     unit,
                     [scoredCandidates[0], scoredCandidates[bestIdx]],
                     hashSimulationParts("a19-nonregressive-override-validation-v2", seedBase),
                     "turns",
-                    2,
+                    validationRollouts,
                     deadlineAt,
                     turnHorizon,
                 );
-                nonregressiveOverrideValidationDelta =
+                let validationDelta: number | null =
                     pairedMeans[0] === -Infinity || pairedMeans[1] === -Infinity
                         ? null
                         : pairedMeans[1] - pairedMeans[0];
-                if (
-                    pairedMeans[0] === -Infinity ||
-                    pairedMeans[1] === -Infinity ||
-                    pairedMeans[1] - pairedMeans[0] < this.gate
-                ) {
+                if (this.pooledOverrideValidation && validationDelta !== null) {
+                    // Same rollouts, one estimate: the shortlist means already average `this.rollouts` samples
+                    // per candidate on the same horizon mode, so the fresh pair simply extends that sample.
+                    const weight = this.rollouts + validationRollouts;
+                    validationDelta =
+                        (means[bestIdx] * this.rollouts +
+                            pairedMeans[1] * validationRollouts -
+                            (means[0] * this.rollouts + pairedMeans[0] * validationRollouts)) /
+                        weight;
+                }
+                nonregressiveOverrideValidationDelta = validationDelta;
+                if (validationDelta === null || validationDelta < this.gate) {
                     nonregressiveOverrideValidationPass = false;
                     this.counters.nonregressiveOverrideValidationRejects += 1;
                 } else {

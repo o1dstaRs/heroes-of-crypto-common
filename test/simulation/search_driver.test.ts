@@ -106,6 +106,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE",
     "SEARCH_A19_EXACT_TERMINAL_RESULTS",
     "SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION",
+    "SEARCH_A19_POOLED_OVERRIDE_VALIDATION",
     "SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE",
     "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY",
     "SEARCH_A19_FAST_FLYER_COHESION",
@@ -939,6 +940,81 @@ describe("search driver — gating, hygiene, determinism", () => {
             nonregressiveOverrideValidationPasses: 1,
             nonregressiveOverrideValidationRejects: 1,
         });
+    });
+
+    it("A19 pooled validation tests one rollouts+2 estimate against the gate instead of a second bar", () => {
+        // Same samples as the stock bank — the shortlist means (SEARCH_ROLLOUTS, 3 here) plus the paired
+        // 2-rollout re-score — but pooled into one estimate per candidate and gated once. The stock bank asks
+        // the 2-rollout re-score to clear the gate on its own; on the audited default roster that vetoed 78%
+        // of proposals with a median re-score delta of exactly 0.000, and switching the bank off measured null.
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "0.03",
+            SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "1",
+            SEARCH_A19_POOLED_OVERRIDE_VALIDATION: "1",
+        });
+        const harness = buildBattle(92, "v0.8");
+        const unit = harness.activeUnit()!;
+        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const attack: GameAction[] = [
+            { type: "melee_attack", attackerId: unit.getId(), targetId: "enemy", attackFrom: { x: 4, y: 4 } },
+        ];
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "melee", actions: attack },
+        ] as unknown as IEnumeratedCandidate[];
+        type Driver = {
+            counters: {
+                nonregressiveOverrideValidationAttempts: number;
+                nonregressiveOverrideValidationPasses: number;
+                nonregressiveOverrideValidationRejects: number;
+            };
+            scoreCandidates(): number[];
+            search(
+                unit: Unit,
+                candidates: IEnumeratedCandidate[],
+                incumbent: GameAction[],
+                seed: number,
+                t0: number,
+            ): GameAction[];
+        };
+        const driver = harness.makeDriver() as unknown as Driver;
+
+        // The stock bank's own reject case: shortlist 0.4 vs 0.8, re-score 0.70 vs 0.72 (+0.02 < gate).
+        // Pooled over 3 + 2 samples the challenger still leads by (2.4+1.44 - 1.2-1.4)/5 = +0.248: passes.
+        let call = 0;
+        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.8] : [0.7, 0.72]);
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(attack);
+        expect(call).toBe(2);
+        expect(driver.counters).toMatchObject({
+            nonregressiveOverrideValidationAttempts: 1,
+            nonregressiveOverrideValidationPasses: 1,
+            nonregressiveOverrideValidationRejects: 0,
+        });
+
+        // A thin shortlist lead (+0.04) that the re-score reverses (0.6 vs 0.5) pools to -0.016: still vetoed.
+        call = 0;
+        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.44] : [0.6, 0.5]);
+        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(incumbent);
+        expect(call).toBe(2);
+        expect(driver.counters).toMatchObject({
+            nonregressiveOverrideValidationAttempts: 2,
+            nonregressiveOverrideValidationPasses: 1,
+            nonregressiveOverrideValidationRejects: 1,
+        });
+
+        // The knob is inert without the bank: no re-score is spent, the shortlist verdict stands.
+        setEnv({ SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "0", SEARCH_A19_POOLED_OVERRIDE_VALIDATION: "1" });
+        const bare = harness.makeDriver() as unknown as Driver;
+        call = 0;
+        bare.scoreCandidates = () => (++call === 1 ? [0.4, 0.8] : [0, 1]);
+        expect(bare.search(unit, candidates, incumbent, 123, performance.now())).toBe(attack);
+        expect(call).toBe(1);
+        expect(bare.counters.nonregressiveOverrideValidationAttempts).toBe(0);
+
+        setEnv({ SEARCH_A19_POOLED_OVERRIDE_VALIDATION: "2" });
+        expect(() => harness.makeDriver()).toThrow("SEARCH_A19_POOLED_OVERRIDE_VALIDATION must be 0 or 1");
     });
 
     it("does not treat a move-then-mountain incumbent as productive", () => {
