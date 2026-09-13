@@ -591,8 +591,10 @@ export class GameActionEngine {
                 unitId: unit.getId(),
                 from,
                 to: { ...result.newPosition },
-                path: structuredClone(action.path),
-                targetCells: structuredClone(targetCells),
+                // Own-property copies of plain cells: what structuredClone produced for these, without its
+                // serialization round-trip (it ran once per rollout move and showed up in the search profile).
+                path: action.path.map((cell) => ({ ...cell })),
+                targetCells: targetCells.map((cell) => ({ ...cell })),
             });
         }
         if (!this.headlessEvents && result.dispelledSmokeCells?.length) {

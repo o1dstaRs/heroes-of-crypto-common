@@ -1268,8 +1268,10 @@ export class UnitsHolder {
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
         for (const unit of this.getAllUnitsIterator()) {
-            const baseCell = unit.getBaseCell();
-            const cells = unit.getCells();
+            // The body's cells and anchor are a pure function of the position and the footprint dimensions
+            // (grid_math), so those four scalars carry exactly the same information as listing every cell —
+            // without allocating the cell list for every unit on every stack-power refresh.
+            const position = unit.getPosition();
             const auraEffects = unit.getAuraEffects();
             const madeOfFire = unit.getBuff("Made of Fire");
 
@@ -1277,9 +1279,10 @@ export class UnitsHolder {
                 "unit",
                 unit.getId(),
                 unit.getTeam(),
-                baseCell.x,
-                baseCell.y,
-                cells.length,
+                position.x,
+                position.y,
+                unit.getFootprintWidth(),
+                unit.getFootprintHeight(),
                 unit.getAttackType(),
                 unit.canFly(),
                 unit.getLuck(),
@@ -1289,9 +1292,6 @@ export class UnitsHolder {
                 madeOfFire?.getPower(),
                 auraEffects.length,
             );
-            for (const cell of cells) {
-                fingerprint.push(cell.x, cell.y);
-            }
 
             if (auraEffects.length) {
                 fingerprint.push(
