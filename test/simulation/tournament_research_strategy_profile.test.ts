@@ -30,6 +30,9 @@ const baseOptions = (): ITournamentOptions => ({
     games: 2,
     baseSeed: BOAR_ROSTER_SEED,
     maxLaps: 1,
+    // These assertions compare exact seeded records. Use the simulator's operation-bounded search so
+    // host load cannot make one run hit the live wall-clock deadline before the other.
+    searchOfflineDeterministicWork: true,
 });
 
 const cellFor = (record: IGameRecord, side: "green" | "red", creatureName: string) =>
