@@ -1,0 +1,4 @@
+w1 draw-aware 0.57700
+w2 draw-aware 0.63225
+w4 draw-aware 0.80200
+chosen w4
