@@ -1,4 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+
+import { V08_ABOMINATION_GUARD_ENV } from "../../src/ai/versions/v0_8_backline_protector";
 
 import { AbilityFactory } from "../../src/abilities/ability_factory";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../../src/ai";
@@ -161,6 +163,18 @@ const strategyFactories: readonly [string, () => IAIStrategy][] = [
     ["v0.8s", () => new StrategyV0_8S()],
     ["v0.9 anchor", () => new StrategyV0_9()],
 ];
+
+// These cases pin Abomination's guard-duty contract, which is off by default since 2026-09-14 and restored per seat
+// by V08_ABOMINATION_GUARD_<LEFT|RIGHT>=1.
+beforeEach(() => {
+    process.env[`${V08_ABOMINATION_GUARD_ENV}_LEFT`] = "1";
+    process.env[`${V08_ABOMINATION_GUARD_ENV}_RIGHT`] = "1";
+});
+
+afterEach(() => {
+    delete process.env[`${V08_ABOMINATION_GUARD_ENV}_LEFT`];
+    delete process.env[`${V08_ABOMINATION_GUARD_ENV}_RIGHT`];
+});
 
 describe("Abomination runtime role contract", () => {
     test.each([

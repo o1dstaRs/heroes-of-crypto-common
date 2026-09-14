@@ -9,7 +9,9 @@
  * -----------------------------------------------------------------------------
  */
 
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+
+import { V08_ABOMINATION_GUARD_ENV } from "../../src/ai/versions/v0_8_backline_protector";
 
 import { AbilityFactory } from "../../src/abilities/ability_factory";
 import type { IDecisionContext } from "../../src/ai";
@@ -139,6 +141,18 @@ function spell(unit: Unit, name: string) {
     if (!found) throw new Error(`${unit.getName()} does not have ${name}`);
     return found;
 }
+
+// The Abomination ward case below pins its guard-duty contract, which is off by default since 2026-09-14 and
+// restored per seat by V08_ABOMINATION_GUARD_<LEFT|RIGHT>=1.
+beforeEach(() => {
+    process.env[`${V08_ABOMINATION_GUARD_ENV}_LEFT`] = "1";
+    process.env[`${V08_ABOMINATION_GUARD_ENV}_RIGHT`] = "1";
+});
+
+afterEach(() => {
+    delete process.env[`${V08_ABOMINATION_GUARD_ENV}_LEFT`];
+    delete process.env[`${V08_ABOMINATION_GUARD_ENV}_RIGHT`];
+});
 
 describe("v0.8 damage-spell policy", () => {
     it("Battle Mage and the v0.8s alias cast Fire Strike instead of walking when it is the best legal hit", () => {

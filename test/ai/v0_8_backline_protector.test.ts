@@ -9,7 +9,9 @@
  * -----------------------------------------------------------------------------
  */
 
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+
+import { V08_ABOMINATION_GUARD_ENV } from "../../src/ai/versions/v0_8_backline_protector";
 
 import type { IDecisionContext, IPlacementContext } from "../../src/ai";
 import {
@@ -148,6 +150,18 @@ const protectorBoard = (
     );
     return { protector, ward, enemy, context: decisionContext(combat) };
 };
+
+// The Abomination cases below pin its guard-duty contract, which is off by default since 2026-09-14 and restored
+// per seat by V08_ABOMINATION_GUARD_<LEFT|RIGHT>=1.
+beforeEach(() => {
+    process.env[`${V08_ABOMINATION_GUARD_ENV}_LEFT`] = "1";
+    process.env[`${V08_ABOMINATION_GUARD_ENV}_RIGHT`] = "1";
+});
+
+afterEach(() => {
+    delete process.env[`${V08_ABOMINATION_GUARD_ENV}_LEFT`];
+    delete process.env[`${V08_ABOMINATION_GUARD_ENV}_RIGHT`];
+});
 
 describe("v0.8 back-line protector intent", () => {
     it("recognizes live shot output and remaining hybrid-caster spells, but not depleted shooters", () => {

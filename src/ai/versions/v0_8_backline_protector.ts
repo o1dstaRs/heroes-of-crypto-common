@@ -41,11 +41,13 @@ export interface IV08BacklineWardIntent {
 }
 
 /**
- * Research seam, off by default: `V08_ABOMINATION_RELEASE_<LEFT|RIGHT>=1` gives that seat's Abomination no
- * protector intent, so native v0.8 and the a19 search both play it as an ordinary melee unit. It exists to measure
- * the protector contract against releasing it on the same drafted matchups.
+ * Abomination has no protector intent by default: native v0.8 and the a19 search play it as an ordinary melee
+ * unit. Releasing it passed two preregistered paired A/Bs on live-drafted side boards (+4.20pp and +5.35pp for its
+ * army, docs/evidence/draft_unit_strength_20260913) and shipped on 2026-09-14. `V08_ABOMINATION_GUARD_<LEFT|RIGHT>=1`
+ * restores the old guard duty for that seat, for rollback and for measuring the two contracts against each other.
+ * Placement still screens wards with it either way.
  */
-export const V08_ABOMINATION_RELEASE_ENV = "V08_ABOMINATION_RELEASE";
+export const V08_ABOMINATION_GUARD_ENV = "V08_ABOMINATION_GUARD";
 
 /**
  * Research seam, off by default: `V08_PROTECTOR_RELEASE_<LEFT|RIGHT>` is a comma list of protector kinds
@@ -72,8 +74,8 @@ const protectorReleasedForTeam = (kind: V08BacklineProtectorKind, team: number):
 };
 
 const abominationReleasedForTeam = (team: number): boolean => {
-    assertNoLegacySeatEnv(V08_ABOMINATION_RELEASE_ENV);
-    return process.env[seatEnvName(V08_ABOMINATION_RELEASE_ENV, team)] === "1";
+    assertNoLegacySeatEnv(V08_ABOMINATION_GUARD_ENV);
+    return process.env[seatEnvName(V08_ABOMINATION_GUARD_ENV, team)] !== "1";
 };
 
 export const v08BacklineProtectorKind = (unit: Unit): V08BacklineProtectorKind | undefined => {

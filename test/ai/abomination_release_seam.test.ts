@@ -16,7 +16,7 @@ import type { IDecisionContext } from "../../src/ai";
 import { resetLegacySeatEnvChecksForTests } from "../../src/ai/seat_env";
 import {
     buildV08BacklineProtectorIntent,
-    V08_ABOMINATION_RELEASE_ENV,
+    V08_ABOMINATION_GUARD_ENV,
 } from "../../src/ai/versions/v0_8_backline_protector";
 import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
@@ -31,9 +31,9 @@ import { createCombatTestContext, testGridSettings, type CombatTestContext } fro
 const LEFT = PBTypes.TeamVals.LEFT;
 const RIGHT = PBTypes.TeamVals.RIGHT;
 const SEAM_KEYS = [
-    `${V08_ABOMINATION_RELEASE_ENV}_LEFT`,
-    `${V08_ABOMINATION_RELEASE_ENV}_RIGHT`,
-    `${V08_ABOMINATION_RELEASE_ENV}_LOWER`,
+    `${V08_ABOMINATION_GUARD_ENV}_LEFT`,
+    `${V08_ABOMINATION_GUARD_ENV}_RIGHT`,
+    `${V08_ABOMINATION_GUARD_ENV}_LOWER`,
 ];
 
 function nativeUnit(team: number, faction: string, name: string): Unit {
@@ -91,21 +91,21 @@ afterEach(() => {
     FightStateManager.getInstance().reset();
 });
 
-describe("Abomination protector release seam", () => {
-    test("keeps the protector contract unless the Abomination's own seat is released", () => {
+describe("Abomination guard duty", () => {
+    test("is off by default and comes back only for the seat that asks for it", () => {
         const { protector, context } = protectorBoard();
-        expect(buildV08BacklineProtectorIntent(protector, context)?.kind).toBe("abomination");
-
-        process.env[`${V08_ABOMINATION_RELEASE_ENV}_RIGHT`] = "1";
-        expect(buildV08BacklineProtectorIntent(protector, context)?.kind).toBe("abomination");
-
-        process.env[`${V08_ABOMINATION_RELEASE_ENV}_LEFT`] = "1";
         expect(buildV08BacklineProtectorIntent(protector, context)).toBeUndefined();
+
+        process.env[`${V08_ABOMINATION_GUARD_ENV}_RIGHT`] = "1";
+        expect(buildV08BacklineProtectorIntent(protector, context)).toBeUndefined();
+
+        process.env[`${V08_ABOMINATION_GUARD_ENV}_LEFT`] = "1";
+        expect(buildV08BacklineProtectorIntent(protector, context)?.kind).toBe("abomination");
     });
 
     test("refuses the pre-rename seat name loudly", () => {
         const { protector, context } = protectorBoard();
-        process.env[`${V08_ABOMINATION_RELEASE_ENV}_LOWER`] = "1";
+        process.env[`${V08_ABOMINATION_GUARD_ENV}_LOWER`] = "1";
         expect(() => buildV08BacklineProtectorIntent(protector, context)).toThrow("LEFT/RIGHT");
     });
 });
