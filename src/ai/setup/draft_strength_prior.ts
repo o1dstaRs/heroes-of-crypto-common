@@ -11,6 +11,7 @@
 
 import { creatureInfo } from "./creature_score";
 import strengthPriorJson from "./draft_strength_priors/ranked_unit_strength_a19_side_v1.json";
+import strengthPriorV3Json from "./draft_strength_priors/ranked_unit_strength_a19_side_v3.json";
 import unitSynergyPriorJson from "./draft_strength_priors/ranked_unit_synergy_a19_side_v2.json";
 
 /**
@@ -23,6 +24,8 @@ import unitSynergyPriorJson from "./draft_strength_priors/ranked_unit_synergy_a1
  * - v2 (fit_ranked_draft_unit_synergy): level-1/2 creatures map-independent, level-3/4 creatures per map (the live
  *   pick phase reveals the map right before the level-3 picks), plus the value of faction synergy tiers, and the
  *   faction-diversity tax relaxed so a tier-2 army is reachable.
+ * - v3 (fit_ranked_draft_unit_strength, on-policy): the v1 model refitted on armies drafted by the shipped v1-w4
+ *   policy with 50% exploration (PREREGISTRATION_V3_REFIT.md).
  *
  * A policy id carries its prior and weight, so every evaluated or shipped variant is immutable: a pick's normalized
  * draft score gains weight x (percentage points / 100).
@@ -60,6 +63,7 @@ interface IRawUnitSynergyPrior {
 
 export const RANKED_DRAFT_STRENGTH_PRIOR_ID = "ranked-unit-strength-a19-side-v1" as const;
 export const RANKED_DRAFT_UNIT_SYNERGY_PRIOR_ID = "ranked-unit-synergy-a19-side-v2" as const;
+export const RANKED_DRAFT_STRENGTH_V3_PRIOR_ID = "ranked-unit-strength-a19-side-v3" as const;
 
 export const RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS = {
     "ranked-unit-strength-a19-side-v1-w1": 1,
@@ -71,6 +75,9 @@ export const RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS = {
     "ranked-unit-synergy-a19-side-v2-w1": 1,
     "ranked-unit-synergy-a19-side-v2-w2": 2,
     "ranked-unit-synergy-a19-side-v2-w4": 4,
+    "ranked-unit-strength-a19-side-v3-w2": 2,
+    "ranked-unit-strength-a19-side-v3-w4": 4,
+    "ranked-unit-strength-a19-side-v3-w8": 8,
 } as const;
 
 export type RankedDraftStrengthPolicyId = keyof typeof RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS;
@@ -90,15 +97,22 @@ export const RANKED_DRAFT_RELAXED_FACTION_TAX_FREE_STACKS = 3;
 
 const V1 = strengthPriorJson as IRawStrengthPrior;
 const V2 = unitSynergyPriorJson as IRawUnitSynergyPrior;
+const V3 = strengthPriorV3Json as IRawStrengthPrior;
 if (V1.schemaVersion !== 1 || V1.id !== RANKED_DRAFT_STRENGTH_PRIOR_ID) {
     throw new Error(`Unexpected ranked draft strength prior ${String(V1.id)} (schema ${String(V1.schemaVersion)})`);
 }
 if (V2.schemaVersion !== 2 || V2.id !== RANKED_DRAFT_UNIT_SYNERGY_PRIOR_ID) {
     throw new Error(`Unexpected ranked draft unit-synergy prior ${String(V2.id)} (schema ${String(V2.schemaVersion)})`);
 }
+if (V3.schemaVersion !== 1 || V3.id !== RANKED_DRAFT_STRENGTH_V3_PRIOR_ID) {
+    throw new Error(`Unexpected ranked draft v3 strength prior ${String(V3.id)} (schema ${String(V3.schemaVersion)})`);
+}
 
 const V1_LIFT: ReadonlyMap<number, number> = new Map(
     V1.creatures.map((creature) => [creature.creatureId, creature.conservativeLiftPp]),
+);
+const V3_LIFT: ReadonlyMap<number, number> = new Map(
+    V3.creatures.map((creature) => [creature.creatureId, creature.conservativeLiftPp]),
 );
 const V2_GLOBAL_LIFT = new Map<number, number>();
 const V2_MAP_LIFT = new Map<number, Map<number, number>>();
@@ -123,6 +137,9 @@ export function isRankedDraftStrengthPolicy(value: unknown): value is RankedDraf
 const isUnitSynergyPolicy = (policy: RankedDraftStrengthPolicyId): boolean =>
     policy.startsWith(`${RANKED_DRAFT_UNIT_SYNERGY_PRIOR_ID}-`);
 
+const isV3StrengthPolicy = (policy: RankedDraftStrengthPolicyId): boolean =>
+    policy.startsWith(`${RANKED_DRAFT_STRENGTH_V3_PRIOR_ID}-`);
+
 export function rankedDraftStrengthPriorSource(): Readonly<IRawSource> {
     return { ...V1.source };
 }
@@ -131,9 +148,18 @@ export function rankedDraftUnitSynergyPriorSource(): Readonly<IRawSource> {
     return { ...V2.source };
 }
 
+export function rankedDraftStrengthV3PriorSource(): Readonly<IRawSource> {
+    return { ...V3.source };
+}
+
 /** v1 conservative fitted lift in percentage points; creatures the fit never saw are neutral. */
 export function rankedDraftStrengthLiftPp(creatureId: number): number {
     return V1_LIFT.get(creatureId) ?? 0;
+}
+
+/** v3 (on-policy refit) conservative fitted lift in percentage points; creatures the fit never saw are neutral. */
+export function rankedDraftStrengthV3LiftPp(creatureId: number): number {
+    return V3_LIFT.get(creatureId) ?? 0;
 }
 
 /**
@@ -186,6 +212,9 @@ export function rankedDraftStrengthScore(
 ): number {
     if (!isRankedDraftStrengthPolicy(policy)) return 0;
     const weight = RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS[policy];
+    if (isV3StrengthPolicy(policy)) {
+        return (weight * rankedDraftStrengthV3LiftPp(creatureId)) / 100;
+    }
     if (!isUnitSynergyPolicy(policy)) {
         return (weight * rankedDraftStrengthLiftPp(creatureId)) / 100;
     }
