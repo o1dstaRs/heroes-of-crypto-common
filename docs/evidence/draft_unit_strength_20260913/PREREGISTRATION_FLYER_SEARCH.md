@@ -44,3 +44,21 @@ second A19 driver with `V08_A19_SEARCH_ENV_OVERRIDES` merged in) to the units th
 3. On PASS, the same F vs B design on fresh seed 98510001 must also have a positive point estimate before
    flyer-only deep search is proposed. Shipping it also needs a live-host latency probe (wall-clock deadline and
    fallback rate), which is outside this experiment. On FAIL, report it; no re-roll.
+
+## Amendments before any game of seed 98500001
+
+A 12-game smoke run on throwaway seed 11 (never used for analysis) found two problems, fixed before launch:
+
+1. **Treatment was inert.** The draft harness copies the sealed a19 settings into the environment, and they include
+   `V07_SEARCH=1`, so `shouldUseDefaultV08A19Search` is false and battle_engine never builds the override driver:
+   all three arms played identical games. Fix: every arm runs with `V08_A19_SEARCH=1`, which builds both the stock
+   and the override driver from the hermetic sealed profile. Check: the four seed-11 baseline games reproduced the
+   unforced harness digests exactly (70122cf649, 0079a26d6d, bc8b2f6b1c, c781d80fe1), and the F and A arms then
+   diverged from baseline.
+2. **Melee flyer definition missed Harpy.** Harpy, Angel and Valkyrie have attack type MELEE_MAGIC, not MELEE, so
+   the rule above excluded Harpy although the motivation names it. Melee flyer now means FLY movement with a MELEE
+   or MELEE_MAGIC attack, both for board selection (creatures.json) and for routing (`canFly()` and
+   `getAttackType()`). The set is Angel, Black Dragon, Efreet, Fairy, Griffin, Harpy, Imp, Magic Dragon,
+   Manticore, Mantis, Pegasus, Phoenix, Thunderbird, Valkyrie, Wandering Mage, Wyvern.
+
+Arms, seeds, metric and gates are unchanged.
