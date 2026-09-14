@@ -23,8 +23,8 @@ Research seam `IMatchConfig.searchEnvOverrideUnitFilter` (common eb62054) with t
 (see the amendment in `PREREGISTRATION_FLYER_SEARCH.md`; baseline digests are identical to the unforced harness).
 
 - **B (baseline):** stock a19 for both armies.
-- **S (treatment):** a decision of the treated army uses the deep budget when the acting unit's `getSteps()` is
-    > = 7 at that moment; every other decision, and the opponent, uses stock a19.
+- **S (treatment):** a decision of the treated army uses the deep budget when the acting unit's `getSteps()` is at
+  least 7 at that moment; every other decision, and the opponent, uses stock a19.
 
 ## Design (paired)
 
