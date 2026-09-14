@@ -42,8 +42,11 @@ export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SOURCE = "src/simul
 // audit / IL rows per game but runMatchInner never called its onMatchEnd, so every row was discarded and a
 // SEARCH_AUDIT aimed at that arm wrote nothing. The added call touches only the override driver; the stock
 // production driver's construction, routing and onMatchEnd are byte-for-byte unchanged.
+// Re-pinned for the flyer-only deep-search A/B (2026-09-13, previous 9896770c): the research arm gained an
+// optional `searchEnvOverrideUnitFilter` that narrows `searchEnvOverrideTeams` to the units it accepts. Omitted,
+// the arm routes every unit of a listed team exactly as before, and production never sets either option.
 export const V08_A19_PRODUCTION_BATTLE_ENGINE_IMPLEMENTATION_SHA256 =
-    "9896770c4c8474063f9850886fce6552159715a91549f500573492fb8dec17e3" as const;
+    "51b90a5336674d7eb231e93795574946f4b0a1318b4497091b0404c8c9a03335" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SOURCE = "src/simulation/tournament.ts" as const;
 export const V08_A19_PRODUCTION_TOURNAMENT_IMPLEMENTATION_SHA256 =
     "330fcb06556c354310d76eb08faab4928bb8833434999fbc9cc6d37649f04014" as const;

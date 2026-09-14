@@ -308,6 +308,11 @@ export interface IMatchConfig {
      * env being set.
      */
     searchEnvOverrideTeams?: readonly TeamType[];
+    /**
+     * Research: narrows `searchEnvOverrideTeams` to the units this returns true for; that team's other units
+     * keep the stock driver. Omitted routes every unit of a listed team, as before.
+     */
+    searchEnvOverrideUnitFilter?: (unit: Unit) => boolean;
     /** Emit only lifecycle/destruction events required to drive an in-process simulation. */
     headlessEvents?: boolean;
     /** Board layout for this match. Defaults to NORMAL (GridVals: 1 NORMAL, 2 WATER_CENTER, 3 LAVA_CENTER, 4 BLOCK_CENTER). */
@@ -1352,6 +1357,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         const envOverrideSearchApplies =
             !mindlessUnit &&
             searchEnvOverrideTeams.has(unit.getTeam()) &&
+            (config.searchEnvOverrideUnitFilter?.(unit) ?? true) &&
             searchEnvOverrideSearch?.appliesTo(strategy.version, unit.getTeam()) === true;
         const searchApplies =
             !mindlessUnit && !envOverrideSearchApplies && search.appliesTo(strategy.version, unit.getTeam());
