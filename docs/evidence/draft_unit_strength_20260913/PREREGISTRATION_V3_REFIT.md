@@ -44,3 +44,13 @@ Incumbent I = the round-1 winner if round 1 passed all its gates, else `ranked-u
 
 Identical to `PREREGISTRATION_V1_WEIGHTS.md` gates 1-6 with I as incumbent. PASS makes P the proposed next default;
 the owner decides the ship. FAIL is reported as a fail, no re-roll of any seed above.
+
+## Amendments before any v3 game was recorded
+
+- 2026-09-14 01:43: the first launch of the data script stopped on a shell error before playing a game (an empty
+  argument array under `set -u` in macOS bash 3.2); fixed.
+- 2026-09-14 01:46: the relaunched collector crashed inside Bun 1.4.2 (`panic: Bus error`, exit 138) after 89 s at 12
+  workers, with system swap at 39.5 of 39.9 GB; no chunk had finished, so no record exists. The data stage now runs 8
+  workers and 100-board chunks, and resumes after the last complete chunk for up to 30 attempts. Every game is seeded
+  by its index, so chunk size, concurrency and restarts do not change any record. Seeds, boards, exploration, policy,
+  fit, selection, confirmation and gates are unchanged.
