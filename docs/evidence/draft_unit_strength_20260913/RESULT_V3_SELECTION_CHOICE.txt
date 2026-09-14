@@ -1,0 +1,5 @@
+v3-w2 draw-aware 0.58050 decisive 0.58214
+v3-w4 draw-aware 0.72975 decisive 0.73149
+v3-w8 draw-aware 0.87275 decisive 0.87443
+control v1-w4 draw-aware 0.78225 decisive 0.78582
+chosen v3-w8
