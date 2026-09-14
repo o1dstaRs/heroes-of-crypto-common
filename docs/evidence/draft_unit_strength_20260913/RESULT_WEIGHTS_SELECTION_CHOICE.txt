@@ -1,0 +1,5 @@
+w4 draw-aware 0.79450 decisive 0.79747
+w6 draw-aware 0.84275 decisive 0.84534
+w8 draw-aware 0.86475 decisive 0.86677
+w12 draw-aware 0.89525 decisive 0.89704
+chosen w12
