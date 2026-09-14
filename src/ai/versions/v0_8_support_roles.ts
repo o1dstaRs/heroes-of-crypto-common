@@ -17,6 +17,7 @@ import { enumerateCandidates, type IEnumeratedCandidate } from "../candidates";
 import { buildV08BacklineProtectorIntent, isImmediateMeleeResponseExposed } from "./v0_8_backline_protector";
 import { isV08DirectCombatDecision } from "./v0_8_dominant_finish";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
+import { v08RoleReleasedForTeam } from "./v0_8_role_release";
 
 const WANDERING_MAGE = "Wandering Mage";
 const HEALER = "Healer";
@@ -101,6 +102,7 @@ export function prioritizeV08WanderingMageSmoke(
 ): GameAction[] {
     if (
         unit.getName() !== WANDERING_MAGE ||
+        v08RoleReleasedForTeam("wandering_mage_smoke", unit.getTeam()) ||
         v08DominantFinishState(context.unitsHolder, unit.getTeam(), context.fightProperties?.getCurrentLap() ?? 0)
             .active
     ) {
@@ -247,7 +249,7 @@ export function prioritizeV08HealerSustain(
     context: IDecisionContext,
     decision: GameAction[],
 ): GameAction[] {
-    if (unit.getName() !== HEALER) return decision;
+    if (unit.getName() !== HEALER || v08RoleReleasedForTeam("healer_sustain", unit.getTeam())) return decision;
     const candidates = enumerateSupportCandidates(unit, context, decision);
     if (incumbentGuaranteedKill(unit, context, candidates)) return decision;
 

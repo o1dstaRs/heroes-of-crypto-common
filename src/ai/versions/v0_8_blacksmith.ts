@@ -26,6 +26,7 @@ import {
     V08_ANGEL_SCREEN_RANGE,
 } from "./v0_8_backline_protector";
 import { v08DominantFinishState } from "./v0_8_dominant_finish";
+import { v08RoleReleasedForTeam } from "./v0_8_role_release";
 
 export const V08_BLACKSMITH_CRAFT_SPELL = "Craft";
 
@@ -189,7 +190,7 @@ export function prioritizeV08BlacksmithCraft(
     context: IDecisionContext,
     decision: GameAction[],
 ): GameAction[] {
-    if (unit.getName() !== "Blacksmith") return decision;
+    if (unit.getName() !== "Blacksmith" || v08RoleReleasedForTeam("blacksmith_craft", unit.getTeam())) return decision;
     const craft = unit
         .getSpells()
         .find((spell) => spell.getName() === V08_BLACKSMITH_CRAFT_SPELL && isSpellUsableByCaster(unit, spell));
@@ -422,6 +423,7 @@ export function v08BlacksmithCraftPlacement(
     const opponentCreatureIds = opponentCreatureIdsForPlacement(context, "v0.8");
     if (
         !units.some(placementHasUsableCraft) ||
+        v08RoleReleasedForTeam("blacksmith_craft", context.team) ||
         context.publicOpponentCreatureIds === undefined ||
         !opponentCreatureIds?.length ||
         v08PublicRosterPunishesCraftCluster(opponentCreatureIds) ||

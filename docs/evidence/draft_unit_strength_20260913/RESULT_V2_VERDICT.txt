@@ -1,0 +1,16 @@
+run: v2_confirm_vs_incumbent vs incumbent:ranked-unit-strength-a19-side-v1-w4
+head-to-head: 4074W 3818L 108D over 8000 games; decisive 51.62% CI [49.43, 53.81]
+  grid 1: 47.47% (LCB 43.70)
+  grid 3: 51.18% (LCB 47.39)
+  grid 4: 56.21% (LCB 52.42)
+diversity: candidate 55 distinct, incumbent 52; top share 31.2% vs 35.9% over 4000 drafts
+informational: tier-2 synergy reach candidate 25.4% vs incumbent 0.9%
+PASS  1 draw-aware head-to-head > 0.50: 0.5160
+FAIL  2 clustered 95% LCB > 0.50: 0.4943
+PASS  3 candidate rejections == 0: 0
+FAIL  4 worst map (grid 1) >= 0.49: 0.4747
+PASS  5 vs untrained-heuristic: candidate - incumbent >= -0.02: -0.0080
+PASS  5 vs league-round3-exploiter: candidate - incumbent >= -0.02: 0.0049
+PASS  6a distinct creatures >= 80% of incumbent: 1.0577
+PASS  6b top creature share <= incumbent + 10pp: -0.0475
+VERDICT: FAIL
