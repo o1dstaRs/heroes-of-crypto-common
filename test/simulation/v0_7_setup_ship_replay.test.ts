@@ -54,7 +54,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned 2026-09-13 for a second Abomination balance pass: armor 49 -> 45 (owner request). Its armor
 // prices every hit it takes in the seeded draws, so the trace diverges from its first wound on. Two runs
 // reproduced this value byte-identically.
-const EXPECTED_REPLAY_SHA256 = "5b42ca8c8d93a8c00e98a448074bdc374e5c6895418146d9ff2e182c5522f17b";
+// Previous approved digest: 5b42ca8c8d93a8c00e98a448074bdc374e5c6895418146d9ff2e182c5522f17b
+// Re-pinned 2026-09-18: Stun Aura taken off the Abomination (owner, "for now"), so allies standing in its
+// field no longer roll a stun on their hits and the seeded traces diverge from the first exchange on. Two
+// isolated runs reproduced this value byte-identically.
+const EXPECTED_REPLAY_SHA256 = "3a50d04db5eb08aa9e3c64326f1676e490ccbb7c42908c99289d3c584ed7d29b";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

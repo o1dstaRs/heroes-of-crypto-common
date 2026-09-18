@@ -823,14 +823,13 @@ describe("Stun Aura (ally buff, stun-on-hit)", () => {
         expect(props.abilities_descriptions[index]).not.toContain("115%");
     });
 
-    it("is carried by the real Abomination as a stack-powered range-2 BUFF aura card", () => {
+    it("is off the real Abomination for now, while the aura itself stays wired for its return", () => {
+        // OWNER 2026-09-18: "remove Stun Aura for now from abomination" — taken off the creature only. The
+        // ability, its catalog entry and the on-hit processor are untouched (the tests above drive them
+        // through a unit built with the ability), so bringing it back is one name in creatures.json.
         const props = HoCConfig.getCreatureConfig(PBTypes.TeamVals.LEFT, "Chaos", "Abomination", "abomination_512", 1);
-        const index = props.abilities.indexOf("Stun Aura");
-        expect(index).toBeGreaterThanOrEqual(0);
-        expect(props.abilities_stack_powered[index]).toBe(true);
-        expect(props.abilities_auras[index]).toBe(true);
-        expect(props.aura_ranges[index]).toBe(2);
-        expect(props.aura_is_buff[index]).toBe(true);
-        expect(props.abilities_descriptions[index]).not.toContain("{}");
+        expect(props.abilities).not.toContain("Stun Aura");
+        expect(props.abilities).toContain("Dense Flesh");
+        expect(props.abilities).toContain("Flesh Shield Aura");
     });
 });

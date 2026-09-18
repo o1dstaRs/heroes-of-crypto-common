@@ -937,7 +937,7 @@
             "size": 2,
             "level": 4,
             "spells": [],
-            "abilities": ["Dense Flesh", "Flesh Shield Aura", "Stun Aura"]
+            "abilities": ["Dense Flesh", "Flesh Shield Aura"]
         },
         "Wandering Mage": {
             "name": "Wandering Mage",
