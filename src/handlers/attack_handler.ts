@@ -27,6 +27,11 @@ import * as HoCConstants from "../constants";
 import * as AbilityHelper from "../abilities/ability_helper";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import type { IAbilityTransfer } from "../engine/events";
+import {
+    bodyCellsEnteredAlongPath,
+    burnUnitOnFireWallCells,
+    travelledMovePath,
+} from "../engine/post_move_actor_availability";
 import { Unit } from "../units/unit";
 import { recordEffectApplication } from "../units/effect_application_capture";
 import { FightStateManager } from "../fights/fight_state_manager";
@@ -111,6 +116,19 @@ export interface IAttackResult {
     spunObstacleCells?: HoCMath.XY[];
     /** Cemetery barrels a unit strike's piercing passive ran on into behind its target, tagged with that passive. */
     piercedObstacles?: IPiercedObstacle[];
+    /** Fire Wall damage the attacker took walking into the flames on its way in, before it could strike. */
+    fireWallBurn?: IFireWallBurnReport;
+    /** The attacker died in those flames on arrival, so its blow never landed. */
+    strikeSkipped?: boolean;
+}
+
+/** One attacker's Fire Wall burn, in the shape the action engine puts on a `fire_wall_burned` event. */
+export interface IFireWallBurnReport {
+    unitId: string;
+    cells: HoCMath.XY[];
+    position: HoCMath.XY;
+    amount: number;
+    unitsDied: number;
 }
 
 export interface IPiercedObstacle {
@@ -1943,6 +1961,11 @@ export class AttackHandler {
         let targetUnitPlusMorale = 0;
         const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
 
+        // Captured BEFORE the attack's own move below: the wall charges the body cells this walk ENTERS, and
+        // neither the starting body nor its anchor can be read back once the attacker has been relocated.
+        const startCellsBeforeAttackMove = attackerUnit.getCells();
+        const startBaseCellBeforeAttackMove = attackerUnit.getBaseCell();
+
         if (attackerUnit.isSmallSize()) {
             const attackFromCells = [attackFromCell];
             if (
@@ -2065,6 +2088,21 @@ export class AttackHandler {
             } else {
                 return { completed: false, unitIdsDied, animationData };
             }
+        }
+
+        // The walk in burns before the blow: a stack that dies in the flames never gets to strike.
+        const fireWallBurn = stationaryAttack
+            ? undefined
+            : this.burnAttackerOnFireWalls(
+                  attackerUnit,
+                  attackFromCell,
+                  startCellsBeforeAttackMove,
+                  startBaseCellBeforeAttackMove,
+                  currentActiveKnownPaths,
+              );
+        if (fireWallBurn && attackerUnit.isDead()) {
+            updateUnitsDied([attackerUnit.getId()]);
+            return { completed: true, unitIdsDied, animationData, fireWallBurn, strikeSkipped: true };
         }
 
         let abilityMultiplier = 1;
@@ -2908,7 +2946,41 @@ export class AttackHandler {
             abilityStolen,
             spunObstacleCells,
             piercedObstacles,
+            fireWallBurn,
         };
+    }
+    /**
+     * Fire Wall: an attack that walks into the flames pays for them ON ARRIVAL, before its blow lands (owner
+     * call 2026-09-18) — a stack that dies crossing the wall never strikes. A standalone move charges this in
+     * the action engine, which is why an attack's own move went uncharged: it moves in here instead, so it
+     * burns here, off the very route the move modifiers walked.
+     */
+    private burnAttackerOnFireWalls(
+        attackerUnit: Unit,
+        attackFromCell: HoCMath.XY,
+        startCells: HoCMath.XY[],
+        startBaseCell: HoCMath.XY,
+        currentActiveKnownPaths?: Map<number, IWeightedRoute[]>,
+    ): IFireWallBurnReport | undefined {
+        const fireWalls = FightStateManager.getInstance().getFightProperties().getFireWalls();
+        if (!fireWalls?.size()) {
+            return undefined;
+        }
+        // The anchors the attacker actually walked, expanded to the body each one carried: a wall under any
+        // cell of a large body is crossed fire, exactly as on the move path.
+        const route = currentActiveKnownPaths?.get((attackFromCell.x << 4) | attackFromCell.y)?.[0]?.route;
+        const entered = bodyCellsEnteredAlongPath(
+            startCells,
+            travelledMovePath(startBaseCell, route ?? [attackFromCell]),
+            attackerUnit.getFootprintWidth(),
+            attackerUnit.getFootprintHeight(),
+        );
+        const position = { ...attackerUnit.getPosition() };
+        const { burning, total, unitsDied } = burnUnitOnFireWallCells(attackerUnit, entered, fireWalls, this.sceneLog);
+        if (total <= 0) {
+            return undefined;
+        }
+        return { unitId: attackerUnit.getId(), cells: burning, position, amount: total, unitsDied };
     }
     /** Break the barrels a unit strike's piercing passive ran on into, and report them tagged with that passive. */
     private spendPiercedObstacles(
@@ -3234,6 +3306,10 @@ export class AttackHandler {
             const stationaryAttack = currentCell.x === attackFromCell.x && currentCell.y === attackFromCell.y;
             // Stacks a Skewer Strike killed running on through the struck barrel.
             let piercedUnitIdsDied: string[] = [];
+            // Captured BEFORE either branch below relocates the attacker — see burnAttackerOnFireWalls.
+            const startCellsBeforeObstacleMove = attackerUnit.getCells();
+            const startBaseCellBeforeObstacleMove = attackerUnit.getBaseCell();
+            let fireWallBurn: IFireWallBurnReport | undefined;
 
             if (attackerUnit.isSmallSize()) {
                 if (
@@ -3286,6 +3362,27 @@ export class AttackHandler {
                         affectedUnit: attackerUnit,
                         bodyUnit: attackerUnit,
                     });
+
+                    // Same arrival rule as a melee attack: the walk in burns before the barrel is struck, and
+                    // a stack that dies in the flames never swings.
+                    fireWallBurn = stationaryAttack
+                        ? undefined
+                        : this.burnAttackerOnFireWalls(
+                              attackerUnit,
+                              attackFromCell,
+                              startCellsBeforeObstacleMove,
+                              startBaseCellBeforeObstacleMove,
+                              currentActiveKnownPaths,
+                          );
+                    if (fireWallBurn && attackerUnit.isDead()) {
+                        return {
+                            completed: true,
+                            unitIdsDied: [attackerUnit.getId()],
+                            animationData,
+                            fireWallBurn,
+                            strikeSkipped: true,
+                        };
+                    }
 
                     this.spendObstacleHit(targetCell, isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
@@ -3370,6 +3467,27 @@ export class AttackHandler {
                         bodyUnit: attackerUnit,
                     });
 
+                    // Same arrival rule as a melee attack: the walk in burns before the barrel is struck, and
+                    // a stack that dies in the flames never swings.
+                    fireWallBurn = stationaryAttack
+                        ? undefined
+                        : this.burnAttackerOnFireWalls(
+                              attackerUnit,
+                              attackFromCell,
+                              startCellsBeforeObstacleMove,
+                              startBaseCellBeforeObstacleMove,
+                              currentActiveKnownPaths,
+                          );
+                    if (fireWallBurn && attackerUnit.isDead()) {
+                        return {
+                            completed: true,
+                            unitIdsDied: [attackerUnit.getId()],
+                            animationData,
+                            fireWallBurn,
+                            strikeSkipped: true,
+                        };
+                    }
+
                     this.spendObstacleHit(targetCell, isRightMountain);
                     this.sceneLog.updateLog(`${attackerUnit.getName()} hit mountain`);
                     piercedUnitIdsDied = this.pierceScatteredObstacleBehind(
@@ -3418,6 +3536,7 @@ export class AttackHandler {
                 unitIdsDied,
                 animationData,
                 spunObstacleCells: spin.spunObstacleCells,
+                fireWallBurn,
             };
         }
 

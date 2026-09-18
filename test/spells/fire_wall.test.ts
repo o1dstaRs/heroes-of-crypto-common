@@ -464,6 +464,108 @@ describe("Fire Wall through the action engine", () => {
         expect(s.enemy.getCumulativeHp()).toBe(s.enemy.getCumulativeMaxHp());
     });
 
+    // An ATTACK carries its own move, and that move happens inside the attack handler rather than through
+    // the move action — so the walls went unread and walking into the flames to swing was free (owner report
+    // 2026-09-18 off staging game 0d3dc917: a Nightmare stepped into its own wall mid-attack, untouched).
+    it("sears an attacker that walks into the flames to reach its target, before its blow lands", () => {
+        const s = setup({ moverMaxHp: 20 });
+        const victim = createTestUnit({
+            name: "Victim",
+            team: PBTypes.TeamVals.LEFT,
+            maxHp: 100,
+            amountAlive: 10,
+            // A harmless target keeps retaliation out of the health arithmetic below.
+            damageMin: 0,
+            damageMax: 0,
+        });
+        placeUnit(s.grid, s.unitsHolder, victim, { x: 7, y: 9 });
+        s.setActive(s.enemy);
+        const burning = { x: 8, y: 9 };
+        s.fightProperties.getFireWalls().add(burning, 3);
+        const maxHp = s.enemy.getCumulativeMaxHp(); // 10 x 20 = 200
+
+        const result = s.engine.apply({
+            type: "melee_attack",
+            attackerId: s.enemy.getId(),
+            targetId: victim.getId(),
+            attackFrom: burning,
+            path: [burning],
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "fire_wall_burned",
+                unitId: s.enemy.getId(),
+                cells: [burning],
+                amount: fireWallBurnDamage(maxHp),
+            }),
+        );
+        // Charged on ARRIVAL: the burn is reported before the blow the attacker walked in to deliver.
+        const burnAt = result.events.findIndex((e) => e.type === "fire_wall_burned");
+        const strikeAt = result.events.findIndex((e) => e.type === "unit_attacked");
+        expect(burnAt).toBeGreaterThanOrEqual(0);
+        expect(strikeAt).toBeGreaterThan(burnAt);
+        // At least the burn: retaliation floors at one point however harmless the target is.
+        expect(s.enemy.getCumulativeHp()).toBeLessThanOrEqual(maxHp - fireWallBurnDamage(maxHp));
+    });
+
+    it("lets a stack that dies crossing the wall land no blow at all", () => {
+        const s = setup({ moverMaxHp: 20 });
+        const victim = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.LEFT, maxHp: 100, amountAlive: 10 });
+        placeUnit(s.grid, s.unitsHolder, victim, { x: 7, y: 9 });
+        s.setActive(s.enemy);
+        const burning = { x: 8, y: 9 };
+        s.fightProperties.getFireWalls().add(burning, 3);
+        // The wall takes a quarter of the stack's CURRENT maximum (it shrinks as creatures die), so thin the
+        // stack to one wounded creature: 20 max -> a 5-point burn against the 4 hit points left.
+        s.enemy.applyDamage(s.enemy.getCumulativeMaxHp() - 4, 0, s.sceneLog);
+        expect(s.enemy.getAmountAlive()).toBe(1);
+
+        const result = s.engine.apply({
+            type: "melee_attack",
+            attackerId: s.enemy.getId(),
+            targetId: victim.getId(),
+            attackFrom: burning,
+            path: [burning],
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events.some((e) => e.type === "fire_wall_burned")).toBe(true);
+        expect(result.events.some((e) => e.type === "unit_attacked")).toBe(false);
+        expect(s.enemy.isDead()).toBe(true);
+        expect(victim.getCumulativeHp()).toBe(victim.getCumulativeMaxHp());
+    });
+
+    it("does not charge an attacker that was already standing in the fire and never moved", () => {
+        const s = setup();
+        const victim = createTestUnit({
+            name: "Victim",
+            team: PBTypes.TeamVals.LEFT,
+            maxHp: 100,
+            amountAlive: 10,
+            damageMin: 0,
+            damageMax: 0,
+        });
+        placeUnit(s.grid, s.unitsHolder, victim, { x: 8, y: 9 });
+        s.setActive(s.enemy);
+        const standing = s.enemy.getBaseCell();
+        s.fightProperties.getFireWalls().add(standing, 3);
+
+        const result = s.engine.apply({
+            type: "melee_attack",
+            attackerId: s.enemy.getId(),
+            targetId: victim.getId(),
+            attackFrom: standing,
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events.some((e) => e.type === "fire_wall_burned")).toBe(false);
+        // Only the one-point retaliation floor, nowhere near a quarter of maximum health.
+        const maxHp = s.enemy.getCumulativeMaxHp();
+        expect(maxHp - s.enemy.getCumulativeHp()).toBeLessThan(fireWallBurnDamage(maxHp));
+    });
+
     // Standing in the fire at the start of a turn is not a crossing — only cells walked INTO are charged.
     it("does not re-burn a creature that starts its turn already in the fire", () => {
         const s = setup();

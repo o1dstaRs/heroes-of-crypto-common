@@ -695,7 +695,13 @@ export class GameActionEngine {
             { victim: attacker, killer: target },
         ]);
         const events: GameEvent[] = [];
-        if (!this.headlessEvents) {
+        // Fire Wall: the attacker paid for walking into the flames the moment it arrived, before its blow, so
+        // the burn leads. When the flames killed it there is no blow to report at all — the move still
+        // happened, so this is a completed action rather than a refusal.
+        if (result.fireWallBurn && !this.headlessEvents) {
+            events.push({ type: "fire_wall_burned", ...result.fireWallBurn });
+        }
+        if (!this.headlessEvents && !result.strikeSkipped) {
             events.push({
                 type: "unit_attacked",
                 attackType: "melee",
@@ -1012,6 +1018,18 @@ export class GameActionEngine {
         // "Did the attack achieve anything?" — for scattered stones that is one fewer standing, not one
         // fewer hit point, because their counters never move.
         const landed = scattered ? standingAfter < standingBefore : hitsAfter < hitsBefore;
+        // Burned to death walking into a Fire Wall on the way in: nothing was struck, but the move happened
+        // and the stack is gone, so this completes with the burn alone rather than rejecting a board that has
+        // already moved.
+        if (result.strikeSkipped) {
+            const burnEvents: GameEvent[] = [];
+            if (result.fireWallBurn && !this.headlessEvents) {
+                burnEvents.push({ type: "fire_wall_burned", ...result.fireWallBurn });
+            }
+            burnEvents.push(...this.cleanupDeadUnits([...new Set(result.unitIdsDied)]));
+            burnEvents.push(...this.turnEngine.completeTurn(attacker));
+            return { completed: true, events: burnEvents };
+        }
         if (!result.completed || !landed) {
             return this.reject("attack_not_available");
         }
@@ -1069,6 +1087,10 @@ export class GameActionEngine {
                 : {};
         const serializedAnimations = this.serializeAnimations(result.animationData ?? []);
         const events: GameEvent[] = [];
+        // The walk in burned before the barrel was struck, so the burn leads the strike's own events.
+        if (result.fireWallBurn && !this.headlessEvents) {
+            events.push({ type: "fire_wall_burned", ...result.fireWallBurn });
+        }
         if (!this.headlessEvents) {
             if (scattered) {
                 events.push(
