@@ -50,6 +50,7 @@ export * from "./engine/runtime";
 export * from "./engine/turn_engine";
 export * from "./handlers/move_handler";
 export * from "./handlers/attack_handler";
+export * from "./handlers/melee_response";
 export * from "./spells/spell_properties";
 export * from "./spells/spell_damage";
 export * from "./spells/spell_cast_projection";
