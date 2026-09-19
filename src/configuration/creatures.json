@@ -1277,7 +1277,7 @@
             "hp": 60,
             "steps": 4,
             "initiative": 5,
-            "armor": 20,
+            "armor": 21,
             "attack_type": "MELEE_MAGIC",
             "attack": 24,
             "attack_damage_min": 16,
