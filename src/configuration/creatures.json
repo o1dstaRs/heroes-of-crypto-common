@@ -550,7 +550,7 @@
         },
         "Pegasus": {
             "name": "Pegasus",
-            "hp": 58,
+            "hp": 56,
             "steps": 7.5,
             "initiative": 6.7,
             "armor": 19,
