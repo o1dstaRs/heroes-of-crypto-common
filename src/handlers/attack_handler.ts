@@ -945,13 +945,21 @@ export class AttackHandler {
         // if so, check if the forced target is still alive
         const forcedTargetUnitId = attackerUnit.getTarget();
         const forcedTargetUnit = unitsHolder.getAllUnits().get(forcedTargetUnitId);
-        if (
-            forcedTargetUnit &&
-            !forcedTargetUnit.isDead() &&
-            forcedTargetUnitId &&
-            forcedTargetUnitId !== targetUnit.getId()
-        ) {
-            return { completed: false, unitIdsDied, animationData };
+        if (forcedTargetUnit && !forcedTargetUnit.isDead() && forcedTargetUnitId) {
+            // A single shot strikes one stack, so the provoker must BE that stack. A splash strikes its whole
+            // 3x3 at once and has no "the" target, so the lock asks the only question that means anything
+            // there: does the blast actually catch the provoker? The ordered first entry cannot answer it —
+            // the aimed cell is enumerated LAST (cellsAround + target), so targetUnits[0][0] is whichever
+            // stack happens to stand in the ring. Reading it refused a Gargantuan aiming squarely at its
+            // provoker whenever anyone else stood beside it, the AI's own throws included: its area router
+            // only ever aims at the provoker (area_throw_router), so those rejections were unreachable
+            // by any legal play and simply lost the turn.
+            const landsOnForcedTarget = isAOE
+                ? targetUnits.some((group) => group.some((unit) => unit.getId() === forcedTargetUnitId))
+                : targetUnit.getId() === forcedTargetUnitId;
+            if (!landsOnForcedTarget) {
+                return { completed: false, unitIdsDied, animationData };
+            }
         }
 
         // ...and the inverse: Terrifying Gaze bars this one enemy while leaving every other target open.

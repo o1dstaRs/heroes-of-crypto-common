@@ -1602,6 +1602,83 @@ describe("GameActionEngine", () => {
         expect(setup.grid.getScatteredMountainsStanding()).toEqual(blast);
     });
 
+    // Aggr narrows every attack to the stack that provoked it. A single shot strikes one stack, so that
+    // stack must BE the provoker; a splash strikes its whole 3x3 at once and has no "the" target, so the
+    // only question that means anything is whether the blast catches the provoker. The gate used to read
+    // the ordered first victim for both, and a splash enumerates its aimed cell LAST — so the first entry
+    // is whichever stack stands in the RING, and a throw aimed squarely at the provoker was refused for
+    // having a neighbour. The AI could not escape it either: its area router only ever aims at the provoker.
+    const setupAggrThrow = () => {
+        const setup = setupActionFight({
+            leftAttackType: PBTypes.AttackVals.RANGE,
+            leftAttack: 20,
+            leftAbilities: ["Area Throw"],
+            leftDamageMin: 10,
+            leftDamageMax: 10,
+            leftRangeShots: 3,
+            leftCell: { x: 3, y: 3 },
+            supportCell: { x: 4, y: 3 },
+            // The provoker sits on the thrower's diagonal, so a throw aimed past it (9,9) projects onto its
+            // own cell — which the blast enumerates LAST, behind every occupied cell of the ring.
+            rightCell: { x: 7, y: 7 },
+        });
+        const neighbour = createTestUnit({
+            name: "Upper Neighbour",
+            team: PBTypes.TeamVals.RIGHT,
+            initiative: 2,
+            maxHp: 10_000,
+        });
+        const elsewhere = createTestUnit({
+            name: "Upper Elsewhere",
+            team: PBTypes.TeamVals.RIGHT,
+            initiative: 1,
+            maxHp: 10_000,
+        });
+        // Off the thrower's line (so it never steals the projection) but inside the provoker's ring.
+        placeUnit(setup.grid, setup.unitsHolder, neighbour, { x: 6, y: 7 });
+        placeUnit(setup.grid, setup.unitsHolder, elsewhere, { x: 2, y: 12 });
+        setup.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 3);
+        setup.left.refreshPossibleAttackTypes(true);
+        setup.left.setTarget(setup.right.getId());
+        return { ...setup, neighbour, elsewhere };
+    };
+
+    it("an aggravated splash lands whenever the blast catches its provoker, neighbours included", () => {
+        const setup = setupAggrThrow();
+        const provokerHpBefore = setup.right.getCumulativeHp();
+        const neighbourHpBefore = setup.neighbour.getCumulativeHp();
+        const shotsBefore = setup.left.getRangeShots();
+
+        const result = setup.engine.apply({
+            type: "area_throw_attack",
+            attackerId: setup.left.getId(),
+            targetCell: { x: 9, y: 9 },
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.right.getCumulativeHp()).toBeLessThan(provokerHpBefore);
+        // The neighbour is what the blast enumerates first; reading it as "the" target is what refused this.
+        expect(setup.neighbour.getCumulativeHp()).toBeLessThan(neighbourHpBefore);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore - 1);
+    });
+
+    it("an aggravated splash that catches everyone except its provoker is refused", () => {
+        const setup = setupAggrThrow();
+        const elsewhereHpBefore = setup.elsewhere.getCumulativeHp();
+        const shotsBefore = setup.left.getRangeShots();
+
+        const result = setup.engine.apply({
+            type: "area_throw_attack",
+            attackerId: setup.left.getId(),
+            targetCell: { x: 2, y: 11 },
+        });
+
+        expect(result.completed).toBe(false);
+        expect(result.rejectionReason).toBe("attack_not_available");
+        expect(setup.elsewhere.getCumulativeHp()).toBe(elsewhereHpBefore);
+        expect(setup.left.getRangeShots()).toBe(shotsBefore);
+    });
+
     it("Large Caliber ignores scattered stones on its trajectory and destroys every stone in its 3x3 blast", () => {
         const setup = setupActionFight({
             gridType: PBTypes.GridVals.BLOCK_CENTER,
