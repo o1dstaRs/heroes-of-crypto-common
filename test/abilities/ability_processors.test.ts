@@ -618,6 +618,45 @@ describe("ability processors", () => {
         expect(capture.lines.some((line) => line.includes("Armored") && line.includes("💀1"))).toBe(true);
     });
 
+    it("says a fire-immune unit resisted instead of the wave stopping with nothing said", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const stats = new DamageStatisticHolder();
+        const capture = capturingSceneLog();
+        const attacker = createTestUnit({
+            name: "Dragon",
+            team: PBTypes.TeamVals.LEFT,
+            abilities: ["Fire Breath"],
+            attack: 20,
+            damageMin: 20,
+            damageMax: 20,
+            stackPower: 100,
+        });
+        const primary = createTestUnit({ name: "Primary", team: PBTypes.TeamVals.RIGHT, amountAlive: 3, maxHp: 30 });
+        // The breath sweeps the ranks BEHIND the primary. Full magic resistance is full fire immunity: this unit
+        // takes nothing AND walls the fire off from everyone behind it.
+        const immune = createTestUnit({
+            name: "Immune",
+            team: PBTypes.TeamVals.RIGHT,
+            amountAlive: 3,
+            maxHp: 30,
+            magicResist: 100,
+        });
+        const behind = createTestUnit({ name: "Sheltered", team: PBTypes.TeamVals.RIGHT, amountAlive: 1, maxHp: 5 });
+
+        placeUnit(grid, unitsHolder, attacker, { x: 5, y: 7 });
+        placeUnit(grid, unitsHolder, primary, { x: 5, y: 5 });
+        placeUnit(grid, unitsHolder, immune, { x: 5, y: 3 });
+        placeUnit(grid, unitsHolder, behind, { x: 5, y: 1 });
+
+        const result = processFireBreathAbility(attacker, primary, capture.log, unitsHolder, grid, "attk", stats);
+
+        expect(capture.lines).toContain("Immune resisted from Fire Breath");
+        expect(result.unitIdsDied).toEqual([]);
+        expect(stats.get()).toHaveLength(0);
+        expect(immune.isDead()).toBe(false);
+        expect(behind.isDead()).toBe(false);
+    });
+
     it("processes standalone status and effect abilities deterministically", () => {
         const sceneLog = new SceneLogMock();
         const attacker = createTestUnit({

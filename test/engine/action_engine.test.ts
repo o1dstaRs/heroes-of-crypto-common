@@ -32,9 +32,22 @@ import { Spell } from "../../src/spells/spell";
 import { SpellProperties, SpellTargetType } from "../../src/spells/spell_properties";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
+/** A scene log that keeps its lines, for tests that assert what the fight log actually told the player. */
+class CapturingSceneLog extends SceneLogMock {
+    public readonly lines: string[] = [];
+
+    public override updateLog(newLog?: string): void {
+        if (newLog) {
+            this.lines.push(newLog);
+        }
+    }
+}
+
 const setupActionFight = (
     opts: {
         activeUnit?: "lower" | "upper";
+        /** Pass a CapturingSceneLog to read the lines the fight wrote; defaults to the silent mock. */
+        sceneLog?: SceneLogMock;
         leftAttackType?: AttackType;
         leftAttack?: number;
         leftAbilities?: string[];
@@ -121,7 +134,7 @@ const setupActionFight = (
     fightProperties.startTurn(PBTypes.TeamVals.LEFT, 1000);
 
     const activeUnit = opts.activeUnit === "upper" ? right : left;
-    const sceneLog = new SceneLogMock();
+    const sceneLog = opts.sceneLog ?? new SceneLogMock();
     const moveHandler = new MoveHandler(context.grid.getSettings(), context.grid, context.unitsHolder);
     const engine = new GameActionEngine({
         fightProperties,
@@ -2772,6 +2785,77 @@ describe("GameActionEngine", () => {
         expect(result.completed).toBe(true);
         expect(setup.right.hasDebuffActive("Mass Weakness")).toBe(true);
         expect(setup.left.hasSpellRemaining("Mass Weakness")).toBe(false);
+    });
+
+    /** The ALL_ENEMIES variant of a configured spell, as the mass-cast tests need it. */
+    const massVariantOf = (faction: string, spellName: string, massName: string): Spell => {
+        const base = getSpellConfig(faction, spellName);
+        return new Spell({
+            spellProperties: new SpellProperties(
+                base.faction,
+                massName,
+                base.level,
+                [...base.desc],
+                SpellTargetType.ALL_ENEMIES,
+                base.power,
+                base.power_type,
+                base.element,
+                base.multiplier_type,
+                base.laps,
+                base.is_buff,
+                base.self_cast_allowed,
+                base.self_debuff_applies,
+                base.minimal_caster_stack_power,
+                [...base.conflicts_with],
+                base.is_giftable,
+                base.maximum_gift_level,
+            ),
+            amount: 1,
+        });
+    };
+
+    it("tells the player a fully magic-resistant enemy resisted the mass debuff", () => {
+        const sceneLog = new CapturingSceneLog();
+        // A second enemy on purpose: with every enemy immune the cast is refused outright (the spell is not
+        // spent), so the skip this test is about only happens beside a target the debuff can land on.
+        const setup = setupActionFight({ sceneLog });
+        const immune = createTestUnit({
+            name: "Warded",
+            team: PBTypes.TeamVals.RIGHT,
+            magicResist: 100,
+        });
+        placeUnit(setup.grid, setup.unitsHolder, immune, { x: 7, y: 5 });
+        setup.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, 2);
+        setup.left.getSpells().push(massVariantOf("Death", "Weakness", "Mass Weakness"));
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.left.getId(),
+            spellName: "Mass Weakness",
+        });
+
+        // Full immunity used to skip the unit without a word, so a debuff that missed it looked like nothing.
+        expect(result.completed).toBe(true);
+        expect(setup.right.hasDebuffActive("Mass Weakness")).toBe(true);
+        expect(immune.hasDebuffActive("Mass Weakness")).toBe(false);
+        expect(sceneLog.lines).toContain("Warded resisted from Mass Weakness");
+    });
+
+    it("tells the player a mind-resistant enemy resisted a MIND mass debuff", () => {
+        const sceneLog = new CapturingSceneLog();
+        // Mechanism (like Madness) carries mind-attack resistance.
+        const setup = setupActionFight({ sceneLog, rightAbilities: ["Mechanism"] });
+        setup.left.getSpells().push(massVariantOf("Death", "Sadness", "Mass Sadness"));
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.left.getId(),
+            spellName: "Mass Sadness",
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.right.hasDebuffActive("Mass Sadness")).toBe(false);
+        expect(sceneLog.lines).toContain(`${setup.right.getName()} resisted from Mass Sadness`);
     });
 
     it("summons a new stack through common mechanics", () => {

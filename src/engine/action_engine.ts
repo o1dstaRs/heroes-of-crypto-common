@@ -2618,7 +2618,16 @@ export class GameActionEngine {
             );
             const debuffTarget = absorptionTarget ?? enemy;
 
+            // Full immunity reads as a resist to the player exactly like a won roll does — it was silent
+            // before, so a mass debuff that touched nobody looked like a spell that had simply done nothing.
             if (debuffTarget.getMagicResist() === 100) {
+                this.context.sceneLog.updateLog(`${debuffTarget.getName()} resisted from ${spell.getName()}`);
+                recordEffectApplication({
+                    unitId: debuffTarget.getId(),
+                    name: spell.getName(),
+                    kind: "debuff",
+                    resisted: true,
+                });
                 continue;
             }
             if (getRandomInt(0, 100) < Math.floor(debuffTarget.getMagicResist())) {
@@ -2631,10 +2640,19 @@ export class GameActionEngine {
                 });
                 continue;
             }
-            if (
-                SpellHelper.hasAlreadyAppliedSpell(debuffTarget, spell) ||
-                (spell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance())
-            ) {
+            // Shrugging off a MIND spell is a resist and reads as one; say so. An already-applied spell is
+            // not a resist — it stays silent, as the "suffers" line for it was already written.
+            if (spell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance()) {
+                this.context.sceneLog.updateLog(`${debuffTarget.getName()} resisted from ${spell.getName()}`);
+                recordEffectApplication({
+                    unitId: debuffTarget.getId(),
+                    name: spell.getName(),
+                    kind: "debuff",
+                    resisted: true,
+                });
+                continue;
+            }
+            if (SpellHelper.hasAlreadyAppliedSpell(debuffTarget, spell)) {
                 continue;
             }
 

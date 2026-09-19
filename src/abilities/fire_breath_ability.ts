@@ -90,8 +90,10 @@ export function breatheFireOnTargets(
             continue;
         }
         // A fully fire-immune unit takes no damage AND acts as a fire wall: it shields every unit behind it in the
-        // wave's path. Stop the sweep here — do not carry the breath through to further targets.
+        // wave's path. Stop the sweep here — do not carry the breath through to further targets. Say so: the wave
+        // stopping dead with no line at all read as the breath failing for no reason.
         if (isFullyFireImmune(nextStandingTarget)) {
+            sceneLog.updateLog(`${nextStandingTarget.getName()} resisted from Fire Breath`);
             break;
         }
 
