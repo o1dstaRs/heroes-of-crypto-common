@@ -33,12 +33,13 @@ import {
     travelledMovePath,
 } from "../engine/post_move_actor_availability";
 import { Unit } from "../units/unit";
+import type { IFireforgedSwordResult } from "../abilities/fireforged_sword_ability";
 import { recordEffectApplication } from "../units/effect_application_capture";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
 import * as EffectHelper from "../effects/effect_helper";
 import { MoveHandler } from "./move_handler";
-import type { IAnimationData } from "../scene/animations";
+import type { IAnimationData, ISecondaryDamage, SecondaryDamageSource } from "../scene/animations";
 import type { IBoardObj } from "../units/unit";
 import type { IVisibleDamage } from "../scene/animations";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
@@ -893,6 +894,11 @@ export class AttackHandler {
             return { completed: false, unitIdsDied, animationData };
         }
 
+        // Declared up here rather than beside the response block below: the Fireforged Sword burns that
+        // ride the through-shot, AOE and double-shot paths all fold their kill morale into these, and
+        // those paths resolve earlier in the function than the response does.
+        let attackerUnitPlusMorale = 0;
+        const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         let targetUnitUndex = 0;
         let affectedUnits = targetUnits.at(targetUnitUndex);
         if (!affectedUnits?.length) {
@@ -1002,6 +1008,8 @@ export class AttackHandler {
         if (throughShotResult.landed) {
             primaryAssimilationLanded = true;
             resolveAssimilation();
+            // Both volleys' pierced units, gathered for the one sword pass at the end of this branch.
+            const throughShotSwordVictims = [...throughShotResult.perUnitDamage];
 
             // Double Shot (incl. Crafted Double Shot) on a Through-Shot attacker fires a SECOND piercing
             // volley down the same lane. The generic double-shot path (processDoubleShotAbility, reached only
@@ -1059,6 +1067,25 @@ export class AttackHandler {
                             })),
                         );
                     }
+                    throughShotSwordVictims.push(...secondThroughShot.perUnitDamage);
+                }
+            }
+
+            // Every unit the volley pierced burns for its own share. Through Shot returns straight out of
+            // handleRangeAttack, so the single-target sword pass further down is never reached on this
+            // path — a Fireforged Tsar Cannon set nothing alight at all before this (owner report
+            // 2026-09-20). Both volleys of a Double Shot are included, each priced on its own damage.
+            const throughShotSwordResult = AllAbilities.processFireforgedSwordOnVictims(
+                attackerUnit,
+                throughShotSwordVictims,
+                unitsHolder,
+                this.sceneLog,
+                this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
+            );
+            for (const uId of throughShotSwordResult.unitIdsDied) {
+                if (!unitIdsDied.includes(uId)) {
+                    unitIdsDied.push(uId);
                 }
             }
 
@@ -1261,6 +1288,33 @@ export class AttackHandler {
                     position: { ...entry.position },
                 }));
             }
+            // The blade over the whole splash: an Area Throw is still "the ally's attack", so every unit
+            // it damaged burns for its OWN share. Before this the sword sat behind a gate that skipped a
+            // landed AOE entirely, so a Fireforged Gargantuan set nobody alight at all — not even the unit
+            // it aimed at (owner report 2026-09-20).
+            //
+            // `isAOE` makes this EXACTLY complementary to the single-target sword pass further down, whose
+            // gate is `!landed || !isAOE`: every shot is burned by one of the two, never by both.
+            if (isAOE) {
+                const aoeSwordResult = AllAbilities.processFireforgedSwordOnVictims(
+                    attackerUnit,
+                    aoeRangeAttackResult.perUnitDamage.filter((entry) => !entry.missed),
+                    unitsHolder,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                attackerUnitPlusMorale += aoeSwordResult.increaseMorale;
+                for (const uId of aoeSwordResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(uId)) {
+                        unitIdsDied.push(uId);
+                    }
+                }
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    aoeSwordResult.moraleDecreaseForTheUnitTeam,
+                );
+            }
         } else if (isAttackMissed) {
             this.sceneLog.updateLog(`${attackerUnit.getName()} misses 🏹 on ${targetUnit.getName()}`);
             // Dodged ranged shot (Dodge / Small Specie / Boar Saliva / Broken Aegis): flag it so the
@@ -1397,6 +1451,26 @@ export class AttackHandler {
                 for (const uId of aoeRangeResponseResult.unitIdsDied) {
                     unitIdsDied.push(uId);
                 }
+                // The responder's own blade over its counter-volley's splash, for the same reason the
+                // attacking volley burns: the card says "the ally's attacks", and this is one.
+                const aoeResponseSwordResult = AllAbilities.processFireforgedSwordOnVictims(
+                    targetUnit,
+                    aoeRangeResponseResult.perUnitDamage.filter((entry) => !entry.missed),
+                    unitsHolder,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                targetUnitPlusMorale += aoeResponseSwordResult.increaseMorale;
+                for (const uId of aoeResponseSwordResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(uId)) {
+                        unitIdsDied.push(uId);
+                    }
+                }
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    aoeResponseSwordResult.moraleDecreaseForTheUnitTeam,
+                );
             } else if (isResponseMissed) {
                 this.sceneLog.updateLog(`${targetUnit.getName()} misses 🏹 resp on ${rangeResponseUnit.getName()}`);
             } else {
@@ -1476,6 +1550,26 @@ export class AttackHandler {
                         damageFromResponse,
                         this.sceneLog,
                     );
+                    // ...and so does the responder's Fireforged Sword, for the same reason: the card says
+                    // "the ally's attacks", and a counter-shot is one of them.
+                    const rangeResponseSwordResult = AllAbilities.processFireforgedSwordAbility(
+                        targetUnit,
+                        rangeResponseUnit,
+                        damageFromResponse,
+                        this.sceneLog,
+                        this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
+                    );
+                    targetUnitPlusMorale += rangeResponseSwordResult.increaseMorale;
+                    for (const uId of rangeResponseSwordResult.unitIdsDied) {
+                        if (!unitIdsDied.includes(uId)) {
+                            unitIdsDied.push(uId);
+                        }
+                    }
+                    this.updateMoraleDecreaseForTheUnitTeam(
+                        moraleDecreaseForTheUnitTeam,
+                        rangeResponseSwordResult.moraleDecreaseForTheUnitTeam,
+                    );
                 }
             }
 
@@ -1486,8 +1580,6 @@ export class AttackHandler {
             responseAssimilationTarget = rangeResponseUnit;
         }
 
-        let attackerUnitPlusMorale = 0;
-        const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
         if (rangeResponseFleshShieldAbsorb) {
             this.updateMoraleDecreaseForTheUnitTeam(
                 moraleDecreaseForTheUnitTeam,
@@ -1847,6 +1939,26 @@ export class AttackHandler {
 
         if (!secondShotResult.aoeRangeAttackLanded) {
             if (!targetUnit.isDead() && secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
+                // The second shot is a second attack, so it sets the target alight again on its own
+                // damage. It rides with the other on-hit riders here and under the same gate.
+                const secondShotSwordResult = AllAbilities.processFireforgedSwordAbility(
+                    attackerUnit,
+                    targetUnit,
+                    secondShotResult.damage,
+                    this.sceneLog,
+                    this.damageStatisticHolder,
+                    (damageForAnimation.secondary ??= []),
+                );
+                attackerUnitPlusMorale += secondShotSwordResult.increaseMorale;
+                for (const uId of secondShotSwordResult.unitIdsDied) {
+                    if (!unitIdsDied.includes(uId)) {
+                        unitIdsDied.push(uId);
+                    }
+                }
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    secondShotSwordResult.moraleDecreaseForTheUnitTeam,
+                );
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -2191,6 +2303,9 @@ export class AttackHandler {
 
         const fightProperties = FightStateManager.getInstance().getFightProperties();
 
+        // Everything the three sweeping abilities below damage gets the blade afterwards; remember where
+        // their entries start so the burn only reads this exchange's victims.
+        const sweepSecondaryFromIndex = (damageForAnimation.secondary ??= []).length;
         const lightningSpinAttackResult = AllAbilities.processLightningSpinAbility(
             attackerUnit,
             this.sceneLog,
@@ -2257,6 +2372,22 @@ export class AttackHandler {
                 unitsDied: sd.unitsDied,
             });
         }
+        // The blade over everything the sweeps hit: a Fireforged breath, spin or skewer sets every unit it
+        // caught alight, each for its own damage. Only the single primary victim burned before this.
+        const sweepSwordResult = this.burnSweptUnitsWithFireforgedSword(
+            attackerUnit,
+            (damageForAnimation.secondary ??= []),
+            sweepSecondaryFromIndex,
+            ["fire_breath", "lightning_spin", "skewer_strike"],
+            unitsHolder,
+        );
+        updateUnitsDied(sweepSwordResult.unitIdsDied);
+        attackerUnitPlusMorale += sweepSwordResult.increaseMorale;
+        this.updateMoraleDecreaseForTheUnitTeam(
+            moraleDecreaseForTheUnitTeam,
+            sweepSwordResult.moraleDecreaseForTheUnitTeam,
+        );
+
         // Past a small target the skewer runs on into a cemetery barrel standing behind it just as into a unit.
         const skeweredObstacleCell = AllAbilities.skewerStrikeObstacleCell(
             attackerUnit,
@@ -2343,6 +2474,8 @@ export class AttackHandler {
                             .getAdditionalAbilityPowerPerTeam(attackerUnit.getTeam()),
                     );
 
+                // Same as the attack side: mark where the response sweeps' victims begin.
+                const responseSweepSecondaryFromIndex = (damageForAnimation.secondary ??= []).length;
                 const fireBreathResponseResult = AllAbilities.processFireBreathAbility(
                     targetUnit,
                     attackerUnit,
@@ -2401,6 +2534,21 @@ export class AttackHandler {
                 );
                 hasLightningSpinResponseLanded = lightningSpinResponseResult.landed;
                 updateUnitsDied(lightningSpinResponseResult.unitIdsDied);
+
+                // The RESPONDER's blade over everything its own sweeps caught.
+                const responseSweepSwordResult = this.burnSweptUnitsWithFireforgedSword(
+                    targetUnit,
+                    (damageForAnimation.secondary ??= []),
+                    responseSweepSecondaryFromIndex,
+                    ["fire_breath", "lightning_spin", "skewer_strike"],
+                    unitsHolder,
+                );
+                updateUnitsDied(responseSweepSwordResult.unitIdsDied);
+                targetUnitPlusMorale += responseSweepSwordResult.increaseMorale;
+                this.updateMoraleDecreaseForTheUnitTeam(
+                    moraleDecreaseForTheUnitTeam,
+                    responseSweepSwordResult.moraleDecreaseForTheUnitTeam,
+                );
 
                 if (!isResponseMissed && !assimilationResponseProcessed) {
                     assimilationResponseProcessed = true;
@@ -2524,6 +2672,24 @@ export class AttackHandler {
                         this.updateMoraleDecreaseForTheUnitTeam(
                             moraleDecreaseForTheUnitTeam,
                             fireShieldFromAttackerResult.moraleDecreaseForTheUnitTeam,
+                        );
+                        // The RESPONDER's own Fireforged Sword. A retaliation is one of "the ally's
+                        // attacks" the card promises, and the mirror-image Fire Shield already fires on
+                        // this exact path — the blade simply never did, so a buffed defender struck back
+                        // with cold steel (owner report 2026-09-20).
+                        const responseFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
+                            targetUnit,
+                            attackerUnit,
+                            damageFromResponse,
+                            this.sceneLog,
+                            this.damageStatisticHolder,
+                            (damageForAnimation.secondary ??= []),
+                        );
+                        updateUnitsDied(responseFireforgedSwordResult.unitIdsDied);
+                        targetUnitPlusMorale += responseFireforgedSwordResult.increaseMorale;
+                        this.updateMoraleDecreaseForTheUnitTeam(
+                            moraleDecreaseForTheUnitTeam,
+                            responseFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
                         );
                         AllAbilities.processStunAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processStunAuraOnHit(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
@@ -3707,6 +3873,40 @@ export class AttackHandler {
             affectedCells,
             attackObstacle,
         };
+    }
+    /**
+     * Run the attacker's Fireforged Sword over every unit a SWEEPING melee ability just damaged.
+     *
+     * Fire Breath, Lightning Spin and Skewer Strike hit several units in one blow and report each one as
+     * its own secondary-damage entry. Those entries are the only per-victim damage breakdown they produce,
+     * so the blade reads them: everything appended to `secondary` since `fromIndex` whose source is one of
+     * `sources` is a unit this attack hurt, and each burns for its own damage.
+     *
+     * Taking the index BEFORE the sweep matters — the burn pushes its own `fireforged_sword` entries onto
+     * the same array, and re-reading from the start would set the same unit alight from its own fire.
+     */
+    private burnSweptUnitsWithFireforgedSword(
+        fromUnit: Unit,
+        secondary: ISecondaryDamage[],
+        fromIndex: number,
+        sources: readonly SecondaryDamageSource[],
+        unitsHolder: UnitsHolder,
+    ): IFireforgedSwordResult {
+        if (!fromUnit.getBuff("Fireforged Sword")) {
+            return { increaseMorale: 0, unitIdsDied: [], moraleDecreaseForTheUnitTeam: {} };
+        }
+        const victims = secondary
+            .slice(fromIndex)
+            .filter((entry) => sources.includes(entry.source))
+            .map((entry) => ({ unitId: entry.unitId, amount: entry.amount }));
+        return AllAbilities.processFireforgedSwordOnVictims(
+            fromUnit,
+            victims,
+            unitsHolder,
+            this.sceneLog,
+            this.damageStatisticHolder,
+            secondary,
+        );
     }
     private updateMoraleDecreaseForTheUnitTeam(
         initialRecord: Record<string, number>,

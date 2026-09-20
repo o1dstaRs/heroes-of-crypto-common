@@ -117,3 +117,69 @@ export function processFireforgedSwordAbility(
         ? { increaseMorale: 0, unitIdsDied: reflectedDeaths, moraleDecreaseForTheUnitTeam: {} }
         : NO_BURN;
 }
+
+/** Somewhere to look a victim's id up — UnitsHolder, without dragging its import in here. */
+export interface IFireforgedSwordUnitLookup {
+    getAllUnits(): ReadonlyMap<string, Unit>;
+}
+
+/**
+ * The blade against a whole volley: every unit one attack damaged, each burned for its OWN damage.
+ *
+ * A sweeping or piercing attack is still "the ally's attack", so every unit it hurts takes the blade's
+ * fire — an Area Throw that lands on four creatures sets four alight, each for its own share rather than
+ * all for the biggest. Built on top of the single-victim call so there is exactly one place that prices
+ * and applies a burn.
+ *
+ * Victims are given as (unitId, amount) because that is what every multi-victim processor already reports
+ * (perUnitDamage on the AOE and Through Shot results, the secondary-damage entries a breath or a spin
+ * pushes). A victim that took nothing, missed, or is already gone is skipped.
+ */
+export function processFireforgedSwordOnVictims(
+    fromUnit: Unit,
+    victims: readonly { unitId: string; amount: number }[],
+    unitsHolder: IFireforgedSwordUnitLookup,
+    sceneLog: ISceneLog,
+    damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
+    secondaryDamage?: ISecondaryDamage[],
+): IFireforgedSwordResult {
+    if (!victims.length || !fromUnit.getBuff(FIREFORGED_SWORD_BUFF_NAME)) {
+        return NO_BURN;
+    }
+    const allUnits = unitsHolder.getAllUnits();
+    let increaseMorale = 0;
+    const unitIdsDied: string[] = [];
+    const moraleDecreaseForTheUnitTeam: Record<string, number> = {};
+    // One burn per victim even when a processor reported it in several pieces, so a unit hit twice by the
+    // same sweep is not set alight twice by one swing.
+    const burned = new Set<string>();
+    for (const victim of victims) {
+        if (!(victim.amount > 0) || burned.has(victim.unitId)) {
+            continue;
+        }
+        const target = allUnits.get(victim.unitId);
+        // Never burn the wielder with its own blade, whatever a processor reported.
+        if (!target || target.getId() === fromUnit.getId()) {
+            continue;
+        }
+        burned.add(victim.unitId);
+        const result = processFireforgedSwordAbility(
+            fromUnit,
+            target,
+            victim.amount,
+            sceneLog,
+            damageStatisticHolder,
+            secondaryDamage,
+        );
+        increaseMorale += result.increaseMorale;
+        for (const id of result.unitIdsDied) {
+            if (!unitIdsDied.includes(id)) {
+                unitIdsDied.push(id);
+            }
+        }
+        for (const [key, value] of Object.entries(result.moraleDecreaseForTheUnitTeam)) {
+            moraleDecreaseForTheUnitTeam[key] = (moraleDecreaseForTheUnitTeam[key] ?? 0) + value;
+        }
+    }
+    return { increaseMorale, unitIdsDied, moraleDecreaseForTheUnitTeam };
+}
