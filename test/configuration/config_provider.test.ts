@@ -170,13 +170,24 @@ describe("config_provider", () => {
         expect(creature.attack_damage_max).toBe(11);
     });
 
-    it("loads Nightmare's improved durability and damage range", () => {
+    // Re-pinned 2026-09-20: the owner traded a tenth of the Nightmare's body and swing for an extra one in
+    // the stack (hp 65 -> 59, attack 23 -> 21, exp 102 -> 91.8, so 1000 XP now buys 11 instead of 10). Its
+    // armour and damage range are untouched.
+    it("loads Nightmare's durability and damage range", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Nightmare", "nightmare_512", 1);
 
-        expect(creature.hp).toBe(65);
+        expect(creature.hp).toBe(59);
+        expect(creature.base_attack).toBe(21);
         expect(creature.base_armor).toBe(21);
         expect(creature.attack_damage_min).toBe(15);
         expect(creature.attack_damage_max).toBe(20);
+    });
+
+    // The whole point of the exp change: 1000 XP fields one more Nightmare than it used to.
+    it("fields eleven Nightmares for the 1000 XP stack budget", () => {
+        const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Nightmare", "nightmare_512", 0, 1000);
+
+        expect(creature.amount_alive).toBe(11);
     });
 
     it("loads the reduced caster initiatives without rounding away tenths", () => {
