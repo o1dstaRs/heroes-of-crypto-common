@@ -122,6 +122,11 @@ export const V08_ALL_UNIT_CATALOG_SHA256 = catalogFingerprint(V08_ALL_UNIT_CATAL
  * Deliberately pinned. Adding/removing/enabling a creature, changing its roster level/footprint, or changing
  * its intrinsic spell kit stops the panel until this identity and its focused census tests are reviewed.
  *
+ * Re-pinned 2026-09-20 for the Fireball dropping to a single scroll (owner call): reviewed by dumping the
+ * catalog either side of the change — still 56 entries, and exactly ONE entry differs, the Wandering Mage
+ * reading `Fireball: 1` instead of 2 with its Fireforged Sword 2 / Misfortune 1 / Smoke 1 untouched.
+ * Previous approved identity: 68f750261bb90448e5a4aa9ed42ac45ac31b508767b537861f23912fc267e306
+ *
  * Re-pinned 2026-09-20 for the Wandering Mage's new Fireball (owner call): reviewed by dumping the catalog
  * either side of the change — still 56 entries, nothing added or removed, and exactly ONE entry differs:
  * Wandering Mage gains `Fireball: 2` alongside its unchanged Fireforged Sword 2 / Misfortune 1 / Smoke 1.
@@ -135,7 +140,7 @@ export const V08_ALL_UNIT_CATALOG_SHA256 = catalogFingerprint(V08_ALL_UNIT_CATAL
  * Previous approved identity: 591455f8a38c83302e082f1d650afca503342ca946cc95c70afa71565ad09858
  */
 export const V08_ALL_UNIT_EXPECTED_CATALOG_SHA256 =
-    "68f750261bb90448e5a4aa9ed42ac45ac31b508767b537861f23912fc267e306" as const;
+    "976e6c0bc11f3c7def03866f6be14e09a1ea3967f78123ff54ef8893692d23b0" as const;
 
 export function assertV08AllUnitCatalogCurrent(
     catalog: readonly IV08AllUnitCatalogEntry[] = V08_ALL_UNIT_CATALOG,

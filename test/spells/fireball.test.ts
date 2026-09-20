@@ -185,7 +185,7 @@ describe("Fireball", () => {
         const target = s.addUnit("Target", PBTypes.TeamVals.RIGHT, { x: 8, y: 8 });
 
         expect(s.cast(target.getId()).completed).toBe(true);
-        // This fixture carries ONE charge (the live Wandering Mage carries two), so it is now spent.
+        // One charge is all the live Wandering Mage carries either (owner 2026-09-20), so it is now spent.
         expect(s.mage.hasSpellRemaining("Fireball")).toBe(false);
         expect(s.fightProperties.hasAlreadyMadeTurn(s.mage.getId())).toBe(true);
     });
