@@ -39,7 +39,7 @@ describe("Fireforged Sword", () => {
         expect(burn({ targetIsFireElement: true, targetIsWaterElement: true })).toBe(0);
     });
 
-    it("is magic damage, so magic resistance cuts it and full immunity stops it", () => {
+    it("is fire damage that magic resistance still cuts, and full immunity stops", () => {
         expect(burn({ targetMagicResist: 50 })).toBe(5);
         expect(burn({ targetMagicResist: 75 })).toBe(2);
         expect(burn({ targetMagicResist: 100 })).toBe(0);
