@@ -2,11 +2,11 @@
  * -----------------------------------------------------------------------------
  * The number the hover projection SHOWS must be the number the cast DEALS.
  *
- * It was not: the client priced every offensive spell with the UNIT_AMOUNT_STACK_POWER shape, so the Battle
- * Mage's flat-per-caster book (Fire Strike, Meteorite) was projected at up to 5x — one extra factor of the
- * caster's stack power — while the Magic Dragon's stack-powered book happened to read correctly. These tests
- * walk every offensive spell in the catalog rather than a hand-picked pair, so a new spell in either shape
- * cannot reintroduce the gap.
+ * It was not: the client once re-implemented the damage arithmetic by hand and multiplied the Battle Mage's
+ * flat-per-caster book (Fire Strike, Meteorite) by a stack power the cast never used, projecting up to 5x.
+ * These tests walk every offensive spell in the catalog rather than a hand-picked pair, so a new spell cannot
+ * reintroduce the gap. Since 2026-09-19 (owner call) there is exactly one offensive shape, head-count x power:
+ * stack power is never an input to magic damage, for any caster.
  * -----------------------------------------------------------------------------
  */
 
@@ -52,12 +52,11 @@ const engineDamage = (
     multiplier: SpellMultiplierType,
     power: number,
     alive: number,
-    stackPower: number,
     bonus: number,
     elementMultiplier: number,
     resist: number,
 ): number => {
-    const raw = calculateSpellDamage(multiplier, power, alive, stackPower, bonus);
+    const raw = calculateSpellDamage(multiplier, power, alive, bonus);
     if (elementMultiplier <= 0) {
         return 0;
     }
@@ -66,18 +65,21 @@ const engineDamage = (
 };
 
 describe("offensive spell damage projection", () => {
-    it("covers both multiplier shapes, so this suite is not silently testing one of them", () => {
-        const shapes = new Set(offensiveSpells().map((row) => row.multiplier));
-        expect(shapes.has(SpellMultiplierType.UNIT_AMOUNT_DAMAGE)).toBe(true);
-        expect(shapes.has(SpellMultiplierType.UNIT_AMOUNT_STACK_POWER)).toBe(true);
+    it("covers both spellbooks on the one offensive shape, so this suite is not silently testing a pair", () => {
+        const rows = offensiveSpells();
+        expect(new Set(rows.map((row) => row.multiplier))).toEqual(new Set([SpellMultiplierType.UNIT_AMOUNT_DAMAGE]));
+        const names = new Set(rows.map((row) => row.name));
+        // The Battle Mage's book and the Magic Dragon's book both walk through here.
+        expect(names.has("Fire Strike")).toBe(true);
+        expect(names.has("Lightning Strike")).toBe(true);
     });
 
     it("projects exactly what the engine deals, for every offensive spell across casters and targets", () => {
         const casters = [
-            { alive: 1, stackPower: 1, bonus: 0 },
-            { alive: 50, stackPower: 5, bonus: 0 },
-            { alive: 37, stackPower: 3, bonus: 15 },
-            { alive: 200, stackPower: 5, bonus: 30 },
+            { alive: 1, bonus: 0 },
+            { alive: 50, bonus: 0 },
+            { alive: 37, bonus: 15 },
+            { alive: 200, bonus: 30 },
         ];
         // Element multipliers the catalog actually produces: immune, neutral, and the half-again weakness.
         const targets = [
@@ -96,7 +98,6 @@ describe("offensive spell damage projection", () => {
                         spell.multiplier,
                         spell.power,
                         caster.alive,
-                        caster.stackPower,
                         caster.bonus,
                         target.resist,
                         target.element,
@@ -105,7 +106,6 @@ describe("offensive spell damage projection", () => {
                         spell.multiplier,
                         spell.power,
                         caster.alive,
-                        caster.stackPower,
                         caster.bonus,
                         target.element,
                         target.resist,
@@ -121,26 +121,24 @@ describe("offensive spell damage projection", () => {
         }
     });
 
-    // The specific regression: a flat-per-caster spell must NOT pick up the caster's stack power.
-    it("does not multiply a UNIT_AMOUNT_DAMAGE spell by stack power", () => {
-        const flat = (stackPower: number) =>
-            offensiveSpellDamageAgainstTarget(SpellMultiplierType.UNIT_AMOUNT_DAMAGE, 6, 50, stackPower, 0, 0);
-        // Fire Strike at 50 casters is 300 regardless of how powered the stack is.
-        expect(flat(1)).toBe(300);
-        expect(flat(5)).toBe(300);
-        // ...while the stack-powered shape does scale, which is what made the bug invisible on the Dragon.
-        const powered = (stackPower: number) =>
-            offensiveSpellDamageAgainstTarget(SpellMultiplierType.UNIT_AMOUNT_STACK_POWER, 24, 50, stackPower, 0, 0);
-        expect(powered(1)).toBe(1200);
-        expect(powered(5)).toBe(6000);
+    // Head-count times power, and nothing else: a dragon pair throws exactly twice a lone dragon's bolt.
+    it("scales a UNIT_AMOUNT_DAMAGE spell linearly with the casters alive", () => {
+        const bolt = (alive: number) =>
+            offensiveSpellDamageAgainstTarget(SpellMultiplierType.UNIT_AMOUNT_DAMAGE, 150, alive, 0, 0);
+        expect(bolt(1)).toBe(150);
+        expect(bolt(2)).toBe(300);
+        // Fire Strike at 50 casters is 300.
+        expect(offensiveSpellDamageAgainstTarget(SpellMultiplierType.UNIT_AMOUNT_DAMAGE, 6, 50, 0, 0)).toBe(300);
+        // Any other shape is not a damage spell.
+        expect(offensiveSpellDamageAgainstTarget(SpellMultiplierType.UNIT_AMOUNT, 6, 50, 0, 0)).toBe(0);
     });
 
     // An AOE deals one raw damage but lands differently on each unit it catches, which is the whole reason
     // the projection is computed per target rather than once for the blast.
     it("differs per target under one blast when resistances differ", () => {
-        const raw = { multiplier: SpellMultiplierType.UNIT_AMOUNT_STACK_POWER, power: 21.6, alive: 10, sp: 5 };
+        const raw = { multiplier: SpellMultiplierType.UNIT_AMOUNT_DAMAGE, power: 108, alive: 10 };
         const against = (resist: number) =>
-            offensiveSpellDamageAgainstTarget(raw.multiplier, raw.power, raw.alive, raw.sp, 0, resist);
+            offensiveSpellDamageAgainstTarget(raw.multiplier, raw.power, raw.alive, 0, resist);
         expect(against(0)).toBe(1080);
         expect(against(50)).toBe(540);
         expect(against(100)).toBe(0);

@@ -22,17 +22,13 @@ import {
     SniperAugment,
     ToEmpowerAugment,
 } from "../../src/augments/augment_properties";
-import { MAX_UNIT_STACK_POWER } from "../../src/constants";
+import { SpellMultiplierType } from "../../src/spells/spell_properties";
 import { FightProperties } from "../../src/fights/fight_properties";
 import { Doctrine } from "../../src/doctrines/doctrine_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { DefaultPlacementLevel1 } from "../../src/augments/augment_properties";
 import { fireWallBurnDamage, fireWallBurnPercentage, FIRE_WALL_BURN_PERCENTAGE } from "../../src/spells/fire_walls";
-import {
-    calculateStackPoweredSpellDamage,
-    fireforgedSwordPower,
-    getEmpowerPercentage,
-} from "../../src/spells/spell_damage";
+import { calculateSpellDamage, fireforgedSwordPower, getEmpowerPercentage } from "../../src/spells/spell_damage";
 
 describe("Empower augment — power table", () => {
     it("is worth 7 / 15 / 24 percent, and nothing when unbought", () => {
@@ -144,23 +140,24 @@ describe("Empower augment — fight properties", () => {
 });
 
 describe("Empower augment — magic damage routing", () => {
+    const flat = SpellMultiplierType.UNIT_AMOUNT_DAMAGE;
+
     it("leaves every damage figure alone when the team did not buy it", () => {
-        expect(calculateStackPoweredSpellDamage(0.8, 38, 5, 0)).toBe(calculateStackPoweredSpellDamage(0.8, 38, 5));
+        expect(calculateSpellDamage(flat, 4, 38, 0)).toBe(calculateSpellDamage(flat, 4, 38));
         expect(fireWallBurnPercentage(0)).toBe(FIRE_WALL_BURN_PERCENTAGE);
         expect(fireforgedSwordPower(10, 0)).toBe(10);
     });
 
-    it("raises stack-powered spell damage by exactly the augment's percentage", () => {
-        // Fire Strike at a full 38-strong stack: 38 x 5 x 0.8 = 152 base.
-        expect(calculateStackPoweredSpellDamage(0.8, 38, MAX_UNIT_STACK_POWER)).toBe(152);
-        expect(calculateStackPoweredSpellDamage(0.8, 38, MAX_UNIT_STACK_POWER, 7)).toBe(162); // floor(152 * 1.07)
-        expect(calculateStackPoweredSpellDamage(0.8, 38, MAX_UNIT_STACK_POWER, 15)).toBe(174); // floor(152 * 1.15)
-        expect(calculateStackPoweredSpellDamage(0.8, 38, MAX_UNIT_STACK_POWER, 24)).toBe(188); // floor(152 * 1.24)
+    it("raises spell damage by exactly the augment's percentage", () => {
+        // Meteorite at a 38-strong stack: 38 x 4 = 152 base.
+        expect(calculateSpellDamage(flat, 4, 38)).toBe(152);
+        expect(calculateSpellDamage(flat, 4, 38, 7)).toBe(162); // floor(152 * 1.07)
+        expect(calculateSpellDamage(flat, 4, 38, 15)).toBe(174); // floor(152 * 1.15)
+        expect(calculateSpellDamage(flat, 4, 38, 24)).toBe(188); // floor(152 * 1.24)
     });
 
-    it("keeps a dead or powerless stack at zero however Empowered the team is", () => {
-        expect(calculateStackPoweredSpellDamage(0.8, 0, MAX_UNIT_STACK_POWER, 24)).toBe(0);
-        expect(calculateStackPoweredSpellDamage(0.8, 38, 0, 24)).toBe(0);
+    it("keeps a dead stack at zero however Empowered the team is", () => {
+        expect(calculateSpellDamage(flat, 4, 0, 24)).toBe(0);
     });
 
     it("burns a hotter Fire Wall, and the wall remembers the heat it was lit with", () => {

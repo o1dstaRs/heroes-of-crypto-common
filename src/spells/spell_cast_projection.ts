@@ -103,7 +103,6 @@ export function spellRawDamage(spell: Spell, caster: Unit): number {
         spell.getMultiplierType(),
         spell.getPower(),
         caster.getAmountAlive(),
-        caster.getStackPower(),
         caster.getMagicDamageBonusPercentage(),
         getSpellMoraleMultiplier(spell.getName(), attackMultiplier),
     );

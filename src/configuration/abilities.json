@@ -860,7 +860,7 @@
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,
-        "stack_powered": true,
+        "stack_powered": false,
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false

@@ -10,7 +10,6 @@
  */
 
 import { empowerMultiplier } from "../augments/augment_properties";
-import { MAX_UNIT_STACK_POWER } from "../constants";
 import { SpellElement, SpellMultiplierType } from "./spell_properties";
 
 /** The bare minimum of a unit this module needs, so it stays free of a Unit import cycle. */
@@ -72,45 +71,7 @@ export function fireforgedSwordPower(basePower: number, empowerPercentage: numbe
 }
 
 /**
- * Damage of a stack-powered offensive spell (SpellMultiplierType.UNIT_AMOUNT_STACK_POWER):
- *
- *     creatures alive x stack power x the spell's own damage multiplier
- *
- * The Magic Dragon's Lightning Strike, Ring of Fire and Meteor Shower use this shape. This is deliberately
- * the ONLY place the formula exists: the spellbook, AI estimate and engine cast must never disagree.
- *
- * Both inputs come off the LIVE caster, so the spell decays with the stack that carries it: a full stack
- * throws a real fireball, a nearly-dead one barely a spark. `stackPower` is clamped to the same 0..5 band
- * the rest of the engine uses (see MAX_UNIT_STACK_POWER and FightProperties.setUnitsCalculatedStacksPower)
- * so a stale or hand-built value can never inflate the damage.
- *
- * Returned pre-resistance: this is the number the card shows, before any particular target's magic
- * resistance is known. Per-target reduction is applied by applyMagicResistToSpellDamage.
- *
- * `magicDamageBonusPercentage` is the caster's additive total from Empower, its cast buff, and allied auras.
- * It multiplies the finished figure so the card, AI estimate, aim preview, and cast share one calculation.
- */
-export function calculateStackPoweredSpellDamage(
-    spellPower: number,
-    casterAmountAlive: number,
-    casterStackPower: number,
-    magicDamageBonusPercentage = 0,
-    moraleMultiplier = 1,
-): number {
-    const amountAlive = Math.max(0, Math.floor(casterAmountAlive));
-    const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, Math.floor(casterStackPower)));
-
-    return Math.max(
-        0,
-        Math.floor(
-            amountAlive * stackPower * spellPower * empowerMultiplier(magicDamageBonusPercentage) * moraleMultiplier,
-        ),
-    );
-}
-
-/**
- * The stack-powered offensive spells that are THROWN at their target, as opposed to the ones CALLED DOWN out
- * of the sky.
+ * The offensive spells that are THROWN at their target, as opposed to the ones CALLED DOWN out of the sky.
  *
  * A thrown spell needs a clear line to what it is aimed at — the mountain or a wall of bodies stops it. A
  * called-down one (Lightning Strike, Meteor Shower) is stopped by nothing, which is the whole point of it.
@@ -139,36 +100,38 @@ export function applyMagicResistToSpellDamage(damage: number, targetMagicResist:
 }
 
 /**
- * Damage of an offensive spell, dispatched on its multiplier shape so the engine's cast, the client's card
- * and the AI's estimate all price it identically.
- *  - UNIT_AMOUNT_DAMAGE: creatures alive x power — the Battle Mage's flat-per-caster spells.
- *  - UNIT_AMOUNT_STACK_POWER: creatures alive x stack power x power — the Magic Dragon's.
+ * Damage of an offensive spell (SpellMultiplierType.UNIT_AMOUNT_DAMAGE):
+ *
+ *     creatures alive x the spell's power
+ *
+ * Every damage spell in the game — the Battle Mage's Fire Strike and Meteorite, the Magic Dragon's Lightning
+ * Strike, Ring of Fire and Meteor Shower — is priced by head-count alone. OWNER call 2026-09-19: magic damage
+ * is never stack-powered; a stack of two dragons throws exactly twice what one does, and the strongest stack
+ * on the board has no say in it. This is deliberately the ONLY place the formula exists: the spellbook card,
+ * the AI estimate and the engine cast must never disagree.
+ *
+ * Returned pre-resistance: this is the number the card shows, before any particular target's magic
+ * resistance is known. Per-target reduction is applied by applyElementAndResistToSpellDamage.
+ *
+ * `magicDamageBonusPercentage` is the caster's additive total from Empower, its cast buff, and allied auras.
+ * It multiplies the finished figure so the card, AI estimate, aim preview, and cast share one calculation.
+ * Any other multiplier shape is not a damage spell and prices at 0.
  */
 export function calculateSpellDamage(
     multiplierType: SpellMultiplierType,
     spellPower: number,
     casterAmountAlive: number,
-    casterStackPower: number,
     magicDamageBonusPercentage = 0,
     moraleMultiplier = 1,
 ): number {
-    if (multiplierType === SpellMultiplierType.UNIT_AMOUNT_DAMAGE) {
-        const amountAlive = Math.max(0, Math.floor(casterAmountAlive));
-        return Math.max(
-            0,
-            Math.floor(amountAlive * spellPower * empowerMultiplier(magicDamageBonusPercentage) * moraleMultiplier),
-        );
+    if (multiplierType !== SpellMultiplierType.UNIT_AMOUNT_DAMAGE) {
+        return 0;
     }
-    if (multiplierType === SpellMultiplierType.UNIT_AMOUNT_STACK_POWER) {
-        return calculateStackPoweredSpellDamage(
-            spellPower,
-            casterAmountAlive,
-            casterStackPower,
-            magicDamageBonusPercentage,
-            moraleMultiplier,
-        );
-    }
-    return 0;
+    const amountAlive = Math.max(0, Math.floor(casterAmountAlive));
+    return Math.max(
+        0,
+        Math.floor(amountAlive * spellPower * empowerMultiplier(magicDamageBonusPercentage) * moraleMultiplier),
+    );
 }
 
 /**
@@ -192,11 +155,10 @@ export function applyElementAndResistToSpellDamage(
  * What ONE target actually takes from an offensive spell: the spell's own damage shape, then that target's
  * element and magic resistance.
  *
- * This is the whole projection in one call, and it exists because the hover preview used to hard-code the
- * UNIT_AMOUNT_STACK_POWER shape for every spell. That silently multiplied the Battle Mage's flat-per-caster
- * book (Fire Strike, Meteorite) by its stack power — up to 5x the damage the cast would really deal — while
- * the Magic Dragon's stack-powered book happened to read correctly. Dispatching here means a new spell in
- * either shape is projected right without touching the client.
+ * This is the whole projection in one call, and it exists because the hover preview once re-implemented the
+ * damage shape by hand and drifted from the cast (it multiplied the Battle Mage's book by a stack power the
+ * cast never used — up to 5x the damage really dealt). Going through calculateSpellDamage here means the
+ * client projects exactly what the engine deals without carrying any arithmetic of its own.
  *
  * Per TARGET by construction: an AOE must call this once per caught unit, because resistances and elements
  * differ across the units under one blast even though the raw damage does not.
@@ -205,30 +167,20 @@ export function offensiveSpellDamageAgainstTarget(
     multiplierType: SpellMultiplierType,
     spellPower: number,
     casterAmountAlive: number,
-    casterStackPower: number,
     casterMagicDamageBonusPercentage: number,
     targetMagicResist: number,
     elementMultiplier = 1,
 ): number {
     return applyElementAndResistToSpellDamage(
-        calculateSpellDamage(
-            multiplierType,
-            spellPower,
-            casterAmountAlive,
-            casterStackPower,
-            casterMagicDamageBonusPercentage,
-        ),
+        calculateSpellDamage(multiplierType, spellPower, casterAmountAlive, casterMagicDamageBonusPercentage),
         elementMultiplier,
         targetMagicResist,
     );
 }
 
-/** Whether a spell's multiplier is one of the OFFENSIVE shapes calculateSpellDamage can price. */
+/** Whether a spell's multiplier is the OFFENSIVE shape calculateSpellDamage can price. */
 export function isOffensiveSpellMultiplier(multiplierType: SpellMultiplierType): boolean {
-    return (
-        multiplierType === SpellMultiplierType.UNIT_AMOUNT_STACK_POWER ||
-        multiplierType === SpellMultiplierType.UNIT_AMOUNT_DAMAGE
-    );
+    return multiplierType === SpellMultiplierType.UNIT_AMOUNT_DAMAGE;
 }
 
 /** A Fireforged Sword blade burns 50% hotter against water. */

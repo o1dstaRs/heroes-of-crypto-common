@@ -179,11 +179,14 @@ describe("Magic Mirror returns all direct magical ability damage", () => {
             secondary,
         );
 
-        // The configured sword burns for 10% of the 100 physical damage. Only that 10-point magic rider is
-        // reflected; the physical 100-point swing itself is outside Magic Mirror's contract.
-        expect(attackerHpBefore - attacker.getHp()).toBe(10);
+        // The sword burns for its CONFIGURED share of the 100 physical damage, and only that magic rider
+        // is reflected — the physical swing itself is outside Magic Mirror's contract. Read from the config
+        // rather than restated, so a balance change to the blade moves this with it instead of failing it.
+        const rider = getSpellConfig("Chaos", "Fireforged Sword").power;
+        expect(rider).toBeGreaterThan(0);
+        expect(attackerHpBefore - attacker.getHp()).toBe(rider);
         expect(reflected(secondary)).toEqual([
-            expect.objectContaining({ unitId: attacker.getId(), amount: 10, rebounded: true }),
+            expect.objectContaining({ unitId: attacker.getId(), amount: rider, rebounded: true }),
         ]);
     });
 });

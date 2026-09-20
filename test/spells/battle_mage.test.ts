@@ -13,7 +13,7 @@ import { describe, expect, it } from "bun:test";
 
 import creaturesJson from "../../src/configuration/creatures.json";
 import spellsJson from "../../src/configuration/spells.json";
-import { MAX_UNIT_STACK_POWER, NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
+import { NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
@@ -23,7 +23,7 @@ import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { ELEMENT_COUNTER_MULTIPLIER, FIRE_AGAINST_WATER_MULTIPLIER } from "../../src/spells/spell_damage";
 import { amountForCreatureExperienceBudget, STACK_EXPERIENCE_BUDGET } from "../../src/simulation/army";
-import { applyMagicResistToSpellDamage, calculateStackPoweredSpellDamage } from "../../src/spells/spell_damage";
+import { applyMagicResistToSpellDamage, calculateSpellDamage } from "../../src/spells/spell_damage";
 import { Spell } from "../../src/spells/spell";
 import { SpellMultiplierType, SpellTargetType } from "../../src/spells/spell_properties";
 import type { Unit } from "../../src/units/unit";
@@ -141,25 +141,26 @@ const setupMageFight = (opts: {
     return { ...context, fightProperties, caster, enemies, ally, blocker, engine, sceneLog };
 };
 
-// The Magic Dragon formula: creatures alive x stack power x the spell's damage multiplier. It lives in one
-// place because the spellbook card, AI estimate and engine cast must agree.
-describe("stack-powered spell damage formula", () => {
-    it("multiplies creatures alive by stack power by the spell multiplier", () => {
-        expect(calculateStackPoweredSpellDamage(0.8, 38, 5)).toBe(152); // 38 * 5 * 0.8
-        expect(calculateStackPoweredSpellDamage(0.8, 38, 3)).toBe(91); // floor(38 * 3 * 0.8) = floor(91.2)
-        expect(calculateStackPoweredSpellDamage(0.8, 10, 1)).toBe(8);
+// The one damage formula: creatures alive x the spell's power. It lives in one place because the spellbook
+// card, AI estimate and engine cast must agree — and stack power is not an input (owner call 2026-09-19).
+describe("spell damage formula", () => {
+    const flat = SpellMultiplierType.UNIT_AMOUNT_DAMAGE;
+
+    it("multiplies creatures alive by the spell power", () => {
+        expect(calculateSpellDamage(flat, 4, 38)).toBe(152); // 38 * 4
+        expect(calculateSpellDamage(flat, 2.4, 38)).toBe(91); // floor(38 * 2.4) = floor(91.2)
+        expect(calculateSpellDamage(flat, 0.8, 10)).toBe(8);
     });
 
     it("floors the result and never goes negative", () => {
-        expect(calculateStackPoweredSpellDamage(0.48, 7, 1)).toBe(3); // floor(3.36)
-        expect(calculateStackPoweredSpellDamage(0.8, 0, 5)).toBe(0);
-        expect(calculateStackPoweredSpellDamage(0.8, -5, 5)).toBe(0);
+        expect(calculateSpellDamage(flat, 0.48, 7)).toBe(3); // floor(3.36)
+        expect(calculateSpellDamage(flat, 4, 0)).toBe(0);
+        expect(calculateSpellDamage(flat, 4, -5)).toBe(0);
     });
 
-    it("clamps stack power to the engine's 0..MAX band", () => {
-        const atMax = calculateStackPoweredSpellDamage(0.8, 38, MAX_UNIT_STACK_POWER);
-        expect(calculateStackPoweredSpellDamage(0.8, 38, MAX_UNIT_STACK_POWER + 7)).toBe(atMax);
-        expect(calculateStackPoweredSpellDamage(0.8, 38, -2)).toBe(0);
+    it("prices only the offensive shape; any other multiplier is not a damage spell", () => {
+        expect(calculateSpellDamage(SpellMultiplierType.UNIT_AMOUNT, 4, 38)).toBe(0);
+        expect(calculateSpellDamage(SpellMultiplierType.NO_MULTIPLIER, 4, 38)).toBe(0);
     });
 
     it("cuts damage by the target's magic resistance and ignores armor entirely", () => {

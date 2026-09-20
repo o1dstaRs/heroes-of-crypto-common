@@ -89,7 +89,7 @@ describe("cast buffs no longer show a raw placeholder", () => {
         ["Chaos", "Mass Magic Mirror", 32],
         ["Chaos", "Magic Mirror", 40],
         ["Chaos", "Empower", 25],
-        ["Chaos", "Fireforged Sword", 10],
+        ["Chaos", "Fireforged Sword", 20],
     ] as const) {
         it(`${name} states its ${power}% rather than a placeholder`, () => {
             const spell = new Spell({ spellProperties: getSpellConfig(faction, name), amount: 1 });

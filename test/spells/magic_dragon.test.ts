@@ -14,14 +14,13 @@ import { afterEach, describe, expect, it } from "bun:test";
 import creaturesJson from "../../src/configuration/creatures.json";
 import spellsJson from "../../src/configuration/spells.json";
 import { getSpellConfig } from "../../src/configuration/config_provider";
-import { MAX_UNIT_STACK_POWER } from "../../src/constants";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { amountForCreatureExperienceBudget, STACK_EXPERIENCE_BUDGET } from "../../src/simulation/army";
-import { calculateStackPoweredSpellDamage, isThrownOffensiveSpell } from "../../src/spells/spell_damage";
+import { calculateSpellDamage, isThrownOffensiveSpell } from "../../src/spells/spell_damage";
 import { Spell } from "../../src/spells/spell";
 import { SpellElement, SpellMultiplierType, SpellTargetType } from "../../src/spells/spell_properties";
 import { getMagicMirrorAbilityChance } from "../../src/spells/spell_helper";
@@ -256,12 +255,12 @@ describe("Tome of Elements spell configuration", () => {
 
     // The three damage spells are a chained LADDER, which is the design as briefed: the bolt is the number
     // everything else is priced off, the ring is the bolt less 20%, and the shower is the ring less 10% for
-    // covering the most ground. Every power was then halved across the board, so the ladder reads
-    // 30 -> 24 -> 21.6 in the config. A full stack is 2 dragons — exp 500 against the 1000-point stack
-    // budget — so the two-dragon row is what the spellbook actually reads on the board.
-    it("prices each spell at its per-dragon damage target at full stack power", () => {
+    // covering the most ground. The config carries the PER-DRAGON figure outright — 150 -> 120 -> 108 —
+    // since 2026-09-19 (owner call: magic damage is head-count-powered, never stack-powered), so a lone
+    // dragon throws exactly half of what a pair does, whatever else stands on the board.
+    it("prices each spell at its per-dragon damage, head-count alone", () => {
         const damage = (name: string, alive: number): number =>
-            calculateStackPoweredSpellDamage(natureSpells[name].power, alive, MAX_UNIT_STACK_POWER);
+            calculateSpellDamage(SpellMultiplierType.UNIT_AMOUNT_DAMAGE, natureSpells[name].power, alive);
 
         expect(damage("Lightning Strike", 1)).toBe(150);
         expect(damage("Ring of Fire", 1)).toBe(120);
@@ -297,7 +296,7 @@ describe("Tome of Elements spell configuration", () => {
     it("aims each spell the way its own handler reads it", () => {
         for (const name of ["Lightning Strike", "Ring of Fire", "Meteor Shower"]) {
             const spell = getSpellConfig("Nature", name);
-            expect(spell.multiplier_type).toBe(SpellMultiplierType.UNIT_AMOUNT_STACK_POWER);
+            expect(spell.multiplier_type).toBe(SpellMultiplierType.UNIT_AMOUNT_DAMAGE);
             expect(spell.is_buff).toBe(false);
         }
         expect(getSpellConfig("Nature", "Lightning Strike").spell_target_type).toBe(SpellTargetType.ANY_ENEMY);
@@ -342,7 +341,7 @@ describe("action engine — Lightning Strike", () => {
         });
 
         expect(result.completed).toBe(true);
-        expect(hpBefore - setup.enemies[0].getHp()).toBe(150); // 1 alive x stack power 5 x 30
+        expect(hpBefore - setup.enemies[0].getHp()).toBe(150); // 1 alive x 150
         expect(
             setup.caster
                 .getSpells()

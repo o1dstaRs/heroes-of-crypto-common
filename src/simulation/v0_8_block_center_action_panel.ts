@@ -1043,7 +1043,6 @@ const spellDamage = (caster: Unit, spell: Spell, target: Unit): number =>
             spell.getMultiplierType(),
             spell.getPower(),
             caster.getAmountAlive(),
-            caster.getStackPower(),
             caster.getMagicDamageBonusPercentage(),
             getSpellMoraleMultiplier(spell.getName(), caster.getAttackMultiplier()),
         ),
