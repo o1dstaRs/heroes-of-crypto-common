@@ -54,7 +54,7 @@ import {
     endWaterShieldAbsorbCapture,
     recordEffectApplication,
 } from "../units/effect_application_capture";
-import { getLapString, getRandomInt } from "../utils/lib";
+import { getLapString, getRandomInt, killTag } from "../utils/lib";
 import type { XY } from "../utils/math";
 import type { GameAction } from "./actions";
 import { isHeadlessSimulationEvent, type GameEvent, type IGameAnimationEvent } from "./events";
@@ -2260,11 +2260,22 @@ export class GameActionEngine {
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, caught);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
-        this.context.sceneLog.updateLog(
-            // Post-resistance total across everyone caught, as Ring of Fire reports it: each victim resists
-            // separately, so the sum is the one honest number for a blast.
-            `${caster.getName()} burst a Fireball on ${epicentre.getName()}, catching ${splashed.length} more (${spellDamageTotal(damaged)})`,
-        );
+        // One line per victim, not one total. A blast is priced per creature — each resists separately, an
+        // element can halve or void it, and a Water Shield can eat one outright — so a single summed number
+        // told the player nothing about who actually took what (owner report 2026-09-20, reading
+        // "burst a Fireball on Centaur, catching 2 more (984)" off the battle log). Same shape the engine
+        // already uses for a splash shot and a multi-hit attack: a headline saying WHERE it burst, then the
+        // damage broken out. Rebounds are excluded here; Magic Mirror writes its own line.
+        this.context.sceneLog.updateLog(`${caster.getName()} burst a Fireball on ${epicentre.getName()}`);
+        for (const entry of damaged) {
+            if (entry.rebounded) {
+                continue;
+            }
+            const victim = this.context.unitsHolder.getAllUnits().get(entry.unitId);
+            this.context.sceneLog.updateLog(
+                `${victim?.getName() ?? "Unit"} burned for (${entry.amount}) by Fireball${killTag(entry.unitsDied)}`,
+            );
+        }
 
         const events: GameEvent[] = [
             {

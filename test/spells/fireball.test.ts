@@ -168,6 +168,26 @@ describe("Fireball", () => {
         expect(ownFrontLine.getCumulativeHp()).toBe(ownFrontLine.getCumulativeMaxHp());
     });
 
+    // One summed number told the player nothing about who took what: a blast prices every victim
+    // separately (owner report 2026-09-20, reading "burst a Fireball on Centaur, catching 2 more (984)").
+    it("logs the damage per victim, not as one total", () => {
+        const s = setup({ casterAmount: 10 });
+        const target = s.addUnit("Centaur", PBTypes.TeamVals.RIGHT, { x: 8, y: 8 });
+        s.addUnit("Peasant", PBTypes.TeamVals.RIGHT, { x: 9, y: 8 });
+        s.addUnit("Wolf", PBTypes.TeamVals.RIGHT, { x: 9, y: 9 });
+
+        expect(s.cast(target.getId()).completed).toBe(true);
+
+        const each = 10 * CONFIG.power;
+        // A headline saying WHERE it burst, then one line per creature with its own number.
+        expect(s.sceneLog.lines).toContain("Wandering Mage burst a Fireball on Centaur");
+        for (const name of ["Centaur", "Peasant", "Wolf"]) {
+            expect(s.sceneLog.lines).toContain(`${name} burned for (${each}) by Fireball`);
+        }
+        // ...and no summed line anywhere.
+        expect(s.sceneLog.lines.some((line) => line.includes(String(each * 3)))).toBe(false);
+    });
+
     it("refuses the cast below a stack of 3, keeping the charge and the turn", () => {
         const s = setup({ casterStackPower: 2 });
         const target = s.addUnit("Target", PBTypes.TeamVals.RIGHT, { x: 8, y: 8 });
