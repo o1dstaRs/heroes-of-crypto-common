@@ -2930,6 +2930,40 @@ class CandidateGenerator {
         return { value, kill };
     }
     /**
+     * Fireball's worth: the aim point PLUS everything the blast catches beside it, allies subtracted.
+     *
+     * Ring of Fire's valuation next door spares the target and refuses an empty ring, because a ring around
+     * a lone creature burns nobody. A fireball always has at least one victim — the one it is thrown at —
+     * so there is nothing to refuse, and the target's own damage is the floor of the score rather than an
+     * exclusion. Allies caught in the blast count AGAINST the throw for the same reason they do there: this
+     * spell does not care whose side a body is on.
+     */
+    private fireballDamage(spell: Spell, target: Unit): { value: number; kill: 0 | 1 } {
+        const cells = getCellsAroundFootprint(
+            this.context.grid.getSettings(),
+            target.isSmallSize() ? [target.getBaseCell()] : target.getCells(),
+        );
+        const splashed = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
+            (unit) => !unit.isDead() && unit.getId() !== this.unit.getId() && unit.getId() !== target.getId(),
+        );
+
+        const aimed = this.offensiveSpellDamage(spell, target);
+        let value = aimed.value;
+        let kill: 0 | 1 = aimed.kill ? 1 : 0;
+        for (const victim of splashed) {
+            const damage = this.offensiveSpellDamage(spell, victim);
+            if (victim.getTeam() === this.enemyTeam) {
+                value += damage.value;
+                if (damage.kill) {
+                    kill = 1;
+                }
+            } else {
+                value -= damage.value;
+            }
+        }
+        return { value, kill };
+    }
+    /**
      * A thrown spell must actually REACH the unit we are scoring. Terrain refuses it outright, and a screening
      * body intercepts it (Fire Strike) or refuses it (Vine Throw, Ring of Fire) — either way the aimed target
      * is not the one that gets hit, so proposing it would mis-attribute the damage.
@@ -3157,6 +3191,14 @@ class CandidateGenerator {
                                 if (!damage) {
                                     continue;
                                 }
+                                this.pushSpell(spell, enemy.getId(), undefined, {
+                                    expectedDamage: damage.value,
+                                    expectedKill: damage.kill,
+                                });
+                                continue;
+                            }
+                            if (spell.getName() === "Fireball") {
+                                const damage = this.fireballDamage(spell, enemy);
                                 this.pushSpell(spell, enemy.getId(), undefined, {
                                     expectedDamage: damage.value,
                                     expectedKill: damage.kill,

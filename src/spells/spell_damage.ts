@@ -20,6 +20,7 @@ interface IEmpowerableCaster {
 const MORALE_SCALED_SPELLS: ReadonlySet<string> = new Set([
     "Lightning Strike",
     "Ring of Fire",
+    "Fireball",
     "Meteor Shower",
     "Meteorite",
     "Fire Strike",
@@ -81,7 +82,7 @@ export function fireforgedSwordPower(basePower: number, empowerPercentage: numbe
  * lights up a target the engine then refuses is the same class of bug as a card promising damage the cast
  * does not deal. Keep this in step with the cast handlers in GameActionEngine.
  */
-const THROWN_OFFENSIVE_SPELLS: ReadonlySet<string> = new Set(["Fire Strike", "Ring of Fire"]);
+const THROWN_OFFENSIVE_SPELLS: ReadonlySet<string> = new Set(["Fire Strike", "Ring of Fire", "Fireball"]);
 
 export function isThrownOffensiveSpell(spellName: string): boolean {
     return THROWN_OFFENSIVE_SPELLS.has(spellName);

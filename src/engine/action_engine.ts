@@ -1366,6 +1366,11 @@ export class GameActionEngine {
         if (target && spell.getName() === "Fire Strike") {
             return this.fireStrikeCast(caster, target, spell);
         }
+        // Wandering Mage's Fireball: Fire Strike with a blast radius — it burns what it hits AND what
+        // stands beside it.
+        if (target && spell.getName() === "Fireball") {
+            return this.fireballCast(caster, target, spell);
+        }
         // Battle Mage's Meteorite: a 2x2 impact aimed at a cell rather than a unit (no range gate).
         if (!target && spell.getName() === "Meteorite") {
             return this.meteoriteCast(action, caster, spell);
@@ -2165,6 +2170,111 @@ export class GameActionEngine {
                 spellName: spell.getName(),
                 targetId: target.getId(),
                 targetCell: to,
+                unitIdsDied,
+                animations: [],
+                damaged,
+            },
+        ];
+        events.push(...this.cleanupDeadUnits(unitIdsDied, this.createDirectKillAttributions(unitIdsDied, killed)));
+        events.push(...this.turnEngine.completeTurn(caster));
+        return { completed: true, events };
+    }
+    /**
+     * Fireball (Wandering Mage / Book of Chaos): a thrown fireball that bursts where it lands.
+     *
+     * Ring of Fire's opposite number, and deliberately built from the same parts. Both are aimed at one
+     * enemy in line of sight and both catch everything on the cells touching it, friend or foe — but the
+     * ring SPARES the creature at its centre while the fireball is thrown AT it, so the aim point takes the
+     * blast like everyone else (owner call 2026-09-20: "like fire arrow, but with AOE around the target,
+     * like cyclops attack"). That is the whole difference, and it is why the target is in the victim list
+     * here and filtered out there.
+     *
+     * Everything else is the shared spell tail: each victim resists separately, a Fire Element shrugs the
+     * whole thing off and a Water Element takes half again as much, and the damage is magical so armour
+     * does nothing. Its power is per CREATURE in the caster's stack (UNIT_AMOUNT_DAMAGE), priced well under
+     * Fire Strike's because it lands on a whole cluster rather than one body.
+     */
+    private fireballCast(caster: Unit, target: Unit, spell: Spell): IGameActionResult {
+        const from = caster.getBaseCell();
+        const to = target.getBaseCell();
+        if (!from || !to) {
+            return this.reject("spell_not_available");
+        }
+        if (
+            !SpellHelper.canCastSpell(
+                false,
+                this.context.grid.getSettings(),
+                this.context.grid.getMatrix(),
+                caster,
+                target,
+                spell,
+                to,
+                target.getMagicResist(),
+                target.hasMindAttackResistance(),
+                target.canBeHealed(),
+            )
+        ) {
+            return this.reject("spell_not_available");
+        }
+        // Thrown like Fire Strike, which is the half of it the owner described as "like fire arrow": it
+        // arcs over the caster's own troops, and a screening ENEMY intercepts it and wears the burst
+        // itself rather than the cast being refused. Only terrain stops it outright. Resolved through the
+        // shared helper, so the trajectory the client draws names the creature that actually burns.
+        const settings = this.context.grid.getSettings();
+        const impact = SpellHelper.resolveThrownSpellImpact(
+            spell.getName(),
+            this.context.grid,
+            (cell) => isCellWithinGrid(settings, cell),
+            from,
+            to,
+            (unitId) => this.isAllyOfCaster(caster, unitId),
+        );
+        if (impact.blockedByTerrain) {
+            return this.reject("spell_not_available");
+        }
+        let epicentre = target;
+        if (impact.interceptedBy && impact.interceptedBy !== target.getId()) {
+            const intercepting = this.context.unitsHolder.getAllUnits().get(impact.interceptedBy);
+            if (!intercepting || intercepting.isDead()) {
+                return this.reject("spell_not_available");
+            }
+            epicentre = intercepting;
+            this.context.sceneLog.updateLog(
+                `${intercepting.getName()} intercepted ${spell.getName()} aimed at ${target.getName()}`,
+            );
+        }
+
+        // The blast is lifted from the epicentre's own cells, so a 2x2 creature is ringed by the 12 cells
+        // that touch it rather than the 8 around one corner — the same footprint rule Ring of Fire uses,
+        // and the reason a big body is not blasted through its own middle.
+        const cells = getCellsAroundFootprint(settings, epicentre.getCells());
+        const splashed = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
+            // The caster is spared: a mage does not blow itself up with its own throw. The epicentre is
+            // not — it owns none of the surrounding cells, so it is absent here and added below by name.
+            (unit) => !unit.isDead() && unit.getId() !== caster.getId() && unit.getId() !== epicentre.getId(),
+        );
+        // The unit it burst on first, so the log and the damage list read epicentre-then-splash.
+        const caught = [epicentre, ...splashed];
+
+        const rawDamage = spellRawDamage(spell, caster);
+        const victims = this.resolveSpellVictims(caster, spell, rawDamage, caught);
+        const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
+        caster.useSpell(spell.getName());
+        this.context.sceneLog.updateLog(
+            // Post-resistance total across everyone caught, as Ring of Fire reports it: each victim resists
+            // separately, so the sum is the one honest number for a blast.
+            `${caster.getName()} burst a Fireball on ${epicentre.getName()}, catching ${splashed.length} more (${spellDamageTotal(damaged)})`,
+        );
+
+        const events: GameEvent[] = [
+            {
+                type: "spell_cast",
+                casterId: caster.getId(),
+                spellName: spell.getName(),
+                // The unit it BURST on, not the one aimed at — a screening enemy may have taken it. The
+                // client centres the explosion here, so it must be where the fire actually went.
+                targetId: epicentre.getId(),
+                targetCell: impact.cell,
                 unitIdsDied,
                 animations: [],
                 damaged,

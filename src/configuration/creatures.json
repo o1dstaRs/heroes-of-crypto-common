@@ -957,7 +957,14 @@
             "exp": 6.1,
             "size": 1,
             "level": 1,
-            "spells": ["Chaos:Smoke", "Chaos:Misfortune", "Chaos:Fireforged Sword", "Chaos:Fireforged Sword"],
+            "spells": [
+                "Chaos:Smoke",
+                "Chaos:Misfortune",
+                "Chaos:Fireforged Sword",
+                "Chaos:Fireforged Sword",
+                "Chaos:Fireball",
+                "Chaos:Fireball"
+            ],
             "abilities": ["Book of Chaos"]
         },
         "Manticore": {

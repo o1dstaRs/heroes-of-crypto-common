@@ -816,7 +816,7 @@
     "Book of Chaos": {
         "name": "Book of Chaos",
         "type": "INFO",
-        "desc": ["Allows the caster to access the following spells:", "Smoke, Misfortune, Fireforged Sword"],
+        "desc": ["Allows the caster to access the following spells:", "Smoke, Misfortune, Fireforged Sword, Fireball"],
         "power": 0,
         "power_type": "SPELLBOOK",
         "skip_reponse": false,

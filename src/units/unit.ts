@@ -88,7 +88,7 @@ const SPELLBOOK_SPELL_NAMES: Readonly<Record<string, ReadonlySet<string>>> = {
     "Book of Healing": new Set(["Heal", "Spiritual Armor", "Blessing", "Mass Heal"]),
     "Forest Spellbook": new Set(["Courage", "Helping Hand", "Summon Wolves"]),
     "Tome of Might": new Set(["Riot", "Magic Mirror", "Mass Riot", "Mass Magic Mirror"]),
-    "Book of Chaos": new Set(["Smoke", "Misfortune", "Fireforged Sword"]),
+    "Book of Chaos": new Set(["Smoke", "Misfortune", "Fireforged Sword", "Fireball"]),
     "Book of Nightmares": new Set(["Fire Wall", "Empower"]),
     "Basic Tome of Battle Magic": new Set(["Fire Strike", "Meteorite"]),
     "Tome of Elements": new Set(["Whirlpool", "Lightning Strike", "Ring of Fire", "Meteor Shower"]),

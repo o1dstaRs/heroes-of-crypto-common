@@ -89,10 +89,14 @@ describe("draft ship genome", () => {
             draftSpellRangedPolicy: RANKED_SPELL_RANGED_DRAFT_POLICY_ID,
         });
 
-        for (const creatureId of [magicDragon, battleMage, arbalester]) {
+        // The Wandering Mage joined the offensive casters when it gained Fireball (owner 2026-09-20). That
+        // reclassification is the POINT of the rule under test, not a regression in it: a stack that throws
+        // damage across the board is a ranged-damage asset however it throws it. Nightmare and Satyr stay
+        // out — their books buff and control, they deal none.
+        for (const creatureId of [magicDragon, battleMage, arbalester, wanderingMage]) {
             expect(isRangedDamageCreature(creatureId)).toBe(true);
         }
-        for (const creatureId of [nightmare, satyr, wanderingMage]) {
+        for (const creatureId of [nightmare, satyr]) {
             expect(isRangedDamageCreature(creatureId)).toBe(false);
         }
         for (const creatureId of [magicDragon, battleMage, nightmare]) {
@@ -104,6 +108,8 @@ describe("draft ship genome", () => {
         expect(rankedSpellRangedCoPlayAffinity(magicDragon, [satyr])).toBeGreaterThan(0);
         expect(rankedSpellRangedCoPlayAffinity(nightmare, [magicDragon])).toBeGreaterThan(0);
         expect(rankedSpellRangedCoPlayAffinity(satyr, [magicDragon])).toBeGreaterThan(0);
+        // Two offensive casters are not a co-play pairing — the bonus is for a caster ALONGSIDE a magic
+        // amplifier, and the Wandering Mage is neither an amplifier nor made one by carrying Fireball.
         expect(rankedSpellRangedCoPlayAffinity(magicDragon, [wanderingMage])).toBe(0);
         expect(rankedSpellRangedCoPlayAffinity(magicDragon, [PBTypes.CreatureVals.PEASANT])).toBe(0);
         expect(projectDraftGenomeForShipping(candidate).draftSpellRangedPolicy).toBe(

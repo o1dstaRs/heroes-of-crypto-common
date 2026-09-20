@@ -354,6 +354,22 @@ export function targetedSpellRequiresLineOfSight(spellName: string): boolean {
  * Shared target-specific reachability gate. Returning true for non-thrown spells lets callers apply this after
  * the generic canCastSpell check without growing another spell-name branch at every decision surface.
  */
+/**
+ * Thrown spells that behave like an ARCHER'S SHOT rather than a refused throw: they arc over the caster's
+ * own troops, land on the centre of a visible edge of their target, and are INTERCEPTED by a screening
+ * enemy instead of being refused by it (owner 2026-08-09 for Fire Strike; Fireball was added 2026-09-20 as
+ * "basically like fire arrow, but with AOE around the target").
+ *
+ * Deliberately NOT every thrown offensive spell. Ring of Fire resolves on the aimed target through its own
+ * cast path, so letting a blocked one through would fire it THROUGH the blocker, and Vine Throw snares one
+ * named enemy — snaring a different creature instead would be a different spell.
+ */
+const INTERCEPTED_THROWN_SPELLS: ReadonlySet<string> = new Set(["Fire Strike", "Fireball"]);
+
+export function isInterceptedThrownSpell(spellName: string): boolean {
+    return INTERCEPTED_THROWN_SPELLS.has(spellName);
+}
+
 export function isTargetedSpellLineOfSightClear(
     spellName: string,
     grid: ISpellSightGrid,
@@ -373,11 +389,11 @@ export function isTargetedSpellLineOfSightClear(
     // — the same rule ranged shots obey). Checked before the line walk because it is a property of the
     // TARGET, independent of which lane the throw takes.
     //
-    // Fire Strike ONLY. Vine Throw snares one named enemy and Ring of Fire resolves on the aimed target
-    // through their own cast paths; neither is a shot at an edge, and gating them here would silently
-    // delete legal casts the engine still performs.
+    // The intercepted throws ONLY (Fire Strike, Fireball). Vine Throw snares one named enemy and Ring of
+    // Fire resolves on the aimed target through their own cast paths; neither is a shot at an edge, and
+    // gating them here would silently delete legal casts the engine still performs.
     if (
-        spellName === "Fire Strike" &&
+        isInterceptedThrownSpell(spellName) &&
         !hasObservableThrownSpellEdge(grid, isWithinGrid, targetCells ?? [to], isTransparentUnit)
     ) {
         return false;
@@ -386,13 +402,10 @@ export function isTargetedSpellLineOfSightClear(
     if (!blocker) {
         return true;
     }
-    // Fire Strike alone is no longer refused by a body in the way (owner 2026-08-09): like an archer's
-    // shot it is INTERCEPTED, and the engine burns whoever stepped into the line, so only terrain still
-    // refuses it. Deliberately NOT every thrown offensive spell: Ring of Fire has its own cast path that
-    // still resolves on the aimed target, so letting a blocked one through would fire it THROUGH the
-    // blocker. Vine Throw likewise keeps refusing — it snares one named enemy, and snaring a different
-    // creature instead would be a different spell.
-    if (spellName === "Fire Strike") {
+    // An intercepted throw is not refused by a body in the way: like an archer's shot it burns whoever
+    // stepped into the line, so only terrain still refuses it. See INTERCEPTED_THROWN_SPELLS for why this
+    // is not every thrown spell.
+    if (isInterceptedThrownSpell(spellName)) {
         return blocker.occupantId !== "B" && blocker.occupantId !== "H";
     }
 
@@ -511,10 +524,10 @@ export function thrownSpellReachesAimedTarget(
     if (!targetedSpellRequiresLineOfSight(spellName)) {
         return true;
     }
-    // Same Fire-Strike-only visible-edge gate the engine applies, so the AI never scores a throw the cast
-    // would refuse. Scoped identically — see isTargetedSpellLineOfSightClear.
+    // The same visible-edge gate the engine applies to an intercepted throw, so the AI never scores one the
+    // cast would refuse. Scoped identically — see isTargetedSpellLineOfSightClear.
     if (
-        spellName === "Fire Strike" &&
+        isInterceptedThrownSpell(spellName) &&
         !hasObservableThrownSpellEdge(grid, isWithinGrid, targetCells ?? [to], isTransparentUnit)
     ) {
         return false;

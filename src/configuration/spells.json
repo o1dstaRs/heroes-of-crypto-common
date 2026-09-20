@@ -1456,6 +1456,29 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Fireball": {
+            "name": "Fireball",
+            "level": 1,
+            "desc": [
+                "Hurls a fireball at an enemy in line of sight, dealing {} damage.",
+                "Everything on a cell touching it — friend or foe — is caught in the blast for the same.",
+                "Magical: it ignores armor, but magic resistance cuts it down.",
+                "Fire magic: a Fire Element is untouched, a Water Element burns half again as hard."
+            ],
+            "target": "ANY_ENEMY",
+            "power": 2,
+            "power_type": "COMMON",
+            "element": "FIRE",
+            "multiplier_type": "UNIT_AMOUNT_DAMAGE",
+            "laps": 1,
+            "is_buff": false,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 3,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Meteorite": {
             "name": "Meteorite",
             "level": 2,
