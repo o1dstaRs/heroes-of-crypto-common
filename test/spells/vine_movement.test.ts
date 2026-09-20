@@ -14,11 +14,11 @@ import { PathHelper } from "../../src/grid/path_helper";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { simulationGridSettings } from "../../src/simulation/battle_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
-import { VINE_CROSS_PENALTY, VINE_STRIDE_COST_MULTIPLIER, vinePathCells } from "../../src/spells/vines";
+import { VINE_CROSS_PENALTY, VINE_STRIDE_CELL_COST, vinePathCells } from "../../src/spells/vines";
 
 // Vine Throw lays terrain, and terrain is priced in the pathfinder — so the numbers below ARE the feature.
-// A vined cell costs a walker one extra step; Trent ("In Its Own World") instead pays half a plain step and
-// owes nothing extra for taking it diagonally.
+// A vined cell costs a walker one extra step; Trent ("In Its Own World") instead walks it for free, straight
+// or diagonal, and only starts paying on the plain ground past the vine's end.
 describe("Vine Throw movement costs", () => {
     const settings = simulationGridSettings();
     const START = { x: 8, y: 8 };
@@ -58,15 +58,16 @@ describe("Vine Throw movement costs", () => {
         expect(costTo({ x: 9, y: 8 }, false)).toBeCloseTo(1 + VINE_CROSS_PENALTY, 5);
     });
 
-    it("charges a vine strider half a plain step for the same cell", () => {
+    it("charges a vine strider nothing for the same cell", () => {
         vines().add({ x: 9, y: 8 });
-        expect(costTo({ x: 9, y: 8 }, true)).toBeCloseTo(VINE_STRIDE_COST_MULTIPLIER, 5);
+        expect(VINE_STRIDE_CELL_COST).toBe(0);
+        expect(costTo({ x: 9, y: 8 }, true)).toBeCloseTo(VINE_STRIDE_CELL_COST, 5);
     });
 
     // The worked example from the spec: one ordinary cell followed by one vined cell.
-    it("prices 'one plain cell then one vined cell' at 1.5 for the strider", () => {
+    it("prices 'one plain cell then one vined cell' at the plain step alone for the strider", () => {
         vines().add({ x: 10, y: 8 });
-        expect(costTo({ x: 10, y: 8 }, true)).toBeCloseTo(1 + VINE_STRIDE_COST_MULTIPLIER, 5);
+        expect(costTo({ x: 10, y: 8 }, true)).toBeCloseTo(1 + VINE_STRIDE_CELL_COST, 5);
         // The same two cells cost a walker the plain step plus the vine toll.
         expect(costTo({ x: 10, y: 8 }, false)).toBeCloseTo(1 + 1 + VINE_CROSS_PENALTY, 5);
     });
@@ -77,10 +78,72 @@ describe("Vine Throw movement costs", () => {
         expect(costTo(diagonal, false)).toBeCloseTo(PathHelper.DIAGONAL_MOVE_COST, 5);
 
         vines().add(diagonal);
-        // The strider pays a half step, NOT half of sqrt(2).
-        expect(costTo(diagonal, true)).toBeCloseTo(VINE_STRIDE_COST_MULTIPLIER, 5);
+        // The strider pays nothing, NOT a share of sqrt(2).
+        expect(costTo(diagonal, true)).toBeCloseTo(VINE_STRIDE_CELL_COST, 5);
         // The walker still pays the diagonal plus the toll.
         expect(costTo(diagonal, false)).toBeCloseTo(PathHelper.DIAGONAL_MOVE_COST + VINE_CROSS_PENALTY, 5);
+    });
+
+    // A thrown vine is a supercover line, so it bends: some of its cells sit diagonally off the previous one,
+    // and a plain neighbour of the road can be reached first from the wrong side. The strider must still
+    // arrive at the far end with its whole budget and pay only for what lies beyond.
+    it("walks a bent vine to its far end for free and pays plain price only past it", () => {
+        const farEnd = { x: 13, y: 10 };
+        const road = vinePathCells(START, farEnd);
+        // The lane from (8,8) to (13,10) steps diagonally twice on the way; those bends are the point.
+        expect(road).toEqual([
+            { x: 9, y: 8 },
+            { x: 10, y: 9 },
+            { x: 11, y: 9 },
+            { x: 12, y: 10 },
+            { x: 13, y: 10 },
+        ]);
+        vines().addAll(road);
+
+        for (const cell of road) {
+            expect(costTo(cell, true)).toBeCloseTo(0, 5);
+        }
+        // Plain ground past the far end: a straight step and a diagonal one, priced from a full budget.
+        expect(costTo({ x: 14, y: 10 }, true)).toBeCloseTo(1, 5);
+        expect(costTo({ x: 14, y: 11 }, true)).toBeCloseTo(PathHelper.DIAGONAL_MOVE_COST, 5);
+        // A plain cell beside the road takes the cheapest hop OFF the road — a straight step from (11,9),
+        // not the diagonal from (10,9) that a first-come walk reaches it by one hop earlier.
+        expect(costTo({ x: 11, y: 10 }, true)).toBeCloseTo(1, 5);
+        // The walker pays the toll on every one of those cells.
+        expect(costTo({ x: 9, y: 8 }, false)).toBeCloseTo(1 + VINE_CROSS_PENALTY, 5);
+    });
+
+    it("keeps the far end of a vine within reach of a budget smaller than the vine is long", () => {
+        const road = vinePathCells(START, { x: 15, y: 8 });
+        expect(road.length).toBe(7);
+        vines().addAll(road);
+        const grid = new Grid(settings, PBTypes.GridVals.NORMAL);
+        const path = new PathHelper(settings).getMovePath(
+            START,
+            grid.getMatrix(),
+            2.9,
+            undefined,
+            false,
+            true,
+            false,
+            true,
+        );
+        expect(path.hashes.has((15 << 4) | 8)).toBe(true);
+        // ...and two plain cells off the road at the far end, but not a third: the budget is 2.9.
+        expect(path.hashes.has((15 << 4) | 10)).toBe(true);
+        expect(path.hashes.has((15 << 4) | 11)).toBe(false);
+        // Without the passive, the same budget does not even clear the second vined cell (1 + 1 + 1 + 1).
+        const walker = new PathHelper(settings).getMovePath(
+            START,
+            grid.getMatrix(),
+            2.9,
+            undefined,
+            false,
+            true,
+            false,
+            false,
+        );
+        expect(walker.hashes.has((10 << 4) | 8)).toBe(false);
     });
 
     it("lets a flyer step over the vine for free", () => {

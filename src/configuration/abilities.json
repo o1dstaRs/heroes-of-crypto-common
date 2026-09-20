@@ -747,9 +747,10 @@
         "name": "In Its Own World",
         "type": "MOVEMENT",
         "desc": [
-            "Moves through its own vines at half the usual cost, and crosses them diagonally for the price of a straight step."
+            "Walks its own vines for free: a vined cell costs no steps at all, straight or diagonal,",
+            "so it can follow a thrown vine to its far end and only pays for the plain ground beyond."
         ],
-        "power": 50,
+        "power": 100,
         "power_type": "VINE_STRIDE",
         "skip_reponse": false,
         "stack_powered": false,

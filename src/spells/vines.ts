@@ -19,10 +19,24 @@ export const VINE_DEFAULT_LAPS = 3;
 // Extra steps a non-flying creature pays to enter a vined cell. Flying units step over the vine for free.
 export const VINE_CROSS_PENALTY = 1;
 
-// What a vined cell costs the vine's own kind (Trent, via "In Its Own World"): half a normal step instead of
-// the usual one, and no sqrt(2) surcharge when crossing diagonally. Expressed as a multiplier of the plain
-// orthogonal step so the passive's "50%" reads straight out of the config.
-export const VINE_STRIDE_COST_MULTIPLIER = 0.5;
+// What a vined cell costs the vine's own kind (Trent, via "In Its Own World"): nothing at all. Straight or
+// diagonal, a vined cell is free, so Trent walks the whole vine to its far end and only starts spending
+// steps on the plain ground beyond it. OWNER call 2026-09-19 (was half a plain step); Trent gave up one
+// base step in exchange (creatures.json 3.9 -> 2.9).
+export const VINE_STRIDE_CELL_COST = 0;
+
+/**
+ * The most cells one move can span on a budget of `steps`. A plain walker pays at least a full step per
+ * cell, so the budget's ceiling bounds the walk. A vine strider with vines on the board walks a vined cell
+ * for free, so no count follows from its budget at all — only the board does. Real reachability is the
+ * pathfinder's job either way; this is the cheap sanity bound the engine applies to a submitted path.
+ */
+export function maxCellsForStepBudget(steps: number, stridesFreeVines: boolean, gridSize: number): number {
+    if (stridesFreeVines) {
+        return gridSize * gridSize;
+    }
+    return Math.max(1, Math.ceil(steps));
+}
 
 interface IVineCellJSON {
     x: number;
@@ -40,7 +54,7 @@ export class Vine {
         private lapsRemaining: number,
         /**
          * The thrower's team. Standing in your own side's vine is not a snare — Trent walks his own vines
-         * for half price, and a vine that also punished his allies would fight its own passive.
+         * for free, and a vine that also punished his allies would fight its own passive.
          */
         public readonly team: number = 0,
     ) {}
@@ -60,7 +74,7 @@ export class Vine {
  * path here is the pathfinder asking "is this cell vined?" once per neighbour per expansion.
  *
  * Unlike smoke, a vine is NOT dispelled by a creature standing on it — the whole point is that units keep
- * paying to wade through it, and that Trent keeps its discount on cells its enemies are contesting.
+ * paying to wade through it, and that Trent keeps its free road on cells its enemies are contesting.
  *
  * Lives on FightProperties so it serializes with the rest of the fight state and survives a server restart
  * (the ranked server replays from snapshots). The turn engine decrements every vine on lap transition.

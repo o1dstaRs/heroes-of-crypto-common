@@ -484,7 +484,7 @@
         "Trent": {
             "name": "Trent",
             "hp": 31,
-            "steps": 3.9,
+            "steps": 2.9,
             "initiative": 3.9,
             "armor": 20,
             "attack_type": "MELEE",

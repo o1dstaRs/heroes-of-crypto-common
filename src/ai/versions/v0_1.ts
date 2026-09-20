@@ -23,7 +23,7 @@ import {
     resolveRangeAttackAimEdge,
 } from "../../grid/grid_math";
 import { footprintCellsForAnchor } from "../../simulation/footprint";
-import { VINE_STRIDE_COST_MULTIPLIER } from "../../spells/vines";
+import { maxCellsForStepBudget } from "../../spells/vines";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import { AIActionType, canUnitLandAt, findTarget, type IAIAction } from "../ai";
@@ -510,9 +510,11 @@ export class StrategyV0_1 implements IAIStrategy {
             route.route[0]?.x === base.x && route.route[0]?.y === base.y ? route.route.slice(1) : route.route;
         const vines =
             context.fightProperties?.getVines() ?? FightStateManager.getInstance().getFightProperties().getVines();
-        const cheapestCellCost =
-            unit.hasAbilityActive("In Its Own World") && vines.size() > 0 ? VINE_STRIDE_COST_MULTIPLIER : 1;
-        const maxTravelledCells = Math.max(1, Math.ceil(unit.getSteps() / cheapestCellCost));
+        const maxTravelledCells = maxCellsForStepBudget(
+            unit.getSteps(),
+            unit.hasAbilityActive("In Its Own World") && vines.size() > 0,
+            context.grid.getSettings().getGridSize(),
+        );
         if (
             !travelled.length ||
             travelled.length > maxTravelledCells ||

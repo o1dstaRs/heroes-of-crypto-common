@@ -44,7 +44,7 @@ import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
 import { isSmokeableCell } from "../spells/smoke_clouds";
 import { projectSpellRebound, spellDamageAgainstUnit, spellRawDamage } from "../spells/spell_cast_projection";
-import { VINE_STRIDE_COST_MULTIPLIER, canVineTakeRoot, vinePathCells } from "../spells/vines";
+import { canVineTakeRoot, maxCellsForStepBudget, vinePathCells } from "../spells/vines";
 import { fireWallBurnPercentage, fireWallLitCells, normalizeFireWallOrientation } from "../spells/fire_walls";
 import { getSpellConfig } from "../configuration/config_provider";
 import { Unit } from "../units/unit";
@@ -484,15 +484,15 @@ export class GameActionEngine {
             ? action.path
             : travelledMovePath(unit.getBaseCell(), knownMoveRoute?.route ?? action.path);
         // The cell COUNT is a cheap sanity bound on the walk (real reachability is enforced by knownPaths
-        // above). It assumed a cell costs at least one step — no longer true: a vine strider (Trent, "In Its
-        // Own World") pays half a step per vined cell, so the same budget legitimately covers twice as many
-        // cells. Bound by the cheapest cell THIS unit could pay for, or a legal vine walk is rejected as
+        // above). It assumed a cell costs at least one step — not true for a vine strider (Trent, "In Its
+        // Own World"), who walks a vined cell for free, so no cell count follows from its budget at all: the
+        // board itself is the only bound then. A tighter guess here rejected legal vine walks as
         // invalid_move — which is exactly what "the range shows further but I cannot step there" looked like.
-        const cheapestCellCost =
-            unit.hasAbilityActive("In Its Own World") && this.context.fightProperties.getVines().size() > 0
-                ? VINE_STRIDE_COST_MULTIPLIER
-                : 1;
-        const maxTravelledCells = Math.max(1, Math.ceil(unit.getSteps() / cheapestCellCost));
+        const maxTravelledCells = maxCellsForStepBudget(
+            unit.getSteps(),
+            unit.hasAbilityActive("In Its Own World") && this.context.fightProperties.getVines().size() > 0,
+            this.context.grid.getSettings().getGridSize(),
+        );
         if (
             !pathIsFootprintOnly &&
             (!travelledPath.length ||

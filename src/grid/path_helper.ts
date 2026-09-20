@@ -26,10 +26,14 @@ import type { IMovePath, IWeightedRoute } from "./path_definitions";
 import { TeamVals } from "../generated/protobuf/v1";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
-import { VINE_CROSS_PENALTY, VINE_STRIDE_COST_MULTIPLIER } from "../spells/vines";
+import { VINE_CROSS_PENALTY, VINE_STRIDE_CELL_COST } from "../spells/vines";
 import { FIRE_WALL_CROSS_PENALTY } from "../spells/fire_walls";
 import type { IPlacement } from "./placement_properties";
 import { UnitsHolder } from "../units/units_holder";
+
+// Slack for comparing accumulated float step budgets (sums of 1, ~1.414 and terrain tolls). Far below any
+// real cost difference, so it only ever hides rounding noise, never a genuinely cheaper route.
+const PATH_BUDGET_EPSILON = 1e-9;
 
 export class PathHelper {
     public static DIAGONAL_MOVE_COST = 1.4142135623730951;
@@ -1447,19 +1451,41 @@ export class PathHelper {
         // state they are exploring rather than the live board.
         //
         // A vined cell slows everything that wades through it, except flyers stepping over the top — and
-        // except Trent, whose "In Its Own World" turns its own vines into the fastest road on the board:
-        // half a plain step, with a diagonal costing no more than a straight one.
+        // except Trent, whose "In Its Own World" turns its own vines into a free road: a vined cell costs
+        // nothing, straight or diagonal, so the budget is spent only on the plain ground past the vine's end.
         const vines = FightStateManager.getInstance().getFightProperties().getVines();
         const hasAnyVine = vines.size() > 0;
-        const vineAdjustedCost = (baseCost: number, plainStepCost: number, cell: XY): number => {
+        const vineAdjustedCost = (baseCost: number, cell: XY): number => {
             if (!hasAnyVine || !vines.has(cell)) {
                 return baseCost;
             }
             if (hasVineStride) {
-                return plainStepCost * VINE_STRIDE_COST_MULTIPLIER;
+                return VINE_STRIDE_CELL_COST;
             }
             return canFly ? baseCost : baseCost + VINE_CROSS_PENALTY;
         };
+
+        // Free cells break the one-visit-per-cell walk below: a vined cell reached first from plain ground
+        // (diagonally, say, for ~1.41) would keep that budget for good, even though the free road behind it
+        // hands over the FULL budget one hop later — and the vine is a supercover line, so which side of it
+        // the walk reaches a cell from is an accident of queue order. So while a strider has vines to walk,
+        // a cell may be reached again, and walked on from again, whenever the new route leaves strictly more
+        // steps than the one it already holds; queued entries the relaxation has overtaken are dropped when
+        // they surface. Everyone else keeps the plain first-come walk, byte for byte.
+        const relaxesVisited = hasVineStride && hasAnyVine;
+        const isVisited = (cellKey: number): boolean =>
+            indexedVisited ? indexedVisited[cellKey] === 1 : visited!.has(cellKey);
+        const recordedRemaining = (cellKey: number): number =>
+            indexedStepsRemaining
+                ? indexedStepsRemaining[cellKey]
+                : (mappedStepsRemaining!.get(cellKey) ?? Number.NEGATIVE_INFINITY);
+        const relaxesBudget = (cellKey: number, nextRemaining: number): boolean =>
+            !isVisited(cellKey) || nextRemaining > recordedRemaining(cellKey) + PATH_BUDGET_EPSILON;
+        // What the neighbour scan consults: the visited table, or nothing at all while relaxing — the budget
+        // comparison above is the gate then.
+        const neighborVisitGate: Uint8Array | undefined =
+            indexedVisited && (relaxesVisited ? new Uint8Array(256) : indexedVisited);
+        const neighborVisitSet: Set<number> | undefined = visited && (relaxesVisited ? new Set<number>() : visited);
 
         // Fire Wall terrain, read off the live fight the same way. A burning cell costs one extra step on
         // top of whatever the cell already cost — so a plain step through the wall is double price, and a
@@ -1467,8 +1493,8 @@ export class PathHelper {
         // over; a wall of fire is not), which is also why this sits outside vineAdjustedCost's canFly check.
         const fireWalls = FightStateManager.getInstance().getFightProperties().getFireWalls();
         const hasAnyFireWall = fireWalls.size() > 0;
-        const terrainAdjustedCost = (baseCost: number, plainStepCost: number, cell: XY): number => {
-            const cost = vineAdjustedCost(baseCost, plainStepCost, cell);
+        const terrainAdjustedCost = (baseCost: number, cell: XY): number => {
+            const cost = vineAdjustedCost(baseCost, cell);
             if (!hasAnyFireWall || !fireWalls.has(cell)) {
                 return cost;
             }
@@ -1485,6 +1511,10 @@ export class PathHelper {
             const cur = curWeightedRoute.cell;
 
             const key = (cur.x << 4) | cur.y;
+            if (relaxesVisited && maxSteps - curWeightedRoute.weight < recordedRemaining(key) - PATH_BUDGET_EPSILON) {
+                // Overtaken by a cheaper route to this cell, which has already walked on from here.
+                continue;
+            }
             let neighbors: XY[];
             if (indexedNeighbors) {
                 indexedNeighbors.length = 0;
@@ -1494,43 +1524,43 @@ export class PathHelper {
                 const canGoUp = cur.y < 15;
                 if (canGoLeft) {
                     const x = cur.x - 1;
-                    if (!indexedVisited![(x << 4) | cur.y]) indexedNeighbors.push({ x, y: cur.y });
+                    if (!neighborVisitGate![(x << 4) | cur.y]) indexedNeighbors.push({ x, y: cur.y });
                 }
                 if (canGoUp) {
                     const y = cur.y + 1;
-                    if (!indexedVisited![(cur.x << 4) | y]) indexedNeighbors.push({ x: cur.x, y });
+                    if (!neighborVisitGate![(cur.x << 4) | y]) indexedNeighbors.push({ x: cur.x, y });
                 }
                 if (canGoDown) {
                     const y = cur.y - 1;
-                    if (!indexedVisited![(cur.x << 4) | y]) indexedNeighbors.push({ x: cur.x, y });
+                    if (!neighborVisitGate![(cur.x << 4) | y]) indexedNeighbors.push({ x: cur.x, y });
                 }
                 if (canGoRight) {
                     const x = cur.x + 1;
-                    if (!indexedVisited![(x << 4) | cur.y]) indexedNeighbors.push({ x, y: cur.y });
+                    if (!neighborVisitGate![(x << 4) | cur.y]) indexedNeighbors.push({ x, y: cur.y });
                 }
                 if (canGoLeft && canGoDown) {
                     const x = cur.x - 1;
                     const y = cur.y - 1;
-                    if (!indexedVisited![(x << 4) | y]) indexedNeighbors.push({ x, y });
+                    if (!neighborVisitGate![(x << 4) | y]) indexedNeighbors.push({ x, y });
                 }
                 if (canGoLeft && canGoUp) {
                     const x = cur.x - 1;
                     const y = cur.y + 1;
-                    if (!indexedVisited![(x << 4) | y]) indexedNeighbors.push({ x, y });
+                    if (!neighborVisitGate![(x << 4) | y]) indexedNeighbors.push({ x, y });
                 }
                 if (canGoRight && canGoDown) {
                     const x = cur.x + 1;
                     const y = cur.y - 1;
-                    if (!indexedVisited![(x << 4) | y]) indexedNeighbors.push({ x, y });
+                    if (!neighborVisitGate![(x << 4) | y]) indexedNeighbors.push({ x, y });
                 }
                 if (canGoRight && canGoUp) {
                     const x = cur.x + 1;
                     const y = cur.y + 1;
-                    if (!indexedVisited![(x << 4) | y]) indexedNeighbors.push({ x, y });
+                    if (!neighborVisitGate![(x << 4) | y]) indexedNeighbors.push({ x, y });
                 }
                 neighbors = indexedNeighbors;
             } else {
-                neighbors = this.getNeighborCells(cur, visited!, isSmallUnit, true, false, width, height);
+                neighbors = this.getNeighborCells(cur, neighborVisitSet!, isSmallUnit, true, false, width, height);
             }
             for (const n of neighbors) {
                 const keyNeighbor = (n.x << 4) | n.y;
@@ -1612,11 +1642,12 @@ export class PathHelper {
                     } else {
                         moveCost = PathHelper.DIAGONAL_MOVE_COST * aggr(n, curWeightedRoute);
                     }
-                    // Dividing back out the diagonal factor recovers the aggression-adjusted plain step, which
-                    // is what a vine strider pays for a diagonal.
-                    moveCost = terrainAdjustedCost(moveCost, moveCost / PathHelper.DIAGONAL_MOVE_COST, n);
+                    moveCost = terrainAdjustedCost(moveCost, n);
 
                     if (remaining >= moveCost) {
+                        if (relaxesVisited && !relaxesBudget(keyNeighbor, remaining - moveCost)) {
+                            continue;
+                        }
                         // disallow sneaking between diagonals
                         if (!canFly) {
                             const xA = cur.x - 1;
@@ -1699,7 +1730,10 @@ export class PathHelper {
                             hasLavaCell: curWeightedRoute.hasLavaCell || el1 === ObstacleType.LAVA,
                             hasWaterCell: curWeightedRoute.hasWaterCell || el1 === ObstacleType.WATER,
                         };
-                        if (this.captureRoute(knownPaths, keyNeighbor, weightedRoute)) {
+                        if (relaxesVisited && isVisited(keyNeighbor)) {
+                            // A better route to a cell already walked: the routes it held are dead.
+                            knownPaths.set(keyNeighbor, [weightedRoute]);
+                        } else if (this.captureRoute(knownPaths, keyNeighbor, weightedRoute)) {
                             if (
                                 !(indexedAllowed ? indexedAllowed[keyNeighbor] : allowedToMoveThere!.has(keyNeighbor))
                             ) {
@@ -1753,8 +1787,11 @@ export class PathHelper {
                     } else {
                         moveCost = aggr(n, curWeightedRoute);
                     }
-                    moveCost = terrainAdjustedCost(moveCost, moveCost, n);
+                    moveCost = terrainAdjustedCost(moveCost, n);
                     if (remaining >= moveCost) {
+                        if (relaxesVisited && !relaxesBudget(keyNeighbor, remaining - moveCost)) {
+                            continue;
+                        }
                         if (indexedStepsRemaining) {
                             indexedStepsRemaining[keyNeighbor] = remaining - moveCost;
                         } else {
@@ -1769,7 +1806,10 @@ export class PathHelper {
                             hasWaterCell: curWeightedRoute.hasWaterCell || el1 === ObstacleType.WATER,
                         };
 
-                        if (this.captureRoute(knownPaths, keyNeighbor, weightedRoute)) {
+                        if (relaxesVisited && isVisited(keyNeighbor)) {
+                            // A better route to a cell already walked: the routes it held are dead.
+                            knownPaths.set(keyNeighbor, [weightedRoute]);
+                        } else if (this.captureRoute(knownPaths, keyNeighbor, weightedRoute)) {
                             if (
                                 !(indexedAllowed ? indexedAllowed[keyNeighbor] : allowedToMoveThere!.has(keyNeighbor))
                             ) {

@@ -58,7 +58,12 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned 2026-09-18: Stun Aura taken off the Abomination (owner, "for now"), so allies standing in its
 // field no longer roll a stun on their hits and the seeded traces diverge from the first exchange on. Two
 // isolated runs reproduced this value byte-identically.
-const EXPECTED_REPLAY_SHA256 = "3a50d04db5eb08aa9e3c64326f1676e490ccbb7c42908c99289d3c584ed7d29b";
+// Previous approved digest: 3a50d04db5eb08aa9e3c64326f1676e490ccbb7c42908c99289d3c584ed7d29b
+// Re-pinned 2026-09-19 for a Trent balance pass (owner request): its own vines are now FREE to walk (was
+// half a step per vined cell) and its base steps drop 3.9 -> 2.9. Trent is fielded across the seeded draws
+// and its steps decide every move it makes, so any trace holding one diverges from its first move on. Two
+// isolated runs reproduced this value byte-identically.
+const EXPECTED_REPLAY_SHA256 = "f6eac4417823a2721740915c73a90fd9ca889125fceb78570717ac616102db3b";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

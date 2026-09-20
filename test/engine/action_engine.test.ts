@@ -3619,7 +3619,7 @@ describe("action engine — Vine Throw", () => {
 
 // The client's move pipeline end-to-end for a vine strider: compute the reachable set with the REAL
 // pathfinder (as Sandbox does), hand it to the engine as currentActiveKnownPaths (as Sandbox does), then
-// actually walk onto a cell that is only reachable BECAUSE of the vine discount. The earlier vine tests
+// actually walk onto a cell that is only reachable BECAUSE the vine is free. The earlier vine tests
 // only pinned the path COST — they never proved the engine accepts the resulting move, which is exactly
 // where "the range shows further but I cannot step there" would live.
 describe("action engine — walking the vine", () => {
@@ -3634,7 +3634,7 @@ describe("action engine — walking the vine", () => {
         return road;
     };
 
-    it("accepts a move onto a far vine cell that only the stride discount makes reachable", () => {
+    it("accepts a move onto a far vine cell that only the free stride makes reachable", () => {
         const opts: Parameters<typeof setupActionFight>[0] & {
             currentActiveKnownPaths?: Map<number, IWeightedRoute[]>;
         } = {
@@ -3659,12 +3659,14 @@ describe("action engine — walking the vine", () => {
         );
 
         // The last vine cell is far beyond a plain walker's reach at these steps — that is the whole point.
+        expect(road.length).toBeGreaterThan(Math.ceil(steps));
         const destination = road[road.length - 1];
         const key = (destination.x << 4) | destination.y;
         expect(movePath.hashes.has(key)).toBe(true);
         const route = movePath.knownPaths.get(key)?.[0];
         expect(route).toBeDefined();
-        expect(route!.weight).toBeLessThanOrEqual(steps);
+        // The whole vine is free: the budget arrives at its far end untouched.
+        expect(route!.weight).toBeCloseTo(0, 5);
 
         // Wire the computed reachability into the engine exactly like the scene does, then walk it.
         opts.currentActiveKnownPaths = movePath.knownPaths;
@@ -3679,7 +3681,7 @@ describe("action engine — walking the vine", () => {
         expect(setup.left.getBaseCell()).toEqual(destination);
     });
 
-    it("still refuses a vine cell beyond the discounted budget", () => {
+    it("walks the whole vine for free, then pays plain price and stops where the budget runs out", () => {
         const opts: Parameters<typeof setupActionFight>[0] & {
             currentActiveKnownPaths?: Map<number, IWeightedRoute[]>;
         } = {
@@ -3688,21 +3690,47 @@ describe("action engine — walking the vine", () => {
             rightCell: { x: 12, y: 12 },
         };
         const setup = setupActionFight(opts);
-        layVineRoad(3, 3, 12);
+        const road = layVineRoad(3, 3, 6);
+        const roadEnd = road[road.length - 1];
 
+        const steps = setup.left.getSteps();
+        const wholeCells = Math.floor(steps);
+        // The fixture's budget has to leave room for the plain cells the assertions below walk east of (9,3).
+        expect(wholeCells).toBeLessThanOrEqual(5);
         const movePath = new PathHelper(setup.grid.getSettings()).getMovePath(
             { x: 3, y: 3 },
             setup.grid.getMatrix(),
-            setup.left.getSteps(),
+            steps,
             undefined,
             false,
             true,
             false,
             true,
         );
-        // Even at half price the budget runs out eventually; that cell must not be reachable.
-        const tooFar = { x: 3 + 12, y: 3 };
+        // Whole road free, so it is the plain ground past its end that the budget is spent on: one cell per
+        // step, and the first cell the budget cannot cover is out of reach.
+        expect(movePath.knownPaths.get((roadEnd.x << 4) | roadEnd.y)?.[0]?.weight).toBeCloseTo(0, 5);
+        const lastReachable = { x: roadEnd.x + wholeCells, y: 3 };
+        const tooFar = { x: roadEnd.x + wholeCells + 1, y: 3 };
+        expect(movePath.hashes.has((lastReachable.x << 4) | lastReachable.y)).toBe(true);
+        expect(movePath.knownPaths.get((lastReachable.x << 4) | lastReachable.y)?.[0]?.weight).toBeCloseTo(
+            wholeCells,
+            5,
+        );
         expect(movePath.hashes.has((tooFar.x << 4) | tooFar.y)).toBe(false);
+
+        // And the engine takes the long walk: more cells than the budget could ever buy on plain ground.
+        const route = movePath.knownPaths.get((lastReachable.x << 4) | lastReachable.y)![0];
+        expect(route.route.length - 1).toBeGreaterThan(Math.ceil(steps));
+        opts.currentActiveKnownPaths = movePath.knownPaths;
+        const result = setup.engine.apply({
+            type: "move_unit",
+            unitId: setup.left.getId(),
+            path: route.route as { x: number; y: number }[],
+        });
+        expect(result.rejectionReason).toBeUndefined();
+        expect(result.completed).toBe(true);
+        expect(setup.left.getBaseCell()).toEqual(lastReachable);
     });
 });
 
