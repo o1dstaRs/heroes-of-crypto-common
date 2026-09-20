@@ -751,6 +751,16 @@ export function buildRankedReplayAbEnvironment(
     environment[V07_WAIT_WEIGHTS_V2_VERSIONS_ENV] = components.wait ? "v0.8" : "";
     environment[V07_WAIT_WEIGHTS_V2_GRIDS_ENV] = components.wait ? String(PBTypes.GridVals.NORMAL) : "";
     environment[V07_WAIT_WEIGHTS_V2_MAX_INITIAL_RANGED_ENV] = components.wait ? "1" : "";
+    // A/B evidence must be reproducible whatever else the host is doing. Both of the search's wall-clock
+    // fallbacks change the POLICY when they fire — the circuit breaker opens the search (or degrades it),
+    // and the decision deadline cuts it short — so under CPU contention the candidate and control arms can
+    // take different decisions from identical inputs. That turned this harness's own identity control (a
+    // no-feature cluster, which must score exactly 0.5) into a one-in-three failure under
+    // `bun test --parallel`, and would just as quietly have skewed a real measurement on a busy machine.
+    // Cleared here for the same reason the CEM fitness harness clears them (v0_8_aggressive_12h): the
+    // wall-clock envelope is validated as an operational property elsewhere, never during measurement.
+    environment.SEARCH_DECISION_DEADLINE_MS = "";
+    environment.SEARCH_CIRCUIT_BREAKER_MS = "";
     environment.V08_RANKED_REPLAY_TACTICS_VERSIONS = "";
     environment.LIVETWIN = "1";
     environment.FIGHT_MELEE_ROSTERS = "0";
