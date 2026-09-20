@@ -2788,8 +2788,28 @@ class CandidateGenerator {
             samples: Array<{ cell: XY; frac: number }>;
         }> = [];
         let best: { cell: XY; orientation: number; score: number } | undefined;
-        const isLegalWall = (cell: XY, orientation: number): boolean =>
-            fireWallCells(cell, orientation).every((c) => isFireWallableCell(grid, isCellWithinGrid(gs, c), c));
+        // The engine lights whatever part of the line is free and refuses only a line that lights nothing
+        // (fireWallLitCells). A roadblock is worth its charge only when it has no GAP, though: a cell left
+        // unlit because a creature stands there is exactly where the enemy walks round. The board edge, the
+        // mountain and a narrowed-away cell are walls already, so a line cut short by one of those still
+        // seals the approach — which is why an edge-hugging wall is legal here and a wall through a body is
+        // not, whatever the engine would accept.
+        const units = this.context.unitsHolder.getAllUnits();
+        const isLegalWall = (cell: XY, orientation: number): boolean => {
+            let lit = 0;
+            for (const c of fireWallCells(cell, orientation)) {
+                const withinGrid = isCellWithinGrid(gs, c);
+                if (isFireWallableCell(grid, withinGrid, c)) {
+                    lit += 1;
+                    continue;
+                }
+                const occupant = withinGrid ? grid.getOccupantUnitId(c) : undefined;
+                if (occupant && units.has(occupant)) {
+                    return false;
+                }
+            }
+            return lit > 0;
+        };
         for (const e of blockable) {
             const ec = e.getBaseCell();
             const dx = ax - ec.x;
@@ -2836,9 +2856,9 @@ class CandidateGenerator {
             }
         }
 
-        // At a field edge every sampled centre can be invalid even though shifting the wall one cell sideways
-        // still blocks the same approach. Only pay for this bounded full-grid fallback when all exact samples
-        // failed. Score by proximity to the sampled approach cells; stable plan/x/y/orientation order resolves
+        // On a crowded approach every sampled anchor can be invalid (a body under the line) even though
+        // shifting the wall one cell sideways still blocks the same approach. Only pay for this bounded
+        // full-grid fallback when all exact samples failed. Score by proximity to the sampled approach cells; stable plan/x/y/orientation order resolves
         // ties deterministically.
         if (!best) {
             for (const { threat, orientations, samples } of plans) {

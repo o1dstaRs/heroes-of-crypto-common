@@ -60,7 +60,7 @@ export type GameAction =
       }
     | { type: "area_throw_attack"; attackerId: string; targetCell: XY }
     // `targetOrientation` only means anything to a spell whose footprint can be turned — today just Fire
-    // Wall, whose 3-cell line the player rotates with Shift while aiming (see FireWallOrientation). Omitted
+    // Wall, whose 4-cell line the player rotates with Shift while aiming (see FireWallOrientation). Omitted
     // by every other cast, and normalized engine-side, so an absent or malformed value falls back to the
     // default horizontal lay rather than rejecting the action.
     | {

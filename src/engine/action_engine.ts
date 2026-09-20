@@ -45,12 +45,7 @@ import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/
 import { isSmokeableCell } from "../spells/smoke_clouds";
 import { projectSpellRebound, spellDamageAgainstUnit, spellRawDamage } from "../spells/spell_cast_projection";
 import { VINE_STRIDE_COST_MULTIPLIER, canVineTakeRoot, vinePathCells } from "../spells/vines";
-import {
-    fireWallBurnPercentage,
-    fireWallCells,
-    isFireWallableCell,
-    normalizeFireWallOrientation,
-} from "../spells/fire_walls";
+import { fireWallBurnPercentage, fireWallLitCells, normalizeFireWallOrientation } from "../spells/fire_walls";
 import { getSpellConfig } from "../configuration/config_provider";
 import { Unit } from "../units/unit";
 import {
@@ -1355,7 +1350,8 @@ export class GameActionEngine {
         if (!target && spell.getName() === "Smoke") {
             return this.smokeCast(action, caster, spell);
         }
-        // Fire Wall: a cell-targeted 3-cell line, laid anywhere on the field in one of four orientations.
+        // Fire Wall: a cell-targeted 4-cell line, laid anywhere on the field in one of four orientations;
+        // only the free cells of the line light.
         if (!target && spell.getName() === "Fire Wall") {
             return this.fireWallCast(action, caster, spell);
         }
@@ -1524,12 +1520,16 @@ export class GameActionEngine {
         return { completed: true, events };
     }
     /**
-     * Fire Wall (Nightmare / Book of Nightmares): lays a burning wall across 3 cells in a straight line,
-     * anywhere on the battlefield, in whichever of the four orientations the player rotated the aim to.
+     * Fire Wall (Nightmare / Book of Nightmares): lays a burning wall across FIRE_WALL_LENGTH (4) cells in a
+     * straight line, anywhere on the battlefield, in whichever of the four orientations the player rotated
+     * the aim to.
      *
-     * All-or-nothing like Smoke: the WHOLE line must be placeable or the cast is refused outright, so the
-     * three cells the aim preview highlighted are exactly the three that light up. Lava and water are
-     * ground the flames sit over; the mountain, a narrowed-away cell, a creature or the board edge are not.
+     * NOT all-or-nothing, unlike Smoke (owner call 2026-09-19: the wall goes anywhere, it just lights the
+     * empty cells): a creature, the mountain, a narrowed-away cell or the board edge under part of the line
+     * leaves that cell unlit and the rest burns. Lava and water are ground the flames sit over. The only
+     * refused placement is one where nothing on the line can burn — a charge that lights nothing is wasted.
+     * fireWallLitCells is the shared readout, so the cells the aim preview highlighted are exactly the cells
+     * that light up.
      *
      * Two effects, both lasting `spell.getLapsTotal()` laps: entering a burning cell costs one extra step
      * (see FIRE_WALL_CROSS_PENALTY in path_helper) and sears the crossing stack for a share of its maximum
@@ -1544,12 +1544,14 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
         const orientation = normalizeFireWallOrientation(action.targetOrientation);
-        const cells = fireWallCells(action.targetCell, orientation);
         const settings = this.context.grid.getSettings();
-        const allPlaceable = cells.every((cell) =>
-            isFireWallableCell(this.context.grid, isCellWithinGrid(settings, cell), cell),
+        const cells = fireWallLitCells(
+            this.context.grid,
+            (cell) => isCellWithinGrid(settings, cell),
+            action.targetCell,
+            orientation,
         );
-        if (!allPlaceable) {
+        if (!cells.length) {
             return this.reject("spell_not_available");
         }
         const laps = spell.getLapsTotal();
@@ -2177,7 +2179,7 @@ export class GameActionEngine {
      *
      * Aimed at a CELL rather than a unit, anywhere the dragon likes — no range gate and no line of sight,
      * because it falls out of the sky. `action.targetCell` is the CENTRE of the block: an odd-sided footprint
-     * pivots around the cursor the way the Fire Wall's 3-cell line does, unlike the even-sided 2x2 of Meteorite
+     * pivots around the cursor the way the Fire Wall's line does, unlike the even-sided 2x2 of Meteorite
      * and Craft, which have no centre cell to anchor on and take a corner instead.
      *
      * Every ENEMY standing under the block takes the damage — allies are not caught (that is Ring of Fire's

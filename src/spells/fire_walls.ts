@@ -39,11 +39,20 @@ export const FIRE_WALL_CROSS_PENALTY = 1;
 // be noise to any real stack and the wall would read as decorative.
 export const FIRE_WALL_BURN_PERCENTAGE = 25;
 
-// Cells a single cast lights, always in a straight line.
-export const FIRE_WALL_LENGTH = 3;
+// Cells a single cast covers, always in a straight line. Not every one of them necessarily lights: a cell
+// holding a creature, the mountain, a narrowed-away cell or one past the board edge is skipped and the rest
+// of the line still burns (see fireWallLitCells). Four, up from three (owner call 2026-09-19).
+export const FIRE_WALL_LENGTH = 4;
 
 /**
- * The four ways a 3-cell wall can lie on the board. HORIZONTAL is the default the aim preview opens on;
+ * Where the aimed cell sits inside the line: this many cells lie BEFORE it along the wall's step vector and
+ * the rest after. For an odd length that is the exact middle; for the even four it is the cell just past
+ * the middle, so the cursor always sits inside the wall and the wall still pivots about it as it rotates.
+ */
+export const FIRE_WALL_ANCHOR_INDEX = Math.floor(FIRE_WALL_LENGTH / 2);
+
+/**
+ * The four ways a 4-cell wall can lie on the board. HORIZONTAL is the default the aim preview opens on;
  * the player cycles forward through this list with Shift while aiming (see Sandbox.rotateFireWallAim).
  *
  * The order is a quarter-turn each time, so holding Shift sweeps the wall around like a clock hand rather
@@ -86,17 +95,18 @@ export function nextFireWallOrientation(current: FireWallOrientation): FireWallO
 }
 
 /**
- * The three cells a wall anchored on `anchor` covers, in order along the wall.
+ * The FIRE_WALL_LENGTH cells a wall anchored on `anchor` covers, in order along the wall — the whole line,
+ * whether or not each cell can burn (fireWallLitCells is the subset that will).
  *
- * The anchor is the MIDDLE cell, not a corner: the wall rotates about the cursor, so the cell under the
- * mouse stays put as the player cycles orientations. (Smoke and Craft anchor their 2x2 at a corner instead
- * — those footprints never rotate, so there is nothing to pivot around.)
+ * The anchor sits INSIDE the line (FIRE_WALL_ANCHOR_INDEX cells in), not at a corner: the wall rotates
+ * about the cursor, so the cell under the mouse stays put as the player cycles orientations. (Smoke and
+ * Craft anchor their 2x2 at a corner instead — those footprints never rotate, so there is nothing to pivot
+ * around.)
  */
 export function fireWallCells(anchor: XY, orientation: FireWallOrientation): XY[] {
     const step = ORIENTATION_STEPS[normalizeFireWallOrientation(orientation)];
     const cells: XY[] = [];
-    const half = Math.floor(FIRE_WALL_LENGTH / 2);
-    for (let i = -half; i <= half; i++) {
+    for (let i = -FIRE_WALL_ANCHOR_INDEX; i < FIRE_WALL_LENGTH - FIRE_WALL_ANCHOR_INDEX; i++) {
         cells.push({ x: anchor.x + step.x * i, y: anchor.y + step.y * i });
     }
     return cells;
@@ -258,11 +268,12 @@ export interface IFireWallGrid {
  *
  * Same rule as smoke: off-grid, the centre MOUNTAIN ("B"), a cell already NARROWED away ("H") and any cell a
  * creature stands on are all refused; lava ("L") and water ("W") are ground the flames sit over. Refusing an
- * occupied cell is what stops the wall from being cast straight through a body for free damage — it has to
- * be laid in the enemy's path, not on top of them.
+ * occupied cell is what stops the wall from being lit straight through a body for free damage — it has to
+ * be laid in the enemy's path, not on top of them. A refused cell only stays unlit, though: the rest of the
+ * line still burns (see fireWallLitCells).
  *
  * Shared by the engine's fireWallCast and the client's aim preview on purpose: the preview must highlight
- * exactly the placements the engine will accept, or it teaches the player a rule the game does not have.
+ * exactly the cells the engine will light, or it teaches the player a rule the game does not have.
  */
 export function isFireWallableCell(grid: IFireWallGrid, withinGrid: boolean, cell: XY): boolean {
     if (!withinGrid) {
@@ -273,6 +284,27 @@ export function isFireWallableCell(grid: IFireWallGrid, withinGrid: boolean, cel
         return true;
     }
     return occupant === "L" || occupant === "W";
+}
+
+/**
+ * The cells of the line anchored on `anchor` that a cast actually sets alight — every cell of fireWallCells
+ * that isFireWallableCell accepts, in wall order.
+ *
+ * The wall is laid ANYWHERE on the field (owner call 2026-09-19): a creature, the mountain, a narrowed-away
+ * cell or the board edge under part of the line does not refuse the cast, it just leaves that cell unlit
+ * while the rest of the line burns. Empty when nothing on the line can burn — the one placement the engine
+ * still refuses, because a charge that lights nothing is a charge wasted.
+ *
+ * The ONE place the lit subset is derived: fireWallCast lights it, the client's aim preview highlights it
+ * and the AI's enumeration scores it, so no endpoint can promise a wall another one lays differently.
+ */
+export function fireWallLitCells(
+    grid: IFireWallGrid,
+    isWithinGrid: (cell: XY) => boolean,
+    anchor: XY,
+    orientation: FireWallOrientation,
+): XY[] {
+    return fireWallCells(anchor, orientation).filter((cell) => isFireWallableCell(grid, isWithinGrid(cell), cell));
 }
 
 /**

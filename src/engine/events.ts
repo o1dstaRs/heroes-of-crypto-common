@@ -237,8 +237,9 @@ export type GameEvent =
       }
     // Vines that withered on lap transition — the client drops their visuals.
     | { type: "vine_expired"; cells: XY[] }
-    // Fire Wall: the three cells set alight by one cast, in wall order (so the client can light them up in
-    // sequence). lapsRemaining is the per-cell budget at place time, mirroring FireWalls.add.
+    // Fire Wall: the cells set alight by one cast, in wall order (so the client can light them up in
+    // sequence) — up to FIRE_WALL_LENGTH, fewer where a creature, the mountain, a narrowed cell or the board
+    // edge sat under the line. lapsRemaining is the per-cell budget at place time, mirroring FireWalls.add.
     | { type: "fire_wall_placed"; casterId: string; cells: XY[]; lapsRemaining: number }
     // Walls that burnt out on lap transition — the client drops their visuals.
     | { type: "fire_wall_expired"; cells: XY[] }

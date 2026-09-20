@@ -42,7 +42,8 @@ import {
     ilActionSignature,
     ilCandidateFeatureVector,
 } from "../../src/simulation/il_dataset";
-import { fireWallCells, normalizeFireWallOrientation } from "../../src/spells/fire_walls";
+import { fireWallCells, fireWallLitCells, normalizeFireWallOrientation } from "../../src/spells/fire_walls";
+import { isCellWithinGrid } from "../../src/grid/grid_math";
 import { Spell } from "../../src/spells/spell";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
@@ -2331,7 +2332,17 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(action.targetCell).toBeDefined();
         expect(action.targetOrientation).toBeDefined();
         expect(wall!.features.expectedDamage).toBe(0);
-        const expectedCells = fireWallCells(action.targetCell!, normalizeFireWallOrientation(action.targetOrientation));
+        const orientation = normalizeFireWallOrientation(action.targetOrientation);
+        const expectedCells = fireWallCells(action.targetCell!, orientation);
+        // On an open board the AI proposes a complete wall: every cell of the line lights.
+        expect(
+            fireWallLitCells(
+                c.grid,
+                (cell) => isCellWithinGrid(c.grid.getSettings(), cell),
+                action.targetCell!,
+                orientation,
+            ),
+        ).toEqual(expectedCells);
 
         const result = startActionEngine(c, nightmare, context).apply(action);
         expect(result.completed).toBe(true);
@@ -2367,7 +2378,9 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(challengers[0].actions[0]).toEqual(generatedAction);
     });
 
-    it("Nightmare: Fire Wall falls back to a shifted legal wall on a field-edge approach", () => {
+    // The engine lights the on-board part of a line and the board edge is a wall already, so an approach
+    // along the edge is sealed by a wall cut short by that edge — no shifting inward that would leave a gap.
+    it("Nightmare: Fire Wall hugs the field edge on an edge approach, lighting only the on-board cells", () => {
         const c = createCombatTestContext();
         const nightmare = makeReal(LEFT, "Chaos", "Nightmare");
         nightmare.setStackPower(5);
@@ -2384,12 +2397,27 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         if (action?.type !== "cast_spell" || !action.targetCell) {
             throw new Error("expected edge fallback Fire Wall cast");
         }
-        const expectedCells = fireWallCells(action.targetCell, normalizeFireWallOrientation(action.targetOrientation));
-        expect(expectedCells.every((cell) => cell.x >= 0 && cell.y >= 0)).toBe(true);
+        const orientation = normalizeFireWallOrientation(action.targetOrientation);
+        const line = fireWallCells(action.targetCell, orientation);
+        const lit = fireWallLitCells(
+            c.grid,
+            (cell) => isCellWithinGrid(c.grid.getSettings(), cell),
+            action.targetCell,
+            orientation,
+        );
+        expect(lit.length).toBeGreaterThan(0);
+        expect(lit.every((cell) => cell.x >= 0 && cell.y >= 0)).toBe(true);
+        // Whatever the line lost went off the board, never onto a body: the wall has no gap to walk through.
+        const litKeys = new Set(lit.map((cell) => `${cell.x},${cell.y}`));
+        for (const cell of line) {
+            if (!litKeys.has(`${cell.x},${cell.y}`)) {
+                expect(isCellWithinGrid(c.grid.getSettings(), cell)).toBe(false);
+            }
+        }
         expect(wall!.features.expectedDamage).toBe(0);
 
         expect(startActionEngine(c, nightmare, context).apply(action).completed).toBe(true);
-        expect(context.fightProperties!.getFireWalls().cells()).toEqual(expectedCells);
+        expect(context.fightProperties!.getFireWalls().cells()).toEqual(lit);
     });
 
     it("Magic Dragon: AI only proposes Ring of Fire with a ring victim, spares its aim, and respects thrown LOS", () => {

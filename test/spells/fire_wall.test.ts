@@ -23,6 +23,7 @@ import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Spell } from "../../src/spells/spell";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 import {
+    FIRE_WALL_ANCHOR_INDEX,
     FIRE_WALL_CROSS_PENALTY,
     FIRE_WALL_LENGTH,
     FIRE_WALL_ORIENTATIONS,
@@ -31,6 +32,7 @@ import {
     fireWallBurnDamage,
     fireWallBurnPercentage,
     fireWallCells,
+    fireWallLitCells,
     isFireWallableCell,
     nextFireWallOrientation,
     normalizeFireWallOrientation,
@@ -104,18 +106,26 @@ describe("Fire Wall movement costs", () => {
     });
 });
 
-// The wall pivots about the cell under the cursor, so the anchor is the MIDDLE cell in every orientation.
+// The wall pivots about the cell under the cursor: four cells has no middle one, so the anchor is the cell
+// just past the middle — two cells lie before it along the wall and one after (owner call 2026-09-19: 4x1).
 describe("fireWallCells", () => {
-    it("lays three cells horizontally by default, centred on the anchor", () => {
+    it("is four cells long, anchored on the third", () => {
+        expect(FIRE_WALL_LENGTH).toBe(4);
+        expect(FIRE_WALL_ANCHOR_INDEX).toBe(2);
+    });
+
+    it("lays four cells horizontally by default, two before the anchor and one after", () => {
         expect(fireWallCells({ x: 5, y: 5 }, FireWallOrientation.HORIZONTAL)).toEqual([
+            { x: 3, y: 5 },
             { x: 4, y: 5 },
             { x: 5, y: 5 },
             { x: 6, y: 5 },
         ]);
     });
 
-    it("lays three cells vertically", () => {
+    it("lays four cells vertically", () => {
         expect(fireWallCells({ x: 5, y: 5 }, FireWallOrientation.VERTICAL)).toEqual([
+            { x: 5, y: 3 },
             { x: 5, y: 4 },
             { x: 5, y: 5 },
             { x: 5, y: 6 },
@@ -124,22 +134,24 @@ describe("fireWallCells", () => {
 
     it("lays both diagonals", () => {
         expect(fireWallCells({ x: 5, y: 5 }, FireWallOrientation.DIAGONAL_UP)).toEqual([
+            { x: 3, y: 3 },
             { x: 4, y: 4 },
             { x: 5, y: 5 },
             { x: 6, y: 6 },
         ]);
         expect(fireWallCells({ x: 5, y: 5 }, FireWallOrientation.DIAGONAL_DOWN)).toEqual([
+            { x: 3, y: 7 },
             { x: 4, y: 6 },
             { x: 5, y: 5 },
             { x: 6, y: 4 },
         ]);
     });
 
-    it("keeps the anchor cell in every orientation", () => {
+    it("keeps the anchor cell at the same place in the line in every orientation", () => {
         for (const orientation of FIRE_WALL_ORIENTATIONS) {
             const cells = fireWallCells({ x: 7, y: 3 }, orientation);
             expect(cells).toHaveLength(FIRE_WALL_LENGTH);
-            expect(cells).toContainEqual({ x: 7, y: 3 });
+            expect(cells[FIRE_WALL_ANCHOR_INDEX]).toEqual({ x: 7, y: 3 });
         }
     });
 });
@@ -184,13 +196,13 @@ describe("FireWalls store", () => {
     it("burns out a cell once its laps run down", () => {
         const walls = new FireWalls();
         walls.addAll(fireWallCells({ x: 5, y: 5 }, FireWallOrientation.HORIZONTAL), 2);
-        expect(walls.size()).toBe(3);
+        expect(walls.size()).toBe(FIRE_WALL_LENGTH);
 
         expect(walls.minusAllLaps()).toEqual([]);
-        expect(walls.size()).toBe(3);
+        expect(walls.size()).toBe(FIRE_WALL_LENGTH);
 
         const expired = walls.minusAllLaps();
-        expect(expired).toHaveLength(3);
+        expect(expired).toHaveLength(FIRE_WALL_LENGTH);
         expect(walls.size()).toBe(0);
     });
 
@@ -242,6 +254,48 @@ describe("isFireWallableCell", () => {
         expect(isFireWallableCell(grid("some-unit-id"), true, { x: 3, y: 3 })).toBe(false);
         expect(isFireWallableCell(grid("B"), true, { x: 3, y: 3 })).toBe(false);
         expect(isFireWallableCell(grid("H"), true, { x: 3, y: 3 })).toBe(false);
+    });
+});
+
+// The wall goes anywhere; what it LIGHTS is the free part of the line (owner call 2026-09-19).
+describe("fireWallLitCells", () => {
+    const key = (c: { x: number; y: number }) => `${c.x},${c.y}`;
+    const gridWith = (occupants: Record<string, string>) => ({
+        getOccupantUnitId: (cell: { x: number; y: number }) => occupants[key(cell)],
+    });
+    const within = (c: { x: number; y: number }) => c.x >= 0 && c.y >= 0 && c.x < 16 && c.y < 16;
+
+    it("lights the whole line when every cell is free", () => {
+        expect(fireWallLitCells(gridWith({}), within, { x: 5, y: 5 }, FireWallOrientation.HORIZONTAL)).toEqual(
+            fireWallCells({ x: 5, y: 5 }, FireWallOrientation.HORIZONTAL),
+        );
+    });
+
+    it("skips a creature, the mountain and a narrowed cell but lights the rest, in wall order", () => {
+        const grid = gridWith({ "3,5": "some-unit-id", "5,5": "B", "6,5": "H" });
+        expect(fireWallLitCells(grid, within, { x: 5, y: 5 }, FireWallOrientation.HORIZONTAL)).toEqual([
+            { x: 4, y: 5 },
+        ]);
+    });
+
+    it("still burns over lava and water", () => {
+        const grid = gridWith({ "4,5": "L", "5,5": "W" });
+        expect(fireWallLitCells(grid, within, { x: 5, y: 5 }, FireWallOrientation.HORIZONTAL)).toHaveLength(
+            FIRE_WALL_LENGTH,
+        );
+    });
+
+    it("drops the part of the line that runs off the board", () => {
+        expect(fireWallLitCells(gridWith({}), within, { x: 0, y: 5 }, FireWallOrientation.HORIZONTAL)).toEqual([
+            { x: 0, y: 5 },
+            { x: 1, y: 5 },
+        ]);
+    });
+
+    it("is empty when nothing on the line can burn", () => {
+        expect(fireWallLitCells(gridWith({}), within, { x: -5, y: 5 }, FireWallOrientation.HORIZONTAL)).toEqual([]);
+        const bodies = gridWith({ "3,5": "u1", "4,5": "u2", "5,5": "u3", "6,5": "u4" });
+        expect(fireWallLitCells(bodies, within, { x: 5, y: 5 }, FireWallOrientation.HORIZONTAL)).toEqual([]);
     });
 });
 
@@ -310,7 +364,7 @@ describe("Fire Wall through the action engine", () => {
         FightStateManager.getInstance().getFightProperties().getFireWalls().clear();
     });
 
-    it("lights the three cells of the requested orientation and reports them", () => {
+    it("lights the four cells of the requested orientation and reports them", () => {
         const s = setup();
         const anchor = { x: 6, y: 6 };
 
@@ -392,15 +446,59 @@ describe("Fire Wall through the action engine", () => {
         ).toEqual(fireWallCells(anchor, FireWallOrientation.HORIZONTAL));
     });
 
-    // All-or-nothing: what the aim preview highlighted is exactly what lands, or nothing does.
-    it("refuses the whole cast when one cell of the line is occupied", () => {
+    // Not all-or-nothing (owner call 2026-09-19): the wall goes anywhere and lights the free cells of its
+    // line. A body under one cell leaves that cell unlit — the flames never land on a creature for free
+    // damage — and the rest of the line burns. What the aim preview highlights is exactly what lands.
+    it("lights the free cells of the line and skips the one a creature stands on", () => {
         const s = setup();
-        // The enemy stands at (9,9); a horizontal wall anchored at (8,9) would need that cell.
+        // The enemy stands at (9,9); a horizontal wall anchored at (8,9) runs (6..9, 9) and covers it.
         const result = s.engine.apply({
             type: "cast_spell",
             casterId: s.caster.getId(),
             spellName: "Fire Wall",
             targetCell: { x: 8, y: 9 },
+            targetOrientation: FireWallOrientation.HORIZONTAL,
+        });
+
+        expect(result.completed).toBe(true);
+        const lit = [
+            { x: 6, y: 9 },
+            { x: 7, y: 9 },
+            { x: 8, y: 9 },
+        ];
+        expect(s.fightProperties.getFireWalls().cells()).toEqual(lit);
+        expect(s.fightProperties.getFireWalls().has({ x: 9, y: 9 })).toBe(false);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({ type: "fire_wall_placed", casterId: s.caster.getId(), cells: lit }),
+        );
+        expect(s.caster.hasSpellRemaining("Fire Wall")).toBe(false);
+    });
+
+    it("lights the on-board part of a line that runs off the field edge", () => {
+        const s = setup();
+        const result = s.engine.apply({
+            type: "cast_spell",
+            casterId: s.caster.getId(),
+            spellName: "Fire Wall",
+            targetCell: { x: 0, y: 6 },
+            targetOrientation: FireWallOrientation.HORIZONTAL,
+        });
+
+        expect(result.completed).toBe(true);
+        expect(s.fightProperties.getFireWalls().cells()).toEqual([
+            { x: 0, y: 6 },
+            { x: 1, y: 6 },
+        ]);
+    });
+
+    // The one placement still refused: a charge that would light nothing is a charge wasted.
+    it("refuses a cast whose line lights nothing, and keeps the charge", () => {
+        const s = setup();
+        const result = s.engine.apply({
+            type: "cast_spell",
+            casterId: s.caster.getId(),
+            spellName: "Fire Wall",
+            targetCell: { x: 40, y: 40 },
             targetOrientation: FireWallOrientation.HORIZONTAL,
         });
 

@@ -1413,8 +1413,9 @@
             "name": "Fire Wall",
             "level": 2,
             "desc": [
-                "Lays a burning wall across 3 cells in a straight line, in any of the four orientations.",
-                "Hold Shift while aiming to rotate it.",
+                "Lays a burning wall across 4 cells in a straight line, anywhere on the field, in any of the four orientations.",
+                "Hold Shift while aiming to rotate it. Only free cells catch fire: a creature, the mountain or a",
+                "narrowed-away cell under the line is skipped and the rest of the line still burns.",
                 "Entering a burning cell costs any creature 1 extra step (double the usual cost)",
                 "and sears it for {}% of its maximum health, friend or foe alike.",
                 "Lasts 3 laps."

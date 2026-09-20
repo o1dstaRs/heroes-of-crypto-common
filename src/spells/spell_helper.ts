@@ -429,7 +429,7 @@ export function firstTargetedSpellSightBlocker(
  * The block of cells a CELL-targeted spell covers when aimed at `origin`.
  *
  * Meteor Shower's 3x3 is CENTRED on the aimed cell — an odd-sided footprint pivots about the cursor, the way
- * the Fire Wall's 3-cell line does. Everything else here is 2x2 (Meteorite, Smoke, Craft) and hangs off the
+ * the Fire Wall's line does. Everything else here is 2x2 (Meteorite, Smoke, Craft) and hangs off the
  * aimed cell as its bottom-left corner, because an even-sided block has no centre cell to anchor on.
  *
  * The ONE place either footprint is derived: meteoriteCast / meteorShowerCast read their block out of this,
