@@ -1652,7 +1652,24 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.amount_died -= Math.min(this.unitProperties.amount_died, decreaseBy);
         }
     }
+    /**
+     * Misfortune OWNS luck for as long as it lasts: adjustBaseStats pins the value (the floor, or zero for a
+     * luck-buffed target) and zeroes the modifier, so every other writer has to stand down until the debuff
+     * expires. Without this the next per-turn roll or Luck Shield added its +3 straight back on top of the
+     * floor and the unit sat at -7 wearing a debuff that promises the minimum.
+     */
+    private luckIsPinnedByMisfortune(): boolean {
+        if (!this.hasDebuffActive("Misfortune")) {
+            return false;
+        }
+        this.unitProperties.luck_mod = 0;
+        this.luckPerTurn = 0;
+        return true;
+    }
     public randomizeLuckPerTurn(): void {
+        if (this.luckIsPinnedByMisfortune()) {
+            return;
+        }
         let calculatedLuck = getRandomInt(-LUCK_MAX_CHANGE_FOR_TURN, LUCK_MAX_CHANGE_FOR_TURN + 1);
         if (calculatedLuck + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
             calculatedLuck = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;
@@ -1662,11 +1679,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.luck_mod = calculatedLuck;
         this.luckPerTurn = calculatedLuck;
     }
-    public applyLuckShield(): void {
+    /** True when the shield actually raised luck; false while Misfortune holds it at the floor. */
+    public applyLuckShield(): boolean {
         // Luck Shield: replace this turn's random luck spread with a fixed positive bonus (so a bad roll
         // like -3 becomes +LUCK_CHANGE_FOR_SHIELD). Persisting it via luckPerTurn keeps it for the rest
         // of the lap — adjustBaseStats re-derives luck_mod from luckPerTurn and only re-rolls once per
         // lap, so it won't be overwritten. Clamped so base + bonus never exceeds the luck cap.
+        if (this.luckIsPinnedByMisfortune()) {
+            return false;
+        }
         let luckMod = LUCK_CHANGE_FOR_SHIELD;
         if (luckMod + this.unitProperties.luck > LUCK_MAX_VALUE_TOTAL) {
             luckMod = LUCK_MAX_VALUE_TOTAL - this.unitProperties.luck;

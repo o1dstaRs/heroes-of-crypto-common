@@ -380,13 +380,17 @@ export class GameActionEngine {
             return this.reject(unit.message as GameActionRejectionReason);
         }
 
-        unit.applyLuckShield();
+        // Misfortune pins luck at the floor for its duration, so a defending unit under it pays the morale
+        // and gains no luck. Say so rather than printing a bonus the unit never got.
+        const luckRaised = unit.applyLuckShield();
         unit.decreaseMorale(
             MORALE_CHANGE_FOR_SHIELD,
             this.context.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
         );
         this.context.sceneLog.updateLog(
-            `${unit.getName()} uses Luck Shield (luck +${LUCK_CHANGE_FOR_SHIELD}, morale -${MORALE_CHANGE_FOR_SHIELD})`,
+            luckRaised
+                ? `${unit.getName()} uses Luck Shield (luck +${LUCK_CHANGE_FOR_SHIELD}, morale -${MORALE_CHANGE_FOR_SHIELD})`
+                : `${unit.getName()} uses Luck Shield (luck held by Misfortune, morale -${MORALE_CHANGE_FOR_SHIELD})`,
         );
 
         const events: GameEvent[] = [{ type: "unit_defended", unitId: unit.getId(), team: unit.getTeam() }];
