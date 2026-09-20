@@ -930,6 +930,55 @@ describe("Magic Reflection (passive)", () => {
         ]);
     });
 
+    /**
+     * A mirror that the spell KILLS still throws it back: the rebound is decided from the damage the spell
+     * lands, before any of it is applied, so the last creature of a stack reflects on its way out. Owner
+     * report (19 Sep) that reflection "doesn't work if the target died" — which it does; what actually
+     * thins out on a dying stack is the passive's stack-scaled CHANCE (15% at the bottom tier, asserted by
+     * the formula test above), not this ordering.
+     */
+    it("rebounds even when the spell kills the mirror outright, passive and buff alike", () => {
+        for (const mirror of [
+            { abilities: ["Magic Reflection"], expected: 112 }, // 75% of the 150 the bolt landed
+            { abilities: [] as string[], buff: "Magic Mirror", expected: 60 }, // the buff's guaranteed 40%
+        ]) {
+            alwaysRoll(0);
+            const setup = setupDragonFight({
+                casterAmountAlive: 1,
+                casterStackPower: 5,
+                // 100 HP against a 150 bolt: the mirror is gone the moment the spell resolves.
+                enemies: [{ cell: { x: 6, y: 3 }, maxHp: 100, abilities: mirror.abilities, stackPower: 5 }],
+            });
+            if (mirror.buff) {
+                setup.enemies[0].applyBuff(
+                    new Spell({ spellProperties: getSpellConfig("Chaos", mirror.buff), amount: 1 }),
+                );
+            }
+            const casterHpBefore = setup.caster.getHp();
+
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.caster.getId(),
+                spellName: "Lightning Strike",
+                targetId: setup.enemies[0].getId(),
+            });
+
+            expect(result.completed).toBe(true);
+            expect(setup.enemies[0].isDead()).toBe(true);
+            expect(casterHpBefore - setup.caster.getHp()).toBe(mirror.expected);
+            const cast = result.events.find((event) => event.type === "spell_cast");
+            const rebounds = cast?.type === "spell_cast" ? (cast.damaged ?? []).filter((entry) => entry.rebounded) : [];
+            // The VFX reads the holder off the event, so a dead mirror still has a beam to throw from.
+            expect(rebounds).toEqual([
+                expect.objectContaining({
+                    unitId: setup.caster.getId(),
+                    amount: mirror.expected,
+                    reboundedFromUnitId: setup.enemies[0].getId(),
+                }),
+            ]);
+        }
+    });
+
     it("never routes spell damage — direct or rebounded — through a Flesh Shield owner", () => {
         alwaysRoll(0);
         const setup = setupDragonFight({
