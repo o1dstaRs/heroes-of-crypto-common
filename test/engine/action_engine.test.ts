@@ -12,7 +12,12 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { ArtifactTier, Tier2Artifact } from "../../src/artifacts/artifact_properties";
-import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_CLOCK, MORALE_CHANGE_FOR_SHIELD } from "../../src/constants";
+import {
+    HITS_PER_MOUNTAIN,
+    LUCK_MAX_VALUE_TOTAL,
+    MORALE_CHANGE_FOR_CLOCK,
+    MORALE_CHANGE_FOR_SHIELD,
+} from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine, type IGameActionEngineContext } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
@@ -324,6 +329,20 @@ describe("GameActionEngine", () => {
             rejectionReason: "additional_time_not_available",
         });
         expect(setup.fightProperties.getCurrentTurnEnd()).toBe(extended);
+    });
+
+    it("holds a Misfortune'd defender at the luck floor instead of granting the shield's bonus", () => {
+        const sceneLog = new CapturingSceneLog();
+        const setup = setupActionFight({ sceneLog });
+        setup.left.applyDebuff(new Spell({ spellProperties: getSpellConfig("Chaos", "Misfortune"), amount: 1 }));
+        setup.unitsHolder.refreshStackPowerForAllUnits();
+        expect(setup.left.getLuck()).toBe(-LUCK_MAX_VALUE_TOTAL);
+
+        expect(setup.engine.apply({ type: "defend_turn", unitId: setup.left.getId() }).completed).toBe(true);
+
+        // This is the number the server snapshots and the client prints, so the panel cannot read -7 either.
+        expect(setup.left.getLuck()).toBe(-LUCK_MAX_VALUE_TOTAL);
+        expect(sceneLog.lines.some((line) => line.includes("luck held by Misfortune"))).toBe(true);
     });
 
     it("defends with luck shield and completes the unit turn", () => {
