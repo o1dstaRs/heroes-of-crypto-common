@@ -168,6 +168,28 @@ describe("Fireball", () => {
         expect(ownFrontLine.getCumulativeHp()).toBe(ownFrontLine.getCumulativeMaxHp());
     });
 
+    // Owner report 2026-09-20: "my allies also can block". The pre-dispatch gate applied the visible-edge
+    // rule with the caster's own troops as opaque, so an enemy the front line had closed in on could not be
+    // aimed at at all — the cast was refused before fireballCast ever got to fly over them.
+    it("can be aimed at an enemy the caster's own troops have surrounded", () => {
+        const s = setup();
+        const target = s.addUnit("Surrounded", PBTypes.TeamVals.RIGHT, { x: 10, y: 8 });
+        const ring: { x: number; y: number }[] = [];
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+                if (dx || dy) {
+                    ring.push({ x: 10 + dx, y: 8 + dy });
+                }
+            }
+        }
+        const allies = ring.map((cell, index) => s.addUnit(`Own ${index}`, PBTypes.TeamVals.LEFT, cell));
+
+        expect(s.cast(target.getId()).completed).toBe(true);
+        expect(target.getCumulativeHp()).toBeLessThan(target.getCumulativeMaxHp());
+        // The blast still catches everyone touching the target — the owner's own ring included.
+        expect(allies.every((ally) => ally.getCumulativeHp() < ally.getCumulativeMaxHp())).toBe(true);
+    });
+
     // One summed number told the player nothing about who took what: a blast prices every victim
     // separately (owner report 2026-09-20, reading "burst a Fireball on Centaur, catching 2 more (984)").
     it("logs the damage per victim, not as one total", () => {

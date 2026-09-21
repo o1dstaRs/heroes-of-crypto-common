@@ -59,6 +59,7 @@ import {
 import {
     canCastSpell,
     canMassCastSpell,
+    isInterceptedThrownSpell,
     isSpellUsableByCaster,
     thrownSpellReachesAimedTarget,
 } from "../spells/spell_helper";
@@ -1069,14 +1070,15 @@ const canTargetOffensiveSpell = (caster: Unit, target: Unit, spell: Spell, conte
             undefined,
         ) === true &&
         // Must LAND on this target, not merely be legal: a screening enemy intercepts Fire Strike onto itself.
-        // Fire Strike alone arcs over friendlies — any body blocks the other throws, as in the engine.
+        // The intercepted throws (Fire Strike, Fireball) arc over friendlies — any body blocks the other
+        // throws, as in the engine.
         thrownSpellReachesAimedTarget(
             spell.getName(),
             context.grid,
             (cell) => isCellWithinGrid(settings, cell),
             caster.getBaseCell(),
             target.getBaseCell(),
-            spell.getName() === "Fire Strike"
+            isInterceptedThrownSpell(spell.getName())
                 ? (unitId) => context.unitsHolder.getAllUnits().get(unitId)?.getTeam() === caster.getTeam()
                 : undefined,
             target.getCells(),

@@ -1309,10 +1309,15 @@ export class GameActionEngine {
                 (cell) => isCellWithinGrid(this.context.grid.getSettings(), cell),
                 caster.getBaseCell(),
                 target.getBaseCell(),
-                // Only Fire Strike arcs over the caster's own troops. Every other thrown spell is blocked by
-                // ANY body, and each re-checks that strictly in its own handler — scoping the transparency
-                // here keeps this gate from quietly becoming the more permissive of the two.
-                spell.getName() === "Fire Strike" ? (unitId) => this.isAllyOfCaster(caster, unitId) : undefined,
+                // The intercepted throws (Fire Strike, Fireball) arc over the caster's own troops — for
+                // the visible-edge gate too, or a target screened by the caster's own front line was refused
+                // here before fireballCast could fly over them (owner report 2026-09-20, "my allies also can
+                // block"). Every other thrown spell is blocked by ANY body, and each re-checks that strictly in
+                // its own handler — scoping the transparency here keeps this gate from quietly becoming the
+                // more permissive of the two.
+                SpellHelper.isInterceptedThrownSpell(spell.getName())
+                    ? (unitId) => this.isAllyOfCaster(caster, unitId)
+                    : undefined,
                 // The whole footprint, so a large target boxed in on one corner is still reachable by the
                 // open edge of another of its cells.
                 target.getCells(),

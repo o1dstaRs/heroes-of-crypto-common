@@ -38,6 +38,7 @@ import {
     firstSummonableAnchor,
     canMassCastSpell,
     thrownSpellReachesAimedTarget,
+    isInterceptedThrownSpell,
     isSpellUsableByCaster,
 } from "../spells/spell_helper";
 import type { Spell } from "../spells/spell";
@@ -2980,7 +2981,8 @@ class CandidateGenerator {
             (cell) => isCellWithinGrid(gs, cell),
             this.unit.getBaseCell(),
             target.getBaseCell(),
-            spell.getName() === "Fire Strike"
+            // The intercepted throws (Fire Strike, Fireball) arc over the caster's own troops, as in the engine.
+            isInterceptedThrownSpell(spell.getName())
                 ? (unitId) => allUnits.get(unitId)?.getTeam() === this.unit.getTeam()
                 : undefined,
             target.getCells(),
