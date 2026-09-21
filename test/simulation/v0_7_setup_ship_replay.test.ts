@@ -80,7 +80,12 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Wardguard from the pass above stand. Goblin Knight is a level-3 stack fielded across the seeded draws
 // and steps decide every move, so any trace holding one diverges from its first move on. Measured at a
 // clean HEAD with only this one-line change; two isolated runs reproduced this value byte-identically.
-const EXPECTED_REPLAY_SHA256 = "d58a6db6df70cbfbd90b33ed893dccb86108c50f864bbfec3970060776f2f35c";
+// Previous approved digest: d58a6db6df70cbfbd90b33ed893dccb86108c50f864bbfec3970060776f2f35c
+// Re-pinned 2026-09-21 for a Goblin Knight balance pass (owner request): attack_damage_max 18 -> 17.
+// Goblin Knight is a level-3 stack fielded across the seeded draws and its damage roll decides when
+// each wound kills, so any trace holding one diverges from its first landed hit. Measured at a clean
+// HEAD with only this one-line change; two isolated runs reproduced this value byte-identically.
+const EXPECTED_REPLAY_SHA256 = "80b1633a7a6b4cf9fb91657c80ba5d2f331bcc7cbd9492d610f1212f57a058b7";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

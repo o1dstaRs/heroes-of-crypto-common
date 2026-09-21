@@ -864,7 +864,7 @@
             "attack_type": "MELEE",
             "attack": 20,
             "attack_damage_min": 14,
-            "attack_damage_max": 18,
+            "attack_damage_max": 17,
             "attack_range": 1,
             "range_shots": 0,
             "shot_distance": 0,
