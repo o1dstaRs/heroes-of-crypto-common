@@ -115,6 +115,45 @@ describe("CustomEventSource", () => {
         source.close();
     });
 
+    /**
+     * The pick screen treats onopen as "your draft stream is live", which is only safe while a refused
+     * stream stays silent: a 429 means the draft is open somewhere else, and the read-only view exists to
+     * say so. A stream that never opens must never announce that it did.
+     */
+    it("never announces an open stream while the server keeps refusing it", async () => {
+        let fetchCount = 0;
+        let opens = 0;
+        const errors: string[] = [];
+
+        globalThis.fetch = (async () => {
+            fetchCount += 1;
+            return new Response(null, { status: 429, statusText: "Too Many Requests" });
+        }) as unknown as typeof fetch;
+
+        const source = new CustomEventSource<CustomEvent>("https://example.test/refused", {
+            reconnectDelay: 1,
+            maxReconnectAttempts: 1,
+        });
+        let resolveExhausted!: () => void;
+        const exhausted = new Promise<void>((resolve) => {
+            resolveExhausted = resolve;
+        });
+
+        source.onopen = () => {
+            opens += 1;
+        };
+        source.onerror = (error) => {
+            errors.push(error.message);
+            if (error.message === "Max reconnection attempts reached") resolveExhausted();
+        };
+
+        await exhausted;
+
+        expect(opens).toBe(0);
+        expect(fetchCount).toBeGreaterThan(1);
+        expect(source.readyState).toBe(2);
+    });
+
     it("reports connection failures and closes after exhausting reconnects", async () => {
         const errors: string[] = [];
 
