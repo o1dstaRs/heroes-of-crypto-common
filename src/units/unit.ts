@@ -2786,7 +2786,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // the top-up must happen exactly once: rallying_volley_granted makes stepping out and back in, a
         // second Zena, or another refresh a no-op, so shots already FIRED stay spent. The quiver is topped up,
         // never refilled. Effect-helper scoping already guarantees only RANGED allies get here.
-        if (isBuff && auraEffectName === "Rallying Volley Aura") {
+        // A ranked client's count is authoritative (range_shots_authoritative): the server already handed
+        // the shots over, so topping up again here showed an extra +2 until the next snapshot corrected it.
+        if (isBuff && auraEffectName === "Rallying Volley Aura" && !this.unitProperties.range_shots_authoritative) {
             const bonus = Math.max(0, Math.floor(power));
             if (bonus > this.unitProperties.rallying_volley_granted) {
                 this.unitProperties.range_shots += bonus - this.unitProperties.rallying_volley_granted;
@@ -3663,7 +3665,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // MIND-type ability lands — read as a marker buff at the ability hooks, exactly like getStatusResist.
 
         // SHOTS
-        if (hasStatAbilityActive(limitedSupplyAbility, "Limited Supply")) {
+        // A ranked client's count is authoritative (range_shots_authoritative): the server applied this cap to
+        // the FULL quiver, while a rebuilt unit's maxRangeShots is only the remaining count, so re-capping
+        // here compounded it — a stack-power-1 Arbalester the server had at 4 (2 capped + Zena's 2) showed 2.
+        if (
+            hasStatAbilityActive(limitedSupplyAbility, "Limited Supply") &&
+            !this.unitProperties.range_shots_authoritative
+        ) {
             const actualStackPowerCoeff = this.getStackPower() / MAX_UNIT_STACK_POWER;
             // Rallying Volley's arrows sit ON TOP of the supply cap rather than inside it. The ceiling is
             // derived from maxRangeShots — the unit's OWN quiver — so without this the aura handed an
