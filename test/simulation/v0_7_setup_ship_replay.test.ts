@@ -68,7 +68,14 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // (owner request), so a Unicorn that opens an exchange blinds the target it hits. Unicorn is a Nature
 // level-3 stack fielded across the seeded draws, and a blinded stack forfeits its turn, so any trace
 // holding one diverges from its first attack on. Two isolated runs reproduced this value byte-identically.
-const EXPECTED_REPLAY_SHA256 = "391bb66a51a2a5384211593c161152f502be220a77ddc006a478662383b4dd73";
+// Previous approved digest: 391bb66a51a2a5384211593c161152f502be220a77ddc006a478662383b4dd73
+// Re-pinned 2026-09-20 for a Goblin Knight / Crusader balance pass (owner request): Goblin Knight loses
+// Wardguard and goes hp 85 -> 100, steps 5.1 -> 4.9; Crusader goes steps 5 -> 4.8. Both are level-3 stacks
+// fielded across the seeded draws, and steps decide every move while hp decides when each wound kills, so
+// any trace holding either diverges from its first move on. Measured in a clean worktree at HEAD with ONLY
+// creatures.json changed (a peer had unrelated WIP in the shared tree): the digest is green at HEAD and two
+// isolated runs reproduced this value byte-identically.
+const EXPECTED_REPLAY_SHA256 = "dae4aa5cd272b91496c09b869276e9a025dd9a567214597109058c13ce838392";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

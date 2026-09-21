@@ -196,7 +196,7 @@
         "Crusader": {
             "name": "Crusader",
             "hp": 74,
-            "steps": 5,
+            "steps": 4.8,
             "initiative": 5,
             "armor": 25,
             "attack_type": "MELEE",
@@ -857,8 +857,8 @@
         },
         "Goblin Knight": {
             "name": "Goblin Knight",
-            "hp": 85,
-            "steps": 5.1,
+            "hp": 100,
+            "steps": 4.9,
             "initiative": 6,
             "armor": 22,
             "attack_type": "MELEE",
@@ -874,7 +874,7 @@
             "size": 1,
             "level": 3,
             "spells": [],
-            "abilities": ["Heavy Armor", "Dulling Defense", "Wardguard"]
+            "abilities": ["Heavy Armor", "Dulling Defense"]
         },
         "Black Dragon": {
             "name": "Black Dragon",
