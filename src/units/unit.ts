@@ -1694,6 +1694,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.unitProperties.luck_mod = luckMod;
         this.luckPerTurn = luckMod;
+        return true;
     }
     public applyArmageddonDamage(armageddonWave: number, sceneLog: ISceneLog): number {
         const aw = Math.floor(armageddonWave);
