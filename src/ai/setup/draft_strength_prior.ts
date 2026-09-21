@@ -78,9 +78,49 @@ export const RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS = {
     "ranked-unit-strength-a19-side-v3-w2": 2,
     "ranked-unit-strength-a19-side-v3-w4": 4,
     "ranked-unit-strength-a19-side-v3-w8": 8,
+    // v1 strength at the staging weight plus a shooter floor (see RANKED_DRAFT_RANGED_FLOOR).
+    "ranked-unit-strength-a19-side-v1-w4-r2": 4,
+    "ranked-unit-strength-a19-side-v1-w4-r3": 4,
 } as const;
 
 export type RankedDraftStrengthPolicyId = keyof typeof RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS;
+
+/**
+ * Shooter floor: the fewest natively ranged creatures a finished army must hold. Test-server replays (2026-09-21,
+ * 27 decisive human-vs-AI fights) showed the bot fielding zero shooters in 22 and losing 16; on live draft rules the
+ * staging policy v1-w4 still drafts zero or one shooter 72% of the time (mean 1.0) while humans bring 2-5. A floor
+ * only ever narrows the eligible offers when the remaining picks could no longer reach it otherwise, so every pick
+ * that is not forced keeps the exact policy order of the un-floored id.
+ */
+export const RANKED_DRAFT_RANGED_FLOOR: Partial<Record<RankedDraftStrengthPolicyId, number>> = {
+    "ranked-unit-strength-a19-side-v1-w4-r2": 2,
+    "ranked-unit-strength-a19-side-v1-w4-r3": 3,
+};
+
+/** Shooter floor of a policy (0 = none). */
+export function rankedDraftRangedFloor(policy: RankedDraftStrengthPolicyId | undefined): number {
+    return isRankedDraftStrengthPolicy(policy) ? (RANKED_DRAFT_RANGED_FLOOR[policy] ?? 0) : 0;
+}
+
+/**
+ * Apply a policy's shooter floor to one creature pick: when the army's ranged count plus every remaining pick after
+ * this one could not reach the floor, keep only the ranged offers (if any exist). Otherwise the offers are returned
+ * untouched, by reference.
+ */
+export function applyRankedDraftRangedFloor(
+    policy: RankedDraftStrengthPolicyId | undefined,
+    available: readonly number[],
+    ownCreatureIds: readonly number[],
+): readonly number[] {
+    const floor = rankedDraftRangedFloor(policy);
+    if (floor <= 0) return available;
+    const isRanged = (creatureId: number): boolean => creatureInfo(creatureId)?.ranged === true;
+    const ownRanged = ownCreatureIds.filter(isRanged).length;
+    const picksAfterThis = Math.max(0, RANKED_DRAFT_ARMY_SIZE - ownCreatureIds.length - 1);
+    if (ownRanged + picksAfterThis >= floor) return available;
+    const ranged = available.filter(isRanged);
+    return ranged.length ? ranged : available;
+}
 
 /** What a strength policy may read about the pick: the acting seat's roster and, once revealed, the map. */
 export interface IDraftStrengthContext {

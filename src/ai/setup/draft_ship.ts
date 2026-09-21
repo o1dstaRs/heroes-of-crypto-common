@@ -33,6 +33,7 @@ import {
 } from "./creature_score";
 import { pickCoherentDraftBundle, pickCoherentDraftCreature, type DraftBundle } from "./draft_coherence";
 import {
+    applyRankedDraftRangedFloor,
     isRankedDraftStrengthPolicy,
     RANKED_DRAFT_RELAXED_FACTION_TAX_FREE_STACKS,
     rankedDraftStrengthRelaxesFactionTax,
@@ -359,7 +360,11 @@ export function pickRankedLiveDraftCreature(
     tier1ArtifactId?: number,
     revealedGridType?: number,
 ): number | undefined {
-    const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
+    const eligible = applyRankedDraftRangedFloor(
+        genome.draftStrengthPolicy,
+        eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds),
+        ownCreatureIds,
+    );
     const roleFitScore = (creatureId: number): number =>
         applyCreatureRoleFitMultiplier(
             draftGenomeCreatureScore(genome, creatureId),
