@@ -354,7 +354,7 @@
     "Blindness": {
         "name": "Blindness",
         "type": "MIND",
-        "desc": ["When responding to a melee attack, there is a {}% chance to blind (Mind) the enemy for 2 turns"],
+        "desc": ["On attack, has a {}% chance to blind (Mind) an enemy for 2 turns"],
         "power": 25,
         "power_type": "APPLY_EFFECT",
         "skip_reponse": false,

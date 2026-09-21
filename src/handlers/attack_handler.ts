@@ -2862,6 +2862,9 @@ export class AttackHandler {
                 );
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
                 AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
+                // Blindness rides the blow the Unicorn strikes as well as the one it answers — it used to
+                // fire only from the response path, so a Unicorn that opened the exchange blinded nobody.
+                AllAbilities.processBlindnessAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 updateUnitsDied(
                     AllAbilities.processChainLightningAbility(
                         attackerUnit,
@@ -3039,6 +3042,7 @@ export class AttackHandler {
                     secondPunchResult.damage,
                     this.sceneLog,
                 );
+                AllAbilities.processBlindnessAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             }
 
             if (

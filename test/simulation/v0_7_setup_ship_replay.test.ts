@@ -63,7 +63,12 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // half a step per vined cell) and its base steps drop 3.9 -> 2.9. Trent is fielded across the seeded draws
 // and its steps decide every move it makes, so any trace holding one diverges from its first move on. Two
 // isolated runs reproduced this value byte-identically.
-const EXPECTED_REPLAY_SHA256 = "f6eac4417823a2721740915c73a90fd9ca889125fceb78570717ac616102db3b";
+// Previous approved digest: f6eac4417823a2721740915c73a90fd9ca889125fceb78570717ac616102db3b
+// Re-pinned 2026-09-20: Blindness now rides the blow its owner STRIKES as well as the one it answers
+// (owner request), so a Unicorn that opens an exchange blinds the target it hits. Unicorn is a Nature
+// level-3 stack fielded across the seeded draws, and a blinded stack forfeits its turn, so any trace
+// holding one diverges from its first attack on. Two isolated runs reproduced this value byte-identically.
+const EXPECTED_REPLAY_SHA256 = "391bb66a51a2a5384211593c161152f502be220a77ddc006a478662383b4dd73";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
