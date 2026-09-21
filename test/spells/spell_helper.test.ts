@@ -384,7 +384,7 @@ describe("spell_helper", () => {
         ).toBe(false);
     });
 
-    it("rejects Castling inherited by a large caster", () => {
+    it("lets a large caster that inherited Castling swap with another large unit, but not with a small one", () => {
         const caster = createTestUnit({
             name: "Arachna Queen",
             team: PBTypes.TeamVals.RIGHT,
@@ -392,81 +392,80 @@ describe("spell_helper", () => {
             spells: ["System:Castling"],
             stackPower: 5,
         });
-        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LEFT });
+        const smallEnemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LEFT });
+        const largeEnemy = createTestUnit({
+            name: "Large Enemy",
+            team: PBTypes.TeamVals.LEFT,
+            size: PBTypes.UnitSizeVals.LARGE,
+        });
         const castling = caster.getSpells().find((candidate) => candidate.getName() === "Castling");
-
-        expect(
+        const cast = (target: Unit): boolean | undefined =>
             canCastSpell(
                 false,
                 testGridSettings,
                 emptyMatrix(),
                 caster,
-                enemy,
+                target,
                 castling,
-                enemy.getBaseCell(),
-                enemy.getMagicResist(),
+                target.getBaseCell(),
+                target.getMagicResist(),
                 false,
-                enemy.canBeHealed(),
-                [enemy.getBaseCell()],
-            ),
-        ).toBe(false);
+                target.canBeHealed(),
+                [target.getBaseCell()],
+            );
+
+        expect(cast(smallEnemy)).toBe(false);
+        expect(cast(largeEnemy)).toBe(true);
     });
 
-    // `isSmallSize()` reads the FOOTPRINT, not `size`, so the swap's one-cell-for-one-cell rule covers the
-    // rectangles the mounted class ships (2x1 / 1x2) as well as a 2x2 — shapes no `size` value can express.
-    for (const [label, footprintWidth, footprintHeight] of [
+    // Castling swaps bodies of the SAME footprint, and only those. The four shapes below are compared
+    // pairwise, every direction: the diagonal (like with like) is the whole legal set, and every other
+    // pairing is refused. Two of the shapes are RECTANGLES, which no `size` value can express — and 2x1
+    // against 1x2 is the pairing that proves the rule compares both sides rather than cell counts.
+    const SWAP_SHAPES = [
+        ["1x1", 1, 1],
         ["2x1", 2, 1],
         ["1x2", 1, 2],
-    ] as const) {
-        it(`rejects Castling in either direction for a ${label} body`, () => {
-            const smallCaster = createTestUnit({
-                name: "Harpy",
-                team: PBTypes.TeamVals.RIGHT,
-                spells: ["System:Castling"],
-                stackPower: 5,
-            });
-            const rectangularEnemy = createTestUnit({
-                name: "Mount",
-                team: PBTypes.TeamVals.LEFT,
-                footprintWidth,
-                footprintHeight,
-            });
-            const rectangularCaster = createTestUnit({
-                name: "Mounted Thief",
-                team: PBTypes.TeamVals.RIGHT,
-                spells: ["System:Castling"],
-                stackPower: 5,
-                footprintWidth,
-                footprintHeight,
-            });
-            const smallEnemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.LEFT });
+        ["2x2", 2, 2],
+    ] as const;
 
-            expect(rectangularEnemy.isSmallSize()).toBe(false);
-            expect(rectangularCaster.isSmallSize()).toBe(false);
+    for (const [casterLabel, casterWidth, casterHeight] of SWAP_SHAPES) {
+        for (const [targetLabel, targetWidth, targetHeight] of SWAP_SHAPES) {
+            const sameShape = casterWidth === targetWidth && casterHeight === targetHeight;
+            it(`${sameShape ? "allows" : "refuses"} a ${casterLabel} caster swapping with a ${targetLabel} target`, () => {
+                const caster = createTestUnit({
+                    name: `Caster ${casterLabel}`,
+                    team: PBTypes.TeamVals.RIGHT,
+                    spells: ["System:Castling"],
+                    stackPower: 5,
+                    footprintWidth: casterWidth,
+                    footprintHeight: casterHeight,
+                });
+                const target = createTestUnit({
+                    name: `Target ${targetLabel}`,
+                    team: PBTypes.TeamVals.LEFT,
+                    footprintWidth: targetWidth,
+                    footprintHeight: targetHeight,
+                });
+                const castling = caster.getSpells().find((candidate) => candidate.getName() === "Castling");
 
-            const castling = (unit: Unit) => unit.getSpells().find((candidate) => candidate.getName() === "Castling");
-            const cast = (caster: Unit, target: Unit): boolean | undefined =>
-                canCastSpell(
-                    false,
-                    testGridSettings,
-                    emptyMatrix(),
-                    caster,
-                    target,
-                    castling(caster),
-                    target.getBaseCell(),
-                    target.getMagicResist(),
-                    false,
-                    target.canBeHealed(),
-                    [target.getBaseCell()],
-                );
-
-            // The same caster that CAN swap with a single-cell enemy cannot swap with the rectangle, and
-            // the rectangle cannot swap with anything even when it owns the spell.
-            expect(cast(smallCaster, smallEnemy)).toBe(true);
-            expect(cast(smallCaster, rectangularEnemy)).toBe(false);
-            expect(cast(rectangularCaster, smallEnemy)).toBe(false);
-            expect(cast(rectangularCaster, rectangularEnemy)).toBe(false);
-        });
+                expect(
+                    canCastSpell(
+                        false,
+                        testGridSettings,
+                        emptyMatrix(),
+                        caster,
+                        target,
+                        castling,
+                        target.getBaseCell(),
+                        target.getMagicResist(),
+                        false,
+                        target.canBeHealed(),
+                        [target.getBaseCell()],
+                    ),
+                ).toBe(sameShape);
+            });
+        }
     }
 
     it("rejects direct spell casts for missing spells, immunity, and already-applied effects", () => {

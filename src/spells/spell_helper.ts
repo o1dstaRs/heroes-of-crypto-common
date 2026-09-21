@@ -674,6 +674,25 @@ export function isSpellUsableByCaster(casterUnit: Unit, spell: Spell): boolean {
     );
 }
 
+/**
+ * Whether a position swap (Castling) may exchange these two bodies: only when their footprints are the
+ * SAME shape — identical width AND identical height.
+ *
+ * The swap is a straight exchange of anchors, so identical footprints are what make it well defined: each
+ * body lands exactly on the cells the other vacated, with no overlap to resolve and no cell left stranded.
+ * Any mismatch breaks that. Two cells apiece is not enough — a 2x1 dropped onto a 1x2's anchor would claim
+ * a cell the 1x2 never held — so this compares the two sides, not their areas.
+ *
+ * It is deliberately NOT "both must be 1x1": a 2x2 Arachna Queen that stole Castling through Predatory
+ * Assimilation swaps with a 2x2, and a 2x1 mount with a 2x1.
+ */
+export function hasSwappableFootprint(casterUnit: Unit, targetUnit: Unit): boolean {
+    return (
+        casterUnit.getFootprintWidth() === targetUnit.getFootprintWidth() &&
+        casterUnit.getFootprintHeight() === targetUnit.getFootprintHeight()
+    );
+}
+
 export function canCastSpell(
     isLocked: boolean,
     gridSettings: GridSettings,
@@ -822,9 +841,8 @@ export function canCastSpell(
     if (
         spell.getSpellTargetType() === SpellTargetType.ANY_ENEMY ||
         (spell.getSpellTargetType() === SpellTargetType.ENEMY_WITHIN_MOVEMENT_RANGE &&
-            casterUnit.isSmallSize() &&
             targetUnit &&
-            targetUnit.isSmallSize() &&
+            hasSwappableFootprint(casterUnit, targetUnit) &&
             oneOfTheEnemiesHasTargetCell())
     ) {
         const forcedUnitId = casterUnit.getTarget();

@@ -165,7 +165,7 @@
         "Castling": {
             "name": "Castling",
             "level": 0,
-            "desc": ["Swaps with small opponent within caster's movement range."],
+            "desc": ["Swaps with an opponent of the same size within caster's movement range."],
             "target": "ENEMY_WITHIN_MOVEMENT_RANGE",
             "power": 0,
             "power_type": "POSITION_CHANGE",

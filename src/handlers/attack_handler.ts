@@ -686,12 +686,13 @@ export class AttackHandler {
                 if (!(
                     currentActiveSpell.getPowerType() === SpellPowerType.MIND && debuffTarget.hasMindAttackResistance()
                 )) {
-                    // Castling's one-cell swap is only defined for two small units. Re-check the effective
-                    // target after Absorb Penalties redirection so an aura cannot collapse a large unit's
-                    // 2x2 footprint into a single occupied cell.
+                    // A swap exchanges anchors, so it is only well defined between two bodies of the SAME
+                    // footprint. Re-check the EFFECTIVE target after Absorb Penalties redirection: the aura
+                    // can hand the swap to a body of another shape, which would land one unit on cells the
+                    // other never held.
                     if (
                         currentActiveSpell.getPowerType() === SpellPowerType.POSITION_CHANGE &&
-                        (!attackerUnit.isSmallSize() || !debuffTarget.isSmallSize())
+                        !SpellHelper.hasSwappableFootprint(attackerUnit, debuffTarget)
                     ) {
                         applied = false;
                     } else if (currentActiveSpell.getPowerType() === SpellPowerType.POSITION_CHANGE) {
@@ -714,15 +715,28 @@ export class AttackHandler {
                                 debuffTarget.isSmallSize(),
                             );
 
-                            const newAttackerPosition = GridMath.getPositionForCell(
+                            // Both bodies are the same shape (guarded above), so each one landing on the
+                            // other's ANCHOR lands on exactly the cells the other just vacated. Anchor and
+                            // position are not interchangeable: `position` is the footprint's CENTRE, which
+                            // only coincides with the anchor cell's centre for a 1x1 — so the move has to go
+                            // through getPositionForFootprintAnchor, and the whole body has to be
+                            // re-registered with occupyCells, not one cell with occupyCell.
+                            const footprintWidth = attackerUnit.getFootprintWidth();
+                            const footprintHeight = attackerUnit.getFootprintHeight();
+
+                            const newAttackerPosition = GridMath.getPositionForFootprintAnchor(
+                                this.gridSettings,
                                 initialTargetUnitCell,
-                                this.gridSettings.getMinX(),
-                                this.gridSettings.getStep(),
-                                this.gridSettings.getHalfStep(),
+                                footprintWidth,
+                                footprintHeight,
                             );
                             attackerUnit.setPosition(newAttackerPosition.x, newAttackerPosition.y, false);
-                            this.grid.occupyCell(
-                                initialTargetUnitCell,
+                            this.grid.occupyCells(
+                                GridMath.getFootprintCellsForAnchor(
+                                    initialTargetUnitCell,
+                                    footprintWidth,
+                                    footprintHeight,
+                                ),
                                 attackerUnit.getId(),
                                 attackerUnit.getTeam(),
                                 attackerUnit.getAttackRange(),
@@ -730,15 +744,19 @@ export class AttackHandler {
                                 attackerUnit.hasAbilityActive("Made of Water"),
                             );
 
-                            const newTargetUnitPosition = GridMath.getPositionForCell(
+                            const newTargetUnitPosition = GridMath.getPositionForFootprintAnchor(
+                                this.gridSettings,
                                 initialAttackerCell,
-                                this.gridSettings.getMinX(),
-                                this.gridSettings.getStep(),
-                                this.gridSettings.getHalfStep(),
+                                footprintWidth,
+                                footprintHeight,
                             );
                             debuffTarget.setPosition(newTargetUnitPosition.x, newTargetUnitPosition.y, false);
-                            this.grid.occupyCell(
-                                initialAttackerCell,
+                            this.grid.occupyCells(
+                                GridMath.getFootprintCellsForAnchor(
+                                    initialAttackerCell,
+                                    footprintWidth,
+                                    footprintHeight,
+                                ),
                                 debuffTarget.getId(),
                                 debuffTarget.getTeam(),
                                 debuffTarget.getAttackRange(),

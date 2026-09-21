@@ -2488,7 +2488,7 @@ describe("GameActionEngine", () => {
         expect(setup.right.getBaseCell()).toEqual(casterStart);
     });
 
-    it("rejects Castling inherited by a LARGE caster without mutating combat state", () => {
+    it("rejects a LARGE caster's Castling aimed at a SMALL enemy without mutating combat state", () => {
         const enemyCell = { x: 5, y: 3 };
         const setup = setupActionFight({
             leftSize: PBTypes.UnitSizeVals.LARGE,
@@ -2518,13 +2518,60 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
-    // `isSmallSize()` is FOOTPRINT-based, not `size`-based, so the one-cell-for-one-cell rule has to hold
-    // for the rectangles the mounted class ships (2x1 / 1x2) exactly as it does for a 2x2. No `size` value
-    // can express a rectangle, so the LARGE-caster test above cannot reach these shapes.
+    // A swap exchanges anchors, so the two bodies must be the SAME footprint. Mismatches are refused in
+    // either direction; the rectangles are the shapes no `size` value can express, so the LARGE-caster test
+    // above cannot reach them.
     for (const [label, width, height] of [
         ["2x1", 2, 1],
         ["1x2", 1, 2],
+        ["2x2", 2, 2],
     ] as const) {
+        it(`swaps a ${label} caster with a ${label} enemy, moving both whole bodies`, () => {
+            // The anchor is the body's TOP-RIGHT cell, so at (7,3) a 2x1 covers (6,3)-(7,3), a 1x2 covers
+            // (7,2)-(7,3) and a 2x2 covers (6,2)-(7,3). The caster is anchored at (3,3) and the support
+            // stands on (4,3), so no pair of bodies overlaps before the swap.
+            const enemyCell = { x: 7, y: 3 };
+            const setup = setupActionFight({
+                leftSpells: ["System:Castling"],
+                leftStackPower: 4,
+                leftFootprintWidth: width,
+                leftFootprintHeight: height,
+                rightCell: enemyCell,
+                rightFootprintWidth: width,
+                rightFootprintHeight: height,
+                currentEnemiesCellsWithinMovementRange: [enemyCell],
+            });
+            const casterStart = { ...setup.left.getBaseCell() };
+            const casterStartCells = setup.left.getCells().map((cell) => ({ ...cell }));
+            const targetStartCells = setup.right.getCells().map((cell) => ({ ...cell }));
+            expect(casterStartCells).toHaveLength(width * height);
+            expect(targetStartCells).toHaveLength(width * height);
+
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.left.getId(),
+                spellName: "Castling",
+                targetId: setup.right.getId(),
+                targetCell: setup.right.getBaseCell(),
+            });
+
+            expect(result.completed).toBe(true);
+            // Anchors exchanged...
+            expect(setup.left.getBaseCell()).toEqual(enemyCell);
+            expect(setup.right.getBaseCell()).toEqual(casterStart);
+            // ...and so did the WHOLE bodies. A one-cell swap would leave each unit's position on the
+            // anchor cell's centre rather than the footprint's, and getCells() would disagree with the grid.
+            expect(setup.left.getCells()).toEqual(targetStartCells);
+            expect(setup.right.getCells()).toEqual(casterStartCells);
+            // The grid has to agree with the units: every vacated cell reassigned, none stranded.
+            for (const cell of targetStartCells) {
+                expect(setup.grid.getOccupantUnitId(cell)).toBe(setup.left.getId());
+            }
+            for (const cell of casterStartCells) {
+                expect(setup.grid.getOccupantUnitId(cell)).toBe(setup.right.getId());
+            }
+        });
+
         it(`rejects Castling aimed at a ${label} target without mutating combat state`, () => {
             // Anchored at (7,3) a 2x1 body covers (6,3)-(7,3), clear of the support standing on (4,3).
             const enemyCell = { x: 7, y: 3 };
@@ -2537,7 +2584,7 @@ describe("GameActionEngine", () => {
                 currentEnemiesCellsWithinMovementRange: [enemyCell],
             });
             expect(setup.right.isSmallSize()).toBe(false);
-            expect(setup.right.getCells()).toHaveLength(2);
+            expect(setup.right.getCells()).toHaveLength(width * height);
             const casterPosition = structuredClone(setup.left.getPosition());
             const targetPosition = structuredClone(setup.right.getPosition());
             const matrix = structuredClone(setup.grid.getMatrix());

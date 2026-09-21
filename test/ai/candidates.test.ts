@@ -2233,38 +2233,51 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         ).toHaveLength(0);
     });
 
-    it("a RECTANGULAR (2x1) caster that inherited Castling enumerates none, and its range list is empty", () => {
+    it("a RECTANGULAR (2x1) caster that inherited Castling swaps with a 2x1, never with a 1x1", () => {
         const c = createCombatTestContext();
         const tiger = makeReal(LEFT, "Nature", "White Tiger");
         tiger.grantStolenAbility("Castling", [":Castling"]);
         tiger.setStackPower(5);
-        const enemy = createTestUnit({ team: RIGHT, name: "Near", attackType: MELEE, amountAlive: 3 });
+        // Wolf is another shipped 2x1, so it is the one enemy here whose body this one can exchange with.
+        const wolf = makeReal(RIGHT, "Nature", "Wolf");
+        const small = createTestUnit({ team: RIGHT, name: "Small", attackType: MELEE, amountAlive: 3 });
         placeUnit(c.grid, c.unitsHolder, tiger, { x: 3, y: 3 });
-        placeUnit(c.grid, c.unitsHolder, enemy, { x: 6, y: 6 });
+        placeUnit(c.grid, c.unitsHolder, wolf, { x: 6, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, small, { x: 3, y: 5 });
         const ctx = ctxFor(c);
 
         expect(tiger.hasSpellRemaining("Castling")).toBe(true);
-        expect(tiger.isSmallSize()).toBe(false);
-        expect(getEnemiesCellsWithinMovementRange(tiger, ctx)).toHaveLength(0);
-        expect(
-            ofKind(enumerateCandidates(tiger, ctx, endTurn(tiger)).candidates, "spell").filter(
-                (candidate) => candidate.spellName === "Castling",
-            ),
-        ).toHaveLength(0);
+        expect([wolf.getFootprintWidth(), wolf.getFootprintHeight()]).toEqual([2, 1]);
+        // Both enemies are inside the tiger's stride; only the matching body is offered.
+        expect(getEnemiesCellsWithinMovementRange(tiger, ctx)).toEqual([wolf.getBaseCell()]);
+
+        const castling = ofKind(enumerateCandidates(tiger, ctx, endTurn(tiger)).candidates, "spell").filter(
+            (candidate) => candidate.spellName === "Castling",
+        );
+        expect(castling).toHaveLength(1);
+        expect(castling[0].targetId).toBe(wolf.getId());
     });
 
-    it("Arachna Queen: inherited Castling is not enumerated for a LARGE caster", () => {
+    it("Arachna Queen: inherited Castling swaps with another 2x2, never with a 1x1", () => {
         const c = createCombatTestContext();
         const queen = makeReal(LEFT, "Nature", "Arachna Queen");
         queen.grantStolenAbility("Castling", [":Castling"]);
         queen.setStackPower(5);
-        const enemy = createTestUnit({ team: RIGHT, name: "Near", attackType: MELEE, amountAlive: 3 });
+        const small = createTestUnit({ team: RIGHT, name: "Near", attackType: MELEE, amountAlive: 3 });
+        const big = makeReal(RIGHT, "Nature", "Gargantuan"); // the other 2x2 on the board
         placeLarge(c, queen, { x: 3, y: 3 });
-        placeUnit(c.grid, c.unitsHolder, enemy, { x: 6, y: 6 });
+        placeUnit(c.grid, c.unitsHolder, small, { x: 6, y: 6 });
+        placeLarge(c, big, { x: 7, y: 3 });
+        const ctx = ctxFor(c);
 
         expect(queen.hasSpellRemaining("Castling")).toBe(true);
-        const { candidates } = enumerateCandidates(queen, ctxFor(c), endTurn(queen));
-        expect(ofKind(candidates, "spell").filter((candidate) => candidate.spellName === "Castling")).toHaveLength(0);
+        expect(getEnemiesCellsWithinMovementRange(queen, ctx)).toEqual([big.getBaseCell()]);
+
+        const castling = ofKind(enumerateCandidates(queen, ctx, endTurn(queen)).candidates, "spell").filter(
+            (candidate) => candidate.spellName === "Castling",
+        );
+        expect(castling).toHaveLength(1);
+        expect(castling[0].targetId).toBe(big.getId());
     });
 
     it("Battle Mage: Fire Strike respects thrown LOS and its clear candidate completes in the engine", () => {

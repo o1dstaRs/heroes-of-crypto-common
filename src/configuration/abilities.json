@@ -1194,7 +1194,7 @@
     "Castling": {
         "name": "Castling",
         "type": "ATTACK",
-        "desc": ["Swaps small opponent within movement range when casted"],
+        "desc": ["Swaps with an opponent of the same size within movement range when casted"],
         "power": 0,
         "power_type": "SWAP_WITH_OPPONENT",
         "skip_reponse": false,

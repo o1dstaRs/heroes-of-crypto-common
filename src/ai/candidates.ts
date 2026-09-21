@@ -39,6 +39,7 @@ import {
     firstSummonableAnchor,
     canMassCastSpell,
     thrownSpellReachesAimedTarget,
+    hasSwappableFootprint,
     isInterceptedThrownSpell,
     isSpellUsableByCaster,
 } from "../spells/spell_helper";
@@ -833,10 +834,16 @@ export interface ICandidateSet {
 }
 
 /**
- * Base cells of SMALL living enemies standing within the unit's movement range — the legality input for
+ * Base cells of the living enemies this unit could SWAP with — the legality input for
  * ENEMY_WITHIN_MOVEMENT_RANGE spells (Harpy's Castling). Mirrors the client's arming path
  * (Sandbox.currentEnemiesCellsWithinMovementRange): pathing runs on grid.getMatrixNoUnits() (enemy-occupied
  * cells must be REACHABLE-through, not blocked), no aggro board, small/fly/lava flags from the unit.
+ *
+ * Two conditions, and both are about the ANCHOR. An enemy qualifies only if its footprint matches the
+ * caster's (hasSwappableFootprint) and its own anchor is a cell this body could stand on — not merely a cell
+ * the body could touch. That distinction is invisible at 1x1, where a unit's only cell IS its anchor, but it
+ * decides the multi-cell case: a 2x1 that can reach a 2x1 enemy's far cell but not its anchor would land on
+ * cells the enemy never held.
  *
  * Exported for consumers to wire into IGameActionEngineContext.getCurrentEnemiesCellsWithinMovementRange —
  * the engine's castSpell re-validates against that context callback, so the SAME list must be visible on
@@ -848,12 +855,6 @@ export function getEnemiesCellsWithinMovementRange(unit: Unit, context: IDecisio
         return provided;
     }
     if (!unit.canMove()) {
-        return [];
-    }
-    // The swap is defined only between two single-cell bodies, so a 2x1 / 1x2 / 2x2 caster has no legal
-    // target however far it can walk. canCastSpell refuses it anyway; answering [] here keeps the list the
-    // engine and the AI share from ever describing a swap neither of them will allow.
-    if (!unit.isSmallSize()) {
         return [];
     }
     const moveCells = context.pathHelper.getMovePath(
@@ -869,16 +870,30 @@ export function getEnemiesCellsWithinMovementRange(unit: Unit, context: IDecisio
         unit.getFootprintHeight(),
     ).cells;
     const out: XY[] = [];
+    const seen = new Set<string>();
     for (const c of moveCells) {
         const enemyId = context.grid.getOccupantUnitId(c);
         if (!enemyId) {
             continue;
         }
         const enemy = context.unitsHolder.getAllUnits().get(enemyId);
-        if (!enemy || enemy.isDead() || enemy.getTeam() === unit.getTeam() || !enemy.isSmallSize()) {
+        if (!enemy || enemy.isDead() || enemy.getTeam() === unit.getTeam()) {
             continue;
         }
-        out.push(enemy.getBaseCell());
+        // The reachable cell has to be the enemy's own anchor: that is where this body would come to rest.
+        const anchor = enemy.getBaseCell();
+        if (anchor.x !== c.x || anchor.y !== c.y) {
+            continue;
+        }
+        if (!hasSwappableFootprint(unit, enemy)) {
+            continue;
+        }
+        const key = `${anchor.x},${anchor.y}`;
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        out.push(anchor);
     }
     return out;
 }
@@ -2619,7 +2634,7 @@ class CandidateGenerator {
      *   ANY_ALLY (Heal/buffs/Resurrection)         -> per-ally canCastSpell
      *   ANY_ENEMY (debuffs)                        -> per-enemy canCastSpell
      *   ALLIES_AREA (Blacksmith Craft)             -> every useful in-grid 2x2 ally footprint
-     *   ENEMY_WITHIN_MOVEMENT_RANGE (Castling)     -> small enemies on getEnemiesCellsWithinMovementRange
+     *   ENEMY_WITHIN_MOVEMENT_RANGE (Castling)     -> same-footprint enemies on getEnemiesCellsWithinMovementRange
      *   ALL_ALLIES / ALL_ENEMIES / ALL_FLYING      -> single mass candidate via canMassCastSpell
      *   RANDOM_CLOSE_TO_CASTER summons             -> deterministic first empty adjacent cell
      * AUTO-targeted entries (system effects like Morale) are not player-castable and are skipped.
@@ -3253,11 +3268,9 @@ class CandidateGenerator {
             }
 
             if (targetType === SpellTargetType.ENEMY_WITHIN_MOVEMENT_RANGE) {
-                // Castling swaps two SMALL units. Predatory Assimilation can install the spell on a large
-                // Arachna Queen, but that inherited cast is not engine-legal and must never be enumerated.
-                if (!this.unit.isSmallSize()) {
-                    continue;
-                }
+                // Castling exchanges anchors, so it is legal only between two bodies of the same footprint —
+                // a 1x1 with a 1x1, and the 2x2 Arachna Queen that stole the spell through Predatory
+                // Assimilation with another 2x2.
                 // The legality list is computed once per decision; the engine must see the same list through
                 // its own context callback (see getEnemiesCellsWithinMovementRange docs).
                 castlingCells ??= getEnemiesCellsWithinMovementRange(this.unit, this.context);
@@ -3265,7 +3278,7 @@ class CandidateGenerator {
                     continue;
                 }
                 for (const enemy of this.enemies) {
-                    if (isHidden(enemy) || !enemy.isSmallSize()) {
+                    if (isHidden(enemy) || !hasSwappableFootprint(this.unit, enemy)) {
                         continue;
                     }
                     const bc = enemy.getBaseCell();
