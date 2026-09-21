@@ -858,7 +858,7 @@
         "Goblin Knight": {
             "name": "Goblin Knight",
             "hp": 100,
-            "steps": 4.9,
+            "steps": 5.1,
             "initiative": 6,
             "armor": 22,
             "attack_type": "MELEE",

@@ -75,7 +75,12 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // any trace holding either diverges from its first move on. Measured in a clean worktree at HEAD with ONLY
 // creatures.json changed (a peer had unrelated WIP in the shared tree): the digest is green at HEAD and two
 // isolated runs reproduced this value byte-identically.
-const EXPECTED_REPLAY_SHA256 = "dae4aa5cd272b91496c09b869276e9a025dd9a567214597109058c13ce838392";
+// Previous approved digest: dae4aa5cd272b91496c09b869276e9a025dd9a567214597109058c13ce838392
+// Re-pinned 2026-09-20 (owner walk-back): Goblin Knight's steps go back 4.9 -> 5.1 — hp 100 and losing
+// Wardguard from the pass above stand. Goblin Knight is a level-3 stack fielded across the seeded draws
+// and steps decide every move, so any trace holding one diverges from its first move on. Measured at a
+// clean HEAD with only this one-line change; two isolated runs reproduced this value byte-identically.
+const EXPECTED_REPLAY_SHA256 = "d58a6db6df70cbfbd90b33ed893dccb86108c50f864bbfec3970060776f2f35c";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
