@@ -1346,7 +1346,7 @@
             "name": "Smoke",
             "level": 2,
             "desc": [
-                "Throws a 2x2 smoke cloud onto free cells anywhere on the battlefield.",
+                "Throws a 3x3 smoke cloud onto free cells anywhere on the battlefield.",
                 "Any ranged attack (either side) whose arrow path crosses a smoked cell deals HALF damage (its range divisor doubles: full -> 1/2, 1/2 -> 1/4).",
                 "A creature stepping onto a smoked cell disperses the smoke from that cell.",
                 "Lasts 3 laps."

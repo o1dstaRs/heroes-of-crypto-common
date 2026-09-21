@@ -1472,11 +1472,10 @@ export class GameActionEngine {
         return { completed: true, events };
     }
     /**
-     * Smoke spell (Wandering Mage / Book of Chaos): throws a 2x2 smoke cloud onto FREE cells anywhere on the
-     * battlefield. Only empty cells of the 2x2 block become smoked — cells already occupied by a creature (or
-     * off-grid) are skipped, so the cloud shapes around whatever is standing in it. Ranged attacks crossing a
-     * smoked cell have their damage halved (divisor x2); a creature stepping on a smoked cell dispels it; the
-     * cloud lasts `spell.getLapsTotal()` laps. One cast = one charge.
+     * Smoke spell (Wandering Mage / Book of Chaos): throws a 3x3 smoke cloud onto FREE cells anywhere on the
+     * battlefield, CENTRED on the aimed cell the way Meteor Shower's 3x3 is. Ranged attacks crossing a smoked
+     * cell have their damage halved (divisor x2); a creature stepping on a smoked cell dispels it; the cloud
+     * lasts `spell.getLapsTotal()` laps. One cast = one charge.
      */
     private smokeCast(
         action: Extract<GameAction, { type: "cast_spell" }>,
@@ -1487,9 +1486,9 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
         const c = action.targetCell;
-        const cells: XY[] = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
-        // The WHOLE 2x2 must be placeable — a partial cast is rejected outright rather than quietly
-        // smoking two of four cells, so what the aim preview highlights is exactly what lands. Blocked by
+        const cells = SpellHelper.cellTargetedSpellBlockCells(spell.getName(), c);
+        // The WHOLE 3x3 must be placeable — a partial cast is rejected outright rather than quietly
+        // smoking part of the block, so what the aim preview highlights is exactly what lands. Blocked by
         // the mountain, a narrowed-away cell, a creature, or the edge of the board; lava and water are
         // fine (smoking the lava lane is an intended play). See isSmokeableCell, shared with the client.
         const settings = this.context.grid.getSettings();

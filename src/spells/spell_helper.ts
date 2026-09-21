@@ -438,19 +438,22 @@ export function firstTargetedSpellSightBlocker(
     );
 }
 
+/** The cell-targeted spells whose block is an odd-sided 3x3, centred on the aimed cell. */
+const CELL_TARGETED_3X3_SPELLS: ReadonlySet<string> = new Set(["Meteor Shower", "Smoke"]);
+
 /**
  * The block of cells a CELL-targeted spell covers when aimed at `origin`.
  *
- * Meteor Shower's 3x3 is CENTRED on the aimed cell — an odd-sided footprint pivots about the cursor, the way
- * the Fire Wall's line does. Everything else here is 2x2 (Meteorite, Smoke, Craft) and hangs off the
- * aimed cell as its bottom-left corner, because an even-sided block has no centre cell to anchor on.
+ * Meteor Shower's and Smoke's 3x3 are CENTRED on the aimed cell — an odd-sided footprint pivots about the
+ * cursor, the way the Fire Wall's line does. Everything else here is 2x2 (Meteorite, Craft) and hangs off
+ * the aimed cell as its bottom-left corner, because an even-sided block has no centre cell to anchor on.
  *
- * The ONE place either footprint is derived: meteoriteCast / meteorShowerCast read their block out of this,
- * and so does the client's aim outline and every damage label drawn inside it. A preview whose footprint
- * differs from the cast's is worse than no preview at all.
+ * The ONE place any of these footprints is derived: meteoriteCast / meteorShowerCast / smokeCast read their
+ * block out of this, and so does the client's aim outline and every damage label drawn inside it. A preview
+ * whose footprint differs from the cast's is worse than no preview at all.
  */
 export function cellTargetedSpellBlockCells(spellName: string, origin: XY): XY[] {
-    const spread = spellName === "Meteor Shower" ? [-1, 0, 1] : [0, 1];
+    const spread = CELL_TARGETED_3X3_SPELLS.has(spellName) ? [-1, 0, 1] : [0, 1];
     return spread.flatMap((dx) => spread.map((dy) => ({ x: origin.x + dx, y: origin.y + dy })));
 }
 

@@ -216,7 +216,7 @@ export type GameEvent =
            */
           outcomes?: { unitId: string; outcome: string; grantedAbility?: string; amount?: number }[];
       }
-    // Smoke spell: clouds placed on free cells of a 2x2 block. lapsRemaining is the per-cell budget at place
+    // Smoke spell: clouds placed on free cells of a 3x3 block. lapsRemaining is the per-cell budget at place
     // time (mirrors SmokeClouds.add) — the client renders the cloud and can show the countdown.
     | { type: "smoke_placed"; casterId: string; cells: XY[]; lapsRemaining: number }
     // A creature stepped onto a smoked cell (or otherwise occupied it) — that cell's smoke disperses now.

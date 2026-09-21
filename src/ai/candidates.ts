@@ -35,6 +35,7 @@ import { ToFactionName } from "../factions/faction_type";
 import { AttackHandler, type IPreparedRangeAttackEvaluation } from "../handlers/attack_handler";
 import {
     canCastSpell,
+    cellTargetedSpellBlockCells,
     firstSummonableAnchor,
     canMassCastSpell,
     thrownSpellReachesAimedTarget,
@@ -2651,7 +2652,7 @@ class CandidateGenerator {
         }
     }
     /**
-     * Smoke spell candidate selection. Smoke is a defensive tool: it halves ranged damage that crosses a 2x2
+     * Smoke spell candidate selection. Smoke is a defensive tool: it halves ranged damage that crosses a 3x3
      * cloud, so the AI wants it on the line of fire BETWEEN enemy ranged units and its own army. There is no
      * cast-range gate, so we search a bounded set of engine-legal cells sampled between each enemy shooter and
      * our army. Every sample is scored by the authoritative best legal shot before versus after the cloud:
@@ -2659,7 +2660,7 @@ class CandidateGenerator {
      *     AttackHandler, with the proposed cells passed as a pure hypothetical;
      *   - the shooter may retarget after Smoke, so a bypassable cloud receives no imaginary protection value;
      *   - enemy damage prevented adds value and friendly damage prevented subtracts it;
-     *   - all 4 footprint cells must pass the engine's exact smoke-placement oracle.
+     *   - all 9 footprint cells must pass the engine's exact smoke-placement oracle.
      * Determinism: ties broken by grid order (no RNG), so the lookahead is reproducible.
      */
     private addSmokeCastCandidates(spell: Spell): void {
@@ -2727,14 +2728,16 @@ class CandidateGenerator {
                     x: Math.round(ec.x + (ax - ec.x) * frac),
                     y: Math.round(ec.y + (ay - ec.y) * frac),
                 };
-                // The 2x2 expands +x/+y from the anchor; slide a little to fit if the anchor is at the edge.
-                for (const ox of [0, -1]) {
-                    for (const oy of [0, -1]) {
+                // The 3x3 is CENTRED on the anchor, so the sample itself is the natural placement; the
+                // neighbours are probed either way, because one blocked cell fails the whole all-or-nothing
+                // block and a cloud one cell over usually still covers the same lane.
+                for (const ox of [0, -1, 1]) {
+                    for (const oy of [0, -1, 1]) {
                         const c = { x: anchor.x + ox, y: anchor.y + oy };
                         const anchorKey = (c.x << 8) | (c.y & 0xff);
                         if (seenAnchors.has(anchorKey)) continue;
                         seenAnchors.add(anchorKey);
-                        const cells = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
+                        const cells = cellTargetedSpellBlockCells(spell.getName(), c);
                         if (!cells.every((cell) => isSmokeableCell(grid, isCellWithinGrid(gs, cell), cell))) {
                             continue;
                         }

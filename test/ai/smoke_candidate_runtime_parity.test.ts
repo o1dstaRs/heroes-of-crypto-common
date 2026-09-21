@@ -27,6 +27,7 @@ import type { IRangeAttackEvaluation } from "../../src/handlers/attack_handler";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { isSmokeableCell, SmokeClouds } from "../../src/spells/smoke_clouds";
+import { cellTargetedSpellBlockCells } from "../../src/spells/spell_helper";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import {
@@ -65,13 +66,9 @@ function decisionContext(combat: CombatTestContext): IDecisionContext {
     };
 }
 
+/** The engine's own footprint, so the harness can never drift from the block smokeCast actually lays. */
 function smokeCells(anchor: XY): XY[] {
-    return [
-        anchor,
-        { x: anchor.x + 1, y: anchor.y },
-        { x: anchor.x, y: anchor.y + 1 },
-        { x: anchor.x + 1, y: anchor.y + 1 },
-    ];
+    return cellTargetedSpellBlockCells("Smoke", anchor);
 }
 
 interface ISmokeHarness {
@@ -172,7 +169,10 @@ describe("authoritative hypothetical Smoke range evaluation", () => {
         placeUnit(combat.grid, combat.unitsHolder, shooter, { x: 1, y: 1 });
         placeUnit(combat.grid, combat.unitsHolder, target, { x: 2, y: 3 });
         const context = decisionContext(combat);
-        const hypothetical = smokeCells({ x: 2, y: 1 });
+        // Centred at (3,1): the 3x3 sits across the centre ray but still leaves one of the target's visible
+        // edges clear. (2,1) was the 2x2's anchor for the same geometry — a 3x3 there blankets every edge,
+        // which would make the test pass for the wrong reason (no bypass left to ignore).
+        const hypothetical = smokeCells({ x: 3, y: 1 });
         const smokeHashes = new Set(hypothetical.map((cell) => `${cell.x},${cell.y}`));
 
         expect(
