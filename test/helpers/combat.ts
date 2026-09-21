@@ -67,6 +67,12 @@ export interface TestUnitOptions {
     initiative?: number;
     movementType?: MovementType;
     size?: UnitSizeType;
+    /**
+     * The board footprint in cells. Omitted, both default to `size` (the square legacy shape), so a test
+     * only names them to build a RECTANGLE — 2x1 or 1x2 — which no `size` value can express.
+     */
+    footprintWidth?: number;
+    footprintHeight?: number;
     level?: UnitLevelType;
     unitType?: UnitType;
     spells?: string[];
@@ -183,6 +189,10 @@ export function createTestUnit(options: TestUnitOptions = {}): Unit {
             "",
             options.stackPower ?? 1,
             options.target ?? "",
+            noStrings,
+            false,
+            options.footprintWidth,
+            options.footprintHeight,
         ),
         testGridSettings,
         options.team ?? PBTypes.TeamVals.RIGHT,

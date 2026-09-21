@@ -2212,6 +2212,47 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         expect(ofKind(candidates, "spell").filter((s) => s.spellName === "Castling").length).toBe(0);
     });
 
+    it("Harpy: a RECTANGULAR (2x1) enemy within range is neither listed nor a Castling target", () => {
+        const c = createCombatTestContext();
+        const harpy = makeReal(LEFT, "Might", "Harpy");
+        harpy.setStackPower(5);
+        // White Tiger is a shipped 2x1 mount — `size` 2, footprint 2x1, so it is NOT small even though a
+        // rectangle is no bigger across than a single cell in one of its two axes.
+        const tiger = makeReal(RIGHT, "Nature", "White Tiger");
+        expect([tiger.getFootprintWidth(), tiger.getFootprintHeight()]).toEqual([2, 1]);
+        placeUnit(c.grid, c.unitsHolder, harpy, { x: 2, y: 2 });
+        placeUnit(c.grid, c.unitsHolder, tiger, { x: 6, y: 6 });
+        const ctx = ctxFor(c);
+
+        // The legality list the engine and the AI share must not name the rectangle's cells at all.
+        expect(getEnemiesCellsWithinMovementRange(harpy, ctx)).toHaveLength(0);
+        expect(
+            ofKind(enumerateCandidates(harpy, ctx, endTurn(harpy)).candidates, "spell").filter(
+                (s) => s.spellName === "Castling",
+            ),
+        ).toHaveLength(0);
+    });
+
+    it("a RECTANGULAR (2x1) caster that inherited Castling enumerates none, and its range list is empty", () => {
+        const c = createCombatTestContext();
+        const tiger = makeReal(LEFT, "Nature", "White Tiger");
+        tiger.grantStolenAbility("Castling", [":Castling"]);
+        tiger.setStackPower(5);
+        const enemy = createTestUnit({ team: RIGHT, name: "Near", attackType: MELEE, amountAlive: 3 });
+        placeUnit(c.grid, c.unitsHolder, tiger, { x: 3, y: 3 });
+        placeUnit(c.grid, c.unitsHolder, enemy, { x: 6, y: 6 });
+        const ctx = ctxFor(c);
+
+        expect(tiger.hasSpellRemaining("Castling")).toBe(true);
+        expect(tiger.isSmallSize()).toBe(false);
+        expect(getEnemiesCellsWithinMovementRange(tiger, ctx)).toHaveLength(0);
+        expect(
+            ofKind(enumerateCandidates(tiger, ctx, endTurn(tiger)).candidates, "spell").filter(
+                (candidate) => candidate.spellName === "Castling",
+            ),
+        ).toHaveLength(0);
+    });
+
     it("Arachna Queen: inherited Castling is not enumerated for a LARGE caster", () => {
         const c = createCombatTestContext();
         const queen = makeReal(LEFT, "Nature", "Arachna Queen");

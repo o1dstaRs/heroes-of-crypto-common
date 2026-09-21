@@ -850,6 +850,12 @@ export function getEnemiesCellsWithinMovementRange(unit: Unit, context: IDecisio
     if (!unit.canMove()) {
         return [];
     }
+    // The swap is defined only between two single-cell bodies, so a 2x1 / 1x2 / 2x2 caster has no legal
+    // target however far it can walk. canCastSpell refuses it anyway; answering [] here keeps the list the
+    // engine and the AI share from ever describing a swap neither of them will allow.
+    if (!unit.isSmallSize()) {
+        return [];
+    }
     const moveCells = context.pathHelper.getMovePath(
         unit.getBaseCell(),
         context.grid.getMatrixNoUnits(),

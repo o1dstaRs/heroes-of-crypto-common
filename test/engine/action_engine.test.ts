@@ -60,6 +60,11 @@ const setupActionFight = (
         leftDamageMax?: number;
         leftRangeShots?: number;
         leftSize?: UnitSizeType;
+        /** Rectangular bodies (2x1 / 1x2) no `size` value can express; both default to `size`. */
+        leftFootprintWidth?: number;
+        leftFootprintHeight?: number;
+        rightFootprintWidth?: number;
+        rightFootprintHeight?: number;
         leftSpells?: string[];
         leftStackPower?: number;
         leftMovementType?: MovementType;
@@ -101,6 +106,8 @@ const setupActionFight = (
         abilities: opts.leftAbilities,
         rangeShots: opts.leftRangeShots ?? 0,
         size: opts.leftSize,
+        footprintWidth: opts.leftFootprintWidth,
+        footprintHeight: opts.leftFootprintHeight,
         initiative: 5,
         morale: 4,
         spells: opts.leftSpells,
@@ -123,6 +130,8 @@ const setupActionFight = (
         rangeShots: opts.rightRangeShots,
         spells: opts.rightSpells,
         movementType: opts.rightMovementType,
+        footprintWidth: opts.rightFootprintWidth,
+        footprintHeight: opts.rightFootprintHeight,
     });
     const leftSupport = createTestUnit({
         name: "Lower Support",
@@ -2509,6 +2518,81 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
     });
 
+    // `isSmallSize()` is FOOTPRINT-based, not `size`-based, so the one-cell-for-one-cell rule has to hold
+    // for the rectangles the mounted class ships (2x1 / 1x2) exactly as it does for a 2x2. No `size` value
+    // can express a rectangle, so the LARGE-caster test above cannot reach these shapes.
+    for (const [label, width, height] of [
+        ["2x1", 2, 1],
+        ["1x2", 1, 2],
+    ] as const) {
+        it(`rejects Castling aimed at a ${label} target without mutating combat state`, () => {
+            // Anchored at (7,3) a 2x1 body covers (6,3)-(7,3), clear of the support standing on (4,3).
+            const enemyCell = { x: 7, y: 3 };
+            const setup = setupActionFight({
+                leftSpells: ["System:Castling"],
+                leftStackPower: 4,
+                rightCell: enemyCell,
+                rightFootprintWidth: width,
+                rightFootprintHeight: height,
+                currentEnemiesCellsWithinMovementRange: [enemyCell],
+            });
+            expect(setup.right.isSmallSize()).toBe(false);
+            expect(setup.right.getCells()).toHaveLength(2);
+            const casterPosition = structuredClone(setup.left.getPosition());
+            const targetPosition = structuredClone(setup.right.getPosition());
+            const matrix = structuredClone(setup.grid.getMatrix());
+
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.left.getId(),
+                spellName: "Castling",
+                targetId: setup.right.getId(),
+                targetCell: setup.right.getBaseCell(),
+            });
+
+            expect(result.completed).toBe(false);
+            expect(result.rejectionReason).toBe("spell_not_available");
+            expect(setup.left.getPosition()).toEqual(casterPosition);
+            expect(setup.right.getPosition()).toEqual(targetPosition);
+            expect(setup.grid.getMatrix()).toEqual(matrix);
+            expect(setup.left.hasSpellRemaining("Castling")).toBe(true);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
+        });
+
+        it(`rejects Castling inherited by a ${label} caster without mutating combat state`, () => {
+            const enemyCell = { x: 5, y: 3 };
+            const setup = setupActionFight({
+                leftSpells: ["System:Castling"],
+                leftStackPower: 4,
+                leftFootprintWidth: width,
+                leftFootprintHeight: height,
+                rightCell: enemyCell,
+                currentEnemiesCellsWithinMovementRange: [enemyCell],
+            });
+            expect(setup.left.isSmallSize()).toBe(false);
+            expect(setup.right.isSmallSize()).toBe(true);
+            const casterPosition = structuredClone(setup.left.getPosition());
+            const targetPosition = structuredClone(setup.right.getPosition());
+            const matrix = structuredClone(setup.grid.getMatrix());
+
+            const result = setup.engine.apply({
+                type: "cast_spell",
+                casterId: setup.left.getId(),
+                spellName: "Castling",
+                targetId: setup.right.getId(),
+                targetCell: setup.right.getBaseCell(),
+            });
+
+            expect(result.completed).toBe(false);
+            expect(result.rejectionReason).toBe("spell_not_available");
+            expect(setup.left.getPosition()).toEqual(casterPosition);
+            expect(setup.right.getPosition()).toEqual(targetPosition);
+            expect(setup.grid.getMatrix()).toEqual(matrix);
+            expect(setup.left.hasSpellRemaining("Castling")).toBe(true);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(false);
+        });
+    }
+
     it("does not collapse a LARGE Absorb Penalties target when Castling is redirected", () => {
         const enemyCell = { x: 5, y: 3 };
         const setup = setupActionFight({
@@ -2571,6 +2655,48 @@ describe("GameActionEngine", () => {
         );
         expect(setup.left.hasSpellRemaining("Castling")).toBe(false);
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
+    });
+
+    it("does not collapse a RECTANGULAR (2x1) Absorb Penalties target when Castling is redirected", () => {
+        // The swap body writes ONE cell per unit, so redirecting it onto a multi-cell absorber would squeeze
+        // that body into a single cell. The 2x2 case above pins the square; a rectangle is the shape a
+        // `size`-based guard would wave through, and it is what the mounted class actually ships.
+        const enemyCell = { x: 5, y: 3 };
+        const setup = setupActionFight({
+            leftSpells: ["System:Castling"],
+            leftStackPower: 4,
+            rightCell: enemyCell,
+            currentEnemiesCellsWithinMovementRange: [enemyCell],
+        });
+        const absorber = createTestUnit({
+            name: "Rectangular Absorber",
+            team: PBTypes.TeamVals.RIGHT,
+            footprintWidth: 2,
+            footprintHeight: 1,
+        });
+        placeUnit(setup.grid, setup.unitsHolder, absorber, { x: 7, y: 5 });
+        expect(absorber.getCells()).toHaveLength(2);
+        setup.right.applyAuraEffect("Absorb Penalties Aura", "absorb", true, 100, "7;5");
+
+        const casterPosition = structuredClone(setup.left.getPosition());
+        const targetPosition = structuredClone(setup.right.getPosition());
+        const absorberPosition = structuredClone(absorber.getPosition());
+        const matrix = structuredClone(setup.grid.getMatrix());
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.left.getId(),
+            spellName: "Castling",
+            targetId: setup.right.getId(),
+            targetCell: setup.right.getBaseCell(),
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.left.getPosition()).toEqual(casterPosition);
+        expect(setup.right.getPosition()).toEqual(targetPosition);
+        expect(absorber.getPosition()).toEqual(absorberPosition);
+        expect(absorber.getCells()).toHaveLength(2);
+        expect(setup.grid.getMatrix()).toEqual(matrix);
     });
 
     it("rejects Castling when the in-range enemy list is absent (the ranked server-context bug)", () => {
