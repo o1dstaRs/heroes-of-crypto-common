@@ -330,6 +330,32 @@ describe("post-move actor availability projection", () => {
         expect(setup.unit.hasSpellRemaining("Resurrection")).toBe(false);
     });
 
+    /**
+     * The wall is FIRE, and every other fire source in the game is priced through the element table —
+     * burnUnitOnFireWallCells passes the crosser's elements, so a Fire Element stack walks its own element
+     * untouched and a Water Element one pays half again. The projection the AI plans with (and any preview
+     * drawn from it) has to say the same, or it plans around damage the fight never deals.
+     */
+    it("prices the burn through the crosser's element, exactly as the fight does", () => {
+        for (const [ability, expected] of [
+            ["Fire Element", 0],
+            ["Water Element", 75],
+            ["Earth Element", 50],
+        ] as const) {
+            const setup = activatedMover({ amountAlive: 10, maxHp: 20, abilities: [ability] });
+            const wall = { x: 5, y: 3 };
+            FightStateManager.getInstance().getFightProperties().getFireWalls().add(wall, 3, 25);
+
+            const projected = applyAndCompare(setup, {
+                type: "move_unit",
+                unitId: setup.unit.getId(),
+                path: [setup.unit.getBaseCell(), { x: 4, y: 3 }, wall],
+            });
+
+            expect(projected.totalAppliedDamage).toBe(expected);
+        }
+    });
+
     it("applies the lava max-HP boost before deriving Fire Wall damage", () => {
         const setup = activatedMover(
             { amountAlive: 10, maxHp: 20, abilities: ["Made of Fire"] },
