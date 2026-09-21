@@ -82,12 +82,21 @@ export {
 } from "./versions/v0_8_a13_profile";
 export {
     buildV08A19SearchEnvironment,
+    createV08A19RankedPlacementStrategy,
     createV08A19Strategy,
+    V08_A19_BEHAVIOR_ENVIRONMENT_SHA256,
     V08_A19_CANDIDATE_ID,
+    V08_A19_DEGRADED_BUDGET,
+    V08_A19_GENOME,
+    V08_A19_GENOME_SHA256,
+    V08_A19_PLACEMENT_POLICY,
+    V08_A19_POLICY,
     V08_A19_PRODUCTION_VERSION,
     V08_A19_PROFILE,
     V08_A19_PROFILE_SCHEMA,
-    V08_A19_PRODUCTION_ROUTING_SOURCE_LEDGER,
+    V08_A19_SEARCH,
+    V08_A19_SEARCH_RULES,
+    V08_A19_SOURCE_LEDGER,
 } from "./versions/v0_8_a19_profile";
 
 // F4 — the shared enumerated candidate generator (./candidates.ts): every engine-legal candidate turn

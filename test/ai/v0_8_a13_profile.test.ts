@@ -45,10 +45,8 @@ const ENV_KEYS = [
     "SEARCH_INCLUDE_MOVES",
     "SEARCH_ACTIVE_CHALLENGERS",
     "SEARCH_A19_ABOMINATION_MIRROR_RELEASE",
-    "SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE",
     "SEARCH_A19_EXACT_TERMINAL_RESULTS",
     "SEARCH_A19_FAST_FLYER_COHESION",
-    "SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION",
     "SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE",
     "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY",
     "SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES",
@@ -218,10 +216,8 @@ describe("v0.8 a13 production profile", () => {
         process.env.SEARCH_MAX_MOVE_SHOTS = "2";
         process.env.SEARCH_MOVE_SHOT_VERSIONS = "v0.7";
         process.env.SEARCH_A19_ABOMINATION_MIRROR_RELEASE = "1";
-        process.env.SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE = "1";
         process.env.SEARCH_A19_EXACT_TERMINAL_RESULTS = "1";
         process.env.SEARCH_A19_FAST_FLYER_COHESION = "1";
-        process.env.SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION = "1";
         process.env.SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE = "1";
         process.env.SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY = "1";
         process.env.SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES = "1";
@@ -322,10 +318,8 @@ describe("v0.8 a13 production profile", () => {
             pureRangedParetoNoMeleeFocusScope: "pure_ranged",
             pureRangedJitNoMeleeFocus: false,
             abominationMirrorRelease: false,
-            armageddonDefendCandidate: false,
             exactTerminalResults: false,
             fastFlyerCohesion: false,
-            nonregressiveOverrideValidation: false,
             nonregressiveProductiveOverride: false,
             soleAbominationArmageddonDefendPolicy: false,
             strictAggressiveWaitTies: false,
@@ -348,10 +342,8 @@ describe("v0.8 a13 production profile", () => {
         expect(process.env.SEARCH_MAX_MOVE_SHOTS).toBe("2");
         expect(process.env.SEARCH_MOVE_SHOT_VERSIONS).toBe("v0.7");
         expect(process.env.SEARCH_A19_ABOMINATION_MIRROR_RELEASE).toBe("1");
-        expect(process.env.SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE).toBe("1");
         expect(process.env.SEARCH_A19_EXACT_TERMINAL_RESULTS).toBe("1");
         expect(process.env.SEARCH_A19_FAST_FLYER_COHESION).toBe("1");
-        expect(process.env.SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION).toBe("1");
         expect(process.env.SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE).toBe("1");
         expect(process.env.SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY).toBe("1");
         expect(process.env.SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES).toBe("1");

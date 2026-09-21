@@ -103,10 +103,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_AUDIT_TURNS",
     "SEARCH_ACTIVE_CHALLENGERS",
     "SEARCH_A19_ABOMINATION_MIRROR_RELEASE",
-    "SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE",
     "SEARCH_A19_EXACT_TERMINAL_RESULTS",
-    "SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION",
-    "SEARCH_A19_POOLED_OVERRIDE_VALIDATION",
     "SEARCH_A19_ADAPTIVE_BUDGET",
     "SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE",
     "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY",
@@ -879,149 +876,10 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true)).toBe(spell);
     });
 
-    it("A19 validates only a provisional override and requires the full gate in an independent paired bank", () => {
-        setEnv({
-            V07_SEARCH: "1",
-            SEARCH_VERSIONS: "v0.8",
-            SEARCH_GATE: "0.03",
-            SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "1",
-        });
-        const harness = buildBattle(92, "v0.8");
-        const unit = harness.activeUnit()!;
-        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
-        const attack: GameAction[] = [
-            { type: "melee_attack", attackerId: unit.getId(), targetId: "enemy", attackFrom: { x: 4, y: 4 } },
-        ];
-        const candidates = [
-            { kind: "incumbent", actions: incumbent },
-            { kind: "melee", actions: attack },
-        ] as unknown as IEnumeratedCandidate[];
-        const driver = harness.makeDriver() as unknown as {
-            counters: {
-                nonregressiveOverrideValidationAttempts: number;
-                nonregressiveOverrideValidationPasses: number;
-                nonregressiveOverrideValidationRejects: number;
-            };
-            scoreCandidates(): number[];
-            search(
-                unit: Unit,
-                candidates: IEnumeratedCandidate[],
-                incumbent: GameAction[],
-                seed: number,
-                t0: number,
-            ): GameAction[];
-        };
-
-        let call = 0;
-        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.42] : [0, 1]);
-        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(incumbent);
-        expect(call).toBe(1);
-        expect(driver.counters).toMatchObject({
-            nonregressiveOverrideValidationAttempts: 0,
-            nonregressiveOverrideValidationPasses: 0,
-            nonregressiveOverrideValidationRejects: 0,
-        });
-
-        call = 0;
-        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.8] : [0.7, 0.72]);
-        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(incumbent);
-        expect(call).toBe(2);
-        expect(driver.counters).toMatchObject({
-            nonregressiveOverrideValidationAttempts: 1,
-            nonregressiveOverrideValidationPasses: 0,
-            nonregressiveOverrideValidationRejects: 1,
-        });
-
-        call = 0;
-        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.8] : [0.5, 0.54]);
-        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(attack);
-        expect(call).toBe(2);
-        expect(driver.counters).toMatchObject({
-            nonregressiveOverrideValidationAttempts: 2,
-            nonregressiveOverrideValidationPasses: 1,
-            nonregressiveOverrideValidationRejects: 1,
-        });
-    });
-
-    it("A19 pooled validation tests one rollouts+2 estimate against the gate instead of a second bar", () => {
-        // Same samples as the stock bank — the shortlist means (SEARCH_ROLLOUTS, 3 here) plus the paired
-        // 2-rollout re-score — but pooled into one estimate per candidate and gated once. The stock bank asks
-        // the 2-rollout re-score to clear the gate on its own; on the audited default roster that vetoed 78%
-        // of proposals with a median re-score delta of exactly 0.000, and switching the bank off measured null.
-        setEnv({
-            V07_SEARCH: "1",
-            SEARCH_VERSIONS: "v0.8",
-            SEARCH_GATE: "0.03",
-            SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "1",
-            SEARCH_A19_POOLED_OVERRIDE_VALIDATION: "1",
-        });
-        const harness = buildBattle(92, "v0.8");
-        const unit = harness.activeUnit()!;
-        const incumbent: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
-        const attack: GameAction[] = [
-            { type: "melee_attack", attackerId: unit.getId(), targetId: "enemy", attackFrom: { x: 4, y: 4 } },
-        ];
-        const candidates = [
-            { kind: "incumbent", actions: incumbent },
-            { kind: "melee", actions: attack },
-        ] as unknown as IEnumeratedCandidate[];
-        type Driver = {
-            counters: {
-                nonregressiveOverrideValidationAttempts: number;
-                nonregressiveOverrideValidationPasses: number;
-                nonregressiveOverrideValidationRejects: number;
-            };
-            scoreCandidates(): number[];
-            search(
-                unit: Unit,
-                candidates: IEnumeratedCandidate[],
-                incumbent: GameAction[],
-                seed: number,
-                t0: number,
-            ): GameAction[];
-        };
-        const driver = harness.makeDriver() as unknown as Driver;
-
-        // The stock bank's own reject case: shortlist 0.4 vs 0.8, re-score 0.70 vs 0.72 (+0.02 < gate).
-        // Pooled over 3 + 2 samples the challenger still leads by (2.4+1.44 - 1.2-1.4)/5 = +0.248: passes.
-        let call = 0;
-        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.8] : [0.7, 0.72]);
-        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(attack);
-        expect(call).toBe(2);
-        expect(driver.counters).toMatchObject({
-            nonregressiveOverrideValidationAttempts: 1,
-            nonregressiveOverrideValidationPasses: 1,
-            nonregressiveOverrideValidationRejects: 0,
-        });
-
-        // A thin shortlist lead (+0.04) that the re-score reverses (0.6 vs 0.5) pools to -0.016: still vetoed.
-        call = 0;
-        driver.scoreCandidates = () => (++call === 1 ? [0.4, 0.44] : [0.6, 0.5]);
-        expect(driver.search(unit, candidates, incumbent, 123, performance.now())).toBe(incumbent);
-        expect(call).toBe(2);
-        expect(driver.counters).toMatchObject({
-            nonregressiveOverrideValidationAttempts: 2,
-            nonregressiveOverrideValidationPasses: 1,
-            nonregressiveOverrideValidationRejects: 1,
-        });
-
-        // The knob is inert without the bank: no re-score is spent, the shortlist verdict stands.
-        setEnv({ SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "0", SEARCH_A19_POOLED_OVERRIDE_VALIDATION: "1" });
-        const bare = harness.makeDriver() as unknown as Driver;
-        call = 0;
-        bare.scoreCandidates = () => (++call === 1 ? [0.4, 0.8] : [0, 1]);
-        expect(bare.search(unit, candidates, incumbent, 123, performance.now())).toBe(attack);
-        expect(call).toBe(1);
-        expect(bare.counters.nonregressiveOverrideValidationAttempts).toBe(0);
-
-        setEnv({ SEARCH_A19_POOLED_OVERRIDE_VALIDATION: "2" });
-        expect(() => harness.makeDriver()).toThrow("SEARCH_A19_POOLED_OVERRIDE_VALIDATION must be 0 or 1");
-    });
-
     it("A19 adaptive budget degrades the next decisions after a breaker overrun instead of opening the circuit", () => {
         // A breaker of 0.001 ms makes every decision an overrun. Stock: the first overrun opens the circuit for
         // the rest of the match and every later decision skips search. Adaptive: the next decisions still search,
-        // with one rollout and a shortlist of two, and the re-score bank is skipped while degraded.
+        // with one rollout and a shortlist of two.
         setEnv({
             V07_SEARCH: "1",
             SEARCH_VERSIONS: "v0.8",
@@ -1030,7 +888,6 @@ describe("search driver — gating, hygiene, determinism", () => {
             SEARCH_SHORTLIST: "3",
             SEARCH_DECISION_DEADLINE_MS: undefined,
             SEARCH_CIRCUIT_BREAKER_MS: "0.001",
-            SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "1",
             SEARCH_A19_ADAPTIVE_BUDGET: "1",
         });
         const harness = buildBattle(92, "v0.8");
@@ -1060,11 +917,11 @@ describe("search driver — gating, hygiene, determinism", () => {
             return scored.map((_candidate, index) => (index === 0 ? 0.4 : 0.8));
         };
 
-        // Decision 1 runs at the full budget (3 rollouts, then the 2-rollout re-score) and overruns the breaker.
+        // Decision 1 runs at the full budget (3 rollouts) and overruns the breaker.
         expect(driver.chooseDecision(unit, "v0.8", incumbent)).not.toBe(incumbent);
         expect(driver.circuitOpen).toBe(false);
         expect(driver.degradedRemaining).toBe(3);
-        expect(rolloutCounts).toEqual([3, 2]);
+        expect(rolloutCounts).toEqual([3]);
 
         // Decision 2 is degraded: one rollout, no re-score bank — and it still searches rather than skipping.
         rolloutCounts.length = 0;
@@ -1072,7 +929,6 @@ describe("search driver — gating, hygiene, determinism", () => {
         expect(rolloutCounts).toEqual([1]);
         expect(driver.counters.degradedDecisions).toBe(1);
         expect(driver.counters.circuitSkipped).toBe(0);
-        expect(driver.counters.nonregressiveOverrideValidationAttempts).toBe(1);
         // Every decision overruns this breaker, so the degradation is re-armed rather than counted down.
         expect(driver.degradedRemaining).toBe(3);
     });
@@ -1085,7 +941,6 @@ describe("search driver — gating, hygiene, determinism", () => {
             SEARCH_ROLLOUTS: "3",
             SEARCH_DECISION_DEADLINE_MS: "100000",
             SEARCH_CIRCUIT_BREAKER_MS: "200000",
-            SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION: "0",
             SEARCH_A19_ADAPTIVE_BUDGET: "1",
         });
         const harness = buildBattle(92, "v0.8");

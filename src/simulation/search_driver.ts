@@ -730,21 +730,6 @@ export function isEarlyIsolatingFastFlyerWaitMove(
 }
 
 /** A narrow late-game state where preserving Abomination HP deserves an exact rollout comparison. */
-export function isV08ArmageddonDefendOpportunity(
-    unit: Unit,
-    unitsHolder: ILookaheadDeps["unitsHolder"],
-    currentLap: number,
-): boolean {
-    if (unit.getName() !== "Abomination" || unit.isDead()) return false;
-    const opposingAbomination = unitsHolder
-        .getAllEnemyUnits(unit.getTeam())
-        .find((enemy) => !enemy.isDead() && enemy.getName() === "Abomination");
-    return (
-        opposingAbomination !== undefined &&
-        v08ArmageddonPreservationOpportunity(unit, opposingAbomination, currentLap) !== undefined
-    );
-}
-
 /**
  * Deterministic terminal policy gate: no ally or enemy besides the two original Abominations may remain.
  * Keeping this stricter than the research candidate opportunity prevents a rollout-only multi-stack defend.
@@ -877,16 +862,8 @@ interface ISearchCounters {
     degradedDecisions: number;
     /** H18 opening decisions where at least one move-only fast-flyer solo dive was removed from the catalog. */
     isolatingFastFlyerMoveRejects: number;
-    /** Late Abomination turns that admitted defend into exact-terminal rollout arbitration. */
-    armageddonDefendOpportunities: number;
     /** Live turns where the strict sole-Abomination terminal policy deterministically defended. */
     soleAbominationArmageddonDefends: number;
-    /** Provisional A19 overrides that reached the independent paired validation bank. */
-    nonregressiveOverrideValidationAttempts: number;
-    /** Paired validation banks whose challenger cleared the configured gate. */
-    nonregressiveOverrideValidationPasses: number;
-    /** Paired validation banks that failed closed to the incumbent. */
-    nonregressiveOverrideValidationRejects: number;
     /** Finite operation-bounded wait arbitrations entered after the per-match timing circuit has opened. */
     circuitWaitArbitrations: number;
     /** v0.8 turns that entered the fixed late two-to-one-HP finish window. */
@@ -1058,11 +1035,7 @@ const emptyCounters = (): ISearchCounters => ({
     deadlineFallbacks: 0,
     degradedDecisions: 0,
     isolatingFastFlyerMoveRejects: 0,
-    armageddonDefendOpportunities: 0,
     soleAbominationArmageddonDefends: 0,
-    nonregressiveOverrideValidationAttempts: 0,
-    nonregressiveOverrideValidationPasses: 0,
-    nonregressiveOverrideValidationRejects: 0,
     circuitWaitArbitrations: 0,
     dominantFinishTurns: 0,
     dominantFinishCombatOverrides: 0,
@@ -1295,22 +1268,11 @@ export class SearchDriver {
     private readonly rapidChargeReservationVersions: ReadonlySet<string>;
     /** Explicit A19-H18-v2 policy gate; horizon alone must never opt another profile into this rule. */
     private readonly fastFlyerCohesion: boolean;
-    private readonly armageddonDefendCandidate: boolean;
     private readonly soleAbominationArmageddonDefendPolicy: boolean;
     private readonly abominationMirrorRelease: boolean;
     private readonly strictAggressiveWaitTies: boolean;
     private readonly nonregressiveProductiveOverride: boolean;
     private readonly exactTerminalResults: boolean;
-    private readonly nonregressiveOverrideValidation: boolean;
-    /**
-     * Research: pool the nonregressive re-score with the shortlist rollouts into ONE estimate per candidate
-     * (rollouts + 2 samples) and test that against the gate once, instead of asking the 2-rollout re-score to
-     * clear the gate on its own. The stock bank vetoes 78% of proposals with a median re-score delta of
-     * 0.000 (coin-flips), and switching it off measured null — the samples are the constraint, and this
-     * spends the same samples with twice the power. `SEARCH_A19_POOLED_OVERRIDE_VALIDATION=1`; inert
-     * without the bank itself.
-     */
-    private readonly pooledOverrideValidation: boolean;
     /**
      * Per-decision budget degradation instead of the match-sticky circuit breaker. Measured on the live host
      * (2 shared vCPU): the stock breaker tripped in most games and, because `circuitOpen` never resets, the
@@ -1478,16 +1440,6 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_FAST_FLYER_COHESION must be 0 or 1");
         }
         this.fastFlyerCohesion = this.mode === "search" && rawFastFlyerCohesion === "1";
-        const rawArmageddonDefendCandidate = process.env.SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE;
-        if (
-            rawArmageddonDefendCandidate !== undefined &&
-            rawArmageddonDefendCandidate !== "" &&
-            rawArmageddonDefendCandidate !== "0" &&
-            rawArmageddonDefendCandidate !== "1"
-        ) {
-            throw new Error("SEARCH_A19_ARMAGEDDON_DEFEND_CANDIDATE must be 0 or 1");
-        }
-        this.armageddonDefendCandidate = this.mode === "search" && rawArmageddonDefendCandidate === "1";
         const rawSoleAbominationArmageddonDefendPolicy =
             process.env[SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV];
         if (
@@ -1540,26 +1492,6 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_EXACT_TERMINAL_RESULTS must be 0 or 1");
         }
         this.exactTerminalResults = this.mode === "search" && rawExactTerminalResults === "1";
-        const rawNonregressiveOverrideValidation = process.env.SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION;
-        if (
-            rawNonregressiveOverrideValidation !== undefined &&
-            rawNonregressiveOverrideValidation !== "" &&
-            rawNonregressiveOverrideValidation !== "0" &&
-            rawNonregressiveOverrideValidation !== "1"
-        ) {
-            throw new Error("SEARCH_A19_NONREGRESSIVE_OVERRIDE_VALIDATION must be 0 or 1");
-        }
-        this.nonregressiveOverrideValidation = this.mode === "search" && rawNonregressiveOverrideValidation === "1";
-        const rawPooledOverrideValidation = process.env.SEARCH_A19_POOLED_OVERRIDE_VALIDATION;
-        if (
-            rawPooledOverrideValidation !== undefined &&
-            rawPooledOverrideValidation !== "" &&
-            rawPooledOverrideValidation !== "0" &&
-            rawPooledOverrideValidation !== "1"
-        ) {
-            throw new Error("SEARCH_A19_POOLED_OVERRIDE_VALIDATION must be 0 or 1");
-        }
-        this.pooledOverrideValidation = this.nonregressiveOverrideValidation && rawPooledOverrideValidation === "1";
         const rawAdaptiveBudget = process.env.SEARCH_A19_ADAPTIVE_BUDGET;
         if (
             rawAdaptiveBudget !== undefined &&
@@ -2107,10 +2039,6 @@ export class SearchDriver {
             return incumbent;
         }
         const currentLap = this.deps.fightProperties.getCurrentLap();
-        const armageddonDefendOpportunity =
-            !this.soleAbominationArmageddonDefendPolicy &&
-            this.armageddonDefendCandidate &&
-            isV08ArmageddonDefendOpportunity(unit, this.deps.unitsHolder, currentLap);
         const isV08TargetPressurePolicy = isV08Search && V08_TARGET_PRESSURE_VERSIONS.has(version);
         const pureRangedNoMeleePressureSeat =
             this.pureRangedNoMeleePressure && this.pureRangedNoMeleePressureVersions.has(version);
@@ -2448,10 +2376,7 @@ export class SearchDriver {
                 }
                 // Search may compare a strategic wait, but it must never introduce a new Luck Shield or mountain
                 // hit. Retaining candidate zero above still permits either action as a fail-closed/true fallback.
-                if (
-                    isV08Search &&
-                    (candidate.kind === "mine" || (candidate.kind === "defend" && !armageddonDefendOpportunity))
-                ) {
+                if (isV08Search && (candidate.kind === "mine" || candidate.kind === "defend")) {
                     return false;
                 }
                 // Every v0.8 search keeps the enumerator's nearest legal move even when the catalog arm does not
@@ -2461,21 +2386,9 @@ export class SearchDriver {
                 if (!this.includeMoves && candidate.kind === "move" && !isV08Search) {
                     return false;
                 }
-                if (armageddonDefendOpportunity && candidate.kind === "defend") return true;
                 return !this.activeChallengers || (candidate.kind !== "wait" && candidate.kind !== "defend");
             };
             const enumeratedCandidates = enumerateCandidates(unit, context, incumbent, enumerationOptions).candidates;
-            if (
-                armageddonDefendOpportunity &&
-                enumeratedCandidates.some(
-                    (candidate) =>
-                        candidate.kind === "defend" ||
-                        (candidate.kind === "incumbent" &&
-                            candidate.actions.some((action) => action.type === "defend_turn")),
-                )
-            ) {
-                this.counters.armageddonDefendOpportunities += 1;
-            }
             let candidates = enumeratedCandidates.filter(keepCandidate);
             const urgentMoveShotFallback =
                 prioritizeV08SUrgency &&
@@ -3061,9 +2974,7 @@ export class SearchDriver {
                 if (isDominantFinishCombatReplacement(prioritizeDominantFinish, productiveFallback, incumbent)) {
                     this.counters.dominantFinishCombatFallbacks += 1;
                 }
-                const fallbackActions = this.nonregressiveOverrideValidation
-                    ? incumbent
-                    : (productiveFallback?.actions ?? incumbent);
+                const fallbackActions = productiveFallback?.actions ?? incumbent;
                 const counterfactual = this.scorePassiveCounterfactual(
                     passiveAudit,
                     unit,
@@ -3091,7 +3002,6 @@ export class SearchDriver {
             // already-probed action avoids spending the deadline on an inevitable screen-preserving move and
             // materially lowers protector decision latency without changing candidate identity or posture.
             if (
-                !this.nonregressiveOverrideValidation &&
                 prioritizeProductiveActions &&
                 productiveFallback &&
                 candidates.filter(isForceTierProductiveCandidate).length === 1
@@ -3121,9 +3031,7 @@ export class SearchDriver {
             }
             if (candidates.length <= 1) {
                 this.counters.singleCandidate += 1;
-                const fallbackActions = this.nonregressiveOverrideValidation
-                    ? incumbent
-                    : (productiveFallback?.actions ?? incumbent);
+                const fallbackActions = productiveFallback?.actions ?? incumbent;
                 this.capturePassiveProductiveProbe(
                     passiveAudit,
                     unit,
@@ -3296,13 +3204,8 @@ export class SearchDriver {
             adaptiveBudget: this.adaptiveBudget,
             offlineDeterministicWork: this.match.offlineDeterministicWork === true,
             isolatingFastFlyerMoveRejects: c.isolatingFastFlyerMoveRejects,
-            armageddonDefendOpportunities: c.armageddonDefendOpportunities,
             soleAbominationArmageddonDefendPolicy: this.soleAbominationArmageddonDefendPolicy,
             soleAbominationArmageddonDefends: c.soleAbominationArmageddonDefends,
-            nonregressiveOverrideValidation: this.nonregressiveOverrideValidation,
-            nonregressiveOverrideValidationAttempts: c.nonregressiveOverrideValidationAttempts,
-            nonregressiveOverrideValidationPasses: c.nonregressiveOverrideValidationPasses,
-            nonregressiveOverrideValidationRejects: c.nonregressiveOverrideValidationRejects,
             waitDeadlinePolicy: this.waitDeadlinePolicy,
             circuitWaitArbitrations: c.circuitWaitArbitrations,
             passiveCatalogExpansions: c.passiveCatalogExpansions,
@@ -3675,10 +3578,7 @@ export class SearchDriver {
         let bestIdx = 0;
         let bestChallengerIdx = -1;
         let hasPreferredV08STarget = false;
-        let armageddonDefendArbitration = false;
         let provisionalWouldOverride = false;
-        let nonregressiveOverrideValidationPass = true;
-        let nonregressiveOverrideValidationDelta: number | null = null;
         let validationMeans: number[] | null = null;
         const turnHorizon = this.turnHorizonForVersion(version, unit.getTeam());
         if (this.isDegraded()) {
@@ -3705,20 +3605,6 @@ export class SearchDriver {
                 deadlineAt,
                 turnHorizon,
             );
-            armageddonDefendArbitration =
-                !this.soleAbominationArmageddonDefendPolicy &&
-                this.armageddonDefendCandidate &&
-                isV08ArmageddonDefendOpportunity(
-                    unit,
-                    this.deps.unitsHolder,
-                    this.deps.fightProperties.getCurrentLap(),
-                ) &&
-                scoredCandidates.some(
-                    (candidate) =>
-                        candidate.kind === "defend" ||
-                        (candidate.kind === "incumbent" &&
-                            candidate.actions.some((action) => action.type === "defend_turn")),
-                );
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
             const legalProductiveIndices = scoredCandidates
                 .map((candidate, index) => ({ candidate, index }))
@@ -3794,22 +3680,18 @@ export class SearchDriver {
             // In this one environmental-preservation state, ordinary rollout value must arbitrate. The late
             // productive/urgent layers were designed to prevent passive draws and would otherwise discard the
             // very defend action whose H64 terminal result distinguishes a draw from a surviving win.
-            const selectionIndices = armageddonDefendArbitration
-                ? scoredCandidates.map((_candidate, index) => index)
-                : policySelectionIndices;
+            const selectionIndices = policySelectionIndices;
             bestIdx = selectionIndices[0];
             for (const index of selectionIndices) {
                 if (
                     means[index] > means[bestIdx] ||
-                    (!armageddonDefendArbitration &&
-                        prioritizeV08STargetPressure &&
+                    (prioritizeV08STargetPressure &&
                         !prioritizeV08SUrgency &&
                         bestIdx === 0 &&
                         index > 0 &&
                         means[index] !== -Infinity &&
                         means[index] === means[bestIdx]) ||
-                    (!armageddonDefendArbitration &&
-                        !this.strictAggressiveWaitTies &&
+                    (!this.strictAggressiveWaitTies &&
                         aggressiveWaitComparison &&
                         bestIdx === 0 &&
                         index > 0 &&
@@ -3879,59 +3761,16 @@ export class SearchDriver {
                 bestIdx !== 0 &&
                 means[bestIdx] !== -Infinity &&
                 (means[0] === -Infinity ||
-                    (!armageddonDefendArbitration &&
-                        ((prioritizeProductiveActions &&
-                            isProductiveCandidate(scoredCandidates[bestIdx]) &&
-                            !isProductiveCandidate(scoredCandidates[0])) ||
-                            (prioritizeV08STargetPressure && hasPreferredV08STarget) ||
-                            (prioritizeV08SUrgency && isProductiveCandidate(scoredCandidates[bestIdx])) ||
-                            (prioritizeDominantFinish && isProductiveCandidate(scoredCandidates[bestIdx])) ||
-                            (aggressiveWaitComparison &&
-                                isProductiveCandidate(scoredCandidates[bestIdx]) &&
-                                (this.strictAggressiveWaitTies
-                                    ? means[bestIdx] > means[0]
-                                    : means[bestIdx] >= means[0])))) ||
+                    (prioritizeProductiveActions &&
+                        isProductiveCandidate(scoredCandidates[bestIdx]) &&
+                        !isProductiveCandidate(scoredCandidates[0])) ||
+                    (prioritizeV08STargetPressure && hasPreferredV08STarget) ||
+                    (prioritizeV08SUrgency && isProductiveCandidate(scoredCandidates[bestIdx])) ||
+                    (prioritizeDominantFinish && isProductiveCandidate(scoredCandidates[bestIdx])) ||
+                    (aggressiveWaitComparison &&
+                        isProductiveCandidate(scoredCandidates[bestIdx]) &&
+                        (this.strictAggressiveWaitTies ? means[bestIdx] > means[0] : means[bestIdx] >= means[0])) ||
                     means[bestIdx] - means[0] >= this.gate);
-            if (
-                this.nonregressiveOverrideValidation &&
-                !this.isDegraded() &&
-                provisionalWouldOverride &&
-                means[0] !== -Infinity
-            ) {
-                this.counters.nonregressiveOverrideValidationAttempts += 1;
-                const validationRollouts = 2;
-                const pairedMeans = this.scoreCandidates(
-                    unit,
-                    [scoredCandidates[0], scoredCandidates[bestIdx]],
-                    hashSimulationParts("a19-nonregressive-override-validation-v2", seedBase),
-                    "turns",
-                    validationRollouts,
-                    deadlineAt,
-                    turnHorizon,
-                );
-                let validationDelta: number | null =
-                    pairedMeans[0] === -Infinity || pairedMeans[1] === -Infinity
-                        ? null
-                        : pairedMeans[1] - pairedMeans[0];
-                if (this.pooledOverrideValidation && validationDelta !== null) {
-                    // Same rollouts, one estimate: the shortlist means already average `this.rollouts` samples
-                    // per candidate on the same horizon mode, so the fresh pair simply extends that sample.
-                    const shortlistRollouts = this.effectiveRollouts();
-                    const weight = shortlistRollouts + validationRollouts;
-                    validationDelta =
-                        (means[bestIdx] * shortlistRollouts +
-                            pairedMeans[1] * validationRollouts -
-                            (means[0] * shortlistRollouts + pairedMeans[0] * validationRollouts)) /
-                        weight;
-                }
-                nonregressiveOverrideValidationDelta = validationDelta;
-                if (validationDelta === null || validationDelta < this.gate) {
-                    nonregressiveOverrideValidationPass = false;
-                    this.counters.nonregressiveOverrideValidationRejects += 1;
-                } else {
-                    this.counters.nonregressiveOverrideValidationPasses += 1;
-                }
-            }
             if (this.validationRollouts !== null && bestChallengerIdx !== -1) {
                 const validationSeedBase = hashSimulationParts("search-validation-v1", seedBase);
                 validationMeans = this.scoreCandidates(
@@ -3963,11 +3802,8 @@ export class SearchDriver {
             // may force the valid fallback. Qualification scores the wait/action pair after behavior is frozen.
             const forceProductiveFallback =
                 prioritizeProductiveActions || prioritizeDominantFinish || prioritizeV08SUrgency;
-            const selectedFallback = this.nonregressiveOverrideValidation
-                ? undefined
-                : aggressiveWaitComparison && !forceProductiveFallback
-                  ? undefined
-                  : productiveFallback;
+            const selectedFallback =
+                aggressiveWaitComparison && !forceProductiveFallback ? undefined : productiveFallback;
             const fallbackActions = selectedFallback?.actions ?? incumbent;
             if (isDominantFinishCombatReplacement(prioritizeDominantFinish, selectedFallback, incumbent)) {
                 this.counters.dominantFinishCombatFallbacks += 1;
@@ -3995,17 +3831,6 @@ export class SearchDriver {
                         ms: Math.round(ms * 10) / 10,
                         deadlineFallback: 1,
                         productiveFallback: Number(selectedFallback !== undefined),
-                        ...(this.nonregressiveOverrideValidation
-                            ? {
-                                  provisionalWouldOverride: provisionalWouldOverride ? 1 : 0,
-                                  nonregressiveOverrideValidationRollouts: provisionalWouldOverride ? 2 : 0,
-                                  nonregressiveOverrideValidationDelta:
-                                      nonregressiveOverrideValidationDelta === null
-                                          ? null
-                                          : Number(nonregressiveOverrideValidationDelta.toFixed(4)),
-                                  nonregressiveOverrideValidationPass: 0,
-                              }
-                            : {}),
                         ...(this.observeOnly
                             ? {
                                   observeOnly: 1,
@@ -4035,7 +3860,7 @@ export class SearchDriver {
         }
         // The GATE: trust the policy unless a challenger clearly beats it on mean rollout value. An
         // incumbent that is illegal in sim is always replaced by the best legal candidate.
-        const wouldOverride = provisionalWouldOverride && nonregressiveOverrideValidationPass;
+        const wouldOverride = provisionalWouldOverride;
         const overridden = wouldOverride && !this.observeOnly;
         if (wouldOverride && this.observeOnly) {
             this.counters.shadowRecommendations += 1;
@@ -4139,19 +3964,6 @@ export class SearchDriver {
                             ? null
                             : Number((means[bestIdx] - means[0]).toFixed(4)),
                     ms: Math.round(ms * 10) / 10,
-                    ...(this.nonregressiveOverrideValidation
-                        ? {
-                              provisionalWouldOverride: provisionalWouldOverride ? 1 : 0,
-                              nonregressiveOverrideValidationRollouts:
-                                  provisionalWouldOverride && !incumbentIllegal ? 2 : 0,
-                              nonregressiveOverrideValidationDelta:
-                                  nonregressiveOverrideValidationDelta === null
-                                      ? null
-                                      : Number(nonregressiveOverrideValidationDelta.toFixed(4)),
-                              nonregressiveOverrideValidationPass:
-                                  provisionalWouldOverride && nonregressiveOverrideValidationPass ? 1 : 0,
-                          }
-                        : {}),
                     ...(this.observeOnly
                         ? {
                               observeOnly: 1,
@@ -4504,15 +4316,6 @@ export class SearchDriver {
             : undefined;
         if (reservedVine && !challengers.includes(reservedVine)) {
             challengers = [...challengers, reservedVine];
-        }
-        const reservedArmageddonDefend =
-            !this.soleAbominationArmageddonDefendPolicy &&
-            this.armageddonDefendCandidate &&
-            isV08ArmageddonDefendOpportunity(unit, this.deps.unitsHolder, this.deps.fightProperties.getCurrentLap())
-                ? candidates.find((candidate) => candidate.kind === "defend")
-                : undefined;
-        if (reservedArmageddonDefend && !challengers.includes(reservedArmageddonDefend)) {
-            challengers = [...challengers, reservedArmageddonDefend];
         }
         challengers = reserveResearchRapidChargeShortlist(candidates, challengers);
         return [candidates[0], ...challengers];
@@ -5103,34 +4906,25 @@ export class SearchDriver {
             const matrix = this.deps.grid.getMatrix();
             // Search itself is intentionally non-recursive, so future same-team turns normally use the native
             // strategy. Stateful Armageddon policies must therefore recur here exactly as they do in live play.
-            // The strict policy reuses one shared gate; the earlier broad research arm remains isolated behind its
-            // own flag and is suppressed whenever strict mode is selected. The opponent keeps its configured model.
-            decided =
-                this.shouldUseSoleAbominationArmageddonDefend(unit) ||
-                (!this.soleAbominationArmageddonDefendPolicy &&
-                    this.armageddonDefendCandidate &&
-                    unit.getTeam() !== this.rolloutEnemyTeam &&
-                    isV08ArmageddonDefendOpportunity(
-                        unit,
-                        this.deps.unitsHolder,
-                        this.deps.fightProperties.getCurrentLap(),
-                    ))
-                    ? [{ type: "defend_turn", unitId: id }]
-                    : strat.decideTurn(unit, {
-                          grid: this.deps.grid,
+            // The strict sole-Abomination policy is the only defend policy left; the opponent keeps its configured
+            // model.
+            decided = this.shouldUseSoleAbominationArmageddonDefend(unit)
+                ? [{ type: "defend_turn", unitId: id }]
+                : strat.decideTurn(unit, {
+                      grid: this.deps.grid,
+                      matrix,
+                      unitsHolder: this.deps.unitsHolder,
+                      pathHelper: this.deps.pathHelper,
+                      decisionPathCatalog: createDecisionPathCatalog(
+                          this.deps.grid,
+                          this.deps.pathHelper,
+                          unit,
                           matrix,
-                          unitsHolder: this.deps.unitsHolder,
-                          pathHelper: this.deps.pathHelper,
-                          decisionPathCatalog: createDecisionPathCatalog(
-                              this.deps.grid,
-                              this.deps.pathHelper,
-                              unit,
-                              matrix,
-                          ),
-                          attackHandler: this.deps.attackHandler,
-                          fightProperties: this.deps.fightProperties,
-                          decisionOrigin: "rollout",
-                      });
+                      ),
+                      attackHandler: this.deps.attackHandler,
+                      fightProperties: this.deps.fightProperties,
+                      decisionOrigin: "rollout",
+                  });
         } catch {
             decided = [];
         }

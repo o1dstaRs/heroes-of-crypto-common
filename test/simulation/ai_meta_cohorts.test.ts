@@ -291,43 +291,7 @@ describe("AI meta cohort generation", () => {
         expect(environment.V08_A13_SEARCH).toBe("1");
     });
 
-    it("materializes the explicit a19 h18 worker profile without ambient experiment leakage", () => {
-        const baseProfile = resolveAiMetaFightProfile("a19-h18");
-        const environment = sanitizedAiMetaEnvironment(
-            {
-                SEARCH_HORIZON: "999",
-                V07_SEARCH: "0",
-                V08_A13_SEARCH: "1",
-            },
-            baseProfile,
-        );
-        expect(environment).toMatchObject({
-            V07_SEARCH: "1",
-            SEARCH_HORIZON: "18",
-            SEARCH_DECISION_DEADLINE_MS: "175",
-            SEARCH_CIRCUIT_BREAKER_MS: "275",
-            SEARCH_SHORTLIST: "3",
-            V08_A13_SEARCH: "0",
-        });
-        expect(environment.SEARCH_INCUMBENT_KINDS).toBeUndefined();
-        expect(environment.SEARCH_CHALLENGER_KINDS).toBeUndefined();
-        expect(Object.values(environment)).not.toContain("undefined");
-        expect(baseProfile.strategyProfileId).toBe("native-v0.8");
-        expect(baseProfile.provenance).toMatchObject({ strategyProfileId: "native-v0.8" });
-
-        const placementProfile = resolveAiMetaFightProfile("a19-h18-ranked-placement");
-        expect(placementProfile.strategyProfileId).toBe("a19-h18-ranked-placement-v8");
-        expect(placementProfile.provenance).toMatchObject({
-            name: "v0.8+a19-h18-ranked-placement-v8-research",
-            researchOnly: true,
-            strategyProfileId: "a19-h18-ranked-placement-v8",
-            placementPolicy: {
-                informationRequirement: "public-roster",
-                scope: { map: "NORMAL" },
-            },
-        });
-        expect(placementProfile.workerEnvironment).toEqual(baseProfile.workerEnvironment);
-
+    it("materializes the production a19 worker profile without ambient experiment leakage", () => {
         const productionProfile = resolveAiMetaFightProfile("a19");
         const productionEnvironment = sanitizedAiMetaEnvironment({ V08_A13_SEARCH: "1" }, productionProfile);
         expect(productionProfile.provenance).toMatchObject({
