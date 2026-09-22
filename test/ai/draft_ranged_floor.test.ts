@@ -19,6 +19,7 @@ describe("ranked draft shooter floor", () => {
         expect(RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS["ranked-unit-strength-a19-side-v1-w4-r2"]).toBe(4);
         expect(RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS["ranked-unit-strength-a19-side-v1-w4-r3"]).toBe(4);
         expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v1-w4-r2")).toBe(2);
+        expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v1-w4-r4")).toBe(4);
         expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v1-w4")).toBe(0);
         expect(rankedDraftRangedFloor(undefined)).toBe(0);
         for (const policy of Object.keys(

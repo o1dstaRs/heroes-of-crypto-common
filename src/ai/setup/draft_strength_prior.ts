@@ -81,6 +81,7 @@ export const RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS = {
     // v1 strength at the staging weight plus a shooter floor (see RANKED_DRAFT_RANGED_FLOOR).
     "ranked-unit-strength-a19-side-v1-w4-r2": 4,
     "ranked-unit-strength-a19-side-v1-w4-r3": 4,
+    "ranked-unit-strength-a19-side-v1-w4-r4": 4,
 } as const;
 
 export type RankedDraftStrengthPolicyId = keyof typeof RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS;
@@ -95,6 +96,7 @@ export type RankedDraftStrengthPolicyId = keyof typeof RANKED_DRAFT_STRENGTH_POL
 export const RANKED_DRAFT_RANGED_FLOOR: Partial<Record<RankedDraftStrengthPolicyId, number>> = {
     "ranked-unit-strength-a19-side-v1-w4-r2": 2,
     "ranked-unit-strength-a19-side-v1-w4-r3": 3,
+    "ranked-unit-strength-a19-side-v1-w4-r4": 4,
 };
 
 /** Shooter floor of a policy (0 = none). */
