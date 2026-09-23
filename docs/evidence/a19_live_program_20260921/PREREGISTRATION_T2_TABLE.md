@@ -53,3 +53,25 @@ different creatures (Wandering Mage in 37% of armies against r4's 3%, Magic Drag
 drafts `ranked-unit-strength-a19-side-v4-w8-r4` on both seats: the twelve stage-1 arms, the stage-3 confirmation and
 both robustness cells. Everything else is unchanged, seeds included. v4 armies are 99.7% in the ranged cohort (P7
 confirmation, 4,000 drafts), so the single ranged table still covers them.
+Execution note 14:33Z: the shared node's four stage-1 arms started at 14:31Z alongside P8's gating replication
+(two launchers raced for the same trigger). Their shard processes were paused with SIGSTOP at 14:33Z and resume
+automatically when the replication finishes. Search runs on fixed work budgets, so a pause cannot change a game.
+Execution note 15:36Z: rebalanced between hosts without touching any running arm. Arms 11 and 9 moved from hft to the
+shared node (4 shards × 6 workers each, after its four arms finish); hft keeps 10, 13, 8 (running) then 2, 4, 1.
+Same tree (1c9d132), seed, flags and games.
+Execution note 16:12Z: outside load halved the shared node's rate (~0.53 games/s against ~0.88 in the morning), so
+arms 11 and 9 went back to hft, where they run together at 8 workers each after 2, 4 and 1. The shared node keeps
+6, 12, 5, 7. No running arm was touched; same tree, seed, flags and games.
+
+## RESULT — stage 1 (12 arms × 2000 games, seed 99970001, v4-w8-r4 drafts) and stage 2 (p9_t2_table.ts)
+Ranged table (draw-aware score of each forced artifact against the policy's own pick; 1,998 of 2,000 armies ranged):
+Crown of Command 56.53, Giant's Maul 54.30, Clover of Fortune 53.55, Farsight Quiver 53.23, Pendant of Vitality
+52.43, Titan Plate 51.33, Warlord's Edge 50.78, Berserker's Bond 47.57, Archmage's Ring 46.55, Rime Charm 43.69, Tome
+of Amplification 42.29, Lava Striders 41.84 (no map above 43 for Lava Striders, so a map-aware rule would not rescue
+it). The policy took Farsight 27.5%, Tome 19.7%, Titan 15.8% of these armies; the new rule takes Crown 24.6%, Giant's
+Maul 19.0%, Clover 16.0%, Farsight 14.7%, Pendant 10.4%. Crown was buffed (2026-07-31) and Giant's Maul got +40% AOE
+(2026-08-08) after the old table was measured.
+Predicted effect, cross-fitted: +3.88pp (even→odd +4.90 on 570 changed games; odd→even +2.85 on 652); in-sample
++4.78pp. Decision: CONFIRM with 8000 games (preregistered size rule).
+Stage 3 queued 20:20Z from an unpushed measurement commit (the rule + this table on 711f1c4): the confirmation on
+hft after its P10 arms, both robustness cells on the shared node after P11's selection.

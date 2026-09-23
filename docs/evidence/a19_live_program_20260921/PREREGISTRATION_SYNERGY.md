@@ -43,3 +43,17 @@ changes which factions qualify: on v4 armies Nature's synergy applies to 54.2%, 
 Might's 38.9% (r4: 56.4 / 45.2 / 44.2 / 57.2). Every P10 cell now drafts `ranked-unit-strength-a19-side-v4-w8-r4` on
 both seats: the four stage-1 arms, the stage-3 confirmation and both robustness cells. Everything else is unchanged,
 seeds included.
+
+## RESULT — stage 1 (4 arms × 2000 games, seed 99870001, v4-w8-r4 drafts) and stage 2 (p10_synergy_table.ts)
+Over the games where each flip changed the candidate's synergies (95% interval clustered by offer board):
+LIFE:2 morale and luck 49.01% [45.97, 52.04] (1,058 games) → keep; CHAOS:2 break on attack 53.60% [50.26, 56.93]
+(904) → FLIP; MIGHT:1 aura range 40.26% [36.70, 43.82] (806) → keep; NATURE:1 board units 51.48% [48.41, 54.54]
+(1,048) → keep. The prediction above was wrong about Nature. Stage-3 candidate: Chaos takes break on attack, every
+other faction keeps its option.
+
+## Amendment 2026-09-23 20:50Z, before any stage-3 game
+The flip applies to 45% of armies at about +3.6pp, which predicts about +1.6pp overall — an effect 8,000 games cannot
+separate from even (clustered SE ~1.1pp). The confirmation therefore uses P9's preregistered sizing rule on this
+stage-1 prediction (1.0 <= prediction < 2.5pp → 16,000 games), decided from stage-1 data only. With 16,000 games the
+confirmation's seeds (99880001, 12,000 preimages) would reach into the robustness seed, so robustness moves to the
+fresh 99895001. Gates and everything else unchanged.

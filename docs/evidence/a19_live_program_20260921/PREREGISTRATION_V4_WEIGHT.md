@@ -28,3 +28,9 @@ PASS -> the winning id is registered on main and becomes the server default, rol
 
 Prediction, written down so it can be wrong: w12 edges w8 by 1–4pp; w16 is no better than w12 and loses on the top
 share gate or on robustness.
+
+## RESULT — selection (2000 games each, v4-w8-r4 incumbent, both seats conditional-v1 + SEE_NONE)
+w12 (seed 99650001): 1016W 961L 23D; decisive 51.39% [47.02, 55.74], draw-aware 51.38%, 0 rejections; maps NORMAL
+49.7 / LAVA 52.5 / BLOCK 52.0. w16 (seed 99660001): 1104W 872L 24D; decisive 55.87% [51.49, 60.16], draw-aware 55.80%,
+0 rejections; maps 56.9 / 54.7 / 56.0. Selected w16 (0.5580 > 0.505 and > w12). The prediction above was wrong about
+w16. Confirmation 99670001 and robustness 99680001 queued behind P9's stage 3 on each host.
