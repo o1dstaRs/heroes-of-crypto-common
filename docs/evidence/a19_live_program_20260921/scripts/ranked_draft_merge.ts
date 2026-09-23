@@ -42,6 +42,8 @@ const options = {
     fightProfile: values.get("fight-profile") ?? "v0.7",
     candidateSetupPolicySpec: setupSpec(values.get("candidate-setup")),
     opponentSetupPolicySpec: setupSpec(values.get("opponent-setup")),
+    candidateDoctrinePolicy: values.get("candidate-doctrine") ?? "see-none",
+    opponentDoctrinePolicy: values.get("opponent-doctrine") ?? "see-none",
     liveDraftRules: flag("live-draft-rules"),
     sideBoard: flag("side-board"),
     deterministicSearch: flag("deterministic-search"),

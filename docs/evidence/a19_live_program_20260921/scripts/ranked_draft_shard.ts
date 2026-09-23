@@ -33,6 +33,8 @@ const options = {
     ...(values.get("fight-profile") ? { fightProfile: values.get("fight-profile") } : {}),
     ...(values.get("candidate-setup") ? { candidateSetupPolicySpec: values.get("candidate-setup") } : {}),
     ...(values.get("opponent-setup") ? { opponentSetupPolicySpec: values.get("opponent-setup") } : {}),
+    ...(values.get("candidate-doctrine") ? { candidateDoctrinePolicy: values.get("candidate-doctrine") } : {}),
+    ...(values.get("opponent-doctrine") ? { opponentDoctrinePolicy: values.get("opponent-doctrine") } : {}),
     liveDraftRules: flag("live-draft-rules"),
     sideBoard: flag("side-board"),
     deterministicSearch: flag("deterministic-search"),

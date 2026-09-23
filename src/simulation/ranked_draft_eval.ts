@@ -33,8 +33,9 @@ import { creatureInfo } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { TIER1_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import { buildV08A19SearchEnvironment } from "../ai/versions/v0_8_a19_profile";
+import { pickRankedAIDoctrine } from "../ai/setup/doctrine_variety";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { getUpgradePoints } from "../doctrines/doctrine_properties";
+import { Doctrine, getUpgradePoints } from "../doctrines/doctrine_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
@@ -106,6 +107,46 @@ export const RANKED_DRAFT_LIVE_MAP_TYPES = [
 
 export type RankedDraftCohort = "ranged" | "mage" | "melee_magic" | "aura_heavy";
 export type RankedDraftFightProfileId = "v0.7" | "a19";
+
+/**
+ * How a seat takes its scouting doctrine: always one doctrine, or the live bot's per-match variety
+ * (`pickRankedAIDoctrine`). Every panel before this option gave both seats `SETUP_POLICY_V0.pickDoctrine()`,
+ * which is `see-none`, so that stays the default.
+ */
+export type RankedDraftDoctrinePolicy = "see-none" | "see-all" | "three-reveals" | "ranked-variety";
+export const RANKED_DRAFT_DOCTRINE_POLICIES: readonly RankedDraftDoctrinePolicy[] = [
+    "see-none",
+    "see-all",
+    "three-reveals",
+    "ranked-variety",
+];
+export const RANKED_DRAFT_DEFAULT_DOCTRINE_POLICY: RankedDraftDoctrinePolicy = "see-none";
+
+/** The doctrine a seat takes on one board. The board's pick seed stands in for the live match id. */
+export function resolveRankedDraftDoctrine(
+    policy: RankedDraftDoctrinePolicy,
+    pickSeed: number,
+    team: PickTeam,
+): Doctrine {
+    switch (policy) {
+        case "see-none":
+            return Doctrine.SEE_NONE;
+        case "see-all":
+            return Doctrine.SEE_ALL;
+        case "three-reveals":
+            return Doctrine.THREE_REVEALS;
+        case "ranked-variety":
+            return pickRankedAIDoctrine({ matchId: String(pickSeed), team, aiVersion: "v0.8" });
+    }
+}
+
+const rankedDraftDoctrinePolicy = (value: string | undefined): RankedDraftDoctrinePolicy => {
+    const policy = value ?? RANKED_DRAFT_DEFAULT_DOCTRINE_POLICY;
+    if (!(RANKED_DRAFT_DOCTRINE_POLICIES as readonly string[]).includes(policy)) {
+        throw new RangeError(`doctrine policy must be one of ${RANKED_DRAFT_DOCTRINE_POLICIES.join(", ")}`);
+    }
+    return policy as RankedDraftDoctrinePolicy;
+};
 
 export const RANKED_DRAFT_COHORT_DEFINITIONS: Readonly<Record<RankedDraftCohort, string>> = {
     ranged: "candidate roster contains at least one RANGE creature",
@@ -224,6 +265,9 @@ export interface IRankedDraftEvaluationReport {
         setupRules: "all";
         candidateSetupPolicySpec: string;
         opponentSetupPolicySpec: string;
+        /** Present only when a seat does not take the default `see-none`, so older reports reproduce exactly. */
+        candidateDoctrinePolicy?: RankedDraftDoctrinePolicy;
+        opponentDoctrinePolicy?: RankedDraftDoctrinePolicy;
         draftDimensions: { offset: number; length: number };
         clusterSize: 4;
         seedAllocation: "indexed-bijective-v1";
@@ -263,6 +307,9 @@ export interface IRankedDraftEvaluationOptions {
     fightProfile?: RankedDraftFightProfileId;
     candidateSetupPolicySpec?: string;
     opponentSetupPolicySpec?: string;
+    /** Each seat's scouting doctrine; both default to `see-none`. */
+    candidateDoctrinePolicy?: RankedDraftDoctrinePolicy;
+    opponentDoctrinePolicy?: RankedDraftDoctrinePolicy;
     /** Draft creatures with the live server's rules (faction-diversity tax), not the League-era argmax. */
     liveDraftRules?: boolean;
     /** Fight on the side-oriented ranked board (side zones, seeded stones) instead of the classic board. */
@@ -284,6 +331,8 @@ interface INormalizedOptions {
     fightProfile: RankedDraftFightProfileId;
     candidateSetupPolicySpec: string;
     opponentSetupPolicySpec: string;
+    candidateDoctrinePolicy: RankedDraftDoctrinePolicy;
+    opponentDoctrinePolicy: RankedDraftDoctrinePolicy;
     liveDraftRules: boolean;
     sideBoard: boolean;
     deterministicSearch: boolean;
@@ -535,6 +584,8 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
         fightProfile,
         candidateSetupPolicySpec,
         opponentSetupPolicySpec,
+        candidateDoctrinePolicy: rankedDraftDoctrinePolicy(options.candidateDoctrinePolicy),
+        opponentDoctrinePolicy: rankedDraftDoctrinePolicy(options.opponentDoctrinePolicy),
         liveDraftRules: options.liveDraftRules === true,
         sideBoard: options.sideBoard === true,
         deterministicSearch: options.deterministicSearch === true,
@@ -632,6 +683,9 @@ function applyAccepted(state: IPickSimState, action: PickAction, rng: PickRandom
 export interface IRankedDraftSetupPolicySpecs {
     left?: string;
     right?: string;
+    /** Each seat's scouting doctrine; unset seats take `SETUP_POLICY_V0.pickDoctrine()`. */
+    leftDoctrine?: Doctrine;
+    rightDoctrine?: Doctrine;
 }
 
 export interface IRankedDraftPickRules {
@@ -669,9 +723,10 @@ export function resolveRankedDraftPick(
     let state = createPickSimState(rng);
     const teamState = (team: PickTeam): IPickTeamState => (team === LEFT ? state.left : state.right);
 
-    const doctrine = SETUP_POLICY_V0.pickDoctrine();
-    state = applyAccepted(state, { type: "select_doctrine", team: LEFT, doctrine }, rng);
-    state = applyAccepted(state, { type: "select_doctrine", team: RIGHT, doctrine }, rng);
+    const leftDoctrine = setupPolicySpecs.leftDoctrine ?? SETUP_POLICY_V0.pickDoctrine();
+    const rightDoctrine = setupPolicySpecs.rightDoctrine ?? SETUP_POLICY_V0.pickDoctrine();
+    state = applyAccepted(state, { type: "select_doctrine", team: LEFT, doctrine: leftDoctrine }, rng);
+    state = applyAccepted(state, { type: "select_doctrine", team: RIGHT, doctrine: rightDoctrine }, rng);
 
     // Both simultaneous policies decide from the same pre-commit state.
     const leftBundle =
@@ -842,6 +897,19 @@ const rankedDraftPickRules = (options: INormalizedOptions, gridType: number): IR
     gridType,
 });
 
+const rankedDraftSeatDoctrines = (
+    options: INormalizedOptions,
+    pickSeed: number,
+    candidatePickedLeft: boolean,
+): Pick<IRankedDraftSetupPolicySpecs, "leftDoctrine" | "rightDoctrine"> => {
+    const leftPolicy = candidatePickedLeft ? options.candidateDoctrinePolicy : options.opponentDoctrinePolicy;
+    const rightPolicy = candidatePickedLeft ? options.opponentDoctrinePolicy : options.candidateDoctrinePolicy;
+    return {
+        leftDoctrine: resolveRankedDraftDoctrine(leftPolicy, pickSeed, LEFT),
+        rightDoctrine: resolveRankedDraftDoctrine(rightPolicy, pickSeed, RIGHT),
+    };
+};
+
 const recordedArmy = (army: IRankedDraftArmy): IRankedDraftRecordedArmy => ({
     creatureIds: [...army.creatureIds],
     tier1Artifact: army.tier1Artifact,
@@ -893,7 +961,11 @@ export function playRankedDraftGame(
         pickSeed,
         leftGenome,
         rightGenome,
-        { left: leftSetupPolicy.spec, right: rightSetupPolicy.spec },
+        {
+            left: leftSetupPolicy.spec,
+            right: rightSetupPolicy.spec,
+            ...rankedDraftSeatDoctrines(options, pickSeed, candidatePickedLeft),
+        },
         rankedDraftPickRules(options, gridType),
     );
     const left = materializeArmy(pick.left, getKnownOpponentCreatures(pick, LEFT), leftSetupPolicy);
@@ -970,6 +1042,7 @@ export function inspectRankedDraftBoard(
             {
                 left: candidatePickedLeft ? options.candidateSetupPolicySpec : options.opponentSetupPolicySpec,
                 right: candidatePickedLeft ? options.opponentSetupPolicySpec : options.candidateSetupPolicySpec,
+                ...rankedDraftSeatDoctrines(options, pickSeed, candidatePickedLeft),
             },
             rankedDraftPickRules(options, gridType),
         );
@@ -1204,6 +1277,13 @@ export function summarizeRankedDraftRecords(
             setupRules: "all",
             candidateSetupPolicySpec: options.candidateSetupPolicySpec,
             opponentSetupPolicySpec: options.opponentSetupPolicySpec,
+            ...(options.candidateDoctrinePolicy !== RANKED_DRAFT_DEFAULT_DOCTRINE_POLICY ||
+            options.opponentDoctrinePolicy !== RANKED_DRAFT_DEFAULT_DOCTRINE_POLICY
+                ? {
+                      candidateDoctrinePolicy: options.candidateDoctrinePolicy,
+                      opponentDoctrinePolicy: options.opponentDoctrinePolicy,
+                  }
+                : {}),
             draftDimensions: { offset: RANKED_DRAFT_INTRINSIC_OFFSET, length: RANKED_DRAFT_INTRINSIC_DIM },
             clusterSize: 4,
             seedAllocation: "indexed-bijective-v1",
@@ -1409,6 +1489,8 @@ function parseCli(argv: readonly string[]): ICliOptions {
         "fight-profile",
         "candidate-setup",
         "opponent-setup",
+        "candidate-doctrine",
+        "opponent-doctrine",
         "output",
         "live-draft-rules",
         "side-board",
@@ -1448,6 +1530,12 @@ function parseCli(argv: readonly string[]): ICliOptions {
             : {}),
         ...(values.get("candidate-setup") ? { candidateSetupPolicySpec: values.get("candidate-setup") } : {}),
         ...(values.get("opponent-setup") ? { opponentSetupPolicySpec: values.get("opponent-setup") } : {}),
+        ...(values.get("candidate-doctrine")
+            ? { candidateDoctrinePolicy: rankedDraftDoctrinePolicy(values.get("candidate-doctrine")) }
+            : {}),
+        ...(values.get("opponent-doctrine")
+            ? { opponentDoctrinePolicy: rankedDraftDoctrinePolicy(values.get("opponent-doctrine")) }
+            : {}),
         ...(values.get("output") ? { outputPath: resolve(values.get("output")!) } : {}),
         liveDraftRules: flag("live-draft-rules"),
         sideBoard: flag("side-board"),
