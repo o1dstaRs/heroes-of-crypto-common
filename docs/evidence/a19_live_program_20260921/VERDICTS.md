@@ -82,3 +82,27 @@ PASS  6a distinct creatures >= 80% of incumbent: 1.0000
 PASS  6b top creature share <= incumbent + 10pp: 0.0000
 VERDICT: PASS
 ```
+
+## v4-w8-r4 vs the floor-4 default r4 (P7, shipped as the ranked draft default)
+
+```
+run: confirm_v4 vs incumbent:ranked-unit-strength-a19-side-v1-w4-r4
+head-to-head: 4993W 2927L 80D over 8000 games; decisive 63.04% CI [60.90, 65.13]
+  grid 1: 63.33% (LCB 59.61)
+  grid 3: 62.10% (LCB 58.36)
+  grid 4: 63.70% (LCB 59.98)
+diversity: candidate 48 distinct, incumbent 50; top share 37.5% vs 37.2% over 4000 drafts
+informational: tier-2 synergy reach candidate 5.9% vs incumbent 3.8%
+PASS  1 draw-aware head-to-head > 0.50: 0.6291
+PASS  2 clustered 95% LCB > 0.50: 0.6090
+PASS  3 candidate rejections == 0: 0
+PASS  4 worst map (grid 3) >= 0.49: 0.6210
+PASS  5 vs untrained-heuristic: candidate - incumbent >= -0.02: 0.1137
+PASS  5 vs league-round3-exploiter: candidate - incumbent >= -0.02: 0.0058
+PASS  6a distinct creatures >= 80% of incumbent: 0.9600
+PASS  6b top creature share <= incumbent + 10pp: 0.0030
+VERDICT: PASS
+```
+
+Ship condition added before any result (both seats on conditional-v1, seed 99770001): 1220W 753L 27D, decisive 61.83%
+[57.50, 65.99]. Informational replication of r4 vs r3 on current balance (seed 99760001): 60.04% [55.69, 64.24].
