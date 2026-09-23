@@ -42,6 +42,7 @@ import {
     getKnownOpponentCreatures,
     getVisibleCreatureChoices,
     isPickSimComplete,
+    LIVE_TIER1_ARTIFACT_IDS,
     LIVE_TIER2_ARTIFACT_IDS,
     transitionPickSim,
     type IPickSimState,
@@ -314,6 +315,8 @@ export interface IRankedDraftEvaluationReport {
         opponentDoctrinePolicy?: RankedDraftDoctrinePolicy;
         /** Present only when the candidate's Tier-2 artifact is forced. */
         candidateTier2Override?: number;
+        /** Present only when the candidate's Tier-1 artifact is forced. */
+        candidateTier1Override?: number;
         /** Present only when the candidate's synergy options are forced (FactionVals id -> option). */
         candidateSynergyOverride?: Record<number, number>;
         draftDimensions: { offset: number; length: number };
@@ -364,6 +367,7 @@ export interface IRankedDraftEvaluationOptions {
      * it after the draft leaves the drafted armies, augments and synergies exactly as they were.
      */
     candidateTier2Override?: number;
+    candidateTier1Override?: number;
     /**
      * Give the candidate these synergy options (FactionVals id -> option) wherever its army qualifies for that
      * faction's synergy (measurement only). The level still follows the unit count, and nothing in the draft reads
@@ -394,6 +398,7 @@ interface INormalizedOptions {
     candidateDoctrinePolicy: RankedDraftDoctrinePolicy;
     opponentDoctrinePolicy: RankedDraftDoctrinePolicy;
     candidateTier2Override?: number;
+    candidateTier1Override?: number;
     candidateSynergyOverride?: Record<number, number>;
     liveDraftRules: boolean;
     sideBoard: boolean;
@@ -637,6 +642,10 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
     if (candidateTier2Override !== undefined && !LIVE_TIER2_ARTIFACT_IDS.includes(candidateTier2Override)) {
         throw new RangeError(`candidateTier2Override must be a live Tier-2 artifact id (${LIVE_TIER2_ARTIFACT_IDS})`);
     }
+    const candidateTier1Override = options.candidateTier1Override;
+    if (candidateTier1Override !== undefined && !LIVE_TIER1_ARTIFACT_IDS.includes(candidateTier1Override)) {
+        throw new RangeError(`candidateTier1Override must be a live Tier-1 artifact id (${LIVE_TIER1_ARTIFACT_IDS})`);
+    }
     const explorationRate = options.explorationRate ?? 0;
     if (!Number.isFinite(explorationRate) || explorationRate < 0 || explorationRate >= 1) {
         throw new RangeError("explorationRate must be in [0, 1)");
@@ -653,6 +662,7 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
         candidateDoctrinePolicy: rankedDraftDoctrinePolicy(options.candidateDoctrinePolicy),
         opponentDoctrinePolicy: rankedDraftDoctrinePolicy(options.opponentDoctrinePolicy),
         ...(candidateTier2Override === undefined ? {} : { candidateTier2Override }),
+        ...(candidateTier1Override === undefined ? {} : { candidateTier1Override }),
         ...(options.candidateSynergyOverride === undefined
             ? {}
             : { candidateSynergyOverride: validateRankedDraftSynergyOverride(options.candidateSynergyOverride) }),
@@ -1041,6 +1051,9 @@ export function playRankedDraftGame(
     const left = materializeArmy(pick.left, getKnownOpponentCreatures(pick, LEFT), leftSetupPolicy);
     const right = materializeArmy(pick.right, getKnownOpponentCreatures(pick, RIGHT), rightSetupPolicy);
     const candidatePolicyTier2 = (candidatePickedLeft ? left : right).tier2Artifact;
+    if (options.candidateTier1Override !== undefined) {
+        (candidatePickedLeft ? left : right).tier1Artifact = options.candidateTier1Override;
+    }
     if (options.candidateTier2Override !== undefined) {
         (candidatePickedLeft ? left : right).tier2Artifact = options.candidateTier2Override;
     }
@@ -1090,6 +1103,9 @@ export function playRankedDraftGame(
                   armies: {
                       candidate: {
                           ...recordedArmy(candidateArmy),
+                          ...(options.candidateTier1Override === undefined
+                              ? {}
+                              : { forcedTier1Artifact: options.candidateTier1Override }),
                           ...(options.candidateTier2Override === undefined
                               ? {}
                               : {
@@ -1382,6 +1398,9 @@ export function summarizeRankedDraftRecords(
                       opponentDoctrinePolicy: options.opponentDoctrinePolicy,
                   }
                 : {}),
+            ...(options.candidateTier1Override === undefined
+                ? {}
+                : { candidateTier1Override: options.candidateTier1Override }),
             ...(options.candidateTier2Override === undefined
                 ? {}
                 : { candidateTier2Override: options.candidateTier2Override }),
@@ -1595,6 +1614,7 @@ function parseCli(argv: readonly string[]): ICliOptions {
         "opponent-setup",
         "candidate-doctrine",
         "opponent-doctrine",
+        "candidate-t1",
         "candidate-t2",
         "candidate-synergy",
         "output",
@@ -1642,6 +1662,7 @@ function parseCli(argv: readonly string[]): ICliOptions {
         ...(values.get("opponent-doctrine")
             ? { opponentDoctrinePolicy: rankedDraftDoctrinePolicy(values.get("opponent-doctrine")) }
             : {}),
+        ...(values.get("candidate-t1") ? { candidateTier1Override: Number(values.get("candidate-t1")) } : {}),
         ...(values.get("candidate-t2") ? { candidateTier2Override: Number(values.get("candidate-t2")) } : {}),
         ...(values.get("candidate-synergy")
             ? { candidateSynergyOverride: parseRankedDraftSynergyOverride(values.get("candidate-synergy")!) }

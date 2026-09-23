@@ -783,6 +783,42 @@ const conditionalRulesForSpec = (normalized: string): ReadonlySet<ConditionalSet
 };
 
 /** Resolve an explicit setup spec. Undefined/blank remains setup-v0; the optimized artifact is opt-in only. */
+/**
+ * Research-only setup spec: the frozen v0.7 non-fight policy with ONE head replaced, its augment plan.
+ * `v07-nonfight-aug:P-A-M-S-V` (levels in that order, e.g. `v07-nonfight-aug:0-3-1-3-0`) keeps that artifact's
+ * Tier-2, synergy, placement and timing heads byte-identical and overrides the plan for every cohort, so an A/B
+ * against V07_NONFIGHT_SETUP_SPEC isolates the augment spend and nothing else. The plan must spend exactly the
+ * optimized budget. Nothing in production resolves this prefix; it exists so the live spend can be re-measured
+ * after the ranked draft's composition changes.
+ */
+export const V07_NONFIGHT_AUGMENT_OVERRIDE_PREFIX = "v07-nonfight-aug:";
+
+export function parseAugmentOverridePlan(suffix: string): IAugmentPlan {
+    const parts = suffix.split("-");
+    if (parts.length !== 5) throw new Error(`${V07_NONFIGHT_AUGMENT_OVERRIDE_PREFIX} needs P-A-M-S-V levels`);
+    const [placement, armor, might, sniper, movement] = parts.map((part) => {
+        const value = Number(part);
+        if (!Number.isInteger(value))
+            throw new Error(`${V07_NONFIGHT_AUGMENT_OVERRIDE_PREFIX} levels must be integers`);
+        return value;
+    });
+    const plan = { placement, armor, might, sniper, movement } satisfies IAugmentPlan;
+    assertAugmentPlan(plan);
+    if (augmentPlanCost(plan) !== SETUP_OPTIMIZED_BUDGET) {
+        throw new Error(`${V07_NONFIGHT_AUGMENT_OVERRIDE_PREFIX} plan must spend exactly ${SETUP_OPTIMIZED_BUDGET}`);
+    }
+    return plan;
+}
+
+function compileNonFightAugmentOverridePolicy(spec: string, suffix: string): IResolvedSetupPolicy {
+    const plan = parseAugmentOverridePlan(suffix);
+    const frozen = V07_NONFIGHT_SETUP_ARTIFACT.policy;
+    const augmentsByCohort = Object.fromEntries(
+        Object.keys(frozen.augmentsByCohort).map((cohort) => [cohort, plan]),
+    ) as typeof frozen.augmentsByCohort;
+    return compileNonFightSetupPolicy({ ...frozen, augmentsByCohort }, spec);
+}
+
 export function resolveSetupPolicy(spec: string | undefined): IResolvedSetupPolicy {
     const normalized = (spec ?? "").trim().toLowerCase();
     if (!normalized || normalized === "off" || normalized === "0" || normalized === SETUP_V0_SPEC) {
@@ -804,6 +840,12 @@ export function resolveSetupPolicy(spec: string | undefined): IResolvedSetupPoli
         return compileNonFightSetupPolicy(
             V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_ARTIFACT.policy,
             V07_COHORT_SAFE_PUBLIC_ROSTER_SETUP_SPEC,
+        );
+    }
+    if (normalized.startsWith(V07_NONFIGHT_AUGMENT_OVERRIDE_PREFIX)) {
+        return compileNonFightAugmentOverridePolicy(
+            normalized,
+            normalized.slice(V07_NONFIGHT_AUGMENT_OVERRIDE_PREFIX.length),
         );
     }
     const rules = conditionalRulesForSpec(normalized);
