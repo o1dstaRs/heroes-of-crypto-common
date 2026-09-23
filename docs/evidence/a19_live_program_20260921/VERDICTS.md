@@ -106,3 +106,37 @@ VERDICT: PASS
 
 Ship condition added before any result (both seats on conditional-v1, seed 99770001): 1220W 753L 27D, decisive 61.83%
 [57.50, 65.99]. Informational replication of r4 vs r3 on current balance (seed 99760001): 60.04% [55.69, 64.24].
+
+## SEE_NONE vs the per-match doctrine variety for v0.8 seats (P8, shipped v0.8 only)
+
+Both seats draft r4 and set up with conditional-v1; the seats differ only in how they take their doctrine.
+
+```
+run: confirm_doctrine vs incumbent:ranked-unit-strength-a19-side-v1-w4-r4
+head-to-head: 4204W 3693L 103D over 8000 games; decisive 53.24% CI [51.04, 55.41]
+  grid 1: 53.34% (LCB 49.54)
+  grid 3: 53.58% (LCB 49.78)
+  grid 4: 52.79% (LCB 48.99)
+diversity: candidate 50 distinct, incumbent 50; top share 37.5% vs 37.5% over 4000 drafts
+informational: tier-2 synergy reach candidate 3.7% vs incumbent 3.7%
+PASS  1 draw-aware head-to-head > 0.50: 0.5319
+PASS  2 clustered 95% LCB > 0.50: 0.5104
+PASS  3 candidate rejections == 0: 0
+PASS  4 worst map (grid 4) >= 0.49: 0.5279
+PASS  5 vs untrained-heuristic: candidate - incumbent >= -0.02: 0.0278
+PASS  5 vs league-round3-exploiter: candidate - incumbent >= -0.02: 0.0220
+PASS  6a distinct creatures >= 80% of incumbent: 1.0000
+PASS  6b top creature share <= incumbent + 10pp: 0.0000
+VERDICT: PASS
+```
+
+Split by the doctrine the variety seat drew:
+
+```
+SEE_NONE vs SEE_ALL              games  2636  draw-aware 60.45%  decisive 60.54% ± 1.87 (games not clustered)
+SEE_NONE vs SEE_NONE             games  2624  draw-aware 48.86%  decisive 48.84% ± 1.93 (games not clustered)
+SEE_NONE vs THREE_REVEALS        games  2740  draw-aware 50.36%  decisive 50.37% ± 1.89 (games not clustered)
+```
+
+Informational cells (2,000 games each): SEE_NONE vs SEE_ALL 56.89% [52.51, 61.16]; SEE_NONE vs THREE_REVEALS 51.47%
+[47.09, 55.82]. Replication with both seats drafting v4-w8-r4 (seed 99960001): 54.41% [50.02, 58.72].

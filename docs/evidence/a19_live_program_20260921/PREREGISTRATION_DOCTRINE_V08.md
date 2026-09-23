@@ -47,3 +47,29 @@ was measured. FAIL -> record it; the variety stays. Seeds are never re-rolled.
 
 Prediction, written down so it can be wrong: 53–57% draw-aware, i.e. about +4pp per upgrade point against the two
 non-mirror thirds, with SEE_ALL the weakest doctrine for this bot.
+
+## RESULT — informational SEE_NONE vs SEE_ALL (seed 99940001, 2000 games, r4 drafts, conditional-v1)
+1127W 854L 19D; decisive 56.89% [52.51, 61.16], draw-aware 56.83%, 0 rejections; maps NORMAL 54.2 / LAVA 57.8 /
+BLOCK 58.6. Two upgrade points outweigh full sight of the opponent's draft for this bot.
+
+## RESULT — informational SEE_NONE vs THREE_REVEALS (seed 99950001, 2000 games, r4 drafts, conditional-v1)
+1018W 960L 22D; decisive 51.47% [47.09, 55.82], draw-aware 51.45%, 0 rejections; maps NORMAL 51.6 / LAVA 52.2 /
+BLOCK 50.6. One upgrade point and three random reveals are worth about the same to this bot. Together with the mirror
+third, these two cells put the expected head-to-head against the variety near 52.8% — lower than the prediction above,
+and close to what 8,000 games can separate from even. Written down before the confirmation's result is known.
+Execution note: P7 shipped v4-w8-r4 at ~13:10Z, before P8 was decided, so the conditional replication (seed 99960001,
+both seats drafting v4-w8-r4, see-none vs ranked-variety) was queued and started at 14:31Z on the shared node.
+
+## RESULT — conditional replication on v4-w8-r4 drafts (seed 99960001, 2000 games)
+1074W 900L 26D; decisive 54.41% [50.02, 58.72], draw-aware 54.35% (expectation: > 0.50 — met), 0 rejections; maps
+NORMAL 53.3 / LAVA 55.1 / BLOCK 54.9.
+
+## RESULT — confirmation SEE_NONE vs ranked-variety (seed 99910001, 8000 games, merged from 2 shards)
+4204W 3693L 103D; decisive 53.24% [51.04, 55.41], draw-aware 53.19%, clustered LCB 51.04, 0 rejections; maps NORMAL
+53.34 / LAVA 53.58 / BLOCK 52.79. Split by the doctrine the variety drew (p8_doctrine_split.ts): against SEE_ALL 60.5%
+(2,636 games), against THREE_REVEALS 50.4% (2,740), mirror 48.8% (2,624).
+Robustness (seed 99920001): SEE_NONE 52.86% against the untrained ranged stack and 87.29% against the round-3
+exploiter; the variety 50.08% and 85.08%.
+
+## VERDICT (verdict.py over confirm_doctrine + robust_doctrine_candidate + robust_doctrine_incumbent): PASS on all 8
+gates; replication on v4 drafts 54.41% (> 0.50) → shipped as server f6c9b42, v0.8 seats only.
