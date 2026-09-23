@@ -44,6 +44,7 @@ const options = {
     opponentSetupPolicySpec: setupSpec(values.get("opponent-setup")),
     candidateDoctrinePolicy: values.get("candidate-doctrine") ?? "see-none",
     opponentDoctrinePolicy: values.get("opponent-doctrine") ?? "see-none",
+    ...(values.get("candidate-t2") ? { candidateTier2Override: Number(values.get("candidate-t2")) } : {}),
     liveDraftRules: flag("live-draft-rules"),
     sideBoard: flag("side-board"),
     deterministicSearch: flag("deterministic-search"),

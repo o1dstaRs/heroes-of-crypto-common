@@ -42,6 +42,7 @@ import {
     getKnownOpponentCreatures,
     getVisibleCreatureChoices,
     isPickSimComplete,
+    LIVE_TIER2_ARTIFACT_IDS,
     transitionPickSim,
     type IPickSimState,
     type IPickTeamState,
@@ -200,6 +201,9 @@ export interface IRankedDraftRecordedArmy {
     creatureIds: number[];
     tier1Artifact: number;
     tier2Artifact: number;
+    /** With a Tier-2 override only: the three artifacts the draft offered and the one the setup policy took. */
+    tier2Offers?: number[];
+    policyTier2Artifact?: number;
 }
 
 export interface IRankedDraftOpponentSummary {
@@ -268,6 +272,8 @@ export interface IRankedDraftEvaluationReport {
         /** Present only when a seat does not take the default `see-none`, so older reports reproduce exactly. */
         candidateDoctrinePolicy?: RankedDraftDoctrinePolicy;
         opponentDoctrinePolicy?: RankedDraftDoctrinePolicy;
+        /** Present only when the candidate's Tier-2 artifact is forced. */
+        candidateTier2Override?: number;
         draftDimensions: { offset: number; length: number };
         clusterSize: 4;
         seedAllocation: "indexed-bijective-v1";
@@ -310,6 +316,12 @@ export interface IRankedDraftEvaluationOptions {
     /** Each seat's scouting doctrine; both default to `see-none`. */
     candidateDoctrinePolicy?: RankedDraftDoctrinePolicy;
     opponentDoctrinePolicy?: RankedDraftDoctrinePolicy;
+    /**
+     * Give the candidate this Tier-2 artifact after the draft, whatever was offered (measurement only). The
+     * artifact is chosen after the level-3 picks and nothing later in the draft or setup reads it, so replacing
+     * it after the draft leaves the drafted armies, augments and synergies exactly as they were.
+     */
+    candidateTier2Override?: number;
     /** Draft creatures with the live server's rules (faction-diversity tax), not the League-era argmax. */
     liveDraftRules?: boolean;
     /** Fight on the side-oriented ranked board (side zones, seeded stones) instead of the classic board. */
@@ -333,6 +345,7 @@ interface INormalizedOptions {
     opponentSetupPolicySpec: string;
     candidateDoctrinePolicy: RankedDraftDoctrinePolicy;
     opponentDoctrinePolicy: RankedDraftDoctrinePolicy;
+    candidateTier2Override?: number;
     liveDraftRules: boolean;
     sideBoard: boolean;
     deterministicSearch: boolean;
@@ -571,6 +584,10 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
     const opponentSetupPolicySpec = resolveSetupPolicy(
         options.opponentSetupPolicySpec ?? RANKED_DRAFT_DEFAULT_SETUP_POLICY_SPEC,
     ).spec;
+    const candidateTier2Override = options.candidateTier2Override;
+    if (candidateTier2Override !== undefined && !LIVE_TIER2_ARTIFACT_IDS.includes(candidateTier2Override)) {
+        throw new RangeError(`candidateTier2Override must be a live Tier-2 artifact id (${LIVE_TIER2_ARTIFACT_IDS})`);
+    }
     const explorationRate = options.explorationRate ?? 0;
     if (!Number.isFinite(explorationRate) || explorationRate < 0 || explorationRate >= 1) {
         throw new RangeError("explorationRate must be in [0, 1)");
@@ -586,6 +603,7 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
         opponentSetupPolicySpec,
         candidateDoctrinePolicy: rankedDraftDoctrinePolicy(options.candidateDoctrinePolicy),
         opponentDoctrinePolicy: rankedDraftDoctrinePolicy(options.opponentDoctrinePolicy),
+        ...(candidateTier2Override === undefined ? {} : { candidateTier2Override }),
         liveDraftRules: options.liveDraftRules === true,
         sideBoard: options.sideBoard === true,
         deterministicSearch: options.deterministicSearch === true,
@@ -970,6 +988,10 @@ export function playRankedDraftGame(
     );
     const left = materializeArmy(pick.left, getKnownOpponentCreatures(pick, LEFT), leftSetupPolicy);
     const right = materializeArmy(pick.right, getKnownOpponentCreatures(pick, RIGHT), rightSetupPolicy);
+    const candidatePolicyTier2 = (candidatePickedLeft ? left : right).tier2Artifact;
+    if (options.candidateTier2Override !== undefined) {
+        (candidatePickedLeft ? left : right).tier2Artifact = options.candidateTier2Override;
+    }
     const green = battleMirror ? right : left;
     const red = battleMirror ? left : right;
     const candidateIsGreen = battleMirror ? !candidatePickedLeft : candidatePickedLeft;
@@ -1004,7 +1026,15 @@ export function playRankedDraftGame(
         ...(options.recordArmies
             ? {
                   armies: {
-                      candidate: recordedArmy(candidateArmy),
+                      candidate: {
+                          ...recordedArmy(candidateArmy),
+                          ...(options.candidateTier2Override === undefined
+                              ? {}
+                              : {
+                                    tier2Offers: [...(candidatePickedLeft ? pick.left : pick.right).tier2Offers],
+                                    policyTier2Artifact: candidatePolicyTier2,
+                                }),
+                      },
                       opponent: recordedArmy(candidatePickedLeft ? right : left),
                   },
               }
@@ -1284,6 +1314,9 @@ export function summarizeRankedDraftRecords(
                       opponentDoctrinePolicy: options.opponentDoctrinePolicy,
                   }
                 : {}),
+            ...(options.candidateTier2Override === undefined
+                ? {}
+                : { candidateTier2Override: options.candidateTier2Override }),
             draftDimensions: { offset: RANKED_DRAFT_INTRINSIC_OFFSET, length: RANKED_DRAFT_INTRINSIC_DIM },
             clusterSize: 4,
             seedAllocation: "indexed-bijective-v1",
@@ -1491,6 +1524,7 @@ function parseCli(argv: readonly string[]): ICliOptions {
         "opponent-setup",
         "candidate-doctrine",
         "opponent-doctrine",
+        "candidate-t2",
         "output",
         "live-draft-rules",
         "side-board",
@@ -1536,6 +1570,7 @@ function parseCli(argv: readonly string[]): ICliOptions {
         ...(values.get("opponent-doctrine")
             ? { opponentDoctrinePolicy: rankedDraftDoctrinePolicy(values.get("opponent-doctrine")) }
             : {}),
+        ...(values.get("candidate-t2") ? { candidateTier2Override: Number(values.get("candidate-t2")) } : {}),
         ...(values.get("output") ? { outputPath: resolve(values.get("output")!) } : {}),
         liveDraftRules: flag("live-draft-rules"),
         sideBoard: flag("side-board"),
