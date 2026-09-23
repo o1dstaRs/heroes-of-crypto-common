@@ -59,3 +59,26 @@ PASS  6a distinct creatures >= 80% of incumbent: 1.0000
 PASS  6b top creature share <= incumbent + 10pp: 0.0005
 VERDICT: FAIL
 ```
+
+## conditional-v1 setup vs the live v07-nonfight setup, both drafts r4 (P6, shipped scoped to v0.8)
+
+The incumbent label names the draft policy both seats used; the two arms differ only in setup.
+
+```
+run: confirm_setup vs incumbent:ranked-unit-strength-a19-side-v1-w4-r4
+head-to-head: 4410W 3525L 65D over 8000 games; decisive 55.58% CI [53.39, 57.74]
+  grid 1: 55.59% (LCB 51.79)
+  grid 3: 57.03% (LCB 53.24)
+  grid 4: 54.12% (LCB 50.32)
+diversity: candidate 51 distinct, incumbent 51; top share 38.0% vs 38.0% over 4000 drafts
+informational: tier-2 synergy reach candidate 3.7% vs incumbent 3.7%
+PASS  1 draw-aware head-to-head > 0.50: 0.5553
+PASS  2 clustered 95% LCB > 0.50: 0.5339
+PASS  3 candidate rejections == 0: 0
+PASS  4 worst map (grid 4) >= 0.49: 0.5412
+PASS  5 vs untrained-heuristic: candidate - incumbent >= -0.02: 0.0487
+PASS  5 vs league-round3-exploiter: candidate - incumbent >= -0.02: 0.0130
+PASS  6a distinct creatures >= 80% of incumbent: 1.0000
+PASS  6b top creature share <= incumbent + 10pp: 0.0000
+VERDICT: PASS
+```

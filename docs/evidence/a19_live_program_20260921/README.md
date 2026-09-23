@@ -1,4 +1,4 @@
-# a19 improvement program from live test-server games (2026-09-21 → 2026-09-22)
+# a19 improvement program from live test-server games (2026-09-21 → 2026-09-23)
 
 Owner request: analyse past games on test.heroesofcrypto.io and make a19 v0.8 measurably better than what we have —
 make a proposal, evaluate it, make the change, measure it on multiple cohorts, set it in stone, continue.
@@ -23,6 +23,7 @@ counts was wrong in three places; the correction is at the top of LIVE_ANALYSIS.
 | 4 | draft shooter floor 4 (`…-v1-w4-r4`) | vs r3, 8,000 games: 57.09% [54.91, 59.24], 8/8 gates | **shipped, current default** |
 | 5 | draft shooter floor 5 | vs r4, 8,000 games: 52.05% [49.86, 54.23], gate 2 fails | fail, lever closed |
 | – | a19 Pareto No-Melee focus (`any_board`) | withdrawn before any deciding game: its trigger co-occurs on 6.4% of boards | not run |
+| 6 | `conditional-v1` setup for v0.8 seats (Sniper 3 > Armor 3 > Might) | vs the live setup, 8,000 games, both drafts r4: 55.58% [53.39, 57.74], 8/8 gates | **shipped, v0.8 only** |
 
 Also measured: r4 against the validated but unshipped v1-w12, 10,000 games: 51.63% [49.43, 53.81] —
 indistinguishable, so preferring the floor gives nothing up. The informational r3 vs v1-w12 run (2,000 games) had
@@ -38,6 +39,14 @@ r3 at 41.51%, which is what prompted P4.
   or `…-v1-w4` for the pre-program default.
 - Calibration: r4 beat the untrained ranged stack 52.77% on seed 99330001 and 50.43% on 99430001. The honest claim is
   that r4 closed the exploit that beat v1-w4 two to one (33.87%) to about even, not that it dominates it.
+
+- server 13bca49: v0.8 seats (the ranked bot and vs-AI brutal) set up with `conditional-v1` through the v0.8
+  lifecycle profile. The global setup default, the easy/normal/hard tiers (v0.4/v0.6/v0.7) and absent-human
+  auto-setup are unchanged: for v0.7, `conditional-v1`'s undefined placement override would turn reveal placement
+  off, which was not measured. v0.8 deploys exactly as measured because its strategy fills an unset placement
+  policy with `public-roster`. Rollback: `HOC_V08_SETUP_POLICY=v07-nonfight-4eda84635fe7`; `HOC_SETUP_POLICY` no
+  longer governs v0.8 seats. The human-derived `ranked-replay-tactics-v1` setup (Placement 2 for Might 2) lost
+  45.53% on every map, ending its experiment.
 
 ## The draft optimum is bracketed
 
@@ -66,11 +75,13 @@ composition problem.
 | draft comparison | `bun src/simulation/ranked_draft_eval.ts --candidate <policy> --pool policy:<incumbent> --games N --seed S --fight-profile a19 --candidate-setup v07-nonfight-4eda84635fe7 --opponent-setup v07-nonfight-4eda84635fe7 --live-draft-rules true --side-board true --deterministic-search true --record-armies true --records X.jsonl --output X.json` |
 | draft verdict | `VERDICT_OUT=<dir> python3 scripts/verdict.py <confirm> <robust_candidate> <robust_incumbent> incumbent:<policy>` |
 | paired search-seam A/B | `COMMON_ROOT=<common> EDGE_OVERRIDE_JSON='{…}' EDGE_LABEL=<l> [EDGE_DRAFT_POLICY=<policy>] bun scripts/edge_launch.ts <shards> <seed> <boards> <mirror\|vsranged\|vsmelee> <outdir>`, then `python3 scripts/paired_release_aggregate.py '<outdir>/*.jsonl'` |
+| sharded draft run | `bun scripts/ranked_draft_shard.ts --common <common> --shard k --shards K --records <dir>/X.shard<k>.jsonl <draft flags>`, then `bun scripts/ranked_draft_merge.ts --common <common> --out <dir>/X --shard-glob '<dir>/X.shard*.jsonl' <draft flags>`; byte-identical to one run |
 | side-board cohorts | `COMMON_ROOT=<common> OVERRIDE_JSON='{…}' scripts/side_battery.sh <random\|melee\|ranged> <seed> <pairs> <conc> <outdir>` |
 
 Seeds used, all first-use and never re-rolled: 99010001, 99030001 (P1); 99110001 (P2); 99210001, 99220001, 99230001,
 99240001 (P3); 99260001 (r3 vs w12); 99310001, 99320001, 99330001, 99340001, 99350001 (P4); 99410001, 99420001,
-99430001 (P5). Burned by smoke runs: 99000001, 99500001.
+99430001 (P5); 99610001, 99620001, 99630001, 99640001 (P6). Burned by smoke and identity runs: 99000001, 99500001,
+12340001.
 
 ## Open for the owner
 
