@@ -75,3 +75,13 @@ Predicted effect, cross-fitted: +3.88pp (even→odd +4.90 on 570 changed games; 
 +4.78pp. Decision: CONFIRM with 8000 games (preregistered size rule).
 Stage 3 queued 20:20Z from an unpushed measurement commit (the rule + this table on 711f1c4): the confirmation on
 hft after its P10 arms, both robustness cells on the shared node after P11's selection.
+
+## RESULT — stage 3 confirmation (seed 99980001, 8000 games) and robustness (seed 99990001)
+conditional-v1:sniper+t2a19 vs conditional-v1, both seats v4-w8-r4 + SEE_NONE: 4238W 3652L 110D; decisive 53.71%
+[51.52, 55.89], draw-aware 53.66%, clustered LCB 51.52, 0 rejections; maps NORMAL 53.38 / LAVA 54.24 / BLOCK 53.52.
+The cross-fitted prediction was +3.88pp; the confirmation measured +3.7pp. Robustness: 67.22% against the untrained
+ranged stack and 90.12% against the round-3 exploiter (conditional-v1: 63.66% and 89.73%).
+
+## VERDICT (verdict.py over confirm_t2a19 + robust_t2a19_candidate + robust_t2a19_incumbent): PASS on all 8 gates
+→ shipped: common 13a92e3 (rule + table), server 24a9a0e (v0.8 spec conditional-v1:sniper+t2a19, pin + lockfile),
+client 5981464 (pin).

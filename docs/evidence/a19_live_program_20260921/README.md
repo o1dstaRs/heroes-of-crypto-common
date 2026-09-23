@@ -26,7 +26,7 @@ counts was wrong in three places; the correction is at the top of LIVE_ANALYSIS.
 | 6 | `conditional-v1` setup for v0.8 seats (Sniper 3 > Armor 3 > Might) | vs the live setup, 8,000 games, both drafts r4: 55.58% [53.39, 57.74], 8/8 gates | **shipped, v0.8 only** |
 | 7 | unit-strength prior re-fitted on r4 armies and current balance, weight 8 (`…-v4-w8-r4`) | vs r4, 8,000 games: 63.04% [60.90, 65.13], 8/8 gates; with both seats on `conditional-v1` 61.83% [57.50, 65.99] | **shipped, current default** |
 | 8 | the v0.8 bot always takes SEE_NONE instead of a per-match doctrine | vs the variety, 8,000 games: 53.24% [51.04, 55.41], 8/8 gates; on v4 drafts 54.41% | **shipped, v0.8 only** |
-| 9 | the Tier-2 artifact table re-measured for a19 on v4 armies | preregistered, stage 1 running | – |
+| 9 | the Tier-2 artifact table re-measured for a19 on v4 armies (rule `t2a19`) | vs the old table, 8,000 games: 53.71% [51.52, 55.89], 8/8 gates; predicted +3.88pp cross-fitted | **shipped, v0.8 only** |
 | 10 | synergy options re-measured for a19 on v4 armies | preregistered, queued | – |
 
 Also measured: r4 against the validated but unshipped v1-w12, 10,000 games: 51.63% [49.43, 53.81] —
@@ -66,6 +66,13 @@ changes) r4 still beats r3 60.04% [55.69, 64.24] over 2,000 games.
   60.5% of the games where the variety drew SEE_ALL and 50.4% where it drew THREE_REVEALS: two points outweigh full
   sight of the opponent's draft, one point and three random reveals come out even. The easy/normal/hard tiers keep the
   variety. Rollback: `HOC_V08_DOCTRINE_POLICY=ranked-variety`.
+
+- common 13a92e3, server 24a9a0e, client 5981464: v0.8 seats pick their Tier-2 artifact from a table re-measured on the
+  armies they draft (rule `t2a19`, spec `conditional-v1:sniper+t2a19`). Twelve paired arms forced each artifact onto
+  the same 2,000 games: Crown of Command 56.5 leads, Giant's Maul 54.3, Clover 53.6, Farsight 53.2; Tome of
+  Amplification (42.3), which the old table put first or second and the bot took on a fifth of its armies, is second
+  from last. Five of the twelve rows had moved since the old table was measured (Tome reworked, Crown and Giant's Maul
+  buffed, Berserker's Bond changed, Archmage's Ring added). Rollback: `HOC_V08_SETUP_POLICY=conditional-v1`.
 
 ## The draft optimum is bracketed
 
