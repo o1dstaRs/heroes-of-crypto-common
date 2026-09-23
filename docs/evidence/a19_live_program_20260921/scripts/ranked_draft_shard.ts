@@ -36,6 +36,9 @@ const options = {
     ...(values.get("candidate-doctrine") ? { candidateDoctrinePolicy: values.get("candidate-doctrine") } : {}),
     ...(values.get("opponent-doctrine") ? { opponentDoctrinePolicy: values.get("opponent-doctrine") } : {}),
     ...(values.get("candidate-t2") ? { candidateTier2Override: Number(values.get("candidate-t2")) } : {}),
+    ...(values.get("candidate-synergy")
+        ? { candidateSynergyOverride: ev.parseRankedDraftSynergyOverride(values.get("candidate-synergy")!) }
+        : {}),
     liveDraftRules: flag("live-draft-rules"),
     sideBoard: flag("side-board"),
     deterministicSearch: flag("deterministic-search"),

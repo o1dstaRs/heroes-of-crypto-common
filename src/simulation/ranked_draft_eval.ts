@@ -204,6 +204,46 @@ export interface IRankedDraftRecordedArmy {
     /** With a Tier-2 override only: the three artifacts the draft offered and the one the setup policy took. */
     tier2Offers?: number[];
     policyTier2Artifact?: number;
+    /** With a synergy override only: the synergies the candidate fought with and the ones its setup policy took. */
+    synergies?: ISetupSynergy[];
+    policySynergies?: ISetupSynergy[];
+}
+
+/** The synergy factions and their two options (FactionVals id -> the faction's SpecificSynergy ids). */
+export const RANKED_DRAFT_SYNERGY_OPTIONS: Readonly<Record<number, readonly number[]>> = {
+    [PBTypes.FactionVals.LIFE]: [1, 2],
+    [PBTypes.FactionVals.CHAOS]: [1, 2],
+    [PBTypes.FactionVals.MIGHT]: [1, 2],
+    [PBTypes.FactionVals.NATURE]: [1, 2],
+};
+
+/** Check a FactionVals id -> synergy option map against the options the fight can apply; returns a plain copy. */
+export function validateRankedDraftSynergyOverride(override: Readonly<Record<number, number>>): Record<number, number> {
+    const checked: Record<number, number> = {};
+    for (const [key, option] of Object.entries(override)) {
+        const faction = Number(key);
+        if (!RANKED_DRAFT_SYNERGY_OPTIONS[faction]?.includes(option)) {
+            throw new RangeError(`synergy override ${key}:${option} needs a synergy faction and option 1 or 2`);
+        }
+        checked[faction] = option;
+    }
+    if (!Object.keys(checked).length) throw new RangeError("synergy override is empty");
+    return checked;
+}
+
+/** Parse "NATURE:1,CHAOS:2" (faction names) into a validated FactionVals id -> synergy option map. */
+export function parseRankedDraftSynergyOverride(spec: string): Record<number, number> {
+    const override: Record<number, number> = {};
+    for (const part of spec
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean)) {
+        const [name, value] = part.split(":");
+        const faction = (PBTypes.FactionVals as unknown as Record<string, unknown>)[name?.trim().toUpperCase() ?? ""];
+        if (typeof faction !== "number") throw new RangeError(`synergy override "${part}" names no faction`);
+        override[faction] = Number(value);
+    }
+    return validateRankedDraftSynergyOverride(override);
 }
 
 export interface IRankedDraftOpponentSummary {
@@ -274,6 +314,8 @@ export interface IRankedDraftEvaluationReport {
         opponentDoctrinePolicy?: RankedDraftDoctrinePolicy;
         /** Present only when the candidate's Tier-2 artifact is forced. */
         candidateTier2Override?: number;
+        /** Present only when the candidate's synergy options are forced (FactionVals id -> option). */
+        candidateSynergyOverride?: Record<number, number>;
         draftDimensions: { offset: number; length: number };
         clusterSize: 4;
         seedAllocation: "indexed-bijective-v1";
@@ -322,6 +364,12 @@ export interface IRankedDraftEvaluationOptions {
      * it after the draft leaves the drafted armies, augments and synergies exactly as they were.
      */
     candidateTier2Override?: number;
+    /**
+     * Give the candidate these synergy options (FactionVals id -> option) wherever its army qualifies for that
+     * faction's synergy (measurement only). The level still follows the unit count, and nothing in the draft reads
+     * the choice, so only the option changes.
+     */
+    candidateSynergyOverride?: Readonly<Record<number, number>>;
     /** Draft creatures with the live server's rules (faction-diversity tax), not the League-era argmax. */
     liveDraftRules?: boolean;
     /** Fight on the side-oriented ranked board (side zones, seeded stones) instead of the classic board. */
@@ -346,6 +394,7 @@ interface INormalizedOptions {
     candidateDoctrinePolicy: RankedDraftDoctrinePolicy;
     opponentDoctrinePolicy: RankedDraftDoctrinePolicy;
     candidateTier2Override?: number;
+    candidateSynergyOverride?: Record<number, number>;
     liveDraftRules: boolean;
     sideBoard: boolean;
     deterministicSearch: boolean;
@@ -604,6 +653,9 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
         candidateDoctrinePolicy: rankedDraftDoctrinePolicy(options.candidateDoctrinePolicy),
         opponentDoctrinePolicy: rankedDraftDoctrinePolicy(options.opponentDoctrinePolicy),
         ...(candidateTier2Override === undefined ? {} : { candidateTier2Override }),
+        ...(options.candidateSynergyOverride === undefined
+            ? {}
+            : { candidateSynergyOverride: validateRankedDraftSynergyOverride(options.candidateSynergyOverride) }),
         liveDraftRules: options.liveDraftRules === true,
         sideBoard: options.sideBoard === true,
         deterministicSearch: options.deterministicSearch === true,
@@ -992,6 +1044,16 @@ export function playRankedDraftGame(
     if (options.candidateTier2Override !== undefined) {
         (candidatePickedLeft ? left : right).tier2Artifact = options.candidateTier2Override;
     }
+    const candidatePolicySynergies = [...(candidatePickedLeft ? left : right).synergies];
+    const synergyOverride = options.candidateSynergyOverride;
+    if (synergyOverride !== undefined) {
+        const army = candidatePickedLeft ? left : right;
+        army.synergies = army.synergies.map((entry) =>
+            synergyOverride[entry.faction] === undefined
+                ? entry
+                : { ...entry, synergy: synergyOverride[entry.faction] },
+        );
+    }
     const green = battleMirror ? right : left;
     const red = battleMirror ? left : right;
     const candidateIsGreen = battleMirror ? !candidatePickedLeft : candidatePickedLeft;
@@ -1033,6 +1095,12 @@ export function playRankedDraftGame(
                               : {
                                     tier2Offers: [...(candidatePickedLeft ? pick.left : pick.right).tier2Offers],
                                     policyTier2Artifact: candidatePolicyTier2,
+                                }),
+                          ...(options.candidateSynergyOverride === undefined
+                              ? {}
+                              : {
+                                    synergies: [...candidateArmy.synergies],
+                                    policySynergies: candidatePolicySynergies,
                                 }),
                       },
                       opponent: recordedArmy(candidatePickedLeft ? right : left),
@@ -1317,6 +1385,9 @@ export function summarizeRankedDraftRecords(
             ...(options.candidateTier2Override === undefined
                 ? {}
                 : { candidateTier2Override: options.candidateTier2Override }),
+            ...(options.candidateSynergyOverride === undefined
+                ? {}
+                : { candidateSynergyOverride: options.candidateSynergyOverride }),
             draftDimensions: { offset: RANKED_DRAFT_INTRINSIC_OFFSET, length: RANKED_DRAFT_INTRINSIC_DIM },
             clusterSize: 4,
             seedAllocation: "indexed-bijective-v1",
@@ -1525,6 +1596,7 @@ function parseCli(argv: readonly string[]): ICliOptions {
         "candidate-doctrine",
         "opponent-doctrine",
         "candidate-t2",
+        "candidate-synergy",
         "output",
         "live-draft-rules",
         "side-board",
@@ -1571,6 +1643,9 @@ function parseCli(argv: readonly string[]): ICliOptions {
             ? { opponentDoctrinePolicy: rankedDraftDoctrinePolicy(values.get("opponent-doctrine")) }
             : {}),
         ...(values.get("candidate-t2") ? { candidateTier2Override: Number(values.get("candidate-t2")) } : {}),
+        ...(values.get("candidate-synergy")
+            ? { candidateSynergyOverride: parseRankedDraftSynergyOverride(values.get("candidate-synergy")!) }
+            : {}),
         ...(values.get("output") ? { outputPath: resolve(values.get("output")!) } : {}),
         liveDraftRules: flag("live-draft-rules"),
         sideBoard: flag("side-board"),
