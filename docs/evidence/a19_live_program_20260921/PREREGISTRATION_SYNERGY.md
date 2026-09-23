@@ -36,3 +36,10 @@ rollback. Seeds are never re-rolled.
 
 Prediction, written down so it can be wrong: Nature's board units now beat fly armor on these armies; the other three
 factions hold.
+
+## Amendment 2026-09-23 13:15Z, before any P10 game
+P7 shipped v4-w8-r4 as the ranked draft default (common 993078e, server 304b333) after this was written, and it
+changes which factions qualify: on v4 armies Nature's synergy applies to 54.2%, Life's 49.9%, Chaos's 49.0% and
+Might's 38.9% (r4: 56.4 / 45.2 / 44.2 / 57.2). Every P10 cell now drafts `ranked-unit-strength-a19-side-v4-w8-r4` on
+both seats: the four stage-1 arms, the stage-3 confirmation and both robustness cells. Everything else is unchanged,
+seeds included.

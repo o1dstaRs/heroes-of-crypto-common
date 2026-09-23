@@ -45,3 +45,11 @@ rollback; bare `conditional-v1` keeps meaning sniper + t2. Seeds are never re-ro
 
 Prediction, written down so it can be wrong: Tome measures near the bottom of the table on these armies, and the
 predicted effect lands between +1 and +3pp.
+
+## Amendment 2026-09-23 13:15Z, before any P9 game
+P7 shipped v4-w8-r4 as the ranked draft default (common 993078e, server 304b333) after this was written. v4 drafts
+different creatures (Wandering Mage in 37% of armies against r4's 3%, Magic Dragon 26% against 9%, Hydra 0% against
+15%), and a Tier-2 table fitted on r4 armies would be fitted to armies the bot no longer builds. Every P9 cell now
+drafts `ranked-unit-strength-a19-side-v4-w8-r4` on both seats: the twelve stage-1 arms, the stage-3 confirmation and
+both robustness cells. Everything else is unchanged, seeds included. v4 armies are 99.7% in the ranged cohort (P7
+confirmation, 4,000 drafts), so the single ranged table still covers them.
