@@ -45,6 +45,11 @@ describe("unit turn-mix census", () => {
         expect(process.env.FORCE_CREATURES).toBe("2:Pikeman");
     });
 
+    it("sizes stacks the historical way by default and the ranked way on request", () => {
+        expect(measureUnitTurnMix("Abomination", 4, 0).amountMode).toBe("levelTable");
+        expect(measureUnitTurnMix("Abomination", 4, 0, 0, "expBudget").amountMode).toBe("expBudget");
+    });
+
     it("reports zeroed shares rather than dividing by zero when nothing was observed", () => {
         const census = measureUnitTurnMix("Abomination", 4, 0);
         expect(census).toMatchObject({

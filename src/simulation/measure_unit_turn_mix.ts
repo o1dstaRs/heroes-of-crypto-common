@@ -24,13 +24,19 @@
  * and the comparison against a level-matched peer is like-for-like. Run a peer at the same level for a
  * control; the absolute numbers move with the roster distribution, the gap between peers is the signal.
  *
+ * Pass `expBudget` as the fifth argument to size stacks as ranked does (LiveTwin): stack power, which gates spells
+ * such as Fireball, is relative to the biggest stack on the board, and the historical `levelTable` sizing leaves
+ * level-1 casters below the gate. Casts are counted by spell (SIM_RECORD_SPELL_EFFECTS).
+ * MEASURED 2026-09-23, ranked sizing, 10 games each: Wandering Mage casts its Fireball scroll ~once per stack for 469
+ * damage, then Smoke / Misfortune / Fireforged Sword (spell dmg/turn 87); Battle Mage Fire Strike 191 per cast (124);
+ * Magic Dragon Lightning Strike 210, Meteor Shower 462 (219). Under levelTable sizing Wandering Mage never cast Fireball.
  * MEASURED 2026-09-21 on the deep budget (14 games per unit), bottom vs level-matched top of the 7,056-fight
  * cohort report: defend was 0% for every unit and wait was level-matched, so the passive-turn problem that
  * motivated the 2026-09 unit-release A/Bs is GONE. What remains is conversion — damage per turn:
  * Abomination 78 vs Frenzied Boar 328, Cyclops 103 vs Zena 137, Blacksmith 5 vs Peasant 14.
  */
 
-import { buildRoster, makeRng } from "./army";
+import { buildRoster, makeRng, type StackAmountMode } from "./army";
 import { runMatch, SIM_RECORD_SPELL_EFFECTS_ENV, type IRecordedAction } from "./battle_engine";
 
 const ATTACK_ACTION_TYPES: ReadonlySet<IRecordedAction["actionType"]> = new Set([
@@ -43,6 +49,8 @@ const ATTACK_ACTION_TYPES: ReadonlySet<IRecordedAction["actionType"]> = new Set(
 export interface IUnitTurnMixCensus {
     readonly creatureName: string;
     readonly games: number;
+    /** How stacks were sized: "expBudget" is the ranked / LiveTwin sizing, "levelTable" the historical default. */
+    readonly amountMode?: StackAmountMode;
     /** Stacks of this creature observed across both mirrored sides. */
     readonly stacks: number;
     readonly turns: number;
@@ -72,6 +80,7 @@ export function measureUnitTurnMix(
     level: number,
     games: number,
     seedOffset = 0,
+    amountMode: StackAmountMode = "levelTable",
 ): IUnitTurnMixCensus {
     const previous = process.env.FORCE_CREATURES;
     const previousSpellEffects = process.env[SIM_RECORD_SPELL_EFFECTS_ENV];
@@ -93,7 +102,7 @@ export function measureUnitTurnMix(
             const result = runMatch({
                 greenVersion: "v0.8",
                 redVersion: "v0.8",
-                roster: buildRoster(makeRng(seed)),
+                roster: buildRoster(makeRng(seed), undefined, undefined, undefined, amountMode),
                 seed,
                 searchOfflineDeterministicWork: true,
             });
@@ -139,6 +148,7 @@ export function measureUnitTurnMix(
     return {
         creatureName,
         games,
+        amountMode,
         stacks,
         turns,
         turnsPerStack: stacks ? turns / stacks : 0,
@@ -186,11 +196,22 @@ if (import.meta.main) {
     const level = Number(levelText);
     if (!creatureName || !Number.isInteger(level)) {
         console.error(
-            'Usage: bun src/simulation/measure_unit_turn_mix.ts "<level>:<Creature Name>" [games] [seedOffset]',
+            'Usage: bun src/simulation/measure_unit_turn_mix.ts "<level>:<Creature Name>" [games] [seedOffset] [levelTable|expBudget]',
         );
         process.exit(2);
     }
-    const census = measureUnitTurnMix(creatureName, level, Number(process.argv[3] ?? 14), Number(process.argv[4] ?? 0));
+    const amountMode = (process.argv[5] ?? "levelTable") as StackAmountMode;
+    if (amountMode !== "levelTable" && amountMode !== "expBudget") {
+        console.error('amount mode must be "levelTable" (default) or "expBudget" (ranked / LiveTwin stack sizing)');
+        process.exit(2);
+    }
+    const census = measureUnitTurnMix(
+        creatureName,
+        level,
+        Number(process.argv[3] ?? 14),
+        Number(process.argv[4] ?? 0),
+        amountMode,
+    );
     console.log(formatUnitTurnMix(census));
     console.log(JSON.stringify(census));
 }
