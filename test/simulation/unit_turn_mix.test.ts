@@ -24,6 +24,17 @@ afterEach(() => {
 });
 
 describe("unit turn-mix census", () => {
+    it("restores the ambient spell-effect recording switch", () => {
+        delete process.env.SIM_RECORD_SPELL_EFFECTS;
+        measureUnitTurnMix("Abomination", 4, 0);
+        expect(process.env.SIM_RECORD_SPELL_EFFECTS).toBeUndefined();
+
+        process.env.SIM_RECORD_SPELL_EFFECTS = "0";
+        measureUnitTurnMix("Abomination", 4, 0);
+        expect(process.env.SIM_RECORD_SPELL_EFFECTS).toBe("0");
+        delete process.env.SIM_RECORD_SPELL_EFFECTS;
+    });
+
     it("restores the ambient FORCE_CREATURES roster override", () => {
         delete process.env.FORCE_CREATURES;
         measureUnitTurnMix("Abomination", 4, 0);
@@ -64,6 +75,9 @@ describe("unit turn-mix census", () => {
             defendShare: 0,
             damagePerStack: 1420,
             damagePerTurn: 78,
+            spellDamagePerTurn: 12,
+            healPerTurn: 3,
+            casts: { Fireball: { casts: 4, damage: 600, healed: 0 }, Heal: { casts: 2, damage: 0, healed: 90 } },
             diedShare: 0.04,
             averageDeathLap: 8,
             averageLaps: 7.4,
@@ -75,6 +89,12 @@ describe("unit turn-mix census", () => {
         expect(line).toContain("attack  55%");
         expect(line).toContain("defend   0%");
         expect(line).toContain("dmg/turn    78");
+        expect(line).toContain("spell dmg/turn    12");
+        expect(line).toContain("heal/turn    3");
         expect(line).toContain("at lap 8.0");
+        expect(line).toContain("Fireball");
+        expect(line).toContain("dmg/cast   150");
+        expect(line).toContain("healed/cast    45");
+        expect(line.split("\n")[1]).toContain("Fireball");
     });
 });

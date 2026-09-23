@@ -492,7 +492,19 @@ export interface IRecordedAction {
     /** Legacy single-target visible amount; zero for Through Shot/AOE even when splash dealt damage. */
     damage?: number;
     unitIdsDied?: string[];
+    /**
+     * Only with SIM_RECORD_SPELL_EFFECTS=1, and only on casts: the spell and what it did, read from its spell_cast
+     * event — damage dealt to others (rebounds off a Magic Mirror excluded), HP healed, HP raised. Off by default
+     * so every existing action log and behavior-trace digest stays byte-identical.
+     */
+    spellName?: string;
+    spellDamage?: number;
+    spellHealed?: number;
+    spellResurrectedHp?: number;
 }
+
+/** Env switch for the spell fields of IRecordedAction (measurement runs only). */
+export const SIM_RECORD_SPELL_EFFECTS_ENV = "SIM_RECORD_SPELL_EFFECTS";
 
 export interface ISideOutcome {
     version: string;
@@ -1968,6 +1980,10 @@ function recordAction(
         return; // the engine declined this proposal — it isn't an action the unit took, so don't log it
     }
     const attackEvent = result.events.find((e) => e.type === "unit_attacked");
+    const spellEvent =
+        action.type === "cast_spell" && process.env[SIM_RECORD_SPELL_EFFECTS_ENV] === "1"
+            ? result.events.find((e): e is Extract<GameEvent, { type: "spell_cast" }> => e.type === "spell_cast")
+            : undefined;
     let targetId: string | undefined;
     let toCell: XY | undefined;
     if (action.type === "melee_attack" || action.type === "range_attack") {
@@ -2009,6 +2025,16 @@ function recordAction(
             attackEvent?.type === "unit_attacked"
                 ? (attackEvent.damage.secondary?.length ?? 0) + (attackEvent.damage.splash?.length ?? 0)
                 : undefined,
+        ...(spellEvent
+            ? {
+                  spellName: spellEvent.spellName,
+                  spellDamage: (spellEvent.damaged ?? [])
+                      .filter((hit) => !hit.rebounded)
+                      .reduce((total, hit) => total + hit.amount, 0),
+                  spellHealed: (spellEvent.healed ?? []).reduce((total, heal) => total + heal.amount, 0),
+                  spellResurrectedHp: (spellEvent.resurrected ?? []).reduce((total, raised) => total + raised.hp, 0),
+              }
+            : {}),
     });
 }
 

@@ -31,7 +31,7 @@
  */
 
 import { buildRoster, makeRng } from "./army";
-import { runMatch, type IRecordedAction } from "./battle_engine";
+import { runMatch, SIM_RECORD_SPELL_EFFECTS_ENV, type IRecordedAction } from "./battle_engine";
 
 const ATTACK_ACTION_TYPES: ReadonlySet<IRecordedAction["actionType"]> = new Set([
     "melee_attack",
@@ -52,9 +52,14 @@ export interface IUnitTurnMixCensus {
     readonly moveShare: number;
     readonly waitShare: number;
     readonly defendShare: number;
-    /** Impact damage this creature converted, per stack and per turn it took. */
+    /** Impact damage this creature's attacks converted, per stack and per turn it took (spells not included). */
     readonly damagePerStack: number;
     readonly damagePerTurn: number;
+    /** What its casts did, per turn it took: damage to others, HP healed (HP raised by resurrection counts as healed). */
+    readonly spellDamagePerTurn: number;
+    readonly healPerTurn: number;
+    /** Casts by spell name, with what they dealt and healed in total. */
+    readonly casts: Readonly<Record<string, { casts: number; damage: number; healed: number }>>;
     readonly diedShare: number;
     readonly averageDeathLap: number;
     readonly averageLaps: number;
@@ -69,10 +74,15 @@ export function measureUnitTurnMix(
     seedOffset = 0,
 ): IUnitTurnMixCensus {
     const previous = process.env.FORCE_CREATURES;
+    const previousSpellEffects = process.env[SIM_RECORD_SPELL_EFFECTS_ENV];
     process.env.FORCE_CREATURES = `${level}:${creatureName}`;
+    process.env[SIM_RECORD_SPELL_EFFECTS_ENV] = "1";
     const actionCounts: Record<string, number> = {};
+    const casts: Record<string, { casts: number; damage: number; healed: number }> = {};
     let turns = 0;
     let damage = 0;
+    let spellDamage = 0;
+    let healed = 0;
     let stacks = 0;
     let deaths = 0;
     let deathLapSum = 0;
@@ -103,6 +113,15 @@ export function measureUnitTurnMix(
                 turns += 1;
                 actionCounts[action.actionType] = (actionCounts[action.actionType] ?? 0) + 1;
                 damage += action.impactDamage ?? action.damage ?? 0;
+                if (action.spellName !== undefined) {
+                    const cast = (casts[action.spellName] ??= { casts: 0, damage: 0, healed: 0 });
+                    const castHealed = (action.spellHealed ?? 0) + (action.spellResurrectedHp ?? 0);
+                    cast.casts += 1;
+                    cast.damage += action.spellDamage ?? 0;
+                    cast.healed += castHealed;
+                    spellDamage += action.spellDamage ?? 0;
+                    healed += castHealed;
+                }
             }
             for (const lap of diedAtLap.values()) {
                 deaths += 1;
@@ -112,6 +131,8 @@ export function measureUnitTurnMix(
     } finally {
         if (previous === undefined) delete process.env.FORCE_CREATURES;
         else process.env.FORCE_CREATURES = previous;
+        if (previousSpellEffects === undefined) delete process.env[SIM_RECORD_SPELL_EFFECTS_ENV];
+        else process.env[SIM_RECORD_SPELL_EFFECTS_ENV] = previousSpellEffects;
     }
     const share = (...types: string[]): number =>
         turns ? types.reduce((sum, type) => sum + (actionCounts[type] ?? 0), 0) / turns : 0;
@@ -127,6 +148,9 @@ export function measureUnitTurnMix(
         defendShare: share("defend_turn"),
         damagePerStack: stacks ? damage / stacks : 0,
         damagePerTurn: turns ? damage / turns : 0,
+        spellDamagePerTurn: turns ? spellDamage / turns : 0,
+        healPerTurn: turns ? healed / turns : 0,
+        casts,
         diedShare: stacks ? deaths / stacks : 0,
         averageDeathLap: deaths ? deathLapSum / deaths : 0,
         averageLaps: games ? lapSum / games : 0,
@@ -140,8 +164,18 @@ export function formatUnitTurnMix(census: IUnitTurnMixCensus): string {
         `${census.creatureName.padEnd(16)} turns/stack ${census.turnsPerStack.toFixed(1).padStart(5)}  ` +
         `attack ${percent(census.attackShare).padStart(4)} move ${percent(census.moveShare).padStart(4)} ` +
         `wait ${percent(census.waitShare).padStart(4)} defend ${percent(census.defendShare).padStart(4)}  ` +
-        `dmg/turn ${census.damagePerTurn.toFixed(0).padStart(5)}  died ${percent(census.diedShare).padStart(4)} ` +
-        `at lap ${census.averageDeathLap.toFixed(1)}`
+        `dmg/turn ${census.damagePerTurn.toFixed(0).padStart(5)}  spell dmg/turn ${census.spellDamagePerTurn
+            .toFixed(0)
+            .padStart(5)}  heal/turn ${census.healPerTurn.toFixed(0).padStart(4)}  ` +
+        `died ${percent(census.diedShare).padStart(4)} at lap ${census.averageDeathLap.toFixed(1)}` +
+        Object.entries(census.casts)
+            .sort((left, right) => right[1].casts - left[1].casts)
+            .map(
+                ([spell, cast]) =>
+                    `\n    ${spell.padEnd(22)} casts ${String(cast.casts).padStart(4)}  dmg/cast ` +
+                    `${(cast.damage / cast.casts).toFixed(0).padStart(5)}  healed/cast ${(cast.healed / cast.casts).toFixed(0).padStart(5)}`,
+            )
+            .join("")
     );
 }
 
