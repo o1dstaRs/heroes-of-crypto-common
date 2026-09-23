@@ -12,6 +12,7 @@
 import { creatureInfo } from "./creature_score";
 import strengthPriorJson from "./draft_strength_priors/ranked_unit_strength_a19_side_v1.json";
 import strengthPriorV3Json from "./draft_strength_priors/ranked_unit_strength_a19_side_v3.json";
+import strengthPriorV4Json from "./draft_strength_priors/ranked_unit_strength_a19_side_v4.json";
 import unitSynergyPriorJson from "./draft_strength_priors/ranked_unit_synergy_a19_side_v2.json";
 
 /**
@@ -64,6 +65,12 @@ interface IRawUnitSynergyPrior {
 export const RANKED_DRAFT_STRENGTH_PRIOR_ID = "ranked-unit-strength-a19-side-v1" as const;
 export const RANKED_DRAFT_UNIT_SYNERGY_PRIOR_ID = "ranked-unit-synergy-a19-side-v2" as const;
 export const RANKED_DRAFT_STRENGTH_V3_PRIOR_ID = "ranked-unit-strength-a19-side-v3" as const;
+/**
+ * v4: the v1 model refitted on current balance and current armies — both seats drafting with the shipped floor-4
+ * policy (…-v1-w4-r4) at 50% exploration, common 6f67b22 (PREREGISTRATION_STRENGTH_V4.md in
+ * docs/evidence/a19_live_program_20260921).
+ */
+export const RANKED_DRAFT_STRENGTH_V4_PRIOR_ID = "ranked-unit-strength-a19-side-v4" as const;
 
 export const RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS = {
     "ranked-unit-strength-a19-side-v1-w1": 1,
@@ -82,6 +89,9 @@ export const RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS = {
     "ranked-unit-strength-a19-side-v1-w4-r2": 4,
     "ranked-unit-strength-a19-side-v1-w4-r3": 4,
     "ranked-unit-strength-a19-side-v1-w4-r4": 4,
+    // v4 prior with r4's shooter floor, at r4's weight and at twice it.
+    "ranked-unit-strength-a19-side-v4-w4-r4": 4,
+    "ranked-unit-strength-a19-side-v4-w8-r4": 8,
 } as const;
 
 export type RankedDraftStrengthPolicyId = keyof typeof RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS;
@@ -97,6 +107,8 @@ export const RANKED_DRAFT_RANGED_FLOOR: Partial<Record<RankedDraftStrengthPolicy
     "ranked-unit-strength-a19-side-v1-w4-r2": 2,
     "ranked-unit-strength-a19-side-v1-w4-r3": 3,
     "ranked-unit-strength-a19-side-v1-w4-r4": 4,
+    "ranked-unit-strength-a19-side-v4-w4-r4": 4,
+    "ranked-unit-strength-a19-side-v4-w8-r4": 4,
 };
 
 /** Shooter floor of a policy (0 = none). */
@@ -140,6 +152,7 @@ export const RANKED_DRAFT_RELAXED_FACTION_TAX_FREE_STACKS = 3;
 const V1 = strengthPriorJson as IRawStrengthPrior;
 const V2 = unitSynergyPriorJson as IRawUnitSynergyPrior;
 const V3 = strengthPriorV3Json as IRawStrengthPrior;
+const V4 = strengthPriorV4Json as IRawStrengthPrior;
 if (V1.schemaVersion !== 1 || V1.id !== RANKED_DRAFT_STRENGTH_PRIOR_ID) {
     throw new Error(`Unexpected ranked draft strength prior ${String(V1.id)} (schema ${String(V1.schemaVersion)})`);
 }
@@ -149,12 +162,18 @@ if (V2.schemaVersion !== 2 || V2.id !== RANKED_DRAFT_UNIT_SYNERGY_PRIOR_ID) {
 if (V3.schemaVersion !== 1 || V3.id !== RANKED_DRAFT_STRENGTH_V3_PRIOR_ID) {
     throw new Error(`Unexpected ranked draft v3 strength prior ${String(V3.id)} (schema ${String(V3.schemaVersion)})`);
 }
+if (V4.schemaVersion !== 1 || V4.id !== RANKED_DRAFT_STRENGTH_V4_PRIOR_ID) {
+    throw new Error(`Unexpected ranked draft v4 strength prior ${String(V4.id)} (schema ${String(V4.schemaVersion)})`);
+}
 
 const V1_LIFT: ReadonlyMap<number, number> = new Map(
     V1.creatures.map((creature) => [creature.creatureId, creature.conservativeLiftPp]),
 );
 const V3_LIFT: ReadonlyMap<number, number> = new Map(
     V3.creatures.map((creature) => [creature.creatureId, creature.conservativeLiftPp]),
+);
+const V4_LIFT: ReadonlyMap<number, number> = new Map(
+    V4.creatures.map((creature) => [creature.creatureId, creature.conservativeLiftPp]),
 );
 const V2_GLOBAL_LIFT = new Map<number, number>();
 const V2_MAP_LIFT = new Map<number, Map<number, number>>();
@@ -182,6 +201,9 @@ const isUnitSynergyPolicy = (policy: RankedDraftStrengthPolicyId): boolean =>
 const isV3StrengthPolicy = (policy: RankedDraftStrengthPolicyId): boolean =>
     policy.startsWith(`${RANKED_DRAFT_STRENGTH_V3_PRIOR_ID}-`);
 
+const isV4StrengthPolicy = (policy: RankedDraftStrengthPolicyId): boolean =>
+    policy.startsWith(`${RANKED_DRAFT_STRENGTH_V4_PRIOR_ID}-`);
+
 export function rankedDraftStrengthPriorSource(): Readonly<IRawSource> {
     return { ...V1.source };
 }
@@ -194,6 +216,10 @@ export function rankedDraftStrengthV3PriorSource(): Readonly<IRawSource> {
     return { ...V3.source };
 }
 
+export function rankedDraftStrengthV4PriorSource(): Readonly<IRawSource> {
+    return { ...V4.source };
+}
+
 /** v1 conservative fitted lift in percentage points; creatures the fit never saw are neutral. */
 export function rankedDraftStrengthLiftPp(creatureId: number): number {
     return V1_LIFT.get(creatureId) ?? 0;
@@ -202,6 +228,11 @@ export function rankedDraftStrengthLiftPp(creatureId: number): number {
 /** v3 (on-policy refit) conservative fitted lift in percentage points; creatures the fit never saw are neutral. */
 export function rankedDraftStrengthV3LiftPp(creatureId: number): number {
     return V3_LIFT.get(creatureId) ?? 0;
+}
+
+/** v4 (current balance, current armies) conservative fitted lift in percentage points; unseen creatures are neutral. */
+export function rankedDraftStrengthV4LiftPp(creatureId: number): number {
+    return V4_LIFT.get(creatureId) ?? 0;
 }
 
 /**
@@ -256,6 +287,9 @@ export function rankedDraftStrengthScore(
     const weight = RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS[policy];
     if (isV3StrengthPolicy(policy)) {
         return (weight * rankedDraftStrengthV3LiftPp(creatureId)) / 100;
+    }
+    if (isV4StrengthPolicy(policy)) {
+        return (weight * rankedDraftStrengthV4LiftPp(creatureId)) / 100;
     }
     if (!isUnitSynergyPolicy(policy)) {
         return (weight * rankedDraftStrengthLiftPp(creatureId)) / 100;
