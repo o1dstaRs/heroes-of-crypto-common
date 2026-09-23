@@ -24,6 +24,26 @@ jobs:
             - name: Lint
               run: bun run lint
 
+    # The dist build (`tsc -p tsconfig.build.json`) is what every deploy runs, and it is stricter than the
+    # tests: bun strips types, so a file that fails to compile still passes `bun run test`. A narrowing bug
+    # in a simulation script sailed through Lint + Test and broke a staging deploy at the build gate.
+    typecheck:
+        name: Typecheck
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: latest
+
+            - name: Install dependencies
+              run: bun install
+
+            - name: Typecheck (the dist build's compiler pass)
+              run: bun run typecheck
+
     test:
         name: Test
         runs-on: ubuntu-latest

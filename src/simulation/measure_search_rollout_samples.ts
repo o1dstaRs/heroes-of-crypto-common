@@ -81,6 +81,8 @@ export function installRolloutSampleCapture(onRow: (row: IRolloutSampleRow) => v
     const originalSearch = prototype.search;
     let context: IScoringContext | null = null;
     let last: (IScoringContext & { readonly means: readonly number[] }) | null = null;
+    /** Read `last` at its declared type; see the note in `search` for why a plain read is not enough. */
+    const readLast = (): typeof last => last;
     let game = 0;
     let decision = 0;
 
@@ -120,8 +122,13 @@ export function installRolloutSampleCapture(onRow: (row: IRolloutSampleRow) => v
         const unit = args[0] as unknown as Unit;
         const incumbent = args[2] as unknown;
         const actions = originalSearch.apply(this, args);
-        if (last) {
-            const chosen = last.candidates.findIndex(
+        // originalSearch reaches back into `last` through scoreCandidates' closure, which control-flow
+        // analysis cannot see: after the `last = null` above it narrows the variable to null, and inside a
+        // plain `if (last)` to never — ten "does not exist on type 'never'" errors under tsc that bun, which
+        // strips types, never raised. Reading through a function yields the declared type instead.
+        const captured = readLast();
+        if (captured) {
+            const chosen = captured.candidates.findIndex(
                 (candidate) => (candidate as { actions: unknown }).actions === actions,
             );
             onRow({
@@ -129,11 +136,13 @@ export function installRolloutSampleCapture(onRow: (row: IRolloutSampleRow) => v
                 d: decision,
                 unit: unit.getName(),
                 level: unit.getLevel?.() ?? null,
-                k: last.candidates.length,
-                r: last.rollouts,
-                kinds: last.candidates.map((candidate) => String((candidate as { kind: unknown }).kind)),
-                samples: last.samples.map((row) => row.map((value) => (Number.isNaN(value) ? null : encode(value)))),
-                means: last.means.map(encode),
+                k: captured.candidates.length,
+                r: captured.rollouts,
+                kinds: captured.candidates.map((candidate) => String((candidate as { kind: unknown }).kind)),
+                samples: captured.samples.map((row) =>
+                    row.map((value) => (Number.isNaN(value) ? null : encode(value))),
+                ),
+                means: captured.means.map(encode),
                 chosen: chosen >= 0 ? chosen : actions === incumbent ? 0 : -1,
             });
         }

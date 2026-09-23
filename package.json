@@ -17,7 +17,6 @@
         "src"
     ],
     "scripts": {
-        "prebuild": "rimraf dist && bun run fmt",
         "build": "bun run test && tsc -p tsconfig.build.json && bun run copy-json && bun run copy-generated",
         "build:proto": "bun add -d protoc-gen-ts; scripts/protoc_generate.sh",
         "check:test-skips": "bun scripts/check_test_skips.ts",
@@ -33,8 +32,10 @@
         "lint:style": "bun run lint:style:base -- --check",
         "lint:style:base": "bunx prettier \"src/**/*.{ts,tsx,js,json}\" --cache --cache-strategy content --cache-location node_modules/.cache/prettier/.prettier-cache",
         "lint:style:fix": "bun run lint:style:base -- --write",
+        "prebuild": "rimraf dist && bun run fmt",
         "prepare": "git config core.hooksPath .githooks || true",
-        "test": "bun run check:test-skips && bun scripts/run_tests.ts"
+        "test": "bun run check:test-skips && bun scripts/run_tests.ts",
+        "typecheck": "tsc -p tsconfig.build.json --noEmit"
     },
     "lint-staged": {
         "*.{ts,tsx}": [
