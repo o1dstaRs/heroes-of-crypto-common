@@ -50,8 +50,12 @@ export const SETUP_CONDITIONAL_VERSION = "conditional-setup-v1";
 /** Env gate. Unset/"off"/"0" -> disabled (default). "on"/"1"/"all" -> all shipped rules. Or a comma list. */
 export const SETUP_CONDITIONAL_ENV = "V07_SETUP_CONDITIONAL";
 
+/** The v1 rules: what "on"/"1"/"all" and a bare conditional-v1 spec turn on. */
 export const CONDITIONAL_SETUP_RULES = ["sniper", "t2"] as const;
-export type ConditionalSetupRule = (typeof CONDITIONAL_SETUP_RULES)[number];
+/** Rules that exist only when a spec names them; "all" never turns them on, so older specs keep their meaning. */
+export const CONDITIONAL_SETUP_NAMED_RULES = ["t2a19"] as const;
+export const KNOWN_CONDITIONAL_SETUP_RULES = [...CONDITIONAL_SETUP_RULES, ...CONDITIONAL_SETUP_NAMED_RULES] as const;
+export type ConditionalSetupRule = (typeof KNOWN_CONDITIONAL_SETUP_RULES)[number];
 
 /** Own-roster composition counts (ranged first, then flyer, else ground melee — the league role order). */
 export interface IOwnComposition {
@@ -129,6 +133,29 @@ export const TIER2_ARTIFACT_WINRATE_RANGED: Record<number, number> = {
     [Tier2Artifact.BERSERKERS_BOND]: 27.2,
 };
 
+/**
+ * Tier-2 scores for the v0.8 bot on ranged-heavy armies (rule "t2a19"), measured 2026-09-23 (P9,
+ * docs/evidence/a19_live_program_20260921/PREREGISTRATION_T2_TABLE.md): each live artifact forced onto the candidate
+ * of 2,000 paired games — a19 on both seats, side board, v4-w8-r4 drafts, conditional-v1 setup, SEE_NONE, seed
+ * 99970001, all twelve arms on the same boards — scored draw-aware against the setup policy's own pick (50 = even).
+ * The old ranged table predates Tome of Amplification's rework, Crown of Command's and Giant's Maul's buffs,
+ * Berserker's Bond's change and Archmage's Ring; here Crown leads and Tome is second from the bottom.
+ */
+export const TIER2_ARTIFACT_SCORE_A19_RANGED: Record<number, number> = {
+    [Tier2Artifact.CROWN_OF_COMMAND]: 56.53,
+    [Tier2Artifact.GIANTS_MAUL]: 54.3,
+    [Tier2Artifact.CLOVER_OF_FORTUNE]: 53.55,
+    [Tier2Artifact.FARSIGHT_QUIVER]: 53.23,
+    [Tier2Artifact.PENDANT_OF_VITALITY]: 52.43,
+    [Tier2Artifact.TITAN_PLATE]: 51.33,
+    [Tier2Artifact.WARLORDS_EDGE]: 50.78,
+    [Tier2Artifact.BERSERKERS_BOND]: 47.57,
+    [Tier2Artifact.ARCHMAGES_RING]: 46.55,
+    [Tier2Artifact.RIME_CHARM]: 43.69,
+    [Tier2Artifact.TOME_OF_AMPLIFICATION]: 42.29,
+    [Tier2Artifact.LAVA_STRIDERS]: 41.84,
+};
+
 const bestFromTable = (offered: readonly number[], table: Readonly<Record<number, number>>): number | undefined => {
     let best: number | undefined;
     let bestScore = -Infinity;
@@ -151,7 +178,7 @@ export function parseConditionalRules(spec: string | undefined): ReadonlySet<Con
     if (trimmed === "on" || trimmed === "1" || trimmed === "all") {
         return new Set(CONDITIONAL_SETUP_RULES);
     }
-    const known = new Set<string>(CONDITIONAL_SETUP_RULES);
+    const known = new Set<string>(KNOWN_CONDITIONAL_SETUP_RULES);
     return new Set(
         trimmed
             .split(",")
@@ -198,6 +225,7 @@ export function conditionalAugments(
 /**
  * Rule "t2": pick the offered Tier-2 artifact from the measured table of the own-composition cohort
  * (ranged-heavy vs melee). Uncovered composition (no known creatures) or rule off -> setup-v0's blind table.
+ * Rule "t2a19": the same, except that a ranged-heavy army reads TIER2_ARTIFACT_SCORE_A19_RANGED instead.
  */
 export function conditionalArtifactT2(
     offered: readonly number[],
@@ -205,8 +233,11 @@ export function conditionalArtifactT2(
     rules: ReadonlySet<ConditionalSetupRule>,
 ): number {
     const composition = ownComposition(ownCreatureIds);
-    if (!rules.has("t2") || composition.total === 0) {
+    if ((!rules.has("t2") && !rules.has("t2a19")) || composition.total === 0) {
         return SETUP_POLICY_V0.pickArtifactT2(offered);
+    }
+    if (rules.has("t2a19") && composition.ranged >= T2_RANGED_TABLE_MIN_RANGED) {
+        return bestFromTable(offered, TIER2_ARTIFACT_SCORE_A19_RANGED) ?? SETUP_POLICY_V0.pickArtifactT2(offered);
     }
     const table =
         composition.ranged >= T2_RANGED_TABLE_MIN_RANGED ? TIER2_ARTIFACT_WINRATE_RANGED : TIER2_ARTIFACT_WINRATE_MELEE;

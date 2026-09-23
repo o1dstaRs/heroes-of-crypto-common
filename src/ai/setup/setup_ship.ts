@@ -15,6 +15,7 @@ import { PBTypes } from "../../generated/protobuf/v1/types";
 import { creatureInfo } from "./creature_score";
 import {
     CONDITIONAL_SETUP_RULES,
+    KNOWN_CONDITIONAL_SETUP_RULES,
     SETUP_CONDITIONAL_VERSION,
     conditionalArtifactT2,
     conditionalAugments,
@@ -749,7 +750,7 @@ export function compileRankedA19CasterEmpowerSetupPolicy(): IResolvedSetupPolicy
 
 const conditionalPolicy = (rules: ReadonlySet<ConditionalSetupRule>): IResolvedSetupPolicy => {
     const ruleSnapshot = new Set(rules);
-    const enabled = CONDITIONAL_SETUP_RULES.filter((rule) => ruleSnapshot.has(rule));
+    const enabled = KNOWN_CONDITIONAL_SETUP_RULES.filter((rule) => ruleSnapshot.has(rule));
     const exposedRules = Object.freeze([...enabled]);
     return Object.freeze({
         configured: enabled.length > 0,
@@ -777,7 +778,7 @@ const conditionalRulesForSpec = (normalized: string): ReadonlySet<ConditionalSet
     );
     const ruleSpec = prefixed ? normalized.slice(prefixed.length + 1).replaceAll("+", ",") : normalized;
     const requested = ruleSpec.split(",").map((rule) => rule.trim());
-    const known = new Set<string>(CONDITIONAL_SETUP_RULES);
+    const known = new Set<string>(KNOWN_CONDITIONAL_SETUP_RULES);
     if (!requested.length || requested.some((rule) => !known.has(rule))) return undefined;
     return parseConditionalRules(ruleSpec);
 };
