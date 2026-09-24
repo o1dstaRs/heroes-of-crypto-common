@@ -60,3 +60,26 @@ This matters more than the flat pick distribution suggested. Cursed Ward is rate
 that every other artifact occupies that the bundle pick takes it whenever it is offered, which is exactly why id 9
 is the most-picked Tier-1 artifact (10.6% of boards). The table's single largest error is therefore the one the
 draft acts on hardest, and correcting that entry is a capture with real incidence rather than a tie-break.
+- `arm13_mages_ring` (id 13, ABSENT from the table, so scored 50 by fallback): **47.25%** [42.91, 51.63],
+  draw-aware 47.30%. Its omission costs nothing — the fallback already treats it about as well as it deserves.
+- `arm06_winged_boots` (id 6, rated 44.5, the low-band reference): **49.26%** [44.90, 53.63], draw-aware 49.28%.
+  Taking a low-rated artifact always is roughly par with the policy's mix, so the low band is about right.
+
+### STAGE 1 VERDICT (2026-09-24 17:06Z)
+Only `arm10_hunters_longbow` clears the preregistered promotion bar (draw-aware >= 52%) with the control inside
+48-52% (it read exactly 50.00%). The defect is specific, not general: the mid and low band are approximately
+correct, the missing entry is harmless, and the table has exactly one large error — Cursed Ward at 79.8.
+
+### STAGE 2 CAPTURE TABLE, fixed now before any stage-2 game
+Two entries change in `TIER1_ARTIFACT_WINRATE`, each set to the value this program measured, and nothing else:
+    Tier1Artifact.CURSED_WARD      79.8 -> 46.3   (measured 46.32%)
+    Tier1Artifact.HUNTERS_LONGBOW  45.0 -> 53.5   (measured 53.47%)
+Rationale for correcting BOTH rather than only the arm that passed: the promotion bar governs which artifact is
+worth preferring, while these are the two values the arms actually measured, and Cursed Ward's inflated entry is
+what currently makes the bot take a losing artifact whenever it is offered (it is the most-picked Tier-1 at 10.6%
+of boards). Every other entry is left untouched, including the absent Mage's Ring.
+Because the bundle pick reads a module-level table for both seats, the A/B needs a per-seat seam: a registered
+policy id carrying the corrected table, armed on the candidate only. Stage 2 then runs 8000 games at seed 99840001
+with a robustness cell at 99850001, under the same gates as the draft protocol. Expected pooled effect is about
++0.5 to +1pp — bounded by how often these two artifacts are offered — and it is reported in pooled terms whatever
+the in-cohort arms showed.
