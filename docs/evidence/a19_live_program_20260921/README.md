@@ -1,4 +1,4 @@
-# a19 improvement program from live test-server games (2026-09-21 → 2026-09-23)
+# a19 improvement program from live test-server games (2026-09-21 → 2026-09-24)
 
 Owner request: analyse past games on test.heroesofcrypto.io and make a19 v0.8 measurably better than what we have —
 make a proposal, evaluate it, make the change, measure it on multiple cohorts, set it in stone, continue.
@@ -130,13 +130,30 @@ composition problem.
 Seeds used, all first-use and never re-rolled: 99010001, 99030001 (P1); 99110001 (P2); 99210001, 99220001, 99230001,
 99240001 (P3); 99260001 (r3 vs w12); 99310001, 99320001, 99330001, 99340001, 99350001 (P4); 99410001, 99420001,
 99430001 (P5); 99610001, 99620001, 99630001, 99640001 (P6); 99720001, 99730001, 99740001, 99750001, 99760001,
-99770001 and the training data 99800001 + 5000·k for k = 0..7 (P7); 99910001, 99920001, 99940001, 99950001 and, if
-needed, 99960001 (P8); 99970001, 99980001, 99990001 (P9); 99870001, 99880001, 99890001 (P10). Burned by smoke and
-identity runs: 99000001, 99500001, 12340001.
+99770001 and the training data 99800001 + 5000·k for k = 0..7 (P7); 99910001, 99920001, 99940001, 99950001, 99960001
+(P8); 99970001, 99980001, 99990001 (P9); 99870001, 99880001, 99895001 (P10); 99650001, 99660001, 99670001, 99680001
+(P11); 99690001, 99700001, 99710001, 99780001 (P12); 99440001 + 5000·k for k = 0..7 and 99790001 (P13); 99520001
+(P14); 99930001 (stack check). Burned by smoke and identity runs: 99000001, 99500001, 12340001. A parallel session
+measuring the cumulative effect (below) used 99860001 and re-used 99880001 and 99870001 for its own, different
+comparisons; no result here depends on those boards being fresh.
+
+## Where things stand (2026-09-24)
+
+The ranked v0.8 stack in the repositories is: draft `ranked-unit-strength-a19-side-v4-w16-r4` (server 2b169d5), setup
+`conditional-v1:sniper+t2a19` (server 24a9a0e), doctrine SEE_NONE (server f6c9b42). Against the stack as it stood at
+P9's start it wins 57.61% (the stack check). A parallel session measured the cumulative effect against the
+pre-program stack (v1-w4 draft, v07-nonfight setup, doctrine variety): the v4-w16 draft with conditional-v1 and
+SEE_NONE won 84.77% [82.02, 87.16] over 3,000 games, before the Tier-2 table (P9) was added.
+
+What the program closed, so the next round does not repeat it: the shooter floor (P5), the unit-strength re-fit on the
+bot's own drafts (P13: v5 correlates 0.93 with v4 and gains nothing), the prior's weight above 16 (P12), the synergy
+table (P10: a stage-1 false positive), Empower augments (P14), and the two tactical search seams (P1, P2). A caster
+census with spells counted (common 97cb7a0, 1213b17) shows a19 already plays the v4 draft's casters well.
 
 ## Open for the owner
 
-Prod still runs the 2026-09-13 versatile draft. The test server was redeployed on 2026-09-22/23: it runs the r4
-draft on common afa19bc (floor 4 plus the deep-budget a19) but not the v0.8 setup (server 13bca49) or anything after
-it, and only four fights were played there since, none a decisive human-vs-AI game. Re-running `live_report.py` on a
-fresh export after the next deploy is the direct check of whether the AI's 42% against humans moves.
+Nothing here is deployed. Prod still runs the 2026-09-13 versatile draft; the test server runs the r4 draft on common
+afa19bc (redeployed 2026-09-22/23) without P6–P11. The self-play gains are large, but every one of them was measured
+against the bot itself: the next evidence has to come from people. Deploy the current server main to the test server,
+let humans play it, and re-run `live_report.py` on a fresh export — the AI won 11 of 26 decisive games against humans
+before this program.
