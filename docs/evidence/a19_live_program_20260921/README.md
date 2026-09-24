@@ -24,10 +24,11 @@ counts was wrong in three places; the correction is at the top of LIVE_ANALYSIS.
 | 5 | draft shooter floor 5 | vs r4, 8,000 games: 52.05% [49.86, 54.23], gate 2 fails | fail, lever closed |
 | – | a19 Pareto No-Melee focus (`any_board`) | withdrawn before any deciding game: its trigger co-occurs on 6.4% of boards | not run |
 | 6 | `conditional-v1` setup for v0.8 seats (Sniper 3 > Armor 3 > Might) | vs the live setup, 8,000 games, both drafts r4: 55.58% [53.39, 57.74], 8/8 gates | **shipped, v0.8 only** |
-| 7 | unit-strength prior re-fitted on r4 armies and current balance, weight 8 (`…-v4-w8-r4`) | vs r4, 8,000 games: 63.04% [60.90, 65.13], 8/8 gates; with both seats on `conditional-v1` 61.83% [57.50, 65.99] | **shipped, current default** |
+| 7 | unit-strength prior re-fitted on r4 armies and current balance, weight 8 (`…-v4-w8-r4`) | vs r4, 8,000 games: 63.04% [60.90, 65.13], 8/8 gates; with both seats on `conditional-v1` 61.83% [57.50, 65.99] | shipped, then superseded by P11 |
 | 8 | the v0.8 bot always takes SEE_NONE instead of a per-match doctrine | vs the variety, 8,000 games: 53.24% [51.04, 55.41], 8/8 gates; on v4 drafts 54.41% | **shipped, v0.8 only** |
 | 9 | the Tier-2 artifact table re-measured for a19 on v4 armies (rule `t2a19`) | vs the old table, 8,000 games: 53.71% [51.52, 55.89], 8/8 gates; predicted +3.88pp cross-fitted | **shipped, v0.8 only** |
-| 10 | synergy options re-measured for a19 on v4 armies | preregistered, queued | – |
+| 10 | synergy options re-measured for a19 on v4 armies | stage 1: only Chaos flips (break on attack 53.60%); 16,000-game confirmation running | – |
+| 11 | the v4 prior at weight 16 (`…-v4-w16-r4`) | vs weight 8, 8,000 games: 54.60% [52.41, 56.77], 8/8 gates (selection: w12 51.38%, w16 55.80%) | **shipped, current default** |
 
 Also measured: r4 against the validated but unshipped v1-w12, 10,000 games: 51.63% [49.43, 53.81] —
 indistinguishable, so preferring the floor gives nothing up. The informational r3 vs v1-w12 run (2,000 games) had
@@ -73,6 +74,11 @@ changes) r4 still beats r3 60.04% [55.69, 64.24] over 2,000 games.
   Amplification (42.3), which the old table put first or second and the bot took on a fifth of its armies, is second
   from last. Five of the twelve rows had moved since the old table was measured (Tome reworked, Crown and Giant's Maul
   buffed, Berserker's Bond changed, Archmage's Ring added). Rollback: `HOC_V08_SETUP_POLICY=conditional-v1`.
+
+- common 1a6c5d58, server 2b169d5, client 1b1c64a: the ranked draft default is the v4 prior at weight 16. On the live
+  v0.8 stack weight 16 beat weight 8 54.60% [52.41, 56.77]; weight 12 had been only 51.38% in selection. The weight
+  axis kept paying (w4 < w8 < w16) while the draft stayed varied: 47 distinct creatures against 48, top share 41.2%
+  against 38.0%. Rollback: `HOC_DRAFT_WEIGHTS=ranked-unit-strength-a19-side-v4-w8-r4`.
 
 ## The draft optimum is bracketed
 

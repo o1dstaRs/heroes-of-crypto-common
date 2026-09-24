@@ -188,3 +188,26 @@ in-sample (optimistic, for reference only): 4.78pp on 1328/2000 changed games
 stage-3 decision: CONFIRM with 8000 games
 TABLE_JSON {"1":50.78,"2":51.33,"4":53.55,"5":56.53,"6":54.3,"7":52.43,"8":53.23,"9":47.57,"10":42.29,"11":43.69,"12":41.84,"13":46.55}
 ```
+
+## v4-w16-r4 vs the weight-8 default v4-w8-r4 (P11, shipped as the ranked draft default)
+
+Both seats set up with conditional-v1 and take SEE_NONE. Selection: w12 51.38%, w16 55.80%.
+
+```
+run: confirm_w16 vs incumbent:ranked-unit-strength-a19-side-v4-w8-r4
+head-to-head: 4315W 3588L 97D over 8000 games; decisive 54.60% CI [52.41, 56.77]
+  grid 1: 54.30% (LCB 50.50)
+  grid 3: 54.85% (LCB 51.05)
+  grid 4: 54.66% (LCB 50.86)
+diversity: candidate 47 distinct, incumbent 48; top share 41.2% vs 38.0% over 4000 drafts
+informational: tier-2 synergy reach candidate 5.7% vs incumbent 6.3%
+PASS  1 draw-aware head-to-head > 0.50: 0.5454
+PASS  2 clustered 95% LCB > 0.50: 0.5241
+PASS  3 candidate rejections == 0: 0
+PASS  4 worst map (grid 1) >= 0.49: 0.5430
+PASS  5 vs untrained-heuristic: candidate - incumbent >= -0.02: 0.0176
+PASS  5 vs league-round3-exploiter: candidate - incumbent >= -0.02: 0.0131
+PASS  6a distinct creatures >= 80% of incumbent: 0.9792
+PASS  6b top creature share <= incumbent + 10pp: 0.0315
+VERDICT: PASS
+```

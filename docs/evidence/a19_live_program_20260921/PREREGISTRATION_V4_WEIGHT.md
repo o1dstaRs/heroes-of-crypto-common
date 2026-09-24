@@ -34,3 +34,15 @@ w12 (seed 99650001): 1016W 961L 23D; decisive 51.39% [47.02, 55.74], draw-aware 
 49.7 / LAVA 52.5 / BLOCK 52.0. w16 (seed 99660001): 1104W 872L 24D; decisive 55.87% [51.49, 60.16], draw-aware 55.80%,
 0 rejections; maps 56.9 / 54.7 / 56.0. Selected w16 (0.5580 > 0.505 and > w12). The prediction above was wrong about
 w16. Confirmation 99670001 and robustness 99680001 queued behind P9's stage 3 on each host.
+
+## RESULT — confirmation v4-w16-r4 vs v4-w8-r4 (seed 99670001, 8000 games, 2 shards)
+4315W 3588L 97D; decisive 54.60% [52.41, 56.77], draw-aware 54.54%, clustered LCB 52.41, 0 rejections; maps NORMAL
+54.30 (LCB 50.50) / LAVA 54.85 (51.05) / BLOCK 54.66 (50.86). Diversity: 47 vs 48 distinct creatures (0.979), top
+share 41.2% vs 38.0% (+3.2pp). Gates 1-4, 6a, 6b PASS; gate 5 pending.
+
+## RESULT — robustness (seed 99680001, 2000 games per opponent)
+v4-w16-r4: untrained heuristic ranged stack 65.69% [61.4, 69.7], round-3 exploiter 90.85% [88.0, 93.1]; v4-w8-r4:
+63.94% [59.6, 68.0] and 89.53% [86.5, 91.9]; 0 rejections. Gate 5 PASS (+1.76pp, +1.31pp).
+
+## VERDICT (verdict.py over confirm_w16 + robust_w16 + robust_w8): PASS on all 8 gates → shipped: common 1a6c5d58
+(id), server 2b169d5 (default v4-w16-r4, pin + lockfile), client 1b1c64a (pin).
