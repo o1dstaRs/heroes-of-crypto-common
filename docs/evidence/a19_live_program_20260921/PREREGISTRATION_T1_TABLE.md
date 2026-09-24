@@ -39,3 +39,12 @@ value so `pickCoherentDraftBundle` prefers bundles carrying it, then measure the
 8000 games, seed 99840001, gates as the draft protocol (draw-aware > 50, clustered LCB > 50, worst map >= 0.49,
 0 rejections, diversity guards) plus a robustness cell vs pool `reference` (seed 99850001). Pooled impact is bounded
 by how often the artifact is offered, so stage 2 is reported in pp even if stage 1 is large. Seeds never re-rolled.
+
+## STAGE 1 RESULTS (seed 99830001, 2000 games per arm, both seats drafting v4-w8-r4 with conditional-v1)
+- `control_no_override`: **50.00%** decisive (992W 992L 16D), draw-aware 50.00%, 0 rejections. The two seats are
+  identical by construction, so this exactness is the harness proving it adds no bias; any arm's deviation is
+  attributable to the forced artifact alone. Integrity gate PASS.
+- `arm10_hunters_longbow` (id 10, rated 45.0, +1 flat attack per archer): **53.47%** decisive
+  [49.09, 57.80], draw-aware 53.42%, 1056W 919L 25D, 0 rejections; NORMAL 55.52 / LAVA 50.38 / BLOCK 54.49.
+  Clears the 52% promotion bar. The interval still includes 50, so this is directional at 2000 games, not
+  established — consistent with the composition hypothesis (its rating was fixed when armies held ~0.2 archers).
