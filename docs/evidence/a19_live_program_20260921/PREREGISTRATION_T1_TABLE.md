@@ -48,3 +48,15 @@ by how often the artifact is offered, so stage 2 is reported in pp even if stage
   [49.09, 57.80], draw-aware 53.42%, 1056W 919L 25D, 0 rejections; NORMAL 55.52 / LAVA 50.38 / BLOCK 54.49.
   Clears the 52% promotion bar. The interval still includes 50, so this is directional at 2000 games, not
   established — consistent with the composition hypothesis (its rating was fixed when armies held ~0.2 archers).
+- `arm09_cursed_ward` (id 9, rated **79.8** — the table's top entry): **46.32%** decisive [42.00, 50.70],
+  draw-aware 46.38%, 913W 1058L 29D, 0 rejections. Forcing the table's own favourite LOSES to the policy's mix.
+
+### The table is mis-ranked, and inverted at its extremes
+Against the same seed, opponent and boards, the artifact the table rates best (79.8) measures 46.32% while the one
+it rates near the bottom (45.0) measures 53.47% — a 7.15pp gap in the OPPOSITE direction to the ranking. Each arm's
+own interval touches 50 at 2000 games, so the individual claims are directional; the ORDERING between the two arms
+is the robust part, and it is backwards.
+This matters more than the flat pick distribution suggested. Cursed Ward is rated so far above the 42.8-51.5 band
+that every other artifact occupies that the bundle pick takes it whenever it is offered, which is exactly why id 9
+is the most-picked Tier-1 artifact (10.6% of boards). The table's single largest error is therefore the one the
+draft acts on hardest, and correcting that entry is a capture with real incidence rather than a tie-break.
