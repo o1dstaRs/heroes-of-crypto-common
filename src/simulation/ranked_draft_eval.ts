@@ -38,6 +38,7 @@ import { creatureInfo } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { TIER1_ARTIFACT_WINRATE, TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED } from "../ai/setup/setup_strategy";
 import { buildV08A19SearchEnvironment } from "../ai/versions/v0_8_a19_profile";
+import { V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
 import { pickRankedAIDoctrine } from "../ai/setup/doctrine_variety";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { Doctrine, getUpgradePoints } from "../doctrines/doctrine_properties";
@@ -1360,8 +1361,12 @@ export function playRankedDraftGame(
             : {}),
     };
     const previousSearchOverrides = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+    const previousA19Routing = process.env[V08_A19_SEARCH_OVERRIDE_ENV];
     if (options.candidateSearchEnvOverrides) {
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify(options.candidateSearchEnvOverrides);
+        // The override seam builds its second driver only on the promoted A19 routing, which the harness's explicit
+        // profile environment (V07_SEARCH=1) would otherwise bypass; the stock seat's driver is the same profile.
+        process.env[V08_A19_SEARCH_OVERRIDE_ENV] = "1";
     }
     if (options.valueDataPath) {
         process.env.VALUE_DATA = options.valueDataPath;
@@ -1379,6 +1384,8 @@ export function playRankedDraftGame(
         if (options.candidateSearchEnvOverrides) {
             if (previousSearchOverrides === undefined) delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
             else process.env.V08_A19_SEARCH_ENV_OVERRIDES = previousSearchOverrides;
+            if (previousA19Routing === undefined) delete process.env[V08_A19_SEARCH_OVERRIDE_ENV];
+            else process.env[V08_A19_SEARCH_OVERRIDE_ENV] = previousA19Routing;
         }
     }
     const candidateSide: Side = candidateIsGreen ? "green" : "red";
