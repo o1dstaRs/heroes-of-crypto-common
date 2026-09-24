@@ -89,6 +89,9 @@ export const RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS = {
     "ranked-unit-strength-a19-side-v1-w4-r2": 4,
     "ranked-unit-strength-a19-side-v1-w4-r3": 4,
     "ranked-unit-strength-a19-side-v1-w4-r4": 4,
+    // Floors 5 and 6, kept for the record: both realise ~3.14 shooters and r5 failed against r4. Not shipping.
+    "ranked-unit-strength-a19-side-v1-w4-r5": 4,
+    "ranked-unit-strength-a19-side-v1-w4-r6": 4,
     // v4 prior with r4's shooter floor, at r4's weight, twice it and four times it.
     "ranked-unit-strength-a19-side-v4-w4-r4": 4,
     "ranked-unit-strength-a19-side-v4-w8-r4": 8,
@@ -108,6 +111,8 @@ export const RANKED_DRAFT_RANGED_FLOOR: Partial<Record<RankedDraftStrengthPolicy
     "ranked-unit-strength-a19-side-v1-w4-r2": 2,
     "ranked-unit-strength-a19-side-v1-w4-r3": 3,
     "ranked-unit-strength-a19-side-v1-w4-r4": 4,
+    "ranked-unit-strength-a19-side-v1-w4-r5": 5,
+    "ranked-unit-strength-a19-side-v1-w4-r6": 6,
     "ranked-unit-strength-a19-side-v4-w4-r4": 4,
     "ranked-unit-strength-a19-side-v4-w8-r4": 4,
     "ranked-unit-strength-a19-side-v4-w16-r4": 4,

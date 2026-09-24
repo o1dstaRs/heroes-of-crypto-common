@@ -19,6 +19,10 @@ describe("ranked draft shooter floor", () => {
         expect(RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS["ranked-unit-strength-a19-side-v1-w4-r2"]).toBe(4);
         expect(RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS["ranked-unit-strength-a19-side-v1-w4-r3"]).toBe(4);
         expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v1-w4-r2")).toBe(2);
+        // r5/r6 are registered for the record only: both realise ~3.14 shooters because the offers run out, and
+        // r5 failed its confirmation against r4 (52.05% [49.86, 54.23]). Neither is a shipping candidate.
+        expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v1-w4-r5")).toBe(5);
+        expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v1-w4-r6")).toBe(6);
         expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v1-w4-r4")).toBe(4);
         expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v1-w4")).toBe(0);
         expect(rankedDraftRangedFloor(undefined)).toBe(0);
