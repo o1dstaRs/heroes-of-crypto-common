@@ -18,3 +18,9 @@ it against this stack).
 The combination must beat the pre-P9 stack (draw-aware > 0.50) and come within 3pp of the largest single passing
 confirmation. If it does not, the combination is reverted to the single change with the largest confirmation until
 the interaction is understood. Seeds are never re-rolled.
+
+## Execution note 2026-09-24 ~01:45Z, before any stack-check game and before P10's verdict
+P9 and P11 passed, so the check runs. Because P10 is still confirming, both possible combinations are queued on the
+same seed (99930001) so that no host idles: (a) v4-w16-r4 + `conditional-v1:sniper+t2a19` on hft, (b) the same plus
+`syn-a19` on the shared node, each against v4-w8-r4 + `conditional-v1`. Which one counts is fixed by P10's verdict
+alone: (b) if P10 passes, (a) if it fails. The other is reported as informational and never used for the decision.
