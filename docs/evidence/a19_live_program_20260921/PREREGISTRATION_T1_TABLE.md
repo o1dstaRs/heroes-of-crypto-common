@@ -83,3 +83,29 @@ policy id carrying the corrected table, armed on the candidate only. Stage 2 the
 with a robustness cell at 99850001, under the same gates as the draft protocol. Expected pooled effect is about
 +0.5 to +1pp — bounded by how often these two artifacts are offered — and it is reported in pooled terms whatever
 the in-cohort arms showed.
+
+## STAGE 2 CANCELLED before any deciding game (2026-09-24 17:40Z) — the correction is right but unexploitable
+The capture seam was built exactly as declared (`…-v4-w8-r4-t1` / `…-v4-w16-r4-t1` score Tier-1 with
+TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED at bundle time, per seat). Building it exposed a bug worth noting: the
+harness's `resolveRankedDraftPick` calls `pickCoherentDraftBundle` directly with the module table, so wiring only the
+server-side `pickRankedLiveDraftBundle` left the seam INERT — verified by an unchanged draft distribution before the
+harness path was wired too. Always verify a seam changes behaviour before measuring with it.
+
+With both paths wired, over 500 boards against the same seeds:
+    Cursed Ward picked  8.2% -> 7.6%
+    Hunter's Longbow    6.4% -> 6.6%
+    creature lists differing from the base draft: 0.8% of boards
+So a 33-point correction to the table's largest error moves under 1% of drafts. That is the structural fact measured
+at the start of this program: between offered bundles the creature-score spread averages 92.0 against an artifact
+spread of 6.7, so the artifact term only decides a bundle when the creature scores are nearly tied. Pooled value is
+therefore on the order of 0.03pp — roughly 0.8% of boards times a few points on those boards — which no 8000-game
+battery could resolve and which is far below any advance bar. Running it would have burned ~4 hours to measure noise.
+
+### Verdict for the Tier-1 lever
+The table IS mis-ranked — its top entry (Cursed Ward, 79.8) measures 46.32% while a near-bottom entry (Hunter's
+Longbow, 45.0) measures 53.47%, against a control that read exactly 50.00% — but the ranked draft is structurally
+almost insensitive to it, so correcting the table captures nothing. Capturing this would require scaling the
+artifact term in the bundle score by roughly an order of magnitude, which trades creature quality for artifact
+quality and is a different, riskier experiment that this program does not attempt on the strength of a 2000-game
+arm. The corrected table and the `-t1` policy ids stay registered and default-off so the measurement is not lost
+and nobody trusts the 79.8 entry again.

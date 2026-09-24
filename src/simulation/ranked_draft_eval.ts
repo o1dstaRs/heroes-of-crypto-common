@@ -27,11 +27,15 @@ import { RANKED_A19_DRAFT_CANDIDATE, RANKED_A19_DRAFT_CANDIDATE_ID } from "../ai
 import { pickCoherentDraftBundle } from "../ai/setup/draft_coherence";
 import { isRankedDraftInteractionPrior, RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../ai/setup/draft_interaction_prior";
 import { isRankedDraftVarietyPolicy, RANKED_DRAFT_VARIETY_POLICY_ID } from "../ai/setup/draft_variety";
-import { isRankedDraftStrengthPolicy, type RankedDraftStrengthPolicyId } from "../ai/setup/draft_strength_prior";
+import {
+    rankedDraftUsesCorrectedTier1Table,
+    isRankedDraftStrengthPolicy,
+    type RankedDraftStrengthPolicyId,
+} from "../ai/setup/draft_strength_prior";
 import { resolveSetupPolicy, type IResolvedSetupPolicy } from "../ai/setup/setup_ship";
 import { creatureInfo } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
-import { TIER1_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
+import { TIER1_ARTIFACT_WINRATE, TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED } from "../ai/setup/setup_strategy";
 import { buildV08A19SearchEnvironment } from "../ai/versions/v0_8_a19_profile";
 import { pickRankedAIDoctrine } from "../ai/setup/doctrine_variety";
 import { PBTypes } from "../generated/protobuf/v1/types";
@@ -840,6 +844,14 @@ export interface IRankedDraftPickRules {
     gridType?: number;
 }
 
+/** Tier-1 bundle score for a seat: the composition-corrected table when that genome's policy opts in. */
+function tier1ArtifactScore(genome: ILeagueGenome, artifactId: number): number {
+    const table = rankedDraftUsesCorrectedTier1Table(genome.draftStrengthPolicy)
+        ? TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED
+        : TIER1_ARTIFACT_WINRATE;
+    return table[artifactId] ?? 50;
+}
+
 export function resolveRankedDraftPick(
     seed: number,
     leftInput: ILeagueGenome,
@@ -877,7 +889,7 @@ export function resolveRankedDraftPick(
         pickCoherentDraftBundle(
             state.left.bundles,
             (creatureId) => draftGenomeCreatureScore(leftGenome, creatureId),
-            (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+            (artifactId) => tier1ArtifactScore(leftGenome, artifactId),
             {
                 ...(leftGenome.draftSpellRangedPolicy
                     ? { draftSpellRangedPolicy: leftGenome.draftSpellRangedPolicy }
@@ -890,7 +902,7 @@ export function resolveRankedDraftPick(
         pickCoherentDraftBundle(
             state.right.bundles,
             (creatureId) => draftGenomeCreatureScore(rightGenome, creatureId),
-            (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+            (artifactId) => tier1ArtifactScore(rightGenome, artifactId),
             {
                 ...(rightGenome.draftSpellRangedPolicy
                     ? { draftSpellRangedPolicy: rightGenome.draftSpellRangedPolicy }

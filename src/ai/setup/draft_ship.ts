@@ -37,9 +37,10 @@ import {
     isRankedDraftStrengthPolicy,
     RANKED_DRAFT_RELAXED_FACTION_TAX_FREE_STACKS,
     rankedDraftStrengthRelaxesFactionTax,
+    rankedDraftUsesCorrectedTier1Table,
     type RankedDraftStrengthPolicyId,
 } from "./draft_strength_prior";
-import { TIER1_ARTIFACT_WINRATE } from "./setup_strategy";
+import { TIER1_ARTIFACT_WINRATE, TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED } from "./setup_strategy";
 import {
     isRankedDraftInteractionPrior,
     RANKED_DRAFT_INTERACTION_PRIOR_ID,
@@ -402,7 +403,10 @@ export function pickRankedLiveDraftBundle(genome: ILeagueGenome, bundles: readon
     return pickCoherentDraftBundle(
         bundles,
         (creatureId) => draftGenomeCreatureScore(genome, creatureId),
-        (artifactId) => TIER1_ARTIFACT_WINRATE[artifactId] ?? 50,
+        (artifactId) =>
+            (rankedDraftUsesCorrectedTier1Table(genome.draftStrengthPolicy)
+                ? TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED
+                : TIER1_ARTIFACT_WINRATE)[artifactId] ?? 50,
         {
             ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
             ...(genome.draftStrengthPolicy ? { draftStrengthPolicy: genome.draftStrengthPolicy } : {}),

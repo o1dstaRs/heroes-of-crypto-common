@@ -174,6 +174,24 @@ export const TIER1_ARTIFACT_WINRATE: Record<number, number> = {
 };
 
 /**
+ * Tier-1 win rates corrected for the ranked draft's CURRENT composition (2026-09-24). The shipped table was
+ * measured in 2026-07, when ranked armies held ~0.2 natively ranged creatures; the draft now fields ~2.9, and two
+ * entries were measured again under that distribution with the artifact forced on one seat (2000 games per arm,
+ * a control that read exactly 50.00%, evidence in docs/evidence/a19_live_program_20260921):
+ *   CURSED_WARD      79.8 -> 46.3  — the table's top entry, so the bundle pick took it whenever it was offered,
+ *                                    yet forcing it measured 46.32% [42.00, 50.70] against the policy's own mix.
+ *   HUNTERS_LONGBOW  45.0 -> 53.5  — it grants ranged units +1 flat attack PER ARCHER, so its value rose with the
+ *                                    archer count the draft tripled; forcing it measured 53.47% [49.09, 57.80].
+ * Every other entry, and the deliberate absence of MAGES_RING (measured 47.25%, i.e. the 50 fallback is fair), is
+ * unchanged. Research-only: nothing resolves this table unless a draft genome opts in.
+ */
+export const TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED: Record<number, number> = {
+    ...TIER1_ARTIFACT_WINRATE,
+    [Tier1Artifact.CURSED_WARD]: 46.3,
+    [Tier1Artifact.HUNTERS_LONGBOW]: 53.5,
+};
+
+/**
  * Measured marginal win-rate per Tier-2 artifact: v0.7 self-play, 20,000 games, LIVETWIN=1, seed 84001710.
  * See measure_artifacts.ts --tier=2. REFRESHED 2026-07-15 — see the TIER1_ARTIFACT_WINRATE docstring above
  * for the full provenance (same bugfix, same bake). Historical headline rerank: Tome of Amplification

@@ -96,6 +96,10 @@ export const RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS = {
     "ranked-unit-strength-a19-side-v4-w4-r4": 4,
     "ranked-unit-strength-a19-side-v4-w8-r4": 8,
     "ranked-unit-strength-a19-side-v4-w16-r4": 16,
+    // Same drafts as the two ids above, but the bundle pick scores Tier-1 artifacts with the
+    // composition-corrected table (see TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED). Research-only.
+    "ranked-unit-strength-a19-side-v4-w8-r4-t1": 8,
+    "ranked-unit-strength-a19-side-v4-w16-r4-t1": 16,
 } as const;
 
 export type RankedDraftStrengthPolicyId = keyof typeof RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS;
@@ -116,6 +120,8 @@ export const RANKED_DRAFT_RANGED_FLOOR: Partial<Record<RankedDraftStrengthPolicy
     "ranked-unit-strength-a19-side-v4-w4-r4": 4,
     "ranked-unit-strength-a19-side-v4-w8-r4": 4,
     "ranked-unit-strength-a19-side-v4-w16-r4": 4,
+    "ranked-unit-strength-a19-side-v4-w8-r4-t1": 4,
+    "ranked-unit-strength-a19-side-v4-w16-r4-t1": 4,
 };
 
 /** Shooter floor of a policy (0 = none). */
@@ -304,6 +310,11 @@ export function rankedDraftStrengthScore(
     const unitPp = rankedDraftUnitSynergyLiftPp(creatureId, context?.revealedGridType);
     const synergyPp = context ? rankedDraftSynergyMarginalPp(creatureId, context.ownCreatureIds) : 0;
     return (weight * (unitPp + synergyPp)) / 100;
+}
+
+/** Policy ids that score Tier-1 artifacts with the composition-corrected table at bundle time. */
+export function rankedDraftUsesCorrectedTier1Table(policy: RankedDraftStrengthPolicyId | undefined): boolean {
+    return isRankedDraftStrengthPolicy(policy) && policy.endsWith("-t1");
 }
 
 /** Whether a policy moves the faction-diversity tax to the 5th same-faction creature. */
