@@ -510,6 +510,17 @@ export function materializeReplayAbSplits(
     augments: readonly ISetupAugmentChoice[],
     synergies: readonly ISetupSynergyChoice[],
 ): { roster: IArmyUnitSpec[]; splitRoles: IRankedReplayAbSplitRole[] } {
+    return materializeTacticalSplitRoster(roster, maximumStacks(creatureIds, augments, synergies));
+}
+
+/**
+ * The same split materialization for a caller that already knows the seat's stack capacity (what the live server
+ * reads from FightProperties.getNumberOfUnitsAvailableForPlacement before it runs the planner).
+ */
+export function materializeTacticalSplitRoster(
+    roster: readonly IArmyUnitSpec[],
+    maximumStackCount: number,
+): { roster: IArmyUnitSpec[]; splitRoles: IRankedReplayAbSplitRole[] } {
     const factories = createCombatFactories();
     const gridSettings = simulationGridSettings();
     const units = roster.map((spec, index) =>
@@ -523,10 +534,7 @@ export function materializeReplayAbSplits(
             `replay-ab-source-${index}`,
         ),
     );
-    const plans = planTacticalStackSplits(
-        units.map(tacticalSplitUnitFromUnit),
-        maximumStacks(creatureIds, augments, synergies),
-    );
+    const plans = planTacticalStackSplits(units.map(tacticalSplitUnitFromUnit), maximumStackCount);
     if (!plans.length) return { roster: roster.map((unit) => ({ ...unit })), splitRoles: [] };
 
     const sourceIndex = new Map(units.map((unit, index) => [unit.getId(), index]));

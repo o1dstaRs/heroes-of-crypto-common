@@ -42,6 +42,13 @@ const options = {
     ...(values.get("candidate-augments")
         ? { candidateAugmentsOverride: ev.parseRankedDraftAugmentOverride(values.get("candidate-augments")!) }
         : {}),
+    ...(values.get("candidate-t1") ? { candidateTier1Override: Number(values.get("candidate-t1")) } : {}),
+    ...(values.get("candidate-search-env")
+        ? { candidateSearchEnvOverrides: JSON.parse(values.get("candidate-search-env")!) }
+        : {}),
+    liveSynergyVariants: flag("live-synergy-variants"),
+    tacticalSplits: flag("tactical-splits"),
+    candidateSkipsSplits: flag("candidate-skips-splits"),
     liveDraftRules: flag("live-draft-rules"),
     sideBoard: flag("side-board"),
     deterministicSearch: flag("deterministic-search"),

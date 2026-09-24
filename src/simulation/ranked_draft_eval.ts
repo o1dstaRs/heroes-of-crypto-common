@@ -55,10 +55,22 @@ import {
     type PickRandomInt,
     type PickTeam,
 } from "../picks/pick_sim";
-import { creaturesByLevel, DEFAULT_AMOUNT_BY_LEVEL, makeRng, resolveStackAmount, type IArmyUnitSpec } from "./army";
+import { CreatureFactions } from "../generated/protobuf/v1/creature_gen";
+import { ToFactionName } from "../factions/faction_type";
 import {
+    NatureSynergy,
+    SynergyKeysToPower,
+    synergyVariantsForSeed,
+    type SpecificSynergy,
+} from "../synergies/synergy_properties";
+import { creaturesByLevel, DEFAULT_AMOUNT_BY_LEVEL, makeRng, resolveStackAmount, type IArmyUnitSpec } from "./army";
+import { materializeTacticalSplitRoster } from "./ranked_replay_tactics_ab_core";
+import {
+    GREEN_TEAM,
+    RED_TEAM,
     runMatch,
     type IMatchConfig,
+    type ITacticalSplitRosterStack,
     type IMatchResult,
     type ISetupAugment,
     type ISetupSynergy,
@@ -200,6 +212,10 @@ export interface IRankedDraftGameRecord {
     rejectedOpponent: number;
     /** Only when the panel records armies: what each seat drafted, for unit-strength fitting. */
     armies?: { candidate: IRankedDraftRecordedArmy; opponent: IRankedDraftRecordedArmy };
+    /** Only with live synergy variants: the variant each faction fielded on this board (faction name -> id). */
+    synergyVariants?: { [factionName: string]: SpecificSynergy };
+    /** Only with the live split pass: how many one-model stacks each seat split off. */
+    splitStacks?: { candidate: number; opponent: number };
 }
 
 export interface IRankedDraftRecordedArmy {
@@ -377,6 +393,11 @@ export interface IRankedDraftEvaluationReport {
         candidateSynergyOverride?: Record<number, number>;
         /** Present only when the candidate's augment plan is forced. */
         candidateAugmentsOverride?: ISetupAugment[];
+        /** Present only when set, so older reports reproduce exactly. */
+        liveSynergyVariants?: true;
+        tacticalSplits?: true;
+        candidateSkipsSplits?: true;
+        candidateSearchEnvOverrides?: Record<string, string>;
         draftDimensions: { offset: number; length: number };
         clusterSize: 4;
         seedAllocation: "indexed-bijective-v1";
@@ -437,6 +458,22 @@ export interface IRankedDraftEvaluationOptions {
      * the draft and nothing in the draft reads them. The plan must fit the candidate's doctrine budget.
      */
     candidateAugmentsOverride?: readonly ISetupAugment[];
+    /**
+     * Live synergies: every board draws one variant per faction from its pick seed (synergyVariantsForSeed, as the
+     * ranked server draws them from the game id), and each faction an army fields at level 1 or more plays that
+     * variant. Without it the fight keeps DEFAULT_SYNERGY_VARIANTS plus whatever the setup policy picked.
+     */
+    liveSynergyVariants?: boolean;
+    /**
+     * Live split pass (requires liveSynergyVariants): each seat fills the stack slots its Placement augment and a
+     * Nature board-units synergy open with the server's tactical split planner, and a Placement augment re-deploys
+     * in the widened zone (the server's setup-before-placement timing).
+     */
+    tacticalSplits?: boolean;
+    /** Research, with tacticalSplits: the candidate leaves its extra stack slots empty (the opponent still splits). */
+    candidateSkipsSplits?: boolean;
+    /** Research: the candidate's promoted search runs with these V08_A19_SEARCH_ENV_OVERRIDES (key -> value). */
+    candidateSearchEnvOverrides?: Readonly<Record<string, string>>;
     /** Draft creatures with the live server's rules (faction-diversity tax), not the League-era argmax. */
     liveDraftRules?: boolean;
     /** Fight on the side-oriented ranked board (side zones, seeded stones) instead of the classic board. */
@@ -464,6 +501,10 @@ interface INormalizedOptions {
     candidateTier1Override?: number;
     candidateSynergyOverride?: Record<number, number>;
     candidateAugmentsOverride?: ISetupAugment[];
+    liveSynergyVariants: boolean;
+    tacticalSplits: boolean;
+    candidateSkipsSplits: boolean;
+    candidateSearchEnvOverrides?: Record<string, string>;
     liveDraftRules: boolean;
     sideBoard: boolean;
     deterministicSearch: boolean;
@@ -714,6 +755,26 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
     if (!Number.isFinite(explorationRate) || explorationRate < 0 || explorationRate >= 1) {
         throw new RangeError("explorationRate must be in [0, 1)");
     }
+    const liveSynergyVariants = options.liveSynergyVariants === true;
+    const tacticalSplits = options.tacticalSplits === true;
+    if (tacticalSplits && !liveSynergyVariants) {
+        throw new RangeError(
+            "tacticalSplits needs liveSynergyVariants: the Nature board-units slots follow the variant",
+        );
+    }
+    const candidateSkipsSplits = options.candidateSkipsSplits === true;
+    if (candidateSkipsSplits && !tacticalSplits) throw new RangeError("candidateSkipsSplits needs tacticalSplits");
+    if (liveSynergyVariants && options.candidateSynergyOverride !== undefined) {
+        throw new RangeError("candidateSynergyOverride has no meaning under live synergy variants");
+    }
+    const searchOverrides = options.candidateSearchEnvOverrides;
+    if (searchOverrides !== undefined) {
+        if (fightProfile !== "a19") throw new RangeError("candidateSearchEnvOverrides needs the a19 fight profile");
+        if (!Object.keys(searchOverrides).length) throw new RangeError("candidateSearchEnvOverrides is empty");
+        for (const [key, value] of Object.entries(searchOverrides)) {
+            if (typeof value !== "string") throw new RangeError(`candidateSearchEnvOverrides.${key} must be a string`);
+        }
+    }
     return {
         gamesPerOpponent: options.gamesPerOpponent,
         baseSeed: options.baseSeed >>> 0,
@@ -733,6 +794,10 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
         ...(options.candidateAugmentsOverride === undefined
             ? {}
             : { candidateAugmentsOverride: validateRankedDraftAugmentOverride(options.candidateAugmentsOverride) }),
+        liveSynergyVariants,
+        tacticalSplits,
+        candidateSkipsSplits,
+        ...(searchOverrides === undefined ? {} : { candidateSearchEnvOverrides: { ...searchOverrides } }),
         liveDraftRules: options.liveDraftRules === true,
         sideBoard: options.sideBoard === true,
         deterministicSearch: options.deterministicSearch === true,
@@ -1019,6 +1084,7 @@ function matchConfig(
     seed: number,
     gridType: number,
     options: Pick<INormalizedOptions, "maxLaps" | "fightProfile" | "sideBoard" | "deterministicSearch">,
+    extras: Partial<IMatchConfig> = {},
 ): IMatchConfig {
     const { maxLaps, fightProfile } = options;
     return {
@@ -1043,7 +1109,60 @@ function matchConfig(
         redArtifactT2: red.tier2Artifact,
         greenRevealedCreatures: green.revealedOpponentCreatures,
         redRevealedCreatures: red.revealedOpponentCreatures,
+        ...extras,
     };
+}
+
+/**
+ * The synergies the ranked server fields under live variants: every faction an army holds two or more distinct
+ * creatures of plays the board's drawn variant (the level then follows the count, as FightProperties computes it).
+ */
+export function liveRankedDraftSynergies(
+    creatureIds: readonly number[],
+    variants: { readonly [factionName: string]: SpecificSynergy },
+): ISetupSynergy[] {
+    const distinct = new Map<number, Set<number>>();
+    for (const creatureId of creatureIds) {
+        const faction = CreatureFactions[creatureId];
+        if (faction === undefined) continue;
+        const members = distinct.get(faction) ?? new Set<number>();
+        members.add(creatureId);
+        distinct.set(faction, members);
+    }
+    const synergies: ISetupSynergy[] = [];
+    for (const faction of [
+        PBTypes.FactionVals.LIFE,
+        PBTypes.FactionVals.NATURE,
+        PBTypes.FactionVals.CHAOS,
+        PBTypes.FactionVals.MIGHT,
+    ]) {
+        const variant = variants[ToFactionName[faction]];
+        if ((distinct.get(faction)?.size ?? 0) >= 2 && variant !== undefined) {
+            synergies.push({ faction, synergy: variant });
+        }
+    }
+    return synergies;
+}
+
+/**
+ * FightProperties.getNumberOfUnitsAvailableForPlacement for a finished draft: six stacks, plus one per Placement
+ * augment level, plus the Nature board-units bonus when the board fields that variant at level 1 or more.
+ */
+export function rankedDraftStackCapacity(
+    creatureIds: readonly number[],
+    augments: readonly ISetupAugment[],
+    variants: { readonly [factionName: string]: SpecificSynergy },
+): number {
+    const placement = augments.find((augment) => augment.kind === "Placement")?.value ?? 0;
+    const nature = new Set(
+        creatureIds.filter((creatureId) => CreatureFactions[creatureId] === PBTypes.FactionVals.NATURE),
+    ).size;
+    const level = Math.min(Math.floor(nature / 2), 3);
+    const boardUnits =
+        variants.Nature === NatureSynergy.INCREASE_BOARD_UNITS && level >= 1
+            ? (SynergyKeysToPower[`Nature:${NatureSynergy.INCREASE_BOARD_UNITS}:${level}`]?.[0] ?? 0)
+            : 0;
+    return 6 + placement + boardUnits;
 }
 
 const rankedDraftPickRules = (options: INormalizedOptions, gridType: number): IRankedDraftPickRules => ({
@@ -1099,6 +1218,9 @@ export function playRankedDraftGame(
     const pickAssignment = Math.floor(withinBoard / 2) as 0 | 1;
     const battleMirror = (withinBoard % 2) as 0 | 1;
     const { pairSeed, pickSeed, battleSeed } = rankedDraftBoardSeeds(options, seedLaneIndex, offerBoard);
+    const synergyVariants = options.liveSynergyVariants
+        ? synergyVariantsForSeed(`ranked-draft-${pickSeed}`)
+        : undefined;
     const candidatePickedLeft = pickAssignment === 0;
     const leftGenome = candidatePickedLeft ? candidate : opponent;
     const rightGenome = candidatePickedLeft ? opponent : candidate;
@@ -1153,13 +1275,58 @@ export function playRankedDraftGame(
         }
         army.augments = options.candidateAugmentsOverride.map((augment) => ({ ...augment }));
     }
+    if (synergyVariants) {
+        left.synergies = liveRankedDraftSynergies(left.creatureIds, synergyVariants);
+        right.synergies = liveRankedDraftSynergies(right.creatureIds, synergyVariants);
+    }
+    const splitOf = (army: IRankedDraftArmy, candidateSeat: boolean) =>
+        options.tacticalSplits && synergyVariants
+            ? candidateSeat && options.candidateSkipsSplits
+                ? { roster: army.roster.map((unit) => ({ ...unit })), splitRoles: [] }
+                : materializeTacticalSplitRoster(
+                      army.roster,
+                      rankedDraftStackCapacity(army.creatureIds, army.augments, synergyVariants),
+                  )
+            : undefined;
+    const leftSplit = splitOf(left, candidatePickedLeft);
+    const rightSplit = splitOf(right, !candidatePickedLeft);
     const green = battleMirror ? right : left;
     const red = battleMirror ? left : right;
+    const greenSplit = battleMirror ? rightSplit : leftSplit;
+    const redSplit = battleMirror ? leftSplit : rightSplit;
     const candidateIsGreen = battleMirror ? !candidatePickedLeft : candidatePickedLeft;
     const candidateArmy = candidatePickedLeft ? left : right;
-    const result = (dependencies.matchRunner ?? DEFAULT_DEPENDENCIES.matchRunner)(
-        matchConfig(green, red, battleSeed, gridType, options),
-    );
+    const extras: Partial<IMatchConfig> = {
+        ...(synergyVariants ? { synergyVariants } : {}),
+        ...(greenSplit
+            ? {
+                  roster: greenSplit.roster,
+                  greenTacticalSplitStacks: greenSplit.splitRoles as ITacticalSplitRosterStack[],
+              }
+            : {}),
+        ...(redSplit
+            ? { redRoster: redSplit.roster, redTacticalSplitStacks: redSplit.splitRoles as ITacticalSplitRosterStack[] }
+            : {}),
+        ...(options.tacticalSplits ? { placementAugmentTiming: "setup-before-placement" as const } : {}),
+        ...(options.candidateSearchEnvOverrides
+            ? { searchEnvOverrideTeams: [candidateIsGreen ? GREEN_TEAM : RED_TEAM] }
+            : {}),
+    };
+    const previousSearchOverrides = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+    if (options.candidateSearchEnvOverrides) {
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify(options.candidateSearchEnvOverrides);
+    }
+    let result: IMatchResult;
+    try {
+        result = (dependencies.matchRunner ?? DEFAULT_DEPENDENCIES.matchRunner)(
+            matchConfig(green, red, battleSeed, gridType, options, extras),
+        );
+    } finally {
+        if (options.candidateSearchEnvOverrides) {
+            if (previousSearchOverrides === undefined) delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+            else process.env.V08_A19_SEARCH_ENV_OVERRIDES = previousSearchOverrides;
+        }
+    }
     const candidateSide: Side = candidateIsGreen ? "green" : "red";
     const candidateResult = result.winner === "draw" ? "draw" : result.winner === candidateSide ? "win" : "loss";
     return {
@@ -1184,6 +1351,15 @@ export function playRankedDraftGame(
         decidedByArmageddon: result.attrition.decidedByArmageddon,
         rejectedCandidate: (candidateIsGreen ? result.rejectedGreen : result.rejectedRed) ?? 0,
         rejectedOpponent: (candidateIsGreen ? result.rejectedRed : result.rejectedGreen) ?? 0,
+        ...(synergyVariants ? { synergyVariants } : {}),
+        ...(leftSplit && rightSplit
+            ? {
+                  splitStacks: {
+                      candidate: (candidatePickedLeft ? leftSplit : rightSplit).splitRoles.length,
+                      opponent: (candidatePickedLeft ? rightSplit : leftSplit).splitRoles.length,
+                  },
+              }
+            : {}),
         ...(options.recordArmies
             ? {
                   armies: {
@@ -1502,6 +1678,12 @@ export function summarizeRankedDraftRecords(
             ...(options.candidateAugmentsOverride === undefined
                 ? {}
                 : { candidateAugmentsOverride: options.candidateAugmentsOverride }),
+            ...(options.liveSynergyVariants ? { liveSynergyVariants: true as const } : {}),
+            ...(options.tacticalSplits ? { tacticalSplits: true as const } : {}),
+            ...(options.candidateSkipsSplits ? { candidateSkipsSplits: true as const } : {}),
+            ...(options.candidateSearchEnvOverrides === undefined
+                ? {}
+                : { candidateSearchEnvOverrides: options.candidateSearchEnvOverrides }),
             draftDimensions: { offset: RANKED_DRAFT_INTRINSIC_OFFSET, length: RANKED_DRAFT_INTRINSIC_DIM },
             clusterSize: 4,
             seedAllocation: "indexed-bijective-v1",
@@ -1713,6 +1895,10 @@ function parseCli(argv: readonly string[]): ICliOptions {
         "candidate-t2",
         "candidate-synergy",
         "candidate-augments",
+        "live-synergy-variants",
+        "tactical-splits",
+        "candidate-skips-splits",
+        "candidate-search-env",
         "output",
         "live-draft-rules",
         "side-board",
@@ -1766,6 +1952,17 @@ function parseCli(argv: readonly string[]): ICliOptions {
         ...(values.get("candidate-augments")
             ? { candidateAugmentsOverride: parseRankedDraftAugmentOverride(values.get("candidate-augments")!) }
             : {}),
+        ...(values.get("candidate-search-env")
+            ? {
+                  candidateSearchEnvOverrides: JSON.parse(values.get("candidate-search-env")!) as Record<
+                      string,
+                      string
+                  >,
+              }
+            : {}),
+        liveSynergyVariants: flag("live-synergy-variants"),
+        tacticalSplits: flag("tactical-splits"),
+        candidateSkipsSplits: flag("candidate-skips-splits"),
         ...(values.get("output") ? { outputPath: resolve(values.get("output")!) } : {}),
         liveDraftRules: flag("live-draft-rules"),
         sideBoard: flag("side-board"),
