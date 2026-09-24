@@ -30,5 +30,7 @@ describe("rectangular footprints end to end", () => {
             expect(describeRejections(result)).toBe("");
             expect((result.rejectedGreen ?? 0) + (result.rejectedRed ?? 0)).toBe(0);
         });
-    }, 60_000);
+        // 120 s, not 60: this is a real multi-game simulation, and CI's runner is roughly three times slower
+        // than a dev machine — it overran 60 s by milliseconds and turned main red for a day.
+    }, 120_000);
 });

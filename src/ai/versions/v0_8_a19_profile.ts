@@ -174,7 +174,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
-        sha256: "51b90a5336674d7eb231e93795574946f4b0a1318b4497091b0404c8c9a03335" as const,
+        sha256: "134856ca89a666f236eae852c4eb809c78da08160c6dcc5e8a60de0c17e74025" as const,
     }),
 ] as const);
 
