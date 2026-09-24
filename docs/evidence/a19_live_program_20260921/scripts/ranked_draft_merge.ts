@@ -48,6 +48,9 @@ const options = {
     ...(values.get("candidate-synergy")
         ? { candidateSynergyOverride: ev.parseRankedDraftSynergyOverride(values.get("candidate-synergy")!) }
         : {}),
+    ...(values.get("candidate-augments")
+        ? { candidateAugmentsOverride: ev.parseRankedDraftAugmentOverride(values.get("candidate-augments")!) }
+        : {}),
     liveDraftRules: flag("live-draft-rules"),
     sideBoard: flag("side-board"),
     deterministicSearch: flag("deterministic-search"),

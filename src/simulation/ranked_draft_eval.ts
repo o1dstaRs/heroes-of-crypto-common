@@ -208,6 +208,58 @@ export interface IRankedDraftRecordedArmy {
     /** With a synergy override only: the synergies the candidate fought with and the ones its setup policy took. */
     synergies?: ISetupSynergy[];
     policySynergies?: ISetupSynergy[];
+    /** With an augment override only: the augments the candidate fought with and the ones its setup policy took. */
+    augments?: ISetupAugment[];
+    policyAugments?: ISetupAugment[];
+}
+
+const RANKED_DRAFT_AUGMENT_KINDS: readonly ISetupAugment["kind"][] = [
+    "Placement",
+    "Armor",
+    "Might",
+    "Empower",
+    "Sniper",
+    "Movement",
+];
+
+/** Check an augment plan: known kinds, each once, levels 1..3, at most the largest doctrine budget (7 points). */
+export function validateRankedDraftAugmentOverride(plan: readonly ISetupAugment[]): ISetupAugment[] {
+    const kinds = new Set<string>();
+    let total = 0;
+    for (const augment of plan) {
+        if (!RANKED_DRAFT_AUGMENT_KINDS.includes(augment.kind) || kinds.has(augment.kind)) {
+            throw new RangeError(`augment override: unknown or repeated kind ${augment.kind}`);
+        }
+        if (!Number.isInteger(augment.value) || augment.value < 1 || augment.value > 3) {
+            throw new RangeError(`augment override: ${augment.kind} level must be 1..3`);
+        }
+        kinds.add(augment.kind);
+        total += augment.value;
+    }
+    if (!plan.length || total > getUpgradePoints(Doctrine.SEE_NONE)) {
+        throw new RangeError(
+            `augment override must spend 1..${getUpgradePoints(Doctrine.SEE_NONE)} points, got ${total}`,
+        );
+    }
+    return plan.map((augment) => ({ kind: augment.kind, value: augment.value }));
+}
+
+/** Parse "Sniper:3,Armor:3,Empower:1" into a validated augment plan. */
+export function parseRankedDraftAugmentOverride(spec: string): ISetupAugment[] {
+    return validateRankedDraftAugmentOverride(
+        spec
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter(Boolean)
+            .map((entry) => {
+                const [kind, value] = entry.split(":");
+                const match = RANKED_DRAFT_AUGMENT_KINDS.find(
+                    (known) => known.toLowerCase() === kind?.trim().toLowerCase(),
+                );
+                if (!match) throw new RangeError(`augment override "${entry}" names no augment`);
+                return { kind: match, value: Number(value) };
+            }),
+    );
 }
 
 /** The synergy factions and their two options (FactionVals id -> the faction's SpecificSynergy ids). */
@@ -319,6 +371,8 @@ export interface IRankedDraftEvaluationReport {
         candidateTier1Override?: number;
         /** Present only when the candidate's synergy options are forced (FactionVals id -> option). */
         candidateSynergyOverride?: Record<number, number>;
+        /** Present only when the candidate's augment plan is forced. */
+        candidateAugmentsOverride?: ISetupAugment[];
         draftDimensions: { offset: number; length: number };
         clusterSize: 4;
         seedAllocation: "indexed-bijective-v1";
@@ -374,6 +428,11 @@ export interface IRankedDraftEvaluationOptions {
      * the choice, so only the option changes.
      */
     candidateSynergyOverride?: Readonly<Record<number, number>>;
+    /**
+     * Give the candidate this augment plan instead of its setup policy's (measurement only). Augments are chosen after
+     * the draft and nothing in the draft reads them. The plan must fit the candidate's doctrine budget.
+     */
+    candidateAugmentsOverride?: readonly ISetupAugment[];
     /** Draft creatures with the live server's rules (faction-diversity tax), not the League-era argmax. */
     liveDraftRules?: boolean;
     /** Fight on the side-oriented ranked board (side zones, seeded stones) instead of the classic board. */
@@ -400,6 +459,7 @@ interface INormalizedOptions {
     candidateTier2Override?: number;
     candidateTier1Override?: number;
     candidateSynergyOverride?: Record<number, number>;
+    candidateAugmentsOverride?: ISetupAugment[];
     liveDraftRules: boolean;
     sideBoard: boolean;
     deterministicSearch: boolean;
@@ -666,6 +726,9 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
         ...(options.candidateSynergyOverride === undefined
             ? {}
             : { candidateSynergyOverride: validateRankedDraftSynergyOverride(options.candidateSynergyOverride) }),
+        ...(options.candidateAugmentsOverride === undefined
+            ? {}
+            : { candidateAugmentsOverride: validateRankedDraftAugmentOverride(options.candidateAugmentsOverride) }),
         liveDraftRules: options.liveDraftRules === true,
         sideBoard: options.sideBoard === true,
         deterministicSearch: options.deterministicSearch === true,
@@ -1067,6 +1130,17 @@ export function playRankedDraftGame(
                 : { ...entry, synergy: synergyOverride[entry.faction] },
         );
     }
+    const candidatePolicyAugments = [...(candidatePickedLeft ? left : right).augments];
+    if (options.candidateAugmentsOverride !== undefined) {
+        const army = candidatePickedLeft ? left : right;
+        const spent = options.candidateAugmentsOverride.reduce((total, augment) => total + augment.value, 0);
+        if (spent > getUpgradePoints(army.doctrine)) {
+            throw new RangeError(
+                `augment override spends ${spent} points; the candidate's doctrine allows ${getUpgradePoints(army.doctrine)}`,
+            );
+        }
+        army.augments = options.candidateAugmentsOverride.map((augment) => ({ ...augment }));
+    }
     const green = battleMirror ? right : left;
     const red = battleMirror ? left : right;
     const candidateIsGreen = battleMirror ? !candidatePickedLeft : candidatePickedLeft;
@@ -1117,6 +1191,12 @@ export function playRankedDraftGame(
                               : {
                                     synergies: [...candidateArmy.synergies],
                                     policySynergies: candidatePolicySynergies,
+                                }),
+                          ...(options.candidateAugmentsOverride === undefined
+                              ? {}
+                              : {
+                                    augments: candidateArmy.augments.map((augment) => ({ ...augment })),
+                                    policyAugments: candidatePolicyAugments,
                                 }),
                       },
                       opponent: recordedArmy(candidatePickedLeft ? right : left),
@@ -1407,6 +1487,9 @@ export function summarizeRankedDraftRecords(
             ...(options.candidateSynergyOverride === undefined
                 ? {}
                 : { candidateSynergyOverride: options.candidateSynergyOverride }),
+            ...(options.candidateAugmentsOverride === undefined
+                ? {}
+                : { candidateAugmentsOverride: options.candidateAugmentsOverride }),
             draftDimensions: { offset: RANKED_DRAFT_INTRINSIC_OFFSET, length: RANKED_DRAFT_INTRINSIC_DIM },
             clusterSize: 4,
             seedAllocation: "indexed-bijective-v1",
@@ -1617,6 +1700,7 @@ function parseCli(argv: readonly string[]): ICliOptions {
         "candidate-t1",
         "candidate-t2",
         "candidate-synergy",
+        "candidate-augments",
         "output",
         "live-draft-rules",
         "side-board",
@@ -1666,6 +1750,9 @@ function parseCli(argv: readonly string[]): ICliOptions {
         ...(values.get("candidate-t2") ? { candidateTier2Override: Number(values.get("candidate-t2")) } : {}),
         ...(values.get("candidate-synergy")
             ? { candidateSynergyOverride: parseRankedDraftSynergyOverride(values.get("candidate-synergy")!) }
+            : {}),
+        ...(values.get("candidate-augments")
+            ? { candidateAugmentsOverride: parseRankedDraftAugmentOverride(values.get("candidate-augments")!) }
             : {}),
         ...(values.get("output") ? { outputPath: resolve(values.get("output")!) } : {}),
         liveDraftRules: flag("live-draft-rules"),
