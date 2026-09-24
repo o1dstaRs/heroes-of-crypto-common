@@ -49,6 +49,7 @@ const options = {
     liveSynergyVariants: flag("live-synergy-variants"),
     tacticalSplits: flag("tactical-splits"),
     candidateSkipsSplits: flag("candidate-skips-splits"),
+    ...(values.get("value-data") ? { valueDataPath: values.get("value-data") } : {}),
     liveDraftRules: flag("live-draft-rules"),
     sideBoard: flag("side-board"),
     deterministicSearch: flag("deterministic-search"),

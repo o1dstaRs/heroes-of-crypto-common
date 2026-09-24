@@ -29,6 +29,7 @@ import {
     type RankedDraftVarietyPolicyId,
 } from "./draft_variety";
 import { rankedDraftStrengthScore, type RankedDraftStrengthPolicyId } from "./draft_strength_prior";
+import type { RankedDraftSynergyVariants } from "./draft_synergy_variants";
 
 export type DraftBundle = readonly [number, number, number];
 
@@ -49,6 +50,8 @@ export interface IDraftCoherenceContext {
     draftStrengthPolicy?: RankedDraftStrengthPolicyId;
     /** The map, only once the live pick phase has revealed it (right before the level-3 picks). */
     revealedGridType?: number;
+    /** The game's synergy variants (public from the first draft screen); read only by `-sv` strength policies. */
+    synergyVariants?: RankedDraftSynergyVariants;
 }
 
 /** Keep replay-derived build fit influential without making it lexicographically stronger than the genome. */
@@ -184,7 +187,7 @@ export function pickCoherentDraftCreature(
 /** Build-plan fit available at bundle time, before later creature offers have resolved. */
 export function draftBundleCoherenceAffinity(
     [level1, level2, artifactId]: DraftBundle,
-    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy" | "draftStrengthPolicy"> = {},
+    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants"> = {},
 ): number {
     const creatures = [level1, level2] as const;
     const planSeed =
@@ -210,7 +213,7 @@ export function pickCoherentDraftBundle(
     bundles: readonly DraftBundle[],
     creatureScore: (creatureId: number) => number,
     artifactScore: (artifactId: number) => number,
-    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy" | "draftStrengthPolicy"> = {},
+    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants"> = {},
 ): number {
     if (!bundles.length) return 0;
     const baseScores = bundles.map(
@@ -220,8 +223,14 @@ export function pickCoherentDraftBundle(
         (bundle) =>
             draftBundleCoherenceAffinity(bundle, options) +
             // A bundle drafts both creatures, so both count in full; the second joins the first's roster.
-            (rankedDraftStrengthScore(bundle[0], options.draftStrengthPolicy, { ownCreatureIds: [] }) +
-                rankedDraftStrengthScore(bundle[1], options.draftStrengthPolicy, { ownCreatureIds: [bundle[0]] })) /
+            (rankedDraftStrengthScore(bundle[0], options.draftStrengthPolicy, {
+                ownCreatureIds: [],
+                synergyVariants: options.synergyVariants,
+            }) +
+                rankedDraftStrengthScore(bundle[1], options.draftStrengthPolicy, {
+                    ownCreatureIds: [bundle[0]],
+                    synergyVariants: options.synergyVariants,
+                })) /
                 DRAFT_COHERENCE_WEIGHT,
     );
     return bestScoreIndex(applyDraftCoherenceOverlay(baseScores, affinities));

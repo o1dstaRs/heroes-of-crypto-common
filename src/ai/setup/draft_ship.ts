@@ -41,6 +41,7 @@ import {
     type RankedDraftStrengthPolicyId,
 } from "./draft_strength_prior";
 import { TIER1_ARTIFACT_WINRATE, TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED } from "./setup_strategy";
+import type { RankedDraftSynergyVariants } from "./draft_synergy_variants";
 import {
     isRankedDraftInteractionPrior,
     RANKED_DRAFT_INTERACTION_PRIOR_ID,
@@ -360,6 +361,7 @@ export function pickRankedLiveDraftCreature(
     knownOpponentCreatureIds: readonly number[],
     tier1ArtifactId?: number,
     revealedGridType?: number,
+    synergyVariants?: RankedDraftSynergyVariants,
 ): number | undefined {
     const eligible = applyRankedDraftRangedFloor(
         genome.draftStrengthPolicy,
@@ -387,6 +389,7 @@ export function pickRankedLiveDraftCreature(
             tier1ArtifactId,
             knownOpponentCreatureIds,
             ...(revealedGridType === undefined ? {} : { revealedGridType }),
+            ...(synergyVariants === undefined ? {} : { synergyVariants }),
             ...(genome.draftInteractionPrior ? { draftInteractionPrior: genome.draftInteractionPrior } : {}),
             ...(genome.draftVarietyPolicy ? { draftVarietyPolicy: genome.draftVarietyPolicy } : {}),
             ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
@@ -399,7 +402,11 @@ export function pickRankedLiveDraftCreature(
  * The live ranked bot's opening bundle pick: both creatures' genome scores plus the Tier-1 artifact's measured
  * win rate, then the bundle coherence overlay and whichever per-creature overlays the genome carries.
  */
-export function pickRankedLiveDraftBundle(genome: ILeagueGenome, bundles: readonly DraftBundle[]): number {
+export function pickRankedLiveDraftBundle(
+    genome: ILeagueGenome,
+    bundles: readonly DraftBundle[],
+    synergyVariants?: RankedDraftSynergyVariants,
+): number {
     return pickCoherentDraftBundle(
         bundles,
         (creatureId) => draftGenomeCreatureScore(genome, creatureId),
@@ -410,6 +417,7 @@ export function pickRankedLiveDraftBundle(genome: ILeagueGenome, bundles: readon
         {
             ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
             ...(genome.draftStrengthPolicy ? { draftStrengthPolicy: genome.draftStrengthPolicy } : {}),
+            ...(synergyVariants === undefined ? {} : { synergyVariants }),
         },
     );
 }

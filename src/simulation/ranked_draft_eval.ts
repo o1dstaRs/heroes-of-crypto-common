@@ -27,6 +27,7 @@ import { RANKED_A19_DRAFT_CANDIDATE, RANKED_A19_DRAFT_CANDIDATE_ID } from "../ai
 import { pickCoherentDraftBundle } from "../ai/setup/draft_coherence";
 import { isRankedDraftInteractionPrior, RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../ai/setup/draft_interaction_prior";
 import { isRankedDraftVarietyPolicy, RANKED_DRAFT_VARIETY_POLICY_ID } from "../ai/setup/draft_variety";
+import type { RankedDraftSynergyVariants } from "../ai/setup/draft_synergy_variants";
 import {
     rankedDraftUsesCorrectedTier1Table,
     isRankedDraftStrengthPolicy,
@@ -474,6 +475,11 @@ export interface IRankedDraftEvaluationOptions {
     candidateSkipsSplits?: boolean;
     /** Research: the candidate's promoted search runs with these V08_A19_SEARCH_ENV_OVERRIDES (key -> value). */
     candidateSearchEnvOverrides?: Readonly<Record<string, string>>;
+    /**
+     * Data collection: append every real turn's V2 leaf features (both seats, labelled by whether the acting team
+     * won) to this JSONL file through the battle engine's VALUE_DATA capture. Never changes a decision.
+     */
+    valueDataPath?: string;
     /** Draft creatures with the live server's rules (faction-diversity tax), not the League-era argmax. */
     liveDraftRules?: boolean;
     /** Fight on the side-oriented ranked board (side zones, seeded stones) instead of the classic board. */
@@ -505,6 +511,7 @@ interface INormalizedOptions {
     tacticalSplits: boolean;
     candidateSkipsSplits: boolean;
     candidateSearchEnvOverrides?: Record<string, string>;
+    valueDataPath?: string;
     liveDraftRules: boolean;
     sideBoard: boolean;
     deterministicSearch: boolean;
@@ -798,6 +805,7 @@ function normalizeOptions(options: IRankedDraftEvaluationOptions, poolSize: numb
         tacticalSplits,
         candidateSkipsSplits,
         ...(searchOverrides === undefined ? {} : { candidateSearchEnvOverrides: { ...searchOverrides } }),
+        ...(options.valueDataPath ? { valueDataPath: options.valueDataPath } : {}),
         liveDraftRules: options.liveDraftRules === true,
         sideBoard: options.sideBoard === true,
         deterministicSearch: options.deterministicSearch === true,
@@ -907,6 +915,8 @@ export interface IRankedDraftPickRules {
     explorationRate?: number;
     /** The board's map. Creature decisions see it from level 3 on, when the live pick phase reveals it. */
     gridType?: number;
+    /** The board's synergy variants, public from the first draft screen (live rules only; read by `-sv` policies). */
+    synergyVariants?: RankedDraftSynergyVariants;
 }
 
 /** Tier-1 bundle score for a seat: the composition-corrected table when that genome's policy opts in. */
@@ -926,7 +936,32 @@ export function resolveRankedDraftPick(
 ): IPickSimState {
     const leftGenome = normalizeRankedDraftGenome(leftInput);
     const rightGenome = normalizeRankedDraftGenome(rightInput);
-    const pickCreature = rules.liveDraftRules ? pickRankedLiveDraftCreature : pickDraftGenomeCreature;
+    const pickCreature = (
+        genome: ILeagueGenome,
+        available: readonly number[],
+        ownCreatureIds: readonly number[],
+        knownOpponentCreatureIds: readonly number[],
+        tier1ArtifactId?: number,
+        revealedGridType?: number,
+    ): number | undefined =>
+        rules.liveDraftRules
+            ? pickRankedLiveDraftCreature(
+                  genome,
+                  available,
+                  ownCreatureIds,
+                  knownOpponentCreatureIds,
+                  tier1ArtifactId,
+                  revealedGridType,
+                  rules.synergyVariants,
+              )
+            : pickDraftGenomeCreature(
+                  genome,
+                  available,
+                  ownCreatureIds,
+                  knownOpponentCreatureIds,
+                  tier1ArtifactId,
+                  revealedGridType,
+              );
     const explorationRate = rules.explorationRate ?? 0;
     // Exploration draws from its own stream so the reducer's bans, offers and collisions stay on their seeds, and
     // a zero rate reproduces the policy draft exactly. Both draws are taken every time to keep the stream aligned.
@@ -960,6 +995,7 @@ export function resolveRankedDraftPick(
                     ? { draftSpellRangedPolicy: leftGenome.draftSpellRangedPolicy }
                     : {}),
                 ...(leftGenome.draftStrengthPolicy ? { draftStrengthPolicy: leftGenome.draftStrengthPolicy } : {}),
+                ...(rules.liveDraftRules && rules.synergyVariants ? { synergyVariants: rules.synergyVariants } : {}),
             },
         );
     const rightBundle =
@@ -973,6 +1009,7 @@ export function resolveRankedDraftPick(
                     ? { draftSpellRangedPolicy: rightGenome.draftSpellRangedPolicy }
                     : {}),
                 ...(rightGenome.draftStrengthPolicy ? { draftStrengthPolicy: rightGenome.draftStrengthPolicy } : {}),
+                ...(rules.liveDraftRules && rules.synergyVariants ? { synergyVariants: rules.synergyVariants } : {}),
             },
         );
     state = applyAccepted(state, { type: "select_bundle", team: LEFT, bundleIndex: leftBundle }, rng);
@@ -1165,11 +1202,23 @@ export function rankedDraftStackCapacity(
     return 6 + placement + boardUnits;
 }
 
-const rankedDraftPickRules = (options: INormalizedOptions, gridType: number): IRankedDraftPickRules => ({
+const rankedDraftPickRules = (
+    options: INormalizedOptions,
+    gridType: number,
+    synergyVariants?: RankedDraftSynergyVariants,
+): IRankedDraftPickRules => ({
     liveDraftRules: options.liveDraftRules,
     explorationRate: options.explorationRate,
     gridType,
+    ...(synergyVariants ? { synergyVariants } : {}),
 });
+
+/** The board's live synergy variants (the server draws them from the game id; the harness from the pick seed). */
+const rankedDraftBoardSynergyVariants = (
+    options: INormalizedOptions,
+    pickSeed: number,
+): RankedDraftSynergyVariants | undefined =>
+    options.liveSynergyVariants ? synergyVariantsForSeed(`ranked-draft-${pickSeed}`) : undefined;
 
 const rankedDraftSeatDoctrines = (
     options: INormalizedOptions,
@@ -1218,9 +1267,7 @@ export function playRankedDraftGame(
     const pickAssignment = Math.floor(withinBoard / 2) as 0 | 1;
     const battleMirror = (withinBoard % 2) as 0 | 1;
     const { pairSeed, pickSeed, battleSeed } = rankedDraftBoardSeeds(options, seedLaneIndex, offerBoard);
-    const synergyVariants = options.liveSynergyVariants
-        ? synergyVariantsForSeed(`ranked-draft-${pickSeed}`)
-        : undefined;
+    const synergyVariants = rankedDraftBoardSynergyVariants(options, pickSeed);
     const candidatePickedLeft = pickAssignment === 0;
     const leftGenome = candidatePickedLeft ? candidate : opponent;
     const rightGenome = candidatePickedLeft ? opponent : candidate;
@@ -1243,7 +1290,7 @@ export function playRankedDraftGame(
             right: rightSetupPolicy.spec,
             ...rankedDraftSeatDoctrines(options, pickSeed, candidatePickedLeft),
         },
-        rankedDraftPickRules(options, gridType),
+        rankedDraftPickRules(options, gridType, synergyVariants),
     );
     const left = materializeArmy(pick.left, getKnownOpponentCreatures(pick, LEFT), leftSetupPolicy);
     const right = materializeArmy(pick.right, getKnownOpponentCreatures(pick, RIGHT), rightSetupPolicy);
@@ -1315,6 +1362,13 @@ export function playRankedDraftGame(
     const previousSearchOverrides = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
     if (options.candidateSearchEnvOverrides) {
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify(options.candidateSearchEnvOverrides);
+    }
+    if (options.valueDataPath) {
+        process.env.VALUE_DATA = options.valueDataPath;
+        process.env.VALUE_DATA_FEATURES = "v2";
+        process.env.PHASE_B_RUN_FINGERPRINT = createHash("sha256")
+            .update(`ranked-draft-value-data:${options.baseSeed}`)
+            .digest("hex");
     }
     let result: IMatchResult;
     try {
@@ -1426,7 +1480,7 @@ export function inspectRankedDraftBoard(
                 right: candidatePickedLeft ? options.opponentSetupPolicySpec : options.candidateSetupPolicySpec,
                 ...rankedDraftSeatDoctrines(options, pickSeed, candidatePickedLeft),
             },
-            rankedDraftPickRules(options, gridType),
+            rankedDraftPickRules(options, gridType, rankedDraftBoardSynergyVariants(options, pickSeed)),
         );
         const candidateTeam = candidatePickedLeft ? pick.left : pick.right;
         return {
@@ -1899,6 +1953,7 @@ function parseCli(argv: readonly string[]): ICliOptions {
         "tactical-splits",
         "candidate-skips-splits",
         "candidate-search-env",
+        "value-data",
         "output",
         "live-draft-rules",
         "side-board",
@@ -1963,6 +2018,7 @@ function parseCli(argv: readonly string[]): ICliOptions {
         liveSynergyVariants: flag("live-synergy-variants"),
         tacticalSplits: flag("tactical-splits"),
         candidateSkipsSplits: flag("candidate-skips-splits"),
+        ...(values.get("value-data") ? { valueDataPath: resolve(values.get("value-data")!) } : {}),
         ...(values.get("output") ? { outputPath: resolve(values.get("output")!) } : {}),
         liveDraftRules: flag("live-draft-rules"),
         sideBoard: flag("side-board"),

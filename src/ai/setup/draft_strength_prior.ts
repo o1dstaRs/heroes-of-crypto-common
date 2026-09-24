@@ -10,6 +10,7 @@
  */
 
 import { creatureInfo } from "./creature_score";
+import { rankedDraftSynergyVariantMarginalPp, type RankedDraftSynergyVariants } from "./draft_synergy_variants";
 import strengthPriorJson from "./draft_strength_priors/ranked_unit_strength_a19_side_v1.json";
 import strengthPriorV3Json from "./draft_strength_priors/ranked_unit_strength_a19_side_v3.json";
 import strengthPriorV4Json from "./draft_strength_priors/ranked_unit_strength_a19_side_v4.json";
@@ -100,6 +101,10 @@ export const RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS = {
     // composition-corrected table (see TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED). Research-only.
     "ranked-unit-strength-a19-side-v4-w8-r4-t1": 8,
     "ranked-unit-strength-a19-side-v4-w16-r4-t1": 16,
+    // The shipped v4-w16-r4 plus the live synergy variants' residual value (draft_synergy_variants.ts), once and
+    // twice over. Research-only (P16); without variants in the context they draft exactly like v4-w16-r4.
+    "ranked-unit-strength-a19-side-v4-w16-r4-sv": 16,
+    "ranked-unit-strength-a19-side-v4-w16-r4-sv2": 16,
 } as const;
 
 export type RankedDraftStrengthPolicyId = keyof typeof RANKED_DRAFT_STRENGTH_POLICY_WEIGHTS;
@@ -122,6 +127,8 @@ export const RANKED_DRAFT_RANGED_FLOOR: Partial<Record<RankedDraftStrengthPolicy
     "ranked-unit-strength-a19-side-v4-w16-r4": 4,
     "ranked-unit-strength-a19-side-v4-w8-r4-t1": 4,
     "ranked-unit-strength-a19-side-v4-w16-r4-t1": 4,
+    "ranked-unit-strength-a19-side-v4-w16-r4-sv": 4,
+    "ranked-unit-strength-a19-side-v4-w16-r4-sv2": 4,
 };
 
 /** Shooter floor of a policy (0 = none). */
@@ -153,6 +160,16 @@ export function applyRankedDraftRangedFloor(
 export interface IDraftStrengthContext {
     ownCreatureIds: readonly number[];
     revealedGridType?: number;
+    /** The game's four synergy variants, public from the first draft screen. Read only by the `-sv` policies. */
+    synergyVariants?: RankedDraftSynergyVariants;
+}
+
+/** Synergy-variant multiplier of a `-sv` policy id (0 for every other policy). */
+export function rankedDraftSynergyVariantScale(policy: RankedDraftStrengthPolicyId | undefined): number {
+    if (!isRankedDraftStrengthPolicy(policy)) return 0;
+    if (policy.endsWith("-sv")) return 1;
+    if (policy.endsWith("-sv2")) return 2;
+    return 0;
 }
 
 /** A ranked army: two level-1, two level-2, one level-3 and one level-4 creature. */
@@ -302,7 +319,13 @@ export function rankedDraftStrengthScore(
         return (weight * rankedDraftStrengthV3LiftPp(creatureId)) / 100;
     }
     if (isV4StrengthPolicy(policy)) {
-        return (weight * rankedDraftStrengthV4LiftPp(creatureId)) / 100;
+        const variantScale = rankedDraftSynergyVariantScale(policy);
+        const synergyPp =
+            variantScale && context
+                ? variantScale *
+                  rankedDraftSynergyVariantMarginalPp(creatureId, context.ownCreatureIds, context.synergyVariants)
+                : 0;
+        return (weight * (rankedDraftStrengthV4LiftPp(creatureId) + synergyPp)) / 100;
     }
     if (!isUnitSynergyPolicy(policy)) {
         return (weight * rankedDraftStrengthLiftPp(creatureId)) / 100;
