@@ -37,6 +37,10 @@ describe("ranked draft unit-strength prior v4 (current balance, floor-4 armies)"
                 (8 * rankedDraftStrengthV4LiftPp(id)) / 100,
                 12,
             );
+            expect(rankedDraftStrengthScore(id, "ranked-unit-strength-a19-side-v4-w16-r4")).toBeCloseTo(
+                (16 * rankedDraftStrengthV4LiftPp(id)) / 100,
+                12,
+            );
             expect(rankedDraftStrengthScore(id, "ranked-unit-strength-a19-side-v1-w4-r4")).toBeCloseTo(
                 (4 * rankedDraftStrengthLiftPp(id)) / 100,
                 12,
@@ -44,6 +48,7 @@ describe("ranked draft unit-strength prior v4 (current balance, floor-4 armies)"
         }
         expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v4-w4-r4")).toBe(4);
         expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v4-w8-r4")).toBe(4);
+        expect(rankedDraftRangedFloor("ranked-unit-strength-a19-side-v4-w16-r4")).toBe(4);
         expect(parseDraftGenome("ranked-unit-strength-a19-side-v4-w4-r4").draftStrengthPolicy).toBe(
             "ranked-unit-strength-a19-side-v4-w4-r4",
         );
