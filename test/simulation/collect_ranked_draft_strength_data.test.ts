@@ -15,10 +15,25 @@ import { RANKED_VERSATILE_DRAFT_SPEC } from "../../src/ai/setup/draft_ship";
 import {
     rankedDraftStrengthDataDrafter,
     rankedDraftStrengthTasks,
+    rankedDraftStrengthDataOptions,
 } from "../../src/simulation/collect_ranked_draft_strength_data";
 import { rankedDraftLiveIncumbent, rankedDraftStrengthCandidate } from "../../src/simulation/ranked_draft_eval";
 
 describe("ranked draft strength data collector", () => {
+    test("sets both seats up with v07-nonfight unless a setup spec is given", () => {
+        const plain = rankedDraftStrengthDataOptions(10, 1, 0.5, 2);
+        expect(plain.candidateSetupPolicySpec).toBe("v07-nonfight-4eda84635fe7");
+        expect(plain.opponentSetupPolicySpec).toBe("v07-nonfight-4eda84635fe7");
+        const live = rankedDraftStrengthDataOptions(10, 1, 0.5, 2, "conditional-v1:sniper+t2a19");
+        expect(live.candidateSetupPolicySpec).toBe("conditional-v1:sniper+t2a19");
+        expect(live.opponentSetupPolicySpec).toBe("conditional-v1:sniper+t2a19");
+        expect({
+            ...live,
+            candidateSetupPolicySpec: plain.candidateSetupPolicySpec,
+            opponentSetupPolicySpec: plain.opponentSetupPolicySpec,
+        }).toEqual(plain);
+    });
+
     test("drafts with the deployed versatile draft unless a strength policy is named", () => {
         expect(rankedDraftStrengthDataDrafter()).toEqual(rankedDraftLiveIncumbent());
         expect(rankedDraftStrengthDataDrafter(RANKED_VERSATILE_DRAFT_SPEC)).toEqual(rankedDraftLiveIncumbent());

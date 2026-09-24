@@ -37,12 +37,14 @@ import {
  * only the first assignment is played, in both battle mirrors: two unique, side-balanced games per board.
  *
  * --policy drafts both seats with a battle-fitted strength policy instead (e.g. the shipped
- * ranked-unit-strength-a19-side-v1-w4), so a refit sees the armies the current bot actually builds. --from resumes
- * an interrupted run at a board, appending to the existing output instead of truncating it.
+ * ranked-unit-strength-a19-side-v1-w4), so a refit sees the armies the current bot actually builds. --setup sets both
+ * seats up with another setup spec (default v07-nonfight, which every earlier collection used; the v0.8 bot now uses
+ * conditional-v1:sniper+t2a19). --from resumes an interrupted run at a board, appending to the existing output
+ * instead of truncating it.
  *
  * Usage: bun src/simulation/collect_ranked_draft_strength_data.ts --boards 4000 --seed 97100001 \
- *     [--exploration 0.5] [--concurrency 14] [--chunk 250] [--policy <strength policy id>] [--from <board>] \
- *     --output sim-out/draft_strength/train.jsonl
+ *     [--exploration 0.5] [--concurrency 14] [--chunk 250] [--policy <strength policy id>] [--setup <setup spec>] \
+ *     [--from <board>] --output sim-out/draft_strength/train.jsonl
  */
 
 interface ICollectOptions {
@@ -53,12 +55,23 @@ interface ICollectOptions {
     chunk: number;
     outputPath: string;
     policy?: string;
+    setup?: string;
     from: number;
 }
 
 function parseCli(argv: readonly string[]): ICollectOptions {
     const values = new Map<string, string>();
-    const allowed = new Set(["boards", "seed", "exploration", "concurrency", "chunk", "output", "policy", "from"]);
+    const allowed = new Set([
+        "boards",
+        "seed",
+        "exploration",
+        "concurrency",
+        "chunk",
+        "output",
+        "policy",
+        "setup",
+        "from",
+    ]);
     for (let index = 0; index < argv.length; index += 1) {
         const argument = argv[index];
         if (!argument.startsWith("--")) throw new Error(`Unexpected positional argument ${argument}`);
@@ -78,6 +91,7 @@ function parseCli(argv: readonly string[]): ICollectOptions {
         chunk: Number(values.get("chunk") ?? 250),
         outputPath: resolve(output),
         policy: values.get("policy"),
+        setup: values.get("setup"),
         from: Number(values.get("from") ?? 0),
     };
     if (!Number.isInteger(options.boards) || options.boards < 2) throw new RangeError("--boards must be >= 2");
@@ -105,6 +119,7 @@ export function rankedDraftStrengthDataOptions(
     seed: number,
     exploration: number,
     concurrency: number,
+    setup: string = V07_NONFIGHT_SETUP_SPEC,
 ): IRankedDraftEvaluationOptions {
     return {
         gamesPerOpponent: boards * 4,
@@ -112,8 +127,8 @@ export function rankedDraftStrengthDataOptions(
         concurrency,
         mapTypes: [...RANKED_DRAFT_LIVE_MAP_TYPES],
         fightProfile: "a19",
-        candidateSetupPolicySpec: V07_NONFIGHT_SETUP_SPEC,
-        opponentSetupPolicySpec: V07_NONFIGHT_SETUP_SPEC,
+        candidateSetupPolicySpec: setup,
+        opponentSetupPolicySpec: setup,
         liveDraftRules: true,
         sideBoard: true,
         deterministicSearch: true,
@@ -140,6 +155,7 @@ async function cliMain(): Promise<void> {
         options.seed,
         options.exploration,
         options.concurrency,
+        options.setup,
     );
     mkdirSync(dirname(options.outputPath), { recursive: true });
     if (options.from === 0) writeFileSync(options.outputPath, "");
