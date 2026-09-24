@@ -46,6 +46,14 @@ const options = {
     ...(values.get("candidate-search-env")
         ? { candidateSearchEnvOverrides: JSON.parse(values.get("candidate-search-env")!) }
         : {}),
+    // The same overrides from a JSON file (for values that are themselves JSON, e.g. a leaf's weights).
+    ...(values.get("candidate-search-env-file")
+        ? {
+              candidateSearchEnvOverrides: JSON.parse(
+                  (await import("node:fs")).readFileSync(values.get("candidate-search-env-file")!, "utf8"),
+              ),
+          }
+        : {}),
     liveSynergyVariants: flag("live-synergy-variants"),
     tacticalSplits: flag("tactical-splits"),
     candidateSkipsSplits: flag("candidate-skips-splits"),
