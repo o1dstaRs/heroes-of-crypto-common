@@ -56,3 +56,11 @@ that was live when it started (v1-w4 draft + frozen v07-nonfight setup + ranked-
 That is **+33.48pp over an even split, with the 95% lower bound at +30.65pp** — the preregistered bar was 60% with a
 lower bound above 60%, i.e. +10pp. Every live map clears it independently. Cell 3 (`cumulative_w16_vs_pre`, the
 peer's confirmed weight-16 prior, not yet the default) follows, and `since_floor4` last.
+
+## Execution incident, recorded for the reader (2026-09-24 09:09Z)
+The pipeline parent was killed at ~06:00Z by my own aborted restart attempt (the one whose edit never landed). The
+already-spawned cell-1 evaluator survived as an orphan, ran to completion and wrote its result — 3000 games with
+2471+489+40 accounted for, so the cell is whole and is reported as such — but no DONE line was logged and cells 3 and
+2 never started. They were relaunched at 09:09Z with the weight-16 cell first, since it is the decision-relevant one;
+`since_floor4` follows and may not finish before morning. Seeds, candidates, opponents and the decision rule are
+unchanged. No result was read before this relaunch other than cell 1, which was already final.
