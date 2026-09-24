@@ -20,3 +20,12 @@ Gates (verdict.py, unchanged), including distinct creatures >= 80% of w16's and 
 PASS -> the winning id goes to main and becomes the server default; rollback `HOC_DRAFT_WEIGHTS=…-v4-w16-r4`.
 
 Prediction, written down so it can be wrong: w24 edges w16 by 0–2pp and fails to confirm; w32 is no better.
+
+## RESULT — selection (2000 games each, v4-w16-r4 incumbent, both seats conditional-v1:sniper+t2a19 + SEE_NONE)
+w24 (seed 99690001): 1018W 946L 36D; decisive 51.83% [47.46, 56.18], draw-aware 51.80%, 0 rejections; maps 51.3 /
+52.1 / 52.1; top share 38.1% vs 38.1%. w32 (seed 99700001): 1007W 965L 28D; decisive 51.06% [46.69, 55.42],
+draw-aware 51.05%; top share 38.5% vs 37.9%. The weight curve flattens above 16. Selected w24 (0.5180 > 0.505) →
+confirmation 99710001 and robustness 99780001 on hft.
+Execution note 09:05Z: the robustness cells (seed 99780001) moved from hft's queue to the idle shared node; hft keeps
+the confirmation (seed 99710001). A peer session's 5-worker run shared hft from 05:56Z; deterministic search makes
+the sharing irrelevant to results.
