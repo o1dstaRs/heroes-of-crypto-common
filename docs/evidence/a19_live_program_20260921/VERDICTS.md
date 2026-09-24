@@ -211,3 +211,36 @@ PASS  6a distinct creatures >= 80% of incumbent: 0.9792
 PASS  6b top creature share <= incumbent + 10pp: 0.0315
 VERDICT: PASS
 ```
+
+## Chaos break-on-attack synergy vs the table (P10, failed — not shipped)
+
+Both seats draft v4-w8-r4 and take SEE_NONE; the seats differ only in the Chaos synergy option.
+
+```
+run: confirm_syn_a19 vs incumbent:ranked-unit-strength-a19-side-v4-w8-r4
+head-to-head: 7632W 8116L 252D over 16000 games; decisive 48.46% CI [46.92, 50.01]
+  grid 1: 48.03% (LCB 45.36)
+  grid 3: 48.60% (LCB 45.92)
+  grid 4: 48.76% (LCB 46.08)
+diversity: candidate 50 distinct, incumbent 50; top share 37.6% vs 37.6% over 8000 drafts
+informational: tier-2 synergy reach candidate 6.3% vs incumbent 6.3%
+FAIL  1 draw-aware head-to-head > 0.50: 0.4849
+FAIL  2 clustered 95% LCB > 0.50: 0.4692
+PASS  3 candidate rejections == 0: 0
+FAIL  4 worst map (grid 1) >= 0.49: 0.4803
+FAIL  5 vs untrained-heuristic: candidate - incumbent >= -0.02: -0.0208
+PASS  5 vs league-round3-exploiter: candidate - incumbent >= -0.02: 0.0011
+PASS  6a distinct creatures >= 80% of incumbent: 1.0000
+PASS  6b top creature share <= incumbent + 10pp: 0.0000
+VERDICT: FAIL
+```
+
+Stage 2 (four one-faction flip arms, seed 99870001):
+
+```
+LIFE    flip applied in 1058/2000 games; draw-aware 49.01% [45.97, 52.04] over 415 boards -> keep
+CHAOS   flip applied in 904/2000 games; draw-aware 53.60% [50.26, 56.93] over 374 boards -> FLIP
+MIGHT   flip applied in 806/2000 games; draw-aware 40.26% [36.70, 43.82] over 342 boards -> keep
+NATURE  flip applied in 1048/2000 games; draw-aware 51.48% [48.41, 54.54] over 420 boards -> keep
+stage-3 candidate: flip CHAOS
+```

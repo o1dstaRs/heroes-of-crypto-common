@@ -57,3 +57,15 @@ separate from even (clustered SE ~1.1pp). The confirmation therefore uses P9's p
 stage-1 prediction (1.0 <= prediction < 2.5pp → 16,000 games), decided from stage-1 data only. With 16,000 games the
 confirmation's seeds (99880001, 12,000 preimages) would reach into the robustness seed, so robustness moves to the
 fresh 99895001. Gates and everything else unchanged.
+
+## RESULT — stage 3 confirmation (seed 99880001, 16,000 games) and robustness (seed 99895001)
+conditional-v1:sniper+t2+syn-a19 vs conditional-v1, both seats v4-w8-r4 + SEE_NONE: 7632W 8116L 252D; decisive 48.46%
+[46.92, 50.01], draw-aware 48.49%, clustered LCB 46.92, 0 rejections; maps NORMAL 48.03 / LAVA 48.60 / BLOCK 48.76.
+Robustness: 60.74% against the untrained ranged stack and 89.53% against the round-3 exploiter (conditional-v1:
+62.82% and 89.42%).
+
+## VERDICT (verdict.py): FAIL — gates 1, 2, 4 and 5 (untrained heuristic, −2.08pp) fail
+The Chaos flip is not better; if anything it is worse (about −3.4pp in the games where it applies). Stage 1 tested
+four flips at a nominal 95% each, so about one time in five one of them clears by luck; Chaos cleared by 0.26pp and
+the confirmation reversed it. The synergy table holds for all four factions: this lever is closed on these armies.
+The syn-a19 rule was never pushed. For the stack check, variant (a) — without P10 — is the one that counts.
