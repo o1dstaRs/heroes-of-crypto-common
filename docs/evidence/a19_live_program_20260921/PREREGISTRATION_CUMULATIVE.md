@@ -77,3 +77,16 @@ v4-**w16**-r4 + conditional-v1 + SEE-NONE against the same pre-program opponent:
 heavily, so this pair does NOT by itself establish w16 over w8 — the peer's own 8000-game head-to-head does that
 (54.60%, LCB 52.41). Read cell 3 as: the goal is met on either configuration, and w16 is at least as good.
 `since_floor4` started 11:45:57Z as the last, unbarred attribution cell.
+
+## RESULT — cell 2 `since_floor4` (seed 99870001, 3000 games): attribution, no bar
+The shipped stack against the floor-4 draft carrying the OLD setup and doctrine: decisive **68.45%**
+CI [65.04, 71.67], clustered LCB 65.04, draw-aware 68.17%, 0 rejections. So everything that landed after the
+shooter floor — conditional-v1 setup, the re-fitted v4 prior at weight 8, SEE-NONE doctrine — is worth +18.45pp by
+itself, and the floors plus the earlier draft work account for the remainder of cell 1's +33.48pp.
+
+## P13 COMPLETE (2026-09-24 13:27Z) — all three cells, 3000 games each, 0 rejected actions on either seat
+    cumulative_now_vs_pre  83.48% [80.65, 85.97]  LCB 80.65   <- the preregistered goal cell: bar was 60% / LCB > 60
+    cumulative_w16_vs_pre  84.77% [82.02, 87.16]  LCB 82.02
+    since_floor4           68.45% [65.04, 71.67]  LCB 65.04
+GOAL MET on the shipped configuration by +30.65pp at the lower bound, against a +10pp bar. The w16 cell does not by
+itself separate w16 from w8 (the intervals overlap); the peer's 8000-game head-to-head does that.
