@@ -167,9 +167,8 @@ export interface IDraftStrengthContext {
 /** Synergy-variant multiplier of a `-sv` policy id (0 for every other policy). */
 export function rankedDraftSynergyVariantScale(policy: RankedDraftStrengthPolicyId | undefined): number {
     if (!isRankedDraftStrengthPolicy(policy)) return 0;
-    if (policy.endsWith("-sv")) return 1;
-    if (policy.endsWith("-sv2")) return 2;
-    return 0;
+    const match = /-sv(\d?)(?:-|$)/.exec(policy);
+    return match ? Number(match[1] || 1) : 0;
 }
 
 /** A ranked army: two level-1, two level-2, one level-3 and one level-4 creature. */

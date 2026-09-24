@@ -66,3 +66,25 @@ export function rankedDraftSynergyVariantMarginalPp(
     const completionChance = 1 - (1 - RANKED_DRAFT_SYNERGY_VARIANT_PICK_SUCCESS) ** remainingPicks;
     return completionChance * (valueAt(after + 1) - valueAt(after));
 }
+
+/**
+ * Composition value of one more natively ranged creature: the step in a fitted `ranged count -> pp` table (relative to
+ * any reference count) from the army's current ranged count to one more. Zero for a creature that is not ranged, for
+ * one already drafted, and for counts the table does not list.
+ */
+export function rankedDraftRangedCountMarginalPp(
+    creatureId: number,
+    ownCreatureIds: readonly number[],
+    table: Readonly<Record<string, number>> | undefined,
+): number {
+    if (!table || !creatureInfo(creatureId)?.ranged) return 0;
+    const roster = new Set(ownCreatureIds);
+    if (roster.has(creatureId)) return 0;
+    let ranged = 0;
+    for (const ownCreatureId of roster) {
+        if (creatureInfo(ownCreatureId)?.ranged) ranged += 1;
+    }
+    const now = table[String(ranged)];
+    const next = table[String(ranged + 1)];
+    return now === undefined || next === undefined ? 0 : next - now;
+}
