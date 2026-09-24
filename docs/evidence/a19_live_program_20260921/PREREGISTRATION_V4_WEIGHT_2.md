@@ -29,3 +29,15 @@ confirmation 99710001 and robustness 99780001 on hft.
 Execution note 09:05Z: the robustness cells (seed 99780001) moved from hft's queue to the idle shared node; hft keeps
 the confirmation (seed 99710001). A peer session's 5-worker run shared hft from 05:56Z; deterministic search makes
 the sharing irrelevant to results.
+
+## RESULT — confirmation v4-w24-r4 vs v4-w16-r4 (seed 99710001, 8000 games)
+4035W 3839L 126D; decisive 51.24% [49.05, 53.43], draw-aware 51.23%, clustered LCB 49.05, 0 rejections; maps NORMAL
+50.70 / LAVA 51.11 / BLOCK 51.92; distinct 47 vs 47, top share 37.3% vs 37.3%. Gate 2 (LCB > 0.50) FAILS, so P12
+fails whatever the robustness cells show; they finish for the record. As predicted: the weight curve is flat above 16
+(w8 → w16 +4.6pp confirmed, w16 → w24 +1.2pp unconfirmed), so the shipped w16 stays the default.
+
+## VERDICT (verdict.py over confirm_w24 + robust_w24 + robust_w16): FAIL on gate 2 only
+Robustness (seed 99780001): w24 68.34% against the untrained ranged stack and 92.47% against the round-3 exploiter;
+w16 67.09% and 92.22%. Every other gate passes; the head-to-head gain is too small to confirm. w16 stays the
+default. For reference, the shipped w16 stack now beats the untrained ranged stack 67% — the live exploit that
+beat the pre-program draft two to one.

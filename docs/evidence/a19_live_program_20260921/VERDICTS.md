@@ -244,3 +244,26 @@ MIGHT   flip applied in 806/2000 games; draw-aware 40.26% [36.70, 43.82] over 34
 NATURE  flip applied in 1048/2000 games; draw-aware 51.48% [48.41, 54.54] over 420 boards -> keep
 stage-3 candidate: flip CHAOS
 ```
+
+## v4-w24-r4 vs the weight-16 default (P12, failed — not shipped)
+
+Both seats set up with conditional-v1:sniper+t2a19 and take SEE_NONE. Selection: w24 51.80%, w32 51.05%.
+
+```
+run: confirm_w24 vs incumbent:ranked-unit-strength-a19-side-v4-w16-r4
+head-to-head: 4035W 3839L 126D over 8000 games; decisive 51.24% CI [49.05, 53.43]
+  grid 1: 50.70% (LCB 46.92)
+  grid 3: 51.11% (LCB 47.32)
+  grid 4: 51.92% (LCB 48.13)
+diversity: candidate 47 distinct, incumbent 47; top share 37.3% vs 37.3% over 4000 drafts
+informational: tier-2 synergy reach candidate 6.6% vs incumbent 5.8%
+PASS  1 draw-aware head-to-head > 0.50: 0.5122
+FAIL  2 clustered 95% LCB > 0.50: 0.4905
+PASS  3 candidate rejections == 0: 0
+PASS  4 worst map (grid 1) >= 0.49: 0.5070
+PASS  5 vs untrained-heuristic: candidate - incumbent >= -0.02: 0.0125
+PASS  5 vs league-round3-exploiter: candidate - incumbent >= -0.02: 0.0025
+PASS  6a distinct creatures >= 80% of incumbent: 1.0000
+PASS  6b top creature share <= incumbent + 10pp: 0.0000
+VERDICT: FAIL
+```

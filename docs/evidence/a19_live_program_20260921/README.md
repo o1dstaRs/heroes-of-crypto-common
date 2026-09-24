@@ -30,7 +30,7 @@ counts was wrong in three places; the correction is at the top of LIVE_ANALYSIS.
 | 10 | synergy options re-measured for a19 on v4 armies | stage 1: only Chaos passed the flip bar (53.60%); 16,000-game confirmation 48.46% [46.92, 50.01], gates 1, 2, 4, 5 fail | fail — a stage-1 false positive; the table holds |
 | 11 | the v4 prior at weight 16 (`…-v4-w16-r4`) | vs weight 8, 8,000 games: 54.60% [52.41, 56.77], 8/8 gates (selection: w12 51.38%, w16 55.80%) | **shipped, current default** |
 | – | stack check: P9 + P11 together vs the stack before them | 4,000 games: 57.61% [54.52, 60.64] (rule: > 50% and within 3pp of 54.60%) | **pass — the gains add up** |
-| 12 | the v4 prior above weight 16 (w24, w32) | selection: w24 51.80%, w32 51.05% against w16; w24 confirming | – |
+| 12 | the v4 prior above weight 16 (w24, w32) | selection w24 51.80%, w32 51.05%; confirmation w24 vs w16 51.24% [49.05, 53.43], gate 2 fails | fail — the weight curve is flat above 16 |
 | 13 | a v5 prior re-fitted on the armies v4-w16 drafts under the live setup | selection vs v4-w16, 2,000 games: 49.05% [44.67, 53.41] (r = 0.931 with v4) | stop — the on-policy re-fit has converged |
 
 Also measured: r4 against the validated but unshipped v1-w12, 10,000 games: 51.63% [49.43, 53.81] —
