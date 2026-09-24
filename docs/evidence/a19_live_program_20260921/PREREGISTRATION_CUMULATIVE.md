@@ -64,3 +64,16 @@ already-spawned cell-1 evaluator survived as an orphan, ran to completion and wr
 2 never started. They were relaunched at 09:09Z with the weight-16 cell first, since it is the decision-relevant one;
 `since_floor4` follows and may not finish before morning. Seeds, candidates, opponents and the decision rule are
 unchanged. No result was read before this relaunch other than cell 1, which was already final.
+
+## RESULT — cell 3 `cumulative_w16_vs_pre` (seed 99880001, 3000 games): the best-known configuration
+v4-**w16**-r4 + conditional-v1 + SEE-NONE against the same pre-program opponent:
+
+    2521W 453L 26D over 3000 games
+    decisive 84.77%  CI [82.02, 87.16]  clustered LCB 82.02  draw-aware 84.47%
+    grid NORMAL 83.04% | LAVA 81.88% | BLOCK 89.42%
+    0 rejected actions on either seat
+
++34.77pp over an even split, lower bound +32.02pp. Against cell 1's shipped stack (83.48%) the two intervals overlap
+heavily, so this pair does NOT by itself establish w16 over w8 — the peer's own 8000-game head-to-head does that
+(54.60%, LCB 52.41). Read cell 3 as: the goal is met on either configuration, and w16 is at least as good.
+`since_floor4` started 11:45:57Z as the last, unbarred attribution cell.
