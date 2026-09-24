@@ -43,3 +43,16 @@ The restart that would have applied it died with a dropped connection before the
 the parallel agent's stages retired, which puts both cumulative cells inside the morning window at full size, so
 the reduction is withdrawn rather than re-applied. `since_floor4` may be cut short; it is attribution only and
 carries no bar. Every cell therefore runs exactly as first preregistered, at 3000 games, on the amended host.
+
+## RESULT — cell 1 `cumulative_now_vs_pre` (seed 99860001, 3000 games): GOAL MET, more than three times over
+The stack this program shipped (v4-w8-r4 draft + conditional-v1 setup + SEE-NONE doctrine) against the configuration
+that was live when it started (v1-w4 draft + frozen v07-nonfight setup + ranked-variety doctrine):
+
+    2471W 489L 40D over 3000 games
+    decisive 83.48%  CI [80.65, 85.97]  clustered LCB 80.65  draw-aware 83.03%
+    grid NORMAL 82.37% (LCB 77.17) | LAVA 78.84% (73.36) | BLOCK 89.19% (84.73)
+    0 rejected actions on either seat
+
+That is **+33.48pp over an even split, with the 95% lower bound at +30.65pp** — the preregistered bar was 60% with a
+lower bound above 60%, i.e. +10pp. Every live map clears it independently. Cell 3 (`cumulative_w16_vs_pre`, the
+peer's confirmed weight-16 prior, not yet the default) follows, and `since_floor4` last.
