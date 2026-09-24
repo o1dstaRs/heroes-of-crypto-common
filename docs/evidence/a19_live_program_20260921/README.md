@@ -32,6 +32,7 @@ counts was wrong in three places; the correction is at the top of LIVE_ANALYSIS.
 | – | stack check: P9 + P11 together vs the stack before them | 4,000 games: 57.61% [54.52, 60.64] (rule: > 50% and within 3pp of 54.60%) | **pass — the gains add up** |
 | 12 | the v4 prior above weight 16 (w24, w32) | selection w24 51.80%, w32 51.05%; confirmation w24 vs w16 51.24% [49.05, 53.43], gate 2 fails | fail — the weight curve is flat above 16 |
 | 13 | a v5 prior re-fitted on the armies v4-w16 drafts under the live setup | selection vs v4-w16, 2,000 games: 49.05% [44.67, 53.41] (r = 0.931 with v4) | stop — the on-policy re-fit has converged |
+| 14 | Empower augments for the caster-heavy armies (59% hold a magic-damage caster) | five paired plan arms: Empower 1 for Might 1 is a wash; paying for Empower with Armor or Sniper costs 6–18pp; cross-fitted +0.28pp | stop — the current plan holds |
 
 Also measured: r4 against the validated but unshipped v1-w12, 10,000 games: 51.63% [49.43, 53.81] —
 indistinguishable, so preferring the floor gives nothing up. The informational r3 vs v1-w12 run (2,000 games) had

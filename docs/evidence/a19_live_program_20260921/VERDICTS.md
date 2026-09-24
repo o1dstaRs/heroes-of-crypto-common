@@ -267,3 +267,15 @@ PASS  6a distinct creatures >= 80% of incumbent: 1.0000
 PASS  6b top creature share <= incumbent + 10pp: 0.0000
 VERDICT: FAIL
 ```
+
+## Empower augment plans on caster-heavy armies (P14, stopped at stage 2)
+
+```
+magic cohort (1196 games): BASE 50.63  E1 51.09  E2 44.48  E3 42.10  E4 41.35
+plain cohort (804 games): BASE 49.07  E1 47.33  E2 38.56  E3 35.07  E4 31.34
+plans: BASE [{"kind":"Sniper","value":3},{"kind":"Armor","value":3},{"kind":"Might","value":1}] | E1 [{"kind":"Sniper","value":3},{"kind":"Armor","value":3},{"kind":"Empower","value":1}] | E2 [{"kind":"Sniper","value":3},{"kind":"Armor","value":2},{"kind":"Empower","value":2}] | E3 [{"kind":"Sniper","value":3},{"kind":"Armor","value":1},{"kind":"Empower","value":3}] | E4 [{"kind":"Sniper","value":2},{"kind":"Armor","value":3},{"kind":"Empower","value":2}]
+rule (full data): magic -> E1, plain -> BASE
+predicted effect, cross-fitted: 0.28pp (fit even -> odd 0.20pp [rule E1/BASE]; fit odd -> even 0.35pp [rule E1/BASE])
+in-sample (optimistic): 0.28pp
+stage-3 decision: STOP: no confirmable gain
+```

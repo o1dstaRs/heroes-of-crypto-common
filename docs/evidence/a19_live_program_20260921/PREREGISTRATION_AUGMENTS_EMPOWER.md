@@ -31,3 +31,13 @@ PASS -> the v0.8 setup spec gains the rule; the previous spec is the rollback. S
 
 Prediction, written down so it can be wrong: swapping Might 1 for Empower 1 is a wash; in the caster cohort one of
 the two-point Empower plans edges BASE by 1–2pp; the cross-fitted prediction lands under +1pp and P14 stops.
+
+## RESULT — stage 1 (5 paired arms × 2000 games, seed 99520001) and stage 2 (p14_augment_table.ts) → STOP
+Draw-aware score of each forced plan against the policy (BASE, a forced copy of the policy's plan, scored exactly
+50.00% overall — the pairing check):
+- magic-caster armies (1,196 games): BASE 50.63, E1 51.09, E2 44.48, E3 42.10, E4 41.35
+- the rest (804 games): BASE 49.07, E1 47.33, E2 38.56, E3 35.07, E4 31.34
+Rule from the data: Empower 1 for Might 1 in caster armies, the current plan otherwise; cross-fitted prediction
++0.28pp → STOP (below +1.0pp). Swapping the seventh point is a wash; every plan that pays for Empower out of Armor or
+Sniper loses 6–18pp. Armor 3 and Sniper 3 stay essential on these armies, and the current plan holds. The prediction
+was right about the wash and the stop and wrong about the two-point Empower plans, which are far worse, not better.
