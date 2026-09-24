@@ -24,3 +24,11 @@ P9 and P11 passed, so the check runs. Because P10 is still confirming, both poss
 same seed (99930001) so that no host idles: (a) v4-w16-r4 + `conditional-v1:sniper+t2a19` on hft, (b) the same plus
 `syn-a19` on the shared node, each against v4-w8-r4 + `conditional-v1`. Which one counts is fixed by P10's verdict
 alone: (b) if P10 passes, (a) if it fails. The other is reported as informational and never used for the decision.
+
+## RESULT — the counting variant (a): P10 failed, so the combination is P9 + P11
+v4-w16-r4 + `conditional-v1:sniper+t2a19` vs v4-w8-r4 + `conditional-v1`, SEE_NONE both, seed 99930001, 4000 games:
+2271W 1671L 58D; decisive 57.61% [54.52, 60.64], draw-aware 57.50%, clustered LCB 54.52, 0 rejections; maps NORMAL
+58.2 / LAVA 57.4 / BLOCK 57.3. Rule: > 0.50 and >= 54.60 − 3 = 51.60 → PASS. The two changes add up nearly fully
+(+7.5pp together against +3.7pp and +4.6pp alone); the shipped stack stands.
+Informational variant (b), the same plus P10's Chaos flip: 56.33% [53.24, 59.37] — 1.3pp below (a), in line with
+P10's failed confirmation.

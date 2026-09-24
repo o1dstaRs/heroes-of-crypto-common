@@ -29,6 +29,7 @@ counts was wrong in three places; the correction is at the top of LIVE_ANALYSIS.
 | 9 | the Tier-2 artifact table re-measured for a19 on v4 armies (rule `t2a19`) | vs the old table, 8,000 games: 53.71% [51.52, 55.89], 8/8 gates; predicted +3.88pp cross-fitted | **shipped, v0.8 only** |
 | 10 | synergy options re-measured for a19 on v4 armies | stage 1: only Chaos passed the flip bar (53.60%); 16,000-game confirmation 48.46% [46.92, 50.01], gates 1, 2, 4, 5 fail | fail — a stage-1 false positive; the table holds |
 | 11 | the v4 prior at weight 16 (`…-v4-w16-r4`) | vs weight 8, 8,000 games: 54.60% [52.41, 56.77], 8/8 gates (selection: w12 51.38%, w16 55.80%) | **shipped, current default** |
+| – | stack check: P9 + P11 together vs the stack before them | 4,000 games: 57.61% [54.52, 60.64] (rule: > 50% and within 3pp of 54.60%) | **pass — the gains add up** |
 
 Also measured: r4 against the validated but unshipped v1-w12, 10,000 games: 51.63% [49.43, 53.81] —
 indistinguishable, so preferring the floor gives nothing up. The informational r3 vs v1-w12 run (2,000 games) had
