@@ -45,6 +45,7 @@ import { projectMagicMirrorDamage } from "../../src/spells/magic_mirror_damage";
 import { SpellElement } from "../../src/spells/spell_properties";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import type { Unit } from "../../src/units/unit";
+import { isSpellUsableByCaster } from "../../src/spells/spell_helper";
 import {
     createCombatTestContext,
     createTestUnit,
@@ -821,6 +822,25 @@ describe("S4: an augment can only be bought at a level it has", () => {
         expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Placement", value: 3 })).toBe(false);
         expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Might", value: 1.5 })).toBe(false);
         expect(fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, { type: "Movement", value: 3 })).toBe(false);
+    });
+});
+
+describe("G4: a Broken unit can't cast — in the gate the AI shares with the engine too", () => {
+    it("isSpellUsableByCaster refuses a Broken caster's spell, so the AI stops proposing casts the engine refuses", () => {
+        // A ranked_draft_eval game (P23, game 1147): a Broken v0.8 Battle Mage proposed Fire Strike and the engine
+        // refused it as spell_not_available, because the Break rule lived only in the engine's own copy of the gate.
+        const mage = createTestUnit({
+            name: "Battle Mage",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.MAGIC,
+            spells: ["Life:Fire Strike"],
+        });
+        const spell = mage.getSpells()[0]!;
+        expect(isSpellUsableByCaster(mage, spell)).toBe(true);
+
+        mage.applyEffect(breakEffect());
+
+        expect(isSpellUsableByCaster(mage, spell)).toBe(false);
     });
 });
 

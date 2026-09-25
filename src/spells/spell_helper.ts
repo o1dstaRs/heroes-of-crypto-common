@@ -665,9 +665,14 @@ export function firstSummonableAnchor(
  */
 export const spellToTextureName = (spellName: string): string => `${spellName.toLowerCase().replace(/ /g, "_")}_256`;
 
-/** Shared charge/stack gate used by the engine and AI before target-specific spell legality. */
+/**
+ * Shared caster gate used by the engine and AI before target-specific spell legality: a Broken unit can't cast
+ * (G4), and the spell needs laps, charges and enough stack power. The engine's cast validation calls this, so the
+ * AI never proposes a cast the engine refuses.
+ */
 export function isSpellUsableByCaster(casterUnit: Unit, spell: Spell): boolean {
     return (
+        !casterUnit.hasEffectActive("Break") &&
         spell.getLapsTotal() > 0 &&
         spell.isRemaining() &&
         spell.getMinimalCasterStackPower() <= casterUnit.getStackPower()

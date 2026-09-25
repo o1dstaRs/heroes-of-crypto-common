@@ -2480,13 +2480,9 @@ export class GameActionEngine {
         return spell.isSummon() && spell.getSpellTargetType() === SpellTargetType.RANDOM_CLOSE_TO_CASTER;
     }
     private canUseSpell(caster: Unit, spell: Spell): boolean {
-        return (
-            // A Broken unit can't cast — the engine's rule, not only the hidden spellbook.
-            !caster.hasEffectActive("Break") &&
-            spell.getLapsTotal() > 0 &&
-            spell.isRemaining() &&
-            spell.getMinimalCasterStackPower() <= caster.getStackPower()
-        );
+        // One gate for the engine and the AI (a Broken unit can't cast, plus charges and stack power): the AI kept
+        // proposing Broken casts the engine refused while the Break rule lived only in a copy here.
+        return SpellHelper.isSpellUsableByCaster(caster, spell);
     }
     private massCastSpell(
         action: Extract<GameAction, { type: "cast_spell" }>,

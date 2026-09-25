@@ -1352,15 +1352,14 @@ describe("candidates — the F4 enumerated candidate generator", () => {
         // And the MELEE_MAGIC Angel still gets melee/move candidates alongside the cast.
         expect(ofKind(candidates, "move").length).toBeGreaterThan(0);
 
-        // Break suppresses hasAbilityActive(), but the cast remains engine-legal and still burns the stored
-        // passive. The opportunity-cost feature must therefore remain set while Angel is Broken.
+        // Break suppresses hasAbilityActive() and, since G4, every cast: the engine refuses a Broken caster's
+        // spells, so the generator must not offer a Resurrection the engine would turn down.
         angel.applyEffect(new EffectFactory().makeEffect("Break"));
         expect(angel.hasAbilityActive("Resurrection")).toBe(false);
         const brokenRes = ofKind(enumerateCandidates(angel, ctxFor(c), endTurn(angel)).candidates, "spell").filter(
             (candidate) => candidate.spellName === "Resurrection",
         );
-        expect(brokenRes).toHaveLength(1);
-        expect(brokenRes[0].features.burnsResurrectionCharge).toBe(1);
+        expect(brokenRes).toHaveLength(0);
     });
 
     it("Valkyrie: Wind Flow (ALL_FLYING mass) is emitted when a flyer is on the board", () => {
