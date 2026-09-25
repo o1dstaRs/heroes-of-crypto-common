@@ -114,6 +114,32 @@ export interface IGameActionResult {
     message?: string;
 }
 
+/**
+ * The time a request_additional_time from `team` adds to the running turn right now; 0 means it is refused.
+ *
+ * Valid only while one of that team's units is active (a team must not pad the opponent's clock) and once
+ * per lap, from what is left of the lap's budget for the stacks still to act. The engine grants exactly this
+ * amount. With `justCheck` (the default) nothing changes, so a server can put the answer on its snapshot:
+ * a ranked client's own FightProperties never learn that its team already asked this lap, and offering the
+ * button from them brought it back on the next unit, where the request was refused.
+ */
+export const additionalTurnTimeFor = (
+    context: Pick<ITurnEngineContext, "fightProperties" | "unitsHolder" | "getCurrentActiveUnitId">,
+    team: TeamType,
+    justCheck = true,
+): number => {
+    const activeUnitId = context.getCurrentActiveUnitId?.();
+    const activeUnit = activeUnitId ? context.unitsHolder.getAllUnits().get(activeUnitId) : undefined;
+    if (!activeUnit || activeUnit.getTeam() !== team) {
+        return 0;
+    }
+    const stacksToAct = context.unitsHolder
+        .getAllAllies(team)
+        .filter((ally) => !ally.isDead() && !context.fightProperties.hasAlreadyMadeTurn(ally.getId())).length;
+
+    return context.fightProperties.requestAdditionalTurnTime(team, justCheck, stacksToAct);
+};
+
 export interface IGameActionEngineContext extends ITurnEngineContext {
     attackHandler?: AttackHandler;
     getCurrentActiveKnownPaths?: () => Map<number, IWeightedRoute[]> | undefined;
@@ -426,22 +452,12 @@ export class GameActionEngine {
         };
     }
     /**
-     * Extend the acting team's running turn clock (once per lap per team). Only valid while a unit of
-     * that team is the active unit — otherwise a team could pad the opponent's clock. Rejects if the
-     * team already used its request this lap or there's no remaining budget (both surface as
-     * requestAdditionalTurnTime() returning 0). Produces no game events — the extension lives entirely
-     * in fightProperties.currentTurnEnd, which the snapshot re-broadcasts.
+     * Extend the acting team's running turn clock by what additionalTurnTimeFor grants (once per lap per
+     * team, only on that team's own turn). Produces no game events — the extension lives entirely in
+     * fightProperties.currentTurnEnd, which the snapshot re-broadcasts.
      */
     private requestAdditionalTime(team: TeamType): IGameActionResult {
-        const activeUnitId = this.context.getCurrentActiveUnitId?.();
-        const activeUnit = activeUnitId ? this.context.unitsHolder.getAllUnits().get(activeUnitId) : undefined;
-        if (!activeUnit || activeUnit.getTeam() !== team) {
-            return this.reject("additional_time_not_available");
-        }
-        const stacksToAct = this.context.unitsHolder
-            .getAllAllies(team)
-            .filter((ally) => !ally.isDead() && !this.context.fightProperties.hasAlreadyMadeTurn(ally.getId())).length;
-        const additionalTime = this.context.fightProperties.requestAdditionalTurnTime(team, false, stacksToAct);
+        const additionalTime = additionalTurnTimeFor(this.context, team, false);
         if (additionalTime <= 0) {
             return this.reject("additional_time_not_available");
         }

@@ -19,7 +19,7 @@ import {
     MORALE_CHANGE_FOR_SHIELD,
 } from "../../src/constants";
 import { getSpellConfig } from "../../src/configuration/config_provider";
-import { GameActionEngine, type IGameActionEngineContext } from "../../src/engine/action_engine";
+import { additionalTurnTimeFor, GameActionEngine, type IGameActionEngineContext } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import type { GameEvent } from "../../src/engine/events";
 import { createSequenceGameRuntime } from "../../src/engine/runtime";
@@ -338,6 +338,28 @@ describe("GameActionEngine", () => {
             rejectionReason: "additional_time_not_available",
         });
         expect(setup.fightProperties.getCurrentTurnEnd()).toBe(extended);
+    });
+
+    it("reports, without spending it, exactly the additional time the engine then grants", () => {
+        const setup = setupActionFight(); // active unit belongs to LEFT
+        const query = {
+            fightProperties: setup.fightProperties,
+            unitsHolder: setup.unitsHolder,
+            getCurrentActiveUnitId: () => setup.activeUnit.getId(),
+        };
+        const before = setup.fightProperties.getCurrentTurnEnd();
+
+        expect(additionalTurnTimeFor(query, PBTypes.TeamVals.RIGHT)).toBe(0);
+        const offered = additionalTurnTimeFor(query, PBTypes.TeamVals.LEFT);
+        expect(offered).toBeGreaterThan(0);
+        expect(additionalTurnTimeFor(query, PBTypes.TeamVals.LEFT)).toBe(offered);
+        expect(setup.fightProperties.getCurrentTurnEnd()).toBe(before);
+
+        expect(setup.engine.apply({ type: "request_additional_time", team: PBTypes.TeamVals.LEFT }).completed).toBe(
+            true,
+        );
+        expect(setup.fightProperties.getCurrentTurnEnd() - before).toBe(offered);
+        expect(additionalTurnTimeFor(query, PBTypes.TeamVals.LEFT)).toBe(0);
     });
 
     it("holds a Misfortune'd defender at the luck floor instead of granting the shield's bonus", () => {
