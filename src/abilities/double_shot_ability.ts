@@ -23,7 +23,7 @@ import type { IVisibleDamage } from "../scene/animations";
 import { FightStateManager } from "../fights/fight_state_manager";
 
 import { getDoubleShotAbility, withDualStrikeCharm } from "./ability_helper";
-import { processRangeAOEAbility } from "./aoe_range_ability";
+import { type IAOERangeAttackResult, processRangeAOEAbility } from "./aoe_range_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 
@@ -39,6 +39,8 @@ export interface IDoubleShotResult {
     animationData: IAnimationData[];
     moraleIncrease: number;
     moraleDecreaseForTheUnitTeam: Record<string, number>;
+    /** What an area second volley did to each unit it caught (empty for a single-target second shot). */
+    perUnitDamage: IAOERangeAttackResult["perUnitDamage"];
 }
 
 export function processDoubleShotAbility(
@@ -88,6 +90,7 @@ export function processDoubleShotAbility(
             animationData,
             moraleIncrease,
             moraleDecreaseForTheUnitTeam,
+            perUnitDamage: [],
         };
     }
 
@@ -120,6 +123,7 @@ export function processDoubleShotAbility(
             animationData,
             moraleIncrease,
             moraleDecreaseForTheUnitTeam,
+            perUnitDamage: [],
         };
     }
     // Dual Strike Charm amplifies the area second volley (Gargantuan's Double Throw, a Crafted Double Shot on
@@ -253,5 +257,6 @@ export function processDoubleShotAbility(
         animationData,
         moraleIncrease,
         moraleDecreaseForTheUnitTeam,
+        perUnitDamage: aoeRangeAttackResult.landed ? aoeRangeAttackResult.perUnitDamage : [],
     };
 }

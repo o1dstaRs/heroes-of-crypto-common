@@ -995,6 +995,49 @@ describe("G20: an area shot aimed at a unit burns every unit it hits and rolls e
         expect(neighbourLoss).toBe(targetLoss);
     });
 
+    it("a second area volley burns everything it caught again, as the first does", () => {
+        const lossesFrom = (abilities: string[]) => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const thrower = shooter("Thrower", abilities);
+            const target = createTestUnit({
+                name: "Target",
+                team: PBTypes.TeamVals.LEFT,
+                maxHp: 10_000,
+                amountAlive: 1,
+            });
+            const neighbour = createTestUnit({
+                name: "Neighbour",
+                team: PBTypes.TeamVals.LEFT,
+                maxHp: 10_000,
+                amountAlive: 1,
+            });
+            placeUnit(grid, unitsHolder, thrower, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 8, y: 4 });
+            placeUnit(grid, unitsHolder, neighbour, { x: 8, y: 5 });
+            thrower.applyBuff(new Spell({ spellProperties: getSpellConfig("Chaos", "Fireforged Sword"), amount: 1 }));
+            thrower.calculateMissChance = () => 0;
+            thrower.calculateAttackDamage = () => 100;
+
+            attackHandler.handleRangeAttack(
+                unitsHolder,
+                [1],
+                1,
+                createVisibleDamage(target),
+                thrower,
+                [[target, neighbour]],
+                undefined,
+                target.getPosition(),
+            );
+            return [target, neighbour].map((unit) => unit.getCumulativeMaxHp() - unit.getCumulativeHp());
+        };
+
+        const oneVolley = lossesFrom(["Area Throw"]);
+        const twoVolleys = lossesFrom(["Area Throw", "Double Throw"]);
+
+        expect(oneVolley[0]).toBeGreaterThan(100);
+        expect(twoVolleys).toEqual(oneVolley.map((loss) => loss * 2));
+    });
+
     it("the aimed unit rolls Rime Charm once, as a plain shot's target does", () => {
         const rimeRollDraws = (abilities: string[]): number => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();

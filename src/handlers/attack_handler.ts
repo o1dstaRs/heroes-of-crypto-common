@@ -1936,6 +1936,7 @@ export class AttackHandler {
                   waterShieldAbsorbed: false,
                   petrifyingGazeDamage: 0,
                   moraleIncrease: 0,
+                  perUnitDamage: [],
               }
             : AllAbilities.processDoubleShotAbility(
                   attackerUnit,
@@ -1973,6 +1974,30 @@ export class AttackHandler {
 
         for (const uId of secondShotResult.unitIdsDied) {
             unitIdsDied.push(uId);
+        }
+
+        // An area second volley (Double Throw, a Crafted Double Shot on an area shooter) is a second attack on
+        // everything it caught, so the blade burns each of those units again on this volley's own damage — as
+        // it does the first volley's splash and a single-target second shot. Nothing burned on it before.
+        if (secondShotResult.aoeRangeAttackLanded) {
+            const secondVolleySwordResult = AllAbilities.processFireforgedSwordOnVictims(
+                attackerUnit,
+                secondShotResult.perUnitDamage.filter((entry) => !entry.missed),
+                unitsHolder,
+                this.sceneLog,
+                this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
+            );
+            attackerUnitPlusMorale += secondVolleySwordResult.increaseMorale;
+            for (const uId of secondVolleySwordResult.unitIdsDied) {
+                if (!unitIdsDied.includes(uId)) {
+                    unitIdsDied.push(uId);
+                }
+            }
+            this.updateMoraleDecreaseForTheUnitTeam(
+                moraleDecreaseForTheUnitTeam,
+                secondVolleySwordResult.moraleDecreaseForTheUnitTeam,
+            );
         }
 
         if (!secondShotResult.aoeRangeAttackLanded) {
