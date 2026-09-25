@@ -99,6 +99,14 @@ export type GameActionRejectionReason =
     | "augment_not_available"
     | "unsupported_action";
 
+/**
+ * Only melee may follow a move in the same turn. A unit that has moved cannot shoot, throw, fire at an obstacle from
+ * range, cast or wait on the hourglass (which would hand it a fresh turn later in the lap): the player's board ends
+ * the turn when a plain move lands, and the engine holds every other caller (the AI, the server, a tampered client)
+ * to the same rule.
+ */
+export const MOVED_THIS_TURN_MELEE_ONLY_MESSAGE = "a unit that moved this turn can only strike in melee";
+
 export interface IGameActionResult {
     completed: boolean;
     events: GameEvent[];
@@ -357,6 +365,9 @@ export class GameActionEngine {
         const unit = this.validateTurnAction(unitId);
         if (unit instanceof Error) {
             return this.reject(unit.message as GameActionRejectionReason);
+        }
+        if (unit.hasMovedThisTurn()) {
+            return this.reject("hourglass_not_available", MOVED_THIS_TURN_MELEE_ONLY_MESSAGE);
         }
         if (!this.canWaitOnHourglass(unit)) {
             return this.reject("hourglass_not_available");
@@ -732,6 +743,9 @@ export class GameActionEngine {
         if (attacker instanceof Error) {
             return this.reject(attacker.message as GameActionRejectionReason);
         }
+        if (attacker.hasMovedThisTurn()) {
+            return this.reject("attack_not_available", MOVED_THIS_TURN_MELEE_ONLY_MESSAGE);
+        }
         // Through Shot may be aimed at a free world point instead of a declared stack: the shot pierces,
         // so its victims are whatever the ray actually crosses rather than one nominated target. Every
         // other ranged attack still has to name one — honouring a bare position from them would let a
@@ -981,6 +995,11 @@ export class GameActionEngine {
         if (!canLandRangeHit && !action.attackFrom) {
             return this.reject("attack_not_available");
         }
+        // handleObstacleAttack fires from range whenever it can land a ranged hit, so that is the case a move rules
+        // out; a melee strike on the obstacle after walking up to it stays legal.
+        if (canLandRangeHit && attacker.hasMovedThisTurn()) {
+            return this.reject("attack_not_available", MOVED_THIS_TURN_MELEE_ONLY_MESSAGE);
+        }
         // A splash shooter aimed at a cemetery barrel lands its shot ON that barrel: a Gargantuan's Area Throw and a
         // Cyclops' Large Caliber both ignore structures on the way, and their 3x3 breaks every barrel and hits every
         // unit there, exactly like a throw anywhere else. The stone-by-stone projectile rule below is for shooters
@@ -1176,6 +1195,9 @@ export class GameActionEngine {
         if (attacker instanceof Error) {
             return this.reject(attacker.message as GameActionRejectionReason);
         }
+        if (attacker.hasMovedThisTurn()) {
+            return this.reject("attack_not_available", MOVED_THIS_TURN_MELEE_ONLY_MESSAGE);
+        }
         if (!this.context.attackHandler) {
             return this.reject("attack_handler_missing");
         }
@@ -1284,6 +1306,9 @@ export class GameActionEngine {
         const caster = this.validateTurnAction(action.casterId);
         if (caster instanceof Error) {
             return this.reject(caster.message as GameActionRejectionReason);
+        }
+        if (caster.hasMovedThisTurn()) {
+            return this.reject("spell_not_available", MOVED_THIS_TURN_MELEE_ONLY_MESSAGE);
         }
         if (!this.context.attackHandler) {
             return this.reject("attack_handler_missing");

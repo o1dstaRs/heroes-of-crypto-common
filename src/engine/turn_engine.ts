@@ -504,6 +504,9 @@ export class TurnEngine {
     }
     private activateNextUnit(unit: Unit): GameEvent[] {
         const events: GameEvent[] = [];
+        // completeTurn clears the flag when a turn ends; clearing it again as a turn starts means no path that ends a
+        // turn without it (a stack killed mid-move and raised later) can leave a unit barred from shooting or casting.
+        unit.setMovedThisTurn(false);
         if (unit.isOnHourglass()) {
             unit.setOnHourglass(false);
         }

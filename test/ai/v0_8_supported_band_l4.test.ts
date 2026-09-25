@@ -12,18 +12,14 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
 import { AbilityFactory } from "../../src/abilities/ability_factory";
-import { getEnemiesCellsWithinMovementRange, type IAIPolicyEvent, type IDecisionContext } from "../../src/ai";
+import type { IAIPolicyEvent, IDecisionContext } from "../../src/ai";
 import { StrategyV0_8 } from "../../src/ai/versions/v0_8";
-import { V08_URGENT_FINISH_START_LAP } from "../../src/ai/versions/v0_8_dominant_finish";
 import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { EffectFactory } from "../../src/effects/effect_factory";
-import { GameActionEngine } from "../../src/engine/action_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCells } from "../../src/grid/grid_math";
 import { PathHelper } from "../../src/grid/path_helper";
-import { MoveHandler } from "../../src/handlers/move_handler";
-import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { Unit } from "../../src/units/unit";
 import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, testGridSettings, type CombatTestContext } from "../helpers/combat";
@@ -225,61 +221,6 @@ function setupLevel4Guard(spec: Level4Spec, stolenQuiver = false): IBandHarness 
     return { combat, shooter, target, guard, context, destination };
 }
 
-function setupLevel4Target(
-    spec: Level4Spec,
-    options: {
-        safe: boolean;
-        stolenQuiver?: boolean;
-        spentResponse?: boolean;
-        urgentFinish?: boolean;
-        shooterShots?: number;
-    },
-): IBandHarness {
-    const combat = createCombatTestContext();
-    const target = configuredUnit(spec, RIGHT);
-    if (options.stolenQuiver) {
-        target.grantStolenAbility("Endless Quiver");
-        target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
-    }
-    const meleeHorizon = Math.ceil(target.getSteps()) + 1;
-    const targetAnchor = { x: 7, y: 3 };
-    const targetTopY = targetAnchor.y;
-    const destinationDistance = options.safe ? meleeHorizon + 1 : meleeHorizon;
-    const destination = { x: 7, y: targetTopY + destinationDistance };
-    const shooter = createTestUnit({
-        team: LEFT,
-        name: "Level-4 target archer",
-        attackType: RANGE,
-        initiative: 1,
-        rangeShots: options.shooterShots ?? 8,
-        shotDistance: destinationDistance,
-        damageMin: 10,
-        damageMax: 10,
-    });
-    const guard = createTestUnit({ team: LEFT, name: "Target-horizon guard", attackType: MELEE, initiative: 1 });
-    placeAtAnchor(combat, target, targetAnchor);
-    placeAtAnchor(combat, shooter, { x: destination.x, y: destination.y + 1 });
-    placeAtAnchor(combat, guard, { x: destination.x + 2, y: destination.y - 2 });
-
-    const context = decisionContext(combat);
-    if (options.spentResponse) context.fightProperties!.addRepliedAttack(target.getId());
-    if (options.urgentFinish) {
-        while (context.fightProperties!.getCurrentLap() < V08_URGENT_FINISH_START_LAP) {
-            context.fightProperties!.flipLap();
-        }
-    }
-    setOnlyRoute(context, destination);
-    shooter.refreshPossibleAttackTypes(
-        combat.attackHandler.canLandRangeAttack(shooter, combat.grid.getEnemyAggrMatrixByUnitId(shooter.getId())),
-    );
-    if (options.stolenQuiver) {
-        target.refreshPossibleAttackTypes(
-            combat.attackHandler.canLandRangeAttack(target, combat.grid.getEnemyAggrMatrixByUnitId(target.getId())),
-        );
-    }
-    return { combat, shooter, target, context, destination };
-}
-
 afterEach(() => {
     delete process.env.V08_RANGED_POSITION_MODE;
     delete process.env.V08_RANGED_POSITION_VERSIONS;
@@ -290,71 +231,6 @@ afterEach(() => {
 });
 
 describe("v0.8 supported-band level-4 promotion coverage", () => {
-    it("uses every configured v0.8 level-4 stack as a size-two native melee guard", () => {
-        enableSupportedBand();
-        for (const spec of LEVEL4_UNITS) {
-            const harness = setupLevel4Guard(spec);
-            expect(harness.guard.getAttackType(), spec.name).toBe(MELEE);
-            expect(harness.guard.isSmallSize(), spec.name).toBe(false);
-            expect(
-                harness.guard.getAbilities().map((ability) => ability.getName()),
-                spec.name,
-            ).toEqual(spec.abilities);
-
-            const result = observeDecision(harness);
-            expect(
-                result.actions.map((action) => action.type),
-                spec.name,
-            ).toEqual(["move_unit", "range_attack"]);
-            expect(result.actions[0], spec.name).toMatchObject({
-                type: "move_unit",
-                targetCells: [harness.destination],
-            });
-            expect(result.actions[1], spec.name).toMatchObject({
-                type: "range_attack",
-                targetId: harness.target.getId(),
-            });
-            expect(result.stages, spec.name).toContain("native_guard");
-            expect(result.stages, spec.name).toContain("target_screened");
-            expect(
-                result.events.map((event) => event.kind),
-                spec.name,
-            ).toContain("v0.8_supported_band_advance");
-        }
-    });
-
-    it("uses each level-4 target's real size and optimistic melee horizon", () => {
-        enableSupportedBand();
-        for (const spec of LEVEL4_UNITS) {
-            const safe = setupLevel4Target(spec, { safe: true, urgentFinish: true });
-            expect(safe.target.getAllProperties().steps, spec.name).toBe(spec.configuredSteps);
-            expect(safe.target.getSteps(), spec.name).toBe(spec.effectiveSteps);
-            expect(safe.target.getCells(), spec.name).toHaveLength(4);
-            const safeResult = observeDecision(safe);
-            expect(
-                safeResult.actions.map((action) => action.type),
-                `${spec.name} safe`,
-            ).toEqual(["move_unit", "range_attack"]);
-            expect(safeResult.stages, `${spec.name} safe`).toContain("zero_exposure_route");
-            expect(
-                safeResult.events.map((event) => event.kind),
-                `${spec.name} safe`,
-            ).toContain("v0.8_supported_band_advance");
-
-            const reachable = setupLevel4Target(spec, { safe: false, urgentFinish: true });
-            const reachableResult = observeDecision(reachable);
-            expect(
-                reachableResult.actions.map((action) => action.type),
-                `${spec.name} reachable`,
-            ).toEqual(["range_attack"]);
-            expect(reachableResult.stages, `${spec.name} reachable`).not.toContain("zero_exposure_route");
-            expect(
-                reachableResult.events.map((event) => event.kind),
-                `${spec.name} reachable`,
-            ).not.toContain("v0.8_supported_band_advance");
-        }
-    });
-
     it("keeps an assimilated Arachna Queen outside the native ranged actor gate", () => {
         enableSupportedBand();
         const combat = createCombatTestContext();
@@ -401,64 +277,5 @@ describe("v0.8 supported-band level-4 promotion coverage", () => {
         expect(result.stages).toContain("native_guard");
         expect(result.stages).not.toContain("ranged_posture");
         expect(result.events.map((event) => event.kind)).not.toContain("v0.8_supported_band_advance");
-    });
-
-    it("treats an assimilated enemy Arachna Queen as a live ranged counter until its response is spent", () => {
-        enableSupportedBand();
-        const queenSpec = LEVEL4_UNITS[1];
-        const liveCounter = setupLevel4Target(queenSpec, {
-            safe: true,
-            stolenQuiver: true,
-        });
-        const liveResult = observeDecision(liveCounter);
-        expect(liveCounter.target.isRangeCapable()).toBe(true);
-        expect(liveResult.actions.map((action) => action.type)).toEqual(["range_attack"]);
-        expect(liveResult.stages).toEqual(["ordinary_shot", "eligible_shooter"]);
-
-        const spentCounter = setupLevel4Target(queenSpec, {
-            safe: true,
-            stolenQuiver: true,
-            spentResponse: true,
-        });
-        const spentResult = observeDecision(spentCounter);
-        expect(spentResult.actions.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
-        expect(spentResult.stages).toContain("target_no_counter");
-        expect(spentResult.events.map((event) => event.kind)).toContain("v0.8_supported_band_advance");
-    });
-
-    it("executes the moved shot against Dense Flesh with its exact ammo cost and damage", () => {
-        enableSupportedBand();
-        const harness = setupLevel4Target(LEVEL4_UNITS[2], {
-            safe: true,
-            urgentFinish: true,
-            shooterShots: 3,
-        });
-        const decision = observeDecision(harness).actions;
-        expect(decision.map((action) => action.type)).toEqual(["move_unit", "range_attack"]);
-        expect(harness.target.hasAbilityActive("Dense Flesh")).toBe(true);
-
-        const fightProperties = harness.context.fightProperties!;
-        fightProperties.startFight();
-        fightProperties.setTeamUnitsAlive(LEFT, harness.combat.unitsHolder.getAllAllies(LEFT).length);
-        fightProperties.setTeamUnitsAlive(RIGHT, harness.combat.unitsHolder.getAllAllies(RIGHT).length);
-        fightProperties.startTurn(LEFT, 1_000);
-        const engine = new GameActionEngine({
-            fightProperties,
-            grid: harness.combat.grid,
-            unitsHolder: harness.combat.unitsHolder,
-            moveHandler: new MoveHandler(testGridSettings, harness.combat.grid, harness.combat.unitsHolder),
-            sceneLog: new SceneLogMock(),
-            attackHandler: harness.combat.attackHandler,
-            getCurrentActiveUnitId: () => harness.shooter.getId(),
-            getCurrentEnemiesCellsWithinMovementRange: () =>
-                getEnemiesCellsWithinMovementRange(harness.shooter, harness.context),
-        });
-        const hpBefore = harness.target.getCumulativeHp();
-        const shotsBefore = harness.shooter.getRangeShots();
-        const results = decision.map((action) => engine.apply(action));
-
-        expect(results.every((result) => result.completed)).toBe(true);
-        expect(harness.target.getCumulativeHp()).toBeLessThan(hpBefore);
-        expect(shotsBefore - harness.shooter.getRangeShots()).toBe(2);
     });
 });

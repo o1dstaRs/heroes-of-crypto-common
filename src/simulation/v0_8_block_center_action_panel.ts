@@ -50,7 +50,6 @@ import {
     getCellsAroundCell,
     getCellsAroundFootprint,
     getPositionForCell,
-    getPositionForCells,
     getRangeAttackSideCenter,
     isCellWithinGrid,
     isRangeAttackSideObservable,
@@ -816,13 +815,6 @@ function findIndependentMeleeOption(
     return undefined;
 }
 
-interface IIndependentRangeOrigin {
-    position: XY;
-    route?: IReadonlyWeightedRoute;
-    cumulativeHp: number;
-    amountAlive: number;
-}
-
 type V08BlockCenterDirectOptionAcceptance = (option: IV08BlockCenterDirectOption) => boolean;
 const acceptEveryDirectOption: V08BlockCenterDirectOptionAcceptance = () => true;
 
@@ -830,7 +822,6 @@ function findIndependentRangeOption(
     unit: Unit,
     context: IDecisionContext,
     intents: IV08BlockCenterRoleIntents,
-    routes: readonly IReadonlyWeightedRoute[],
     accept: V08BlockCenterDirectOptionAcceptance,
 ): IV08BlockCenterDirectOption | undefined {
     const attackHandler = context.attackHandler;
@@ -845,33 +836,15 @@ function findIndependentRangeOption(
     ) {
         return undefined;
     }
-    const enemyAggression = context.grid.getEnemyAggrMatrixByUnitId(unit.getId());
-    const origins: IIndependentRangeOrigin[] = [];
-    if (attackHandler.canLandRangeAttack(unit, enemyAggression)) {
-        origins.push({
-            position: unit.getPosition(),
-            cumulativeHp: unit.getCumulativeHp(),
-            amountAlive: unit.getAmountAlive(),
-        });
+    // Only melee may follow a move in the same turn, so a shot is proven from where the unit stands.
+    if (!attackHandler.canLandRangeAttack(unit, context.grid.getEnemyAggrMatrixByUnitId(unit.getId()))) {
+        return undefined;
     }
-    const base = unit.getBaseCell();
-    for (const route of routes) {
-        if ((route.cell.x === base.x && route.cell.y === base.y) || route.hasLavaCell || route.hasWaterCell) {
-            continue;
-        }
-        const projected = actorAfterRoute(unit, context, route);
-        if (!projected) continue;
-        const position = getPositionForCells(context.grid.getSettings(), footprintForBase(unit, route.cell));
-        if (position && !attackHandler.canBeAttackedByMelee(position, unit, enemyAggression)) {
-            origins.push({
-                position,
-                route,
-                cumulativeHp: projectedCumulativeHp(projected),
-                amountAlive: projected.stack.amountAlive,
-            });
-        }
-    }
-    if (!origins.length) return undefined;
+    const origin = {
+        position: unit.getPosition(),
+        cumulativeHp: unit.getCumulativeHp(),
+        amountAlive: unit.getAmountAlive(),
+    };
     const enemies = legalEnemyTargets(unit, context);
     const forcedTargetId = liveForcedTargetId(unit, context);
     const isThrough = unit.hasAbilityActive("Through Shot");
@@ -881,74 +854,73 @@ function findIndependentRangeOption(
         unit.getAttackTypeSelection() === RANGE
             ? []
             : [{ type: "select_attack_type", unitId: unit.getId(), attackType: RANGE }];
-    for (const origin of origins) {
-        for (const aimedEnemy of enemies) {
-            for (const aimCell of aimedEnemy.getCells()) {
-                for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
-                    if (!isRangeAttackSideObservable(context.matrix, aimCell, aimSide, unit.getTeam(), isThrough)) {
-                        continue;
-                    }
-                    const targetPosition = getRangeAttackSideCenter(
-                        context.grid.getSettings(),
-                        aimCell,
-                        aimSide,
-                        origin.position,
-                    );
-                    const evaluation = attackHandler.evaluateRangeAttack(
-                        context.unitsHolder.getAllUnits(),
-                        unit,
-                        origin.position,
-                        targetPosition,
-                        isThrough,
-                        false,
-                        isArea,
-                    );
-                    const primary = evaluation.affectedUnits[0]?.[0];
-                    if (
-                        !primary ||
-                        primary.isDead() ||
-                        primary.getTeam() === unit.getTeam() ||
-                        isHidden(primary) ||
-                        unit.cannotAttackUnitId(primary.getId()) ||
-                        (forcedTargetId && forcedTargetId !== primary.getId()) ||
-                        (!isThrough &&
-                            unit.hasDebuffActive("Cowardice") &&
-                            origin.cumulativeHp < primary.getCumulativeHp()) ||
-                        evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length
-                    ) {
-                        continue;
-                    }
-                    const divisor = evaluation.rangeAttackDivisors[0] ?? 1;
-                    if (!physicalDamageCanLand(unit, primary, true, context, divisor)) continue;
-                    const damage = evaluateRangeCandidateDamage(
-                        unit,
-                        context,
-                        evaluation,
-                        primary.getId(),
-                        shots,
-                        isArea,
-                        aimedEnemy.getId(),
-                        origin.amountAlive,
-                    );
-                    if (!(damage.value > 0)) continue;
-                    const actions: GameAction[] = [];
-                    if (origin.route) actions.push(routeMoveAction(unit, origin.route));
-                    actions.push(...prefix, {
+    for (const aimedEnemy of enemies) {
+        for (const aimCell of aimedEnemy.getCells()) {
+            for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
+                if (!isRangeAttackSideObservable(context.matrix, aimCell, aimSide, unit.getTeam(), isThrough)) {
+                    continue;
+                }
+                const targetPosition = getRangeAttackSideCenter(
+                    context.grid.getSettings(),
+                    aimCell,
+                    aimSide,
+                    origin.position,
+                );
+                const evaluation = attackHandler.evaluateRangeAttack(
+                    context.unitsHolder.getAllUnits(),
+                    unit,
+                    origin.position,
+                    targetPosition,
+                    isThrough,
+                    false,
+                    isArea,
+                );
+                const primary = evaluation.affectedUnits[0]?.[0];
+                if (
+                    !primary ||
+                    primary.isDead() ||
+                    primary.getTeam() === unit.getTeam() ||
+                    isHidden(primary) ||
+                    unit.cannotAttackUnitId(primary.getId()) ||
+                    (forcedTargetId && forcedTargetId !== primary.getId()) ||
+                    (!isThrough &&
+                        unit.hasDebuffActive("Cowardice") &&
+                        origin.cumulativeHp < primary.getCumulativeHp()) ||
+                    evaluation.affectedUnits.length !== evaluation.rangeAttackDivisors.length
+                ) {
+                    continue;
+                }
+                const divisor = evaluation.rangeAttackDivisors[0] ?? 1;
+                if (!physicalDamageCanLand(unit, primary, true, context, divisor)) continue;
+                const damage = evaluateRangeCandidateDamage(
+                    unit,
+                    context,
+                    evaluation,
+                    primary.getId(),
+                    shots,
+                    isArea,
+                    aimedEnemy.getId(),
+                    origin.amountAlive,
+                );
+                if (!(damage.value > 0)) continue;
+                const actions: GameAction[] = [
+                    ...prefix,
+                    {
                         type: "range_attack",
                         attackerId: unit.getId(),
                         targetId: aimedEnemy.getId(),
                         aimCell: { ...aimCell },
                         aimSide,
-                    });
-                    if (!preservesRole(intents, unit, context, actions)) continue;
-                    const option: IV08BlockCenterDirectOption = {
-                        kind: "shot",
-                        actions,
-                        targetId: primary.getId(),
-                        aimCell: { ...aimCell },
-                    };
-                    if (accept(option)) return option;
-                }
+                    },
+                ];
+                if (!preservesRole(intents, unit, context, actions)) continue;
+                const option: IV08BlockCenterDirectOption = {
+                    kind: "shot",
+                    actions,
+                    targetId: primary.getId(),
+                    aimCell: { ...aimCell },
+                };
+                if (accept(option)) return option;
             }
         }
     }
@@ -1242,7 +1214,7 @@ export function findIndependentV08BlockCenterDirectOption(
     const routes = routesForUnit(unit, context);
     return (
         findIndependentMeleeOption(unit, context, intents, routes, accept) ??
-        findIndependentRangeOption(unit, context, intents, routes, accept) ??
+        findIndependentRangeOption(unit, context, intents, accept) ??
         findIndependentAreaThrowOption(unit, context, intents, accept) ??
         findIndependentSpellOption(unit, context, intents, accept)
     );

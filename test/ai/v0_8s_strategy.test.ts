@@ -232,7 +232,11 @@ describe("v0.8 search measurement alias", () => {
         // The seeded rosters field Tsar Cannons, so the v0.8 trace diverges at its first such shot; the v0.7
         // digest above is untouched (the frozen versions only gain the line behind V06_THROUGH_SHOT). Two
         // isolated runs reproduced this digest byte-identically.
-        expect(digest("v0.8")).toBe("1cdb22ac528b1f021a3806645307d68ba0d04adad8371f63a95c5ef59903abc3");
+        // Re-pinned 2026-09-25: only melee may follow a move in the same turn. v0.8's ranged positioning no
+        // longer steps a shooter forward and then fires (the engine now rejects that shot), so its trace moves;
+        // the v0.7 control above is untouched (v0.7 never planned move-then-shoot). Two isolated runs reproduced
+        // this digest, both with zero rejected actions.
+        expect(digest("v0.8")).toBe("d93b20d6acf01564891ff53d17a78ab394df99f04054583fc4d2617d3b2f3dff");
     });
 
     it("takes an immediate kill before harder unfinished work", () => {

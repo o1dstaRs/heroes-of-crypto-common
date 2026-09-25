@@ -2197,8 +2197,30 @@ function pinnedRetreat(
 }
 
 /**
+ * Whether a plan moves the unit and then fires from range or casts. Only melee may follow a move in the same turn —
+ * the player's board ends the turn when a plain move lands and GameActionEngine rejects the follow-up
+ * (MOVED_THIS_TURN_MELEE_ONLY_MESSAGE) — so no plan of this shape may leave this module.
+ */
+export const movesThenFiresFromRange = (actions: readonly GameAction[]): boolean => {
+    const moveIndex = actions.findIndex((action) => action.type === "move_unit");
+    return (
+        moveIndex >= 0 &&
+        actions
+            .slice(moveIndex + 1)
+            .some(
+                (action) =>
+                    action.type === "range_attack" ||
+                    action.type === "area_throw_attack" ||
+                    action.type === "cast_spell",
+            )
+    );
+};
+
+/**
  * Browser-safe v0.8 ranged positioning. `v0.8s` deliberately remains the byte-policy control seat unless a
  * caller opts it in, so the M4 can measure this production candidate against an otherwise identical a13 alias.
+ * The advance and band arms were written when a shooter could move and then fire; that is not a legal turn, so any
+ * plan they build of that shape is dropped for the plan they were given (see movesThenFiresFromRange).
  */
 export function prioritizeV08RangedPositioning(
     unit: Unit,
@@ -2216,7 +2238,8 @@ export function prioritizeV08RangedPositioning(
         .map((value) => value.trim())
         .filter(Boolean);
     const responseNeutralAdvance = responseNeutralAdvanceVersions.includes(strategyVersion);
-    const mode = process.env.V08_RANGED_POSITION_MODE ?? "both";
+    // "retreat" by default: the advance arms only ever produced move-then-shoot plans, which are not a legal turn.
+    const mode = process.env.V08_RANGED_POSITION_MODE ?? "retreat";
     // A live-only treatment replaces (rather than follows) the legacy advance at explicit roots. The direct and
     // overlay duels compute shipped and strict catalogs in the same order for both seats before choosing by arm.
     // Rollouts and omitted-origin callers retain the incumbent policy.
@@ -2240,7 +2263,7 @@ export function prioritizeV08RangedPositioning(
         bandAdvanceLegacyControlVersions.size > 0 &&
         (bandAdvanceSelectorVersions.has(strategyVersion) || bandAdvanceLegacyControlVersions.has(strategyVersion));
     const protectedAdvanceGuardrailMode = protectedAdvanceGuardrailsMode(context, strategyVersion);
-    const advanced = bandAdvanceVsLegacy
+    const advancedPlan = bandAdvanceVsLegacy
         ? supportedBandAdvanceVsLegacy(unit, context, decision, strategyVersion, responseNeutralAdvance)
         : !bandAdvanceActiveHere && (mode === "both" || mode === "advance")
           ? protectedAdvanceGuardrailMode
@@ -2253,11 +2276,14 @@ export function prioritizeV08RangedPositioning(
                 )
               : protectedAdvanceShot(unit, context, decision, responseNeutralAdvance)
           : decision;
+    const advanced = movesThenFiresFromRange(advancedPlan) ? decision : advancedPlan;
     const retreated =
         mode === "both" || mode === "retreat" ? pinnedRetreat(unit, context, advanced, strategyVersion) : advanced;
     const bandAdvanced =
         bandAdvanceActiveHere && !bandAdvanceVsLegacy
             ? supportedBandAdvance(unit, context, retreated, strategyVersion)
             : retreated;
-    return supportedPrepinEgress(unit, context, bandAdvanced, strategyVersion);
+    const egress = supportedPrepinEgress(unit, context, bandAdvanced, strategyVersion);
+    if (!movesThenFiresFromRange(egress)) return egress;
+    return movesThenFiresFromRange(bandAdvanced) ? retreated : bandAdvanced;
 }

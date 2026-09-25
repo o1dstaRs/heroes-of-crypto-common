@@ -39,6 +39,9 @@ export function canWaitOnHourglass(
     const team = unit.getTeam();
     return (
         (team === PBTypes.TeamVals.LEFT || team === PBTypes.TeamVals.RIGHT) &&
+        // Only melee may follow a move. Parking a unit that has moved would hand it a fresh turn later in the
+        // lap, so it could move now and shoot, cast or move again then.
+        !unit.hasMovedThisTurn() &&
         !hasActiveTimeDenial(allUnits.values()) &&
         fightProperties.hasUnactedTeammate(team, unit.getId(), allUnits) &&
         !unit.isOnHourglass() &&

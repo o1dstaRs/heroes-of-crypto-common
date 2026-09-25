@@ -736,8 +736,9 @@ export interface IEnumerateOptions {
     /** Cap on ranged aims, kept by expected damage (0/undefined = all distinct hit sets). */
     maxShotAims?: number;
     /**
-     * Experimental move-then-shot challengers. Values above two are clamped to two; 0/undefined disables the
-     * class completely so every existing consumer retains byte-identical actions and candidate ordering.
+     * Retired: move-then-shot challengers. Only melee may follow a move in the same turn, so the engine rejects a shot
+     * from a unit that has moved (GameActionEngine, MOVED_THIS_TURN_MELEE_ONLY_MESSAGE) and the class is never generated,
+     * whatever this asks for. Kept so existing callers and research configs still type-check.
      */
     maxMoveShotComposites?: number;
     /**
@@ -2215,7 +2216,9 @@ class CandidateGenerator {
             this.push(candidateOf(s));
         }
 
-        const moveShotCap = Math.min(2, Math.max(0, Math.floor(this.options.maxMoveShotComposites ?? 0)));
+        // Move-then-shot is not a legal turn (only melee may follow a move), so no composite is ever built; the requested
+        // cap is ignored. See maxMoveShotComposites.
+        const moveShotCap = 0;
         const moveShotDiscoveryRequested = this.options.discoverMoveShotTargetsAfterMove === true;
         // A missing origin is a direct/live library call. Only explicit hypothetical rollout contexts suppress
         // this terminal root escape hatch.
