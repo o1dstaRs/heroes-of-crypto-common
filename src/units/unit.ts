@@ -2212,6 +2212,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public canBeHealed(): boolean {
         return !this.hasAbilityActive("Mechanism");
     }
+    // A machine has nothing alive in it to bring back either: Resurrection skips Mechanism stacks (while Break
+    // is off Mechanism, like every other ability, it works on them again).
+    public canBeResurrected(): boolean {
+        return !this.hasAbilityActive("Mechanism");
+    }
     // Mechanism constructs are machines: the Mechanism ability text promises immunity to poison, and there is
     // nothing alive in them for a damage-over-time to corrode. Enforced at the applyPoisonEffect chokepoint.
     public canBePoisoned(): boolean {

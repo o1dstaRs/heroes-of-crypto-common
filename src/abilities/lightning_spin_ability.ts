@@ -281,15 +281,15 @@ export function processLightningSpinAbility(
                     damageStatisticHolder,
                     secondaryDamage,
                 );
-                processBoarSalivaAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processAggrAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processDeepWoundsAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processPegasusLightAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processParalysisAbility(fromUnit, enemy, fromUnit, sceneLog);
+                processBoarSalivaAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processAggrAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processDeepWoundsAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processPegasusLightAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processParalysisAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
                 if (isAttack) {
-                    processShatterArmorAbility(fromUnit, enemy, fromUnit, sceneLog);
+                    processShatterArmorAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
                 } else {
-                    processBlindnessAbility(fromUnit, enemy, fromUnit, sceneLog);
+                    processBlindnessAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
                 }
             }
             // Gaze resolves after the base hit. If it petrified the last creature, include that death in

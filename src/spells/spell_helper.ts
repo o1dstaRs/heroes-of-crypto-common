@@ -731,6 +731,7 @@ export function canCastSpell(
             targetUnit &&
             targetUnit.getTeam() === casterUnit.getTeam() &&
             targetUnit.getAmountDied() > 0 &&
+            targetUnit.canBeResurrected() &&
             (spell.isSelfCastAllowed() || (!spell.isSelfCastAllowed() && !isSelfCast))
         );
     }

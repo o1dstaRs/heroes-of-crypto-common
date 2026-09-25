@@ -1453,7 +1453,8 @@ export class AttackHandler {
             aoeRangeResponseResult = AllAbilities.processRangeAOEAbility(
                 targetUnit,
                 rangeResponseUnits,
-                targetUnit,
+                // The unit whose turn it is: a counter-volley's effects on the attacker get the extra lap.
+                attackerUnit,
                 rangeResponseAttackDivisor,
                 unitsHolder,
                 this.grid,

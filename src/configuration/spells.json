@@ -183,7 +183,9 @@
         "Resurrection": {
             "name": "Resurrection",
             "level": 0,
-            "desc": ["Resurrect fallen ally units on the battlefield. Up to {} total hit points."],
+            "desc": [
+                "Resurrect fallen ally units on the battlefield (never a Mechanism unit). Up to {} total hit points."
+            ],
             "target": "ANY_ALLY",
             "power": 0,
             "power_type": "RESURRECT",

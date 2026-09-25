@@ -1086,7 +1086,7 @@
         "type": "UNIT_TYPE",
         "desc": [
             "Invulnerable to Mind attacks and spells, and to poison.",
-            "While 50% more vulnerable to Status attacks. Cannot be healed and always has 0 morale"
+            "While 50% more vulnerable to Status attacks. Cannot be healed or resurrected and always has 0 morale"
         ],
         "power": 1,
         "power_type": "MECHANISM",
@@ -1125,7 +1125,7 @@
         "type": "DEFENCE",
         "desc": [
             "50% of the initial units supply will be restored after full stack death.",
-            "Can be cast to resurrect fallen ally units on the battlefield"
+            "Can be cast to resurrect fallen ally units on the battlefield (never a Mechanism unit)"
         ],
         "power": 1,
         "power_type": "RESURRECTION",

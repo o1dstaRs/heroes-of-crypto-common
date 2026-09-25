@@ -281,8 +281,9 @@ export function processRangeAOEAbility(
             if (!landedHitUnitIds.has(unit.getId())) {
                 continue;
             }
-            processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
-            processFreezeAbility(attackerUnit, unit, attackerUnit, sceneLog);
+            // The unit whose turn it is — the attacker even when this is a counter-volley — gets the extra lap.
+            processStunAbility(attackerUnit, unit, currentActiveUnit, sceneLog);
+            processFreezeAbility(attackerUnit, unit, currentActiveUnit, sceneLog);
             processRimeCharmAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
             processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
         }

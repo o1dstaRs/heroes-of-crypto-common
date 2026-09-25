@@ -40,6 +40,7 @@ import { Spell } from "../../src/spells/spell";
 import { spellDamageAgainstUnit } from "../../src/spells/spell_cast_projection";
 import { fireforgedSwordDamage } from "../../src/spells/spell_damage";
 import { fireWallBurnDamage } from "../../src/spells/fire_walls";
+import { canCastSpell } from "../../src/spells/spell_helper";
 import { projectMagicMirrorDamage } from "../../src/spells/magic_mirror_damage";
 import { SpellElement } from "../../src/spells/spell_properties";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
@@ -1156,5 +1157,137 @@ describe("G21: an effect landed on the unit whose turn it is gets the extra lap"
         const onAlly = ally.getEffect("Stun")?.getLaps() ?? 0;
         expect(onAlly).toBeGreaterThan(0);
         expect(blacksmith.getEffect("Stun")?.getLaps()).toBe(onAlly + 1);
+    });
+});
+
+describe("C5: Resurrection never works on a Mechanism unit", () => {
+    it("can't bring back a Tsar Cannon's fallen crew, while any other ally with losses can be resurrected", () => {
+        const caster = createTestUnit({
+            name: "Angel",
+            team: PBTypes.TeamVals.RIGHT,
+            spells: ["System:Resurrection"],
+            stackPower: 4,
+        });
+        const cannon = createTestUnit({
+            name: "Tsar Cannon",
+            team: PBTypes.TeamVals.RIGHT,
+            amountAlive: 2,
+            abilities: ["Mechanism"],
+        });
+        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.RIGHT, amountAlive: 2 });
+        cannon.applyDamage(10, 0, new SceneLogMock());
+        ally.applyDamage(10, 0, new SceneLogMock());
+        const resurrection = caster.getSpells().find((spell) => spell.getName() === "Resurrection");
+        const canResurrect = (target: Unit): boolean =>
+            !!canCastSpell(
+                false,
+                testGridSettings,
+                [],
+                caster,
+                target,
+                resurrection,
+                target.getBaseCell(),
+                target.getMagicResist(),
+                false,
+                target.canBeHealed(),
+            );
+        expect(cannon.getAmountDied()).toBeGreaterThan(0);
+
+        expect(canResurrect(ally)).toBe(true);
+        expect(canResurrect(cannon)).toBe(false);
+
+        // Break switches Mechanism off like every ability, so for those 2 laps it can be resurrected (and healed).
+        cannon.applyEffect(breakEffect());
+        expect(canResurrect(cannon)).toBe(true);
+    });
+});
+
+describe("G24: a retaliating spin and an area counter-volley give the attacker's effects the extra lap too", () => {
+    it("a retaliating Lightning Spin's Paralysis on the attacker lasts a lap longer than on a bystander", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const hydra = createTestUnit({
+            name: "Hydra",
+            team: PBTypes.TeamVals.LEFT,
+            abilities: ["Lightning Spin", "Paralysis"],
+            stackPower: 5,
+        });
+        const attacker = createTestUnit({ name: "Attacker", team: PBTypes.TeamVals.RIGHT, maxHp: 10_000 });
+        const other = createTestUnit({ name: "Other", team: PBTypes.TeamVals.RIGHT, maxHp: 10_000 });
+        placeUnit(grid, unitsHolder, hydra, { x: 5, y: 5 });
+        placeUnit(grid, unitsHolder, attacker, { x: 6, y: 5 });
+        placeUnit(grid, unitsHolder, other, { x: 4, y: 5 });
+        hydra.calculateMissChance = () => 0;
+
+        setDeterministicRandomSource(() => 0);
+        try {
+            processLightningSpinAbility(
+                hydra,
+                new SceneLogMock(),
+                unitsHolder,
+                1,
+                new DamageStatisticHolder(),
+                hydra.getBaseCell(),
+                false,
+                [],
+                grid,
+                attacker,
+            );
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+
+        const onOther = other.getEffect("Paralysis")?.getLaps() ?? 0;
+        expect(onOther).toBeGreaterThan(0);
+        expect(attacker.getEffect("Paralysis")?.getLaps()).toBe(onOther + 1);
+    });
+
+    it("an Area Throw counter-volley's Rime Charm on the attacker lasts a lap longer than on a bystander", () => {
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.RIGHT, 2, Tier2Artifact.RIME_CHARM);
+        const shooter = createTestUnit({
+            name: "Shooter",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+            maxHp: 10_000,
+        });
+        const bystander = createTestUnit({ name: "Bystander", team: PBTypes.TeamVals.LEFT, maxHp: 10_000 });
+        const thrower = createTestUnit({
+            name: "Thrower",
+            team: PBTypes.TeamVals.RIGHT,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+            maxHp: 10_000,
+            abilities: ["Area Throw"],
+        });
+        placeUnit(grid, unitsHolder, shooter, { x: 1, y: 4 });
+        placeUnit(grid, unitsHolder, bystander, { x: 1, y: 5 });
+        placeUnit(grid, unitsHolder, thrower, { x: 10, y: 4 });
+        unitsHolder.applyArtifacts(fightProperties);
+        for (const unit of [shooter, thrower]) {
+            unit.calculateMissChance = () => 0;
+            unit.calculateAttackDamage = () => 10;
+        }
+
+        setDeterministicRandomSource(() => 0);
+        try {
+            attackHandler.handleRangeAttack(
+                unitsHolder,
+                [1],
+                1,
+                createVisibleDamage(thrower),
+                shooter,
+                [[thrower]],
+                [shooter, bystander],
+                thrower.getPosition(),
+            );
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+
+        const onBystander = bystander.getDebuff("Quagmire")?.getLaps() ?? 0;
+        expect(onBystander).toBeGreaterThan(0);
+        expect(shooter.getDebuff("Quagmire")?.getLaps()).toBe(onBystander + 1);
     });
 });
