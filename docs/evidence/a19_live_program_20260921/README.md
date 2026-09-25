@@ -33,6 +33,11 @@ counts was wrong in three places; the correction is at the top of LIVE_ANALYSIS.
 | 12 | the v4 prior above weight 16 (w24, w32) | selection w24 51.80%, w32 51.05%; confirmation w24 vs w16 51.24% [49.05, 53.43], gate 2 fails | fail — the weight curve is flat above 16 |
 | 13 | a v5 prior re-fitted on the armies v4-w16 drafts under the live setup | selection vs v4-w16, 2,000 games: 49.05% [44.67, 53.41] (r = 0.931 with v4) | stop — the on-policy re-fit has converged |
 | 14 | Empower augments for the caster-heavy armies (59% hold a magic-damage caster) | five paired plan arms: Empower 1 for Might 1 is a wash; paying for Empower with Armor or Sniper costs 6–18pp; cross-fitted +0.28pp | stop — the current plan holds |
+| 15 | the live game's mechanics in the harness; the seventh augment point to Placement; skipping the split pass (P15) | paired with a 4000-game self-play BASE (exactly 50.00%): Placement 1 for Might 1 −2.07pp [−4.66, +0.53]; Placement 2 for an Armor point −9.75pp; a19 not splitting +1.12pp [−0.05, +2.30] | harness fixed (below); no arm reached the +1.5pp bar |
+| 17 | a v6 prior fitted under the live synergy variants and splits, variant-aware (`-sv`), with a ranged-count step (`-rc`) | selection vs v4-w16, 2,000 games each: v6 48.65%, v6-sv 50.15%, v6-sv-rc 50.52% | stop — below the 52% bar; the variant and composition terms recover ~2pp over v6, not past v4 |
+| 18 | the search leaf re-fitted on 416,017 turns of today's fights (log-loss 0.371 vs 0.464) | selection, 4,000 games: 50.92% [50.11, 51.74] | stop — real (+0.9pp) but under the 51.5% bar |
+| 20 | a paired screen of cost-neutral fight settings | vs BASE, 2,000 games each: leaf λ30 +1.80pp [+0.62, +2.98], λ300 +1.77, λ0.3 +1.75; gate 0.02 +0.27, gate 0.05 −0.18; late-ranged-finish 4 −0.22 | λ30 promoted; its own confirmation is reported in VERDICTS.md |
+| 21 | the stack: λ30 leaf + a19 seats not splitting | vs the live stack, 8,000 games: 51.41% draw-aware, clustered [49.23, 53.61], 0 rejections, every map ≥ 51.2; robustness within bounds | **fail — gate 2** (LCB 49.23); the overnight goal of +10pp is not met |
 
 Also measured: r4 against the validated but unshipped v1-w12, 10,000 games: 51.63% [49.43, 53.81] —
 indistinguishable, so preferring the floor gives nothing up. The informational r3 vs v1-w12 run (2,000 games) had
@@ -84,6 +89,34 @@ changes) r4 still beats r3 60.04% [55.69, 64.24] over 2,000 games.
   axis kept paying (w4 < w8 < w16) while the draft stayed varied: 47 distinct creatures against 48, top share 41.2%
   against 38.0%. Rollback: `HOC_DRAFT_WEIGHTS=ranked-unit-strength-a19-side-v4-w8-r4`.
 
+## The harness did not play the live game's synergies or splits (found and fixed 2026-09-24)
+
+Live ranked games draw ONE synergy variant per faction from the game id and apply it to whatever the army fields
+(`synergyVariantsForSeed`, play_session), so the setup policy's synergy picks are vestigial live. `ranked_draft_eval`
+never set variants: every measurement above played the DEFAULT variants plus the setup policy's picks — Might armies
+played both Might synergies. The server also splits one-model stacks into the slots Placement and the Nature
+board-units variant open (bots and a19 included), which the harness never did, and it deployed every army in the
+3-deep zone whatever Placement bought; that is why P6's "Placement 2 costs 4.5pp" said nothing about Placement.
+Opt-in flags now play both: `--live-synergy-variants`, `--tactical-splits` (common fb1d99d), plus research arms
+`--candidate-skips-splits`, `--candidate-search-env[-file]` and `--value-data`. Everything from P15 on used them.
+Two traps found on the way: with one policy on both seats, games 4b+2/4b+3 replay 4b/4b+1 exactly, so such runs play
+only the first two games of each board; and `--candidate-search-env` changed nothing until b58791e routed the override
+seat through the promoted A19 driver (the harness's explicit profile environment bypassed it).
+
+What the live mechanics changed in the measurements: nothing the bot does lost its edge, Placement stays dead even with
+splits and the widened zone, the split pass is about a point worse for a19 than leaving the slots empty, and the drawn
+variants are worth drafting for only a little (Chaos movement at level 2 is the one large residual, +26pp, but the
+offers rarely let an army reach it).
+
+## Fight-side changes and gate 2
+
+A candidate that differs only in the fight plays the same drafts on both seats, so a board's four games cancel the
+armies: the board means give intervals of about ±0.7pp at 8,000 games (P21: [50.67, 52.14]). Gate 2 instead takes the
+lower of a cluster-robust interval and a Wilson interval that counts each board as ONE observation, ±2.19pp at 8,000
+games whatever the design. It was set for draft-sized effects (+3.6pp and up) and was kept as written, which is why
+P21's +1.41pp fails it; passing it at that effect size would take about 49,000 games. Whether fight-side changes should
+be judged on the paired board means is the owner's call.
+
 ## The draft optimum is bracketed
 
 r3 (2.12 shooters) is proven worse than r4, r5 (3.14) is not proven better, and the untrained heuristic stack (4.21) is
@@ -133,7 +166,9 @@ Seeds used, all first-use and never re-rolled: 99010001, 99030001 (P1); 99110001
 99770001 and the training data 99800001 + 5000·k for k = 0..7 (P7); 99910001, 99920001, 99940001, 99950001, 99960001
 (P8); 99970001, 99980001, 99990001 (P9); 99870001, 99880001, 99895001 (P10); 99650001, 99660001, 99670001, 99680001
 (P11); 99690001, 99700001, 99710001, 99780001 (P12); 99440001 + 5000·k for k = 0..7 and 99790001 (P13); 99520001
-(P14); 99930001 (stack check). Burned by smoke and identity runs: 99000001, 99500001, 12340001. A parallel session
+(P14); 99930001 (stack check). 99560001 (P15 arms and P20 screen, paired with BASE); 99450001 (P17 data), 99465001 (P17 selection); 99490001
+(P18 selection); 99360001 (P21 confirmation), 99820001 (P20 confirmation), 99480001 (shared robustness cell, P15-P21).
+Burned by smoke and identity runs: 99000001, 99500001, 12340001. A parallel session
 measuring the cumulative effect (below) used 99860001 and re-used 99880001 and 99870001 for its own, different
 comparisons; no result here depends on those boards being fresh.
 
@@ -149,6 +184,11 @@ What the program closed, so the next round does not repeat it: the shooter floor
 bot's own drafts (P13: v5 correlates 0.93 with v4 and gains nothing), the prior's weight above 16 (P12), the synergy
 table (P10: a stage-1 false positive), Empower augments (P14), and the two tactical search seams (P1, P2). A caster
 census with spells counted (common 97cb7a0, 1213b17) shows a19 already plays the v4 draft's casters well.
+
+Overnight 2026-09-24/25 (owner goal: +10pp over the v0.8 a19 above): six proposals, all measured with the live game's
+synergy variants and split pass. Draft and setup levers are closed (P15, P17); the only gains found are fight-side and
+about a point each — the re-fitted leaf (+0.9 to +1.8pp) and a19 leaving its split slots empty (+1.1pp). Stacked they
+measured 51.41% over 8,000 games (P21), short of gate 2 and far short of +10pp. Nothing was shipped overnight.
 
 ## Open for the owner
 

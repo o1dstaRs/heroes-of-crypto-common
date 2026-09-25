@@ -279,3 +279,27 @@ predicted effect, cross-fitted: 0.28pp (fit even -> odd 0.20pp [rule E1/BASE]; f
 in-sample (optimistic): 0.28pp
 stage-3 decision: STOP: no confirmable gain
 ```
+
+## Fight stack: λ30 leaf + a19 not splitting (P21, 2026-09-25)
+
+```
+run: confirm vs incumbent:ranked-unit-strength-a19-side-v4-w16-r4
+head-to-head: 4060W 3835L 105D over 8000 games; decisive 51.42% CI [49.23, 53.61]
+  grid 1: 51.18% (LCB 47.39)
+  grid 3: 51.54% (LCB 47.75)
+  grid 4: 51.56% (LCB 47.77)
+diversity: candidate 48 distinct, incumbent 48; top share 37.7% vs 37.7% over 4000 drafts
+informational: tier-2 synergy reach candidate 5.5% vs incumbent 5.5%
+PASS  1 draw-aware head-to-head > 0.50: 0.5141
+FAIL  2 clustered 95% LCB > 0.50: 0.4923
+PASS  3 candidate rejections == 0: 0
+PASS  4 worst map (grid 1) >= 0.49: 0.5118
+PASS  5 vs untrained-heuristic: candidate - incumbent >= -0.02: 0.0042
+PASS  5 vs league-round3-exploiter: candidate - incumbent >= -0.02: -0.0060
+PASS  6a distinct creatures >= 80% of incumbent: 1.0000
+PASS  6b top creature share <= incumbent + 10pp: 0.0000
+VERDICT: FAIL
+```
+
+Paired screens that fed it (vs the self-play BASE on seed 99560001): leaf λ30 +1.80pp [+0.62, +2.98], a19 not splitting
++1.12pp [−0.05, +2.30]. Board-mean interval of this confirmation: [50.67, 52.14].
