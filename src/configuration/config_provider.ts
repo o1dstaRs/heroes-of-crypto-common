@@ -469,9 +469,10 @@ export const getCreatureConfig = (
             abilityDescriptions.push(updatedDescription);
         } else if (abilityConfig.name === "Paralysis") {
             const description = abilityConfig.desc.join("\n");
+            const damageCut = abilityConfig.effect ? (getEffectConfig(abilityConfig.effect)?.power ?? 0) : 0;
             const updatedDescription = description
                 .replace("{}", Number((abilityConfig.power * 2).toFixed()).toString())
-                .replace("{}", Number(abilityConfig.power.toFixed()).toString());
+                .replace("{}", Number(damageCut.toFixed()).toString());
             abilityDescriptions.push(updatedDescription);
         } else if (abilityConfig.name === CHAKRAM_ABILITY_NAME) {
             // Creature configs are templates with the minimum stack tier. Live units rewrite this after

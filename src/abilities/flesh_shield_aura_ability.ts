@@ -62,6 +62,10 @@ export function processFleshShieldAura(
     if (damage <= 0 || targetUnit.isDead()) {
         return result;
     }
+    // The protected unit's own Water Shield answers first: a hit it absorbs whole never reaches the aura.
+    if (targetUnit.willWaterShieldAbsorb(attackerUnit)) {
+        return result;
+    }
 
     const fleshShieldBuff = targetUnit.getBuff("Flesh Shield Aura");
     if (!fleshShieldBuff) {
@@ -137,11 +141,8 @@ export function processFleshShieldAura(
 
     const positionAtImpact = { ...absorberUnit.getPosition() };
     const amountAliveBefore = absorberUnit.getAmountAlive();
-    const damageDealt = absorberUnit.applyDamage(
-        absorbedRecalculated,
-        FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam(attackerUnit.getTeam()),
-        sceneLog,
-    );
+    // 0 break chance: this is a share of one hit, and that hit already rolled Break on the unit it struck.
+    const damageDealt = absorberUnit.applyDamage(absorbedRecalculated, 0, sceneLog);
     result.absorbedDamage = damageDealt;
     damageStatisticHolder.add({
         unitName: attackerUnit.getName(),

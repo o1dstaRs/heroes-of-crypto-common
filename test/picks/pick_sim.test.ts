@@ -153,6 +153,19 @@ describe("pick_sim", () => {
         expect(getPickTeamView(state, LEFT).bundles).toEqual([]);
     });
 
+    it("reads watched slots off the six-slot board, not off the list of picks so far", () => {
+        const state = finishBundlePhase(finishDoctrinePhase(createPickSimState(first)));
+        expect(state.right.creatures).toEqual([3, 6]);
+
+        // Slot 1 is the second level-1 creature: nothing is there yet. Indexing the picks list gave away the
+        // bundle's level-2 creature (6) to whoever watched slot 1.
+        state.left.revealedOpponentSlots = [1];
+        expect(getKnownOpponentCreatures(state, LEFT)).toEqual([]);
+
+        state.left.revealedOpponentSlots = [2];
+        expect(getKnownOpponentCreatures(state, LEFT)).toEqual([6]);
+    });
+
     it("reveals a hidden collision without advancing, then enforces the shared exclusive pool", () => {
         let state = finishBundlePhase(finishDoctrinePhase(createPickSimState(first)));
         const before = state;

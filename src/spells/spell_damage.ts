@@ -306,6 +306,8 @@ export function fireforgedSwordDamage(params: {
     targetIsWaterElement: boolean;
     targetIsWindElement?: boolean;
     targetIsEarthElement?: boolean;
+    /** Heavy Armor's +magic damage taken (Unit.getMagicDamageTakenMultiplier). */
+    targetMagicDamageTakenMultiplier?: number;
 }): number {
     const { damageDealt, swordPercentage, targetMagicResist } = params;
     if (targetMagicResist >= 100) {
@@ -330,7 +332,7 @@ export function fireforgedSwordDamage(params: {
         return 0;
     }
 
-    const burn = (damageDealt * swordPercentage) / 100;
+    const burn = ((damageDealt * swordPercentage) / 100) * (params.targetMagicDamageTakenMultiplier ?? 1);
 
     return applyMagicResistToSpellDamage(Math.floor(burn * elementMultiplier), targetMagicResist);
 }

@@ -522,11 +522,35 @@ const applyBundle = (
     return accepted(next, event);
 };
 
+/**
+ * A roster laid out on the fixed six-slot board [L1@0, L1@1, L2@2, L2@3, L3@4, L4@5]: each level's creatures
+ * fill that level's slots in the order they arrived, and a slot stays empty until one is picked into it.
+ * `creatures` only lists what was picked so far, so indexing it by slot would surface the wrong creature
+ * mid-draft — right after the bundle it is [L1, L2], and slot 1 (the second L1) would read the L2.
+ */
+const creaturesBySlot = (creatures: readonly number[]): (number | undefined)[] => {
+    const totalSlots = CreaturePoolByLevel.reduce((total, count) => total + count, 0);
+    const layout: (number | undefined)[] = new Array(totalSlots).fill(undefined);
+    const filledByLevel = [0, 0, 0, 0];
+    for (const creatureId of creatures) {
+        const level = CreatureLevelMap[creatureId];
+        if (!level || level < 1 || level > CreaturePoolByLevel.length) {
+            continue;
+        }
+        const base = CreaturePoolByLevel.slice(0, level - 1).reduce((total, count) => total + count, 0);
+        if (filledByLevel[level - 1] < CreaturePoolByLevel[level - 1]) {
+            layout[base + filledByLevel[level - 1]] = creatureId;
+            filledByLevel[level - 1] += 1;
+        }
+    }
+    return layout;
+};
+
 const opponentSlotsForCreature = (state: IPickSimState, team: PickTeam, creatureId: number): number[] => {
     const slots: number[] = [];
-    opponentState(state, team).creatures.forEach((picked, index) => {
+    creaturesBySlot(opponentState(state, team).creatures).forEach((picked, slot) => {
         if (picked === creatureId) {
-            slots.push(index);
+            slots.push(slot);
         }
     });
     return slots;
@@ -686,9 +710,9 @@ export function transitionServerPersistedPickSim(
 
 export function getKnownOpponentCreatures(state: IPickSimState, team: PickTeam): number[] {
     const known: number[] = [];
-    const opponent = opponentState(state, team);
+    const opponentBySlot = creaturesBySlot(opponentState(state, team).creatures);
     for (const slot of teamState(state, team).revealedOpponentSlots) {
-        const creatureId = opponent.creatures[slot];
+        const creatureId = opponentBySlot[slot];
         if (creatureId !== undefined && !known.includes(creatureId)) {
             known.push(creatureId);
         }

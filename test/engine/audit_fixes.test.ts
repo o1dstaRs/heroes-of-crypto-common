@@ -14,7 +14,16 @@
 
 import { describe, expect, it } from "bun:test";
 
+import { evaluateAffectedUnits } from "../../src/abilities/aoe_range_ability";
+import { processDevourEssenceAbility } from "../../src/abilities/devour_essense_ability";
+import { processFleshShieldAura } from "../../src/abilities/flesh_shield_aura_ability";
+import { processPetrifyingGazeAbility } from "../../src/abilities/petrifying_gaze_ability";
+import { processRimeCharmAbility } from "../../src/abilities/rime_charm_ability";
 import { processLightningSpinAbility } from "../../src/abilities/lightning_spin_ability";
+import { processMinerAbility } from "../../src/abilities/miner_ability";
+import { processParalysisAbility } from "../../src/abilities/paralysis_ability";
+import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
+import { getAbilityConfig, getSpellConfig } from "../../src/configuration/config_provider";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { createDefaultGameRuntime } from "../../src/engine/runtime";
 import { TurnEngine } from "../../src/engine/turn_engine";
@@ -23,6 +32,11 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { createCombatFactories, createUnitFromSpec } from "../../src/simulation/army";
+import { Spell } from "../../src/spells/spell";
+import { spellDamageAgainstUnit } from "../../src/spells/spell_cast_projection";
+import { fireforgedSwordDamage } from "../../src/spells/spell_damage";
+import { fireWallBurnDamage } from "../../src/spells/fire_walls";
+import { setDeterministicRandomSource } from "../../src/utils/lib";
 import type { Unit } from "../../src/units/unit";
 import {
     createCombatTestContext,
@@ -280,5 +294,448 @@ describe("G3: the turn clock shares the lap budget among the stacks still alive"
 
         // Two stacks left to act: min(60 s, 240 s ÷ 2), not 240 s ÷ 8 = 30 s.
         expect(fightProperties.getCurrentTurnEnd() - fightProperties.getCurrentTurnStart()).toBe(60_000);
+    });
+});
+
+describe("G5: Dual Strike Charm and Rime Charm reach every second attack", () => {
+    it("marks a Crafted Double Punch unit for the charm", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 1, Tier1Artifact.DUAL_STRIKE_CHARM);
+        const crafted = createTestUnit({
+            name: "Smith",
+            team: PBTypes.TeamVals.LEFT,
+            abilities: ["Crafted Double Punch"],
+        });
+        placeUnit(grid, unitsHolder, crafted, { x: 2, y: 2 });
+
+        unitsHolder.applyArtifacts(fightProperties);
+
+        expect(crafted.getBuff("Dual Strike Charm")).toBeDefined();
+    });
+
+    it("raises an area second volley (Double Throw) like a second arrow", () => {
+        const damageTaken = (withCharm: boolean): number => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const fightProperties = FightStateManager.getInstance().getFightProperties();
+            if (withCharm) {
+                fightProperties.setArtifactPerTeam(PBTypes.TeamVals.RIGHT, 1, Tier1Artifact.DUAL_STRIKE_CHARM);
+            }
+            const thrower = createTestUnit({
+                name: "Thrower",
+                team: PBTypes.TeamVals.RIGHT,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 5,
+                amountAlive: 1,
+                abilities: ["Area Throw", "Double Throw"],
+            });
+            const target = createTestUnit({
+                name: "Target",
+                team: PBTypes.TeamVals.LEFT,
+                maxHp: 10_000,
+                amountAlive: 1,
+            });
+            placeUnit(grid, unitsHolder, thrower, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
+            unitsHolder.applyArtifacts(fightProperties);
+            thrower.calculateMissChance = () => 0;
+            thrower.calculateAttackDamage = () => 100;
+            const before = target.getCumulativeHp();
+
+            attackHandler.handleRangeAttack(
+                unitsHolder,
+                [1],
+                1,
+                createVisibleDamage(target),
+                thrower,
+                [[target]],
+                undefined,
+                target.getPosition(),
+            );
+            return before - target.getCumulativeHp();
+        };
+
+        const plain = damageTaken(false);
+        const charmed = damageTaken(true);
+
+        expect(plain).toBe(200);
+        expect(charmed).toBe(250);
+    });
+
+    it("rolls Rime Charm on the second punch", () => {
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.RIGHT, 2, Tier2Artifact.RIME_CHARM);
+        const puncher = createTestUnit({
+            name: "Puncher",
+            team: PBTypes.TeamVals.RIGHT,
+            abilities: ["Double Punch"],
+            damageMin: 1,
+            damageMax: 1,
+            amountAlive: 5,
+        });
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, maxHp: 1000, amountAlive: 5 });
+        placeUnit(grid, unitsHolder, puncher, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, target, { x: 2, y: 1 });
+        unitsHolder.applyArtifacts(fightProperties);
+        // The first punch misses (no riders roll); the second lands.
+        let swings = 0;
+        puncher.calculateMissChance = () => (swings++ === 0 ? 100 : 0);
+
+        setDeterministicRandomSource(() => 0);
+        try {
+            attackHandler.handleMeleeAttack(
+                unitsHolder,
+                new MoveHandler(testGridSettings, grid, unitsHolder),
+                createVisibleDamage(target),
+                undefined,
+                puncher,
+                target,
+                { x: 1, y: 1 },
+            );
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+
+        expect(swings).toBeGreaterThanOrEqual(2);
+        expect(target.hasDebuffActive("Quagmire")).toBe(true);
+    });
+});
+
+describe("G6: Heavy Armor's +magic damage applies to every magic source", () => {
+    const knight = (heavyArmor: boolean) =>
+        createTestUnit({
+            name: "Goblin Knight",
+            team: PBTypes.TeamVals.LEFT,
+            abilities: heavyArmor ? ["Heavy Armor"] : [],
+            stackPower: 5,
+        });
+
+    it("a damage spell hits a full Heavy Armor stack 50% harder", () => {
+        const fireStrike = new Spell({ spellProperties: getSpellConfig("Chaos", "Fire Strike"), amount: 1 });
+
+        expect(spellDamageAgainstUnit(fireStrike, 100, knight(false))).toBe(100);
+        expect(spellDamageAgainstUnit(fireStrike, 100, knight(true))).toBe(150);
+    });
+
+    it("so do Fireforged burns", () => {
+        const burn = (multiplier: number): number =>
+            fireforgedSwordDamage({
+                damageDealt: 100,
+                swordPercentage: 20,
+                targetMagicResist: 0,
+                targetIsFireElement: false,
+                targetIsWaterElement: false,
+                targetMagicDamageTakenMultiplier: multiplier,
+            });
+
+        expect(burn(knight(false).getMagicDamageTakenMultiplier())).toBe(20);
+        expect(burn(knight(true).getMagicDamageTakenMultiplier())).toBe(30);
+    });
+});
+
+describe("C1: Fire Wall answers magic resistance like every other fire", () => {
+    it("magic resistance cuts the burn and 100% blocks it; Heavy Armor raises it", () => {
+        expect(fireWallBurnDamage(1_000, 25)).toBe(250);
+        expect(fireWallBurnDamage(1_000, 25, { magicResist: 50 })).toBe(125);
+        expect(fireWallBurnDamage(1_000, 25, { magicResist: 100 })).toBe(0);
+        expect(fireWallBurnDamage(1_000, 25, { magicDamageTakenMultiplier: 1.5 })).toBe(375);
+    });
+});
+
+describe("G7: the Angel's shot protection doesn't bend spells", () => {
+    it("an Angel in a spell's block no longer shields the units beside it; a ranged area attack still stops at it", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const angel = createTestUnit({
+            name: "Angel",
+            team: PBTypes.TeamVals.LEFT,
+            abilities: ["Arrows Wingshield Blessing"],
+        });
+        const neighbour = createTestUnit({ name: "Neighbour", team: PBTypes.TeamVals.LEFT });
+        placeUnit(grid, unitsHolder, angel, { x: 5, y: 5 });
+        placeUnit(grid, unitsHolder, neighbour, { x: 6, y: 5 });
+        const block = [
+            { x: 5, y: 5 },
+            { x: 6, y: 5 },
+            { x: 5, y: 6 },
+            { x: 6, y: 6 },
+        ];
+
+        const byShot = evaluateAffectedUnits(block, unitsHolder, grid)?.[0] ?? [];
+        const bySpell = evaluateAffectedUnits(block, unitsHolder, grid, false)?.[0] ?? [];
+
+        expect(byShot.map((unit) => unit.getName())).toEqual(["Angel"]);
+        expect(bySpell.map((unit) => unit.getName()).sort()).toEqual(["Angel", "Neighbour"]);
+    });
+});
+
+const shieldedPair = () => {
+    const { grid, unitsHolder } = createCombatTestContext();
+    const attacker = createTestUnit({ name: "Attacker", team: PBTypes.TeamVals.RIGHT });
+    const target = createTestUnit({ name: "Mermaid", team: PBTypes.TeamVals.LEFT, amountAlive: 3, maxHp: 100 });
+    const abomination = createTestUnit({
+        name: "Abomination",
+        team: PBTypes.TeamVals.LEFT,
+        amountAlive: 1,
+        maxHp: 500,
+        stackPower: 5,
+        abilities: ["Dense Flesh", "Flesh Shield Aura"],
+        auraEffects: ["Flesh Shield"],
+        auraRanges: [1],
+        auraIsBuff: [true],
+    });
+    placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+    placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
+    placeUnit(grid, unitsHolder, abomination, { x: 8, y: 2 });
+    unitsHolder.refreshAuraEffectsForAllUnits();
+    expect(target.getBuff("Flesh Shield Aura")).toBeDefined();
+    return { grid, unitsHolder, attacker, target, abomination };
+};
+
+describe("G8: the protected unit's Water Shield answers before Flesh Shield", () => {
+    it("a hit the Water Shield will absorb is not redirected onto the Abomination", () => {
+        const { grid, unitsHolder, attacker, target, abomination } = shieldedPair();
+        target.applyBuff(new Spell({ spellProperties: getSpellConfig("System", "Water Shield"), amount: 1 }));
+        const abominationHp = abomination.getCumulativeHp();
+
+        const result = processFleshShieldAura(
+            attacker,
+            target,
+            100,
+            false,
+            grid,
+            unitsHolder,
+            new SceneLogMock(),
+            new DamageStatisticHolder(),
+        );
+
+        expect(result.absorbedDamage).toBe(0);
+        expect(result.remainingDamage).toBe(100);
+        expect(abomination.getCumulativeHp()).toBe(abominationHp);
+    });
+
+    it("without a Water Shield the aura still takes its share", () => {
+        const { grid, unitsHolder, attacker, target } = shieldedPair();
+
+        const result = processFleshShieldAura(
+            attacker,
+            target,
+            100,
+            false,
+            grid,
+            unitsHolder,
+            new SceneLogMock(),
+            new DamageStatisticHolder(),
+        );
+
+        expect(result.remainingDamage).toBeLessThan(100);
+    });
+});
+
+describe("G9: secondary damage doesn't roll Break again", () => {
+    it("Flesh Shield's absorbed share doesn't Break the Abomination", () => {
+        const { grid, unitsHolder, attacker, target, abomination } = shieldedPair();
+        FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam = () => 100;
+
+        const result = processFleshShieldAura(
+            attacker,
+            target,
+            100,
+            false,
+            grid,
+            unitsHolder,
+            new SceneLogMock(),
+            new DamageStatisticHolder(),
+        );
+
+        expect(result.absorbedDamage).toBeGreaterThan(0);
+        expect(abomination.hasEffectActive("Break")).toBe(false);
+    });
+
+    it("Petrifying Gaze's extra kills don't Break the target a second time", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const medusa = createTestUnit({
+            name: "Medusa",
+            team: PBTypes.TeamVals.RIGHT,
+            abilities: ["Petrifying Gaze"],
+            stackPower: 5,
+        });
+        const victim = createTestUnit({ name: "Victim", team: PBTypes.TeamVals.LEFT, amountAlive: 20, maxHp: 10 });
+        placeUnit(grid, unitsHolder, medusa, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, victim, { x: 2, y: 1 });
+        FightStateManager.getInstance().getFightProperties().getBreakChancePerTeam = () => 100;
+
+        setDeterministicRandomSource(() => 0);
+        try {
+            processPetrifyingGazeAbility(medusa, victim, 100, new SceneLogMock(), new DamageStatisticHolder());
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+
+        expect(victim.getAmountAlive()).toBeLessThan(20);
+        expect(victim.hasEffectActive("Break")).toBe(false);
+    });
+});
+
+describe("G11: Devour Essence and Infest agree about a kill that resurrects", () => {
+    const hydraHealAfterKilling = (victimAbilities: string[]): number => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const hydra = createTestUnit({
+            name: "Hydra",
+            team: PBTypes.TeamVals.RIGHT,
+            abilities: ["Devour Essence"],
+            stackPower: 5,
+            amountAlive: 3,
+            maxHp: 100,
+        });
+        const victim = createTestUnit({
+            name: "Victim",
+            team: PBTypes.TeamVals.LEFT,
+            abilities: victimAbilities,
+            amountAlive: 2,
+            maxHp: 50,
+        });
+        placeUnit(grid, unitsHolder, hydra, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, victim, { x: 3, y: 1 });
+        hydra.applyDamage(60, 0, new SceneLogMock());
+        victim.applyDamage(1_000, 0, new SceneLogMock());
+        expect(victim.isDead()).toBe(true);
+        const before = hydra.getCumulativeHp();
+
+        processDevourEssenceAbility(hydra, [victim.getId()], unitsHolder, new SceneLogMock());
+        return hydra.getCumulativeHp() - before;
+    };
+
+    it("heals on a stack that stays dead", () => {
+        expect(hydraHealAfterKilling([])).toBeGreaterThan(0);
+    });
+
+    it("doesn't heal on a stack that will raise itself (Resurrection with its charge)", () => {
+        expect(hydraHealAfterKilling(["Resurrection"])).toBe(0);
+    });
+});
+
+const realUnit = (faction: string, creatureName: string, level: number, size: number, team = PBTypes.TeamVals.LEFT) => {
+    const { abilityFactory, effectFactory } = createCombatFactories();
+    return createUnitFromSpec(
+        { faction, creatureName, level, size, amount: 10 },
+        team,
+        testGridSettings,
+        abilityFactory,
+        effectFactory,
+    );
+};
+
+describe("C2: Swift Boots count melee-magic walkers as melee", () => {
+    it("a Troll gets Swift Boots like any walker that fights in melee", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 1, Tier1Artifact.SWIFT_BOOTS);
+        const troll = realUnit("Chaos", "Troll", 2, 1);
+        placeUnit(grid, unitsHolder, troll, { x: 2, y: 2 });
+
+        unitsHolder.applyArtifacts(fightProperties);
+
+        expect(troll.getBuff("Swift Boots")).toBeDefined();
+    });
+});
+
+describe("C3: Tome of Amplification strengthens Wind Flow's armor, not its slow", () => {
+    it("an amplified Wind Flow gives +6 armor but still only −4 movement", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const pegasus = realUnit("Nature", "Pegasus", 3, 2);
+        placeUnit(grid, unitsHolder, pegasus, { x: 6, y: 6 });
+        unitsHolder.refreshStackPowerForAllUnits();
+        const stepsBefore = pegasus.getSteps();
+        const armorBefore = pegasus.getBaseArmor();
+        const windFlow = new Spell({ spellProperties: getSpellConfig("System", "Wind Flow"), amount: 1 });
+        windFlow.setPower(6);
+        pegasus.applyBuff(windFlow);
+
+        unitsHolder.refreshStackPowerForAllUnits();
+
+        expect(pegasus.getSteps()).toBeCloseTo(stepsBefore - 4, 5);
+        expect(pegasus.getBaseArmor()).toBeCloseTo(armorBefore + 6, 5);
+    });
+});
+
+describe("C4: Rime Charm's Quagmire doesn't land on 100% magic resistance", () => {
+    it("Enchanted Skin keeps the Black Dragon from being chilled", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.RIGHT, 2, Tier2Artifact.RIME_CHARM);
+        const hitter = createTestUnit({ name: "Hitter", team: PBTypes.TeamVals.RIGHT });
+        const skinned = createTestUnit({ name: "Skinned", team: PBTypes.TeamVals.LEFT, magicResist: 100 });
+        const plain = createTestUnit({ name: "Plain", team: PBTypes.TeamVals.LEFT });
+        placeUnit(grid, unitsHolder, hitter, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, skinned, { x: 2, y: 1 });
+        placeUnit(grid, unitsHolder, plain, { x: 1, y: 2 });
+        unitsHolder.applyArtifacts(fightProperties);
+
+        setDeterministicRandomSource(() => 0);
+        try {
+            processRimeCharmAbility(hitter, skinned, new SceneLogMock());
+            processRimeCharmAbility(hitter, plain, new SceneLogMock());
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+
+        expect(skinned.hasDebuffActive("Quagmire")).toBe(false);
+        expect(plain.hasDebuffActive("Quagmire")).toBe(true);
+    });
+});
+
+describe("T1: cards say what the engine does", () => {
+    const cardOf = (unit: Unit, abilityName: string): string => {
+        const properties = unit.getUnitProperties();
+        return properties.abilities_descriptions[properties.abilities.indexOf(abilityName)];
+    };
+
+    it("the Paralysis card shows the damage cut a landed Paralysis applies", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const mantis = realUnit("Nature", "Mantis", 3, 2);
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.RIGHT });
+        placeUnit(grid, unitsHolder, mantis, { x: 3, y: 3 });
+        placeUnit(grid, unitsHolder, target, { x: 4, y: 3 });
+        unitsHolder.refreshStackPowerForAllUnits();
+
+        setDeterministicRandomSource(() => 0);
+        try {
+            processParalysisAbility(mantis, target, mantis, new SceneLogMock());
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+
+        // A full stack: the effect's 40 plus the Mantis's luck, where the card used to print the ability's 50.
+        const cut = target.getEffect("Paralysis")?.getPower();
+        expect(cut).toBe(40 + mantis.getLuck());
+        expect(cardOf(mantis, "Paralysis")).toContain("100% chance");
+        expect(cardOf(mantis, "Paralysis")).toContain(`reduces their damage by ${cut}%`);
+    });
+
+    it("the Miner debuff records the armor it took", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const troglodyte = realUnit("Chaos", "Troglodyte", 1, 1);
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.RIGHT, armor: 10 });
+        placeUnit(grid, unitsHolder, troglodyte, { x: 3, y: 3 });
+        placeUnit(grid, unitsHolder, target, { x: 4, y: 3 });
+        unitsHolder.refreshStackPowerForAllUnits();
+
+        processMinerAbility(troglodyte, target, new SceneLogMock());
+
+        const properties = target.getUnitProperties();
+        const mined = target.getDebuff("Miner")?.getPower() ?? 0;
+        expect(mined).toBeGreaterThan(0);
+        expect(properties.applied_debuffs_powers[properties.applied_debuffs.indexOf("Miner")]).toBe(mined);
+    });
+
+    it("ability cards name the right target, trigger and bounce order", () => {
+        const card = (abilityName: string): string => getAbilityConfig(abilityName).desc.join(" ");
+        expect(card("Penetrating Bite")).toContain("of the target's max hp");
+        expect(card("Bitter Experience")).toContain("loses creatures to a hit and survives");
+        expect(card("Chakram")).toContain("bounce clockwise");
+        expect(card("Magic Reflection")).toContain("that same percentage of the damage");
+        expect(card("Mechanism")).not.toContain("vampirism");
+        expect(card("Chain Lightning")).toContain("On attack or response");
     });
 });

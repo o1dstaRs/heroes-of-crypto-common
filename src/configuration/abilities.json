@@ -540,7 +540,9 @@
     "Bitter Experience": {
         "name": "Bitter Experience",
         "type": "DEFENCE",
-        "desc": ["Every time unit gets hit, it gains +1 armor and step for the rest of the battle"],
+        "desc": [
+            "Every time the unit loses creatures to a hit and survives, it gains +1 armor and step for the rest of the battle"
+        ],
         "power": 1,
         "power_type": "GAIN_ARMOR_AND_STEPS_TAKING_DAMAGE",
         "skip_reponse": false,
@@ -692,7 +694,7 @@
         "name": "Chakram",
         "type": "ATTACK",
         "desc": [
-            "Maximum targets: {}. Ranged attacks hit the chosen enemy, then bounce to the nearest eligible enemies.",
+            "Maximum targets: {}. Ranged attacks hit the chosen enemy, then bounce clockwise to eligible enemies.",
             "A 1-cell gap keeps full damage; a 2-cell gap halves it and ends the flight there.",
             "A dodged target also ends it. Each enemy is hit once, and allies are never hit."
         ],
@@ -871,7 +873,7 @@
         "desc": [
             "Rebounds every spell aimed at this creature {}% of the time.",
             "The spell still lands on the dragon in full — the rebound is on top of it,",
-            "striking the caster with the same damage and the same effects"
+            "striking the caster with that same percentage of the damage and the same effects"
         ],
         "power": 75,
         "power_type": "MAGIC_MIRROR_REFLECT",
@@ -932,7 +934,7 @@
     "Penetrating Bite": {
         "name": "Penetrating Bite",
         "type": "ATTACK",
-        "desc": ["Melee attacks deal additional damage equal to {}% of unit's max hp"],
+        "desc": ["Melee attacks deal additional damage equal to {}% of the target's max hp"],
         "power": 35,
         "power_type": "ADDITIONAL_DAMAGE_PERCENTAGE",
         "skip_reponse": false,
@@ -1083,7 +1085,7 @@
         "name": "Mechanism",
         "type": "UNIT_TYPE",
         "desc": [
-            "Invulnerable to Mind attacks and spells, poison and vampirism.",
+            "Invulnerable to Mind attacks and spells, and to poison.",
             "While 50% more vulnerable to Status attacks. Cannot be healed and always has 0 morale"
         ],
         "power": 1,
@@ -1207,7 +1209,7 @@
         "name": "Chain Lightning",
         "type": "ATTACK",
         "desc": [
-            "On attack or reponse, deals {}/{}/{}/{}% of the damage",
+            "On attack or response, deals {}/{}/{}/{}% of the damage",
             "to the connected enemy (Wind). Depending on how far the enemy is from the target.",
             "Earth Elements take 50% more. A Wind Element earths the bolt: it takes nothing",
             "and the chain stops there"

@@ -322,6 +322,8 @@ export function fireWallBurnTargetOf(unit: Unit): IFireWallBurnTarget {
         isWaterElement: unit.hasAbilityActive("Water Element"),
         isWindElement: unit.hasAbilityActive("Wind Element"),
         isEarthElement: unit.hasAbilityActive("Earth Element"),
+        magicResist: unit.getMagicResist(),
+        magicDamageTakenMultiplier: unit.getMagicDamageTakenMultiplier(),
     };
 }
 

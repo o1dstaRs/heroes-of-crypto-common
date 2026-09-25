@@ -242,9 +242,10 @@ function prepareRangeCandidateDamage(
     }
     const giantsMaul = isPhysicalAoe ? unit.getBuff("Giants Maul") : undefined;
     const doubleShotAbility = shots > 1 ? getDoubleShotAbility(unit) : undefined;
+    // An area second volley repeats the first at full power, with the Dual Strike Charm on top as the engine applies it.
     const secondVolleyMultiplier = doubleShotAbility
         ? aoeAbility
-            ? 1
+            ? withDualStrikeCharm(1, unit)
             : withDualStrikeCharm(unit.calculateAbilityMultiplier(doubleShotAbility, attackerAbilityPower), unit)
         : 0;
     return {
@@ -2655,7 +2656,7 @@ class CandidateGenerator {
             for (let y = 0; y < gridSize - 1; y += 1) {
                 const anchor = { x, y };
                 const cells = [anchor, { x: x + 1, y }, { x, y: y + 1 }, { x: x + 1, y: y + 1 }];
-                const affected = evaluateAffectedUnits(cells, unitsHolder, grid)?.[0] ?? [];
+                const affected = evaluateAffectedUnits(cells, unitsHolder, grid, false)?.[0] ?? [];
                 const recipientIds = affected
                     .filter((unit) => unit.getTeam() === team && !unit.isDead())
                     .map((unit) => unit.getId())
@@ -2932,9 +2933,9 @@ class CandidateGenerator {
             this.context.grid.getSettings(),
             target.isSmallSize() ? [target.getBaseCell()] : target.getCells(),
         );
-        const caught = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
-            (unit) => !unit.isDead() && unit.getId() !== this.unit.getId() && unit.getId() !== target.getId(),
-        );
+        const caught = (
+            evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? []
+        ).filter((unit) => !unit.isDead() && unit.getId() !== this.unit.getId() && unit.getId() !== target.getId());
         if (!caught.length) {
             return undefined;
         }
@@ -2968,9 +2969,9 @@ class CandidateGenerator {
             this.context.grid.getSettings(),
             target.isSmallSize() ? [target.getBaseCell()] : target.getCells(),
         );
-        const splashed = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
-            (unit) => !unit.isDead() && unit.getId() !== this.unit.getId() && unit.getId() !== target.getId(),
-        );
+        const splashed = (
+            evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? []
+        ).filter((unit) => !unit.isDead() && unit.getId() !== this.unit.getId() && unit.getId() !== target.getId());
 
         const aimed = this.offensiveSpellDamage(spell, target);
         let value = aimed.value;
@@ -3060,7 +3061,7 @@ class CandidateGenerator {
                         if (cells.some((c) => !isCellWithinGrid(gs, c))) {
                             continue;
                         }
-                        const caught = evaluateAffectedUnits(cells, unitsHolder, grid)?.[0] ?? [];
+                        const caught = evaluateAffectedUnits(cells, unitsHolder, grid, false)?.[0] ?? [];
                         let value = 0;
                         let kill: 0 | 1 = 0;
                         for (const unit of caught) {

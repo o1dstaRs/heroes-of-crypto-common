@@ -1096,7 +1096,7 @@ const ringOfFireNetDamage = (
         context.grid.getSettings(),
         target.isSmallSize() ? [target.getBaseCell()] : target.getCells(),
     );
-    const caught = (evaluateAffectedUnits(cells, context.unitsHolder, context.grid)?.[0] ?? []).filter(
+    const caught = (evaluateAffectedUnits(cells, context.unitsHolder, context.grid, false)?.[0] ?? []).filter(
         (victim) => !victim.isDead() && victim.getId() !== caster.getId() && victim.getId() !== target.getId(),
     );
     if (!caught.length) return undefined;
@@ -1121,7 +1121,7 @@ function findMeteorOption(
             const anchor = { x, y };
             const cells = spread.flatMap((dx) => spread.map((dy) => ({ x: x + dx, y: y + dy })));
             if (cells.some((cell) => !isCellWithinGrid(settings, cell))) continue;
-            const victim = (evaluateAffectedUnits(cells, context.unitsHolder, context.grid)?.[0] ?? []).find(
+            const victim = (evaluateAffectedUnits(cells, context.unitsHolder, context.grid, false)?.[0] ?? []).find(
                 (unit) => unit.getTeam() !== caster.getTeam() && !unit.isDead() && spellDamage(caster, spell, unit) > 0,
             );
             if (!victim) continue;

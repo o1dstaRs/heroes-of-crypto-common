@@ -85,7 +85,13 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Goblin Knight is a level-3 stack fielded across the seeded draws and its damage roll decides when
 // each wound kills, so any trace holding one diverges from its first landed hit. Measured at a clean
 // HEAD with only this one-line change; two isolated runs reproduced this value byte-identically.
-const EXPECTED_REPLAY_SHA256 = "80b1633a7a6b4cf9fb91657c80ba5d2f331bcc7cbd9492d610f1212f57a058b7";
+// Previous approved digest: 80b1633a7a6b4cf9fb91657c80ba5d2f331bcc7cbd9492d610f1212f57a058b7
+// Re-pinned 2026-09-24 for the Knowledge Base audit fixes (server docs/ENGINE_ISSUES.md G8, G9): a hit the
+// protected unit's Water Shield absorbs is no longer redirected onto the Abomination, and Flesh Shield's
+// absorbed share no longer rolls Break a second time — Break draws its RNG only when its chance is above 0,
+// so dropping that roll shifts the seeded stream from the first Flesh Shield absorption on. Bisected: every
+// other audit fix leaves this digest unchanged. Two isolated runs reproduced this value byte-identically.
+const EXPECTED_REPLAY_SHA256 = "e1b08d3259ddaf10680391606a1c668e2d6ff8e7d7e2091b03389f990669c8a9";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

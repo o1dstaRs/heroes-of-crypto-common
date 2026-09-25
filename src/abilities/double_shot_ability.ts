@@ -119,6 +119,9 @@ export function processDoubleShotAbility(
             moraleDecreaseForTheUnitTeam,
         };
     }
+    // Dual Strike Charm amplifies the area second volley (Gargantuan's Double Throw, a Crafted Double Shot on
+    // an area shooter) on every unit it catches, as it does a single second arrow.
+    const charmFactor = withDualStrikeCharm(1, fromUnit);
     let aoeRangeAttackResult = processRangeAOEAbility(
         fromUnit,
         affectedUnits,
@@ -130,6 +133,9 @@ export function processDoubleShotAbility(
         damageStatisticHolder,
         true,
         (damageForAnimation.secondary ??= []),
+        charmFactor === 1
+            ? undefined
+            : Object.fromEntries(affectedUnits.map((unit) => [unit.getId(), charmFactor] as const)),
     );
     if (aoeRangeAttackResult.landed) {
         damageFromAttack = processLuckyStrikeAbility(fromUnit, aoeRangeAttackResult.maxDamage, sceneLog);

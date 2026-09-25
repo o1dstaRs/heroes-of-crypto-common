@@ -26,7 +26,7 @@ import {
     Tier1Artifact,
     Tier2Artifact,
 } from "../artifacts/artifact_properties";
-import { DOUBLE_SHOT_ABILITY_NAMES } from "../abilities/double_shot_names";
+import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES } from "../abilities/double_shot_names";
 import { getSpellConfig, POISON_ON_HIT_AURA_EFFECT_NAMES } from "../configuration/config_provider";
 import { NUMBER_OF_LAPS_TOTAL } from "../constants";
 import { AppliedAuraEffectProperties, type AuraEffectProperties } from "../effects/effect_properties";
@@ -510,7 +510,11 @@ export class UnitsHolder {
             const tier2 = fightProperties.getArtifactTier2(team);
             const isRange = unit.getAttackType() === PBTypes.AttackVals.RANGE;
             const isFlyer = unit.canFly();
-            const isMelee = unit.getAttackType() === PBTypes.AttackVals.MELEE && !isFlyer;
+            // Swift Boots' "melee units": plain melee and melee-magic walkers (Troll, Battle Mage, Ogre Mage, Behemoth).
+            const isMelee =
+                (unit.getAttackType() === PBTypes.AttackVals.MELEE ||
+                    unit.getAttackType() === PBTypes.AttackVals.MELEE_MAGIC) &&
+                !isFlyer;
 
             const applyArtifactBuff = (buffName: string, primary: number, secondary?: number): void => {
                 const buff = new Spell({
@@ -646,7 +650,7 @@ export class UnitsHolder {
                     // marker buff to units with Double Punch (melee) or one of the ranged second-shot
                     // abilities — Double Shot and Gargantuan's full-power Double Throw alike.
                     if (
-                        unit.hasAbilityActive("Double Punch") ||
+                        DOUBLE_PUNCH_ABILITY_NAMES.some((abilityName) => unit.hasAbilityActive(abilityName)) ||
                         DOUBLE_SHOT_ABILITY_NAMES.some((abilityName) => unit.hasAbilityActive(abilityName))
                     ) {
                         applyArtifactBuff("Dual Strike Charm", AP.DUAL_STRIKE_SECOND_ATTACK_PERCENT);

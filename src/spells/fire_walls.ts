@@ -22,6 +22,10 @@ export interface IFireWallBurnTarget {
     isWaterElement?: boolean;
     isWindElement?: boolean;
     isEarthElement?: boolean;
+    /** The burn is magic damage: magic resistance cuts it (100% blocks it) like every other fire. */
+    magicResist?: number;
+    /** Heavy Armor's +magic damage taken (Unit.getMagicDamageTakenMultiplier). */
+    magicDamageTakenMultiplier?: number;
 }
 
 // Default lifetime of a freshly laid fire wall, in laps. Matches the Fire Wall spell's `laps: 3` config —
@@ -352,7 +356,13 @@ export function fireWallBurnDamage(
         return 0;
     }
     const share = Number.isFinite(burnPercentage) && burnPercentage > 0 ? burnPercentage : FIRE_WALL_BURN_PERCENTAGE;
+    const magicResist = Math.max(0, Math.min(100, target?.magicResist ?? 0));
+    if (magicResist >= 100) {
+        return 0;
+    }
+    const heavyArmor = target?.magicDamageTakenMultiplier ?? 1;
+    const burn = Math.floor(((cumulativeMaxHp * share) / 100) * elementMultiplier * heavyArmor);
     // The floor of 1 keeps a token sear on a huge stack, but only for a creature the fire can touch at
-    // all — an immune element is already gone above.
-    return Math.max(1, Math.floor(((cumulativeMaxHp * share) / 100) * elementMultiplier));
+    // all — an immune element or 100% magic resistance is already gone above.
+    return Math.max(1, Math.floor(burn * (1 - magicResist / 100)));
 }

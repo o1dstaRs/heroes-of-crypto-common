@@ -70,6 +70,7 @@ export function processFireforgedSwordAbility(
         targetIsWaterElement: toUnit.hasAbilityActive("Water Element"),
         targetIsWindElement: toUnit.hasAbilityActive("Wind Element"),
         targetIsEarthElement: toUnit.hasAbilityActive("Earth Element"),
+        targetMagicDamageTakenMultiplier: toUnit.getMagicDamageTakenMultiplier(),
     });
     if (burnDamage <= 0) {
         return NO_BURN;

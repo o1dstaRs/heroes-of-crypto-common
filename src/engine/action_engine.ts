@@ -1449,7 +1449,7 @@ export class GameActionEngine {
         }
         const c = action.targetCell;
         const cells: XY[] = [c, { x: c.x + 1, y: c.y }, { x: c.x, y: c.y + 1 }, { x: c.x + 1, y: c.y + 1 }];
-        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? [];
+        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? [];
         const allies = affected.filter((u) => u.getTeam() === caster.getTeam());
         const crafted = processCraftAbility(caster, allies, this.context.sceneLog);
         caster.useSpell(spell.getName());
@@ -1933,7 +1933,7 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? [];
+        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? [];
         const enemies = affected.filter((unit) => unit.getTeam() !== caster.getTeam() && !unit.isDead());
         if (!enemies.length) {
             return this.reject("spell_not_available");
@@ -2156,9 +2156,9 @@ export class GameActionEngine {
         // evaluateAffectedUnits dedupes by unit, so a large creature straddling two of the ring's cells burns
         // once. The aimed target owns none of these cells, so it is already absent; it is filtered by id too
         // so the "spares its target" rule survives any future change to how occupancy is reported.
-        const caught = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
-            (unit) => !unit.isDead() && unit.getId() !== caster.getId() && unit.getId() !== target.getId(),
-        );
+        const caught = (
+            evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? []
+        ).filter((unit) => !unit.isDead() && unit.getId() !== caster.getId() && unit.getId() !== target.getId());
         // An empty ring is NOT a refusal: the owner wants Ring of Fire castable at any enemy in sight, so a
         // lone target simply spends the charge and burns no one. Refusing here was the "sometimes it will not
         // cast — with no barrier in the way" report: the barrier was this neighbour requirement, invisible to
@@ -2259,7 +2259,9 @@ export class GameActionEngine {
         // that touch it rather than the 8 around one corner — the same footprint rule Ring of Fire uses,
         // and the reason a big body is not blasted through its own middle.
         const cells = getCellsAroundFootprint(settings, epicentre.getCells());
-        const splashed = (evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? []).filter(
+        const splashed = (
+            evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? []
+        ).filter(
             // The caster is spared: a mage does not blow itself up with its own throw. The epicentre is
             // not — it owns none of the surrounding cells, so it is absent here and added below by name.
             (unit) => !unit.isDead() && unit.getId() !== caster.getId() && unit.getId() !== epicentre.getId(),
@@ -2338,7 +2340,7 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid)?.[0] ?? [];
+        const affected = evaluateAffectedUnits(cells, this.context.unitsHolder, this.context.grid, false)?.[0] ?? [];
         const enemies = affected.filter((unit) => unit.getTeam() !== caster.getTeam() && !unit.isDead());
         if (!enemies.length) {
             return this.reject("spell_not_available");

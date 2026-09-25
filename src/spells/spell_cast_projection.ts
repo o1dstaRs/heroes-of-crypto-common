@@ -84,8 +84,10 @@ export function spellElementMultiplierAgainst(spell: Spell, unit: Unit): number 
  * why a preview may use it without asking whether the two still agree.
  */
 export function spellDamageAgainstUnit(spell: Spell, rawDamage: number, unit: Unit): number {
+    // Heavy Armor raises the magic damage its holder takes before its element and resistance answer.
+    const multiplier = unit.getMagicDamageTakenMultiplier();
     return applyElementAndResistToSpellDamage(
-        rawDamage,
+        multiplier === 1 ? rawDamage : Math.floor(rawDamage * multiplier),
         spellElementMultiplierAgainst(spell, unit),
         unit.getMagicResist(),
     );

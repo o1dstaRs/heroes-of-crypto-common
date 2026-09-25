@@ -321,6 +321,9 @@ export function evaluateAffectedUnits(
     affectedCells: HoCMath.XY[],
     unitsHolder: UnitsHolder,
     grid: Grid,
+    // The Angel's Arrows Wingshield soaks ranged area ATTACKS (Area Throw, Large Caliber). Spells and Craft
+    // aimed at a block pass false: an Angel in the block doesn't shield the units beside it from them.
+    rangedAreaAttack = true,
 ): Array<Unit[]> | undefined {
     const cellKeys: number[] = [];
     const unitIds: string[] = [];
@@ -356,7 +359,9 @@ export function evaluateAffectedUnits(
     // Applied HERE rather than in processRangeAOEAbility because the client's hover preview calls this
     // same function to outline and price the victims, so what is highlighted is what actually gets hit.
     // Two Angels in one blast both soak it; neither passes it on.
-    const shieldBearers = affectedUnits.filter((unit) => unit.hasAbilityActive("Arrows Wingshield Blessing"));
+    const shieldBearers = rangedAreaAttack
+        ? affectedUnits.filter((unit) => unit.hasAbilityActive("Arrows Wingshield Blessing"))
+        : [];
     if (shieldBearers.length) {
         return [shieldBearers, shieldBearers];
     }

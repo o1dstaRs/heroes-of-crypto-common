@@ -1988,6 +1988,8 @@ export class AttackHandler {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                // Rime Charm rolls on every hit your units land — the second arrow included.
+                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
@@ -3033,6 +3035,8 @@ export class AttackHandler {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                // Rime Charm rolls on every hit your units land — the second punch included.
+                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,

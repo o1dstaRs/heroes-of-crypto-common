@@ -690,12 +690,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return chakramDescription(ability.getDesc().join("\n"), this.getStackPower());
         }
         if (ability.getName() === "Paralysis") {
-            const description = ability.getDesc().join("\n");
-            const reduction = this.calculateAbilityApplyChance(ability, 0);
-            const chance = Math.min(100, reduction * 2);
-            return description
-                .replace("{}", Number(chance.toFixed(2)).toString())
-                .replace("{}", Number(reduction.toFixed(2)).toString());
+            return this.getParalysisDescription(ability, 0);
         }
         if (ability.getName() === ABSOLVING_ARROW_NAME) {
             // Stack-and-luck scaled like the generic apply chance, but routed through the ability's own
@@ -817,6 +812,23 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         return false;
+    }
+    /**
+     * Heavy Armor's other side: every source of magic damage — spells, Fire Wall, Fireforged burns, Chain
+     * Lightning, Fire Breath, Fire Shield — hits this unit harder by the card's power per stack power (+50% at
+     * a full stack, shifted by luck). 1 without the card, or while Broken.
+     */
+    public getMagicDamageTakenMultiplier(): number {
+        const heavyArmor = this.getAbility("Heavy Armor");
+        if (!heavyArmor) {
+            return 1;
+        }
+        return Number(
+            (
+                ((heavyArmor.getPower() + this.getLuck()) / 100 / MAX_UNIT_STACK_POWER) * this.getStackPower() +
+                1
+            ).toFixed(2),
+        );
     }
     public getAbility(abilityName: string): Ability | undefined {
         // Missing-ability probes dominate AI evaluation. Establish absence before consulting Break: Break can
@@ -2961,7 +2973,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 positionalPropertyCount(firstDebuffProperty, secondDebuffProperty),
             )};${firstDebuffPropertyString};${secondDebuffPropertyString}`,
         );
-        this.unitProperties.applied_debuffs_powers.push(0);
+        this.unitProperties.applied_debuffs_powers.push(debuff.getPower());
     }
     /**
      * Overwrite the spellbook authoritatively from a ranked snapshot's exact entry list (each entry
@@ -3805,7 +3817,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.steps_mod += battleRoarBuff.getPower();
         }
         if (windFlowBuff) {
-            const newSteps = this.unitProperties.steps - windFlowBuff.getPower();
+            // Tome of Amplification strengthens Wind Flow's armor for the caster's flyers, never its slow: the
+            // movement penalty stays at the spell's own power.
+            const slow = Math.min(windFlowBuff.getPower(), getSpellConfig("System", "Wind Flow").power);
+            const newSteps = this.unitProperties.steps - slow;
             this.unitProperties.steps = Math.max(1, newSteps);
         }
         // Vine Throw (Trent / Grove Spellbook): the struck creature is snared by the vine and loses a flat
@@ -4330,6 +4345,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         let hasStunAura = false;
         let hasChakram = false;
         let hasMiner = false;
+        let hasParalysis = false;
         let hasDoubleShot = false;
         let hasMaulAoe = false;
         for (const abilityName of this.unitProperties.abilities) {
@@ -4345,6 +4361,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     break;
                 case "Miner":
                     hasMiner = true;
+                    break;
+                case "Paralysis":
+                    hasParalysis = true;
                     break;
                 default:
                     if (DOUBLE_SHOT_ABILITY_NAMES.includes(abilityName)) {
@@ -4377,6 +4396,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // aligned with the amount processMinerAbility actually transfers, including sane decimal rounding.
         if (hasMiner) {
             this.refreshMinerDescription(_synergyAbilityPowerIncrease);
+        }
+        // Paralysis's chance and damage cut both follow the live stack tier, luck and synergy.
+        if (hasParalysis) {
+            this.refreshParalysisDescription(_synergyAbilityPowerIncrease);
         }
         // The second-shot cards are a live percentage too: the ability's power plus the owner's CURRENT
         // luck, and for the stack-powered members its current stack tier on top.
@@ -4507,6 +4530,37 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             .getDesc()
             .join("\n")
             .replace(/\{\}/g, chance.toString());
+    }
+    /**
+     * The Paralysis card: the ability's power sets the landing chance (doubled when it rolls), while the
+     * damage cut is the Paralysis EFFECT's own power, scaled exactly as processParalysisAbility applies it.
+     * The card used to print the ability's power as the cut too, promising 50% where the effect cuts 40%.
+     */
+    private getParalysisDescription(ability: Ability, synergyAbilityPowerIncrease: number): string {
+        const chance = Math.min(100, this.calculateAbilityApplyChance(ability, synergyAbilityPowerIncrease) * 2);
+        const paralysisEffect = ability.getEffect();
+        const reduction = paralysisEffect
+            ? this.calculateEffectMultiplier(paralysisEffect, synergyAbilityPowerIncrease) * 100
+            : 0;
+        return ability
+            .getDesc()
+            .join("\n")
+            .replace("{}", Number(chance.toFixed(2)).toString())
+            .replace("{}", Number(reduction.toFixed(2)).toString());
+    }
+    private refreshParalysisDescription(synergyAbilityPowerIncrease: number): void {
+        const index = this.unitProperties.abilities.indexOf("Paralysis");
+        if (index < 0 || index >= this.unitProperties.abilities_descriptions.length) {
+            return;
+        }
+        const ability = this.abilities.find((candidate) => candidate.getName() === "Paralysis");
+        if (!ability) {
+            return;
+        }
+        this.unitProperties.abilities_descriptions[index] = this.getParalysisDescription(
+            ability,
+            synergyAbilityPowerIncrease,
+        );
     }
     private getMinerDescription(ability: Ability, synergyAbilityPowerIncrease: number): string {
         const amount = Number(this.calculateAbilityCount(ability, synergyAbilityPowerIncrease).toFixed(2));

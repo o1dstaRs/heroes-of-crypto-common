@@ -112,7 +112,7 @@ export function v08BlacksmithCraftRecipientsAt(
     anchor: XY,
 ): Unit[] {
     const seen = new Set<string>();
-    return (evaluateAffectedUnits(craftCells(anchor), context.unitsHolder, context.grid)?.[0] ?? [])
+    return (evaluateAffectedUnits(craftCells(anchor), context.unitsHolder, context.grid, false)?.[0] ?? [])
         .filter((candidate) => {
             if (candidate.getTeam() !== unit.getTeam() || candidate.isDead() || seen.has(candidate.getId())) {
                 return false;

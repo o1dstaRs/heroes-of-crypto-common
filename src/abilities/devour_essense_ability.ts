@@ -38,7 +38,9 @@ export function processDevourEssenceAbility(
         }
 
         const unit = unitsHolder.getAllUnits().get(uId);
-        if (unit && fromUnit.getOppositeTeam() === unit.getTeam()) {
+        // A stack that will raise itself (an Angel with its Resurrection charge) isn't destroyed — the same
+        // rule Infest follows, so the two never disagree about one kill.
+        if (unit && fromUnit.getOppositeTeam() === unit.getTeam() && !unit.canSelfResurrect()) {
             killedAnEnemy = true;
             break;
         }

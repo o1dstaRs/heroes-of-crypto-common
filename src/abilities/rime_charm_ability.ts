@@ -28,6 +28,10 @@ export function processRimeCharmAbility(fromUnit: Unit, targetUnit: Unit, sceneL
     if (!rimeCharmBuff) {
         return;
     }
+    // Quagmire is a spell debuff, and 100% magic resistance (Enchanted Skin) blocks every spell debuff.
+    if (targetUnit.getMagicResist() >= 100) {
+        return;
+    }
 
     if (HoCLib.getRandomInt(0, 100) >= rimeCharmBuff.getPower()) {
         return;
