@@ -1938,6 +1938,7 @@ export class AttackHandler {
                   damageForAnimation,
                   this.damageStatisticHolder,
                   isAOE,
+                  chakramTrajectory.damageFactorByUnitId,
               );
         this.updateMoraleDecreaseForTheUnitTeam(
             moraleDecreaseForTheUnitTeam,

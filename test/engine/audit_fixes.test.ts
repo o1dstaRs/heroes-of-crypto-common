@@ -36,6 +36,8 @@ import { Spell } from "../../src/spells/spell";
 import { spellDamageAgainstUnit } from "../../src/spells/spell_cast_projection";
 import { fireforgedSwordDamage } from "../../src/spells/spell_damage";
 import { fireWallBurnDamage } from "../../src/spells/fire_walls";
+import { projectMagicMirrorDamage } from "../../src/spells/magic_mirror_damage";
+import { SpellElement } from "../../src/spells/spell_properties";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import type { Unit } from "../../src/units/unit";
 import {
@@ -418,6 +420,21 @@ describe("G6: Heavy Armor's +magic damage applies to every magic source", () => 
         expect(spellDamageAgainstUnit(fireStrike, 100, knight(true))).toBe(150);
     });
 
+    it("so does the share a Magic Mirror sends back at an attacker in Heavy Armor", () => {
+        const holder = createTestUnit({ name: "Holder", team: PBTypes.TeamVals.RIGHT });
+        const reflected = (attacker: Unit) =>
+            projectMagicMirrorDamage({
+                attacker,
+                holder,
+                landedOnHolder: 200,
+                element: SpellElement.FIRE,
+                reflectionPercent: 50,
+            })?.landed;
+
+        expect(reflected(knight(false))).toBe(100);
+        expect(reflected(knight(true))).toBe(150);
+    });
+
     it("so do Fireforged burns", () => {
         const burn = (multiplier: number): number =>
             fireforgedSwordDamage({
@@ -737,5 +754,49 @@ describe("T1: cards say what the engine does", () => {
         expect(card("Magic Reflection")).toContain("that same percentage of the damage");
         expect(card("Mechanism")).not.toContain("vampirism");
         expect(card("Chain Lightning")).toContain("On attack or response");
+    });
+});
+
+describe("G14: a second Chakram throw scales its bounces like the first", () => {
+    it("a bounce across a two-cell gap takes half on both throws of a Crafted Double Shot", () => {
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const zena = createTestUnit({
+            name: "Zena",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+            amountAlive: 1,
+            abilities: ["Chakram", "Crafted Double Shot"],
+            stackPower: 5,
+        });
+        const primary = createTestUnit({
+            name: "Primary",
+            team: PBTypes.TeamVals.RIGHT,
+            maxHp: 10_000,
+            amountAlive: 1,
+        });
+        const far = createTestUnit({ name: "Far", team: PBTypes.TeamVals.RIGHT, maxHp: 10_000, amountAlive: 1 });
+        placeUnit(grid, unitsHolder, zena, { x: 8, y: 2 });
+        placeUnit(grid, unitsHolder, primary, { x: 8, y: 8 });
+        placeUnit(grid, unitsHolder, far, { x: 8, y: 11 });
+        zena.calculateMissChance = () => 0;
+        zena.calculateAttackDamage = () => 100;
+        const primaryBefore = primary.getCumulativeHp();
+        const farBefore = far.getCumulativeHp();
+
+        attackHandler.handleRangeAttack(
+            unitsHolder,
+            [1],
+            1,
+            createVisibleDamage(primary),
+            zena,
+            [[primary]],
+            undefined,
+            primary.getPosition(),
+        );
+
+        expect(primaryBefore - primary.getCumulativeHp()).toBe(200);
+        // 50 + 50: the second throw used to land the half-strength bounce at full (50 + 100).
+        expect(farBefore - far.getCumulativeHp()).toBe(100);
     });
 });

@@ -53,6 +53,9 @@ export function processDoubleShotAbility(
     damageForAnimation: IVisibleDamage,
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     isAOE: boolean,
+    // The first volley's per-victim scaling (Zena's Chakram halves a bounce across a two-cell gap): the second
+    // throw flies the same flight, so it scales the same way.
+    perUnitDamageFactors?: Readonly<Record<string, number>>,
 ): IDoubleShotResult {
     const animationData: IAnimationData[] = [];
     // Crafted Double Shot (granted by the Blacksmith's Craft) and Gargantuan's Double Throw run this exact
@@ -122,6 +125,13 @@ export function processDoubleShotAbility(
     // Dual Strike Charm amplifies the area second volley (Gargantuan's Double Throw, a Crafted Double Shot on
     // an area shooter) on every unit it catches, as it does a single second arrow.
     const charmFactor = withDualStrikeCharm(1, fromUnit);
+    const secondVolleyFactors: Record<string, number> = {};
+    for (const unit of affectedUnits) {
+        const factor = (perUnitDamageFactors?.[unit.getId()] ?? 1) * charmFactor;
+        if (factor !== 1) {
+            secondVolleyFactors[unit.getId()] = factor;
+        }
+    }
     let aoeRangeAttackResult = processRangeAOEAbility(
         fromUnit,
         affectedUnits,
@@ -133,9 +143,7 @@ export function processDoubleShotAbility(
         damageStatisticHolder,
         true,
         (damageForAnimation.secondary ??= []),
-        charmFactor === 1
-            ? undefined
-            : Object.fromEntries(affectedUnits.map((unit) => [unit.getId(), charmFactor] as const)),
+        Object.keys(secondVolleyFactors).length ? secondVolleyFactors : undefined,
     );
     if (aoeRangeAttackResult.landed) {
         damageFromAttack = processLuckyStrikeAbility(fromUnit, aoeRangeAttackResult.maxDamage, sceneLog);

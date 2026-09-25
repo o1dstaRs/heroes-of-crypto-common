@@ -72,7 +72,13 @@ export function projectMagicMirrorDamage(input: {
     }
 
     const reflectedRawDamage = Math.floor((landedOnHolder * reflectionPercent) / 100);
-    const landed = elementalMagicDamageAgainstUnit(reflectedRawDamage, element, attacker);
+    // Reflected magic is still magic: an attacker in Heavy Armor takes its share harder, like any other.
+    const heavyArmor = attacker.getMagicDamageTakenMultiplier();
+    const landed = elementalMagicDamageAgainstUnit(
+        heavyArmor === 1 ? reflectedRawDamage : Math.floor(reflectedRawDamage * heavyArmor),
+        element,
+        attacker,
+    );
     const absorbedByWaterShield = landed > 0 && attacker.willWaterShieldAbsorb(attacker);
     const damage = absorbedByWaterShield ? 0 : landed;
 
