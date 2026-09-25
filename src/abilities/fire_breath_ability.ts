@@ -97,19 +97,9 @@ export function breatheFireOnTargets(
             break;
         }
 
-        const heavyArmorAbility = nextStandingTarget.getAbility("Heavy Armor");
-        let multiplier = 1;
-        if (heavyArmorAbility) {
-            multiplier = Number(
-                (
-                    ((heavyArmorAbility.getPower() + nextStandingTarget.getLuck()) /
-                        100 /
-                        HoCConstants.MAX_UNIT_STACK_POWER) *
-                        nextStandingTarget.getStackPower() +
-                    1
-                ).toFixed(2),
-            );
-        }
+        // Heavy Armor's magic vulnerability, from the one place it is defined — the breath pays the same
+        // figure a spell does.
+        const multiplier = nextStandingTarget.getMagicDamageTakenMultiplier();
 
         // take magic resist into account
         let fireBreathAttackDamage = Math.floor(

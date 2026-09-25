@@ -118,17 +118,7 @@ function attackEnemiesAndGetLayerImpact(
             continue;
         }
 
-        const heavyArmorAbilityEnemy = e1.getAbility("Heavy Armor");
-        let heavyArmorMultiplierEnemy = 1;
-        if (heavyArmorAbilityEnemy) {
-            heavyArmorMultiplierEnemy = Number(
-                (
-                    ((heavyArmorAbilityEnemy.getPower() + e1.getLuck()) / 100 / HoCConstants.MAX_UNIT_STACK_POWER) *
-                        e1.getStackPower() +
-                    1
-                ).toFixed(2),
-            );
-        }
+        const heavyArmorMultiplierEnemy = e1.getMagicDamageTakenMultiplier();
 
         const targetEnemyLightningDamage = Math.floor(
             ((abilityMultiplier * multiplier) / 8) *
@@ -226,19 +216,9 @@ export function processChainLightningAbility(
     const wielderAffinity = fromUnit.getElementalDamageMultiplier(targetUnit) || 1;
     const chainBaseDamage = attackDamage / wielderAffinity;
 
-    const heavyArmorAbilityTarget = targetUnit.getAbility("Heavy Armor");
-    let heavyArmorMultiplierTarget = 1;
-    if (heavyArmorAbilityTarget) {
-        heavyArmorMultiplierTarget = Number(
-            (
-                ((heavyArmorAbilityTarget.getPower() + targetUnit.getLuck()) /
-                    100 /
-                    HoCConstants.MAX_UNIT_STACK_POWER) *
-                    targetUnit.getStackPower() +
-                1
-            ).toFixed(2),
-        );
-    }
+    // Heavy Armor's magic vulnerability, from the one place it is defined — every arc pays the same figure a
+    // spell does.
+    const heavyArmorMultiplierTarget = targetUnit.getMagicDamageTakenMultiplier();
 
     const abilityMultiplier = fromUnit.calculateAbilityMultiplier(
         chainLightningAbility,

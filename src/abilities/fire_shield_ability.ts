@@ -44,17 +44,9 @@ export function processFireShieldAbility(
 
     const fireShieldAbility = fromUnit.getAbility("Fire Shield");
     if (fireShieldAbility && !toUnit.hasAbilityActive("Fire Element")) {
-        const heavyArmorAbility = toUnit.getAbility("Heavy Armor");
-        let multiplier = 1;
-        if (heavyArmorAbility) {
-            multiplier = Number(
-                (
-                    ((heavyArmorAbility.getPower() + toUnit.getLuck()) / 100 / HoCConstants.MAX_UNIT_STACK_POWER) *
-                        toUnit.getStackPower() +
-                    1
-                ).toFixed(2),
-            );
-        }
+        // Heavy Armor's magic vulnerability, read from the one place it is defined so the shield can never
+        // price it differently from a spell.
+        const multiplier = toUnit.getMagicDamageTakenMultiplier();
 
         // take magic resist into account
         const fireShieldDmg = Math.floor(
