@@ -2542,11 +2542,6 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        const targetCell = action.targetCell ?? this.context.getSummonTargetCell?.(caster, spell, action);
-        if (!SpellHelper.canCastSummon(spell, this.context.grid.getMatrix(), targetCell)) {
-            return this.reject("spell_not_available");
-        }
-
         const unitName = spell.getSummonUnitName();
         const team = caster.getTeam();
         const existing = this.context.unitsHolder.getSummonedUnitByName(team, unitName);
@@ -2558,6 +2553,32 @@ export class GameActionEngine {
             const events = this.createSummonEvents(caster, spell, existing, amount, existing.getCells(), true);
             events.push(...this.turnEngine.completeTurn(caster));
             return { completed: true, events };
+        }
+
+        // An explicit cell has to hold the creature's real body; it is not relocated. A cast with no
+        // cell (what the ranked client sends) seats that body on the first ring cell that can hold it,
+        // and when none can — a 2x1 Wolf whose left cell is blocked, the case of a Satyr on the board
+        // edge with one free cell beside it — the stack stands on that one free cell.
+        const native = SpellHelper.summonFootprintOf(spell);
+        const ring = getCellsAroundFootprint(this.context.grid.getSettings(), caster.getCells());
+        const seat = action.targetCell
+            ? SpellHelper.canCastSummon(
+                  spell,
+                  this.context.grid.getMatrix(),
+                  action.targetCell,
+                  native.width,
+                  native.height,
+              )
+                ? { cell: action.targetCell, width: native.width, height: native.height }
+                : undefined
+            : SpellHelper.resolveSummonSeat(
+                  spell,
+                  this.context.grid.getMatrix(),
+                  ring,
+                  this.context.getSummonTargetCell?.(caster, spell, action),
+              );
+        if (!seat) {
+            return this.reject("spell_not_available");
         }
 
         if (!this.context.createSummonedUnit) {
@@ -2576,43 +2597,14 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        // The FALLBACK target (no explicit cell on the action) was chosen before the creature existed,
-        // so it could only be vetted as a 1x1. Now that the body's true shape is known, a fallback cell
-        // that cannot seat it retries the ring around the caster's whole footprint for the first anchor
-        // that can — the seam firstSummonableAnchor was written for. An explicit player-chosen cell is
-        // never re-routed: refusing it is the correct answer.
-        let seatCell = targetCell;
-        if (
-            action.targetCell === undefined &&
-            seatCell &&
-            !SpellHelper.canCastSummon(
-                spell,
-                this.context.grid.getMatrix(),
-                seatCell,
-                summoned.getFootprintWidth(),
-                summoned.getFootprintHeight(),
-            )
-        ) {
-            seatCell = SpellHelper.firstSummonableAnchor(
-                spell,
-                this.context.grid.getMatrix(),
-                getCellsAroundFootprint(this.context.grid.getSettings(), caster.getCells()),
-                summoned.getFootprintWidth(),
-                summoned.getFootprintHeight(),
-            );
-            if (!seatCell) {
-                return this.reject("spell_not_available");
-            }
+        if (seat.width !== native.width || seat.height !== native.height) {
+            summoned.standInOneCell();
         }
+        const seatCell = seat.cell;
         const cells = this.resolveSummonCells(summoned, seatCell);
         if (!cells.length) {
             return this.reject("spell_not_available");
         }
-        // The gate at the top of this cast could only prove the ANCHOR cell was free: the creature that
-        // would stand on it did not exist yet. It does now, so put its whole body through the same
-        // authoritative gate. Every shipped summon is a 1x1, for which this re-asks the identical question
-        // and gets the identical answer; for anything wider it is the difference between refusing the cast
-        // and dropping a body across cells that were never looked at.
         if (
             !SpellHelper.canCastSummon(
                 spell,

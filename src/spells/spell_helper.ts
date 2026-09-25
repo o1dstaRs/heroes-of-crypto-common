@@ -627,6 +627,42 @@ export function summonFootprintOf(spell: Spell): { width: number; height: number
  * the client's own cast path each used to spell this rule out separately, and three copies of a targeting
  * rule is three chances to promise a cast the engine then refuses.
  */
+export interface ISummonSeat {
+    cell: XY;
+    width: number;
+    height: number;
+}
+
+/**
+ * Where a summon stands, and how big that body is.
+ *
+ * The creature's own footprint is used whenever a cell around the caster can hold it. When it cannot —
+ * a 2x1 Wolf whose left-hand cell is blocked, including a Satyr on the board edge with one free cell
+ * beside it — the stack stands on that one free cell instead of the cast being refused.
+ */
+export function resolveSummonSeat(
+    spell: Spell,
+    gridMatrix: number[][],
+    casterRingCells: readonly XY[],
+    preferredCell?: XY,
+): ISummonSeat | undefined {
+    const native = summonFootprintOf(spell);
+    const fitted = resolveSummonAnchor(spell, gridMatrix, casterRingCells, preferredCell);
+    if (fitted) {
+        return { cell: fitted, width: native.width, height: native.height };
+    }
+
+    const candidates = preferredCell
+        ? [preferredCell, ...casterRingCells.filter((cell) => cell.x !== preferredCell.x || cell.y !== preferredCell.y)]
+        : casterRingCells;
+    const cell = firstSummonableAnchor(spell, gridMatrix, candidates, 1, 1);
+    if (!cell) {
+        return undefined;
+    }
+
+    return { cell, width: 1, height: 1 };
+}
+
 export function resolveSummonAnchor(
     spell: Spell,
     gridMatrix: number[][],

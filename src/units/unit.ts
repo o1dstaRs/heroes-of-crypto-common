@@ -1571,6 +1571,15 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             normalizeFootprintSide(this.unitProperties.size),
         );
     }
+    /**
+     * Occupy a single cell. Used when a wider summon (a Wolf) has no room for its real body.
+     * Writes the fields directly: Unit.createUnit clones the properties, so a method on that class
+     * does not survive onto the copy the unit actually holds.
+     */
+    public standInOneCell(): void {
+        this.unitProperties.footprint_width = 1;
+        this.unitProperties.footprint_height = 1;
+    }
     public isSummoned(): boolean {
         return this.summoned;
     }

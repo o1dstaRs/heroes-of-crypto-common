@@ -91,8 +91,8 @@ export class UnitProperties {
      * from `size` so a rectangle can differ from the square size the texture and the card still use — and
      * so both sides survive every structuredClone of these properties (snapshots, stack splits, rollouts).
      */
-    public readonly footprint_width: number;
-    public readonly footprint_height: number;
+    public footprint_width: number;
+    public footprint_height: number;
     public readonly level: number;
     public readonly spells: string[];
     /** True once `spells` is a runtime/snapshot charge list rather than raw creature configuration. */

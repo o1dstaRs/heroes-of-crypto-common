@@ -723,6 +723,54 @@ describe("action engine footprints — summoning", () => {
             expect(setup.fightProperties.hasAlreadyMadeTurn(setup.caster.getId())).toBe(false);
         });
     }
+
+    it("stands a 2x1 summon on one free cell when no target was given and the real body cannot fit", () => {
+        const caster = createFootprintUnit(1, 1, { name: "Satyr", spells: ["Nature:Summon Wolves"] });
+        let summoned: Unit | undefined;
+        const setup = fightEngine(caster, {
+            createSummonedUnit: ({ team, unitName, amount }) => {
+                summoned = createFootprintUnit(2, 1, {
+                    name: unitName,
+                    team,
+                    amountAlive: amount,
+                    summoned: true,
+                });
+                return summoned;
+            },
+        });
+        standAt(setup.grid, setup.unitsHolder, caster, { x: 15, y: 7 });
+        for (const cell of [
+            { x: 15, y: 6 },
+            { x: 14, y: 7 },
+            { x: 14, y: 8 },
+            { x: 13, y: 6 },
+        ]) {
+            standAt(
+                setup.grid,
+                setup.unitsHolder,
+                createFootprintUnit(1, 1, { name: "Blocker", team: PBTypes.TeamVals.RIGHT }),
+                cell,
+            );
+        }
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: caster.getId(),
+            spellName: "Summon Wolves",
+        });
+
+        expect(result.completed).toBe(true);
+        const wolf = summoned!;
+        expect(wolf.isSmallSize()).toBe(true);
+        expect(setup.grid.getRegisteredCells(wolf.getId())).toHaveLength(1);
+        const cell = wolf.getBaseCell();
+        expect(
+            [
+                { x: 15, y: 8 },
+                { x: 14, y: 6 },
+            ].some((free) => free.x === cell.x && free.y === cell.y),
+        ).toBe(true);
+    });
 });
 
 describe("action engine footprints — splitting", () => {
