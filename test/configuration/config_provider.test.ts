@@ -110,6 +110,7 @@ describe("config_provider", () => {
 
         expect(creature.hp).toBe(55);
         expect(creature.base_armor).toBe(17);
+        expect(creature.shot_distance).toBe(6);
 
         const handymanIndex = creature.abilities.indexOf("Handyman");
         expect(handymanIndex).toBeGreaterThanOrEqual(0);
@@ -144,14 +145,15 @@ describe("config_provider", () => {
         expect(creature.attack_damage_max).toBe(20);
     });
 
-    it("loads Tsar Cannon's improved ranged profile", () => {
+    // Shot distance walked back 9.5 -> 6.5. Armor, attack, and the damage range stay at the earlier buff.
+    it("loads Tsar Cannon's ranged profile", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Life", "Tsar Cannon", "tsar_cannon_512", 0, 500);
 
         expect(creature.base_armor).toBe(32);
         expect(creature.base_attack).toBe(46);
         expect(creature.attack_damage_min).toBe(40);
         expect(creature.attack_damage_max).toBe(55);
-        expect(creature.shot_distance).toBe(9.5);
+        expect(creature.shot_distance).toBe(6.5);
     });
 
     it("loads Dryad's improved attack profile", () => {
