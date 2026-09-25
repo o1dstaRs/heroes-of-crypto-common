@@ -89,7 +89,10 @@ export function processLightningSpinAbility(
     if (lightningSpinAbility) {
         const unitsDead: Unit[] = [];
         const wasDead: Unit[] = [];
-        const nearbyEnemies = unitsHolder.allEnemiesAroundUnit(fromUnit, isAttack, attackFromCell);
+        // A unit Terrifying Gaze forbids this one to attack is left out of the spin as well.
+        const nearbyEnemies = unitsHolder
+            .allEnemiesAroundUnit(fromUnit, isAttack, attackFromCell)
+            .filter((enemy) => !fromUnit.cannotAttackUnitId(enemy.getId()));
         // Lightning Spin is one radial impact. As with range splash, resolve any Flesh Shield owners
         // caught in it before their protected allies so the owner's direct hit reserves HP and cannot
         // disappear merely because grid-neighbour iteration returned an ally first.
@@ -156,7 +159,17 @@ export function processLightningSpinAbility(
             let damageFromAttack =
                 processLuckyStrikeAbility(
                     fromUnit,
-                    fromUnit.calculateAttackDamage(enemy, PBTypes.AttackVals.MELEE, 1, abilityMultiplier),
+                    // (target, attack type, the team's ability power, divisor 1, the spin's multiplier): the multiplier
+                    // used to land in the DIVISOR slot, so a weak stack spun harder than a full one.
+                    fromUnit.calculateAttackDamage(
+                        enemy,
+                        PBTypes.AttackVals.MELEE,
+                        FightStateManager.getInstance()
+                            .getFightProperties()
+                            .getAdditionalAbilityPowerPerTeam(fromUnit.getTeam()),
+                        1,
+                        abilityMultiplier,
+                    ),
                     sceneLog,
                 ) + processPenetratingBiteAbility(fromUnit, enemy);
 

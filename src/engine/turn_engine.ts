@@ -487,12 +487,31 @@ export class TurnEngine {
 
         return events;
     }
+    /**
+     * The team's living stacks that haven't acted this lap — what the turn clock shares the budget among. Both
+     * teams' stored stack counts are refreshed on the way, so losses and summons reach every reader of them.
+     */
+    private stacksToAct(team: TeamType): number {
+        for (const side of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT] as TeamType[]) {
+            this.fightProperties.setTeamUnitsAlive(
+                side,
+                this.unitsHolder.getAllAllies(side).filter((ally) => !ally.isDead()).length,
+            );
+        }
+        return this.unitsHolder
+            .getAllAllies(team)
+            .filter((ally) => !ally.isDead() && !this.fightProperties.hasAlreadyMadeTurn(ally.getId())).length;
+    }
     private activateNextUnit(unit: Unit): GameEvent[] {
         const events: GameEvent[] = [];
         if (unit.isOnHourglass()) {
             unit.setOnHourglass(false);
         }
-        this.fightProperties.startTurn(unit.getTeam(), this.runtime.clock.nowMillis());
+        this.fightProperties.startTurn(
+            unit.getTeam(),
+            this.runtime.clock.nowMillis(),
+            this.stacksToAct(unit.getTeam()),
+        );
         unit.refreshPreTurnState(this.sceneLog);
 
         // Poison ticks at the very start of the unit's turn, before it acts (even if it is about to skip).

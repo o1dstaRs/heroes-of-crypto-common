@@ -427,7 +427,10 @@ export class GameActionEngine {
         if (!activeUnit || activeUnit.getTeam() !== team) {
             return this.reject("additional_time_not_available");
         }
-        const additionalTime = this.context.fightProperties.requestAdditionalTurnTime(team);
+        const stacksToAct = this.context.unitsHolder
+            .getAllAllies(team)
+            .filter((ally) => !ally.isDead() && !this.context.fightProperties.hasAlreadyMadeTurn(ally.getId())).length;
+        const additionalTime = this.context.fightProperties.requestAdditionalTurnTime(team, false, stacksToAct);
         if (additionalTime <= 0) {
             return this.reject("additional_time_not_available");
         }
@@ -2415,6 +2418,8 @@ export class GameActionEngine {
     }
     private canUseSpell(caster: Unit, spell: Spell): boolean {
         return (
+            // A Broken unit can't cast — the engine's rule, not only the hidden spellbook.
+            !caster.hasEffectActive("Break") &&
             spell.getLapsTotal() > 0 &&
             spell.isRemaining() &&
             spell.getMinimalCasterStackPower() <= caster.getStackPower()
@@ -2969,6 +2974,8 @@ export class GameActionEngine {
             return this.reject(refusal ?? "invalid_placement");
         }
 
+        // The peeled stack takes its share of the spell charges and arrows; nothing is duplicated.
+        sourceUnit.shareResourcesWithSplit(splitUnit, action.amount);
         const sourceAmount = sourceUnit.getAmountAlive() - action.amount;
         sourceUnit.setAmountAlive(sourceAmount);
         this.context.unitsHolder.addUnit(splitUnit);

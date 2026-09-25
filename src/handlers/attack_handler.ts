@@ -1189,21 +1189,6 @@ export class AttackHandler {
                         .getFightProperties()
                         .getAdditionalAbilityPowerPerTeam(rangeResponseUnit.getTeam()),
                 );
-            // The counter-shot is its own arrow down its own line, so a responding Monk cleanses the allies
-            // IT flies past (same rule as the initiating shot above).
-            AllAbilities.processAbsolvingArrowAbility(
-                targetUnit,
-                attackerUnit.getPosition(),
-                unitsHolder.getAllUnits(),
-                this.grid,
-                this.gridSettings,
-                this.sceneLog,
-            );
-            animationData.push({
-                fromPosition: targetUnit.getPosition(),
-                toPosition: attackerUnit.getPosition(),
-                affectedUnit: rangeResponseUnit,
-            });
         } else {
             rangeResponseUnit = undefined;
         }
@@ -1386,6 +1371,29 @@ export class AttackHandler {
                     .getAdditionalMoralePerTeam(unitToIncreaseMoraleTo.getTeam()),
             );
         };
+
+        // An area volley (Area Throw, Large Caliber, Chakram) has already landed on the target: a stack it wiped
+        // out has nobody left to shoot back. (A single shot's damage lands after the counter-shot.)
+        if (rangeResponseUnit && targetUnit.isDead()) {
+            rangeResponseUnit = undefined;
+        }
+        if (rangeResponseUnit) {
+            // The counter-shot is its own arrow down its own line, so a responding Monk cleanses the allies
+            // IT flies past (same rule as the initiating shot above).
+            AllAbilities.processAbsolvingArrowAbility(
+                targetUnit,
+                attackerUnit.getPosition(),
+                unitsHolder.getAllUnits(),
+                this.grid,
+                this.gridSettings,
+                this.sceneLog,
+            );
+            animationData.push({
+                fromPosition: targetUnit.getPosition(),
+                toPosition: attackerUnit.getPosition(),
+                affectedUnit: rangeResponseUnit,
+            });
+        }
 
         if (rangeResponseUnit && rangeResponseUnits) {
             // ABILITY Chakram (Zena) on the RESPONSE: a counter-throw behaves EXACTLY like the initiating one —

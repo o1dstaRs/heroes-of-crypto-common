@@ -2985,6 +2985,61 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             spell.setAmount(remainingByName.get(spell.getName()) ?? 0);
         }
     }
+    /**
+     * A split peels `amount` creatures off this stack into `part`, a fresh stack of the same creature. What
+     * the stack carries is shared out, never duplicated: `part` gets its share of every spell charge and of
+     * the arrows, in proportion to the creatures it takes and rounded down, and this stack keeps the rest —
+     * so splitting can't multiply a spell book, a quiver or a one-per-fight cast (a single Resurrection,
+     * Castling or Battle Roar charge always stays here). Call it before this stack's count is reduced.
+     */
+    public shareResourcesWithSplit(part: Unit, amount: number): void {
+        const total = this.getAmountAlive();
+        if (total <= 0 || amount <= 0 || amount >= total) {
+            return;
+        }
+        this.moveResourcesTo(part, amount / total, false);
+    }
+    /**
+     * Merging `moved` of `from`'s creatures back into this stack brings their share of `from`'s spell
+     * charges and arrows along (all of them when the whole stack merges). Call it before `from`'s count is
+     * reduced.
+     */
+    public takeResourcesFromMerge(from: Unit, moved: number): void {
+        const total = from.getAmountAlive();
+        if (total <= 0 || moved <= 0) {
+            return;
+        }
+        from.moveResourcesTo(this, Math.min(1, moved / total), true);
+    }
+    private moveResourcesTo(other: Unit, share: number, addToOther: boolean): void {
+        const counts = new Map<string, number>();
+        for (const entry of this.unitProperties.spells) {
+            counts.set(entry, (counts.get(entry) ?? 0) + 1);
+        }
+        const toMove = new Map<string, number>();
+        for (const [entry, count] of counts) {
+            toMove.set(entry, Math.floor(count * share));
+        }
+        const moved: string[] = [];
+        const kept: string[] = [];
+        for (const entry of this.unitProperties.spells) {
+            const left = toMove.get(entry) ?? 0;
+            if (left > 0) {
+                moved.push(entry);
+                toMove.set(entry, left - 1);
+            } else {
+                kept.push(entry);
+            }
+        }
+        this.syncAuthoritativeSpellEntries(kept);
+        other.syncAuthoritativeSpellEntries(addToOther ? [...other.unitProperties.spells, ...moved] : moved);
+
+        const arrows = Math.max(0, Math.floor(this.unitProperties.range_shots));
+        const movedArrows = Math.floor(arrows * share);
+        this.unitProperties.range_shots = arrows - movedArrows;
+        other.unitProperties.range_shots =
+            (addToOther ? Math.floor(other.unitProperties.range_shots) : 0) + movedArrows;
+    }
     public useSpell(spellName: string): void {
         for (const s of this.spells) {
             if (s.getName() === spellName) {

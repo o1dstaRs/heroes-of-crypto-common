@@ -475,7 +475,12 @@ export class FightProperties {
     public setHighestInitiativeThisTurn(highestInitiativeThisTurn: number): void {
         this.highestInitiativeThisTurn = highestInitiativeThisTurn;
     }
-    public startTurn(teamType: TeamType, nowMillis: number = getTimeMillis()): void {
+    /**
+     * Start the turn clock. `stacksToAct` is how many of the team's living stacks still have to act this lap,
+     * the starting one included; callers that can see the board pass it. The fallback — the stack count
+     * stored at fight start minus the stacks that acted — never saw losses or summons.
+     */
+    public startTurn(teamType: TeamType, nowMillis: number = getTimeMillis(), stacksToAct?: number): void {
         let currentTotalTimePerTeam = this.currentLapTotalTimePerTeam.get(teamType);
         if (currentTotalTimePerTeam === undefined) {
             currentTotalTimePerTeam = 0;
@@ -490,22 +495,17 @@ export class FightProperties {
             teamType === PBTypes.TeamVals.LEFT
                 ? (this.teamUnitsAlive.get(PBTypes.TeamVals.LEFT) ?? 0)
                 : (this.teamUnitsAlive.get(PBTypes.TeamVals.RIGHT) ?? 0);
-        let teamMembersToMakeTurn = teamMembersAlive - alreadyMadeTurnTeamMembers - 1;
-        if (teamMembersToMakeTurn < 0) {
-            teamMembersToMakeTurn = 0;
-        }
+        const stillToAct = stacksToAct ?? teamMembersAlive - alreadyMadeTurnTeamMembers;
+        const teamMembersToMakeTurn = Math.max(0, stillToAct - 1);
 
         const allocatedForOtherUnits = MIN_TIME_TO_MAKE_TURN_MILLIS * teamMembersToMakeTurn;
         const timeRemaining = TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam - allocatedForOtherUnits;
 
         let maxTimeToMakeTurn = MAX_TIME_TO_MAKE_TURN_MILLIS;
-        if (teamMembersAlive > 0 && teamMembersAlive - alreadyMadeTurnTeamMembers > 0) {
+        if (stillToAct > 0) {
             maxTimeToMakeTurn = Math.min(
                 maxTimeToMakeTurn,
-                Math.ceil(
-                    (TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam) /
-                        (teamMembersAlive - alreadyMadeTurnTeamMembers),
-                ),
+                Math.ceil((TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam) / stillToAct),
             );
         }
 
@@ -515,7 +515,8 @@ export class FightProperties {
         // `timeRemaining:${timeRemaining} currentTotalTimePerTeam:${currentTotalTimePerTeam} maxTimeToMakeTurn:${maxTimeToMakeTurn} alreadyMadeTurnTeamMembers:${alreadyMadeTurnTeamMembers}`,
         // );
     }
-    public requestAdditionalTurnTime(teamType?: TeamType, justCheck = false): number {
+    /** Once per lap per team: more time on the running turn. `stacksToAct` as in startTurn. */
+    public requestAdditionalTurnTime(teamType?: TeamType, justCheck = false, stacksToAct?: number): number {
         if (!teamType) {
             return 0;
         }
@@ -540,19 +541,14 @@ export class FightProperties {
                 ? (this.teamUnitsAlive.get(PBTypes.TeamVals.LEFT) ?? 0)
                 : (this.teamUnitsAlive.get(PBTypes.TeamVals.RIGHT) ?? 0);
 
-        let teamMembersToMakeTurn = teamMembersAlive - alreadyMadeTurnTeamMembers;
-        if (teamMembersToMakeTurn < 0) {
-            teamMembersToMakeTurn = 0;
-        }
+        const stillToAct = stacksToAct ?? teamMembersAlive - alreadyMadeTurnTeamMembers;
+        const teamMembersToMakeTurn = Math.max(0, stillToAct);
         const allocatedForOtherUnits = MIN_TIME_TO_MAKE_TURN_MILLIS * (teamMembersToMakeTurn - 1);
         const timeRemaining = TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam - allocatedForOtherUnits;
-        if (timeRemaining > 0 && teamMembersAlive - alreadyMadeTurnTeamMembers > 0) {
+        if (timeRemaining > 0 && stillToAct > 0) {
             const additionalTime = Math.min(
                 MAX_TIME_TO_MAKE_TURN_MILLIS,
-                Math.ceil(
-                    (TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam) /
-                        (teamMembersAlive - alreadyMadeTurnTeamMembers),
-                ),
+                Math.ceil((TOTAL_TIME_TO_MAKE_TURN_MILLIS - currentTotalTimePerTeam) / stillToAct),
             );
             if (!justCheck) {
                 this.hasAdditionalTimeRequestedPerTeam.set(teamType, true);

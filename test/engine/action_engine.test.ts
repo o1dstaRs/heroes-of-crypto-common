@@ -2368,6 +2368,23 @@ describe("GameActionEngine", () => {
         expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
     });
 
+    it("refuses a cast from a Broken caster — Break stops casting in the engine, not only in the UI", () => {
+        const setup = setupActionFight({ leftSpells: ["Death:Weakness"] });
+        setup.left.applyEffect(new EffectFactory().makeEffect("Break")!);
+
+        const result = setup.engine.apply({
+            type: "cast_spell",
+            casterId: setup.left.getId(),
+            spellName: "Weakness",
+            targetId: setup.right.getId(),
+        });
+
+        expect(result.completed).toBe(false);
+        expect(result.rejectionReason).toBe("spell_not_available");
+        expect(setup.right.hasDebuffActive("Weakness")).toBe(false);
+        expect(setup.left.hasSpellRemaining("Weakness")).toBe(true);
+    });
+
     it("reports Wild Regeneration's delivered ability on the authoritative spell event", () => {
         const setup = setupActionFight({ leftAbilities: ["Wild Regeneration"] });
 
