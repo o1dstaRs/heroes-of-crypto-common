@@ -283,7 +283,7 @@ export function processRangeAOEAbility(
             }
             processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
             processFreezeAbility(attackerUnit, unit, attackerUnit, sceneLog);
-            processRimeCharmAbility(attackerUnit, unit, sceneLog);
+            processRimeCharmAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
             processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
         }
         attackerUnit.increaseMorale(

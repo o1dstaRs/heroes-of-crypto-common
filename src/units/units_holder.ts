@@ -1281,7 +1281,8 @@ export class UnitsHolder {
     public getUnitAuraAttackMod(unit: Unit, cells?: XY[]): number {
         let auraAttackMod = 0;
         const warAngerAuraEffect = unit.getAuraEffect("War Anger");
-        if (warAngerAuraEffect) {
+        // Break switches War Anger off like every aura the unit projects (getAuraEffects is empty then).
+        if (warAngerAuraEffect && !unit.hasEffectActive("Break")) {
             const unitCells = cells?.length ? cells : unit.getCells();
             const enemiesSpotted = this.countEnemiesWithinRange(
                 unit,

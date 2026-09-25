@@ -2029,7 +2029,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * on-hit riders (debuffs, gazes, auras) must not land: an absorbed hit applies nothing, like a miss.
      */
     public willWaterShieldAbsorb(attacker?: Unit): boolean {
-        return this.hasBuffActive("Water Shield") && !attacker?.hasAbilityActive("Fire Element");
+        // The shield is the Water Shield ability at work, so Break turns it off like every other ability: a
+        // Broken holder takes the hit and keeps the shield for when Break wears off.
+        return (
+            this.hasBuffActive("Water Shield") &&
+            !this.hasEffectActive("Break") &&
+            !attacker?.hasAbilityActive("Fire Element")
+        );
     }
     public calculatePossibleLosses(minusHp: number): number {
         let amountDied = 0;
@@ -2569,7 +2575,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return applyAttackDamageChain(chain, getRandomInt(chain.rollMin, chain.rollMaxExclusive));
     }
     public canSkipResponse(): boolean {
-        if (!this.hasAbilityActive("Break")) {
+        // Break is an EFFECT: asking for an ability of that name never matched, so a Broken Shadow Touch or
+        // Lightning Spin stayed unanswerable although Break switches every ability off.
+        if (!this.hasEffectActive("Break")) {
             for (const a of this.abilities) {
                 if (a.getSkipResponse()) {
                     return true;
@@ -3699,6 +3707,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (enchantedSkinAbility) {
             this.unitProperties.magic_resist_mod = enchantedSkinAbility.getPower();
         } else {
+            // Only Enchanted Skin writes the override, so clear it whenever the skin is off (Break): a stale 100
+            // here outranked the resistance recomputed below and kept a Broken Black Dragon immune to magic.
+            this.unitProperties.magic_resist_mod = 0;
             const magicResists: number[] = [this.getMagicResist() / 100];
             magicShieldAbility = getStatAbility(magicShieldAbility, "Magic Shield");
             if (magicShieldAbility) {

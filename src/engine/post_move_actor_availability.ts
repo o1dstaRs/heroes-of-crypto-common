@@ -405,7 +405,8 @@ export function projectPostMoveActorAvailability(
     const burningCells = enteredFireWallCells(fireWalls, traversal.crossedCells);
     const burnTarget = fireWallBurnTargetOf(unit);
     const fireWallHits: IFireWallHitProjection[] = [];
-    let waterShieldAvailable = unit.hasBuffActive("Water Shield");
+    // Same test the burn itself runs (Unit.applyDamage): a Broken holder's shield is off.
+    let waterShieldAvailable = unit.willWaterShieldAbsorb();
     let waterShieldConsumed = false;
     let totalAppliedDamage = 0;
     for (const cell of burningCells) {

@@ -3990,6 +3990,39 @@ describe("action engine — standing in a vine", () => {
         expect(setup.left.hasDebuffActive("Vine Throw")).toBe(true);
     });
 
+    it("gives the arrival snare the extra lap of an effect landed on the unit whose turn it is", () => {
+        const opts: Record<string, unknown> = { supportCell: { x: 6, y: 6 }, rightCell: { x: 12, y: 12 } };
+        const setup = setupActionFight(opts);
+        layEnemyVine({ x: 3, y: 4 }, PBTypes.TeamVals.RIGHT);
+
+        expect(walkOnto(setup, opts).completed).toBe(true);
+        expect(setup.left.getDebuff("Vine Throw")?.getLaps()).toBe(getSpellConfig("System", "Vine Throw").laps + 1);
+    });
+
+    it("snares a unit that walks into an enemy vine to strike, not only one that just moves there", () => {
+        const currentCell = { x: 3, y: 3 };
+        const attackFrom = { x: 4, y: 3 };
+        const setup = setupActionFight({
+            supportCell: { x: 2, y: 3 },
+            rightCell: { x: 5, y: 3 },
+            currentActiveKnownPaths: new Map([[cellKey(attackFrom), [weightedRoute([currentCell, attackFrom])]]]),
+        });
+        layEnemyVine(attackFrom, PBTypes.TeamVals.RIGHT);
+        setup.left.refreshPossibleAttackTypes(true);
+
+        const result = setup.engine.apply({
+            type: "melee_attack",
+            attackerId: setup.left.getId(),
+            targetId: setup.right.getId(),
+            attackFrom,
+            path: [currentCell, attackFrom],
+        });
+
+        expect(result.completed).toBe(true);
+        expect(setup.left.getBaseCell()).toEqual(attackFrom);
+        expect(setup.left.hasDebuffActive("Vine Throw")).toBe(true);
+    });
+
     it("leaves a unit standing in its OWN side's vine alone", () => {
         const opts: Record<string, unknown> = { supportCell: { x: 6, y: 6 }, rightCell: { x: 12, y: 12 } };
         const setup = setupActionFight(opts);

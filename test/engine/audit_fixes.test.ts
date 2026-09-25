@@ -22,11 +22,15 @@ import { processRimeCharmAbility } from "../../src/abilities/rime_charm_ability"
 import { processLightningSpinAbility } from "../../src/abilities/lightning_spin_ability";
 import { processMinerAbility } from "../../src/abilities/miner_ability";
 import { processParalysisAbility } from "../../src/abilities/paralysis_ability";
+import { processCraftAbility } from "../../src/abilities/craft_ability";
 import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { getAbilityConfig, getSpellConfig } from "../../src/configuration/config_provider";
+import { Doctrine } from "../../src/doctrines/doctrine_properties";
+import { EffectFactory } from "../../src/effects/effect_factory";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { createDefaultGameRuntime } from "../../src/engine/runtime";
 import { TurnEngine } from "../../src/engine/turn_engine";
+import { FightProperties } from "../../src/fights/fight_properties";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { MoveHandler } from "../../src/handlers/move_handler";
@@ -798,5 +802,316 @@ describe("G14: a second Chakram throw scales its bounces like the first", () => 
         expect(primaryBefore - primary.getCumulativeHp()).toBe(200);
         // 50 + 50: the second throw used to land the half-strength bounce at full (50 + 100).
         expect(farBefore - far.getCumulativeHp()).toBe(100);
+    });
+});
+
+const breakEffect = () => new EffectFactory().makeEffect("Break")!;
+
+describe("S4: an augment can only be bought at a level it has", () => {
+    it("refuses Movement 3, Armor 4, Placement past level 3 and fractional levels, even within the budget", () => {
+        const fightProperties = new FightProperties();
+        fightProperties.setDoctrinePerTeam(PBTypes.TeamVals.LEFT, Doctrine.SEE_NONE);
+
+        expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Movement", value: 2 })).toBe(true);
+        expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Movement", value: 3 })).toBe(false);
+        expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Armor", value: 3 })).toBe(true);
+        expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Armor", value: 4 })).toBe(false);
+        expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Placement", value: 2 })).toBe(true);
+        expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Placement", value: 3 })).toBe(false);
+        expect(fightProperties.canAugment(PBTypes.TeamVals.LEFT, { type: "Might", value: 1.5 })).toBe(false);
+        expect(fightProperties.setAugmentPerTeam(PBTypes.TeamVals.LEFT, { type: "Movement", value: 3 })).toBe(false);
+    });
+});
+
+describe("G15: Break lets a Shadow Touch or Lightning Spin attack be answered", () => {
+    it("an unbroken spinner can't be answered; a Broken one can", () => {
+        const hydra = createTestUnit({ name: "Hydra", team: PBTypes.TeamVals.LEFT, abilities: ["Lightning Spin"] });
+        const harpy = createTestUnit({ name: "Harpy", team: PBTypes.TeamVals.LEFT, abilities: ["Shadow Touch"] });
+        expect(hydra.canSkipResponse()).toBe(true);
+        expect(harpy.canSkipResponse()).toBe(true);
+
+        hydra.applyEffect(breakEffect());
+        harpy.applyEffect(breakEffect());
+
+        expect(hydra.canSkipResponse()).toBe(false);
+        expect(harpy.canSkipResponse()).toBe(false);
+    });
+});
+
+describe("G16: War Anger is off while Broken", () => {
+    it("a Broken Valkyrie gains nothing from the enemies around her", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const valkyrie = realUnit("Life", "Valkyrie", 2, 1);
+        const enemy = createTestUnit({ name: "Enemy", team: PBTypes.TeamVals.RIGHT });
+        placeUnit(grid, unitsHolder, valkyrie, { x: 5, y: 5 });
+        placeUnit(grid, unitsHolder, enemy, { x: 6, y: 5 });
+        unitsHolder.refreshStackPowerForAllUnits();
+        expect(unitsHolder.getUnitAuraAttackMod(valkyrie)).toBeGreaterThan(0);
+
+        valkyrie.applyEffect(breakEffect());
+
+        expect(unitsHolder.getUnitAuraAttackMod(valkyrie)).toBe(0);
+    });
+});
+
+describe("G17: a Broken Mermaid's Water Shield neither absorbs nor breaks", () => {
+    it("the hit lands while she is Broken and the shield is still there afterwards", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const mermaid = realUnit("Might", "Mermaid", 1, 1);
+        placeUnit(grid, unitsHolder, mermaid, { x: 5, y: 5 });
+        mermaid.trySeedWaterShield();
+        expect(mermaid.willWaterShieldAbsorb()).toBe(true);
+        mermaid.applyEffect(breakEffect());
+        const healthBefore = mermaid.getCumulativeHp();
+
+        mermaid.applyDamage(5, 0, new SceneLogMock());
+
+        expect(mermaid.getCumulativeHp()).toBe(healthBefore - 5);
+        expect(mermaid.hasBuffActive("Water Shield")).toBe(true);
+        mermaid.deleteEffect("Break");
+        expect(mermaid.willWaterShieldAbsorb()).toBe(true);
+    });
+});
+
+describe("G18: Break takes Enchanted Skin's immunity away", () => {
+    it("a Broken Black Dragon's magic resistance drops from 100%", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const dragon = realUnit("Chaos", "Black Dragon", 4, 2);
+        placeUnit(grid, unitsHolder, dragon, { x: 6, y: 6 });
+        unitsHolder.refreshStackPowerForAllUnits();
+        expect(dragon.getMagicResist()).toBe(100);
+
+        dragon.applyEffect(breakEffect());
+        unitsHolder.refreshStackPowerForAllUnits();
+
+        expect(dragon.getMagicResist()).toBeLessThan(100);
+    });
+});
+
+describe("G19: a counter-shot that hits a bystander breaks it like any other hit", () => {
+    const counterShotAt = (bystanderAlreadyBroken: boolean) => {
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.getBreakChancePerTeam = () => 100;
+        const shooter = createTestUnit({
+            name: "Shooter",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+            maxHp: 10_000,
+        });
+        const target = createTestUnit({
+            name: "Target",
+            team: PBTypes.TeamVals.RIGHT,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+            maxHp: 10_000,
+        });
+        const bystander = createTestUnit({ name: "Bystander", team: PBTypes.TeamVals.LEFT, maxHp: 10_000 });
+        placeUnit(grid, unitsHolder, shooter, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, bystander, { x: 5, y: 1 });
+        placeUnit(grid, unitsHolder, target, { x: 10, y: 1 });
+        for (const unit of [shooter, target]) {
+            unit.calculateMissChance = () => 0;
+            unit.calculateAttackDamage = () => 10;
+        }
+        if (bystanderAlreadyBroken) {
+            bystander.applyEffect(breakEffect());
+        }
+        const lapsBefore = bystander.getEffect("Break")?.getLaps();
+
+        setDeterministicRandomSource(() => 0);
+        try {
+            attackHandler.handleRangeAttack(
+                unitsHolder,
+                [1],
+                1,
+                createVisibleDamage(target),
+                shooter,
+                [[target]],
+                [bystander],
+                target.getPosition(),
+            );
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+        return { lapsBefore, lapsAfter: bystander.getEffect("Break")?.getLaps(), bystander };
+    };
+
+    it("a fresh Break on the bystander lasts its normal laps, not one more", () => {
+        const { lapsAfter, bystander } = counterShotAt(false);
+        expect(bystander.getCumulativeHp()).toBeLessThan(bystander.getCumulativeMaxHp());
+        expect(lapsAfter).toBe(breakEffect().getLaps());
+    });
+
+    it("an already Broken bystander isn't re-rolled and renewed", () => {
+        const { lapsBefore, lapsAfter } = counterShotAt(true);
+        expect(lapsAfter).toBe(lapsBefore);
+    });
+});
+
+describe("G20: an area shot aimed at a unit burns every unit it hits and rolls each rider once", () => {
+    const shooter = (name: string, abilities: string[]) =>
+        createTestUnit({
+            name,
+            team: PBTypes.TeamVals.RIGHT,
+            attackType: PBTypes.AttackVals.RANGE,
+            rangeShots: 5,
+            amountAlive: 1,
+            abilities,
+        });
+
+    it("the Fireforged burn reaches the splash, not only the aimed unit", () => {
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const thrower = shooter("Thrower", ["Area Throw"]);
+        const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, maxHp: 10_000, amountAlive: 1 });
+        const neighbour = createTestUnit({
+            name: "Neighbour",
+            team: PBTypes.TeamVals.LEFT,
+            maxHp: 10_000,
+            amountAlive: 1,
+        });
+        placeUnit(grid, unitsHolder, thrower, { x: 1, y: 1 });
+        placeUnit(grid, unitsHolder, target, { x: 8, y: 4 });
+        placeUnit(grid, unitsHolder, neighbour, { x: 8, y: 5 });
+        thrower.applyBuff(new Spell({ spellProperties: getSpellConfig("Chaos", "Fireforged Sword"), amount: 1 }));
+        thrower.calculateMissChance = () => 0;
+        thrower.calculateAttackDamage = () => 100;
+
+        attackHandler.handleRangeAttack(
+            unitsHolder,
+            [1],
+            1,
+            createVisibleDamage(target),
+            thrower,
+            [[target, neighbour]],
+            undefined,
+            target.getPosition(),
+        );
+
+        const targetLoss = target.getCumulativeMaxHp() - target.getCumulativeHp();
+        const neighbourLoss = neighbour.getCumulativeMaxHp() - neighbour.getCumulativeHp();
+        expect(targetLoss).toBeGreaterThan(100);
+        expect(neighbourLoss).toBe(targetLoss);
+    });
+
+    it("the aimed unit rolls Rime Charm once, as a plain shot's target does", () => {
+        const rimeRollDraws = (abilities: string[]): number => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const fightProperties = FightStateManager.getInstance().getFightProperties();
+            fightProperties.setArtifactPerTeam(PBTypes.TeamVals.RIGHT, 2, Tier2Artifact.RIME_CHARM);
+            const attacker = shooter("Shooter", abilities);
+            const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.LEFT, maxHp: 10_000 });
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 8, y: 4 });
+            unitsHolder.applyArtifacts(fightProperties);
+            attacker.calculateMissChance = () => 0;
+            attacker.calculateAttackDamage = () => 10;
+            let draws = 0;
+            setDeterministicRandomSource(() => {
+                if ((new Error().stack ?? "").includes("processRimeCharmAbility")) {
+                    draws += 1;
+                }
+                return 0.99;
+            });
+            try {
+                attackHandler.handleRangeAttack(
+                    unitsHolder,
+                    [1],
+                    1,
+                    createVisibleDamage(target),
+                    attacker,
+                    [[target]],
+                    undefined,
+                    target.getPosition(),
+                );
+            } finally {
+                setDeterministicRandomSource(undefined);
+            }
+            return draws;
+        };
+
+        const plainShot = rimeRollDraws([]);
+        expect(plainShot).toBeGreaterThan(0);
+        expect(rimeRollDraws(["Area Throw"])).toBe(plainShot);
+    });
+});
+
+describe("G21: an effect landed on the unit whose turn it is gets the extra lap", () => {
+    it("Rime Charm's Quagmire on the attacker (a retaliation) lasts a lap longer than on anyone else", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.RIGHT, 2, Tier2Artifact.RIME_CHARM);
+        const defender = createTestUnit({ name: "Defender", team: PBTypes.TeamVals.RIGHT });
+        const attacker = createTestUnit({ name: "Attacker", team: PBTypes.TeamVals.LEFT });
+        const bystander = createTestUnit({ name: "Bystander", team: PBTypes.TeamVals.LEFT });
+        placeUnit(grid, unitsHolder, defender, { x: 5, y: 5 });
+        placeUnit(grid, unitsHolder, attacker, { x: 6, y: 5 });
+        placeUnit(grid, unitsHolder, bystander, { x: 5, y: 6 });
+        unitsHolder.applyArtifacts(fightProperties);
+
+        setDeterministicRandomSource(() => 0);
+        try {
+            processRimeCharmAbility(defender, attacker, new SceneLogMock(), attacker);
+            processRimeCharmAbility(defender, bystander, new SceneLogMock(), attacker);
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+
+        const onBystander = bystander.getDebuff("Quagmire")?.getLaps() ?? 0;
+        expect(onBystander).toBeGreaterThan(0);
+        expect(attacker.getDebuff("Quagmire")?.getLaps()).toBe(onBystander + 1);
+    });
+
+    it("a retaliating Lightning Spin's Rime Charm on the attacker gets the extra lap too", () => {
+        const { grid, unitsHolder } = createCombatTestContext();
+        const fightProperties = FightStateManager.getInstance().getFightProperties();
+        fightProperties.setArtifactPerTeam(PBTypes.TeamVals.LEFT, 2, Tier2Artifact.RIME_CHARM);
+        const hydra = createTestUnit({ name: "Hydra", team: PBTypes.TeamVals.LEFT, abilities: ["Lightning Spin"] });
+        const attacker = createTestUnit({ name: "Attacker", team: PBTypes.TeamVals.RIGHT, maxHp: 10_000 });
+        const other = createTestUnit({ name: "Other", team: PBTypes.TeamVals.RIGHT, maxHp: 10_000 });
+        placeUnit(grid, unitsHolder, hydra, { x: 5, y: 5 });
+        placeUnit(grid, unitsHolder, attacker, { x: 6, y: 5 });
+        placeUnit(grid, unitsHolder, other, { x: 4, y: 5 });
+        unitsHolder.applyArtifacts(fightProperties);
+        hydra.calculateMissChance = () => 0;
+
+        setDeterministicRandomSource(() => 0);
+        try {
+            processLightningSpinAbility(
+                hydra,
+                new SceneLogMock(),
+                unitsHolder,
+                1,
+                new DamageStatisticHolder(),
+                hydra.getBaseCell(),
+                false,
+                [],
+                grid,
+                attacker,
+            );
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+
+        const onOther = other.getDebuff("Quagmire")?.getLaps() ?? 0;
+        expect(onOther).toBeGreaterThan(0);
+        expect(attacker.getDebuff("Quagmire")?.getLaps()).toBe(onOther + 1);
+    });
+
+    it("Craft's backfire Stun on the Blacksmith itself lasts past its own turn", () => {
+        const blacksmith = createTestUnit({ name: "Blacksmith", team: PBTypes.TeamVals.LEFT });
+        const ally = createTestUnit({ name: "Ally", team: PBTypes.TeamVals.LEFT });
+
+        setDeterministicRandomSource(() => 0);
+        try {
+            processCraftAbility(blacksmith, [blacksmith, ally], new SceneLogMock());
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
+
+        const onAlly = ally.getEffect("Stun")?.getLaps() ?? 0;
+        expect(onAlly).toBeGreaterThan(0);
+        expect(blacksmith.getEffect("Stun")?.getLaps()).toBe(onAlly + 1);
     });
 });

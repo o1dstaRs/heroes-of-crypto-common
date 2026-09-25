@@ -257,7 +257,7 @@ export function processThroughShotAbility(
         } else if (!absorbedUnitIds.has(unit.getId())) {
             processStunAbility(attackerUnit, unit, attackerUnit, sceneLog);
             processFreezeAbility(attackerUnit, unit, attackerUnit, sceneLog);
-            processRimeCharmAbility(attackerUnit, unit, sceneLog);
+            processRimeCharmAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
             processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
         }
     }

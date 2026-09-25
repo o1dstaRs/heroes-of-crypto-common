@@ -1296,28 +1296,26 @@ export class AttackHandler {
             // landed AOE entirely, so a Fireforged Gargantuan set nobody alight at all — not even the unit
             // it aimed at (owner report 2026-09-20).
             //
-            // `isAOE` makes this EXACTLY complementary to the single-target sword pass further down, whose
-            // gate is `!landed || !isAOE`: every shot is burned by one of the two, never by both.
-            if (isAOE) {
-                const aoeSwordResult = AllAbilities.processFireforgedSwordOnVictims(
-                    attackerUnit,
-                    aoeRangeAttackResult.perUnitDamage.filter((entry) => !entry.missed),
-                    unitsHolder,
-                    this.sceneLog,
-                    this.damageStatisticHolder,
-                    (damageForAnimation.secondary ??= []),
-                );
-                attackerUnitPlusMorale += aoeSwordResult.increaseMorale;
-                for (const uId of aoeSwordResult.unitIdsDied) {
-                    if (!unitIdsDied.includes(uId)) {
-                        unitIdsDied.push(uId);
-                    }
+            // This pass owns the burn for every landed splash, aimed at a unit or not; the single-target pass
+            // further down skips its sword whenever the splash landed, so no unit burns twice.
+            const aoeSwordResult = AllAbilities.processFireforgedSwordOnVictims(
+                attackerUnit,
+                aoeRangeAttackResult.perUnitDamage.filter((entry) => !entry.missed),
+                unitsHolder,
+                this.sceneLog,
+                this.damageStatisticHolder,
+                (damageForAnimation.secondary ??= []),
+            );
+            attackerUnitPlusMorale += aoeSwordResult.increaseMorale;
+            for (const uId of aoeSwordResult.unitIdsDied) {
+                if (!unitIdsDied.includes(uId)) {
+                    unitIdsDied.push(uId);
                 }
-                this.updateMoraleDecreaseForTheUnitTeam(
-                    moraleDecreaseForTheUnitTeam,
-                    aoeSwordResult.moraleDecreaseForTheUnitTeam,
-                );
             }
+            this.updateMoraleDecreaseForTheUnitTeam(
+                moraleDecreaseForTheUnitTeam,
+                aoeSwordResult.moraleDecreaseForTheUnitTeam,
+            );
         } else if (isAttackMissed) {
             this.sceneLog.updateLog(`${attackerUnit.getName()} misses 🏹 on ${targetUnit.getName()}`);
             // Dodged ranged shot (Dodge / Small Specie / Boar Saliva / Broken Aegis): flag it so the
@@ -1557,7 +1555,9 @@ export class AttackHandler {
                             .getFightProperties()
                             .getBreakChancePerTeam(targetUnit.getTeam()),
                         this.sceneLog,
-                        true,
+                        // Extending (and re-rolling an active Break) is for the unit whose turn it is, like a
+                        // Stun; a counter-shot that hits a bystander on the return line breaks it normally.
+                        rangeResponseUnit.getId() === attackerUnit.getId(),
                         targetUnit,
                     ),
                     team: targetUnit.getTeam(),
@@ -1700,27 +1700,36 @@ export class AttackHandler {
                 // Small Specie / Boar Saliva) must not stun/petrify/etc. — mirrors the melee path,
                 // which gates this same block on !isAttackMissed (bug: an Orc could miss a Scavenger
                 // and still Stun it). A Water-Shield-absorbed shot is treated the same as a miss.
-                const rangedFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
-                    attackerUnit,
-                    targetUnit,
-                    damageFromAttack,
-                    this.sceneLog,
-                    this.damageStatisticHolder,
-                    (damageForAnimation.secondary ??= []),
-                );
-                for (const uId of rangedFireforgedSwordResult.unitIdsDied) {
-                    if (!unitIdsDied.includes(uId)) {
-                        unitIdsDied.push(uId);
+                //
+                // A landed splash (an Area Throw / Large Caliber / Chakram aimed at this unit) already burned
+                // every unit it damaged and rolled Stun, Freeze, Rime Charm and Spit Ball on each of them, the
+                // aimed unit included — rolling them here too gave the aimed unit a second chance at each.
+                const splashLanded = !!aoeRangeAttackResult?.landed;
+                if (!splashLanded) {
+                    const rangedFireforgedSwordResult = AllAbilities.processFireforgedSwordAbility(
+                        attackerUnit,
+                        targetUnit,
+                        damageFromAttack,
+                        this.sceneLog,
+                        this.damageStatisticHolder,
+                        (damageForAnimation.secondary ??= []),
+                    );
+                    for (const uId of rangedFireforgedSwordResult.unitIdsDied) {
+                        if (!unitIdsDied.includes(uId)) {
+                            unitIdsDied.push(uId);
+                        }
                     }
+                    this.updateMoraleDecreaseForTheUnitTeam(
+                        moraleDecreaseForTheUnitTeam,
+                        rangedFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
+                    );
+                    AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 }
-                this.updateMoraleDecreaseForTheUnitTeam(
-                    moraleDecreaseForTheUnitTeam,
-                    rangedFireforgedSwordResult.moraleDecreaseForTheUnitTeam,
-                );
-                AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-                AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
+                if (!splashLanded) {
+                    AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
+                    AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                }
                 // Area Throw / Large Caliber already resolved Gaze for every struck unit in the AOE
                 // processor. Keep the outer primary on-hit pass for its other effects, but do not petrify
                 // the unit-targeted primary a second time.
@@ -1735,14 +1744,16 @@ export class AttackHandler {
                         hoverRangeAttackDivisor,
                     );
                 }
-                AllAbilities.processSpitBallAbility(
-                    attackerUnit,
-                    targetUnit,
-                    attackerUnit,
-                    unitsHolder,
-                    this.grid,
-                    this.sceneLog,
-                );
+                if (!splashLanded) {
+                    AllAbilities.processSpitBallAbility(
+                        attackerUnit,
+                        targetUnit,
+                        attackerUnit,
+                        unitsHolder,
+                        this.grid,
+                        this.sceneLog,
+                    );
+                }
                 AllAbilities.processHamstringAbility(
                     attackerUnit,
                     targetUnit,
@@ -1803,7 +1814,7 @@ export class AttackHandler {
                     AllAbilities.processStunAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processStunAuraOnHit(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
                     AllAbilities.processFreezeAbility(targetUnit, rangeResponseUnit, attackerUnit, this.sceneLog);
-                    AllAbilities.processRimeCharmAbility(targetUnit, rangeResponseUnit, this.sceneLog);
+                    AllAbilities.processRimeCharmAbility(targetUnit, rangeResponseUnit, this.sceneLog, attackerUnit);
                     AllAbilities.processPetrifyingGazeAbility(
                         targetUnit,
                         rangeResponseUnit,
@@ -1990,7 +2001,7 @@ export class AttackHandler {
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 // Rime Charm rolls on every hit your units land — the second arrow included.
-                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
+                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
@@ -2560,6 +2571,7 @@ export class AttackHandler {
                     false,
                     (damageForAnimation.secondary ??= []),
                     this.grid,
+                    attackerUnit,
                 );
                 hasLightningSpinResponseLanded = lightningSpinResponseResult.landed;
                 updateUnitsDied(lightningSpinResponseResult.unitIdsDied);
@@ -2759,7 +2771,7 @@ export class AttackHandler {
                         );
                         AllAbilities.processPegasusLightAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processParalysisAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                        AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog);
+                        AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog, attackerUnit);
                         AllAbilities.processBlindnessAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         updateUnitsDied(
                             AllAbilities.processChainLightningAbility(
@@ -2890,7 +2902,7 @@ export class AttackHandler {
                     this.sceneLog,
                 );
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
-                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
+                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
                 // Blindness rides the blow the Unicorn strikes as well as the one it answers — it used to
                 // fire only from the response path, so a Unicorn that opened the exchange blinded nobody.
                 AllAbilities.processBlindnessAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -3037,7 +3049,7 @@ export class AttackHandler {
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 // Rime Charm rolls on every hit your units land — the second punch included.
-                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog);
+                AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
                 AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,

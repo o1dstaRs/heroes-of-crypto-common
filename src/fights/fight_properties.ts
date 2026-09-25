@@ -113,6 +113,15 @@ const parseLegacySynergyKey = (synergy: string): IParsedSynergyKey | undefined =
 };
 
 export class FightProperties {
+    /** The highest level each augment has (Placement counts from 0: LEVEL_1..LEVEL_3). */
+    public static readonly AUGMENT_MAX_LEVEL: Readonly<Record<AugmentType["type"], number>> = {
+        Placement: PlacementAugment.LEVEL_3,
+        Armor: ArmorAugment.LEVEL_3,
+        Might: MightAugment.LEVEL_3,
+        Empower: EmpowerAugment.LEVEL_3,
+        Sniper: SniperAugment.LEVEL_3,
+        Movement: MovementAugment.LEVEL_2,
+    };
     private id: string;
     private currentLap: number;
     private gridType: GridType;
@@ -1153,6 +1162,12 @@ export class FightProperties {
     }
     public canAugment(teamType: TeamType, augmentType: AugmentType): boolean {
         if (teamType === PBTypes.TeamVals.NO_TEAM || !augmentType || augmentType.value < 0 || !augmentType.type) {
+            return false;
+        }
+        // Only a level the augment actually has: the budget below would accept Movement 3 or Armor 2.5, and the
+        // fight then threw when it applied the augment at start (getMovementPower and friends reject them).
+        const maxLevel = FightProperties.AUGMENT_MAX_LEVEL[augmentType.type];
+        if (maxLevel === undefined || !Number.isInteger(augmentType.value) || augmentType.value > maxLevel) {
             return false;
         }
 

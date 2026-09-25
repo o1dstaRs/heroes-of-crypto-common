@@ -569,28 +569,7 @@ export class GameActionEngine {
             );
         }
 
-        // Vine Throw: standing in the enemy's vine is the same snare the throw itself applies. Charged on
-        // ARRIVAL, not on crossing — the movement penalty already prices passing through, and this is the
-        // price of ending up in it. Flyers are not spared here: they clear a vine they fly OVER, but one
-        // they choose to land in grips them like anything else.
-        //
-        // Own-team vines never snare. Trent walks his own vines at half price, and a vine that also
-        // punished his own side would fight the passive it exists to serve.
-        const vinesOnBoard = this.context.fightProperties.getVines();
-        if (vinesOnBoard.size() && !unit.hasDebuffActive("Vine Throw")) {
-            const snaringCell = targetCells.find((cell) => vinesOnBoard.snares(cell, unit.getTeam()));
-            if (snaringCell) {
-                unit.applyDebuff(
-                    new Spell({
-                        // Same lifetime the throw itself grants: read straight off the spell config so the
-                        // two can never drift apart.
-                        spellProperties: getSpellConfig("System", "Vine Throw"),
-                        amount: 1,
-                    }),
-                );
-                this.context.sceneLog.updateLog(`${unit.getName()} is snared by the vine`);
-            }
-        }
+        this.snareOnVineArrival(unit, targetCells);
 
         // Mark that the unit moved this turn so a later end_turn reads as a real "manual" finish (it
         // acted) rather than a do-nothing skip.
@@ -668,6 +647,37 @@ export class GameActionEngine {
         }
         return events;
     }
+    /**
+     * Vine Throw: standing in the enemy's vine is the same snare the throw itself applies. Charged on ARRIVAL,
+     * not on crossing — the movement penalty already prices passing through, and this is the price of ending up
+     * in it — whether the unit arrived by a move or by walking in to strike. Flyers are not spared here: they
+     * clear a vine they fly OVER, but one they choose to land in grips them like anything else.
+     *
+     * Own-team vines never snare. Trent walks his own vines at half price, and a vine that also punished his own
+     * side would fight the passive it exists to serve. The arriving unit is the one whose turn it is, so the
+     * snare gets the extra lap every effect landed mid-turn gets (it lasted a turn less before).
+     */
+    private snareOnVineArrival(unit: Unit, cells: XY[]): void {
+        const vinesOnBoard = this.context.fightProperties.getVines();
+        if (!vinesOnBoard.size() || unit.isDead() || unit.hasDebuffActive("Vine Throw")) {
+            return;
+        }
+        if (!cells.some((cell) => vinesOnBoard.snares(cell, unit.getTeam()))) {
+            return;
+        }
+        unit.applyDebuff(
+            new Spell({
+                // Same lifetime the throw itself grants: read straight off the spell config so the two can never
+                // drift apart.
+                spellProperties: getSpellConfig("System", "Vine Throw"),
+                amount: 1,
+            }),
+            undefined,
+            undefined,
+            true,
+        );
+        this.context.sceneLog.updateLog(`${unit.getName()} is snared by the vine`);
+    }
     private meleeAttack(action: Extract<GameAction, { type: "melee_attack" }>): IGameActionResult {
         const attacker = this.validateTurnAction(action.attackerId);
         if (attacker instanceof Error) {
@@ -689,6 +699,10 @@ export class GameActionEngine {
             action.hasLavaCell,
             action.hasWaterCell,
         );
+        const cellsBefore = attacker
+            .getCells()
+            .map((cell) => `${cell.x}:${cell.y}`)
+            .join("|");
         const result = this.context.attackHandler.handleMeleeAttack(
             this.context.unitsHolder,
             this.context.moveHandler,
@@ -700,6 +714,12 @@ export class GameActionEngine {
         );
         if (!result.completed) {
             return this.reject("attack_not_available");
+        }
+        // Walking in to strike ends the walk on those cells as surely as a move does, so an enemy vine there
+        // snares the attacker the same way.
+        const attackerCells = attacker.getCells();
+        if (attackerCells.map((cell) => `${cell.x}:${cell.y}`).join("|") !== cellsBefore) {
+            this.snareOnVineArrival(attacker, attackerCells);
         }
 
         const unitIdsDied = [...new Set(result.unitIdsDied)];

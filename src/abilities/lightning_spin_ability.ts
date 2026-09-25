@@ -81,6 +81,9 @@ export function processLightningSpinAbility(
     isAttack = true,
     secondaryDamage?: ISecondaryDamage[],
     grid?: Grid,
+    // The unit whose turn it is. A retaliating spin also strikes the attacker, and a Stun, Freeze or Rime Charm
+    // landed on it then gets the extra lap every effect landed mid-turn gets.
+    currentActiveUnit: Unit = fromUnit,
 ): ILightningSpinResult {
     const unitIdsDied: string[] = [];
     let lightningSpinLanded = false;
@@ -266,9 +269,9 @@ export function processLightningSpinAbility(
                 // check all the possible modificators here
                 // just in case if we have more inherited/stolen abilities
                 processMinerAbility(fromUnit, enemy, sceneLog);
-                processStunAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processFreezeAbility(fromUnit, enemy, fromUnit, sceneLog);
-                processRimeCharmAbility(fromUnit, enemy, sceneLog);
+                processStunAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processFreezeAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
+                processRimeCharmAbility(fromUnit, enemy, sceneLog, currentActiveUnit);
                 processDullingDefenseAblity(enemy, fromUnit, sceneLog);
                 processPetrifyingGazeAbility(
                     fromUnit,

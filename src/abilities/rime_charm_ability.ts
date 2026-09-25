@@ -19,7 +19,12 @@ import { getSpellConfig } from "../configuration/config_provider";
 // 60%) to chill the target — applying a Quagmire slow (movement reduction) for a number of laps stored as
 // the buff's second property (e.g. 3). Reuses the existing "Quagmire" spell debuff so no new effect config
 // is required.
-export function processRimeCharmAbility(fromUnit: Unit, targetUnit: Unit, sceneLog: ISceneLog): void {
+export function processRimeCharmAbility(
+    fromUnit: Unit,
+    targetUnit: Unit,
+    sceneLog: ISceneLog,
+    currentActiveUnit?: Unit,
+): void {
     if (targetUnit.isDead()) {
         return;
     }
@@ -46,6 +51,13 @@ export function processRimeCharmAbility(fromUnit: Unit, targetUnit: Unit, sceneL
         spellProperties: getSpellConfig("Death", "Quagmire", laps),
         amount: 1,
     });
-    targetUnit.applyDebuff(quagmire);
+    // Chilling the unit whose turn it is (a retaliation or counter-shot on the attacker) gets the extra lap every
+    // effect landed mid-turn gets — Spit Ball's Quagmire included — or it lasted a turn less.
+    targetUnit.applyDebuff(
+        quagmire,
+        undefined,
+        undefined,
+        currentActiveUnit !== undefined && targetUnit.getId() === currentActiveUnit.getId(),
+    );
     sceneLog.updateLog(`${fromUnit.getName()} chilled ${targetUnit.getName()} for ${HoCLib.getLapString(laps)}`);
 }
