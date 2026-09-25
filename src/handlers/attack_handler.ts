@@ -655,10 +655,16 @@ export class AttackHandler {
                     unitsHolder.refreshStackPowerForAllUnits();
                 } else {
                     const appliedBuff = amplifyCastBuffForTarget(currentActiveSpell, attackerUnit, targetUnit);
+                    // Helping Hand is the only cast buff whose effect IS the caster's body: its gift is a
+                    // share of that max HP and base armor, so those two numbers have to ride the buff.
+                    // Every other buff's `{}` is its own power. Passing HP here made the client print that
+                    // HP in the placeholder — a Wandering Mage (6 HP) set its ally "alight for 6%" instead
+                    // of Fireforged Sword's stable 20% of the damage that landed.
+                    const carriesCasterBody = appliedBuff.getName() === "Helping Hand";
                     targetUnit.applyBuff(
                         appliedBuff,
-                        attackerUnit.getMaxHp(),
-                        attackerUnit.getBaseArmor(),
+                        carriesCasterBody ? attackerUnit.getMaxHp() : undefined,
+                        carriesCasterBody ? attackerUnit.getBaseArmor() : undefined,
                         attackerUnit.getId() === targetUnit.getId(),
                     );
                 }

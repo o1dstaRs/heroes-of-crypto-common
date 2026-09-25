@@ -91,7 +91,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // absorbed share no longer rolls Break a second time — Break draws its RNG only when its chance is above 0,
 // so dropping that roll shifts the seeded stream from the first Flesh Shield absorption on. Bisected: every
 // other audit fix leaves this digest unchanged. Two isolated runs reproduced this value byte-identically.
-const EXPECTED_REPLAY_SHA256 = "e1b08d3259ddaf10680391606a1c668e2d6ff8e7d7e2091b03389f990669c8a9";
+// Previous approved digest: e1b08d3259ddaf10680391606a1c668e2d6ff8e7d7e2091b03389f990669c8a9
+// Re-pinned 2026-09-25: Unicorn hp 70 -> 75, and Flesh Shield is sampled at the landing cell.
+// Unicorn is fielded across the seeded draws, and a different absorption changes the trace from
+// the first exchange on. Verified against this tree.
+const EXPECTED_REPLAY_SHA256 = "8fcbcc222394d36d7f012ca5f8dc676ba8eb124d2f8149864b6ccafd1a384655";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

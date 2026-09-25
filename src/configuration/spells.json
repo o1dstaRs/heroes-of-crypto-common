@@ -1371,7 +1371,8 @@
             "name": "Fireforged Sword",
             "level": 1,
             "desc": [
-                "The ally's attacks set the target alight for {}% of the damage dealt.",
+                "Melee and ranged attacks, retaliations included, set every unit they damage alight for {}% of the damage that landed.",
+                "Area attacks count too: a pierce, a splash, a spin or a bounce burns each creature for its own share.",
                 "It is fire damage: armor does not stop it, magic resistance does.",
                 "Deals 50% more to water creatures. Fire creatures are immune.",
                 "Lasts 3 laps."

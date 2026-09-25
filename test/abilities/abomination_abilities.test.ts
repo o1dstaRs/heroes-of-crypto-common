@@ -18,8 +18,12 @@ import * as HoCConfig from "../../src/configuration/config_provider";
 import { processLightningSpinAbility } from "../../src/abilities/lightning_spin_ability";
 import { processThroughShotAbility } from "../../src/abilities/through_shot_ability";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { Grid } from "../../src/grid/grid";
+import { getPositionForFootprintAnchor } from "../../src/grid/grid_math";
 import type { ISecondaryDamage } from "../../src/scene/animations";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { Unit } from "../../src/units/unit";
+import type { XY } from "../../src/utils/math";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
 describe("Dense Flesh (ranged attacks cost extra shots)", () => {
@@ -175,6 +179,94 @@ describe("Flesh Shield aura (damage absorption)", () => {
         expect(secondary).toHaveLength(1);
         expect(secondary[0]).toMatchObject({ source: "flesh_shield", unitId: abomination.getId(), amount: 90 });
         expect(result.unitIdsDied).toEqual([]);
+    });
+
+    // A fly-attack relocates the body before retaliation, and the aura refresh that restamps buffs does not
+    // run until the swing is over. Coverage has to follow the landing cell, the way War Anger does.
+    const relocateWithoutAuraRefresh = (grid: Grid, unit: Unit, cell: XY): void => {
+        grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
+        const position = getPositionForFootprintAnchor(
+            grid.getSettings(),
+            cell,
+            unit.getFootprintWidth(),
+            unit.getFootprintHeight(),
+        );
+        unit.setPosition(position.x, position.y, false);
+        grid.occupyCells(
+            unit.getCells(),
+            unit.getId(),
+            unit.getTeam(),
+            unit.getAttackRange(),
+            unit.hasAbilityActive("Made of Fire"),
+            unit.hasAbilityActive("Made of Water"),
+        );
+    };
+
+    it("does not absorb for an ally who flew out of the aura, even though the takeoff buff is still on them", () => {
+        const { grid, unitsHolder, damageStatisticHolder, abomination, ally, attacker } = setupAuraTrio();
+        expect(ally.hasBuffActive("Flesh Shield Aura")).toBe(true);
+        relocateWithoutAuraRefresh(grid, ally, { x: 10, y: 10 });
+        expect(ally.hasBuffActive("Flesh Shield Aura")).toBe(true);
+
+        const result = processFleshShieldAura(
+            attacker,
+            ally,
+            100,
+            false,
+            grid,
+            unitsHolder,
+            new SceneLogMock(),
+            damageStatisticHolder,
+        );
+
+        expect(result.remainingDamage).toBe(100);
+        expect(result.absorbedDamage).toBe(0);
+        expect(abomination.getHp()).toBe(200);
+    });
+
+    it("absorbs for an ally who flew into the aura, even though the takeoff cell granted no buff", () => {
+        const { grid, unitsHolder, damageStatisticHolder, abomination, ally, attacker } = setupAuraTrio();
+        relocateWithoutAuraRefresh(grid, ally, { x: 10, y: 10 });
+        unitsHolder.refreshAuraEffectsForAllUnits();
+        expect(ally.hasBuffActive("Flesh Shield Aura")).toBe(false);
+        relocateWithoutAuraRefresh(grid, ally, { x: 3, y: 2 });
+        expect(ally.hasBuffActive("Flesh Shield Aura")).toBe(false);
+
+        const result = processFleshShieldAura(
+            attacker,
+            ally,
+            100,
+            false,
+            grid,
+            unitsHolder,
+            new SceneLogMock(),
+            damageStatisticHolder,
+        );
+
+        expect(result.remainingDamage).toBe(10);
+        expect(result.absorbedDamage).toBe(90);
+        expect(abomination.getHp()).toBe(110);
+    });
+
+    it("stops covering the old cells once the Abomination itself has flown to the attack cell", () => {
+        const { grid, unitsHolder, damageStatisticHolder, abomination, ally, attacker } = setupAuraTrio();
+        expect(ally.hasBuffActive("Flesh Shield Aura")).toBe(true);
+        relocateWithoutAuraRefresh(grid, abomination, { x: 10, y: 10 });
+
+        const result = processFleshShieldAura(
+            attacker,
+            ally,
+            100,
+            false,
+            grid,
+            unitsHolder,
+            new SceneLogMock(),
+            damageStatisticHolder,
+        );
+
+        expect(result.remainingDamage).toBe(100);
+        expect(result.absorbedDamage).toBe(0);
+        expect(abomination.getHp()).toBe(200);
     });
 
     it("recalculates the absorbed damage against the owner's higher armor", () => {

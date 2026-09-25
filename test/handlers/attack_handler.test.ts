@@ -20,6 +20,7 @@ import { getPositionForCell } from "../../src/grid/grid_math";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { AttackTarget } from "../../src/handlers/attack_handler";
 import { Spell } from "../../src/spells/spell";
+import { fireforgedSwordDamage } from "../../src/spells/spell_damage";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
 import {
     createCombatTestContext,
@@ -321,6 +322,82 @@ describe("AttackHandler", () => {
             expect(result.completed).toBe(true);
             expect(target.hasBuffActive("Helping Hand")).toBe(true);
             expect(caster.hasDebuffActive("Helping Hand")).toBe(true);
+        });
+
+        it("a Fireforged Sword is a stable 20% of the damage that landed, not the caster's HP", () => {
+            setDeterministicRandomSource(() => 0);
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+            // Wandering Mage: 6 HP. That number used to leak into the buff tooltip as "6%".
+            const caster = createTestUnit({
+                name: "Wandering Mage",
+                team: PBTypes.TeamVals.RIGHT,
+                spells: ["Chaos:Fireforged Sword"],
+                maxHp: 6,
+                armor: 8,
+            });
+            const ally = createTestUnit({
+                name: "Swordsman",
+                team: PBTypes.TeamVals.RIGHT,
+                attackType: PBTypes.AttackVals.MELEE,
+                damageMin: 40,
+                damageMax: 40,
+                maxHp: 200,
+                amountAlive: 3,
+            });
+            const enemy = createTestUnit({
+                name: "Target",
+                team: PBTypes.TeamVals.LEFT,
+                armor: 0,
+                magicResist: 0,
+                maxHp: 500,
+                amountAlive: 5,
+                damageMin: 0,
+                damageMax: 0,
+            });
+
+            placeUnit(grid, unitsHolder, caster, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, ally, { x: 2, y: 1 });
+            placeUnit(grid, unitsHolder, enemy, { x: 3, y: 1 });
+
+            const cast = attackHandler.handleMagicAttack(
+                grid.getMatrix(),
+                unitsHolder,
+                caster.getSpells()[0],
+                caster,
+                ally,
+            );
+
+            expect(cast.completed).toBe(true);
+            expect(ally.getBuff("Fireforged Sword")?.getPower()).toBe(20);
+            expect(ally.getBuff("Fireforged Sword")?.getFirstSpellProperty()).toBeUndefined();
+            const shown = ally.getUnitProperties().applied_buffs_descriptions[0]?.split(";")[0] ?? "";
+            expect(shown).toContain("for 20%");
+            expect(shown).not.toContain("for 6%");
+            expect(shown).not.toContain("{}");
+
+            const damage = createVisibleDamage(enemy);
+            const attack = attackHandler.handleMeleeAttack(unitsHolder, moveHandler, damage, undefined, ally, enemy, {
+                x: 2,
+                y: 1,
+            });
+
+            expect(attack.completed).toBe(true);
+            expect(damage.amount).toBeGreaterThan(0);
+            // damage.amount is the swing that landed. The fire is exactly 20% of that number.
+            const burns = (damage.secondary ?? []).filter((entry) => entry.source === "fireforged_sword");
+            expect(burns).toHaveLength(1);
+            expect(burns[0]?.unitId).toBe(enemy.getId());
+            expect(burns[0]?.amount).toBe(
+                fireforgedSwordDamage({
+                    damageDealt: damage.amount,
+                    swordPercentage: 20,
+                    targetMagicResist: 0,
+                    targetIsFireElement: false,
+                    targetIsWaterElement: false,
+                }),
+            );
+            setDeterministicRandomSource(undefined);
         });
 
         it("amplifies a Healer's Spiritual Armor cast without mutating the source spell", () => {

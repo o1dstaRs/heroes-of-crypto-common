@@ -1,7 +1,7 @@
 /*
  * -----------------------------------------------------------------------------
- * The Fireforged Sword card promises "the ally's ATTACKS set the target alight",
- * with no exception for which kind of attack. It used to fire on three paths only
+ * The Fireforged Sword card promises that melee and ranged attacks, area attacks
+ * included, set every unit they damage alight. It used to fire on three paths only
  * — the melee swing, the ranged shot and the second punch — so a buffed unit that
  * retaliated, counter-shot, threw an Area Throw, fired a Through Shot or swept
  * several enemies with a breath/spin/skewer set nobody alight (owner report
@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 
 import { processFireforgedSwordOnVictims } from "../../src/abilities/fireforged_sword_ability";
 import { getSpellConfig } from "../../src/configuration/config_provider";
+import { fireforgedSwordDamage } from "../../src/spells/spell_damage";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
@@ -42,6 +43,29 @@ const giveSword = (unit: ReturnType<typeof createTestUnit>): void => {
 
 const swordBurns = (secondary: ISecondaryDamage[] | undefined): ISecondaryDamage[] =>
     (secondary ?? []).filter((entry) => entry.source === "fireforged_sword");
+
+/** 20% of one landed hit, the number the blade owes that creature. */
+const burnFor = (damageDealt: number): number =>
+    fireforgedSwordDamage({
+        damageDealt,
+        swordPercentage: 20,
+        targetMagicResist: 0,
+        targetIsFireElement: false,
+        targetIsWaterElement: false,
+    });
+
+/** Every physical hit in `hits` has its own fire, for 20% of that hit and no one else's. */
+const expectEachHitBurned = (
+    hits: readonly { unitId: string; amount: number }[],
+    burns: readonly ISecondaryDamage[],
+): void => {
+    const landed = hits.filter((hit) => hit.amount > 0);
+    expect(landed.length).toBeGreaterThan(1);
+    expect(burns.map((burn) => burn.amount).sort((a, b) => a - b)).toEqual(
+        landed.map((hit) => burnFor(hit.amount)).sort((a, b) => a - b),
+    );
+    expect(new Set(burns.map((burn) => burn.unitId))).toEqual(new Set(landed.map((hit) => hit.unitId)));
+};
 
 describe("Fireforged Sword reaches every kind of attack", () => {
     afterEach(() => {
@@ -183,6 +207,262 @@ describe("Fireforged Sword reaches every kind of attack", () => {
         });
 
         expect(swordBurns(damage.secondary)).toHaveLength(0);
+    });
+
+    it("burns the creature a Pikeman's Skewer Strike pierces, for that pierce's own damage", () => {
+        pinRng();
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+        const pikeman = createTestUnit({
+            name: "Pikeman",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.MELEE,
+            abilities: ["Skewer Strike"],
+            damageMin: 20,
+            damageMax: 20,
+            maxHp: 200,
+            amountAlive: 3,
+        });
+        const front = createTestUnit({
+            name: "Front",
+            team: PBTypes.TeamVals.RIGHT,
+            armor: 0,
+            magicResist: 0,
+            maxHp: 400,
+            amountAlive: 5,
+            damageMin: 0,
+            damageMax: 0,
+        });
+        const behind = createTestUnit({
+            name: "Behind",
+            team: PBTypes.TeamVals.RIGHT,
+            armor: 0,
+            magicResist: 0,
+            maxHp: 400,
+            amountAlive: 5,
+            damageMin: 0,
+            damageMax: 0,
+        });
+        giveSword(pikeman);
+        placeUnit(grid, unitsHolder, pikeman, { x: 5, y: 4 });
+        placeUnit(grid, unitsHolder, front, { x: 5, y: 5 });
+        placeUnit(grid, unitsHolder, behind, { x: 5, y: 6 });
+
+        const damage = createVisibleDamage(front);
+        const result = attackHandler.handleMeleeAttack(unitsHolder, moveHandler, damage, undefined, pikeman, front, {
+            x: 5,
+            y: 4,
+        });
+
+        expect(result.completed).toBe(true);
+        const pierced = (damage.secondary ?? []).find(
+            (entry) => entry.source === "skewer_strike" && entry.unitId === behind.getId(),
+        );
+        expect(pierced?.amount).toBeGreaterThan(0);
+        const burns = swordBurns(damage.secondary);
+        expect(burns.find((burn) => burn.unitId === front.getId())?.amount).toBe(burnFor(damage.amount));
+        expect(burns.find((burn) => burn.unitId === behind.getId())?.amount).toBe(burnFor(pierced?.amount ?? 0));
+    });
+
+    it("burns every enemy a Hydra's Lightning Spin reaches, each for its own spin", () => {
+        pinRng();
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+        const hydra = createTestUnit({
+            name: "Hydra",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.MELEE,
+            abilities: ["Lightning Spin"],
+            damageMin: 20,
+            damageMax: 20,
+            maxHp: 300,
+            amountAlive: 3,
+        });
+        const aimed = createTestUnit({
+            name: "Aimed",
+            team: PBTypes.TeamVals.RIGHT,
+            armor: 0,
+            magicResist: 0,
+            maxHp: 500,
+            amountAlive: 5,
+            damageMin: 0,
+            damageMax: 0,
+        });
+        const beside = createTestUnit({
+            name: "Beside",
+            team: PBTypes.TeamVals.RIGHT,
+            armor: 0,
+            magicResist: 0,
+            maxHp: 500,
+            amountAlive: 5,
+            damageMin: 0,
+            damageMax: 0,
+        });
+        giveSword(hydra);
+        placeUnit(grid, unitsHolder, hydra, { x: 4, y: 4 });
+        placeUnit(grid, unitsHolder, aimed, { x: 5, y: 4 });
+        placeUnit(grid, unitsHolder, beside, { x: 4, y: 5 });
+
+        const damage = createVisibleDamage(aimed);
+        const result = attackHandler.handleMeleeAttack(unitsHolder, moveHandler, damage, undefined, hydra, aimed, {
+            x: 4,
+            y: 4,
+        });
+
+        expect(result.completed).toBe(true);
+        const spins = (damage.secondary ?? []).filter((entry) => entry.source === "lightning_spin");
+        expect(spins.map((entry) => entry.unitId).sort()).toEqual([aimed.getId(), beside.getId()].sort());
+        // The spin replaces the swing, so the fire on each creature is 20% of that creature's spin.
+        expectEachHitBurned(spins, swordBurns(damage.secondary));
+    });
+
+    it("burns every creature a Gargantuan's Area Throw splashes, each for its own share", () => {
+        pinRng();
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const gargantuan = createTestUnit({
+            name: "Gargantuan",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.RANGE,
+            abilities: ["Area Throw", "Double Throw"],
+            damageMin: 30,
+            damageMax: 30,
+            rangeShots: 4,
+            stackPower: 5,
+            armor: 0,
+            maxHp: 300,
+            amountAlive: 2,
+        });
+        const first = createTestUnit({
+            name: "First",
+            team: PBTypes.TeamVals.RIGHT,
+            armor: 0,
+            magicResist: 0,
+            maxHp: 800,
+            amountAlive: 6,
+        });
+        const second = createTestUnit({
+            name: "Second",
+            team: PBTypes.TeamVals.RIGHT,
+            armor: 0,
+            magicResist: 0,
+            maxHp: 800,
+            amountAlive: 6,
+        });
+        giveSword(gargantuan);
+        placeUnit(grid, unitsHolder, gargantuan, { x: 2, y: 2 });
+        placeUnit(grid, unitsHolder, first, { x: 8, y: 2 });
+        placeUnit(grid, unitsHolder, second, { x: 8, y: 3 });
+
+        const damage = createVisibleDamage(first);
+        const result = attackHandler.handleRangeAttack(
+            unitsHolder,
+            [1],
+            1,
+            damage,
+            gargantuan,
+            [[first, second]],
+            undefined,
+            first.getPosition(),
+            true,
+        );
+
+        expect(result.completed).toBe(true);
+        expectEachHitBurned(damage.splash ?? [], swordBurns(damage.secondary));
+    });
+
+    it("burns every creature a Tsar Cannon's Through Shot pierces, each for its own share", () => {
+        pinRng();
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const cannon = createTestUnit({
+            name: "Tsar Cannon",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.RANGE,
+            abilities: ["Through Shot", "No Melee"],
+            damageMin: 40,
+            damageMax: 40,
+            rangeShots: 4,
+            armor: 0,
+            maxHp: 300,
+            amountAlive: 2,
+        });
+        const enemies = [0, 1, 2].map((index) =>
+            createTestUnit({
+                name: `Enemy${index}`,
+                team: PBTypes.TeamVals.RIGHT,
+                armor: 0,
+                magicResist: 0,
+                maxHp: 800,
+                amountAlive: 6,
+            }),
+        );
+        giveSword(cannon);
+        placeUnit(grid, unitsHolder, cannon, { x: 2, y: 4 });
+        enemies.forEach((enemy, index) => placeUnit(grid, unitsHolder, enemy, { x: 6 + index, y: 4 }));
+
+        const damage = createVisibleDamage(enemies[0]);
+        const result = attackHandler.handleRangeAttack(
+            unitsHolder,
+            [1, 1, 1],
+            1,
+            damage,
+            cannon,
+            enemies.map((enemy) => [enemy]),
+            undefined,
+            enemies[0].getPosition(),
+        );
+
+        expect(result.completed).toBe(true);
+        expectEachHitBurned(damage.splash ?? [], swordBurns(damage.secondary));
+    });
+
+    it("burns every creature a Zena's Chakram hits, including each bounce", () => {
+        pinRng();
+        const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+        const zena = createTestUnit({
+            name: "Zena",
+            team: PBTypes.TeamVals.LEFT,
+            attackType: PBTypes.AttackVals.RANGE,
+            abilities: ["Chakram"],
+            damageMin: 20,
+            damageMax: 20,
+            rangeShots: 4,
+            stackPower: 5,
+            armor: 0,
+            maxHp: 200,
+            amountAlive: 1,
+        });
+        const victims = (["Primary", "First", "Second"] as const).map((name, index) => {
+            const unit = createTestUnit({
+                name,
+                team: PBTypes.TeamVals.RIGHT,
+                armor: 0,
+                magicResist: 0,
+                maxHp: 400,
+                amountAlive: 4,
+            });
+            // One open cell between each hop, the separation a chakram can curve through.
+            placeUnit(grid, unitsHolder, unit, { x: 8 + index * 2, y: 8 + index * 2 });
+            return unit;
+        });
+        giveSword(zena);
+        placeUnit(grid, unitsHolder, zena, { x: 8, y: 2 });
+
+        const damage = createVisibleDamage(victims[0]);
+        const result = attackHandler.handleRangeAttack(
+            unitsHolder,
+            [1],
+            1,
+            damage,
+            zena,
+            [[victims[0]]],
+            undefined,
+            victims[0].getPosition(),
+        );
+
+        expect(result.completed).toBe(true);
+        const struck = (damage.splash ?? []).filter((hit) => !hit.missed && hit.amount > 0);
+        expect(struck.map((hit) => hit.unitId).sort()).toEqual(victims.map((unit) => unit.getId()).sort());
+        expectEachHitBurned(struck, swordBurns(damage.secondary));
     });
 });
 

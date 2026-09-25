@@ -504,7 +504,7 @@
         },
         "Unicorn": {
             "name": "Unicorn",
-            "hp": 70,
+            "hp": 75,
             "steps": 4.5,
             "initiative": 6,
             "armor": 24,
