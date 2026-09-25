@@ -788,41 +788,31 @@ export function canCastSpell(
             targetIsEarthElement: targetUnit.hasAbilityActive("Earth Element"),
         }) <= 0;
 
+    /**
+     * Whether the target is free of this spell and of everything it conflicts with.
+     *
+     * Read through hasStatusBuffApplied / hasStatusApplied, never the buff/debuff OBJECTS alone: a ranked
+     * client leaves those arrays empty and mirrors only the authoritative display lists, so an object-only
+     * check greyed nothing out there — a Riot aimed at a Mass Riot stack, or a second Sadness, was offered,
+     * sent, and refused by the server as spell_not_available. The server keeps both views in lockstep (an
+     * expired buff leaves the list with its object), so it answers exactly as before.
+     */
     const notAlreadyApplied = (): boolean => {
-        const willConclictWith = spell.getConflictsWith();
         if (!targetUnit) {
             return false;
         }
 
-        if (spell.isBuff()) {
-            // Blacksmith's runes (Armor Rune / Weapon Rune) STACK: re-casting on a unit that already carries the
-            // rune adds +1, so they must stay targetable (green) instead of being rejected as "already applied".
-            // A declared conflict with a DIFFERENT buff still blocks.
-            const stacks = spell.getName() === "Armor Rune" || spell.getName() === "Weapon Rune";
-            const existingBuff = targetUnit.getBuff(spell.getName());
-
-            if (!stacks && existingBuff && existingBuff.getLaps() > 0) {
-                return false;
-            }
-            for (const b of targetUnit.getBuffs()) {
-                const blocksBySameName = !stacks && b.getName() === spell.getName();
-                if ((blocksBySameName || willConclictWith.includes(b.getName())) && b.getLaps()) {
-                    return false;
-                }
-            }
-        } else {
-            const existingDebuff = targetUnit.getDebuff(spell.getName());
-            if (existingDebuff && existingDebuff.getLaps() > 0) {
-                return false;
-            }
-            for (const d of targetUnit.getDebuffs()) {
-                if ((d.getName() === spell.getName() || willConclictWith.includes(d.getName())) && d.getLaps()) {
-                    return false;
-                }
-            }
+        const carries = (name: string): boolean =>
+            spell.isBuff() ? targetUnit.hasStatusBuffApplied(name) : targetUnit.hasStatusApplied(name);
+        // Blacksmith's runes (Armor Rune / Weapon Rune) STACK: re-casting on a unit that already carries the
+        // rune adds +1, so they must stay targetable (green) instead of being rejected as "already applied".
+        // A declared conflict with a DIFFERENT buff still blocks.
+        const stacks = spell.isBuff() && (spell.getName() === "Armor Rune" || spell.getName() === "Weapon Rune");
+        if (!stacks && carries(spell.getName())) {
+            return false;
         }
 
-        return true;
+        return !spell.getConflictsWith().some(carries);
     };
 
     if (spell.getSpellTargetType() === SpellTargetType.ANY_ALLY) {

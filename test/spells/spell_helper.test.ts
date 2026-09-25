@@ -584,6 +584,76 @@ describe("spell_helper", () => {
         ).toBe(false);
     });
 
+    describe("a ranked unit, which mirrors only the authoritative display lists", () => {
+        const mirrorBuff = (unit: Unit, name: string): void => {
+            const properties = unit.getUnitProperties();
+            properties.applied_buffs.push(name);
+            properties.applied_buffs_laps.push(2);
+            properties.applied_buffs_descriptions.push(name);
+            properties.applied_buffs_powers.push(0);
+        };
+        const mirrorDebuff = (unit: Unit, name: string): void => {
+            const properties = unit.getUnitProperties();
+            properties.applied_debuffs.push(name);
+            properties.applied_debuffs_laps.push(2);
+            properties.applied_debuffs_descriptions.push(name);
+            properties.applied_debuffs_powers.push(0);
+        };
+        const caster = (): Unit =>
+            createTestUnit({
+                name: "Caster",
+                team: PBTypes.TeamVals.RIGHT,
+                spells: ["Chaos:Riot", "Death:Sadness", "System:Armor Rune"],
+                stackPower: 5,
+            });
+        const castOn = (from: Unit, target: Unit, spellName: string): boolean =>
+            !!canCastSpell(
+                false,
+                testGridSettings,
+                emptyMatrix(),
+                from,
+                target,
+                from.getSpells().find((candidate) => candidate.getName() === spellName),
+                target.getBaseCell(),
+                target.getMagicResist(),
+                target.hasMindAttackResistance(),
+                target.canBeHealed(),
+            );
+
+        it("refuses Riot on a stack under Mass Riot, and a second Riot", () => {
+            const from = caster();
+            const underMassRiot = createTestUnit({ name: "Mass Rioted", team: PBTypes.TeamVals.RIGHT });
+            const underRiot = createTestUnit({ name: "Rioted", team: PBTypes.TeamVals.RIGHT });
+            const clean = createTestUnit({ name: "Clean", team: PBTypes.TeamVals.RIGHT });
+            mirrorBuff(underMassRiot, "Mass Riot");
+            mirrorBuff(underRiot, "Riot");
+
+            expect(underMassRiot.getBuffs()).toHaveLength(0);
+            expect(castOn(from, underMassRiot, "Riot")).toBe(false);
+            expect(castOn(from, underRiot, "Riot")).toBe(false);
+            expect(castOn(from, clean, "Riot")).toBe(true);
+        });
+
+        it("refuses a debuff the enemy already carries", () => {
+            const from = caster();
+            const saddened = createTestUnit({ name: "Saddened", team: PBTypes.TeamVals.LEFT });
+            const clean = createTestUnit({ name: "Clean", team: PBTypes.TeamVals.LEFT });
+            mirrorDebuff(saddened, "Sadness");
+
+            expect(saddened.getDebuffs()).toHaveLength(0);
+            expect(castOn(from, saddened, "Sadness")).toBe(false);
+            expect(castOn(from, clean, "Sadness")).toBe(true);
+        });
+
+        it("still lets a rune stack onto a stack that already carries it", () => {
+            const from = caster();
+            const runed = createTestUnit({ name: "Runed", team: PBTypes.TeamVals.RIGHT });
+            mirrorBuff(runed, "Armor Rune");
+
+            expect(castOn(from, runed, "Armor Rune")).toBe(true);
+        });
+    });
+
     it("calculates buff and debuff stat effects", () => {
         expect(
             calculateBuffsDebuffsEffect(

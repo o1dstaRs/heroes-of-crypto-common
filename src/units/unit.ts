@@ -3999,9 +3999,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const roared = !!battleRoarBuff || appliedBuffLabels.includes("Battle Roar");
         // Curse is Blessing's mirror: every roll drops to the MINIMUM, so a 2-4 attacker reads 2-2. Same
         // dual read of object + DISPLAY list, for the same reason (ranked mirrors debuff names but never
-        // rebuilds the objects). The two can never sit together — each names the other in conflicts_with
-        // — but check blessing first anyway so a stale label can only ever be generous, never silently
-        // zero a unit's spread.
+        // rebuilds the objects). The two CAN sit together: conflicts_with only gates a cast against effects
+        // of its own kind (a buff against buffs), and Curse arrives through Spit Ball's roll, never a cast
+        // check. Blessing wins that tie, as the Knowledge Base says — never a silent zeroing of the spread.
         const appliedDebuffLabels = this.unitProperties.applied_debuffs ?? [];
         const cursed = !!this.getDebuff("Curse") || appliedDebuffLabels.includes("Curse");
         // Restore BOTH ends from the base first: this pass is re-run every refresh, so a Curse that has
