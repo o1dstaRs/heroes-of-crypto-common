@@ -627,9 +627,10 @@ function selectV08UrgentDamageCandidate(
     unitsHolder: ILookaheadDeps["unitsHolder"],
     candidates: readonly IEnumeratedCandidate[],
     currentLap: number,
+    fightProperties?: ILookaheadDeps["fightProperties"],
 ): IEnumeratedCandidate | undefined {
     const physical = candidates.filter(isPositiveDirectCombatCandidate);
-    const pressured = selectV08STargetPressureCandidate(unit, unitsHolder, physical, currentLap);
+    const pressured = selectV08STargetPressureCandidate(unit, unitsHolder, physical, currentLap, fightProperties);
     if (pressured) return pressured;
 
     let fallbackPhysical: IEnumeratedCandidate | undefined;
@@ -3635,6 +3636,7 @@ export class SearchDriver {
                 this.deps.unitsHolder,
                 legalDirectCombatIndices.map((index) => scoredCandidates[index]),
                 this.deps.fightProperties.getCurrentLap(),
+                this.deps.fightProperties,
             );
             const preferredV08STargetIndex = preferredV08STarget ? scoredCandidates.indexOf(preferredV08STarget) : -1;
             hasPreferredV08STarget = preferredV08STargetIndex >= 0;
@@ -3644,6 +3646,7 @@ export class SearchDriver {
                       this.deps.unitsHolder,
                       legalUrgentDamageIndices.map((index) => scoredCandidates[index]),
                       this.deps.fightProperties.getCurrentLap(),
+                      this.deps.fightProperties,
                   )
                 : undefined;
             const preferredUrgentDamageIndex = preferredUrgentDamage
@@ -4020,6 +4023,7 @@ export class SearchDriver {
                   this.deps.unitsHolder,
                   urgentDamageCandidates,
                   this.deps.fightProperties.getCurrentLap(),
+                  this.deps.fightProperties,
               )
             : undefined;
         const orderedUrgentDamage = preferredUrgentDamage
@@ -4033,6 +4037,7 @@ export class SearchDriver {
             this.deps.unitsHolder,
             forceTierDirectCombatCandidates,
             this.deps.fightProperties.getCurrentLap(),
+            this.deps.fightProperties,
         );
         const preferredFinishingAttack = selectV08DirectCombatCandidate(forceTierDirectCombatCandidates);
         const orderedDirectCombat = preferredFinishingAttack
@@ -4121,6 +4126,7 @@ export class SearchDriver {
             this.deps.unitsHolder,
             damageCandidates,
             this.deps.fightProperties.getCurrentLap(),
+            this.deps.fightProperties,
         );
         const orderedDamage = preferredDamage
             ? [preferredDamage, ...damageCandidates.filter((candidate) => candidate !== preferredDamage)]
@@ -4199,6 +4205,7 @@ export class SearchDriver {
                   this.deps.unitsHolder,
                   v08sUrgentDamage.map(({ index }) => candidates[index]),
                   this.deps.fightProperties.getCurrentLap(),
+                  this.deps.fightProperties,
               )
             : undefined;
         if (preferredUrgentDamage) {
@@ -4213,6 +4220,7 @@ export class SearchDriver {
             this.deps.unitsHolder,
             v08sDirectCombat.map(({ index }) => candidates[index]),
             this.deps.fightProperties.getCurrentLap(),
+            this.deps.fightProperties,
         );
         if (preferredV08STarget) {
             v08sDirectCombat.sort((left, right) => {

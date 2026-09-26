@@ -2767,7 +2767,8 @@ export class AttackHandler {
                         AllAbilities.processStunAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processStunAuraOnHit(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processFreezeAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
-                        AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
+                        // The responder's own blow. Being hit is not enough: the knight dulls only when he answers.
+                        AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processPetrifyingGazeAbility(
                             targetUnit,
                             attackerUnit,
@@ -2896,7 +2897,8 @@ export class AttackHandler {
                 AllAbilities.processStunAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processStunAuraOnHit(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
-                AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
+                // The attacker's own blow. A hit on a knight who does not strike back does not dull.
+                AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,
@@ -3082,7 +3084,7 @@ export class AttackHandler {
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 // Rime Charm rolls on every hit your units land — the second punch included.
                 AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
-                AllAbilities.processDullingDefenseAblity(targetUnit, attackerUnit, this.sceneLog);
+                AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,
                     targetUnit,

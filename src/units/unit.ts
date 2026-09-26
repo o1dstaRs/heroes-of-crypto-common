@@ -2242,11 +2242,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Number(Math.max(0, stackedPower + this.getLuck() + synergyAbilityPowerIncrease).toFixed(1));
     }
     public calculateAbilityCount(ability: Ability, synergyAbilityPowerIncrease: number): number {
+        // Dulling Defense removes a flat amount of base attack. Stack power, luck and synergy do not
+        // change the blow, so a partial stack must not turn the card's {} into 0.4 or 1.2.
+        if (ability.getPowerType() === AbilityPowerType.REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK) {
+            return ability.getPower();
+        }
+
         if (
             ability.getPowerType() !== AbilityPowerType.GAIN_ATTACK_AND_ARMOR_EACH_STEP &&
             ability.getPowerType() !== AbilityPowerType.ADDITIONAL_STEPS &&
             ability.getPowerType() !== AbilityPowerType.STEAL_ARMOR_ON_HIT &&
-            ability.getPowerType() !== AbilityPowerType.REDUCE_BASE_ATTACK_UPON_MELEE_ATTACK &&
             ability.getName() !== "Shatter Armor" &&
             ability.getName() !== "Deep Wounds Level 0" &&
             ability.getName() !== "Deep Wounds Level 1" &&

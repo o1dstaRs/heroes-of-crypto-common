@@ -237,7 +237,7 @@ export function strikeSkewerTargets(
             processStunAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
             processFreezeAbility(fromUnit, nextStandingTarget, fromUnit, sceneLog);
             processRimeCharmAbility(fromUnit, nextStandingTarget, sceneLog);
-            processDullingDefenseAblity(nextStandingTarget, fromUnit, sceneLog);
+            processDullingDefenseAblity(fromUnit, nextStandingTarget, sceneLog);
             processPetrifyingGazeAbility(
                 fromUnit,
                 nextStandingTarget,

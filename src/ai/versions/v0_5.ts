@@ -18,6 +18,7 @@ import {
 } from "../../engine/post_move_actor_availability";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { AttackHandler } from "../../handlers/attack_handler";
+import { canUnitRespondToMelee } from "../../handlers/melee_response";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
 import { canCastSpell } from "../../spells/spell_helper";
@@ -45,6 +46,12 @@ import { loadPlaceWeights, placeByPolicy } from "./v0_5_placement";
 
 const RANGE = PBTypes.AttackVals.RANGE;
 const MELEE = PBTypes.AttackVals.MELEE;
+/**
+ * A landed melee by the unit who has Dulling Defense permanently cuts a survivor's base attack.
+ * Larger than the incumbent anchor, so he will leave a target the blow cannot dull, and smaller
+ * than a kill, so he still finishes a stack instead of chipping one he could remove.
+ */
+const DULLING_OWN_SWING_SCORE = 0.7;
 /** Action types that mean the unit is striking/casting this turn (so a move is a combat reposition, not a free one). */
 const COMBAT_ACTIONS = new Set(["melee_attack", "range_attack", "cast_spell", "obstacle_attack", "area_throw_attack"]);
 /** Rough single-stack firepower proxy (shots * max hit), matching v0.4's firepowerOf. */
@@ -1396,8 +1403,9 @@ export class StrategyV0_5 extends StrategyV0_4 {
         // [49] War Anger Aura (Valkyrie) — +power% melee damage per ENEMY within aura range AT ATTACK TIME, so
         //      the unit wants a stand cell that puts MANY enemies in range (Hydra's surround lesson, for a
         //      single-target flyer). Count living enemies within the aura range of the candidate footprint.
-        // [50] Punish-melee — the target reflects/debuffs melee attackers (Efreet Fire Shield, Goblin Knight
-        //      Dulling Defense); trading into it costs beyond the normal counter, so avoid it (weight learns -).
+        // [50] Punish-melee — Fire Shield burns a melee attacker who leaves the target alive. Dulling Defense
+        //      costs the attacker permanent attack only when that unit will answer this blow. A knight who
+        //      already answered, or who cannot answer, is an ordinary target.
         const wWarAnger = this.w[49] ?? 0;
         const wPunishMelee = this.w[50] ?? 0;
         // [51] target-caster: enemy Healers / spell-casters (Ogre Mage, Satyr, Behemoth, Troll, Angel…) are
@@ -1488,10 +1496,13 @@ export class StrategyV0_5 extends StrategyV0_4 {
             const tAlive = c.target.getAmountAlive();
             const targetWounded = tDead + tAlive > 0 ? tDead / (tDead + tAlive) : 0;
             const warAnger = warAngerCount(c.cell);
-            const punishMelee =
-                !kill && (c.target.hasAbilityActive("Fire Shield") || c.target.hasAbilityActive("Dulling Defense"))
-                    ? 1
-                    : 0;
+            const knightWillAnswer =
+                c.target.hasAbilityActive("Dulling Defense") && canUnitRespondToMelee(unit, c.target, fp);
+            const punishMelee = !kill && (c.target.hasAbilityActive("Fire Shield") || knightWillAnswer) ? 1 : 0;
+            // His own swing is the mirror of that cost: the blow permanently cuts a survivor's base attack,
+            // which is a reason to strike with him. A kill removes the stack, so the cut is not the reason.
+            const dullingSwing =
+                !kill && unit.hasAbilityActive("Dulling Defense") && c.target.getBaseAttack() > 1 ? 1 : 0;
             const targetCaster = c.target.getCanCastSpells() ? 1 : 0;
             // Rapid Charge: the charge bonus is proportional to BOTH distance and base damage (the multiplier
             // scales the hit), so the feature is dmg * normalized-charge-distance — reward a long charge most when
@@ -1522,7 +1533,8 @@ export class StrategyV0_5 extends StrategyV0_4 {
                 wRapidCharge * rapidCharge +
                 wRangedTarget * targetRanged +
                 wBait * baitRetal +
-                wArmageddon * armageddonTrade * counter
+                wArmageddon * armageddonTrade * counter +
+                DULLING_OWN_SWING_SCORE * dullingSwing
             );
         };
         let best: Cand | undefined;

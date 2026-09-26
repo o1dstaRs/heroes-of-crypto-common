@@ -272,7 +272,7 @@ export function processLightningSpinAbility(
                 processStunAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
                 processFreezeAbility(fromUnit, enemy, currentActiveUnit, sceneLog);
                 processRimeCharmAbility(fromUnit, enemy, sceneLog, currentActiveUnit);
-                processDullingDefenseAblity(enemy, fromUnit, sceneLog);
+                processDullingDefenseAblity(fromUnit, enemy, sceneLog);
                 processPetrifyingGazeAbility(
                     fromUnit,
                     enemy,

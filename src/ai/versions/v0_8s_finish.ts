@@ -11,6 +11,8 @@
 
 import { NUMBER_OF_LAPS_FIRST_ARMAGEDDON } from "../../constants";
 import type { GameAction } from "../../engine/actions";
+import type { FightProperties } from "../../fights/fight_properties";
+import { canUnitRespondToMelee } from "../../handlers/melee_response";
 import type { Unit } from "../../units/unit";
 import type { UnitsHolder } from "../../units/units_holder";
 import type { IDecisionContext } from "../ai_strategy";
@@ -24,6 +26,12 @@ export const V08_TARGET_PRESSURE_START_LAP = NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 6
 export const V08S_URGENT_FINISH_START_LAP = NUMBER_OF_LAPS_FIRST_ARMAGEDDON - 3;
 
 const DELIVERY_EPSILON = 1e-9;
+/**
+ * A melee by the unit who has Dulling Defense permanently cuts a survivor's base attack. Count that as
+ * extra remaining work so, among fresh stacks, he would rather swing at one the blow can still dull.
+ * Modest on purpose: a much harder stack that the blow cannot dull is still the one to finish.
+ */
+const DULLING_SWING_WORK_BONUS = 0.2;
 
 interface IScheduledDelivery {
     readonly candidate: IEnumeratedCandidate;
@@ -36,6 +44,7 @@ interface IScheduledDelivery {
     readonly target: Unit;
     readonly remainingFraction: number;
     readonly unsafeDullingMelee: boolean;
+    readonly dullingSwing: boolean;
     readonly work: number;
 }
 
@@ -47,6 +56,29 @@ const isMeleeDelivery = (candidate: IEnumeratedCandidate): boolean =>
 
 const isStationaryDelivery = (candidate: IEnumeratedCandidate): boolean =>
     !candidate.actions.some((action) => action.type === "move_unit");
+
+/** The knight dulls the attacker only by answering. A spent, stunned, or otherwise silent knight does not. */
+const knightAnswersThisMelee = (
+    attacker: Unit,
+    target: Unit,
+    fightProperties?: Pick<FightProperties, "hasAlreadyRepliedAttack">,
+): boolean => target.hasAbilityActive("Dulling Defense") && canUnitRespondToMelee(attacker, target, fightProperties);
+
+/**
+ * His own swing permanently cuts the struck survivor's base attack. A killing blow does not: the stack is
+ * already gone, and a unit already at 1 attack cannot lose any more.
+ */
+const actorDullingSwingCuts = (
+    actor: Unit,
+    target: Unit,
+    candidate: IEnumeratedCandidate,
+    expectedKill: 0 | 1,
+): boolean =>
+    expectedKill === 0 &&
+    isMeleeDelivery(candidate) &&
+    actor.hasAbilityActive("Dulling Defense") &&
+    actor.getAbilityPower("Dulling Defense") > 0 &&
+    target.getBaseAttack() > 1;
 
 const targetDeliveryDamage = (candidate: IEnumeratedCandidate): number => {
     if (candidate.actions.some((action) => action.type === "range_attack")) {
@@ -62,6 +94,8 @@ function targetWork(
     candidate: IEnumeratedCandidate,
     deliveryDamage: number,
     currentLap: number,
+    fightProperties?: Pick<FightProperties, "hasAlreadyRepliedAttack">,
+    expectedKill: 0 | 1 = 0,
 ): number {
     const remainingPreArmageddonActivations = Math.max(
         1,
@@ -71,17 +105,21 @@ function targetWork(
     const regenerationReserve = regenerates ? Math.max(0, target.getMaxHp()) * remainingPreArmageddonActivations : 0;
     const baseWork =
         (Math.max(0, target.getCumulativeHp()) + regenerationReserve) / Math.max(deliveryDamage, DELIVERY_EPSILON);
-    if (!isMeleeDelivery(candidate) || !target.hasAbilityActive("Dulling Defense")) {
-        return baseWork;
+    let work = baseWork;
+    // Answering costs the attacker permanent attack, so later hits into him are weaker. A silent knight does not.
+    if (isMeleeDelivery(candidate) && knightAnswersThisMelee(actor, target, fightProperties)) {
+        const dullingPower = Math.max(0, target.getAbilityPower("Dulling Defense"));
+        const futureHits = Math.max(0, Math.ceil(baseWork) - 1);
+        const dullingTax = Math.min(2, (dullingPower / Math.max(1, actor.getAttack())) * (futureHits / 2));
+        work *= 1 + dullingTax;
     }
-
-    const dullingPower = Math.max(0, target.getAbilityPower("Dulling Defense"));
-    const futureHits = Math.max(0, Math.ceil(baseWork) - 1);
-    const dullingTax = Math.min(2, (dullingPower / Math.max(1, actor.getAttack())) * (futureHits / 2));
-    return baseWork * (1 + dullingTax);
+    if (actorDullingSwingCuts(actor, target, candidate, expectedKill)) {
+        work *= 1 + DULLING_SWING_WORK_BONUS;
+    }
+    return work;
 }
 
-/** Per-target delivery preference: kill, expected damage, stationary attack, then stable enumeration order. */
+/** Per-target delivery preference: kill, incumbent, a silent target over one who will answer, damage, the knight's own dulling swing, stationary attack, then stable order. */
 function deliveryPrecedes(left: IScheduledDelivery, right: IScheduledDelivery): boolean {
     const leftKill = left.expectedKill;
     const rightKill = right.expectedKill;
@@ -94,21 +132,27 @@ function deliveryPrecedes(left: IScheduledDelivery, right: IScheduledDelivery): 
                         (left.unsafeDullingMelee === right.unsafeDullingMelee &&
                             (left.expectedDamage > right.expectedDamage ||
                                 (left.expectedDamage === right.expectedDamage &&
-                                    ((left.stationary && !right.stationary) ||
-                                        (left.stationary === right.stationary && left.index < right.index)))))))))
+                                    ((left.dullingSwing && !right.dullingSwing) ||
+                                        (left.dullingSwing === right.dullingSwing &&
+                                            ((left.stationary && !right.stationary) ||
+                                                (left.stationary === right.stationary &&
+                                                    left.index < right.index)))))))))))
     );
 }
 
 /**
  * Least-deadline-slack target scheduler for the measurement alias. A kill available now is globally first.
  * Otherwise the target with the greatest remaining attack-work wins, including one Wild Regeneration reserve
- * and the compounding melee cost of Dulling Defense. Ties prefer damage, stationary delivery, then stable order.
+ * and the melee cost of Dulling Defense when that unit will answer. The actor's own swing is a reason to
+ * attack: a melee that still cuts base attack is preferred over an equal delivery that does not. Ties prefer
+ * damage, that swing, stationary delivery, then stable order.
  */
 export function selectV08STargetPressureCandidate(
     actor: Unit,
     unitsHolder: UnitsHolder,
     candidates: readonly IEnumeratedCandidate[],
     currentLap = V08_TARGET_PRESSURE_START_LAP,
+    fightProperties?: Pick<FightProperties, "hasAlreadyRepliedAttack">,
 ): IEnumeratedCandidate | undefined {
     const bestByTarget = new Map<string, IScheduledDelivery>();
     for (let index = 0; index < candidates.length; index += 1) {
@@ -132,7 +176,8 @@ export function selectV08STargetPressureCandidate(
             Math.max(0, target.getAmountAlive() + target.getAmountDied()) * Math.max(0, target.getMaxHp());
         const remainingFraction = originalHp > 0 ? Math.min(1, target.getCumulativeHp() / originalHp) : 1;
         const unsafeDullingMelee =
-            expectedKill === 0 && isMeleeDelivery(candidate) && target.hasAbilityActive("Dulling Defense");
+            expectedKill === 0 && isMeleeDelivery(candidate) && knightAnswersThisMelee(actor, target, fightProperties);
+        const dullingSwing = actorDullingSwingCuts(actor, target, candidate, expectedKill);
         const delivery: IScheduledDelivery = {
             candidate,
             index,
@@ -144,7 +189,8 @@ export function selectV08STargetPressureCandidate(
             target,
             remainingFraction,
             unsafeDullingMelee,
-            work: targetWork(actor, target, candidate, deliveryDamage, currentLap),
+            dullingSwing,
+            work: targetWork(actor, target, candidate, deliveryDamage, currentLap, fightProperties, expectedKill),
         };
         const prior = bestByTarget.get(pressureTargetId);
         if (!prior || deliveryPrecedes(delivery, prior)) {
@@ -155,9 +201,10 @@ export function selectV08STargetPressureCandidate(
     const deliveries = [...bestByTarget.values()];
     if (!deliveries.length) return undefined;
     const immediateKills = deliveries.filter(({ expectedKill }) => expectedKill === 1);
-    // Dulling Defense permanently destroys the attacker's base attack. Do not let that delivery cost make a
-    // fresh Goblin Knight look *more* urgent to weak melee: use another positive target while one exists. Once
-    // the Dulling stack is materially wounded (or it is the only target), preserve focus and finish it.
+    // Answering with Dulling Defense permanently cuts the attacker's base attack. Do not let that cost make a
+    // fresh knight who can still answer look more urgent: use another positive target while one exists. A knight
+    // who will not answer has no such cost. Once the answering stack is materially wounded (or it is the only
+    // target), preserve focus and finish it.
     const nonDullingDeliveries = deliveries.filter(
         ({ remainingFraction, unsafeDullingMelee }) => !unsafeDullingMelee || remainingFraction <= 0.5,
     );
@@ -179,6 +226,7 @@ export function selectV08STargetPressureCandidate(
         }
         if (!immediateKills.length && left.work !== right.work) return right.work - left.work;
         if (left.expectedDamage !== right.expectedDamage) return right.expectedDamage - left.expectedDamage;
+        if (left.dullingSwing !== right.dullingSwing) return left.dullingSwing ? -1 : 1;
         if (left.stationary !== right.stationary) return left.stationary ? -1 : 1;
         return left.index - right.index;
     });
@@ -213,7 +261,13 @@ export function prioritizeV08A13FinishDecision(
         enrichIncumbentMetadata: true,
         preserveAttackTargetCoverage: true,
     }).candidates;
-    const attack = selectV08STargetPressureCandidate(unit, context.unitsHolder, candidates, currentLap);
+    const attack = selectV08STargetPressureCandidate(
+        unit,
+        context.unitsHolder,
+        candidates,
+        currentLap,
+        context.fightProperties,
+    );
     if (attack) return attack.actions;
     const advance = candidates.find((candidate) => candidate.kind === "move");
     return advance?.actions ?? incumbent;

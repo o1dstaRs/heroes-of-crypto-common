@@ -16,15 +16,14 @@ beforeEach(() => FightStateManager.getInstance().reset());
 
 // Water Shield fully absorbs the first incoming hit; an absorbed hit must land NO on-hit riders —
 // the same rule as a miss (main melee, response, second punch and Lightning Spin all gate on it).
-// The skewer pierce path ran its rider block unconditionally, so a pierced Water-Shielded unit's
-// Dulling Defense still dulled the attacker through an absorbed hit.
+// Dulling Defense rides the skewer's own blow, so a shielded unit behind must not be dulled.
 describe("Skewer Strike vs Water Shield", () => {
     const setup = (behindAbilities: string[]) => {
         const { grid, unitsHolder } = createCombatTestContext();
         const attacker = createTestUnit({
             name: "Skewer",
             team: PBTypes.TeamVals.RIGHT,
-            abilities: ["Skewer Strike"],
+            abilities: ["Skewer Strike", "Dulling Defense"],
             attack: 40,
             damageMin: 100,
             damageMax: 100,
@@ -36,6 +35,7 @@ describe("Skewer Strike vs Water Shield", () => {
             name: "Behind",
             team: PBTypes.TeamVals.LEFT,
             abilities: behindAbilities,
+            attack: 10,
             maxHp: 500,
             amountAlive: 4,
             stackPower: 100,
@@ -59,7 +59,7 @@ describe("Skewer Strike vs Water Shield", () => {
         );
 
     it("an absorbed pierce hit deals no damage, consumes the shield, and lands no riders", () => {
-        const ctx = setup(["Dulling Defense", "Water Shield"]);
+        const ctx = setup(["Water Shield"]);
         expect(ctx.behind.willWaterShieldAbsorb(ctx.attacker)).toBe(true);
 
         skewer(ctx);
@@ -68,21 +68,21 @@ describe("Skewer Strike vs Water Shield", () => {
         expect(ctx.behind.getAmountAlive()).toBe(4);
         // One-per-battle: the shield broke on the absorb.
         expect(ctx.behind.hasBuffActive("Water Shield")).toBe(false);
-        // The headline: Dulling Defense must NOT reach through the shield.
-        expect(ctx.attacker.getDebuff("Dulling Defense")).toBeUndefined();
-        ctx.attacker.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
-        expect(ctx.attacker.getBaseAttack()).toBe(40);
+        // The skewer's Dulling Defense must NOT reach through the shield.
+        expect(ctx.behind.getDebuff("Dulling Defense")).toBeUndefined();
+        ctx.behind.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(ctx.behind.getBaseAttack()).toBe(10);
     });
 
     it("a landed pierce hit still lands its riders (gate is not over-broad)", () => {
-        const ctx = setup(["Dulling Defense"]);
+        const ctx = setup([]);
         expect(ctx.behind.willWaterShieldAbsorb(ctx.attacker)).toBe(false);
 
         skewer(ctx);
 
         expect(ctx.behind.getHp()).toBeLessThan(500);
-        expect(ctx.attacker.getDebuff("Dulling Defense")).toBeDefined();
-        ctx.attacker.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
-        expect(ctx.attacker.getBaseAttack()).toBe(38);
+        expect(ctx.behind.getDebuff("Dulling Defense")).toBeDefined();
+        ctx.behind.adjustBaseStats(false, 1, 0, 0, 0, 0, 0);
+        expect(ctx.behind.getBaseAttack()).toBe(8);
     });
 });

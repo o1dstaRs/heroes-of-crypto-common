@@ -17,6 +17,13 @@ import * as HoCConstants from "../constants";
 
 const DULLING_DEFENSE_DEBUFF = "Dulling Defense";
 
+/**
+ * The striker's own melee blow dulls the unit it hit.
+ *
+ * `fromUnit` is the one attacking or answering. A hit on a Goblin Knight who does not swing — an
+ * opening blow he never answers, a skewer or a spin that merely reaches him — does not call this
+ * with him as the striker, and so does not dull anyone.
+ */
 export function processDullingDefenseAblity(fromUnit: Unit, toUnit: Unit, sceneLog: ISceneLog): void {
     if (toUnit.isDead()) {
         return;
