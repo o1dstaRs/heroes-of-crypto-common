@@ -53,22 +53,18 @@ export function getEmpowerPercentage(caster?: IEmpowerableCaster | null): number
 }
 
 /**
- * Fireforged Sword's bonus-damage percentage after the holder team's Empower Augment.
+ * Fireforged Sword's own percentage.
  *
- * Both the stat maths (Unit.adjustBaseStats, which turns it into attack_mod) and the spellbook card read
- * this, so the "+10.7%" the card promises is the "+10.7%" the blade delivers. One decimal for the same
- * reason fireWallBurnPercentage rounds: 10 x 1.07 = 10.7 is a number, 10.700000000000001 is not.
+ * Magic-damage bonuses — the Empower augment, the Empower scroll, the Mage's rings, Sylvan Focus — do
+ * not raise it. The card, the applied buff and the burn all read this same number, so a blade that says
+ * 20% deals 20% of the hit that landed. Tome of Amplification is different: it raises the buff's stored
+ * power when the spell is cast, and that stored power is what arrives here.
  */
-export function fireforgedSwordPower(basePower: number, empowerPercentage: number): number {
+export function fireforgedSwordPower(basePower: number): number {
     if (!Number.isFinite(basePower) || basePower <= 0) {
         return 0;
     }
-    if (!Number.isFinite(empowerPercentage) || empowerPercentage <= 0) {
-        return basePower;
-    }
-    // (100 + pct)/100 rather than 1 + pct/100 — see fireWallBurnPercentage for why the arithmetic order
-    // matters at the tenth.
-    return Math.round(((basePower * (100 + empowerPercentage)) / 100) * 10) / 10;
+    return basePower;
 }
 
 /**
@@ -296,7 +292,7 @@ export function maximumElementalSpellDamage(rawDamage: number, element: SpellEle
  * water creatures take half again as much.
  *
  * Pure and Unit-free so the spellbook card, the engine and the tests all price the blade identically.
- * `swordPercentage` is the buff's power AFTER the team's Empower Augment (see fireforgedSwordPower).
+ * `swordPercentage` is the buff's own power (see fireforgedSwordPower). Magic-damage bonuses do not enter.
  */
 export function fireforgedSwordDamage(params: {
     damageDealt: number;

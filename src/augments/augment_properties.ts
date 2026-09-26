@@ -131,7 +131,8 @@ export const getMightPower = (augment: MightAugment): number => {
 /**
  * Empower is Might's arcane twin: where Might sharpens the sword arm, Empower turns up every source of MAGIC
  * damage the team can bring — the Battle Mage's and Magic Dragon's offensive spells, the Nightmare's Fire
- * Wall, a Fireforged Sword's burning edge, and the Chain Lightning / Fire Breath / Fire Shield abilities.
+ * Wall, and the Chain Lightning / Fire Breath / Fire Shield abilities. A Fireforged Sword's share is its
+ * own percentage and is not raised.
  *
  * It deliberately does NOT touch healing, buffs or control spells (Heal, Whirlpool, Magic Mirror): those are
  * balanced against their own clocks, and a "more damage" upgrade that also doubled as a heal booster would be

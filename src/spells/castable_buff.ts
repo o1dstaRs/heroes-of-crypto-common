@@ -16,6 +16,45 @@ import { SpellPowerType } from "./spell_properties";
 const formatPower = (power: number): string => String(Number(power.toFixed(4)));
 
 /**
+ * Rewrite a cast buff's lines so a literal base power reads as the amplified one.
+ *
+ * The last line is the duration ("Lasts N laps") and is left alone, so a power of 3 cannot turn the
+ * duration into the amplified number. Placeholders are not touched: the caller fills `{}` afterwards
+ * with whatever number that spell actually prints.
+ */
+export function rewriteCastBuffPowerText(
+    descriptions: readonly string[],
+    sourcePower: number,
+    amplifiedPower: number,
+): string[] {
+    const sourceText = formatPower(sourcePower);
+    const amplifiedText = formatPower(amplifiedPower);
+    if (sourceText === amplifiedText) {
+        return descriptions.slice();
+    }
+    const sourcePattern = new RegExp(`\\b${sourceText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g");
+    return descriptions.map((description, index) =>
+        index === descriptions.length - 1 ? description : description.replace(sourcePattern, amplifiedText),
+    );
+}
+
+/**
+ * A cast buff's power after Tome of Amplification.
+ *
+ * 50% on a Fireforged Sword's 20 is 30. A missing or non-positive tome leaves the power alone.
+ * Healing and resurrection never call this: the tome does not strengthen them.
+ */
+export function tomeAmplifiedBuffPower(basePower: number, tomePercent: number): number {
+    if (!Number.isFinite(basePower) || basePower === 0) {
+        return basePower;
+    }
+    if (!Number.isFinite(tomePercent) || tomePercent <= 0) {
+        return basePower;
+    }
+    return Number((basePower * (1 + tomePercent / 100)).toFixed(4));
+}
+
+/**
  * Return the positive buff that should be applied for this concrete unit cast.
  *
  * Tome belongs to the caster's army, and only strengthens non-healing buffs the
@@ -40,22 +79,13 @@ export function amplifyCastBuffForTarget(spell: Spell, caster: Unit, target: Uni
         return spell;
     }
 
-    const amplifiedPower = Number((sourcePower * (1 + tome.getPower() / 100)).toFixed(4));
+    const amplifiedPower = tomeAmplifiedBuffPower(sourcePower, tome.getPower());
     const amplified = new Spell({
         spellProperties: spell.getSpellProperties(),
         amount: spell.getAmount(),
     });
     amplified.setPower(amplifiedPower);
-
-    const sourceText = formatPower(sourcePower);
-    const amplifiedText = formatPower(amplifiedPower);
-    const sourcePattern = new RegExp(`\\b${sourceText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g");
-    const descriptions = spell.getDesc();
-    amplified.setDesc(
-        descriptions.map((description, index) =>
-            index === descriptions.length - 1 ? description : description.replace(sourcePattern, amplifiedText),
-        ),
-    );
+    amplified.setDesc(rewriteCastBuffPowerText(spell.getDesc(), sourcePower, amplifiedPower));
 
     return amplified;
 }

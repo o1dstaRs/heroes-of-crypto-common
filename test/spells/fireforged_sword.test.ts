@@ -49,8 +49,8 @@ describe("Fireforged Sword", () => {
         expect(burn({ targetMagicResist: 50, targetIsWaterElement: true })).toBe(7);
     });
 
-    it("scales with the buff's own power, so Empower raises the fire", () => {
-        // swordPercentage arrives already raised by the team's Empower Augment (fireforgedSwordPower).
+    it("scales with the buff's own power, and nothing else", () => {
+        // swordPercentage is the buff's own power. Magic-damage bonuses do not raise it.
         expect(burn({ swordPercentage: 10.7 })).toBe(10);
         expect(burn({ swordPercentage: 20 })).toBe(20);
         expect(burn({ swordPercentage: 0 })).toBe(0);

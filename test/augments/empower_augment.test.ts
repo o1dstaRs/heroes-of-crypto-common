@@ -145,7 +145,7 @@ describe("Empower augment — magic damage routing", () => {
     it("leaves every damage figure alone when the team did not buy it", () => {
         expect(calculateSpellDamage(flat, 4, 38, 0)).toBe(calculateSpellDamage(flat, 4, 38));
         expect(fireWallBurnPercentage(0)).toBe(FIRE_WALL_BURN_PERCENTAGE);
-        expect(fireforgedSwordPower(10, 0)).toBe(10);
+        expect(fireforgedSwordPower(10)).toBe(10);
     });
 
     it("raises spell damage by exactly the augment's percentage", () => {
@@ -172,10 +172,9 @@ describe("Empower augment — magic damage routing", () => {
         expect(fireWallBurnDamage(1000, Number.NaN)).toBe(250);
     });
 
-    it("sharpens a Fireforged Sword's burning edge", () => {
-        expect(fireforgedSwordPower(10, 7)).toBe(10.7);
-        expect(fireforgedSwordPower(10, 15)).toBe(11.5);
-        expect(fireforgedSwordPower(10, 24)).toBe(12.4);
+    it("does not raise a Fireforged Sword — its percentage is its own", () => {
+        expect(fireforgedSwordPower(20)).toBe(20);
+        expect(fireforgedSwordPower(10)).toBe(10);
     });
 
     it("reads the percentage off the buff the augment puts on the caster", () => {

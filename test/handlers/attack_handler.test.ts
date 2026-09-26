@@ -400,6 +400,82 @@ describe("AttackHandler", () => {
             setDeterministicRandomSource(undefined);
         });
 
+        it("Tome of Amplification raises a Fireforged Sword from 20% to 30% of the hit", () => {
+            setDeterministicRandomSource(() => 0);
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+            const caster = createTestUnit({
+                name: "Wandering Mage",
+                team: PBTypes.TeamVals.RIGHT,
+                spells: ["Chaos:Fireforged Sword"],
+                maxHp: 6,
+            });
+            const ally = createTestUnit({
+                name: "Swordsman",
+                team: PBTypes.TeamVals.RIGHT,
+                attackType: PBTypes.AttackVals.MELEE,
+                damageMin: 40,
+                damageMax: 40,
+                maxHp: 200,
+                amountAlive: 3,
+            });
+            const enemy = createTestUnit({
+                name: "Target",
+                team: PBTypes.TeamVals.LEFT,
+                armor: 0,
+                magicResist: 0,
+                maxHp: 500,
+                amountAlive: 5,
+                damageMin: 0,
+                damageMax: 0,
+            });
+
+            placeUnit(grid, unitsHolder, caster, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, ally, { x: 2, y: 1 });
+            placeUnit(grid, unitsHolder, enemy, { x: 3, y: 1 });
+            const fightProperties = FightStateManager.getInstance().getFightProperties();
+            fightProperties.setArtifactPerTeam(
+                PBTypes.TeamVals.RIGHT,
+                ArtifactTier.TIER_2,
+                Tier2Artifact.TOME_OF_AMPLIFICATION,
+            );
+            unitsHolder.applyArtifacts(fightProperties);
+            // Empower is a magic-damage bonus. It must not move the blade on top of the tome.
+            ally.applyBuff(new Spell({ spellProperties: getSpellConfig("Chaos", "Empower"), amount: 1 }));
+
+            const sourceSpell = caster.getSpells()[0];
+            const cast = attackHandler.handleMagicAttack(grid.getMatrix(), unitsHolder, sourceSpell, caster, ally);
+
+            expect(cast.completed).toBe(true);
+            expect(sourceSpell.getPower()).toBe(20);
+            expect(ally.getBuff("Fireforged Sword")?.getPower()).toBe(30);
+            const swordIndex = ally.getUnitProperties().applied_buffs.indexOf("Fireforged Sword");
+            const shown = ally.getUnitProperties().applied_buffs_descriptions[swordIndex]?.split(";")[0] ?? "";
+            expect(shown).toContain("for 30%");
+            expect(ally.getMagicDamageBonusPercentage()).toBeGreaterThan(0);
+
+            const damage = createVisibleDamage(enemy);
+            const attack = attackHandler.handleMeleeAttack(unitsHolder, moveHandler, damage, undefined, ally, enemy, {
+                x: 2,
+                y: 1,
+            });
+
+            expect(attack.completed).toBe(true);
+            expect(damage.amount).toBeGreaterThan(0);
+            const burns = (damage.secondary ?? []).filter((entry) => entry.source === "fireforged_sword");
+            expect(burns).toHaveLength(1);
+            expect(burns[0]?.amount).toBe(
+                fireforgedSwordDamage({
+                    damageDealt: damage.amount,
+                    swordPercentage: 30,
+                    targetMagicResist: 0,
+                    targetIsFireElement: false,
+                    targetIsWaterElement: false,
+                }),
+            );
+            setDeterministicRandomSource(undefined);
+        });
+
         it("amplifies a Healer's Spiritual Armor cast without mutating the source spell", () => {
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const caster = createTestUnit({

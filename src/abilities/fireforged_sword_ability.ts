@@ -64,7 +64,7 @@ export function processFireforgedSwordAbility(
 
     const burnDamage = fireforgedSwordDamage({
         damageDealt: damageFromAttack,
-        swordPercentage: fireforgedSwordPower(swordBuff.getPower(), fromUnit.getEmpowerPercentage()),
+        swordPercentage: fireforgedSwordPower(swordBuff.getPower()),
         targetMagicResist: toUnit.getMagicResist(),
         targetIsFireElement: toUnit.hasAbilityActive("Fire Element"),
         targetIsWaterElement: toUnit.hasAbilityActive("Water Element"),
