@@ -2555,13 +2555,13 @@ export class GameActionEngine {
             return { completed: true, events };
         }
 
-        // An explicit cell has to hold the creature's real body; it is not relocated. A cast with no
-        // cell (what the ranked client sends) seats that body on the first ring cell that can hold it,
-        // and when none can — a 2x1 Wolf whose left cell is blocked, the case of a Satyr on the board
-        // edge with one free cell beside it — the stack stands on that one free cell.
+        // The summoned creature's real body has to fit. An explicit cell is not relocated. A cast
+        // with no cell (what the ranked client sends) takes the first cell around the caster that
+        // holds that body. One empty cell is not enough for a 2×1 Wolf.
         const native = SpellHelper.summonFootprintOf(spell);
         const ring = getCellsAroundFootprint(this.context.grid.getSettings(), caster.getCells());
-        const seat = action.targetCell
+        const hinted = action.targetCell ?? this.context.getSummonTargetCell?.(caster, spell, action);
+        const seatCell = action.targetCell
             ? SpellHelper.canCastSummon(
                   spell,
                   this.context.grid.getMatrix(),
@@ -2569,16 +2569,14 @@ export class GameActionEngine {
                   native.width,
                   native.height,
               )
-                ? { cell: action.targetCell, width: native.width, height: native.height }
+                ? action.targetCell
                 : undefined
-            : SpellHelper.resolveSummonSeat(
-                  spell,
-                  this.context.grid.getMatrix(),
-                  ring,
-                  this.context.getSummonTargetCell?.(caster, spell, action),
-              );
-        if (!seat) {
-            return this.reject("spell_not_available");
+            : SpellHelper.resolveSummonAnchor(spell, this.context.grid.getMatrix(), ring, hinted);
+        if (!seatCell) {
+            return this.reject(
+                "spell_not_available",
+                SpellHelper.noSpaceToSummonMessage(caster.getName(), unitName, native.width, native.height),
+            );
         }
 
         if (!this.context.createSummonedUnit) {
@@ -2597,10 +2595,6 @@ export class GameActionEngine {
             return this.reject("spell_not_available");
         }
 
-        if (seat.width !== native.width || seat.height !== native.height) {
-            summoned.standInOneCell();
-        }
-        const seatCell = seat.cell;
         const cells = this.resolveSummonCells(summoned, seatCell);
         if (!cells.length) {
             return this.reject("spell_not_available");

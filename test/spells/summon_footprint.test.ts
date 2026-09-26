@@ -16,8 +16,8 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Spell } from "../../src/spells/spell";
 import {
     canCastSummon,
+    noSpaceToSummonMessage,
     resolveSummonAnchor,
-    resolveSummonSeat,
     summonFootprintOf,
 } from "../../src/spells/spell_helper";
 import type { XY } from "../../src/utils/math";
@@ -80,7 +80,7 @@ describe("a summon is seated with the summoned creature's real body", () => {
         ).toBeUndefined();
     });
 
-    it("stands on the one free cell next to the caster when the 2x1 body cannot", () => {
+    it("has no seat when one free cell is not wide enough for the Wolf", () => {
         const spell = summonWolves();
         const matrix = emptyBoard();
         // The reported fight: Satyr on the right edge, one empty cell beside him, and the cell a
@@ -103,19 +103,8 @@ describe("a summon is seated with the summoned creature's real body", () => {
         ];
 
         expect(resolveSummonAnchor(spell, matrix, ring)).toBeUndefined();
-        expect(resolveSummonSeat(spell, matrix, ring)).toEqual({ cell: { x: 14, y: 6 }, width: 1, height: 1 });
-    });
-
-    it("still refuses when every cell next to the caster is taken", () => {
-        const spell = summonWolves();
-        const matrix = emptyBoard();
-        matrix[5][5] = PBTypes.TeamVals.LEFT;
-        matrix[9][9] = PBTypes.TeamVals.LEFT;
-        expect(
-            resolveSummonSeat(spell, matrix, [
-                { x: 5, y: 5 },
-                { x: 9, y: 9 },
-            ]),
-        ).toBeUndefined();
+        expect(noSpaceToSummonMessage("Satyr", "Wolf", 2, 1)).toBe(
+            "No space next to Satyr. Wolf needs 2×1 free cells.",
+        );
     });
 });

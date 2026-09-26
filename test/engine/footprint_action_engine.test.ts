@@ -724,7 +724,7 @@ describe("action engine footprints — summoning", () => {
         });
     }
 
-    it("stands a 2x1 summon on one free cell when no target was given and the real body cannot fit", () => {
+    it("refuses a 2x1 summon with no target cell when the real body cannot fit, and says there is no space", () => {
         const caster = createFootprintUnit(1, 1, { name: "Satyr", spells: ["Nature:Summon Wolves"] });
         let summoned: Unit | undefined;
         const setup = fightEngine(caster, {
@@ -759,17 +759,11 @@ describe("action engine footprints — summoning", () => {
             spellName: "Summon Wolves",
         });
 
-        expect(result.completed).toBe(true);
-        const wolf = summoned!;
-        expect(wolf.isSmallSize()).toBe(true);
-        expect(setup.grid.getRegisteredCells(wolf.getId())).toHaveLength(1);
-        const cell = wolf.getBaseCell();
-        expect(
-            [
-                { x: 15, y: 8 },
-                { x: 14, y: 6 },
-            ].some((free) => free.x === cell.x && free.y === cell.y),
-        ).toBe(true);
+        expect(result.completed).toBe(false);
+        expect(result.rejectionReason).toBe("spell_not_available");
+        expect(result.message).toBe("No space next to Satyr. Wolf needs 2×1 free cells.");
+        expect(summoned).toBeUndefined();
+        expect(caster.hasSpellRemaining("Summon Wolves")).toBe(true);
     });
 });
 
