@@ -95,7 +95,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned 2026-09-25: Unicorn hp 70 -> 75, and Flesh Shield is sampled at the landing cell.
 // Unicorn is fielded across the seeded draws, and a different absorption changes the trace from
 // the first exchange on. Verified against this tree.
-const EXPECTED_REPLAY_SHA256 = "8fcbcc222394d36d7f012ca5f8dc676ba8eb124d2f8149864b6ccafd1a384655";
+// Previous approved digest: 8fcbcc222394d36d7f012ca5f8dc676ba8eb124d2f8149864b6ccafd1a384655
+// Re-pinned 2026-09-25: Unicorn melee damage 11-15 -> 12-16. Unicorn is fielded across the
+// seeded draws, so the new roll changes the trace from the first landed hit.
+const EXPECTED_REPLAY_SHA256 = "3534f3c2ca5c3dd4adffc3a0bc700c98d61ed6ab6ba2abb46547eeccf849f09c";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
