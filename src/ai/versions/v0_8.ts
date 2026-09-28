@@ -22,6 +22,7 @@ import { enumerateCandidates, type CandidateKind, type IEnumeratedCandidate } fr
 import { otherTeam } from "./v0_1";
 import { type ICasterRouterPolicy, routeUniversalCasterWithPolicy, V07_CASTER_ROUTER_POLICY } from "./caster_router";
 import { strategyVersionMatchesExperimentScope } from "./experiment_scope";
+import { layoutRevealPlacement, SPLASH_AOE_ABILITIES } from "./v0_7_placement_reveal";
 import { casterPolicyWithExtras, StrategyV0_7 } from "./v0_7";
 import {
     buildV08BacklineWardIntent,
@@ -621,7 +622,24 @@ export class StrategyV0_8 extends StrategyV0_7 {
         // Run the inherited path first so v0.7 primes its immutable initial-army profile even when the
         // role-aware layout below overrides the returned cells.
         const inherited = super.placeArmy(units, productionContext);
-        const protectedLayout = v08BacklineProtectorPlacement(units, productionContext) ?? inherited;
+        // 960 side-board fights: cornering two or more shooters inside the existing zone was about
+        // +30pp against plain ground and +25pp against a shooter wall. Paying to extend that zone
+        // lost, and the same corners lost into Area Throw / Large Caliber, where the inherited
+        // spread is the one that already breaks a splash. Flyers and spell damage were inside the noise.
+        const rangedCount = units.filter((unit) => unit.getAttackType() === PBTypes.AttackVals.RANGE).length;
+        const enemySplash = productionContext.unitsHolder
+            .getAllEnemyUnits(productionContext.team)
+            .some((unit) => !unit.isDead() && SPLASH_AOE_ABILITIES.some((ability) => unit.hasAbilityActive(ability)));
+        const cornered =
+            rangedCount >= 2 && !enemySplash
+                ? layoutRevealPlacement(units, productionContext, {
+                      gap: 0,
+                      screenShooters: true,
+                      cornerShift: false,
+                      physicalMeleeMagicRoles: true,
+                  })
+                : undefined;
+        const protectedLayout = v08BacklineProtectorPlacement(units, productionContext) ?? cornered ?? inherited;
         return strategyVersionMatchesExperimentScope(this.version, process.env[V08_BLACKSMITH_ROLE_VERSIONS_ENV])
             ? v08BlacksmithCraftPlacement(units, productionContext, protectedLayout)
             : protectedLayout;
