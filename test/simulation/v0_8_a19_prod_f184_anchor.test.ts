@@ -149,13 +149,26 @@ describe("v0.8 A19 production f184 placement anchor", () => {
             const decorated = new V08A19RankedPlacementStrategy(new StrategyV0_8());
             const selected = decorated.placeArmy(units, placementContext);
             const corrected = units.find((unit) => unit.getName() === correctedName)!;
-
+            // Since the corner-shooters placement (1c9f1f03) the two sides of this anchor split: LEFT
+            // fields two shooters against a splashless enemy, so the incumbent itself corners them
+            // (Arbalester x=1, Beholder x=14) and the treatment must DECLINE rather than invent a
+            // shooter screen over those corners. RIGHT faces Black Dragon splash, keeps the incumbent
+            // screen, and the reviewed correction still applies.
+            if (team === LEFT) {
+                expect(decorated.getLastPlacementAudit()).toMatchObject({
+                    treatmentApplied: false,
+                    placementChanged: false,
+                    correctedGroundScreens: 0,
+                    fallbackReason: "not-incumbent-shooter-screen",
+                });
+                continue;
+            }
             expect(decorated.getLastPlacementAudit()).toMatchObject({
                 treatmentApplied: true,
                 placementChanged: true,
                 correctedPhysicalUnits: 1,
-                correctedForwardPhysicals: team === RIGHT ? 1 : 0,
-                correctedGroundScreens: team === LEFT ? 1 : 0,
+                correctedForwardPhysicals: 1,
+                correctedGroundScreens: 0,
                 fallbackReason: null,
             });
             expect(frontness(team, corrected, selected)).toBeGreaterThan(frontness(team, corrected, incumbent));

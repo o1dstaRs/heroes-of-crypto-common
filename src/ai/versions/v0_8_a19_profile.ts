@@ -134,7 +134,9 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        sha256: "a4804c1df958bf876398c29a4cd9a44e1515bcb72c3cbf5142d98e15dc6b27e3" as const,
+        // Re-pinned by 6e4f86d (Dulling Defense rides the knight's own blow): the driver's bytes
+        // changed with the ability fix; the ledger follows the reviewed source, not vice versa.
+        sha256: "e7cbcb788802f3c914efee10ad93e3a29a15cabcfc79fd07d3d3227ddf77bf51" as const,
     }),
     Object.freeze({
         role: "armageddon-endgame" as const,
