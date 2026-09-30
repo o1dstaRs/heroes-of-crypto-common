@@ -3828,8 +3828,11 @@ const r2PlanSponge = (
     return empty;
 };
 
-const r2Commit = (board: IBoard, plan: ReadonlyMap<string, XY>): void => {
-    if (plan.size && r2AssignmentLegal(board, plan)) commitAssignments(board, plan, false);
+const r2Commit = (board: IBoard, plan: ReadonlyMap<string, XY>): boolean => {
+    if (!plan.size) return false;
+    if (!r2AssignmentLegal(board, plan)) return false;
+    commitAssignments(board, plan, false);
+    return true;
 };
 
 const r2FrontTanks = (board: IBoard): Unit[] => {
@@ -4239,14 +4242,14 @@ const r3Add = (plan: IPlan, unit: Unit, anchor: XY, board: IBoard): boolean => {
     const footprint = footprintCellsForAnchor(unit, anchor);
     if (!r3Legal(footprint, board, plan.taken)) return false;
     plan.assignment.set(unit.getId(), { x: anchor.x, y: anchor.y });
-    plan.obstacles.push(footprint);
+    plan.obstacles.push([...footprint]);
     for (const cell of footprint) plan.taken.add(keyOf(cell));
     return true;
 };
 
 const r3Hold = (plan: IPlan, footprint: readonly XY[]): void => {
     if (!footprint.length) return;
-    plan.obstacles.push(footprint);
+    plan.obstacles.push([...footprint]);
     for (const cell of footprint) plan.taken.add(keyOf(cell));
 };
 
@@ -20234,7 +20237,7 @@ const c93Area = (board: IBoard): boolean => {
     const empty = new Set<number>();
     for (const cell of screenRing) empty.add(keyOf(cell));
     const seed = new Map<string, XY>([[screen.getId(), c93At(centre)]]);
-    const placed: XY[][] = [screenFoot];
+    const placed: XY[][] = [[...screenFoot]];
     for (const unit of protectedUnits) {
         const spot = c93BestBack(board, unit, placed, empty, fixed, zone.back, 3);
         if (!spot) continue;

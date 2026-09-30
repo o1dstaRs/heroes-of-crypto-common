@@ -23,6 +23,7 @@ import {
     separationGapForThreats,
 } from "../../src/ai/versions/v0_8_placement_lift";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import type { TeamType } from "../../src/generated/protobuf/v1/types_gen";
 import { PlacementPositionType } from "../../src/grid/placement_properties";
 import { PathHelper } from "../../src/grid/path_helper";
 import { RectanglePlacement } from "../../src/grid/rectangle_placement";
@@ -68,7 +69,7 @@ const at = (units: readonly Unit[], cells: readonly XY[]): Map<string, XY> => {
 const contextFor = (
     units: readonly Unit[],
     opponentNames: readonly string[],
-    team: typeof LEFT = LEFT,
+    team: TeamType = LEFT,
 ): IPlacementContext => {
     const combat = createCombatTestContext();
     for (const unit of units) combat.unitsHolder.addUnit(unit);
