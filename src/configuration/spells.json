@@ -1420,7 +1420,8 @@
                 "Hold Shift while aiming to rotate it. Only free cells catch fire: a creature, the mountain or a",
                 "narrowed-away cell under the line is skipped and the rest of the line still burns.",
                 "Entering a burning cell costs any creature 1 extra step (double the usual cost)",
-                "and sears it for {}% of its maximum health, friend or foe alike.",
+                "and sears it for {}% of its maximum health, friend or foe alike. A flying creature",
+                "clears the flames in flight and is only seared for the burning cells it lands on.",
                 "Lasts 3 laps."
             ],
             "target": "FREE_CELL",

@@ -34,8 +34,8 @@ export interface IFireWallBurnTarget {
 export const FIRE_WALL_DEFAULT_LAPS = 3;
 
 // Extra steps a creature pays to enter a burning cell. A plain orthogonal step costs 1, so the penalty is
-// what makes crossing the wall cost double. Unlike a vine, the flames do NOT spare flyers: the wall is a
-// sheet of fire, not something to step over.
+// what makes crossing the wall cost double. Like a vine, the flames spare flyers MID-FLIGHT (owner call
+// 2026-09-30): a flyer pays no crossing toll and only burns for the burning cells it lands on.
 export const FIRE_WALL_CROSS_PENALTY = 1;
 
 // Share of the crossing stack's CUMULATIVE maximum health burned off per burning cell entered. Stack-scaled

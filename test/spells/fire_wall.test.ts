@@ -39,8 +39,8 @@ import {
 } from "../../src/spells/fire_walls";
 
 // A fire wall lays terrain, and terrain is priced in the pathfinder — so the numbers below ARE the feature.
-// Entering a burning cell costs one extra step, which doubles the price of a plain step. Unlike a vine, the
-// flames do not spare flyers.
+// Entering a burning cell costs one extra step, which doubles the price of a plain step. Like a vine, the
+// flames spare flyers in flight (owner call 2026-09-30): no crossing toll, and only the landing burns.
 describe("Fire Wall movement costs", () => {
     const settings = simulationGridSettings();
     const START = { x: 8, y: 8 };
@@ -80,11 +80,13 @@ describe("Fire Wall movement costs", () => {
         expect(costTo({ x: 9, y: 8 }, false)).toBeCloseTo(1 + FIRE_WALL_CROSS_PENALTY, 5);
     });
 
-    // The difference from a vine, and the reason the penalty sits outside vineAdjustedCost's canFly check:
-    // there is no stepping over a sheet of flame.
-    it("charges a flyer the same toll as a walker", () => {
+    // Like a vine: a flyer crosses the sheet of flame in the air, so the wall prices nothing for it.
+    // The burn it pays for landing in fire is covered by the engine move tests below.
+    it("spares a flyer the crossing toll", () => {
         fireWalls().add({ x: 9, y: 8 });
-        expect(costTo({ x: 9, y: 8 }, true)).toBeCloseTo(1 + FIRE_WALL_CROSS_PENALTY, 5);
+        expect(costTo({ x: 9, y: 8 }, true)).toBeCloseTo(1, 5);
+        fireWalls().add({ x: 10, y: 8 });
+        expect(costTo({ x: 10, y: 8 }, true)).toBeCloseTo(2, 5);
     });
 
     it("adds the toll on top of the diagonal surcharge", () => {
@@ -305,7 +307,9 @@ describe("fireWallLitCells", () => {
  * engine actually wires them to a spell and to a move.
  */
 describe("Fire Wall through the action engine", () => {
-    const setup = (opts: { casterSpells?: string[]; casterStackPower?: number; moverMaxHp?: number } = {}) => {
+    const setup = (
+        opts: { casterSpells?: string[]; casterStackPower?: number; moverMaxHp?: number; moverFlies?: boolean } = {},
+    ) => {
         const context = createCombatTestContext(PBTypes.GridVals.NORMAL);
         const fightProperties = FightStateManager.getInstance().getFightProperties();
         fightProperties.setGridType(PBTypes.GridVals.NORMAL);
@@ -328,6 +332,7 @@ describe("Fire Wall through the action engine", () => {
             morale: 4,
             maxHp: opts.moverMaxHp ?? 20,
             amountAlive: 10,
+            movementType: opts.moverFlies ? PBTypes.MovementVals.FLY : PBTypes.MovementVals.WALK,
         });
         placeUnit(context.grid, context.unitsHolder, caster, { x: 3, y: 3 });
         placeUnit(context.grid, context.unitsHolder, enemy, { x: 9, y: 9 });
@@ -560,6 +565,50 @@ describe("Fire Wall through the action engine", () => {
         expect(result.completed).toBe(true);
         expect(result.events.some((e) => e.type === "fire_wall_burned")).toBe(false);
         expect(s.enemy.getCumulativeHp()).toBe(s.enemy.getCumulativeMaxHp());
+    });
+
+    // Owner call 2026-09-30: a flyer crosses the sheet of fire in the air. The wall it passes THROUGH
+    // sears nothing — only the burning cells it lands on are paid for.
+    it("spares a flyer that crosses the flames in flight", () => {
+        const s = setup({ moverFlies: true });
+        s.setActive(s.enemy);
+        const burning = { x: 9, y: 8 };
+        s.fightProperties.getFireWalls().add(burning, 3);
+
+        const result = s.engine.apply({
+            type: "move_unit",
+            unitId: s.enemy.getId(),
+            path: [burning, { x: 9, y: 7 }],
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events.some((e) => e.type === "fire_wall_burned")).toBe(false);
+        expect(s.enemy.getCumulativeHp()).toBe(s.enemy.getCumulativeMaxHp());
+    });
+
+    it("sears a flyer that lands in the flames for a quarter of its maximum health", () => {
+        const s = setup({ moverFlies: true, moverMaxHp: 20 });
+        s.setActive(s.enemy);
+        const burning = { x: 9, y: 8 };
+        s.fightProperties.getFireWalls().add(burning, 3);
+        const maxHp = s.enemy.getCumulativeMaxHp(); // 10 x 20 = 200
+
+        const result = s.engine.apply({
+            type: "move_unit",
+            unitId: s.enemy.getId(),
+            path: [burning],
+        });
+
+        expect(result.completed).toBe(true);
+        expect(result.events).toContainEqual(
+            expect.objectContaining({
+                type: "fire_wall_burned",
+                unitId: s.enemy.getId(),
+                cells: [burning],
+                amount: fireWallBurnDamage(maxHp),
+            }),
+        );
+        expect(s.enemy.getCumulativeHp()).toBe(maxHp - fireWallBurnDamage(maxHp));
     });
 
     // An ATTACK carries its own move, and that move happens inside the attack handler rather than through

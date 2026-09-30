@@ -614,12 +614,16 @@ export class GameActionEngine {
         // Angel gliding onto a wall that sits under any of its other three cells crossed real fire and was
         // charged nothing. Expand each travelled anchor to the block it actually occupied, minus the body
         // the unit started on (staying put is still free). A 1x1 is unaffected: its body IS its anchor.
+        // A flyer is only seared for the burning cells it LANDS on (owner call 2026-09-30): it clears the
+        // flames it crosses, exactly like it clears a vine, and pays only for standing in the fire.
         events.push(
             ...this.applyFireWallBurn(
                 unit,
-                pathIsFootprintOnly
+                unit.canFly()
                     ? targetCells
-                    : bodyCellsEnteredAlongPath(startCells, travelledPath, footprintWidth, footprintHeight),
+                    : pathIsFootprintOnly
+                      ? targetCells
+                      : bodyCellsEnteredAlongPath(startCells, travelledPath, footprintWidth, footprintHeight),
             ),
         );
         return { completed: true, events };
@@ -1610,7 +1614,8 @@ export class GameActionEngine {
      *
      * Two effects, both lasting `spell.getLapsTotal()` laps: entering a burning cell costs one extra step
      * (see FIRE_WALL_CROSS_PENALTY in path_helper) and sears the crossing stack for a share of its maximum
-     * health (see applyFireWallBurn on the move path). Neither spares flyers. One cast = one charge.
+     * health (see applyFireWallBurn on the move path). A flyer clears both in flight (owner call
+     * 2026-09-30) and is only seared for the burning cells it lands on. One cast = one charge.
      */
     private fireWallCast(
         action: Extract<GameAction, { type: "cast_spell" }>,

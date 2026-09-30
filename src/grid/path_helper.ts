@@ -1489,13 +1489,13 @@ export class PathHelper {
 
         // Fire Wall terrain, read off the live fight the same way. A burning cell costs one extra step on
         // top of whatever the cell already cost — so a plain step through the wall is double price, and a
-        // vined-and-burning cell charges for both. Flyers are NOT spared here (a vine is something to step
-        // over; a wall of fire is not), which is also why this sits outside vineAdjustedCost's canFly check.
+        // vined-and-burning cell charges for both. A flyer passes OVER the sheet of fire untouched (owner
+        // call 2026-09-30): no crossing toll, and the burn on arrival only — see applyFireWallBurn.
         const fireWalls = FightStateManager.getInstance().getFightProperties().getFireWalls();
         const hasAnyFireWall = fireWalls.size() > 0;
         const terrainAdjustedCost = (baseCost: number, cell: XY): number => {
             const cost = vineAdjustedCost(baseCost, cell);
-            if (!hasAnyFireWall || !fireWalls.has(cell)) {
+            if (!hasAnyFireWall || canFly || !fireWalls.has(cell)) {
                 return cost;
             }
             return cost + FIRE_WALL_CROSS_PENALTY;
