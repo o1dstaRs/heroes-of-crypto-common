@@ -184,7 +184,10 @@ export function travelledMovePath(currentCell: Readonly<XY>, path: readonly Read
 }
 
 export function resolveMoveTraversal(
-    unit: Pick<Unit, "getBaseCell" | "getCells" | "isSmallSize" | "getFootprintWidth" | "getFootprintHeight">,
+    unit: Pick<
+        Unit,
+        "getBaseCell" | "getCells" | "isSmallSize" | "getFootprintWidth" | "getFootprintHeight" | "canFly"
+    >,
     action: MoveUnitAction,
     resolvedRoute?: IResolvedMoveRoute,
 ): IMoveTraversal {
@@ -216,17 +219,23 @@ export function resolveMoveTraversal(
         pathIsFootprintOnly,
         travelledPath,
         routeModifierPath,
-        // A footprint-only move has no ordered route. The engine treats its final
-        // footprint as the set of cells entered for Fire Wall purposes. A walk charges every cell the BODY
-        // enters, exactly as ActionEngine.moveUnit burns it; the bare anchor route under-priced any body
-        // larger than 1x1, so the AI planned strikes after a traversal that killed or thinned the mover.
-        crossedCells: pathIsFootprintOnly
-            ? targetCells
-            : bodyCellsEnteredAlongPath(unit.getCells(), travelledPath, width, height),
+        crossedCells: fireWallCellsForTraversal(unit, unit.getCells(), travelledPath, targetCells, pathIsFootprintOnly),
     };
 }
 
-/** Ordered, de-duplicated Fire Wall cells entered by the move. */
+/** Flyers only touch fire where they land; walkers touch every cell their body enters along the route. */
+export function fireWallCellsForTraversal(
+    unit: Pick<Unit, "canFly" | "getFootprintWidth" | "getFootprintHeight">,
+    startCells: readonly XY[],
+    travelledAnchors: readonly XY[],
+    landingCells: readonly XY[],
+    pathIsFootprintOnly = false,
+): readonly XY[] {
+    return unit.canFly() || pathIsFootprintOnly
+        ? landingCells
+        : bodyCellsEnteredAlongPath(startCells, travelledAnchors, unit.getFootprintWidth(), unit.getFootprintHeight());
+}
+
 /**
  * Every cell a unit's BODY newly occupies along a walk — the cells a Fire Wall may charge it for.
  *

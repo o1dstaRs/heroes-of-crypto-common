@@ -28,8 +28,8 @@ import * as AbilityHelper from "../abilities/ability_helper";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import type { IAbilityTransfer } from "../engine/events";
 import {
-    bodyCellsEnteredAlongPath,
     burnUnitOnFireWallCells,
+    fireWallCellsForTraversal,
     travelledMovePath,
 } from "../engine/post_move_actor_availability";
 import { Unit } from "../units/unit";
@@ -3221,14 +3221,14 @@ export class AttackHandler {
         if (!fireWalls?.size()) {
             return undefined;
         }
-        // The anchors the attacker actually walked, expanded to the body each one carried: a wall under any
-        // cell of a large body is crossed fire, exactly as on the move path.
+        // Use the same flight/landing rule as standalone moves and their AI projection, including every
+        // cell under a large body's landing footprint.
         const route = currentActiveKnownPaths?.get((attackFromCell.x << 4) | attackFromCell.y)?.[0]?.route;
-        const entered = bodyCellsEnteredAlongPath(
+        const entered = fireWallCellsForTraversal(
+            attackerUnit,
             startCells,
             travelledMovePath(startBaseCell, route ?? [attackFromCell]),
-            attackerUnit.getFootprintWidth(),
-            attackerUnit.getFootprintHeight(),
+            attackerUnit.getCells(),
         );
         const position = { ...attackerUnit.getPosition() };
         const { burning, total, unitsDied } = burnUnitOnFireWallCells(attackerUnit, entered, fireWalls, this.sceneLog);

@@ -60,8 +60,8 @@ import type { GameAction } from "./actions";
 import { isHeadlessSimulationEvent, type GameEvent, type IGameAnimationEvent } from "./events";
 import { canWaitOnHourglass } from "./hourglass";
 import {
-    bodyCellsEnteredAlongPath,
     burnUnitOnFireWallCells,
+    fireWallCellsForTraversal,
     isMovePathFootprintOnly,
     moveCellsMatchAsSet,
     resolveMoveTargetCells,
@@ -619,11 +619,7 @@ export class GameActionEngine {
         events.push(
             ...this.applyFireWallBurn(
                 unit,
-                unit.canFly()
-                    ? targetCells
-                    : pathIsFootprintOnly
-                      ? targetCells
-                      : bodyCellsEnteredAlongPath(startCells, travelledPath, footprintWidth, footprintHeight),
+                fireWallCellsForTraversal(unit, startCells, travelledPath, targetCells, pathIsFootprintOnly),
             ),
         );
         return { completed: true, events };
@@ -639,7 +635,7 @@ export class GameActionEngine {
      * Damage is re-derived per cell rather than multiplied out, because a stack thinned by the first cell has
      * a smaller maximum health for the second to take its share of.
      */
-    private applyFireWallBurn(unit: Unit, crossedCells: XY[]): GameEvent[] {
+    private applyFireWallBurn(unit: Unit, crossedCells: readonly XY[]): GameEvent[] {
         const position = this.headlessEvents ? undefined : { ...unit.getPosition() };
         const { burning, total, unitsDied } = burnUnitOnFireWallCells(
             unit,
