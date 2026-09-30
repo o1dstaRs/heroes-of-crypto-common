@@ -684,9 +684,9 @@ describe("Magic Mirror spell buffs", () => {
         ["Mass Magic Mirror", 48],
     ] as const) {
         it(`${spellName} always returns its configured share of landed magical damage`, () => {
-            // A high roll proves this is the spell buff's guaranteed damage return, not the Magic Dragon
-            // passive's chance-based rebound. Lightning Strike lands for 150; the two buffs return 40% and
-            // 32% respectively, floored before the caster's own defences are applied.
+            // The buff's guaranteed damage return, read apart from any Magic Dragon passive (this holder
+            // carries none). Lightning Strike lands for 150; the two buffs return 40% and 32% respectively,
+            // floored before the caster's own defences are applied.
             alwaysRoll(99);
             const setup = setupDragonFight({
                 casterAmountAlive: 1,
@@ -720,9 +720,10 @@ describe("Magic Mirror spell buffs", () => {
 });
 
 describe("Magic Reflection (passive)", () => {
-    // STACK-SCALED, like the game's other percentages: the configured 75 is what a FULL stack rebounds, and
-    // a depleted one rebounds proportionally less -- 15/30/45/60/75 across the five tiers -- before luck
-    // shifts it. A dragon down to its last pip is a much poorer mirror than a fresh one.
+    // STACK-SCALED, like the game's other percentages: the configured 75 is what a FULL stack returns, and
+    // a depleted one returns proportionally less -- 15/30/45/60/75 across the five tiers -- before luck
+    // shifts it. A dragon down to its last pip is a much poorer mirror than a fresh one. The share itself
+    // is an AMOUNT, never a roll: whatever the card says is what comes back, every single cast.
     it("scales the ability's 75% base across the stack, then shifts it by the holder's own luck", () => {
         const atStack = (stackPower: number, luck = 0) =>
             getMagicMirrorAbilityChance(
@@ -760,7 +761,7 @@ describe("Magic Reflection (passive)", () => {
     // ability, and the rebound is a SECOND hit landing on the caster — that is the whole point of it.
     // What comes back is the mirror's own share (75% at base luck), not the whole spell.
     it("is an extra hit, not a redirection: the holder takes it in full and the caster takes the share", () => {
-        alwaysRoll(0); // 0 < 80 -> the rebound lands
+        alwaysRoll(0); // keeps every OTHER roll (miss chance, luck draws) off this assertion's back
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -782,7 +783,7 @@ describe("Magic Reflection (passive)", () => {
     });
 
     it("reports the rebound's damage rather than leaving the caster hit unexplained", () => {
-        alwaysRoll(0); // 0 < 80 -> the rebound lands
+        alwaysRoll(0); // keeps every OTHER roll (miss chance, luck draws) off this assertion's back
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -932,9 +933,10 @@ describe("Magic Reflection (passive)", () => {
     /**
      * A mirror that the spell KILLS still throws it back: the rebound is decided from the damage the spell
      * lands, before any of it is applied, so the last creature of a stack reflects on its way out. Owner
-     * report (19 Sep) that reflection "doesn't work if the target died" — which it does; what actually
-     * thins out on a dying stack is the passive's stack-scaled CHANCE (15% at the bottom tier, asserted by
-     * the formula test above), not this ordering.
+     * report (19 Sep) that reflection "doesn't work if the target died" — which it does; what thins out on
+     * a dying stack is the passive's stack-scaled SHARE (15% at the bottom tier, asserted by the formula
+     * test above), never this ordering. Since the amount-not-chance rework the share is also guaranteed,
+     * so a kill cannot hide behind a failed proc roll either.
      */
     it("rebounds even when the spell kills the mirror outright, passive and buff alike", () => {
         for (const mirror of [
@@ -1024,7 +1026,7 @@ describe("Magic Reflection (passive)", () => {
     });
 
     it("does not reward or demoralize its team when the Ring burns a friendly stack to death", () => {
-        alwaysRoll(99); // keep Magic Reflection out of this friendly-fire assertion
+        alwaysRoll(99); // pin every chance roll away from this friendly-fire assertion (no mirror is involved)
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -1063,8 +1065,11 @@ describe("Magic Reflection (passive)", () => {
         expect(witness.getMorale()).toBe(witnessMoraleBefore);
     });
 
-    it("costs the caster nothing when the roll misses, while the spell lands the same", () => {
-        alwaysRoll(90); // 90 >= 80 -> no rebound
+    // The amount-not-chance rework: a share that used to be a 75% proc roll now comes back on EVERY cast,
+    // so even the roll that would have missed it (90) still pays. What the caster's defences do to the
+    // return is a separate assertion below.
+    it("returns its share unconditionally — a roll that would once have missed changes nothing", () => {
+        alwaysRoll(90); // under the old chance semantics this suppressed the rebound entirely
         const setup = setupDragonFight({
             casterAmountAlive: 1,
             casterStackPower: 5,
@@ -1081,7 +1086,7 @@ describe("Magic Reflection (passive)", () => {
         });
 
         expect(targetHpBefore - setup.enemies[0].getHp()).toBe(150);
-        expect(setup.caster.getHp()).toBe(casterHpBefore);
+        expect(casterHpBefore - setup.caster.getHp()).toBe(112); // floor(150 * 0.75), same as a "hit" roll
     });
 
     // Effects rebound the same additive way damage does. This half already worked — attack_handler applies

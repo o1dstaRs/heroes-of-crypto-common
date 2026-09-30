@@ -987,16 +987,19 @@ export const getMagicMirrorPower = (targetUnit: Unit): number => {
 };
 
 /**
- * The Magic Dragon's passive "Magic Mirror" ability, as a CHANCE in 0..100 (0 when the unit has no such
+ * The Magic Dragon's passive rebound figure, as a percentage in 0..100 (0 when the unit has no such
  * ability, or while it is Broken).
  *
- * The ability's base power plus the holder's own LUCK, the same way the poison auras combine theirs — a
- * lucky dragon rebounds more often, an unlucky one less. Clamped to 0..100 at the end, so the sum can never
- * push the chance past certain or below impossible.
+ * The ability's base power plus the holder's own LUCK, the same way the poison auras combine theirs —
+ * lucky dragons rebound more, unlucky ones less. Clamped to 0..100 at the end, so the sum can never
+ * push the share past certain or below impossible.
+ *
+ * The figure is an AMOUNT, not a chance — mdef in reverse: the caster ALWAYS takes this percentage of
+ * the magic damage that landed, exactly the way magic resistance always cuts it. The only roll left to
+ * it is the debuff copy (isMirrored), which stays all-or-nothing because half a Stun is not a thing.
  *
  * Deliberately separate from getMagicMirrorPower: the BUFF and passive ability have independent configured
- * values. For the passive, this same advertised percentage is both the proc chance and the share of landed
- * damage returned by getMagicMirrorAbilityShare.
+ * values. For the passive, this figure is the share of landed damage returned by getMagicMirrorAbilityShare.
  */
 export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
     if (!targetUnit.hasAbilityActive("Magic Reflection")) {
@@ -1017,17 +1020,20 @@ export const getMagicMirrorAbilityChance = (targetUnit: Unit): number => {
  * The SHARE of a rebounded spell's damage the passive ability sends back, as a percentage.
  *
  * A mirror returns what it reflects, not more: the caster takes this share of the damage the spell actually
- * landed, never the whole hit. It is the same figure the ability card advertises (base power moved by the
- * holder's luck), so the number the player reads is the number that comes back — a mirror that says 75 and
- * returns 100 is the kind of surprise that makes a stat sheet worthless.
+ * landed, never the whole hit — DETERMINISTICALLY, like magic resistance, never as a roll. It is the same
+ * figure the ability card advertises (base power moved by the holder's luck), so the number the player reads
+ * is the number that comes back — a mirror that says 75 and sometimes returns 0 is the kind of surprise that
+ * makes a stat sheet worthless.
  *
  * Effects are a separate question and stay all-or-nothing (see isMirrored): half a Stun is not a thing.
  */
 export const getMagicMirrorAbilityShare = (targetUnit: Unit): number => getMagicMirrorAbilityChance(targetUnit);
 
 /**
- * Whether the Magic Reflection passive rebounds an incoming spell. The Magic Mirror spell buffs return
- * damage deterministically instead and are resolved by {@link rollMagicMirrorDamageShare}.
+ * Whether the Magic Reflection passive sends an incoming spell's DEBUFF copy back. Damage itself is never
+ * rolled — both the buff and the passive return their share deterministically through
+ * {@link mirroredDamageShare}; this boolean is kept for the effect-side question only (see isMirrored,
+ * which answers it for either mirror source).
  */
 export const reboundsSpell = (targetUnit: Unit): boolean => {
     const chance = getMagicMirrorAbilityChance(targetUnit);
@@ -1038,20 +1044,13 @@ export const reboundsSpell = (targetUnit: Unit): boolean => {
 /**
  * Resolve the percentage of landed magical damage this holder returns to the caster for one incoming spell.
  *
- * Magic Mirror and Mass Magic Mirror always return their configured share. Magic Reflection remains a proc:
- * when it succeeds with a stronger share than the active spell buff, that stronger share wins for this hit.
- * This preserves the existing non-stacking mirror rule and never consumes randomness when the passive could
- * not improve the guaranteed result.
+ * An AMOUNT, not a roll — mdef in reverse: Magic Mirror and Mass Magic Mirror always return their
+ * configured share, the Magic Dragon's passive always returns its stack-scaled one, and when both are
+ * present the STRONGER share wins for the hit. This preserves the non-stacking mirror rule and draws no
+ * randomness at all; the only mirrored thing that still rolls is the debuff copy (isMirrored).
  */
-export const rollMagicMirrorDamageShare = (targetUnit: Unit): number => {
-    const guaranteedShare = getMagicMirrorPower(targetUnit);
-    const passiveShare = getMagicMirrorAbilityShare(targetUnit);
-    if (passiveShare <= guaranteedShare) {
-        return guaranteedShare;
-    }
-
-    return getRandomInt(0, 100) < passiveShare ? passiveShare : guaranteedShare;
-};
+export const mirroredDamageShare = (targetUnit: Unit): number =>
+    Math.max(getMagicMirrorPower(targetUnit), getMagicMirrorAbilityShare(targetUnit));
 
 export const isMirrored = (targetUnit: Unit): boolean => {
     // Either source can send a debuff back: the buff at its own power, the passive ability at its chance.

@@ -18,7 +18,7 @@ import {
     elementalSpellMultiplier,
     getSpellMoraleMultiplier,
 } from "./spell_damage";
-import { getMagicMirrorAbilityShare, getMagicMirrorPower } from "./spell_helper";
+import { mirroredDamageShare } from "./spell_helper";
 
 /**
  * THE single source of truth for "what will this spell actually do to that creature".
@@ -148,8 +148,9 @@ export function projectSpellDamageAgainstUnit({
  *
  * A rebound is an EXTRA hit, not a redirection: the holder still takes the spell in full, and the caster then
  * takes the mirror's own share of what LANDED on the holder (pre-absorb — a shield that ate the hit does not
- * spare the caster), cut down by the caster's own element and magic resistance. The spell buffs return their
- * share every time; the Magic Reflection passive rolls separately before the engine calls this projection.
+ * spare the caster), cut down by the caster's own element and magic resistance. Every mirror — the spell
+ * buffs and the Magic Dragon's passive alike — returns that share DETERMINISTICALLY, so what this projects
+ * is exactly what the engine's resolveSpellVictims charges the caster, not an average it sometimes misses.
  *
  * The caster is never asked to rebound a spell onto itself, so a mirror-carrying caster caught in its own
  * blast cannot loop.
@@ -168,8 +169,7 @@ export function projectSpellRebound(input: {
     if (holder.getId() === caster.getId()) {
         return undefined;
     }
-    const reflectionPercent =
-        input.reflectionPercent ?? Math.max(getMagicMirrorPower(holder), getMagicMirrorAbilityShare(holder));
+    const reflectionPercent = input.reflectionPercent ?? mirroredDamageShare(holder);
     if (reflectionPercent <= 0) {
         return undefined;
     }

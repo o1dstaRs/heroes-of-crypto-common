@@ -757,7 +757,9 @@ describe("T1: cards say what the engine does", () => {
         expect(card("Penetrating Bite")).toContain("of the target's max hp");
         expect(card("Bitter Experience")).toContain("loses creatures to a hit and survives");
         expect(card("Chakram")).toContain("bounce clockwise");
-        expect(card("Magic Reflection")).toContain("that same percentage of the damage");
+        // Amount, not a rate: the share always comes back, mdef-style; only the debuff copy rolls.
+        expect(card("Magic Reflection")).toContain("of the magic damage that landed straight back");
+        expect(card("Magic Reflection")).toContain("always, like magic resistance");
         expect(card("Mechanism")).not.toContain("vampirism");
         expect(card("Chain Lightning")).toContain("On attack or response");
     });

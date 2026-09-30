@@ -731,13 +731,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         if (ability.getName() === "Magic Reflection") {
             // The Magic Dragon's passive: stack-scaled 15/30/45/60/75 at power 75, shifted by luck — the exact
-            // figure getMagicMirrorAbilityChance rolls, so the card matches the rebound the engine performs.
+            // share mirroredDamageShare always returns (and the chance a debuff is copied), so the card matches
+            // the rebound the engine performs.
             const stackPower = Math.max(0, Math.min(MAX_UNIT_STACK_POWER, this.getStackPower()));
-            const chance = Math.max(
+            const share = Math.max(
                 0,
                 Math.min(100, Math.floor((ability.getPower() / MAX_UNIT_STACK_POWER) * stackPower + this.getLuck())),
             );
-            return ability.getDesc().join("\n").replace(/\{\}/g, chance.toString());
+            return ability.getDesc().join("\n").replace(/\{\}/g, share.toString());
         }
         // Fire Breath / Fire Shield print a flat percentage off the ability config, so an Empowered team has to
         // see the RAISED figure or the card would promise 40% while the flames throw back 49.6%. Chain

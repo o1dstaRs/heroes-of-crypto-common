@@ -871,9 +871,9 @@
         "name": "Magic Reflection",
         "type": "REFLECT",
         "desc": [
-            "Rebounds every spell aimed at this creature {}% of the time.",
-            "The spell still lands on the dragon in full — the rebound is on top of it,",
-            "striking the caster with that same percentage of the damage and the same effects"
+            "Every spell still lands on the dragon in full, but its caster takes {}%",
+            "of the magic damage that landed straight back — always, like magic resistance.",
+            "Any debuff has the same {}% chance to be copied onto the caster as well"
         ],
         "power": 75,
         "power_type": "MAGIC_MIRROR_REFLECT",
