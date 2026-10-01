@@ -36,6 +36,7 @@ import { RANKED_DRAFT_VARIETY_POLICY_ID } from "../../src/ai/setup/draft_variety
 import {
     DRAFT_ANCHOR_W,
     DRAFT_FEATURE_DIM,
+    DRAFT_FEATURE_NAMES,
     applyCreatureRoleFitMultiplier,
     creatureRoleFitMultiplier,
     isRangedDamageCreature,
@@ -186,16 +187,23 @@ describe("draft ship genome", () => {
         expect(genome.weights).toEqual(frozenWeights);
     });
 
-    it("makes role fit a monotone boost for both positive and negative learned scores", () => {
+    it("makes role fit a monotone boost for both positive and negative genome scores", () => {
         expect(applyCreatureRoleFitMultiplier(30, 3)).toBe(90);
         expect(applyCreatureRoleFitMultiplier(-30, 3)).toBe(-10);
         expect(applyCreatureRoleFitMultiplier(-30, 1)).toBe(-30);
 
-        const negativeGenome = parseDraftGenome(LEAGUE_ROUND3_DRAFT_SPEC);
+        // Isolate signed role-fit ordering from changes to the roster's mobility and initiative stats.
+        const negativeWeights = new Array(DRAFT_FEATURE_DIM).fill(0);
+        negativeWeights[DRAFT_FEATURE_NAMES.indexOf("level")] = -30;
+        negativeWeights[DRAFT_FEATURE_NAMES.indexOf("exp")] = 1;
+        const negativeGenome = createLeagueGenome("negative-role-fit", embedIntrinsicDraftWeights(negativeWeights));
         const wanderingMage = PBTypes.CreatureVals.WANDERING_MAGE;
         const squire = PBTypes.CreatureVals.SQUIRE;
         const offer = [wanderingMage, squire];
         expect(offer.every((creatureId) => draftGenomeCreatureScore(negativeGenome, creatureId) < 0)).toBe(true);
+        expect(draftGenomeCreatureScore(negativeGenome, squire)).toBeGreaterThan(
+            draftGenomeCreatureScore(negativeGenome, wanderingMage),
+        );
         expect(pickDraftGenomeCreature(negativeGenome, offer, [], [])).toBe(squire);
         expect(pickDraftGenomeCreature(negativeGenome, offer, [], [PBTypes.CreatureVals.ARBALESTER])).toBe(
             wanderingMage,
