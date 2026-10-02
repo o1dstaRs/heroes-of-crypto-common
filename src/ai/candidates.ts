@@ -39,6 +39,7 @@ import {
     firstSummonableAnchor,
     canMassCastSpell,
     thrownSpellReachesAimedTarget,
+    CASTLING_RANGE_BONUS_CELLS,
     hasSwappableFootprint,
     isInterceptedThrownSpell,
     isSpellUsableByCaster,
@@ -840,6 +841,8 @@ export interface ICandidateSet {
  * ENEMY_WITHIN_MOVEMENT_RANGE spells (Harpy's Castling). Mirrors the client's arming path
  * (Sandbox.currentEnemiesCellsWithinMovementRange): pathing runs on grid.getMatrixNoUnits() (enemy-occupied
  * cells must be REACHABLE-through, not blocked), no aggro board, small/fly/lava flags from the unit.
+ * The budget is the unit's movement PLUS CASTLING_RANGE_BONUS_CELLS (owner call 2026-10-02): the swap
+ * reaches one cell farther than the caster can walk.
  *
  * Two conditions, and both are about the ANCHOR. An enemy qualifies only if its footprint matches the
  * caster's (hasSwappableFootprint) and its own anchor is a cell this body could stand on — not merely a cell
@@ -862,7 +865,8 @@ export function getEnemiesCellsWithinMovementRange(unit: Unit, context: IDecisio
     const moveCells = context.pathHelper.getMovePath(
         unit.getBaseCell(),
         context.grid.getMatrixNoUnits(),
-        unit.getSteps(),
+        // One cell farther than the unit's own movement: the swap's reach (owner call 2026-10-02).
+        unit.getSteps() + CASTLING_RANGE_BONUS_CELLS,
         undefined,
         unit.canFly(),
         unit.isSmallSize(),

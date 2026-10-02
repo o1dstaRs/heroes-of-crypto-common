@@ -34,6 +34,7 @@ export * from "./effects/effect_properties";
 export * from "./effects/effect_factory";
 export * from "./effects/effect";
 export * as SpellHelper from "./spells/spell_helper";
+export { CASTLING_RANGE_BONUS_CELLS } from "./spells/spell_helper";
 export * as SmokeHelper from "./spells/smoke_clouds";
 export * as FireWallHelper from "./spells/fire_walls";
 export * as VineHelper from "./spells/vines";

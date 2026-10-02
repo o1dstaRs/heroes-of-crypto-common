@@ -685,6 +685,16 @@ export function isSpellUsableByCaster(casterUnit: Unit, spell: Spell): boolean {
 }
 
 /**
+ * How much farther than its own movement a caster may reach with a position swap (Castling). Owner call
+ * 2026-10-02: the swap range is the unit's movement distance PLUS this many cells. Every place that
+ * computes swap targets pathfinds with `getSteps() + CASTLING_RANGE_BONUS_CELLS` — common's
+ * getEnemiesCellsWithinMovementRange (the engine's cast validation and the AI's candidates) and the
+ * client's two arming paths (Sandbox, LocalModelOpponent) — so the wire, the hover highlight and the
+ * server's re-validation all agree on one number.
+ */
+export const CASTLING_RANGE_BONUS_CELLS = 1;
+
+/**
  * Whether a position swap (Castling) may exchange these two bodies: only when their footprints are the
  * SAME shape — identical width AND identical height.
  *

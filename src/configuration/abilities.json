@@ -1196,7 +1196,7 @@
     "Castling": {
         "name": "Castling",
         "type": "ATTACK",
-        "desc": ["Swaps with an opponent of the same size within movement range when casted"],
+        "desc": ["Swaps with an opponent of the same size up to one cell beyond its movement range when casted"],
         "power": 0,
         "power_type": "SWAP_WITH_OPPONENT",
         "skip_reponse": false,
@@ -1330,6 +1330,7 @@
         "type": "BUFF_AURA",
         "desc": [
             "Absorbs {}% of the physical damage dealt to allies within range.",
+            "Absorption cannot exceed the protected stack's remaining HP.",
             "The absorbed damage is recalculated against the owner's armor",
             "and dealt to the owner instead. Magical damage is not absorbed."
         ],

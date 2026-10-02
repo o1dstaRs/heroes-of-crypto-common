@@ -446,13 +446,14 @@ export interface IDecisionContext {
     /** Optional: turn/hourglass state, so a strategy can decide whether a unit may wait (hourglass). */
     fightProperties?: FightProperties;
     /**
-     * Optional: base cells of SMALL enemy units within the ACTIVE unit's movement range — the legality
-     * input for ENEMY_WITHIN_MOVEMENT_RANGE spells (Harpy's Castling). The client computes this when a
-     * player arms the spell (Sandbox.currentEnemiesCellsWithinMovementRange); AI-side consumers may omit
-     * it and the candidate generator (ai/candidates.ts getEnemiesCellsWithinMovementRange) computes the
-     * same list locally. NOTE: for a Castling cast to be ACCEPTED, the GameActionEngine context must
-     * expose the same list via IGameActionEngineContext.getCurrentEnemiesCellsWithinMovementRange —
-     * wire both from the same helper.
+     * Optional: base cells of SMALL enemy units within the ACTIVE unit's swap reach — its movement
+     * distance PLUS CASTLING_RANGE_BONUS_CELLS — the legality input for ENEMY_WITHIN_MOVEMENT_RANGE
+     * spells (Harpy's Castling). The client computes this when a player arms the spell
+     * (Sandbox.currentEnemiesCellsWithinMovementRange); AI-side consumers may omit it and the candidate
+     * generator (ai/candidates.ts getEnemiesCellsWithinMovementRange) computes the same list locally.
+     * NOTE: for a Castling cast to be ACCEPTED, the GameActionEngine context must expose the same list
+     * via IGameActionEngineContext.getCurrentEnemiesCellsWithinMovementRange — wire both from the same
+     * helper.
      */
     getCurrentEnemiesCellsWithinMovementRange?: () => XY[] | undefined;
     /**
