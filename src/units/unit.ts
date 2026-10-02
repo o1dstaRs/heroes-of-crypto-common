@@ -2438,7 +2438,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             combinedMissChances.push(dodgeChance);
         }
 
-        if (!this.isSmallSize()) {
+        // Small Specie dodges LEVEL-4 attackers only — the 2x2 giants (every level 4 is a 2x2). A mere
+        // "not small" gate also caught the 2x1/1x2 rectangles, which are not the towering bodies the
+        // ability is about; small (1x1) attackers were and remain impossible to dodge this way.
+        if (this.getLevel() === 4) {
             const smallSpecieAbility = enemyUnit.getAbility("Small Specie");
             if (smallSpecieAbility) {
                 const dodgeChance =

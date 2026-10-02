@@ -528,7 +528,7 @@
     "Small Specie": {
         "name": "Small Specie",
         "type": "DEFENCE",
-        "desc": ["Unit has {}% chance to dodge large unit physical attack"],
+        "desc": ["Unit has {}% chance to dodge a level 4 (2x2) unit's physical attack"],
         "power": 50,
         "power_type": "DODGE_LARGE_PERCENTAGE",
         "skip_reponse": false,

@@ -65,9 +65,9 @@ export interface IVisibleDamage {
     unitPosition: XY;
     unitIsSmall: boolean;
     unitId?: string;
-    // The attack (or range response) fully MISSED the target — Dodge, Small Specie (large→small dodge),
-    // or Boar Saliva. No damage was dealt; the client shows a "MISS" pop over `unitPosition` instead of
-    // a damage number. `render` stays false on a miss (there is no damage to draw).
+    // The attack (or range response) fully MISSED the target — Dodge, Small Specie (level-4-attacker
+    // dodge), or Boar Saliva. No damage was dealt; the client shows a "MISS" pop over `unitPosition`
+    // instead of a damage number. `render` stays false on a miss (there is no damage to draw).
     missed?: boolean;
     // Unit ids whose Lucky Strike proc'd during this exchange (attacker and/or responder).
     // Drives the ranked scene-log line and the gold proc VFX: the engine's own sceneLog text
@@ -75,18 +75,18 @@ export interface IVisibleDamage {
     luckyStrikeBy?: string[];
     hits?: { amount: number; unitsDied: number }[];
     /**
-     * Zena's Chakram: one entry per FULL-circle leg the 1-cell disc flew, in flight order (see
-     * resolveChakramTrajectory). `cells` is the circle swept (the scene converts cells -> world and flies the
-     * disc along them); `hitUnitIds` is every enemy that leg damaged and `mountainCells` every mountain cell it
-     * chipped, BOTH in the order the disc reached them — so the client lands each unit's damage number + blood +
-     * push exactly as the disc arrives, instead of everything popping at once. `targetUnitId` is the leg's first
-     * victim, kept for back-compat. Cells, not world positions: the engine has no view geometry.
+     * Zena's Chakram: one entry per bounce, in flight order (see resolveChakramTrajectory).
+     * `cells` contains the departure footprint cell, the empty bridge and the arrival footprint cell.
+     * Older recordings omit the departure cell. `hitUnitIds` names the victim reached by the bounce;
+     * an empty list represents a shield catch. The client lands each victim's damage as the disc arrives.
+     * `targetUnitId` and `mountainCells` retain the legacy wire shape. Cells, not world positions:
+     * the engine has no view geometry. A counterthrow appends its own bounces after the initiating throw.
      */
     chakramArcs?: { targetUnitId: string; cells: XY[]; hitUnitIds?: string[]; mountainCells?: XY[] }[];
-    // Per-affected-unit damage for AOE attacks (Large Caliber / Area Throw). Each entry carries the
+    // Per-affected-unit damage for AOE attacks (Large Caliber / Area Throw / Chakram). Each entry carries the
     // hit unit's id, its world position at the moment of impact, the damage dealt and how many of its
     // stack died — so the renderer can place a floating number on EVERY splashed unit, not just the
-    // primary target. Empty/undefined for single-target attacks.
+    // primary target. A Chakram response includes the initiating shot's entries in the same list.
     // `missed` entries carry no damage — the volley rolled a dodge against that unit. They are still
     // reported so the renderer can pop MISS over it and ranked can log it (ranked rebuilds its scene log
     // from events, never from the engine's own text).

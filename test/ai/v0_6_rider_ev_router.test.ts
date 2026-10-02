@@ -158,6 +158,9 @@ function estimateWithMissSource(mutate?: (attacker: Unit, target: Unit) => void)
         maxHp: 100,
         stackPower: 100,
         size: PBTypes.UnitSizeVals.LARGE,
+        // Small Specie only dodges LEVEL-4 attackers (the 2x2 giants), so the miss-source rig has to
+        // field one for that source to weigh anything.
+        level: PBTypes.UnitLevelVals.FOURTH,
         abilities: ["Petrifying Gaze"],
     });
     const target = createTestUnit({
