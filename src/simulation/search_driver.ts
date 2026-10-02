@@ -46,6 +46,7 @@ import {
     preservesV08BacklineWardIntent,
 } from "../ai/versions/v0_8_backline_protector";
 import { v08ArmageddonPreservationOpportunity } from "../ai/versions/v0_8_armageddon_endgame";
+import { selectV08A19ScoredCandidateIndex } from "../ai/versions/v0_8_a19_scored_arbitration";
 import { applyV08FlyerBacklinePriority } from "../ai/versions/v0_8_flyer_backline_priority";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
 import {
@@ -1274,6 +1275,7 @@ export class SearchDriver {
     private readonly strictAggressiveWaitTies: boolean;
     private readonly nonregressiveProductiveOverride: boolean;
     private readonly exactTerminalResults: boolean;
+    private readonly a19ScoredArbitration: boolean;
     /**
      * Per-decision budget degradation instead of the match-sticky circuit breaker. Measured on the live host
      * (2 shared vCPU): the stock breaker tripped in most games and, because `circuitOpen` never resets, the
@@ -1493,6 +1495,16 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_EXACT_TERMINAL_RESULTS must be 0 or 1");
         }
         this.exactTerminalResults = this.mode === "search" && rawExactTerminalResults === "1";
+        const rawScoredArbitration = process.env.SEARCH_A19_SCORED_ARBITRATION;
+        if (
+            rawScoredArbitration !== undefined &&
+            rawScoredArbitration !== "" &&
+            rawScoredArbitration !== "0" &&
+            rawScoredArbitration !== "1"
+        ) {
+            throw new Error("SEARCH_A19_SCORED_ARBITRATION must be 0 or 1");
+        }
+        this.a19ScoredArbitration = this.mode === "search" && rawScoredArbitration === "1";
         const rawAdaptiveBudget = process.env.SEARCH_A19_ADAPTIVE_BUDGET;
         if (
             rawAdaptiveBudget !== undefined &&
@@ -3785,6 +3797,24 @@ export class SearchDriver {
                     deadlineAt,
                     turnHorizon,
                 );
+            }
+            if (
+                this.a19ScoredArbitration &&
+                version === "v0.8" &&
+                this.deps.fightProperties.getCurrentLap() < V08S_URGENT_FINISH_START_LAP
+            ) {
+                const selectedIndex = provisionalWouldOverride ? bestIdx : 0;
+                const arbitratedIndex = selectV08A19ScoredCandidateIndex(
+                    scoredCandidates,
+                    means,
+                    selectedIndex,
+                    incumbent,
+                );
+                if (arbitratedIndex !== selectedIndex) {
+                    bestIdx = arbitratedIndex;
+                    bestChallengerIdx = arbitratedIndex > 0 ? arbitratedIndex : bestChallengerIdx;
+                    provisionalWouldOverride = arbitratedIndex !== 0;
+                }
             }
         } catch (error) {
             if (!(error instanceof SearchDecisionDeadlineExceeded)) throw error;

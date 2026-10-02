@@ -15,7 +15,9 @@ import { footprintCellsForAnchor } from "../../simulation/footprint";
 import type { Unit } from "../../units/unit";
 import type { XY } from "../../utils/math";
 import type { IAIStrategy, IDecisionContext, IPlacementContext } from "../ai_strategy";
+import { creatureInfo } from "../setup/creature_score";
 import { StrategyV0_1 } from "./v0_1";
+import { SPLASH_AOE_ABILITIES } from "./v0_7_placement_reveal";
 
 export const V08_A19_COMPACT_PLACEMENT_ANCHORS = Object.freeze([
     "Abomination",
@@ -27,11 +29,11 @@ export const V08_A19_COMPACT_PLACEMENT_ANCHORS = Object.freeze([
 ] as const);
 
 export const V08_A19_COMPACT_PLACEMENT_POLICY = Object.freeze({
-    schema: "hoc.v0_8_a19_compact_placement.v1" as const,
-    policyId: "a19-l4-scoped-compact-placement-v1" as const,
+    schema: "hoc.v0_8_a19_compact_placement.v2" as const,
+    policyId: "a19-l4-scoped-compact-placement-v2" as const,
     researchOnly: true as const,
     maps: Object.freeze([PBTypes.GridVals.NORMAL] as const),
-    information: "own-army+map+legal-cells" as const,
+    information: "own-army+map+legal-cells+public-opponent-roster" as const,
     anchors: V08_A19_COMPACT_PLACEMENT_ANCHORS,
     treatment: "preserve-base-initialization-then-use-v0.1-compact-coordinates" as const,
 });
@@ -41,6 +43,7 @@ export type V08A19CompactPlacementFallbackReason =
     | "partial-army"
     | "summoned-army"
     | "unselected-anchor"
+    | "opponent-splash"
     | "candidate-incomplete-or-illegal"
     | "unchanged";
 
@@ -124,6 +127,15 @@ const evaluateCompactPlacement = (
     if (ownArmy.some((unit) => unit.isSummoned())) return fallback("summoned-army");
     const selectedAnchor = ownArmy.find((unit) => ANCHORS.has(unit.getName()))?.getName();
     if (!selectedAnchor) return fallback("unselected-anchor");
+
+    if (
+        context.publicOpponentCreatureIds?.some((creatureId) => {
+            const opponent = creatureInfo(creatureId);
+            return opponent && SPLASH_AOE_ABILITIES.some((ability) => opponent.abilities.includes(ability));
+        })
+    ) {
+        return fallback("opponent-splash");
+    }
 
     const selected = new StrategyV0_1().placeArmy(units, context);
     if (!placementIsCompleteAndLegal(units, selected, context)) return fallback("candidate-incomplete-or-illegal");

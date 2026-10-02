@@ -59,6 +59,17 @@ export interface ISecondaryDamage {
     rebounded?: boolean;
 }
 
+/** One disc's own flight and impact verdicts, independent of other throws in the same exchange. */
+export interface IChakramFlight {
+    attackerId: string;
+    primaryTargetId: string;
+    response: boolean;
+    hitIndex: 0 | 1;
+    missed: boolean;
+    arcs: NonNullable<IVisibleDamage["chakramArcs"]>;
+    splash: NonNullable<IVisibleDamage["splash"]>;
+}
+
 export interface IVisibleDamage {
     amount: number;
     render: boolean;
@@ -83,6 +94,12 @@ export interface IVisibleDamage {
      * the engine has no view geometry. A counterthrow appends its own bounces after the initiating throw.
      */
     chakramArcs?: { targetUnitId: string; cells: XY[]; hitUnitIds?: string[]; mountainCells?: XY[] }[];
+    /**
+     * Every actually thrown Chakram, including dodged and zero-bounce throws. A crafted second throw
+     * resolves its own current-board chain and misses, so repeated victims have separate impact entries.
+     * Recorded ownership survives Break applied later in the exchange. The flat fields remain for old clients.
+     */
+    chakramFlights?: IChakramFlight[];
     // Per-affected-unit damage for AOE attacks (Large Caliber / Area Throw / Chakram). Each entry carries the
     // hit unit's id, its world position at the moment of impact, the damage dealt and how many of its
     // stack died — so the renderer can place a floating number on EVERY splashed unit, not just the

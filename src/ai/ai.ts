@@ -1774,7 +1774,7 @@ function doFindTarget(
                                 );
                             }
 
-                            if (!movementDistance) {
+                            if (movementDistance === undefined) {
                                 if (debug) {
                                     console.log("skip cell: " + cellToString({ x: x, y: y }));
                                 }
@@ -1948,7 +1948,7 @@ function doFindTarget(
                                         );
                                     }
 
-                                    if (!currentDistance) {
+                                    if (currentDistance === undefined) {
                                         continue;
                                     }
                                     // if same indicies left till the target but clooser then prev cell then update the route and hte cell to move to

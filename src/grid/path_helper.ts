@@ -1234,6 +1234,75 @@ export class PathHelper {
         footprintWidth = isSmallUnit ? 1 : 2,
         footprintHeight = isSmallUnit ? 1 : 2,
     ): IMovePath {
+        const normalPath = this.calculateMovePath(
+            currentCell,
+            matrix,
+            maxSteps,
+            aggrBoard,
+            canFly,
+            isSmallUnit,
+            isMadeOfFire,
+            hasVineStride,
+            footprintWidth,
+            footprintHeight,
+        );
+        const vines = FightStateManager.getInstance().getFightProperties().getVines();
+        if (!hasVineStride || !vines.size()) {
+            return normalPath;
+        }
+
+        // Free travel extends the connected vine, not the ordinary ground around it. Keep the normal
+        // routes for bare-ground destinations and allow the free search to leave vines only there.
+        const vinePath = this.calculateMovePath(
+            currentCell,
+            matrix,
+            maxSteps,
+            aggrBoard,
+            canFly,
+            isSmallUnit,
+            isMadeOfFire,
+            hasVineStride,
+            footprintWidth,
+            footprintHeight,
+            normalPath.knownPaths,
+        );
+        const width = normalizeFootprintSide(footprintWidth, isSmallUnit ? 1 : 2);
+        const height = normalizeFootprintSide(footprintHeight, isSmallUnit ? 1 : 2);
+        const vineFootprintHashes = new Set<number>();
+        for (const [key, routes] of vinePath.knownPaths) {
+            const anchor = routes[0]?.cell;
+            if (!anchor || !vines.has(anchor)) {
+                continue;
+            }
+            normalPath.knownPaths.set(key, routes);
+            for (let dx = 0; dx < width; dx++) {
+                for (let dy = 0; dy < height; dy++) {
+                    vineFootprintHashes.add(((anchor.x - dx) << 4) | (anchor.y - dy));
+                }
+            }
+        }
+        for (const cell of vinePath.cells) {
+            const key = (cell.x << 4) | cell.y;
+            if (vineFootprintHashes.has(key) && !normalPath.hashes.has(key)) {
+                normalPath.cells.push(cell);
+                normalPath.hashes.add(key);
+            }
+        }
+        return normalPath;
+    }
+    private calculateMovePath(
+        currentCell: XY,
+        matrix: number[][],
+        maxSteps: number,
+        aggrBoard: number[][] | undefined,
+        canFly: boolean,
+        isSmallUnit: boolean,
+        isMadeOfFire: boolean,
+        hasVineStride: boolean,
+        footprintWidth: number,
+        footprintHeight: number,
+        normalVineStridePaths?: ReadonlyMap<number, IWeightedRoute[]>,
+    ): IMovePath {
         // From here on the body is read off W/H, never off isSmallUnit — that flag now only supplies their
         // defaults. A 1x1 IS the legacy small unit and a 2x2 IS the legacy large one, but a 1x2 is neither,
         // and asking "is it small?" about it gives the wrong answer whichever way it is answered.
@@ -1451,16 +1520,17 @@ export class PathHelper {
         // state they are exploring rather than the live board.
         //
         // A vined cell slows everything that wades through it, except flyers stepping over the top — and
-        // except Trent, whose "In Its Own World" turns its own vines into a free road: a vined cell costs
-        // nothing, straight or diagonal, so the budget is spent only on the plain ground past the vine's end.
+        // except Trent, who ignores their crossing toll. His free-vine search separately extends the road
+        // without carrying that discount into ordinary-ground destinations.
         const vines = FightStateManager.getInstance().getFightProperties().getVines();
         const hasAnyVine = vines.size() > 0;
+        const stridesFreeVines = hasVineStride && normalVineStridePaths !== undefined;
         const vineAdjustedCost = (baseCost: number, cell: XY): number => {
             if (!hasAnyVine || !vines.has(cell)) {
                 return baseCost;
             }
             if (hasVineStride) {
-                return VINE_STRIDE_CELL_COST;
+                return stridesFreeVines ? VINE_STRIDE_CELL_COST : baseCost;
             }
             return canFly ? baseCost : baseCost + VINE_CROSS_PENALTY;
         };
@@ -1472,7 +1542,7 @@ export class PathHelper {
         // a cell may be reached again, and walked on from again, whenever the new route leaves strictly more
         // steps than the one it already holds; queued entries the relaxation has overtaken are dropped when
         // they surface. Everyone else keeps the plain first-come walk, byte for byte.
-        const relaxesVisited = hasVineStride && hasAnyVine;
+        const relaxesVisited = stridesFreeVines && hasAnyVine;
         const isVisited = (cellKey: number): boolean =>
             indexedVisited ? indexedVisited[cellKey] === 1 : visited!.has(cellKey);
         const recordedRemaining = (cellKey: number): number =>
@@ -1564,6 +1634,9 @@ export class PathHelper {
             }
             for (const n of neighbors) {
                 const keyNeighbor = (n.x << 4) | n.y;
+                if (stridesFreeVines && !vines.has(n) && !normalVineStridePaths!.has(keyNeighbor)) {
+                    continue;
+                }
                 // A legal anchor is the upper-right cell of its WxH footprint, so x must stay at least W-1
                 // and y at least H-1 (the legacy "at least 1" is that rule at 2x2). Keep malformed state
                 // (for example, a size-unsafe position swap) from evaluating occupancy or aggro outside the

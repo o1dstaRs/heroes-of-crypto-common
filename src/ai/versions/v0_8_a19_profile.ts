@@ -10,6 +10,7 @@
  */
 
 import { StrategyV0_8 } from "./v0_8";
+import { V08_A19_SCORED_ARBITRATION_POLICY } from "./v0_8_a19_scored_arbitration";
 import {
     buildV08A13SearchEnvironment,
     V08_A13_GENOME,
@@ -50,7 +51,7 @@ import { V08_A19_RANKED_PLACEMENT_POLICY, V08A19RankedPlacementStrategy } from "
  *     the live-host deadline curve recovered the whole gain at 600 ms (+13.4pp) with 0% deadline fallbacks
  *     at 1,000 ms (p50 211 ms / p90 544 ms / max 980 ms on the 2 vCPU game server).
  */
-export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v2" as const;
+export const V08_A19_PROFILE_SCHEMA = "hoc.v0_8_a19_production_profile.v3" as const;
 export const V08_A19_CANDIDATE_ID = "a19" as const;
 export const V08_A19_PRODUCTION_VERSION = V08_A13_PRODUCTION_VERSION;
 
@@ -74,6 +75,7 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     SEARCH_A19_EXACT_TERMINAL_RESULTS: "1",
     SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY: "1",
     SEARCH_A19_ADAPTIVE_BUDGET: "1",
+    SEARCH_A19_SCORED_ARBITRATION: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -102,7 +104,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "67b82dd713bf6f875daa5125b7ca0f15863a3e70fff015140b208221def82db1" as const;
+    "068bbf98f6179ade6c6d314dc9c889a5686d60ae9e031aec918d4e4c21b79410" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -134,9 +136,13 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned by 6e4f86d (Dulling Defense rides the knight's own blow): the driver's bytes
-        // changed with the ability fix; the ledger follows the reviewed source, not vice versa.
-        sha256: "e7cbcb788802f3c914efee10ad93e3a29a15cabcfc79fd07d3d3227ddf77bf51" as const,
+        // Re-pinned for the A19 scored-shortlist arbitration rule.
+        sha256: "56dcd36cd0f0d2aa3028220192bd3999eef6ac18c93a36c7d33679faec0e28f7" as const,
+    }),
+    Object.freeze({
+        role: "scored-arbitration" as const,
+        source: "src/ai/versions/v0_8_a19_scored_arbitration.ts" as const,
+        sha256: "1acc372b0fb09147e6bfe79e159c197868a9f2643f4dffe7bb25177ca0d008ab" as const,
     }),
     Object.freeze({
         role: "armageddon-endgame" as const,
@@ -156,7 +162,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "compact-placement" as const,
         source: "src/ai/versions/v0_8_a19_compact_placement.ts" as const,
-        sha256: "52387ea4bc8d355403e4e74d8026431182ef6bf5430729e31f1e9511439a3629" as const,
+        sha256: "a74b0f7b014b5c138f719f2c4d34d449960975017b36ab796e70a80ac550a6dc" as const,
     }),
     Object.freeze({
         role: "ranked-placement" as const,
@@ -190,6 +196,7 @@ export const V08_A19_PROFILE = Object.freeze({
     genome: V08_A19_GENOME,
     search: V08_A19_SEARCH,
     searchRules: V08_A19_SEARCH_RULES,
+    scoredArbitrationPolicy: V08_A19_SCORED_ARBITRATION_POLICY,
     degradedBudget: V08_A19_DEGRADED_BUDGET,
     policy: V08_A19_POLICY,
     placementPolicy: V08_A19_PLACEMENT_POLICY,

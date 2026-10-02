@@ -106,6 +106,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_A19_EXACT_TERMINAL_RESULTS",
     "SEARCH_A19_ADAPTIVE_BUDGET",
     "SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE",
+    "SEARCH_A19_SCORED_ARBITRATION",
     "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY",
     "SEARCH_A19_FAST_FLYER_COHESION",
     "SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES",
@@ -874,6 +875,56 @@ describe("search driver — gating, hygiene, determinism", () => {
 
         driver.scoreCandidates = () => [0.5, 0.5];
         expect(driver.search(unit, candidates, incumbent, 123, performance.now(), true)).toBe(spell);
+    });
+
+    it("A19 scored arbitration clears its value gate only before urgency and within v0.8", () => {
+        setEnv({
+            V07_SEARCH: "1",
+            SEARCH_VERSIONS: "v0.8",
+            SEARCH_GATE: "0.03",
+            SEARCH_A19_SCORED_ARBITRATION: "1",
+        });
+        const harness = buildBattle(91, "v0.8");
+        const unit = harness.activeUnit()!;
+        const incumbent: GameAction[] = [{ type: "defend_turn", unitId: unit.getId() }];
+        const challenger: GameAction[] = [{ type: "wait_turn", unitId: unit.getId() }];
+        const candidates = [
+            { kind: "incumbent", actions: incumbent },
+            { kind: "wait", actions: challenger },
+        ] as IEnumeratedCandidate[];
+        const driver = harness.makeDriver() as unknown as {
+            scoreCandidates(): number[];
+            search(...args: unknown[]): GameAction[];
+        };
+        driver.scoreCandidates = () => [0.4, 0.42];
+        const search = (version: string): GameAction[] =>
+            driver.search(
+                unit,
+                candidates,
+                incumbent,
+                123,
+                performance.now(),
+                false,
+                undefined,
+                false,
+                false,
+                false,
+                false,
+                undefined,
+                "profile",
+                version,
+            );
+
+        expect(search("v0.8")).toBe(challenger);
+        expect(search("v0.7")).toBe(incumbent);
+        harness.fightProperties.getCurrentLap = () => V08S_URGENT_FINISH_START_LAP;
+        expect(search("v0.8")).toBe(incumbent);
+    });
+
+    it("A19 scored arbitration validates its explicit environment switch", () => {
+        const harness = buildBattle(91, "v0.8");
+        setEnv({ V07_SEARCH: "1", SEARCH_A19_SCORED_ARBITRATION: "invalid" });
+        expect(() => harness.makeDriver()).toThrow("SEARCH_A19_SCORED_ARBITRATION must be 0 or 1");
     });
 
     it("A19 adaptive budget degrades the next decisions after a breaker overrun instead of opening the circuit", () => {

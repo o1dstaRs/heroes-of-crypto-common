@@ -20,9 +20,8 @@ export const VINE_DEFAULT_LAPS = 3;
 export const VINE_CROSS_PENALTY = 1;
 
 // What a vined cell costs the vine's own kind (Trent, via "In Its Own World"): nothing at all. Straight or
-// diagonal, a vined cell is free, so Trent walks the whole vine to its far end and only starts spending
-// steps on the plain ground beyond it. OWNER call 2026-09-19 (was half a plain step); Trent gave up one
-// base step in exchange (creatures.json 3.9 -> 2.9).
+// diagonal, the extra reach follows connected vines only; bare-ground destinations keep their normal
+// movement cost from the starting cell. Trent ignores the usual vine crossing toll on those routes.
 export const VINE_STRIDE_CELL_COST = 0;
 
 /**

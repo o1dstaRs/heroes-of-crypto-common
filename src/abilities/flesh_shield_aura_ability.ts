@@ -35,7 +35,8 @@ export interface IFleshShieldResult {
  * stack-ability modifiers at aura-refresh time by calculateAuraPower). The absorbed portion is
  * recalculated against the owner's own armor — scaled by the ratio of the protected unit's effective
  * armor to the owner's effective armor as seen by this attacker — and dealt to the owner instead. The
- * protected unit only receives the remainder. If the owner cannot survive the full recalculated
+ * protected unit only receives the remainder. Its remaining cumulative HP caps both the redirected
+ * share and the recalculated damage to the owner. If the owner's remaining HP further limits the
  * transfer, only the affordable portion is redirected and the overflow remains on the protected unit.
  * Applies to direct hits, responses, multi-hits, and every unit struck by an AOE or pass-through attack.
  *
@@ -153,7 +154,8 @@ export function processFleshShieldAura(
     }
     const absorberUnit = covering.absorber;
     const absorbPercentage = covering.absorbPercentage;
-    const requestedAbsorbedBase = Math.floor((damage * absorbPercentage) / 100);
+    const targetHpCapacity = targetUnit.getCumulativeHp();
+    const requestedAbsorbedBase = Math.min(Math.floor(targetHpCapacity), Math.floor((damage * absorbPercentage) / 100));
     if (requestedAbsorbedBase <= 0) {
         return result;
     }
@@ -178,8 +180,8 @@ export function processFleshShieldAura(
 
     // Work in the protected target's damage space. The absorber's armor can make one redirected point
     // cost more or less than one HP, so simply min(requested, owner HP) would still lose or invent damage.
-    // Find the largest integer share whose recalculated cost fits the owner's remaining cumulative HP.
-    const absorberHpCapacity = absorberUnit.getCumulativeHp();
+    // Find the largest integer share whose recalculated cost fits both stacks' remaining cumulative HP.
+    const absorberHpCapacity = Math.min(targetHpCapacity, absorberUnit.getCumulativeHp());
     let low = 0;
     let high = requestedAbsorbedBase;
     while (low < high) {

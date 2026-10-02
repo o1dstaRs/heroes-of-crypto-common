@@ -599,12 +599,11 @@ describe("v0.1 melee robustness", () => {
         const startsAtOrigin = move.path[0]?.x === trent.getBaseCell().x && move.path[0]?.y === trent.getBaseCell().y;
         const travelledCells = move.path.length - (startsAtOrigin ? 1 : 0);
         expect(travelledCells).toBeGreaterThan(Math.ceil(trent.getSteps()));
-        // The road is free all the way, so any cell touching the target is affordable from its far end —
-        // which one the strategy settles on is a tie-break, not the point. Whichever it is, the strike
-        // is thrown from exactly there.
         const landing = move.targetCells[0];
-        expect(landing).toBeDefined();
-        expect(Math.max(Math.abs(landing.x - 9), Math.abs(landing.y - 5))).toBe(1);
+        expect(landing).toEqual({ x: 8, y: 5 });
+        for (const cell of move.path.slice(startsAtOrigin ? 1 : 0)) {
+            expect(context.fightProperties!.getVines().has(cell)).toBe(true);
+        }
         expect(meleeAction(actions)).toMatchObject({
             targetId: target.getId(),
             attackFrom: landing,

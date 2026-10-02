@@ -92,6 +92,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         abominationMaxHp?: number;
         abominationStackPower?: number;
         allyArmor?: number;
+        allyMaxHp?: number;
         abominationArmor?: number;
         allyMagicResist?: number;
         abominationMagicResist?: number;
@@ -113,7 +114,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         const ally = createTestUnit({
             name: "Protected Ally",
             team: PBTypes.TeamVals.LEFT,
-            maxHp: 100,
+            maxHp: options?.allyMaxHp ?? 100,
             armor: options?.allyArmor ?? 20,
             magicResist: options?.allyMagicResist ?? 0,
         });
@@ -428,6 +429,7 @@ describe("Flesh Shield aura (damage absorption)", () => {
         const { grid, unitsHolder, damageStatisticHolder, abomination, ally, attacker } = setupAuraTrio({
             abominationLuck: 10,
             abominationMaxHp: 500,
+            allyMaxHp: 1000,
         });
         const secondAlly = createTestUnit({
             name: "Second Protected Ally",

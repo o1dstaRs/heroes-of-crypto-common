@@ -3006,17 +3006,33 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * base value after every ranked cast). Sandbox never needs this: useSpell keeps both in lockstep.
      */
     public syncAuthoritativeSpellEntries(entries: string[]): void {
+        const incomingEntries = entries === this.unitProperties.spells ? [...entries] : entries;
         // In place, not a new array: getUnitProperties() hands out the live object and the HUD reads
         // spells.length off whatever reference it already holds.
         this.unitProperties.spells.length = 0;
-        this.unitProperties.spells.push(...entries);
+        this.unitProperties.spells.push(...incomingEntries);
+        this.unitProperties.can_cast_spells = incomingEntries.length > 0;
         const remainingByName = new Map<string, number>();
-        for (const entry of entries) {
+        for (const entry of incomingEntries) {
             const name = entry.substring(entry.indexOf(":") + 1);
             remainingByName.set(name, (remainingByName.get(name) ?? 0) + 1);
         }
         for (const spell of this.spells) {
             spell.setAmount(remainingByName.get(spell.getName()) ?? 0);
+        }
+        // A reconstructed empty or partial book has no Spell object for charges returned by a merge.
+        // Add those spells without replacing existing objects a client may already have armed.
+        for (const [entry] of this.parseSpellData(incomingEntries)) {
+            const parts = entry.split(":");
+            if (parts.length !== 2 || !parts[1] || this.spells.some((spell) => spell.getName() === parts[1])) {
+                continue;
+            }
+            this.spells.push(
+                new Spell({
+                    spellProperties: getSpellConfig(parts[0] || "System", parts[1]),
+                    amount: remainingByName.get(parts[1]) ?? 0,
+                }),
+            );
         }
     }
     /**

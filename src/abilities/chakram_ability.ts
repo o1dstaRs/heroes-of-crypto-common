@@ -11,6 +11,7 @@
 
 import { MAX_UNIT_STACK_POWER, MIN_UNIT_STACK_POWER } from "../constants";
 import type { Grid } from "../grid/grid";
+import type { IChakramFlight, IVisibleDamage } from "../scene/animations";
 import type { Unit } from "../units/unit";
 import type { UnitsHolder } from "../units/units_holder";
 import type { XY } from "../utils/math";
@@ -42,9 +43,9 @@ export function chakramDescription(descriptionTemplate: string, stackPower: numb
 
 /**
  * One hop of the disc's flight, PRECOMPUTED by the engine so the client only replays it (identical in
- * sandbox and ranked). `circleCells` is the straight line of cells the disc travels for this hop —
- * the name (and the optional legacy fields) are kept from the ricochet-era wire shape so ranked
- * snapshots and the client replayer keep decoding without a protocol change.
+ * sandbox and ranked). `circleCells` follows the empty bridge to the arrival footprint cell, exclusive
+ * of `fromCell`, the departure footprint cell. The name and optional legacy fields are kept from the
+ * ricochet-era wire shape so ranked snapshots and the client replayer need no protocol change.
  */
 export interface IChakramStep {
     fromCell: XY;
@@ -74,6 +75,29 @@ export interface IChakramFlightOutcome {
      * own — a second roll would let the flight stop on one victim and damage the next anyway.
      */
     missByUnitId: Record<string, boolean>;
+}
+
+/** Capture one resolved throw without sharing mutable payload arrays with another volley. */
+export function recordChakramFlight(
+    damage: IVisibleDamage,
+    identity: Omit<IChakramFlight, "arcs" | "splash">,
+    trajectory: IChakramTrajectory,
+    splash: IChakramFlight["splash"],
+): void {
+    const arcs = trajectory.steps.map((step) => ({
+        targetUnitId: step.hitUnitIds[0] ?? "",
+        cells: [step.fromCell, ...step.circleCells].map((cell) => ({ x: cell.x, y: cell.y })),
+        hitUnitIds: [...step.hitUnitIds],
+        mountainCells: step.mountainCells.map((cell) => ({ x: cell.x, y: cell.y })),
+    }));
+    (damage.chakramFlights ??= []).push({
+        ...identity,
+        arcs,
+        splash: splash.map((entry) => ({ ...entry, position: { ...entry.position } })),
+    });
+    if (arcs.length) {
+        (damage.chakramArcs ??= []).push(...arcs);
+    }
 }
 
 /**
@@ -187,7 +211,7 @@ const CHAKRAM_NEIGHBOR_OFFSETS: readonly XY[] = [
 ];
 
 /**
- * Whether the SEPARATING cells between two units are actually open air: an empty-cell chain of length
+ * Find the SEPARATING open-air cells between two units: an empty-cell chain of length
  * `gap` linking the two footprints, every link Chebyshev-adjacent. A packed army has the GEOMETRY of a
  * gap — a diagonal neighbour's neighbour measures two apart — but the cell in between holds a third
  * body, and the disc cannot cut through a wall: no empty bridge, no bounce. Anything standing there
@@ -197,8 +221,12 @@ const CHAKRAM_NEIGHBOR_OFFSETS: readonly XY[] = [
  * them. Otherwise a shoulder-to-shoulder row A B C bounced A -> C by curving through the empty cell
  * next to B, and a diagonal stair did the same: B fills the space between them, and a filled space is
  * not a gap, whichever way you walk around it.
+ *
+ * The returned path includes the departure and arrival footprint cells. Eligibility and playback use
+ * this same bridge: an anchor-to-anchor line can cross a neighbouring body even when another edge of a
+ * rectangle has a clear gap.
  */
-function hasEmptyBridge(grid: Grid, a: Unit, b: Unit, gap: number): boolean {
+function emptyBridgePath(grid: Grid, unitsHolder: UnitsHolder, a: Unit, b: Unit, gap: number): XY[] | undefined {
     const aCells = a.isSmallSize() ? [a.getBaseCell()] : a.getCells();
     const bCells = b.isSmallSize() ? [b.getBaseCell()] : b.getCells();
     const spanned = [...aCells, ...bCells];
@@ -207,12 +235,18 @@ function hasEmptyBridge(grid: Grid, a: Unit, b: Unit, gap: number): boolean {
     const minY = Math.min(...spanned.map((cell) => cell.y));
     const maxY = Math.max(...spanned.map((cell) => cell.y));
     const isBetween = (cell: XY): boolean => cell.x >= minX && cell.x <= maxX && cell.y >= minY && cell.y <= maxY;
-    const isEmpty = (cell: XY): boolean => isBetween(cell) && !grid.getOccupantUnitId(cell);
-    const touches = (cell: XY, cells: XY[]): boolean =>
-        cells.some((c) => Math.max(Math.abs(c.x - cell.x), Math.abs(c.y - cell.y)) === 1);
+    const isEmpty = (cell: XY): boolean => {
+        if (!isBetween(cell)) return false;
+        const occupantId = grid.getOccupantUnitId(cell);
+        // A previous volley may already have killed a body while authoritative action cleanup has
+        // not removed its grid entry yet. A fresh flight crosses that cleared space, never a live wall.
+        return !occupantId || unitsHolder.getAllUnits().get(occupantId)?.isDead() === true;
+    };
+    const arrivalCell = (cell: XY): XY | undefined =>
+        bCells.find((c) => Math.max(Math.abs(c.x - cell.x), Math.abs(c.y - cell.y)) === 1);
 
     // Empty cells hugging `a`'s footprint — every bridge starts on one of these.
-    const starts: XY[] = [];
+    const starts: { departure: XY; cell: XY }[] = [];
     const seen = new Set<string>();
     for (const ac of aCells) {
         for (const offset of CHAKRAM_NEIGHBOR_OFFSETS) {
@@ -220,33 +254,31 @@ function hasEmptyBridge(grid: Grid, a: Unit, b: Unit, gap: number): boolean {
             const key = `${cell.x}:${cell.y}`;
             if (!seen.has(key) && isEmpty(cell)) {
                 seen.add(key);
-                starts.push(cell);
+                starts.push({ departure: ac, cell });
             }
         }
     }
-    if (gap === 1) {
-        return starts.some((cell) => touches(cell, bCells));
-    }
-    // gap === 2: one more empty link between a start cell and `b`.
-    return starts.some((first) =>
-        CHAKRAM_NEIGHBOR_OFFSETS.some((offset) => {
+    for (const { departure, cell: first } of starts) {
+        if (gap === 1) {
+            const arrival = arrivalCell(first);
+            if (arrival) {
+                return [departure, first, arrival];
+            }
+            continue;
+        }
+        // gap === 2: one more empty link between a start cell and `b`.
+        for (const offset of CHAKRAM_NEIGHBOR_OFFSETS) {
             const second = { x: first.x + offset.x, y: first.y + offset.y };
-            return isEmpty(second) && touches(second, bCells);
-        }),
-    );
-}
-
-/** The straight run of cells from `from` to `to` (exclusive of `from`), for the hop's flight visual. */
-function lineCells(from: XY, to: XY): XY[] {
-    const cells: XY[] = [];
-    const steps = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
-    for (let i = 1; i <= steps; i += 1) {
-        cells.push({
-            x: Math.round(from.x + ((to.x - from.x) * i) / steps),
-            y: Math.round(from.y + ((to.y - from.y) * i) / steps),
-        });
+            if (!isEmpty(second)) {
+                continue;
+            }
+            const arrival = arrivalCell(second);
+            if (arrival) {
+                return [departure, first, second, arrival];
+            }
+        }
     }
-    return cells;
+    return undefined;
 }
 
 /**
@@ -315,6 +347,7 @@ export function resolveChakramTrajectory(
         let next: Unit | undefined;
         let nextSeparation = Number.MAX_SAFE_INTEGER;
         let nextSweep = Number.POSITIVE_INFINITY;
+        let nextPath: XY[] | undefined;
         for (const unit of unitsHolder.getAllUnits().values()) {
             if (visited.has(unit.getId()) || unit.isDead() || unit.getTeam() === attackerUnit.getTeam()) {
                 continue;
@@ -332,7 +365,8 @@ export function resolveChakramTrajectory(
             // Geometry alone is not enough: in a packed army a diagonal neighbour's neighbour measures two
             // apart with a third body in between, and the disc cannot cut through a wall (the fight report
             // that pinned this: a solid six-stack block still got three units chained).
-            if (!hasEmptyBridge(grid, last, unit, gap)) {
+            const path = emptyBridgePath(grid, unitsHolder, last, unit, gap);
+            if (!path) {
                 continue;
             }
             // CLOCKWISE, not nearest. The disc keeps turning the same way, so the flight reads as one
@@ -350,21 +384,21 @@ export function resolveChakramTrajectory(
                 next = unit;
                 nextSeparation = separation;
                 nextSweep = sweep;
+                nextPath = path;
             }
         }
 
-        if (!next) {
+        if (!next || !nextPath) {
             break;
         }
 
-        const fromCell = last.getBaseCell();
-        const toCell = next.getBaseCell();
+        const [fromCell, ...circleCells] = nextPath;
         if (next.hasAbilityActive("Arrows Wingshield Blessing")) {
             // The shield catches the disc: the hop flies (for the visual) but lands no hit, and the
             // flight ends here — the disc drops and returns to Zena.
             steps.push({
                 fromCell: { x: fromCell.x, y: fromCell.y },
-                circleCells: lineCells(fromCell, toCell),
+                circleCells,
                 hitUnitIds: [],
                 mountainCells: [],
             });
@@ -377,7 +411,7 @@ export function resolveChakramTrajectory(
         damageFactorByUnitId[next.getId()] = isWideBounce ? CHAKRAM_HALF_DAMAGE_FACTOR : 1;
         steps.push({
             fromCell: { x: fromCell.x, y: fromCell.y },
-            circleCells: lineCells(fromCell, toCell),
+            circleCells,
             hitUnitIds: [next.getId()],
             mountainCells: [],
         });
@@ -388,7 +422,7 @@ export function resolveChakramTrajectory(
             break;
         }
         // The disc leaves this victim travelling the way it arrived, so the next sweep turns from here.
-        heading = chakramBearing(fromCell, toCell);
+        heading = chakramBearing(last.getBaseCell(), next.getBaseCell());
         last = next;
     }
 

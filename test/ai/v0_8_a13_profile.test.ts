@@ -48,6 +48,7 @@ const ENV_KEYS = [
     "SEARCH_A19_EXACT_TERMINAL_RESULTS",
     "SEARCH_A19_FAST_FLYER_COHESION",
     "SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE",
+    "SEARCH_A19_SCORED_ARBITRATION",
     "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY",
     "SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES",
     "SEARCH_MAX_MOVE_SHOTS",
@@ -219,6 +220,7 @@ describe("v0.8 a13 production profile", () => {
         process.env.SEARCH_A19_EXACT_TERMINAL_RESULTS = "1";
         process.env.SEARCH_A19_FAST_FLYER_COHESION = "1";
         process.env.SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE = "1";
+        process.env.SEARCH_A19_SCORED_ARBITRATION = "1";
         process.env.SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY = "1";
         process.env.SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES = "1";
         process.env.SEARCH_WAIT_DEADLINE_POLICY = "profile";
@@ -345,6 +347,7 @@ describe("v0.8 a13 production profile", () => {
         expect(process.env.SEARCH_A19_EXACT_TERMINAL_RESULTS).toBe("1");
         expect(process.env.SEARCH_A19_FAST_FLYER_COHESION).toBe("1");
         expect(process.env.SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE).toBe("1");
+        expect(process.env.SEARCH_A19_SCORED_ARBITRATION).toBe("1");
         expect(process.env.SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY).toBe("1");
         expect(process.env.SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES).toBe("1");
         expect(process.env.SEARCH_WAIT_DEADLINE_POLICY).toBe("profile");

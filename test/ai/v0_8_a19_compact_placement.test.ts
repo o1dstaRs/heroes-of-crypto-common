@@ -70,8 +70,8 @@ const decoratedFor = (fixture: ReturnType<typeof scenario>, placeCalls: { value:
 describe("v0.8 A19 level-4-scoped compact placement", () => {
     test("pins the explicit research identity and reviewed anchor list", () => {
         expect(V08_A19_COMPACT_PLACEMENT_POLICY).toMatchObject({
-            schema: "hoc.v0_8_a19_compact_placement.v1",
-            policyId: "a19-l4-scoped-compact-placement-v1",
+            schema: "hoc.v0_8_a19_compact_placement.v2",
+            policyId: "a19-l4-scoped-compact-placement-v2",
             researchOnly: true,
         });
         expect(V08_A19_COMPACT_PLACEMENT_ANCHORS).toEqual([
@@ -120,6 +120,37 @@ describe("v0.8 A19 level-4-scoped compact placement", () => {
         const strategy = decoratedFor(partial, { value: 0 });
         expect(strategy.placeArmy(partial.units.slice(1), partial.context)).toBe(partial.incumbent);
         expect(strategy.getLastPlacementAudit()?.fallbackReason).toBe("partial-army");
+    });
+
+    test("retains the initialized spread against public splash threats on either side", () => {
+        for (const team of [LEFT, RIGHT] as const) {
+            for (const creatureId of [PBTypes.CreatureVals.CYCLOPS, PBTypes.CreatureVals.GARGANTUAN]) {
+                const fixture = scenario("Frenzied Boar", team);
+                fixture.context.publicOpponentCreatureIds = [creatureId];
+                const calls = { value: 0 };
+                const strategy = decoratedFor(fixture, calls);
+
+                expect(strategy.placeArmy(fixture.units, fixture.context)).toBe(fixture.incumbent);
+                expect(calls.value).toBe(1);
+                expect(strategy.getLastPlacementAudit()).toMatchObject({
+                    treatmentApplied: false,
+                    placementChanged: false,
+                    fallbackReason: "opponent-splash",
+                });
+            }
+        }
+    });
+
+    test("preserves compact placement for ordinary public rosters and missing public information", () => {
+        for (const publicRoster of [undefined, [], [PBTypes.CreatureVals.PEASANT]]) {
+            const fixture = scenario("Frenzied Boar");
+            fixture.context.publicOpponentCreatureIds = publicRoster;
+            const strategy = decoratedFor(fixture, { value: 0 });
+            const compact = new StrategyV0_1().placeArmy(fixture.units, fixture.context);
+
+            expect(strategy.placeArmy(fixture.units, fixture.context)).toEqual(compact);
+            expect(strategy.getLastPlacementAudit()?.treatmentApplied).toBe(true);
+        }
     });
 
     test("fails closed when compact coordinates are illegal and audits an unchanged compact incumbent", () => {

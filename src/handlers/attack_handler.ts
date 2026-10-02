@@ -939,12 +939,20 @@ export class AttackHandler {
         const initialTargetUnit = targetUnit;
         let primaryAssimilationLanded = false;
         let responseAssimilationTarget: Unit | undefined;
-        let assimilationResolved = false;
-        const resolveAssimilation = (): void => {
-            if (assimilationResolved) {
+        const initiatingSingleHits: NonNullable<IVisibleDamage["splash"]> = [];
+        let chakramResponseHits: NonNullable<IVisibleDamage["splash"]> | undefined;
+        let rangeAttackFinalized = false;
+        const finalizeRangeAttack = (): void => {
+            if (rangeAttackFinalized) {
                 return;
             }
-            assimilationResolved = true;
+            rangeAttackFinalized = true;
+            // Splash replaces the client's single-target numbers. A counter-Chakram must therefore carry
+            // both sides of the exchange, including each initiating arrow's own hit/miss and casualties.
+            // Finalize after the last arrow (or a lethal early return), so no later single hit is lost.
+            if (chakramResponseHits?.length) {
+                (damageForAnimation.splash ??= []).push(...initiatingSingleHits, ...chakramResponseHits);
+            }
             if (responseAssimilationTarget) {
                 const responseStolen = AllAbilities.processPredatoryAssimilationAbility(
                     initialTargetUnit,
@@ -997,6 +1005,10 @@ export class AttackHandler {
             return { completed: false, unitIdsDied, animationData };
         }
 
+        // Presence marks an authoritative flight list. Through Shot can take precedence over a
+        // coexisting Chakram, and an empty list prevents clients from inventing a disc for that ray.
+        damageForAnimation.chakramFlights ??= [];
+
         // Track initial amount for kill counting
         // let initialAmountAlive = targetUnit.getAmountAlive();
 
@@ -1031,7 +1043,7 @@ export class AttackHandler {
 
         if (throughShotResult.landed) {
             primaryAssimilationLanded = true;
-            resolveAssimilation();
+            finalizeRangeAttack();
             // Both volleys' pierced units, gathered for the one sword pass at the end of this branch.
             const throughShotSwordVictims = [...throughShotResult.perUnitDamage];
 
@@ -1171,6 +1183,7 @@ export class AttackHandler {
         let damageFromResponse = 0;
         let petrifyingGazeResponseDamage = 0;
         let isResponseMissed = false;
+        let responseChakramResolved = false;
         // Water Shield on the RESPONDER's victim (the original attacker): captured before the counter-shot's
         // damage lands so its on-hit riders are skipped like a missed counter when the hit is absorbed.
         let rangeResponseAbsorbed = false;
@@ -1216,9 +1229,10 @@ export class AttackHandler {
         // A dodge ENDS the throw: the disc never touched that victim, so it never left it either and the
         // enemy behind is never reached. The rolls happen here, in flight order, because
         // resolveChakramTrajectory has to stay pure geometry for the hover preview. The primary reuses
-        // the shot's own miss roll above instead of rolling a second time against the same pair — which
+        // the shot's own miss roll above even when there are no eligible bounces. Rerolling that packed
+        // army's primary in the AOE tail could turn a dodge into a hit (or a hit into a dodge). This
         // also puts its damage and its on-hit riders on one verdict rather than two.
-        const chakramFlight = plannedChakramFlight.hitUnits.length
+        const chakramFlight = attackerUnit.getAbility(AllAbilities.CHAKRAM_ABILITY_NAME)
             ? AllAbilities.resolveChakramFlightMisses(
                   plannedChakramFlight,
                   targetUnit,
@@ -1249,17 +1263,6 @@ export class AttackHandler {
                     .join(", ")}`,
             );
         }
-        if (chakramTrajectory.steps.length) {
-            // Hand the client the exact circles + per-leg hits so it flies the disc and lands each hit as the
-            // disc reaches it (see IVisibleDamage.chakramArcs).
-            damageForAnimation.chakramArcs = chakramTrajectory.steps.map((step) => ({
-                targetUnitId: step.hitUnitIds[0] ?? "",
-                cells: step.circleCells.map((cell) => ({ x: cell.x, y: cell.y })),
-                hitUnitIds: [...step.hitUnitIds],
-                mountainCells: step.mountainCells.map((cell) => ({ x: cell.x, y: cell.y })),
-            }));
-        }
-
         // handle attack damage
         let aoeRangeAttackResult = AllAbilities.processRangeAOEAbility(
             attackerUnit,
@@ -1275,6 +1278,20 @@ export class AttackHandler {
             chakramTrajectory.damageFactorByUnitId,
             chakramFlight?.missByUnitId,
         );
+        if (chakramFlight) {
+            AllAbilities.recordChakramFlight(
+                damageForAnimation,
+                {
+                    attackerId: attackerUnit.getId(),
+                    primaryTargetId: targetUnit.getId(),
+                    response: false,
+                    hitIndex: 0,
+                    missed: isAttackMissed,
+                },
+                chakramTrajectory,
+                aoeRangeAttackResult.perUnitDamage,
+            );
+        }
         let attackDamageApplied = true;
         if (aoeRangeAttackResult.landed) {
             damageFromAttack = AllAbilities.processLuckyStrikeAbility(
@@ -1330,6 +1347,13 @@ export class AttackHandler {
             damageForAnimation.unitId = targetUnit.getId();
             damageForAnimation.unitPosition = targetUnit.getPosition();
             damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
+            initiatingSingleHits.push({
+                unitId: targetUnit.getId(),
+                position: { ...targetUnit.getPosition() },
+                amount: 0,
+                unitsDied: 0,
+                missed: true,
+            });
         } else {
             let abilityMultiplier = 1;
             const paralysisAttackerEffect = attackerUnit.getEffect("Paralysis");
@@ -1410,8 +1434,8 @@ export class AttackHandler {
                 this.grid,
             );
             // Dodges end the counter-throw exactly as they end the initiating one, and its primary
-            // likewise reuses the counter-shot's own miss roll rather than rolling again.
-            const responseChakramFlight = plannedResponseChakramFlight.hitUnits.length
+            // likewise reuses the counter-shot's own miss roll, including when no bounce is eligible.
+            const responseChakramFlight = targetUnit.getAbility(AllAbilities.CHAKRAM_ABILITY_NAME)
                 ? AllAbilities.resolveChakramFlightMisses(
                       plannedResponseChakramFlight,
                       rangeResponseUnit,
@@ -1426,6 +1450,7 @@ export class AttackHandler {
                           ),
                   )
                 : undefined;
+            responseChakramResolved = !!responseChakramFlight;
             const responseChakramTrajectory = responseChakramFlight?.trajectory ?? plannedResponseChakramFlight;
             if (responseChakramTrajectory.hitUnits.length) {
                 for (const hitUnit of responseChakramTrajectory.hitUnits) {
@@ -1444,18 +1469,6 @@ export class AttackHandler {
                         .join(", ")}`,
                 );
             }
-            if (responseChakramTrajectory.steps.length) {
-                damageForAnimation.chakramArcs = [
-                    ...(damageForAnimation.chakramArcs ?? []),
-                    ...responseChakramTrajectory.steps.map((step) => ({
-                        targetUnitId: step.hitUnitIds[0] ?? "",
-                        cells: step.circleCells.map((cell) => ({ x: cell.x, y: cell.y })),
-                        hitUnitIds: [...step.hitUnitIds],
-                        mountainCells: step.mountainCells.map((cell) => ({ x: cell.x, y: cell.y })),
-                    })),
-                ];
-            }
-
             aoeRangeResponseResult = AllAbilities.processRangeAOEAbility(
                 targetUnit,
                 rangeResponseUnits,
@@ -1471,7 +1484,27 @@ export class AttackHandler {
                 responseChakramTrajectory.damageFactorByUnitId,
                 responseChakramFlight?.missByUnitId,
             );
+            if (responseChakramFlight) {
+                AllAbilities.recordChakramFlight(
+                    damageForAnimation,
+                    {
+                        attackerId: targetUnit.getId(),
+                        primaryTargetId: rangeResponseUnit.getId(),
+                        response: true,
+                        hitIndex: 0,
+                        missed: isResponseMissed,
+                    },
+                    responseChakramTrajectory,
+                    aoeRangeResponseResult.perUnitDamage,
+                );
+            }
             if (aoeRangeResponseResult.landed) {
+                if (responseChakramFlight) {
+                    chakramResponseHits = aoeRangeResponseResult.perUnitDamage.map((entry) => ({
+                        ...entry,
+                        position: { ...entry.position },
+                    }));
+                }
                 damageFromResponse = AllAbilities.processLuckyStrikeAbility(
                     targetUnit,
                     aoeRangeResponseResult.maxDamage,
@@ -1609,7 +1642,9 @@ export class AttackHandler {
             AllAbilities.processOneInTheFieldAbility(targetUnit);
         }
 
-        if (rangeResponseUnit && (aoeRangeResponseResult?.landed || !isResponseMissed)) {
+        // AOE `landed` means the routing tail handled the volley, including an all-MISS Chakram.
+        // Assimilation belongs to the direct primary hit, never a missed disc or its bounce victims.
+        if (rangeResponseUnit && (!isResponseMissed || (!responseChakramResolved && aoeRangeResponseResult?.landed))) {
             responseAssimilationTarget = rangeResponseUnit;
         }
 
@@ -1684,6 +1719,12 @@ export class AttackHandler {
                     amount: damageDealt,
                     unitsDied: Math.max(0, initialAmountAlive - currentAmount),
                 }); // Initialize hits with first shot
+                initiatingSingleHits.push({
+                    unitId: targetUnit.getId(),
+                    position: { ...targetUnit.getPosition() },
+                    amount: damageDealt,
+                    unitsDied: Math.max(0, initialAmountAlive - currentAmount),
+                });
                 damageForAnimation.unitPosition = targetUnit.getPosition();
                 damageForAnimation.unitIsSmall = targetUnit.isSmallSize();
                 damageForAnimation.unitId = targetUnit.getId();
@@ -1779,7 +1820,7 @@ export class AttackHandler {
             }
         }
 
-        if (aoeRangeAttackResult?.landed || !isAttackMissed) {
+        if (!isAttackMissed || (!chakramFlight && aoeRangeAttackResult?.landed)) {
             primaryAssimilationLanded = true;
         }
 
@@ -1790,7 +1831,7 @@ export class AttackHandler {
                     increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                     increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                     unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                    resolveAssimilation();
+                    finalizeRangeAttack();
                     return { completed: true, unitIdsDied, animationData, abilityStolen };
                 }
             } else {
@@ -1811,7 +1852,7 @@ export class AttackHandler {
                         increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                         increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                         unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                        resolveAssimilation();
+                        finalizeRangeAttack();
                         return { completed: true, unitIdsDied, animationData, abilityStolen };
                     }
                 } else if (!isResponseMissed && !rangeResponseAbsorbed) {
@@ -1858,7 +1899,7 @@ export class AttackHandler {
                             increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                             increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                             unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                            resolveAssimilation();
+                            finalizeRangeAttack();
                             return { completed: true, unitIdsDied, animationData, abilityStolen };
                         }
                     }
@@ -1892,7 +1933,7 @@ export class AttackHandler {
                 increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                 increaseUnitMorale(targetUnit, targetUnitPlusMorale);
                 unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                resolveAssimilation();
+                finalizeRangeAttack();
                 return { completed: true, unitIdsDied, animationData, abilityStolen };
             }
 
@@ -1916,14 +1957,14 @@ export class AttackHandler {
                 }
                 increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                 unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                resolveAssimilation();
+                finalizeRangeAttack();
                 return { completed: true, unitIdsDied, animationData, abilityStolen };
             }
             hoverRangeAttackDivisor = hoverRangeAttackDivisors.at(targetUnitUndex);
             if (!hoverRangeAttackDivisor) {
                 increaseUnitMorale(attackerUnit, attackerUnitPlusMorale);
                 unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
-                resolveAssimilation();
+                finalizeRangeAttack();
                 return { completed: true, unitIdsDied, animationData, abilityStolen };
             }
         }
@@ -1931,6 +1972,8 @@ export class AttackHandler {
         // Second attack (Double Shot)
         // Capture health state before second shot to calculate units died
         const preSecondShotAmount = targetUnit.getAmountAlive();
+        const preSecondShotHp = targetUnit.getCumulativeHp();
+        const secondShotPosition = { ...targetUnit.getPosition() };
 
         const secondShotResult = suppressDoubleShot
             ? {
@@ -1963,6 +2006,16 @@ export class AttackHandler {
             moraleDecreaseForTheUnitTeam,
             secondShotResult.moraleDecreaseForTheUnitTeam,
         );
+
+        if (!secondShotResult.aoeRangeAttackLanded && secondShotResult.animationData.length) {
+            initiatingSingleHits.push({
+                unitId: targetUnit.getId(),
+                position: secondShotPosition,
+                amount: Math.max(0, preSecondShotHp - targetUnit.getCumulativeHp()),
+                unitsDied: Math.max(0, preSecondShotAmount - targetUnit.getAmountAlive()),
+                ...(!secondShotResult.applied ? { missed: true } : {}),
+            });
+        }
 
         if (secondShotResult.applied && secondShotResult.damage > 0 && damageForAnimation.hits) {
             const currentAmount = targetUnit.getAmountAlive();
@@ -2062,7 +2115,7 @@ export class AttackHandler {
         );
         unitsHolder.decreaseMoraleForTheSameUnitsOfTheTeam(moraleDecreaseForTheUnitTeam);
 
-        resolveAssimilation();
+        finalizeRangeAttack();
         unitsHolder.refreshStackPowerForAllUnits();
 
         return { completed: true, unitIdsDied, animationData, abilityStolen };

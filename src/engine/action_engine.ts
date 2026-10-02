@@ -3407,6 +3407,22 @@ export class GameActionEngine {
             unitPosition: { ...damage.unitPosition },
             hits: damage.hits?.map((hit) => ({ ...hit })),
             splash: damage.splash?.map((entry) => ({ ...entry, position: { ...entry.position } })),
+            chakramArcs: damage.chakramArcs?.map((arc) => ({
+                ...arc,
+                cells: arc.cells.map((cell) => ({ ...cell })),
+                hitUnitIds: arc.hitUnitIds ? [...arc.hitUnitIds] : undefined,
+                mountainCells: arc.mountainCells?.map((cell) => ({ ...cell })),
+            })),
+            chakramFlights: damage.chakramFlights?.map((flight) => ({
+                ...flight,
+                arcs: flight.arcs.map((arc) => ({
+                    ...arc,
+                    cells: arc.cells.map((cell) => ({ ...cell })),
+                    hitUnitIds: arc.hitUnitIds ? [...arc.hitUnitIds] : undefined,
+                    mountainCells: arc.mountainCells?.map((cell) => ({ ...cell })),
+                })),
+                splash: flight.splash.map((entry) => ({ ...entry, position: { ...entry.position } })),
+            })),
             secondary: damage.secondary?.map((entry) => ({ ...entry, position: { ...entry.position } })),
         };
     }
