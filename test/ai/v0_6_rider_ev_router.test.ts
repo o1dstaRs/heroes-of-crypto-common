@@ -244,6 +244,8 @@ describe("v0.6 melee rider EV router", () => {
             amountAlive: 10,
             stackPower: 100,
             size: PBTypes.UnitSizeVals.LARGE,
+            // Small Specie only dodges LEVEL-4 attackers; keep both dodge sources weighing on this rig.
+            level: PBTypes.UnitLevelVals.FOURTH,
             abilities: ["Petrifying Gaze"],
         });
         const evasive = createTestUnit({
@@ -282,6 +284,8 @@ describe("v0.6 melee rider EV router", () => {
             amountAlive: 10,
             stackPower: 100,
             size: PBTypes.UnitSizeVals.LARGE,
+            // Small Specie only dodges LEVEL-4 attackers; keep both dodge sources weighing on this rig.
+            level: PBTypes.UnitLevelVals.FOURTH,
             abilities: ["Petrifying Gaze"],
         });
         const evasive = createTestUnit({
