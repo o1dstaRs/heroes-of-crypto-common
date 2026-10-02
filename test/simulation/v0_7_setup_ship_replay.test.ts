@@ -101,7 +101,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Re-pinned 2026-09-28: Dulling Defense riding the knight's own blow (6e4f86d) changes landed
 // damage in the seeded fights, and corner shooters against splashless enemies (1c9f1f03) move
 // the setup the trace fights from. Both are reviewed mainline behavior changes.
-const EXPECTED_REPLAY_SHA256 = "cd2b4544caaeca807ec7d8b0f1f042e76da2a8e1a078fd66f5a5ae3b7ca0e6ec";
+// Re-pinned 2026-10-02: Blacksmith exp 9.5 -> 8.8 (3ed15b6) changes the setup scoring the
+// resolver replays, and Castling's swap reach grew one cell past movement (253a2e5), which
+// widens the candidate enumeration the paired evaluation sees.
+const EXPECTED_REPLAY_SHA256 = "c60ffd68be63936dea582b033c0dc925f12bbbc39a5ce076e703721bfbc10cad";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
