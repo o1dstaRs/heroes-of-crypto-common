@@ -16,7 +16,7 @@
             "shot_distance": 0,
             "magic_resist": 0,
             "movement_type": "WALK",
-            "exp": 9.5,
+            "exp": 8.8,
             "size": 1,
             "level": 1,
             "spells": [
@@ -669,7 +669,7 @@
             "hp": 200,
             "steps": 6.3,
             "initiative": 5.4,
-            "armor": 33,
+            "armor": 35,
             "attack_type": "MELEE",
             "attack": 32,
             "attack_damage_min": 54,
