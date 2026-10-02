@@ -250,9 +250,12 @@ describe("exact ranked draft evaluator", () => {
 
         expect(record.pickSeat).toBe("candidate-lower");
         expect(configs).toHaveLength(1);
-        expect(configs.some((config) => config.greenAugments?.some((augment) => augment.kind === "Empower"))).toBe(
-            true,
-        );
+        // Since Hydra's hp rose to 190 (owner call 2026-10-02) the optimizer prefers a Hydra roster with
+        // no ranged-spell carry on this fixture, so the caster policy's eligibility gate correctly REFUSES
+        // to spend the team's Empower augment and the setup falls back to the conditional [Armor, Might,
+        // Movement] plan. The positive routing — an eligible roster earning RANKED_A19_CASTER_EMPOWER_
+        // AUGMENTS — is covered hp-independently in setup_ship.test.ts.
+        expect(configs[0].greenAugments?.map((augment) => augment.kind)).toEqual(["Armor", "Might", "Movement"]);
         expect(configs.every((config) => config.redAugments?.every((augment) => augment.kind !== "Empower"))).toBe(
             true,
         );

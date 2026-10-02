@@ -899,7 +899,7 @@
         },
         "Hydra": {
             "name": "Hydra",
-            "hp": 185,
+            "hp": 190,
             "steps": 6.1,
             "initiative": 6.2,
             "armor": 33,

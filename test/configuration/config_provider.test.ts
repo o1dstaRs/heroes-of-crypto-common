@@ -125,10 +125,10 @@ describe("config_provider", () => {
         expect(creature.abilities_descriptions[chakramIndex]).not.toContain("100 targets");
     });
 
-    it("loads Hydra's reduced durability", () => {
+    it("loads Hydra's durability", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Hydra", "hydra_512", 0, 500);
 
-        expect(creature.hp).toBe(185);
+        expect(creature.hp).toBe(190);
         expect(creature.base_armor).toBe(33);
     });
 
