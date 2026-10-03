@@ -1160,8 +1160,8 @@
             "level": 1,
             "desc": [
                 "Opens a churning vortex under an enemy and chains it to the spot.",
-                "The creature skips its next turn while trapped in the vortex.",
-                "Lasts 1 lap.",
+                "The creature skips its next turn — exactly one activation, no more.",
+                "Lasts 1 lap; when the vortex ends the creature acts normally again.",
                 "Water magic: a Water Element cannot be chained by it."
             ],
             "target": "ANY_ENEMY",
