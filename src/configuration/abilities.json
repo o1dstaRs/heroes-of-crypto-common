@@ -238,7 +238,7 @@
         "power": 100,
         "power_type": "TOTAL_DAMAGE_PERCENTAGE",
         "skip_reponse": true,
-        "stack_powered": true,
+        "stack_powered": false,
         "effect": null,
         "aura_effect": null,
         "can_be_cast": false

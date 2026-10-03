@@ -130,6 +130,23 @@ export interface ISmokeGrid {
     getOccupantUnitId(cell: XY): string | undefined;
 }
 
+/** Disperse only the smoked cells a successful arrival actually registered to this unit. */
+export function dispelSmokeOnOccupiedCells(
+    clouds: SmokeClouds,
+    grid: ISmokeGrid,
+    unitId: string,
+    cells: readonly XY[],
+): XY[] {
+    const dispelled: XY[] = [];
+    if (!clouds.size()) return dispelled;
+    for (const cell of cells) {
+        if (grid.getOccupantUnitId(cell) === unitId && clouds.dispel(cell)) {
+            dispelled.push({ x: cell.x, y: cell.y });
+        }
+    }
+    return dispelled;
+}
+
 /**
  * Whether a single cell can take smoke.
  *

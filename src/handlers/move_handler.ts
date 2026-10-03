@@ -21,11 +21,13 @@ import { Unit } from "../units/unit";
 import { UnitsHolder } from "../units/units_holder";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { XY } from "../utils/math";
+import { dispelSmokeOnOccupiedCells } from "../spells/smoke_clouds";
 
 export interface ISystemMoveResult {
     log: string;
     unitIdsDestroyed: string[];
     unitIdToNewPosition: Map<string, XY>;
+    dispelledSmokeCells?: XY[];
 }
 
 export interface IDirectedMoveResult {
@@ -51,6 +53,7 @@ export class MoveHandler {
         const logs: string[] = [];
         const unitIdsDestroyed: string[] = [];
         const unitIdToNewPosition = new Map<string, XY>();
+        const dispelledSmokeCells: XY[] = [];
 
         if (possibleUnitId) {
             const unit = this.unitsHolder.getAllUnits().get(possibleUnitId);
@@ -95,6 +98,7 @@ export class MoveHandler {
                 )
             ) {
                 const systemMoveResult = this.finishDirectedUnitMove(unit, targetCells, undefined, updatePositionMask);
+                dispelledSmokeCells.push(...(systemMoveResult.dispelledSmokeCells ?? []));
                 if (systemMoveResult.log) {
                     logs.push(systemMoveResult.log);
                 }
@@ -148,6 +152,7 @@ export class MoveHandler {
                                     position,
                                     NO_UPDATE,
                                 );
+                                dispelledSmokeCells.push(...(systemMoveResult.dispelledSmokeCells ?? []));
                                 if (systemMoveResult.log) {
                                     logs.push(systemMoveResult.log);
                                 }
@@ -193,6 +198,7 @@ export class MoveHandler {
                                     position,
                                     NO_UPDATE,
                                 );
+                                dispelledSmokeCells.push(...(systemMoveResult.dispelledSmokeCells ?? []));
                                 if (systemMoveResult.log) {
                                     logs.push(systemMoveResult.log);
                                 }
@@ -226,7 +232,12 @@ export class MoveHandler {
             }
         }
 
-        return { log: logs.join("\n"), unitIdsDestroyed, unitIdToNewPosition };
+        return {
+            log: logs.join("\n"),
+            unitIdsDestroyed,
+            unitIdToNewPosition,
+            ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
+        };
     }
     public applyMoveModifiers(
         toCell: XY,
@@ -373,13 +384,8 @@ export class MoveHandler {
         // Smoke spell: a creature stepping onto a smoked cell disperses the smoke from EVERY cell it now
         // occupies (large units clear their whole 2x2 footprint). Collected so the action engine can emit a
         // `smoke_dispel` event for the client to remove the cloud visuals.
-        const dispelledSmokeCells: XY[] = [];
         const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
-        for (const cell of targetCells) {
-            if (smokeClouds.dispel(cell)) {
-                dispelledSmokeCells.push({ x: cell.x, y: cell.y });
-            }
-        }
+        const dispelledSmokeCells = dispelSmokeOnOccupiedCells(smokeClouds, this.grid, unit.getId(), targetCells);
         let deleteUnit = false;
         const bodyPosition = unit.getPosition();
         if (!bodyNewPosition) {

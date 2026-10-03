@@ -22,7 +22,7 @@ import * as SpellHelper from "../spells/spell_helper";
 import { SpellPowerType } from "../spells/spell_properties";
 import type { IWeightedRoute } from "../grid/path_definitions";
 import { Spell } from "../spells/spell";
-import { SmokeClouds } from "../spells/smoke_clouds";
+import { dispelSmokeOnOccupiedCells, SmokeClouds } from "../spells/smoke_clouds";
 import * as HoCConstants from "../constants";
 import * as AbilityHelper from "../abilities/ability_helper";
 import type { ISceneLog } from "../scene/scene_log_interface";
@@ -121,6 +121,8 @@ export interface IAttackResult {
     fireWallBurn?: IFireWallBurnReport;
     /** The attacker died in those flames on arrival, so its blow never landed. */
     strikeSkipped?: boolean;
+    /** Smoke cleared by a successfully occupied arrival footprint, before its burn or strike. */
+    dispelledSmokeCells?: HoCMath.XY[];
 }
 
 /** One attacker's Fire Wall burn, in the shape the action engine puts on a `fire_wall_burned` event. */
@@ -549,6 +551,7 @@ export class AttackHandler {
         // WHEN the transfer happened (or distinguish Holy Cross copy from a pre-existing caster card), so
         // ranked needs the exact outcome on the spell event just like heals and resurrection do.
         const abilityTransfers: IAbilityTransfer[] = [];
+        const dispelledSmokeCells: HoCMath.XY[] = [];
         if (!currentActiveSpell || !attackerUnit) {
             return { completed: false, unitIdsDied, animationData };
         }
@@ -770,6 +773,18 @@ export class AttackHandler {
                                 debuffTarget.hasAbilityActive("Made of Water"),
                             );
 
+                            const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
+                            for (const unit of [attackerUnit, debuffTarget]) {
+                                dispelledSmokeCells.push(
+                                    ...dispelSmokeOnOccupiedCells(
+                                        smokeClouds,
+                                        this.grid,
+                                        unit.getId(),
+                                        unit.getCells(),
+                                    ),
+                                );
+                            }
+
                             animationData.push(
                                 {
                                     toPosition: targetUnitPosition,
@@ -873,6 +888,7 @@ export class AttackHandler {
                 healed: healedUnits,
                 resurrected: resurrectedUnits,
                 abilityTransfers,
+                ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
             };
         }
 
@@ -2247,15 +2263,20 @@ export class AttackHandler {
                     return { completed: false, unitIdsDied, animationData };
                 }
 
+                const occupied =
+                    stationaryAttack ||
+                    this.grid.occupyCell(
+                        attackFromCell,
+                        attackerUnit.getId(),
+                        attackerUnit.getTeam(),
+                        attackerUnit.getAttackRange(),
+                        attackerUnit.canTraverseLava(),
+                        attackerUnit.hasAbilityActive("Made of Water"),
+                    );
+                if (!occupied) {
+                    return { completed: false, unitIdsDied, animationData };
+                }
                 attackerUnit.setPosition(position.x, position.y, false);
-                this.grid.occupyCell(
-                    attackFromCell,
-                    attackerUnit.getId(),
-                    attackerUnit.getTeam(),
-                    attackerUnit.getAttackRange(),
-                    attackerUnit.canTraverseLava(),
-                    attackerUnit.hasAbilityActive("Made of Water"),
-                );
 
                 animationData.push({
                     toPosition: attackerUnit.getPosition(),
@@ -2314,16 +2335,20 @@ export class AttackHandler {
                     return { completed: false, unitIdsDied, animationData };
                 }
 
+                const occupied =
+                    stationaryAttack ||
+                    this.grid.occupyCells(
+                        cells,
+                        attackerUnit.getId(),
+                        attackerUnit.getTeam(),
+                        attackerUnit.getAttackRange(),
+                        attackerUnit.canTraverseLava(),
+                        attackerUnit.hasAbilityActive("Made of Water"),
+                    );
+                if (!occupied) {
+                    return { completed: false, unitIdsDied, animationData };
+                }
                 attackerUnit.setPosition(position.x, position.y, false);
-
-                this.grid.occupyCells(
-                    cells,
-                    attackerUnit.getId(),
-                    attackerUnit.getTeam(),
-                    attackerUnit.getAttackRange(),
-                    attackerUnit.canTraverseLava(),
-                    attackerUnit.hasAbilityActive("Made of Water"),
-                );
 
                 animationData.push({
                     toPosition: attackerUnit.getPosition(),
@@ -2334,6 +2359,13 @@ export class AttackHandler {
                 return { completed: false, unitIdsDied, animationData };
             }
         }
+
+        const dispelledSmokeCells = dispelSmokeOnOccupiedCells(
+            FightStateManager.getInstance().getFightProperties().getSmokeClouds(),
+            this.grid,
+            attackerUnit.getId(),
+            attackFromCells,
+        );
 
         // The walk in burns before the blow: a stack that dies in the flames never gets to strike.
         const fireWallBurn = stationaryAttack
@@ -2347,7 +2379,14 @@ export class AttackHandler {
               );
         if (fireWallBurn && attackerUnit.isDead()) {
             updateUnitsDied([attackerUnit.getId()]);
-            return { completed: true, unitIdsDied, animationData, fireWallBurn, strikeSkipped: true };
+            return {
+                completed: true,
+                unitIdsDied,
+                animationData,
+                fireWallBurn,
+                strikeSkipped: true,
+                ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
+            };
         }
 
         let abilityMultiplier = 1;
@@ -3255,6 +3294,7 @@ export class AttackHandler {
             spunObstacleCells,
             piercedObstacles,
             fireWallBurn,
+            ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
         };
     }
     /**
@@ -3516,6 +3556,7 @@ export class AttackHandler {
         // points are spent. Corridor cells are never targeted, so the midpoint split is unambiguous.
         const isRightMountain = targetCell.x >= this.gridSettings.getGridSize() >> 1;
         const animationData: IAnimationData[] = [];
+        const dispelledSmokeCells: HoCMath.XY[] = [];
         if (
             this.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
             FightStateManager.getInstance().getFightProperties().getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
@@ -3655,14 +3696,27 @@ export class AttackHandler {
                         return { completed: rangeLanded, unitIdsDied: [], animationData };
                     }
 
+                    const occupied =
+                        stationaryAttack ||
+                        this.grid.occupyCell(
+                            attackFromCell,
+                            attackerUnit.getId(),
+                            attackerUnit.getTeam(),
+                            attackerUnit.getAttackRange(),
+                            attackerUnit.canTraverseLava(),
+                            attackerUnit.hasAbilityActive("Made of Water"),
+                        );
+                    if (!occupied) {
+                        return { completed: rangeLanded, unitIdsDied: [], animationData };
+                    }
                     attackerUnit.setPosition(position.x, position.y, false);
-                    this.grid.occupyCell(
-                        attackFromCell,
-                        attackerUnit.getId(),
-                        attackerUnit.getTeam(),
-                        attackerUnit.getAttackRange(),
-                        attackerUnit.canTraverseLava(),
-                        attackerUnit.hasAbilityActive("Made of Water"),
+                    dispelledSmokeCells.push(
+                        ...dispelSmokeOnOccupiedCells(
+                            FightStateManager.getInstance().getFightProperties().getSmokeClouds(),
+                            this.grid,
+                            attackerUnit.getId(),
+                            attackFromCells,
+                        ),
                     );
 
                     animationData.push({
@@ -3689,6 +3743,7 @@ export class AttackHandler {
                             animationData,
                             fireWallBurn,
                             strikeSkipped: true,
+                            ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
                         };
                     }
 
@@ -3758,15 +3813,27 @@ export class AttackHandler {
                         return { completed: rangeLanded, unitIdsDied: [], animationData };
                     }
 
+                    const occupied =
+                        stationaryAttack ||
+                        this.grid.occupyCells(
+                            cells,
+                            attackerUnit.getId(),
+                            attackerUnit.getTeam(),
+                            attackerUnit.getAttackRange(),
+                            attackerUnit.canTraverseLava(),
+                            attackerUnit.hasAbilityActive("Made of Water"),
+                        );
+                    if (!occupied) {
+                        return { completed: rangeLanded, unitIdsDied: [], animationData };
+                    }
                     attackerUnit.setPosition(position.x, position.y, false);
-
-                    this.grid.occupyCells(
-                        cells,
-                        attackerUnit.getId(),
-                        attackerUnit.getTeam(),
-                        attackerUnit.getAttackRange(),
-                        attackerUnit.canTraverseLava(),
-                        attackerUnit.hasAbilityActive("Made of Water"),
+                    dispelledSmokeCells.push(
+                        ...dispelSmokeOnOccupiedCells(
+                            FightStateManager.getInstance().getFightProperties().getSmokeClouds(),
+                            this.grid,
+                            attackerUnit.getId(),
+                            cells,
+                        ),
                     );
 
                     animationData.push({
@@ -3793,6 +3860,7 @@ export class AttackHandler {
                             animationData,
                             fireWallBurn,
                             strikeSkipped: true,
+                            ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
                         };
                     }
 
@@ -3845,6 +3913,7 @@ export class AttackHandler {
                 animationData,
                 spunObstacleCells: spin.spunObstacleCells,
                 fireWallBurn,
+                ...(dispelledSmokeCells.length ? { dispelledSmokeCells } : {}),
             };
         }
 

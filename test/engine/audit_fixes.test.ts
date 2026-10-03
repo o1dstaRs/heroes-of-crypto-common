@@ -157,9 +157,7 @@ describe("S3: a split shares what the stack carries instead of duplicating it", 
     });
 });
 
-describe("G1: Lightning Spin grows with stack power instead of shrinking", () => {
-    // The spin's stack-powered multiplier (20% per stack power) used to land in the damage DIVISOR slot, so a
-    // stack-power-1 Hydra spun for about five times what a full stack did.
+describe("G1: Lightning Spin damage is independent of stack power", () => {
     const spinDamage = (stackPower: number): number => {
         const { grid, unitsHolder } = createCombatTestContext();
         const stats = new DamageStatisticHolder();
@@ -187,12 +185,17 @@ describe("G1: Lightning Spin grows with stack power instead of shrinking", () =>
         return before - tank.getCumulativeHp();
     };
 
-    it("a full stack spins harder than a stack-power-1 one", () => {
-        const full = spinDamage(5);
-        const weak = spinDamage(1);
-
-        expect(full).toBeGreaterThan(0);
-        expect(full).toBeGreaterThan(weak * 2);
+    it("delivers the full attack damage at every stack power", () => {
+        setDeterministicRandomSource(() => 0);
+        try {
+            const full = spinDamage(5);
+            expect(full).toBeGreaterThan(0);
+            for (const stackPower of [1, 2, 3, 4]) {
+                expect(spinDamage(stackPower)).toBe(full);
+            }
+        } finally {
+            setDeterministicRandomSource(undefined);
+        }
     });
 });
 

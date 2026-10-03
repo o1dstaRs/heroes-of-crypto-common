@@ -42,7 +42,7 @@ import { amplifyCastBuffForTarget } from "../spells/castable_buff";
 import { Spell } from "../spells/spell";
 import * as SpellHelper from "../spells/spell_helper";
 import { SpellMultiplierType, SpellPowerType, SpellTargetType } from "../spells/spell_properties";
-import { isSmokeableCell } from "../spells/smoke_clouds";
+import { dispelSmokeOnOccupiedCells, isSmokeableCell } from "../spells/smoke_clouds";
 import { projectSpellRebound, spellDamageAgainstUnit, spellRawDamage } from "../spells/spell_cast_projection";
 import { canVineTakeRoot, maxCellsForStepBudget, vinePathCells } from "../spells/vines";
 import { fireWallBurnPercentage, fireWallLitCells, normalizeFireWallOrientation } from "../spells/fire_walls";
@@ -747,6 +747,9 @@ export class GameActionEngine {
         // Fire Wall: the attacker paid for walking into the flames the moment it arrived, before its blow, so
         // the burn leads. When the flames killed it there is no blow to report at all — the move still
         // happened, so this is a completed action rather than a refusal.
+        if (!this.headlessEvents && result.dispelledSmokeCells?.length) {
+            events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+        }
         if (result.fireWallBurn && !this.headlessEvents) {
             events.push({ type: "fire_wall_burned", ...result.fireWallBurn });
         }
@@ -1080,6 +1083,9 @@ export class GameActionEngine {
         // already moved.
         if (result.strikeSkipped) {
             const burnEvents: GameEvent[] = [];
+            if (!this.headlessEvents && result.dispelledSmokeCells?.length) {
+                burnEvents.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+            }
             if (result.fireWallBurn && !this.headlessEvents) {
                 burnEvents.push({ type: "fire_wall_burned", ...result.fireWallBurn });
             }
@@ -1145,6 +1151,9 @@ export class GameActionEngine {
         const serializedAnimations = this.serializeAnimations(result.animationData ?? []);
         const events: GameEvent[] = [];
         // The walk in burned before the barrel was struck, so the burn leads the strike's own events.
+        if (!this.headlessEvents && result.dispelledSmokeCells?.length) {
+            events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+        }
         if (result.fireWallBurn && !this.headlessEvents) {
             events.push({ type: "fire_wall_burned", ...result.fireWallBurn });
         }
@@ -1492,6 +1501,9 @@ export class GameActionEngine {
                 abilityTransfers: result.abilityTransfers?.length ? result.abilityTransfers : undefined,
             },
         ];
+        if (!this.headlessEvents && result.dispelledSmokeCells?.length) {
+            events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+        }
         events.push(...this.cleanupDeadUnits(unitIdsDied, killAttributions));
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
@@ -2549,10 +2561,20 @@ export class GameActionEngine {
         const existing = this.context.unitsHolder.getSummonedUnitByName(team, unitName);
         if (existing) {
             existing.increaseAmountAlive(amount);
+            const cells = existing.getCells();
+            const dispelledSmokeCells = dispelSmokeOnOccupiedCells(
+                this.context.fightProperties.getSmokeClouds(),
+                this.context.grid,
+                existing.getId(),
+                cells,
+            );
             this.context.sceneLog.updateLog(`${caster.getName()} summoned ${amount} x ${unitName}`);
             caster.useSpell(spell.getName());
 
-            const events = this.createSummonEvents(caster, spell, existing, amount, existing.getCells(), true);
+            const events = this.createSummonEvents(caster, spell, existing, amount, cells, true);
+            if (!this.headlessEvents && dispelledSmokeCells.length) {
+                events.push({ type: "smoke_dispel", cells: dispelledSmokeCells });
+            }
             events.push(...this.turnEngine.completeTurn(caster));
             return { completed: true, events };
         }
@@ -2631,12 +2653,21 @@ export class GameActionEngine {
 
         summoned.setPosition(position.x, position.y);
         this.context.unitsHolder.addUnit(summoned);
+        const dispelledSmokeCells = dispelSmokeOnOccupiedCells(
+            this.context.fightProperties.getSmokeClouds(),
+            this.context.grid,
+            summoned.getId(),
+            cells,
+        );
         this.context.sceneLog.updateLog(`${caster.getName()} summoned ${amount} x ${unitName}`);
         const summonCell = summoned.getBaseCell();
         this.context.sceneLog.updateLog(`${unitName} spawned at (${summonCell.x}, ${summonCell.y})`);
         caster.useSpell(spell.getName());
 
         const events = this.createSummonEvents(caster, spell, summoned, amount, cells, false);
+        if (!this.headlessEvents && dispelledSmokeCells.length) {
+            events.push({ type: "smoke_dispel", cells: dispelledSmokeCells });
+        }
         events.push(...this.turnEngine.completeTurn(caster));
         return { completed: true, events };
     }
@@ -3484,7 +3515,7 @@ export class GameActionEngine {
                 if (killer?.hasAbilityActive("Infest")) {
                     const infested = this.spawnInfestedUnit(killer, corpseLevel, corpseCells);
                     if (infested) {
-                        events.push(infested);
+                        events.push(...infested);
                     }
                 }
                 continue;
@@ -3506,7 +3537,7 @@ export class GameActionEngine {
 
         return events;
     }
-    private spawnInfestedUnit(killer: Unit, corpseLevel: number, corpseCells: XY[]): GameEvent | undefined {
+    private spawnInfestedUnit(killer: Unit, corpseLevel: number, corpseCells: XY[]): GameEvent[] | undefined {
         if (!this.context.createSummonedUnit || !corpseCells.length) {
             return undefined;
         }
@@ -3568,24 +3599,33 @@ export class GameActionEngine {
 
         spawned.setPosition(position.x, position.y);
         this.context.unitsHolder.addUnit(spawned);
+        const dispelledSmokeCells = dispelSmokeOnOccupiedCells(
+            this.context.fightProperties.getSmokeClouds(),
+            this.context.grid,
+            spawned.getId(),
+            cells,
+        );
         if (this.headlessEvents) {
             return undefined;
         }
         this.context.sceneLog.updateLog(`${killer.getName()} infested the fallen stack with ${unitName}`);
         const spawnCell = spawned.getBaseCell();
         this.context.sceneLog.updateLog(`${unitName} spawned at (${spawnCell.x}, ${spawnCell.y})`);
-        return {
-            type: "unit_summoned",
-            casterId: killer.getId(),
-            unitId: spawned.getId(),
-            team: spawned.getTeam(),
-            unitName,
-            amount: 1,
-            position: { ...spawned.getPosition() },
-            cells: structuredClone(cells),
-            merged: false,
-            sourceAbility: "Infest",
-        };
+        return [
+            {
+                type: "unit_summoned",
+                casterId: killer.getId(),
+                unitId: spawned.getId(),
+                team: spawned.getTeam(),
+                unitName,
+                amount: 1,
+                position: { ...spawned.getPosition() },
+                cells: structuredClone(cells),
+                merged: false,
+                sourceAbility: "Infest",
+            },
+            ...(dispelledSmokeCells.length ? [{ type: "smoke_dispel" as const, cells: dispelledSmokeCells }] : []),
+        ];
     }
     private reject(rejectionReason: GameActionRejectionReason, message?: string): IGameActionResult {
         return { completed: false, events: [], rejectionReason, message };

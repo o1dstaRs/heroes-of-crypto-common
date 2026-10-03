@@ -379,6 +379,9 @@ export class TurnEngine {
         for (const [unitId, position] of result.unitIdToNewPosition.entries()) {
             events.push({ type: "unit_moved_by_system", unitId, position, reason: "narrowing" });
         }
+        if (result.dispelledSmokeCells?.length && !this.headlessEvents) {
+            events.push({ type: "smoke_dispel", cells: result.dispelledSmokeCells });
+        }
 
         for (const unitId of result.unitIdsDestroyed) {
             if (this.unitsHolder.deleteUnitById(unitId)) {
