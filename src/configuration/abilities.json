@@ -972,7 +972,8 @@
         "type": "STATUS",
         "desc": [
             "When applied with a {}% chance,",
-            "Paralysis (Status) prevents the affected enemy from moving and reduces their damage by {}%"
+            "Paralysis (Status) prevents the affected enemy from moving and reduces their damage by {}%",
+            "for 1 lap."
         ],
         "power": 50,
         "power_type": "APPLY_EFFECT",
