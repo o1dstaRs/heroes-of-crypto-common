@@ -15,6 +15,7 @@ describe("A19 secondary rollout material evidence", () => {
             "SEARCH_A19_MATERIAL_ARBITRATION",
             "SEARCH_A19_MATERIAL_LOW_EVIDENCE_WINS",
             "SEARCH_A19_HEALER_OPENING_COHESION",
+            "SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE",
         ];
         const saved = keys.map((key) => process.env[key]);
         try {

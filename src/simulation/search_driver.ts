@@ -1310,6 +1310,7 @@ export class SearchDriver {
     private readonly a19ScoredArbitration: boolean;
     private readonly a19MaterialArbitration: A19MaterialArbitrationMode | undefined;
     private readonly a19MaterialLowEvidenceWinningSamples: number;
+    private readonly a19ArtifactBarrelAttackCoverage: boolean;
     private captureA19Material = false;
     private a19MaterialEvidence:
         | {
@@ -1582,6 +1583,11 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_MATERIAL_LOW_EVIDENCE_WINS must be an integer from 1 to 8");
         }
         this.a19MaterialLowEvidenceWinningSamples = lowEvidenceWinningSamples;
+        const barrelCoverage = process.env.SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE;
+        if (barrelCoverage !== undefined && barrelCoverage !== "" && barrelCoverage !== "0" && barrelCoverage !== "1") {
+            throw new Error("SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE must be 0 or 1");
+        }
+        this.a19ArtifactBarrelAttackCoverage = this.mode === "search" && barrelCoverage === "1";
         const rawAdaptiveBudget = process.env.SEARCH_A19_ADAPTIVE_BUDGET;
         if (
             rawAdaptiveBudget !== undefined &&
@@ -2465,6 +2471,7 @@ export class SearchDriver {
                 ...this.caps,
                 maxMoveShotComposites: this.moveShotCapForVersion(version),
                 includeMountainAttacks: isV08Search,
+                includeArtifactBarrelAttackCoverage: isV08Search && this.a19ArtifactBarrelAttackCoverage,
                 // v0.8 search rolls out the free Through Shot lines its native policy can take (V08_THROUGH_SHOT_LINE
                 // scopes both together, so a seat A/B compares whole seats); older versions keep their exact catalog.
                 throughShotFreeAim: isV08Search && throughShotLineEnabled(unit),
@@ -2636,6 +2643,7 @@ export class SearchDriver {
                     const expandedCandidates = enumerateCandidates(unit, context, incumbent, {
                         maxMoveShotComposites: this.moveShotCapForVersion(version),
                         includeMountainAttacks: isV08Search,
+                        includeArtifactBarrelAttackCoverage: isV08Search && this.a19ArtifactBarrelAttackCoverage,
                         enrichIncumbentMetadata:
                             isV08Search || this.ilPath !== undefined || this.scoredDecisionObserver !== undefined,
                         preserveMovePostureDiversity:

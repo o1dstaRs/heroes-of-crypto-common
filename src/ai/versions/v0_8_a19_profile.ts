@@ -136,8 +136,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for opt-in material evidence and opening healer cohesion.
-        sha256: "67408ff9d5e2ce1d742d3198aad6833e8c93de6fd89788baa6e0e96593f4d5be" as const,
+        // Re-pinned for opt-in material evidence, opening healer cohesion, and public barrel coverage.
+        sha256: "9ca9e193762c17e6d829d0579f4d5d1c12233c0a4a60b5ce6bd5e290cc9a5b39" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,

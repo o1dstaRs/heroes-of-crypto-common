@@ -757,6 +757,8 @@ export interface IEnumerateOptions {
     preserveAttackTargetCoverage?: boolean;
     /** Opt in to deterministic BLOCK_CENTER melee-mining challengers (v0.8 search only). */
     includeMountainAttacks?: boolean;
+    /** Research-only: retain distinct one-hit obstacle targets when public deployment barrels are present. */
+    includeArtifactBarrelAttackCoverage?: boolean;
     /**
      * Metadata enrichment for candidate 0. When its exact action is rediscovered by the generator (or is an
      * exact legal move-shot handled by the bounded incumbent probe), copy those observations onto the anchor.
@@ -955,6 +957,7 @@ class CandidateGenerator {
         this.addDefend();
         this.addMelee();
         this.addMountainAttack();
+        this.addArtifactBarrelAttackCoverage();
         this.addShots();
         this.addAreaThrows();
         this.addSpells();
@@ -1715,6 +1718,68 @@ class CandidateGenerator {
             standCell: { x: strike.attackFrom.x, y: strike.attackFrom.y },
             features: this.features(),
         });
+    }
+    private addArtifactBarrelAttackCoverage(): void {
+        const { attackHandler, fightProperties, grid, unitsHolder } = this.context;
+        if (
+            !this.options.includeArtifactBarrelAttackCoverage ||
+            !attackHandler ||
+            !fightProperties ||
+            this.unit.isDead() ||
+            grid.getArtifactBarrels().length === 0
+        )
+            return;
+        const forced = unitsHolder.getAllUnits().get(this.unit.getTarget());
+        if (forced && !forced.isDead()) return;
+        const targets = [...grid.getScatteredMountainsStanding()].sort((a, b) => a.x - b.x || a.y - b.y);
+        const settings = grid.getSettings(),
+            base = this.unit.getBaseCell();
+        const shoots = this.canShoot(attackHandler);
+        if (!shoots && (!this.unit.canMove() || this.unit.getAttackTypeSelection() === RANGE || !this.canMelee()))
+            return;
+        for (const targetCell of targets) {
+            const targetPosition = getPositionForCell(
+                targetCell,
+                settings.getMinX(),
+                settings.getStep(),
+                settings.getHalfStep(),
+            );
+            if (shoots) {
+                this.push({
+                    kind: "mine",
+                    actions: [
+                        ...this.rangePrefix(),
+                        { type: "obstacle_attack", attackerId: this.unit.getId(), targetPosition },
+                    ],
+                    targetCell: { ...targetCell },
+                    standCell: { ...base },
+                    features: this.features({ spendsRangeShot: 1 }),
+                });
+                continue;
+            }
+            const strike = this.mountainMeleeStrike([targetCell]);
+            if (!strike) continue;
+            const inPlace = strike.attackFrom.x === base.x && strike.attackFrom.y === base.y;
+            const route = inPlace ? undefined : strike.route;
+            if (!inPlace && !route?.route.length) continue;
+            this.push({
+                kind: "mine",
+                actions: [
+                    {
+                        type: "obstacle_attack",
+                        attackerId: this.unit.getId(),
+                        targetPosition,
+                        attackFrom: { ...strike.attackFrom },
+                        path: route?.route.map((cell) => ({ ...cell })),
+                        hasLavaCell: route?.hasLavaCell,
+                        hasWaterCell: route?.hasWaterCell,
+                    },
+                ],
+                targetCell: { ...targetCell },
+                standCell: { ...strike.attackFrom },
+                features: this.features(),
+            });
+        }
     }
     // ---- ranged shots --------------------------------------------------------------------------------
     private canShoot(attackHandler: AttackHandler): boolean {
