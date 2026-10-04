@@ -108,7 +108,12 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // deployed one-hit barrels. These seeded fights include the affected artifacts; two isolated
 // runs reproduced the new trace, and the committed pre-change source reproduces the prior digest.
 // Previous approved digest: e73312e64d106a395a55ad53532de4f2f88534db782c382e3a793720beeebd6d
-const EXPECTED_REPLAY_SHA256 = "d327ffd27f762e9c74261717eea8d9e575890665aab0ddbc4986c00ce5c3cb47";
+// Re-pinned 2026-10-04: the opt-in v0.7 setup search extensions — material arbitration
+// (e067d75), public formation support and dispersion (ec1700f), own-army role search plans
+// (7bdb3a9) — move the seeded setup traces even before their gates are enabled. Two isolated
+// runs reproduce the new trace; the fcfd347 source reproduces the prior digest.
+// Previous approved digest: d327ffd27f762e9c74261717eea8d9e575890665aab0ddbc4986c00ce5c3cb47
+const EXPECTED_REPLAY_SHA256 = "d1aab87bed24cbd7a6e26a3c824504819639631057b28e98c869377aba922ee3";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
