@@ -356,6 +356,12 @@ export function createV08A19RoleStrategy(
     const blockedAreaBattery = plan.areaCarry && plan.magic === 1 && plan.ranged >= 4;
     const lavaSparseAreaBattery =
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.areaCarry && plan.magic >= 2 && plan.ranged <= 2;
+    const lavaNarrowSpellWithFlyingProtector =
+        gridType === PBTypes.GridVals.LAVA_CENTER &&
+        plan.magic === 1 &&
+        plan.ranged === 2 &&
+        spellCarry &&
+        reflectionFlyer;
     const lavaRangedArtillery =
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.artillery && plan.magic === 0 && plan.ranged >= 4;
     const volleySupport = reflectionOwn.some((info) => info.abilities.includes("Rallying Volley Aura"));
@@ -369,6 +375,7 @@ export function createV08A19RoleStrategy(
                 reflectionOwn.some((info) => info.level === 4 && info.abilities.includes("AI Driven"))));
     if (
         !lavaSparseAreaBattery &&
+        !lavaNarrowSpellWithFlyingProtector &&
         !lavaRangedArtillery &&
         (gridType !== PBTypes.GridVals.BLOCK_CENTER ||
             !(
@@ -394,7 +401,9 @@ export function createV08A19RoleStrategy(
                     screenBacklineProtectors: true,
                 });
             const batteryFormation =
-                lavaSparseAreaBattery || (blockedCasterBattery && context.team === PBTypes.TeamVals.LEFT)
+                lavaSparseAreaBattery ||
+                lavaNarrowSpellWithFlyingProtector ||
+                (blockedCasterBattery && context.team === PBTypes.TeamVals.LEFT)
                     ? spreadBattery()
                     : blockedSpellBattery
                       ? context.team === PBTypes.TeamVals.RIGHT
