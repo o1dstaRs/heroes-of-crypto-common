@@ -113,7 +113,13 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // (7bdb3a9) — move the seeded setup traces even before their gates are enabled. Two isolated
 // runs reproduce the new trace; the fcfd347 source reproduces the prior digest.
 // Previous approved digest: d327ffd27f762e9c74261717eea8d9e575890665aab0ddbc4986c00ce5c3cb47
-const EXPECTED_REPLAY_SHA256 = "d1aab87bed24cbd7a6e26a3c824504819639631057b28e98c869377aba922ee3";
+// Re-pinned 2026-10-04: the barrel-aware a19 work — artifact barrels reserving their neighbourhood
+// during deployment (d9cb151), the opt-in ranked role candidate (5f44d114), regenerative-artillery
+// damage plans (754dd960), public barrel target coverage (42f30c6) and a19 screening behind barrels
+// (df07612) — each moves the seeded setup traces. Two isolated runs reproduce the new trace, and CI
+// (which checks out the pinned submodule directly) received the same digest byte-for-byte.
+// Previous approved digest: d1aab87bed24cbd7a6e26a3c824504819639631057b28e98c869377aba922ee3
+const EXPECTED_REPLAY_SHA256 = "ca158ed411bbd95b0391bd67a55b6ddeddd6e5d2fc202ac070db5be92c21b44d";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
