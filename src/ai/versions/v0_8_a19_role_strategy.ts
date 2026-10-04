@@ -354,6 +354,13 @@ export function createV08A19RoleStrategy(
     const blockedCasterBattery = plan.magic >= 3 && plan.ranged === 1;
     const blockedSpellBattery = plan.magic === 1 && plan.ranged >= 4 && spellCarry;
     const blockedAreaBattery = plan.areaCarry && plan.magic === 1 && plan.ranged >= 4;
+    const blockedPhysicalBattery =
+        plan.magic === 0 &&
+        plan.ranged === 3 &&
+        !plan.artillery &&
+        !plan.areaCarry &&
+        !plan.healer &&
+        !plan.screenPhysical;
     const lavaSparseAreaBattery =
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.areaCarry && plan.magic >= 2 && plan.ranged <= 2;
     const lavaNarrowSpellWithFlyingProtector =
@@ -383,7 +390,8 @@ export function createV08A19RoleStrategy(
                 blockedSpellBattery ||
                 blockedFlyingVolley ||
                 blockedSplashBattery ||
-                blockedAreaBattery
+                blockedAreaBattery ||
+                blockedPhysicalBattery
             ))
     )
         return finalStrategy;
@@ -401,19 +409,21 @@ export function createV08A19RoleStrategy(
                     screenBacklineProtectors: true,
                 });
             const batteryFormation =
-                lavaSparseAreaBattery ||
-                lavaNarrowSpellWithFlyingProtector ||
-                (blockedCasterBattery && context.team === PBTypes.TeamVals.LEFT)
-                    ? spreadBattery()
-                    : blockedSpellBattery
-                      ? context.team === PBTypes.TeamVals.RIGHT
+                blockedPhysicalBattery && context.team === PBTypes.TeamVals.RIGHT
+                    ? reflectIncumbentPlacement(units, context, incumbent)
+                    : lavaSparseAreaBattery ||
+                        lavaNarrowSpellWithFlyingProtector ||
+                        (blockedCasterBattery && context.team === PBTypes.TeamVals.LEFT)
+                      ? spreadBattery()
+                      : blockedSpellBattery
+                        ? context.team === PBTypes.TeamVals.RIGHT
+                            ? spreadBattery()
+                            : reflectIncumbentPlacement(units, context, incumbent)
+                        : blockedFlyingVolley
                           ? spreadBattery()
-                          : reflectIncumbentPlacement(units, context, incumbent)
-                      : blockedFlyingVolley
-                        ? spreadBattery()
-                        : blockedSplashBattery
-                          ? disperseRevealedSplashArmy(units, context, incumbent)
-                          : incumbent;
+                          : blockedSplashBattery
+                            ? disperseRevealedSplashArmy(units, context, incumbent)
+                            : incumbent;
             const selected =
                 blockedAreaBattery || (lavaRangedArtillery && context.team === PBTypes.TeamVals.LEFT)
                     ? disperseRevealedSplashArmy(units, context, batteryFormation)

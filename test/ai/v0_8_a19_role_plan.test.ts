@@ -3,6 +3,29 @@ import { roleSearchPlan, v08A19RoleSearchOverrides } from "../../src/ai/versions
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 const mage = ["Dryad", "Troll", "Fairy", "Medusa", "Monk", "Magic Dragon"];
 describe("A19 optional own-army role search plan", () => {
+    it("deepens ordinary physical batteries on Normal and Lava while preserving Blocked and healer plans", () => {
+        const family = ["Mermaid", "Hyena", "Arbalester", "Medusa", "Cyclops", "Frenzied Boar"];
+        for (const map of [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER]) {
+            const plan = roleSearchPlan(family, map);
+            expect(plan.rollouts).toBe(64);
+            expect(plan.horizon).toBe(128);
+            expect(plan.moves).toBe(4);
+            expect(plan.shortlist).toBe(24);
+            expect(plan.material).toBe("sample-ties");
+            expect(plan.moveShots).toBe(2);
+            const healer = roleSearchPlan([...family.slice(0, -1), "Angel"], map);
+            expect(healer.rollouts).toBe(32);
+            expect(healer.horizon).toBe(64);
+            expect(healer.moves).toBe(1);
+            expect(healer.shortlist).toBe(12);
+        }
+        const blocked = roleSearchPlan(family, PBTypes.GridVals.BLOCK_CENTER);
+        expect(blocked.rollouts).toBe(32);
+        expect(blocked.horizon).toBe(64);
+        expect(blocked.moves).toBe(1);
+        expect(blocked.shortlist).toBe(12);
+        expect(roleSearchPlan([...family, "Medusa", "Hyena"])).toEqual(roleSearchPlan(family));
+    });
     it("widens blocked sparse ground movement while preserving its measured depth and other maps", () => {
         const family = ["Wandering Mage", "Pikeman", "Arbalester", "Valkyrie", "Zena"];
         for (const [carry, rollouts, horizon] of [

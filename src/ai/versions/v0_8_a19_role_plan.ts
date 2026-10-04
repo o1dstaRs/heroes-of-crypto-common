@@ -42,6 +42,14 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
     const narrowCaster = (healer && magic === 1 && ranged <= 2) || (spellCarry && magic === 1 && ranged === 2);
     const screenPhysical =
         magic === 0 && ranged >= 3 && infos.some((i) => i.level === 4 && !i.canFly && i.melee && i.auraCount > 0);
+    const normalLavaPhysicalDepth =
+        (gridType === PBTypes.GridVals.NORMAL || gridType === PBTypes.GridVals.LAVA_CENTER) &&
+        magic === 0 &&
+        ranged === 3 &&
+        !artillery &&
+        !areaCarry &&
+        !healer &&
+        !screenPhysical;
     const deepSparseAnchor =
         magic === 1 &&
         ranged <= 2 &&
@@ -83,13 +91,13 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
                 ? 128
                 : deepNormalArtillery
                   ? 96
-                  : (artillery && ranged >= 4) || lavaMixedArtillery
+                  : (artillery && ranged >= 4) || lavaMixedArtillery || normalLavaPhysicalDepth
                     ? 64
                     : 32,
         horizon:
             deepSparseAnchor || deepBlockedArea || deepNormalArtillery || deepBlockedSpell || deepBufferedArtillery
                 ? 128
-                : (artillery && ranged >= 4) || lavaMixedArtillery
+                : (artillery && ranged >= 4) || lavaMixedArtillery || normalLavaPhysicalDepth
                   ? 128
                   : 64,
         moves: expandedGroundHybrid
@@ -103,7 +111,8 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
                   screenPhysical ||
                   narrowCaster ||
                   blockedPhysicalHealerMovement ||
-                  blockedSparseGroundMovement
+                  blockedSparseGroundMovement ||
+                  normalLavaPhysicalDepth
                 ? 4
                 : 1,
         shortlist:
@@ -113,7 +122,8 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
             screenPhysical ||
             narrowCaster ||
             blockedPhysicalHealerMovement ||
-            blockedSparseGroundMovement
+            blockedSparseGroundMovement ||
+            normalLavaPhysicalDepth
                 ? 24
                 : 12,
         throws: densePhysicalArea ? 16 : 4,
