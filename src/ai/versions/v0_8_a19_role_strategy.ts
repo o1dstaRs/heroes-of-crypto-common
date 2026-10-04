@@ -354,6 +354,8 @@ export function createV08A19RoleStrategy(
     const blockedCasterBattery = plan.magic >= 3 && plan.ranged === 1;
     const blockedSpellBattery = plan.magic === 1 && plan.ranged >= 4 && spellCarry;
     const blockedAreaBattery = plan.areaCarry && plan.magic === 1 && plan.ranged >= 4;
+    const lavaSparseAreaBattery =
+        gridType === PBTypes.GridVals.LAVA_CENTER && plan.areaCarry && plan.magic >= 2 && plan.ranged <= 2;
     const volleySupport = reflectionOwn.some((info) => info.abilities.includes("Rallying Volley Aura"));
     const meleeFlyer = reflectionOwn.some((info) => info.melee && info.canFly);
     const blockedFlyingVolley = plan.artillery && plan.magic === 1 && plan.ranged === 3 && volleySupport && meleeFlyer;
@@ -364,14 +366,15 @@ export function createV08A19RoleStrategy(
             (plan.ranged <= 2 &&
                 reflectionOwn.some((info) => info.level === 4 && info.abilities.includes("AI Driven"))));
     if (
-        gridType !== PBTypes.GridVals.BLOCK_CENTER ||
-        !(
-            blockedCasterBattery ||
-            blockedSpellBattery ||
-            blockedFlyingVolley ||
-            blockedSplashBattery ||
-            blockedAreaBattery
-        )
+        !lavaSparseAreaBattery &&
+        (gridType !== PBTypes.GridVals.BLOCK_CENTER ||
+            !(
+                blockedCasterBattery ||
+                blockedSpellBattery ||
+                blockedFlyingVolley ||
+                blockedSplashBattery ||
+                blockedAreaBattery
+            ))
     )
         return finalStrategy;
     return {
@@ -388,7 +391,7 @@ export function createV08A19RoleStrategy(
                     screenBacklineProtectors: true,
                 });
             const batteryFormation =
-                blockedCasterBattery && context.team === PBTypes.TeamVals.LEFT
+                lavaSparseAreaBattery || (blockedCasterBattery && context.team === PBTypes.TeamVals.LEFT)
                     ? spreadBattery()
                     : blockedSpellBattery
                       ? context.team === PBTypes.TeamVals.RIGHT
