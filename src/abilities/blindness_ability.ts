@@ -25,7 +25,7 @@ export function processBlindnessAbility(
     }
 
     const blindnessAbility = fromUnit.getAbility("Blindness");
-    // The target's MIND resistance (e.g. Helm of Focus) lowers the odds the blindness lands.
+    // The target's MIND resistance (e.g. Amulet of Resolve) lowers the odds the blindness lands.
     const mindResistCoeff = blindnessAbility?.getType() === AbilityType.MIND ? 1 - targetUnit.getMindResist() / 100 : 1;
     if (
         blindnessAbility &&

@@ -11,7 +11,7 @@
 
 import { ObstacleType } from "../obstacles/obstacle_type";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import type { GridType } from "../generated/protobuf/v1/types_gen";
+import type { GridType, TeamType } from "../generated/protobuf/v1/types_gen";
 import { getCellsAroundFootprint, isCellWithinGrid, normalizeFootprintSide } from "./grid_math";
 import { GridSettings } from "./grid_settings";
 import { type XY, updateMatrixElementIfExists } from "../utils/math";
@@ -19,6 +19,12 @@ import { UPDATE_DOWN_LEFT, UPDATE_DOWN_RIGHT, UPDATE_UP_LEFT, UPDATE_UP_RIGHT } 
 
 const OBSTACLE_SHORTS = ["B", "L", "W", "H"];
 const NO_UNIT = "";
+
+export interface ArtifactBarrel {
+    team: TeamType;
+    index: number;
+    cell: XY;
+}
 
 export class Grid {
     private cellsByUnitId: { [unitId: string]: XY[] } = {};
@@ -58,6 +64,8 @@ export class Grid {
      * Empty layout = classic behaviour, unchanged down to the last cell.
      */
     private scatteredMountainLayout: XY[] = [];
+    private artifactBarrels: Map<string, ArtifactBarrel> = new Map();
+    private artifactBarrelLayoutActive = false;
     /** Packed keys of the scattered mountains still standing; a cleared one is simply dropped from here. */
     private scatteredMountainsStanding: Set<number> = new Set();
     public constructor(gridSettings: GridSettings, gridType: GridType) {
@@ -170,18 +178,18 @@ export class Grid {
         // Clearing must ALWAYS be honoured. The caller switches the board type first and installs the new
         // layout second, so a type guard here would swallow the "wipe it" call on the way out of the
         // mountain board — leaving stones standing on lava and their cells still impassable.
-        if (cells.length && this.gridType !== PBTypes.GridVals.BLOCK_CENTER) {
-            return;
-        }
         // Lift the previous layout off the board first, or a re-roll would leave the old rock behind.
         for (const cell of this.scatteredMountainLayout) {
             if (this.boardCoord[cell.x]?.[cell.y] === "B") {
                 this.boardCoord[cell.x][cell.y] = NO_UNIT;
             }
         }
-        this.scatteredMountainLayout = cells.map((c) => ({ x: c.x, y: c.y }));
+        const combined = [...cells, ...this.getArtifactBarrels().map((barrel) => barrel.cell)];
+        this.scatteredMountainLayout = [
+            ...new Map(combined.map((cell) => [Grid.packCell(cell.x, cell.y), { ...cell }])).values(),
+        ];
         this.scatteredMountainsStanding = new Set(this.scatteredMountainLayout.map((c) => Grid.packCell(c.x, c.y)));
-        if (cells.length) {
+        if (combined.length && this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
             // The classic pair and a scattered layout must never be on the board at once.
             this.leftMountainCleared = true;
             this.rightMountainCleared = true;
@@ -199,8 +207,68 @@ export class Grid {
         }
         this.invalidateMatrixCache();
     }
+    /** Owned deployment barrels share the ordinary one-hit terrain and never count as units. */
+    public getArtifactBarrels(team?: TeamType): ArtifactBarrel[] {
+        return [...this.artifactBarrels.values()]
+            .filter((barrel) => team === undefined || barrel.team === team)
+            .map((barrel) => ({ ...barrel, cell: { ...barrel.cell } }));
+    }
+    public placeArtifactBarrel(team: TeamType, index: number, cell: XY): boolean {
+        if (
+            ![PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT].includes(team) ||
+            !Number.isInteger(index) ||
+            index < 0 ||
+            index >= 2 ||
+            !Number.isInteger(cell.x) ||
+            !Number.isInteger(cell.y) ||
+            !isCellWithinGrid(this.gridSettings, cell)
+        ) {
+            return false;
+        }
+        const key = `${team}:${index}`;
+        const previous = this.artifactBarrels.get(key);
+        if (previous?.cell.x === cell.x && previous.cell.y === cell.y) return true;
+        if (this.boardCoord[cell.x]?.[cell.y] !== NO_UNIT) return false;
+        this.unplaceArtifactBarrel(team, index);
+        this.artifactBarrelLayoutActive = true;
+        this.artifactBarrels.set(key, { team, index, cell: { ...cell } });
+        this.scatteredMountainLayout.push({ ...cell });
+        this.scatteredMountainsStanding.add(Grid.packCell(cell.x, cell.y));
+        this.boardCoord[cell.x][cell.y] = "B";
+        this.invalidateMatrixCache();
+        return true;
+    }
+    public unplaceArtifactBarrel(team: TeamType, index: number): boolean {
+        const key = `${team}:${index}`;
+        const previous = this.artifactBarrels.get(key);
+        if (!previous) return false;
+        this.artifactBarrels.delete(key);
+        this.clearScatteredMountainAt(previous.cell.x, previous.cell.y);
+        this.scatteredMountainLayout = this.scatteredMountainLayout.filter(
+            (cell) => cell.x !== previous.cell.x || cell.y !== previous.cell.y,
+        );
+        return true;
+    }
+    public clearArtifactBarrels(team: TeamType): void {
+        for (const barrel of this.getArtifactBarrels(team)) this.unplaceArtifactBarrel(team, barrel.index);
+    }
+    /** Hydration metadata: terrain is installed separately from the authoritative standing-cell list. */
+    public restoreArtifactBarrels(barrels: readonly ArtifactBarrel[]): void {
+        if (barrels.length) this.artifactBarrelLayoutActive = true;
+        this.artifactBarrels = new Map(
+            barrels.map((barrel) => [`${barrel.team}:${barrel.index}`, { ...barrel, cell: { ...barrel.cell } }]),
+        );
+    }
+    public isScatteredMountainCell(cell: XY): boolean {
+        return this.scatteredMountainLayout.some((entry) => entry.x === cell.x && entry.y === cell.y);
+    }
+    public hasClassicMountains(): boolean {
+        return (
+            this.gridType === PBTypes.GridVals.BLOCK_CENTER && (!this.leftMountainCleared || !this.rightMountainCleared)
+        );
+    }
     public hasScatteredMountains(): boolean {
-        return this.scatteredMountainLayout.length > 0;
+        return this.scatteredMountainLayout.length > 0 || this.artifactBarrelLayoutActive;
     }
     /** The mountains still standing, in layout order — the renderer keeps art per cell, so order matters. */
     public getScatteredMountainsStanding(): XY[] {
@@ -217,6 +285,9 @@ export class Grid {
         }
         if (this.boardCoord[x]?.[y] === "B") {
             this.boardCoord[x][y] = NO_UNIT;
+        }
+        for (const [barrelKey, barrel] of this.artifactBarrels) {
+            if (barrel.cell.x === x && barrel.cell.y === y) this.artifactBarrels.delete(barrelKey);
         }
         this.invalidateMatrixCache();
         return true;
@@ -268,6 +339,7 @@ export class Grid {
         this.cleanedUpCenter = false;
         this.leftMountainCleared = false;
         this.rightMountainCleared = false;
+        for (const barrel of this.getArtifactBarrels()) this.boardCoord[barrel.cell.x][barrel.cell.y] = "B";
         this.invalidateMatrixCache();
     }
     public areCellsAdjacent(cells1: XY[], cells2: XY[]): boolean {
@@ -494,7 +566,7 @@ export class Grid {
         if (!isCellWithinGrid(this.gridSettings, cell)) {
             return false;
         }
-        const swallowedStone = this.scatteredMountainsStanding.delete(Grid.packCell(cell.x, cell.y));
+        const swallowedStone = this.clearScatteredMountainAt(cell.x, cell.y);
         this.boardCoord[cell.x][cell.y] = "H";
         this.invalidateMatrixCache();
         return swallowedStone;
@@ -793,12 +865,9 @@ export class Grid {
         // attack targeting + the AI's mining only ever see intact rock. Rows are world-X (left mid-3,mid-2 /
         // right mid+1,mid+2), columns are world-Y (mid-1,mid). excludeInner has no meaning for this shape.
         if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
-            if (this.scatteredMountainLayout.length) {
-                return this.getScatteredMountainsStanding();
-            }
             const mid = this.gridSettings.getGridSize() >> 1;
             const mountainColumns = [mid - 1, mid];
-            const cells: XY[] = [];
+            const cells: XY[] = this.getScatteredMountainsStanding();
             const pushSide = (rows: number[]): void => {
                 for (const row of rows) {
                     for (const column of mountainColumns) {
@@ -814,6 +883,7 @@ export class Grid {
             }
             return cells;
         }
+        if (this.hasScatteredMountains()) return this.getScatteredMountainsStanding();
         const quarter = this.gridSettings.getGridSize() >> 2;
         const halfQuarter = quarter >> 1;
         const start = quarter + halfQuarter;
@@ -890,9 +960,7 @@ export class Grid {
         if (this.gridType === PBTypes.GridVals.BLOCK_CENTER) {
             // Scattered layout, when one is installed, is the whole answer: the cells are arbitrary, so
             // there is no geometry to fall back on.
-            if (this.scatteredMountainLayout.length) {
-                return this.scatteredMountainsStanding.has(Grid.packCell(row, column));
-            }
+            if (this.scatteredMountainsStanding.has(Grid.packCell(row, column))) return true;
             // NOTE: in this grid `row` is the horizontal (world-X) axis and `column` is vertical (world-Y).
             // The two mountains sit side by side along X (rows), sharing the middle two Y columns, with a 2x2
             // walkable corridor between them (rows mid-1,mid). This matches the two sprites (offset in world-X).

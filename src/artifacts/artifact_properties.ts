@@ -29,7 +29,7 @@ export enum ArtifactTier {
 export enum Tier1Artifact {
     NO_ARTIFACT = 0,
     VETERAN_HELM = 1, // +4% defense (all)
-    AMULET_OF_RESOLVE = 2, // +25% status resist
+    AMULET_OF_RESOLVE = 2, // +25% status and mind resist
     KEEN_BLADE = 3, // +1 attack (flat)
     IRON_PLATE = 4, // +1 defense (flat)
     SWIFT_BOOTS = 5, // +1 movement to melee units
@@ -38,7 +38,7 @@ export enum Tier1Artifact {
     WOUNDING_CHARM = 8, // grants the Deep Wounds Level 1 card to all allies
     CURSED_WARD = 9, // +5 luck / -5 morale
     HUNTERS_LONGBOW = 10, // ranged units: +1 flat atk per archer in the army (scales with archer count), no downside
-    HELM_OF_FOCUS = 11, // +25% mind resist
+    BARREL_BARRICADE = 11, // two deployable single-hit barrels
     BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 20% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
     MAGES_RING = 13, // +10% magic damage (army-wide); Tier-1 half of the arcane pair
 }
@@ -82,7 +82,7 @@ export const ToTier1Artifact: { [key: string]: Tier1Artifact } = {
     "8": Tier1Artifact.WOUNDING_CHARM,
     "9": Tier1Artifact.CURSED_WARD,
     "10": Tier1Artifact.HUNTERS_LONGBOW,
-    "11": Tier1Artifact.HELM_OF_FOCUS,
+    "11": Tier1Artifact.BARREL_BARRICADE,
     "12": Tier1Artifact.BROKEN_AEGIS,
     "13": Tier1Artifact.MAGES_RING,
 };
@@ -129,7 +129,7 @@ export const ARTIFACT_POWER = {
     // Per-archer scaling: each ranged unit in the army grants every ranged unit this much bonus attack and
     // defense penalty. N archers => +N attack and -7.5N% defense on each ranged unit.
     LONGBOW_ATTACK_FLAT_PER_ARCHER: 1,
-    HELM_OF_FOCUS_RESIST_PERCENT: 35,
+    BARREL_BARRICADE_COUNT: 2,
     AMULET_OF_RESOLVE_RESIST_PERCENT: 25,
     AEGIS_AREA_REDUCTION_PERCENT: 0,
     GIANTS_MAUL_AOE_PERCENT: 40,
@@ -213,7 +213,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "amulet_of_resolve",
         "Amulet of Resolve",
         "Amulet of Resolve",
-        "Increases the army's status resistance by {}%.",
+        "Increases the army's status resistance by {}%. Increases the army's mind resistance by []%.",
     ),
     [Tier1Artifact.KEEN_BLADE]: t1(
         Tier1Artifact.KEEN_BLADE,
@@ -271,12 +271,12 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "Hunters Longbow",
         "Ranged units gain +{} attack for each ranged unit in the army.",
     ),
-    [Tier1Artifact.HELM_OF_FOCUS]: t1(
-        Tier1Artifact.HELM_OF_FOCUS,
-        "helm_of_focus",
-        "Helm of Focus",
-        "Helm of Focus",
-        "Increases the army's mind resistance by {}%.",
+    [Tier1Artifact.BARREL_BARRICADE]: t1(
+        Tier1Artifact.BARREL_BARRICADE,
+        "barrel_barricade",
+        "Barrel Barricade",
+        "",
+        "Grants {} barrels to place anywhere in your deployment zone. Each blocks movement and shots until destroyed by one hit.",
     ),
     [Tier1Artifact.BROKEN_AEGIS]: t1(
         Tier1Artifact.BROKEN_AEGIS,
@@ -399,7 +399,7 @@ export const getTier2ArtifactProperties = (id: Tier2Artifact): ArtifactPropertie
 const AP = ARTIFACT_POWER;
 const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] } = {
     veteran_helm: [AP.VETERAN_HELM_PERCENT],
-    amulet_of_resolve: [AP.AMULET_OF_RESOLVE_RESIST_PERCENT],
+    amulet_of_resolve: [AP.AMULET_OF_RESOLVE_RESIST_PERCENT, AP.AMULET_OF_RESOLVE_RESIST_PERCENT],
     keen_blade: [AP.KEEN_BLADE_FLAT],
     iron_plate: [AP.IRON_PLATE_FLAT],
     swift_boots: [AP.SWIFT_BOOTS_STEPS],
@@ -408,7 +408,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     wounding_charm: [AP.WOUNDING_CHARM_DEEP_WOUNDS_PERCENT],
     cursed_ward: [AP.CURSED_WARD_LUCK, AP.CURSED_WARD_MORALE_PENALTY],
     hunters_longbow: [AP.LONGBOW_ATTACK_FLAT_PER_ARCHER],
-    helm_of_focus: [AP.HELM_OF_FOCUS_RESIST_PERCENT],
+    barrel_barricade: [AP.BARREL_BARRICADE_COUNT],
     broken_aegis: [AP.AEGIS_AREA_REDUCTION_PERCENT],
     warlords_edge: [AP.WARLORDS_EDGE_PERCENT],
     titan_plate: [AP.TITAN_PLATE_PERCENT],

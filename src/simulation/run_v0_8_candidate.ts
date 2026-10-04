@@ -60,6 +60,8 @@ const RECORDED_ACTION_TYPE_FLAGS = {
     obstacle_attack: true,
     area_throw_attack: true,
     cast_spell: true,
+    place_barrel: true,
+    unplace_barrel: true,
     place_unit: true,
     split_unit: true,
     delete_unit: true,

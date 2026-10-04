@@ -25,7 +25,7 @@ export function processAggrAbility(
     }
 
     const aggrAbility = fromUnit.getAbility("Aggr");
-    // The target's MIND resistance (e.g. Helm of Focus) lowers the odds the aggr lands.
+    // The target's MIND resistance (e.g. Amulet of Resolve) lowers the odds the aggr lands.
     const mindResistCoeff = aggrAbility?.getType() === AbilityType.MIND ? 1 - targetUnit.getMindResist() / 100 : 1;
     if (
         aggrAbility &&

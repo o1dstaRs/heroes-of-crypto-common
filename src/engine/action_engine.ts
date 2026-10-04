@@ -19,6 +19,8 @@ import * as AbilityHelper from "../abilities/ability_helper";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { processCraftAbility } from "../abilities/craft_ability";
 import * as EffectHelper from "../effects/effect_helper";
+import { Tier1Artifact, ARTIFACT_POWER } from "../artifacts/artifact_properties";
+import { artifactBarrelPlacementCells, autoPlaceArtifactBarrels } from "../grid/artifact_barrels";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { AttackType, FactionType, TeamType } from "../generated/protobuf/v1/types_gen";
 import {
@@ -158,6 +160,7 @@ export interface IGameActionEngineContext extends ITurnEngineContext {
         spell?: Spell;
         sourceAbility?: string;
     }) => Unit | undefined;
+    canPlaceBarrel?: (team: TeamType, cell: XY) => boolean;
     canPlaceUnit?: (unit: Unit, cells: XY[], action: Extract<GameAction, { type: "place_unit" }>) => boolean;
     canSplitUnit?: (unit: Unit, action: Extract<GameAction, { type: "split_unit" }>) => boolean;
     createSplitUnit?: (
@@ -309,6 +312,10 @@ export class GameActionEngine {
                 return this.areaThrowAttack(action);
             case "cast_spell":
                 return this.castSpell(action);
+            case "place_barrel":
+                return this.placeBarrel(action);
+            case "unplace_barrel":
+                return this.unplaceBarrel(action);
             case "place_unit":
                 return this.placeUnit(action);
             case "split_unit":
@@ -342,6 +349,13 @@ export class GameActionEngine {
         this.context.unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.LEFT);
         this.context.unitsHolder.increaseUnitsSupplyIfNeededPerTeam(PBTypes.TeamVals.RIGHT);
         this.context.unitsHolder.haveDistancesToClosestEnemiesDecreased();
+        for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
+            if (!this.context.fightProperties.hasArtifactTier1(team, Tier1Artifact.BARREL_BARRICADE)) continue;
+            const cells = artifactBarrelPlacementCells(this.context.grid, this.context.fightProperties, team).filter(
+                (cell) => !this.context.canPlaceBarrel || this.context.canPlaceBarrel(team, cell),
+            );
+            autoPlaceArtifactBarrels(this.context.grid, this.context.fightProperties, team, cells);
+        }
         this.context.fightProperties.startFight();
         this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, leftUnitsAlive);
         this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.RIGHT, rightUnitsAlive);
@@ -1014,12 +1028,15 @@ export class GameActionEngine {
             return this.reject("attack_handler_missing");
         }
         // A scattered layout has no hit-point counters: what is left to hit is simply what still stands.
-        const scattered = this.context.grid.hasScatteredMountains();
-        const standingCellsBefore = scattered ? this.context.grid.getScatteredMountainsStanding() : [];
+        const scattered = this.context.grid.isScatteredMountainCell(
+            getCellForPosition(this.context.grid.getSettings(), action.targetPosition),
+        );
+        const standingCellsBefore = this.context.grid.getScatteredMountainsStanding();
         const standingBefore = standingCellsBefore.length;
         if (
-            this.context.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
-            this.context.fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+            (!scattered &&
+                (this.context.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+                    this.context.fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER)) ||
             (scattered ? standingBefore <= 0 : this.context.fightProperties.getObstacleHitsLeft() <= 0)
         ) {
             return this.reject("obstacle_not_available");
@@ -1098,12 +1115,10 @@ export class GameActionEngine {
         }
 
         this.context.unitsHolder.refreshStackPowerForAllUnits();
-        const standingCellsAfter = scattered ? this.context.grid.getScatteredMountainsStanding() : [];
-        const removedCellCandidates = scattered
-            ? standingCellsBefore.filter(
-                  (before) => !standingCellsAfter.some((after) => after.x === before.x && after.y === before.y),
-              )
-            : [];
+        const standingCellsAfter = this.context.grid.getScatteredMountainsStanding();
+        const removedCellCandidates = standingCellsBefore.filter(
+            (before) => !standingCellsAfter.some((after) => after.x === before.x && after.y === before.y),
+        );
         // Preserve the actual projectile order, not the random layout-array order. Double Shot can clear two
         // aligned tombstones in one action; replay must emit the nearer impact first so clients can animate
         // shot one -> stone one, then shot two -> stone two. Any non-trajectory removals fall back to stable
@@ -1183,6 +1198,10 @@ export class GameActionEngine {
                     animations: serializedAnimations,
                     ...unitDamage,
                 });
+                events.push(
+                    ...this.scatteredObstacleDestroyedEvents(attacker, removedCells),
+                    ...this.scatteredObstacleDestroyedEvents(attacker, spunCells, "lightning_spin"),
+                );
             }
         }
         events.push(...this.cleanupDeadUnits(unitIdsDied));
@@ -2893,6 +2912,42 @@ export class GameActionEngine {
                 );
             }
         }
+    }
+    private placeBarrel(action: Extract<GameAction, { type: "place_barrel" }>): IGameActionResult {
+        const fp = this.context.fightProperties;
+        if (fp.hasFightStarted() || fp.hasFightFinished()) return this.reject("placement_not_available");
+        if (
+            !fp.hasArtifactTier1(action.team, Tier1Artifact.BARREL_BARRICADE) ||
+            !Number.isInteger(action.barrelIndex) ||
+            action.barrelIndex < 0 ||
+            action.barrelIndex >= ARTIFACT_POWER.BARREL_BARRICADE_COUNT
+        ) {
+            return this.reject("invalid_placement");
+        }
+        const allowed = this.context.canPlaceBarrel
+            ? this.context.canPlaceBarrel(action.team, action.cell)
+            : artifactBarrelPlacementCells(this.context.grid, fp, action.team).some(
+                  (cell) => cell.x === action.cell.x && cell.y === action.cell.y,
+              );
+        if (!allowed) return this.reject("placement_not_available");
+        if (!this.context.grid.placeArtifactBarrel(action.team, action.barrelIndex, action.cell))
+            return this.reject("placement_blocked");
+        return {
+            completed: true,
+            events: [
+                { type: "barrel_placed", team: action.team, barrelIndex: action.barrelIndex, cell: { ...action.cell } },
+            ],
+        };
+    }
+    private unplaceBarrel(action: Extract<GameAction, { type: "unplace_barrel" }>): IGameActionResult {
+        if (this.context.fightProperties.hasFightStarted() || this.context.fightProperties.hasFightFinished())
+            return this.reject("placement_not_available");
+        if (!this.context.grid.unplaceArtifactBarrel(action.team, action.barrelIndex))
+            return this.reject("invalid_placement");
+        return {
+            completed: true,
+            events: [{ type: "barrel_unplaced", team: action.team, barrelIndex: action.barrelIndex }],
+        };
     }
     private placeUnit(action: Extract<GameAction, { type: "place_unit" }>): IGameActionResult {
         if (this.context.fightProperties.hasFightStarted() || this.context.fightProperties.hasFightFinished()) {

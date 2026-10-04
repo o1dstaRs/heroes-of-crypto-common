@@ -11,6 +11,7 @@
 
 export * from "./grid/grid";
 export * from "./grid/scattered_mountains";
+export * from "./grid/artifact_barrels";
 export * as GridConstants from "./grid/grid_constants";
 export * as GridMath from "./grid/grid_math";
 export * as Augment from "./augments/augment_properties";

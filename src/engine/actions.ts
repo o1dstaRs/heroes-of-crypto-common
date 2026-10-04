@@ -71,6 +71,8 @@ export type GameAction =
           targetCell?: XY;
           targetOrientation?: number;
       }
+    | { type: "place_barrel"; team: TeamType; barrelIndex: number; cell: XY }
+    | { type: "unplace_barrel"; team: TeamType; barrelIndex: number }
     | { type: "place_unit"; unitId: string; team: TeamType; unitName: string; cells: XY[]; amount?: number }
     // `cells` places the peeled-off stack in the SAME action. Omit it (the sidebar's "Split Selected"
     // button) and the new stack is created unplaced, for the player to position separately. Supplying it

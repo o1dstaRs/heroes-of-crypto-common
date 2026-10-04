@@ -3376,7 +3376,7 @@ export class AttackHandler {
      * question has to be asked of the grid instead.
      */
     private obstacleStillStands(): boolean {
-        if (this.grid.hasScatteredMountains()) {
+        if (this.grid.hasScatteredMountains() && !this.grid.hasClassicMountains()) {
             return this.grid.getScatteredMountainsStanding().length > 0;
         }
         return FightStateManager.getInstance().getFightProperties().getObstacleHitsLeft() > 0;
@@ -3389,7 +3389,7 @@ export class AttackHandler {
      * the two models from drifting: there are six of them (range, double-shot, and the melee variants).
      */
     private spendObstacleHit(targetCell: HoCMath.XY, isRightMountain: boolean): void {
-        if (this.grid.hasScatteredMountains()) {
+        if (this.grid.isScatteredMountainCell(targetCell)) {
             this.grid.clearScatteredMountainAt(targetCell.x, targetCell.y);
             return;
         }
@@ -3412,7 +3412,7 @@ export class AttackHandler {
         damageForAnimation?: IVisibleDamage,
     ): string[] {
         if (
-            !this.grid.hasScatteredMountains() ||
+            !this.grid.isScatteredMountainCell(targetCell) ||
             (!attackerUnit.hasAbilityActive("Skewer Strike") && !attackerUnit.hasAbilityActive("Fire Breath"))
         ) {
             return [];
@@ -3558,8 +3558,10 @@ export class AttackHandler {
         const animationData: IAnimationData[] = [];
         const dispelledSmokeCells: HoCMath.XY[] = [];
         if (
-            this.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
-            FightStateManager.getInstance().getFightProperties().getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+            (!this.grid.hasScatteredMountains() &&
+                (this.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+                    FightStateManager.getInstance().getFightProperties().getGridType() !==
+                        PBTypes.GridVals.BLOCK_CENTER)) ||
             !this.obstacleStillStands() ||
             !attackerUnit ||
             attackerUnit.isDead() ||

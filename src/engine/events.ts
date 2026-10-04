@@ -55,6 +55,8 @@ export type GameEvent =
     | { type: "unit_defended"; unitId: string; team: TeamType }
     | { type: "attack_type_selected"; unitId: string; team: TeamType; attackType: AttackType }
     | { type: "unit_moved"; unitId: string; from: XY; to: XY; path: XY[]; targetCells: XY[] }
+    | { type: "barrel_placed"; team: TeamType; barrelIndex: number; cell: XY }
+    | { type: "barrel_unplaced"; team: TeamType; barrelIndex: number }
     | { type: "unit_placed"; unitId: string; team: TeamType; position: XY; cells: XY[] }
     | {
           type: "unit_split";

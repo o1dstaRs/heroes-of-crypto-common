@@ -487,7 +487,7 @@ const pickRankedBundle = (bundles: readonly (readonly [number, number, number])[
         const score =
             draftGenomeCreatureScore(AI_META_RANKED_DRAFT_GENOME, level1) +
             draftGenomeCreatureScore(AI_META_RANKED_DRAFT_GENOME, level2) +
-            (TIER1_ARTIFACT_WINRATE[artifact] ?? 50);
+            (artifact === Tier1Artifact.BARREL_BARRICADE ? 50 : (TIER1_ARTIFACT_WINRATE[artifact] ?? 50));
         if (score > bestScore) {
             bestIndex = index;
             bestScore = score;
@@ -644,12 +644,16 @@ function tier1ContextScore(id: number, own: IAiMetaArmyFeatures, opponent: IAiMe
     const ownGround = fraction(own.groundMelee, own.total);
     const opponentRanged = fraction(opponent.ranged, opponent.total);
     const opponentGround = fraction(opponent.groundMelee, opponent.total);
-    const base = TIER1_ARTIFACT_WINRATE[id] ?? 50;
+    const base = id === Tier1Artifact.BARREL_BARRICADE ? 50 : (TIER1_ARTIFACT_WINRATE[id] ?? 50);
     switch (id) {
         case Tier1Artifact.VETERAN_HELM:
             return base + 5 * (opponentGround + opponentRanged);
         case Tier1Artifact.AMULET_OF_RESOLVE:
-            return base + 8 * fraction(opponent.statusSources, opponent.total);
+            return (
+                base +
+                8 * fraction(opponent.statusSources, opponent.total) +
+                18 * fraction(opponent.mindControllers, opponent.total)
+            );
         case Tier1Artifact.KEEN_BLADE:
             return base + 3 * ownGround;
         case Tier1Artifact.IRON_PLATE:
@@ -668,8 +672,8 @@ function tier1ContextScore(id: number, own: IAiMetaArmyFeatures, opponent: IAiMe
             // Bonus scales per archer (each ranged unit grants every ranged unit +1 atk / -7.5% def), so value
             // grows with the ranged share of the army — there is no fixed archer threshold anymore.
             return base + 44 * ownRanged;
-        case Tier1Artifact.HELM_OF_FOCUS:
-            return base + 18 * fraction(opponent.mindControllers, opponent.total);
+        case Tier1Artifact.BARREL_BARRICADE:
+            return base + 8 * ownRanged;
         case Tier1Artifact.BROKEN_AEGIS:
             return base + 8 * fraction(opponent.auraCarriers + opponent.buffers, opponent.total);
         default:

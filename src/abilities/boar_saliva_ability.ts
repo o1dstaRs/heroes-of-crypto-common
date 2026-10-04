@@ -27,7 +27,7 @@ export function processBoarSalivaAbility(
 
     const boarSalivaAbility = fromUnit.getAbility("Boar Saliva");
     if (boarSalivaAbility) {
-        // Boar Saliva otherwise always lands; the target's MIND resistance (e.g. Helm of Focus) gives it a
+        // Boar Saliva otherwise always lands; the target's MIND resistance (e.g. Amulet of Resolve) gives it a
         // chance to shrug the saliva off. No-op when the target carries no mind resist (coeff === 1).
         const mindResistCoeff =
             boarSalivaAbility.getType() === AbilityType.MIND ? 1 - targetUnit.getMindResist() / 100 : 1;

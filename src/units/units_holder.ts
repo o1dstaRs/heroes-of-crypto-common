@@ -638,9 +638,6 @@ export class UnitsHolder {
                         }
                     }
                     break;
-                case Tier1Artifact.HELM_OF_FOCUS:
-                    applyArtifactBuff("Helm of Focus", AP.HELM_OF_FOCUS_RESIST_PERCENT);
-                    break;
                 case Tier1Artifact.AMULET_OF_RESOLVE:
                     applyArtifactBuff("Amulet of Resolve", AP.AMULET_OF_RESOLVE_RESIST_PERCENT);
                     break;

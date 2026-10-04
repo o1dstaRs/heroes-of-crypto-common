@@ -1608,12 +1608,13 @@ class CandidateGenerator {
         }
         const { attackHandler, fightProperties, grid, unitsHolder } = this.context;
         const scattered = grid.hasScatteredMountains();
-        const standingScattered = scattered ? grid.getScatteredMountainsStanding() : [];
+        const standingScattered = scattered ? grid.getCenterCells() : [];
         if (
             !attackHandler ||
             !fightProperties ||
-            grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
-            fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+            (!scattered &&
+                (grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER ||
+                    fightProperties.getGridType() !== PBTypes.GridVals.BLOCK_CENTER)) ||
             (scattered ? standingScattered.length <= 0 : fightProperties.getObstacleHitsLeft() <= 0) ||
             this.unit.isDead() ||
             (!scattered &&

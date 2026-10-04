@@ -1385,12 +1385,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Math.max(0, 1 - effectiveResist / 100);
     }
     // Chance-reduction (%) against MIND-type abilities — Petrifying Gaze, Blindness, Boar Saliva, Aggr.
-    // Granted by the Helm of Focus artifact. SEPARATE from magic resist (which is magic armor — flat % off
+    // Granted by Amulet of Resolve. SEPARATE from magic resist (which is magic armor — flat % off
     // magic damage); mind resistance only lowers the odds a MIND effect lands. Read as a per-unit artifact
     // "marker" buff, exactly like getStatusResist above. 0 when the unit carries no mind-resist source.
     public getMindResist(): number {
-        const helmOfFocusBuff = this.getBuff("Helm of Focus");
-        return helmOfFocusBuff ? helmOfFocusBuff.getPower() : 0;
+        const amuletOfResolveBuff = this.getBuff("Amulet of Resolve");
+        return amuletOfResolveBuff ? amuletOfResolveBuff.getPower() : 0;
     }
     public getSpellsCount(): number {
         if (this.unitType === PBTypes.UnitVals.CREATURE && this.hasEffectActive("Break")) {
@@ -3768,7 +3768,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.magic_resist = roundUnitStat(winningAtLeastOneEventProbability(magicResists) * 100, 2);
         }
 
-        // NOTE: Helm of Focus is intentionally NOT folded into magic_resist (which is magic armor — flat % off
+        // NOTE: Amulet of Resolve is intentionally NOT folded into magic_resist (which is magic armor — flat % off
         // magic DAMAGE). It grants MIND resistance instead (see getMindResist), which lowers the chance a
         // MIND-type ability lands — read as a marker buff at the ability hooks, exactly like getStatusResist.
 
