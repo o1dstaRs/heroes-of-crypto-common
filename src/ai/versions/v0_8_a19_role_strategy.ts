@@ -356,6 +356,8 @@ export function createV08A19RoleStrategy(
     const blockedAreaBattery = plan.areaCarry && plan.magic === 1 && plan.ranged >= 4;
     const lavaSparseAreaBattery =
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.areaCarry && plan.magic >= 2 && plan.ranged <= 2;
+    const lavaRangedArtillery =
+        gridType === PBTypes.GridVals.LAVA_CENTER && plan.artillery && plan.magic === 0 && plan.ranged >= 4;
     const volleySupport = reflectionOwn.some((info) => info.abilities.includes("Rallying Volley Aura"));
     const meleeFlyer = reflectionOwn.some((info) => info.melee && info.canFly);
     const blockedFlyingVolley = plan.artillery && plan.magic === 1 && plan.ranged === 3 && volleySupport && meleeFlyer;
@@ -367,6 +369,7 @@ export function createV08A19RoleStrategy(
                 reflectionOwn.some((info) => info.level === 4 && info.abilities.includes("AI Driven"))));
     if (
         !lavaSparseAreaBattery &&
+        !lavaRangedArtillery &&
         (gridType !== PBTypes.GridVals.BLOCK_CENTER ||
             !(
                 blockedCasterBattery ||
@@ -402,9 +405,10 @@ export function createV08A19RoleStrategy(
                         : blockedSplashBattery
                           ? disperseRevealedSplashArmy(units, context, incumbent)
                           : incumbent;
-            const selected = blockedAreaBattery
-                ? disperseRevealedSplashArmy(units, context, batteryFormation)
-                : batteryFormation;
+            const selected =
+                blockedAreaBattery || (lavaRangedArtillery && context.team === PBTypes.TeamVals.LEFT)
+                    ? disperseRevealedSplashArmy(units, context, batteryFormation)
+                    : batteryFormation;
             if (selected.size !== units.length) return incumbent;
             const legal = context.placement.possibleCellHashes(),
                 occupied = new Set<number>();
