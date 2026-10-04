@@ -9,6 +9,11 @@
  * -----------------------------------------------------------------------------
  */
 
+import { canWaitOnHourglass } from "../engine/hourglass";
+import {
+    selectV08A19MaterialCandidateIndex,
+    type A19MaterialArbitrationMode,
+} from "../ai/versions/v0_8_a19_material_arbitration";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -731,6 +736,33 @@ export function isEarlyIsolatingFastFlyerWaitMove(
     );
 }
 
+/** Opening healer safety: defer an unsupported flying resurrection carry while hourglass remains legal. */
+export function isEarlyUnsupportedHealerDive(
+    unit: Unit,
+    unitsHolder: ILookaheadDeps["unitsHolder"],
+    currentLap: number,
+    candidate: Pick<IEnumeratedCandidate, "actions">,
+): boolean {
+    if (
+        currentLap !== 1 ||
+        !unit.canFly() ||
+        unit.getLevel() !== PBTypes.UnitLevelVals.FOURTH ||
+        !unit.getAbility("Resurrection")
+    )
+        return false;
+    if (!candidate.actions.some((action) => action.type === "melee_attack")) return false;
+    const move = candidate.actions.find((action) => action.type === "move_unit");
+    if (move?.type !== "move_unit" || !move.targetCells?.length) return false;
+    const allies = unitsHolder
+        .getAllAllies(unit.getTeam())
+        .filter((ally) => ally.getId() !== unit.getId() && !ally.isDead())
+        .map((ally) => ally.getCells());
+    if (!allies.length) return false;
+    const current = Math.min(...allies.map((cells) => footprintDistance(unit.getCells(), cells)));
+    const destination = Math.min(...allies.map((cells) => footprintDistance(move.targetCells!, cells)));
+    return current <= 3 && destination >= 4 && destination - current >= 2;
+}
+
 /** A narrow late-game state where preserving Abomination HP deserves an exact rollout comparison. */
 /**
  * Deterministic terminal policy gate: no ally or enemy besides the two original Abominations may remain.
@@ -1276,6 +1308,18 @@ export class SearchDriver {
     private readonly nonregressiveProductiveOverride: boolean;
     private readonly exactTerminalResults: boolean;
     private readonly a19ScoredArbitration: boolean;
+    private readonly a19MaterialArbitration: A19MaterialArbitrationMode | undefined;
+    private readonly a19MaterialLowEvidenceWinningSamples: number;
+    private captureA19Material = false;
+    private a19MaterialEvidence:
+        | {
+              unitId: string;
+              candidates: readonly ISearchCandidate[];
+              means: number[];
+              materials: number[];
+              rolloutCount: number;
+          }
+        | undefined;
     /**
      * Per-decision budget degradation instead of the match-sticky circuit breaker. Measured on the live host
      * (2 shared vCPU): the stock breaker tripped in most games and, because `circuitOpen` never resets, the
@@ -1505,6 +1549,39 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_SCORED_ARBITRATION must be 0 or 1");
         }
         this.a19ScoredArbitration = this.mode === "search" && rawScoredArbitration === "1";
+        const materialMode = process.env.SEARCH_A19_MATERIAL_ARBITRATION;
+        if (
+            materialMode !== undefined &&
+            materialMode !== "" &&
+            materialMode !== "off" &&
+            materialMode !== "ties" &&
+            materialMode !== "loss-edge" &&
+            materialMode !== "both-edges" &&
+            materialMode !== "sample-ties" &&
+            materialMode !== "sample-relative"
+        ) {
+            throw new Error(
+                "SEARCH_A19_MATERIAL_ARBITRATION must be off, ties, loss-edge, both-edges, sample-ties, or sample-relative",
+            );
+        }
+        this.a19MaterialArbitration =
+            this.mode === "search" &&
+            (materialMode === "ties" ||
+                materialMode === "loss-edge" ||
+                materialMode === "both-edges" ||
+                materialMode === "sample-ties" ||
+                materialMode === "sample-relative")
+                ? materialMode
+                : undefined;
+        const lowEvidenceWinningSamples = Number(process.env.SEARCH_A19_MATERIAL_LOW_EVIDENCE_WINS ?? "1");
+        if (
+            !Number.isInteger(lowEvidenceWinningSamples) ||
+            lowEvidenceWinningSamples < 1 ||
+            lowEvidenceWinningSamples > 8
+        ) {
+            throw new Error("SEARCH_A19_MATERIAL_LOW_EVIDENCE_WINS must be an integer from 1 to 8");
+        }
+        this.a19MaterialLowEvidenceWinningSamples = lowEvidenceWinningSamples;
         const rawAdaptiveBudget = process.env.SEARCH_A19_ADAPTIVE_BUDGET;
         if (
             rawAdaptiveBudget !== undefined &&
@@ -2008,10 +2085,63 @@ export class SearchDriver {
         incumbent: GameAction[],
         rootDecisionContext?: IDecisionContext,
     ): GameAction[] {
-        const chosen = this.chooseSearchDecision(unit, version, incumbent, rootDecisionContext);
+        const healerWaitGuard =
+            process.env.SEARCH_A19_HEALER_OPENING_COHESION === "1" &&
+            this.enabled &&
+            version === "v0.8" &&
+            this.versions.has(version) &&
+            !this.observeOnly &&
+            (this.teamScope === null || this.teamScope.has(unit.getTeam())) &&
+            !!rootDecisionContext?.fightProperties &&
+            canWaitOnHourglass(unit, rootDecisionContext.fightProperties, this.deps.unitsHolder.getAllUnits());
+        if (
+            healerWaitGuard &&
+            isEarlyUnsupportedHealerDive(unit, this.deps.unitsHolder, this.deps.fightProperties.getCurrentLap(), {
+                actions: incumbent,
+            })
+        ) {
+            incumbent = [{ type: "wait_turn", unitId: unit.getId() }];
+        }
+        this.resetA19MaterialEvidence();
+        this.captureA19Material =
+            this.a19MaterialArbitration !== undefined &&
+            this.enabled &&
+            this.versions.has(version) &&
+            version === "v0.8" &&
+            !this.observeOnly &&
+            (this.teamScope === null || this.teamScope.has(unit.getTeam())) &&
+            this.deps.fightProperties.getCurrentLap() < V08S_URGENT_FINISH_START_LAP;
+        let chosen: GameAction[];
+        try {
+            chosen = this.chooseSearchDecision(unit, version, incumbent, rootDecisionContext);
+        } finally {
+            this.captureA19Material = false;
+        }
         // Research seam (off by default): the one decision step the simulator and the ranked server share.
         if (!this.enabled || !this.versions.has(version)) return chosen;
-        return applyV08FlyerBacklinePriority(unit, rootDecisionContext, chosen);
+        chosen = applyV08FlyerBacklinePriority(unit, rootDecisionContext, chosen);
+        const evidence = this.a19MaterialEvidence;
+        if (!this.a19MaterialArbitration || !evidence || evidence.unitId !== unit.getId() || !rootDecisionContext)
+            return chosen;
+        const signature = JSON.stringify(chosen);
+        const selected = evidence.candidates.findIndex((candidate) => JSON.stringify(candidate.actions) === signature);
+        if (selected < 0) return chosen;
+        const scored = this.a19ScoredArbitration
+            ? selectV08A19ScoredCandidateIndex(evidence.candidates, evidence.means, selected, incumbent)
+            : selected;
+        const material = selectV08A19MaterialCandidateIndex(
+            evidence.candidates,
+            evidence.means,
+            evidence.materials,
+            scored,
+            evidence.rolloutCount,
+            this.a19MaterialArbitration,
+            this.a19MaterialLowEvidenceWinningSamples,
+        );
+        return material === selected ? chosen : [...evidence.candidates[material].actions];
+    }
+    private resetA19MaterialEvidence(): void {
+        this.a19MaterialEvidence = undefined;
     }
     private chooseSearchDecision(
         unit: Unit,
@@ -2358,6 +2488,18 @@ export class SearchDriver {
             let rejectedIsolatingFastFlyerMove = false;
             const keepCandidate = (candidate: IEnumeratedCandidate): boolean => {
                 if (candidate.kind === "incumbent") return true;
+                if (
+                    process.env.SEARCH_A19_HEALER_OPENING_COHESION === "1" &&
+                    isV08Search &&
+                    rootDecisionContext?.fightProperties &&
+                    canWaitOnHourglass(
+                        unit,
+                        rootDecisionContext.fightProperties,
+                        this.deps.unitsHolder.getAllUnits(),
+                    ) &&
+                    isEarlyUnsupportedHealerDive(unit, this.deps.unitsHolder, currentLap, candidate)
+                )
+                    return false;
                 if (this.challengerKinds && !this.challengerKinds.has(candidate.kind)) return false;
                 if (
                     this.fastFlyerCohesion &&
@@ -4685,9 +4827,14 @@ export class SearchDriver {
         const savedStats = this.deps.captureDamageStats();
         this.assertBeforeDecisionDeadline(deadlineAt);
         const means: number[] = [];
+        const captureMaterial = this.captureA19Material && horizonMode === "turns";
+        const materials: number[] = [];
+        const actingTeam = captureMaterial ? unit.getTeam() : undefined;
         for (const cand of candidates) {
             this.assertBeforeDecisionDeadline(deadlineAt);
             let sum = 0;
+            let materialSum = 0;
+            let materialCount = 0;
             let illegal = false;
             for (let r = 0; r < rolloutCount; r += 1) {
                 this.assertBeforeDecisionDeadline(deadlineAt);
@@ -4696,6 +4843,19 @@ export class SearchDriver {
                 try {
                     checkpoint = journal?.checkpoint();
                     score = this.rollout(unit, cand, seedBase, r, horizonMode, deadlineAt, turnHorizon);
+                    if (captureMaterial && Number.isFinite(score)) {
+                        let ours = 0,
+                            enemy = 0;
+                        for (const remaining of this.deps.unitsHolder.getAllUnits().values()) {
+                            if (remaining.isDead()) continue;
+                            const strength =
+                                (remaining.getExp() * remaining.getCumulativeHp()) / Math.max(1, remaining.getMaxHp());
+                            if (remaining.getTeam() === actingTeam) ours += strength;
+                            else enemy += strength;
+                        }
+                        materialSum += 0.5 * (1 + (ours - enemy) / (ours + enemy + 1000));
+                        materialCount += 1;
+                    }
                 } finally {
                     const cleanupErrors: unknown[] = [];
                     try {
@@ -4721,7 +4881,11 @@ export class SearchDriver {
                 sum += score;
             }
             means.push(illegal ? -Infinity : sum / rolloutCount);
+            if (captureMaterial)
+                materials.push(!illegal && materialCount === rolloutCount ? materialSum / rolloutCount : -Infinity);
         }
+        if (captureMaterial)
+            this.a19MaterialEvidence = { unitId: unit.getId(), candidates, means, materials, rolloutCount };
         return means;
     }
     private assertBeforeDecisionDeadline(deadlineAt: number | null): void {

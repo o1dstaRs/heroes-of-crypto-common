@@ -145,6 +145,7 @@ describe("v0.8+A19 production profile", () => {
         expect(V08_A19_SOURCE_LEDGER.map(({ role }) => role)).toEqual([
             "search-driver",
             "scored-arbitration",
+            "material-arbitration",
             "armageddon-endgame",
             "f184-lower-placement",
             "boar-battle-mage-flank-placement",

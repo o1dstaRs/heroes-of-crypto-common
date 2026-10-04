@@ -136,13 +136,18 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for the A19 scored-shortlist arbitration rule.
-        sha256: "56dcd36cd0f0d2aa3028220192bd3999eef6ac18c93a36c7d33679faec0e28f7" as const,
+        // Re-pinned for opt-in material evidence and opening healer cohesion.
+        sha256: "67408ff9d5e2ce1d742d3198aad6833e8c93de6fd89788baa6e0e96593f4d5be" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,
         source: "src/ai/versions/v0_8_a19_scored_arbitration.ts" as const,
         sha256: "1acc372b0fb09147e6bfe79e159c197868a9f2643f4dffe7bb25177ca0d008ab" as const,
+    }),
+    Object.freeze({
+        role: "material-arbitration" as const,
+        source: "src/ai/versions/v0_8_a19_material_arbitration.ts" as const,
+        sha256: "954c5a156b3c814a51ba8fabd9b1b94098198b43ab0068db15f4620b6fba7235" as const,
     }),
     Object.freeze({
         role: "armageddon-endgame" as const,
