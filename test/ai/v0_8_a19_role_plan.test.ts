@@ -3,6 +3,29 @@ import { roleSearchPlan, v08A19RoleSearchOverrides } from "../../src/ai/versions
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 const mage = ["Dryad", "Troll", "Fairy", "Medusa", "Monk", "Magic Dragon"];
 describe("A19 optional own-army role search plan", () => {
+    it("widens blocked physical healer movement while retaining other maps and ranged or magic profiles", () => {
+        const healer = ["Squire", "Wyvern", "Orc", "Elf", "Cyclops", "Angel"];
+        const blocked = roleSearchPlan(healer, PBTypes.GridVals.BLOCK_CENTER);
+        expect(blocked.moves).toBe(4);
+        expect(blocked.shortlist).toBe(24);
+        expect(blocked.rollouts).toBe(32);
+        expect(blocked.horizon).toBe(64);
+        expect(blocked.material).toBe("sample-relative");
+        for (const map of [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER]) {
+            const native = roleSearchPlan(healer, map);
+            expect(native.moves).toBe(1);
+            expect(native.shortlist).toBe(12);
+        }
+        const physical = roleSearchPlan([...healer.slice(0, -1), "Frenzied Boar"], PBTypes.GridVals.BLOCK_CENTER);
+        expect(physical.moves).toBe(1);
+        expect(physical.shortlist).toBe(12);
+        const fourRanged = roleSearchPlan(
+            ["Arbalester", "Beholder", "Orc", "Elf", "Cyclops", "Angel"],
+            PBTypes.GridVals.BLOCK_CENTER,
+        );
+        expect(fourRanged.moves).toBe(1);
+        expect(fourRanged.shortlist).toBe(12);
+    });
     it("counts unique creature roles rather than split stacks and distinguishes magic attacks from physical range", () => {
         const first = roleSearchPlan(mage);
         expect(first.ranged).toBe(3);

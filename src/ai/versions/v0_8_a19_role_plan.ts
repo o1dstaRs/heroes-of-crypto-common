@@ -26,6 +26,8 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
         !healer &&
         !spellCarry &&
         !infos.some((i) => i.level === 4 && i.abilities.includes("Dense Flesh"));
+    const blockedPhysicalHealerMovement =
+        gridType === PBTypes.GridVals.BLOCK_CENTER && healer && magic === 0 && ranged === 3;
     const lowPhysicalMagic = magic >= 2 && ranged <= 2;
     const hybridBattery = magic >= 2 && ranged >= 3;
     const preserveSparseArtillery = artillery && ranged === 3 && gridType !== PBTypes.GridVals.NORMAL;
@@ -94,11 +96,19 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
                   densePhysicalArea ||
                   mixedBattery ||
                   screenPhysical ||
-                  narrowCaster
+                  narrowCaster ||
+                  blockedPhysicalHealerMovement
                 ? 4
                 : 1,
         shortlist:
-            (artillery && ranged >= 4) || densePhysicalArea || mixedBattery || screenPhysical || narrowCaster ? 24 : 12,
+            (artillery && ranged >= 4) ||
+            densePhysicalArea ||
+            mixedBattery ||
+            screenPhysical ||
+            narrowCaster ||
+            blockedPhysicalHealerMovement
+                ? 24
+                : 12,
         throws: densePhysicalArea ? 16 : 4,
         moveShots: ranged >= 3 ? 2 : 0,
         material: relative ? "sample-relative" : "sample-ties",
