@@ -40,6 +40,64 @@ const fixture = (): IMatchConfig => ({
     redTacticalSplitStacks: [],
 });
 describe("A19 opt-in complete ranked simulation candidate", () => {
+    it("empowers a Lava hybrid healer only when its complete army fits the ranked stack capacity", () => {
+        for (const side of ["green", "red"] as const)
+            for (const gridType of [
+                PBTypes.GridVals.NORMAL,
+                PBTypes.GridVals.LAVA_CENTER,
+                PBTypes.GridVals.BLOCK_CENTER,
+            ])
+                for (const extraStack of [false, true]) {
+                    const c = fixture();
+                    c.gridType = gridType;
+                    const rosterKey = side === "green" ? "roster" : "redRoster";
+                    c[rosterKey] = ["Arbalester", "Battle Mage", "Wandering Mage", "Medusa", "Cyclops", "Angel"].map(
+                        (creatureName) => {
+                            const info = creatureInfo(creatureIdForName(creatureName)!)!;
+                            return {
+                                faction: ToFactionName[info.faction],
+                                creatureName,
+                                level: info.level,
+                                size: info.footprintWidth,
+                                amount: 12,
+                            };
+                        },
+                    );
+                    if (extraStack) c[rosterKey].push({ ...c[rosterKey][0], amount: 1 });
+                    c[`${side}Augments`] = [
+                        { kind: "Sniper", value: 3 },
+                        { kind: "Armor", value: 3 },
+                        { kind: extraStack ? "Placement" : "Might", value: 1 },
+                    ];
+                    const before = structuredClone(c);
+                    const environment = prepareV08A19RoleCandidate(c, side);
+                    if (gridType === PBTypes.GridVals.LAVA_CENTER && !extraStack)
+                        expect(c[`${side}Augments`]).toEqual([
+                            { kind: "Sniper", value: 1 },
+                            { kind: "Armor", value: 3 },
+                            { kind: "Empower", value: 3 },
+                        ]);
+                    else if (extraStack) expect(c[`${side}Augments`]).toEqual(before[`${side}Augments`]);
+                    else expect(c[`${side}Augments`]?.find((augment) => augment.kind === "Empower")?.value).toBe(1);
+                    expect(c[`${side}Augments`]!.reduce((sum, augment) => sum + augment.value, 0)).toBe(7);
+                    expect(c[rosterKey]).toEqual(before[rosterKey]);
+                    expect(c[`${side}TacticalSplitStacks`]).toEqual(before[`${side}TacticalSplitStacks`]);
+                    const enemy = side === "green" ? "red" : "green";
+                    for (const field of [
+                        "Augments",
+                        "Doctrine",
+                        "ArtifactT1",
+                        "ArtifactT2",
+                        "Synergies",
+                        "TacticalSplitStacks",
+                    ] as const)
+                        expect(c[`${enemy}${field}`]).toEqual(before[`${enemy}${field}`]);
+                    expect(c[enemy === "green" ? "roster" : "redRoster"]).toEqual(
+                        before[enemy === "green" ? "roster" : "redRoster"],
+                    );
+                    expect(environment.SEARCH_A19_HEALER_OPENING_COHESION).toBe("1");
+                }
+    });
     it("gives a blocked regenerative volley battery its legal damage plan on either seat", () => {
         for (const side of ["green", "red"] as const) {
             const c = fixture();

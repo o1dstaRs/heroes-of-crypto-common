@@ -7,6 +7,7 @@ import { createV08A19RoleStrategy } from "../ai/versions/v0_8_a19_role_strategy"
 import { roleSearchPlan, v08A19RoleSearchOverrides } from "../ai/versions/v0_8_a19_role_plan";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { materializeReplayAbSplits } from "./ranked_replay_tactics_ab_core";
+import { rankedDraftStackCapacity } from "./ranked_draft_eval";
 import type { IArmyUnitSpec } from "./army";
 import type { IMatchConfig, ISetupAugment, Side } from "./battle_engine";
 import { withScopedAIEnvironment } from "./v0_8_a13_search";
@@ -260,6 +261,18 @@ export function prepareV08A19RoleCandidate(config: IMatchConfig, side: Side): Re
             { kind: "Armor", value: 1 },
             { kind: "Might", value: 3 },
         ];
+    }
+
+    if (config.gridType === PBTypes.GridVals.LAVA_CENTER && plan.healer && plan.magic >= 2 && plan.ranged >= 3) {
+        const empowered: ISetupAugment[] = [
+            { kind: "Sniper", value: 1 },
+            { kind: "Armor", value: 3 },
+            { kind: "Empower", value: 3 },
+        ];
+        const roster = config[ownRosterKey],
+            identities = [...new Set(roster.map((unit) => creatureIdForName(unit.creatureName)!))];
+        if (roster.length <= rankedDraftStackCapacity(identities, empowered, config.synergyVariants ?? {}))
+            config[augmentKey] = empowered;
     }
 
     config.searchEnvOverrideTeams = [side === "green" ? PBTypes.TeamVals.LEFT : PBTypes.TeamVals.RIGHT];
