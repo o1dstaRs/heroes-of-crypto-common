@@ -361,6 +361,7 @@ export function createV08A19RoleStrategy(
         !plan.areaCarry &&
         !plan.healer &&
         !plan.screenPhysical;
+    const blockedGroundPhysicalHealer = plan.healer && plan.magic === 0 && plan.ranged === 3 && !reflectionFlyer;
     const lavaSparseAreaBattery =
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.areaCarry && plan.magic >= 2 && plan.ranged <= 2;
     const lavaNarrowSpellWithFlyingProtector =
@@ -391,7 +392,8 @@ export function createV08A19RoleStrategy(
                 blockedFlyingVolley ||
                 blockedSplashBattery ||
                 blockedAreaBattery ||
-                blockedPhysicalBattery
+                blockedPhysicalBattery ||
+                blockedGroundPhysicalHealer
             ))
     )
         return finalStrategy;
@@ -421,7 +423,7 @@ export function createV08A19RoleStrategy(
                             : reflectIncumbentPlacement(units, context, incumbent)
                         : blockedFlyingVolley
                           ? spreadBattery()
-                          : blockedSplashBattery
+                          : blockedSplashBattery || blockedGroundPhysicalHealer
                             ? disperseRevealedSplashArmy(units, context, incumbent)
                             : incumbent;
             const selected =
