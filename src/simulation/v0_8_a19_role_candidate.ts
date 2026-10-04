@@ -120,7 +120,12 @@ export function prepareV08A19RoleCandidate(config: IMatchConfig, side: Side): Re
             ownNames.some((name) =>
                 creatureInfo(creatureIdForName(name)!)?.abilities.includes("Rallying Volley Aura"),
             ) &&
-            ownNames.some((name) => creatureInfo(creatureIdForName(name)!)?.castsAmplifiableBuff))
+            (ownNames.some((name) => creatureInfo(creatureIdForName(name)!)?.castsAmplifiableBuff) ||
+                (plan.magic === 1 &&
+                    ownNames.some((name) => {
+                        const info = creatureInfo(creatureIdForName(name)!)!;
+                        return info.melee && info.abilities.includes("Wild Regeneration");
+                    }))))
     ) {
         config[ownRosterKey] = inputRoster;
         config[splitKey] = inputSplits;

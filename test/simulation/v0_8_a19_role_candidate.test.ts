@@ -3,6 +3,8 @@ import { prepareV08A19RoleCandidate, withV08A19RoleCandidate } from "../../src/s
 import { buildV08A19SearchEnvironment, V08_A19_SEARCH_RULES } from "../../src/ai/versions/v0_8_a19_profile";
 import type { IMatchConfig } from "../../src/simulation/battle_engine";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { creatureInfo, creatureIdForName } from "../../src/ai/setup/creature_score";
+import { ToFactionName } from "../../src/factions/faction_type";
 const fixture = (): IMatchConfig => ({
     greenVersion: "v0.8",
     redVersion: "v0.7",
@@ -38,6 +40,39 @@ const fixture = (): IMatchConfig => ({
     redTacticalSplitStacks: [],
 });
 describe("A19 opt-in complete ranked simulation candidate", () => {
+    it("gives a blocked regenerative volley battery its legal damage plan on either seat", () => {
+        for (const side of ["green", "red"] as const) {
+            const c = fixture();
+            c.gridType = PBTypes.GridVals.BLOCK_CENTER;
+            const names = ["Berserker", "Battle Mage", "Orc", "Troll", "Zena", "Tsar Cannon"];
+            c[side === "green" ? "roster" : "redRoster"] = names.map((creatureName) => {
+                const info = creatureInfo(creatureIdForName(creatureName)!)!;
+                return {
+                    faction: ToFactionName[info.faction],
+                    creatureName,
+                    level: info.level,
+                    size: info.footprintWidth,
+                    amount: 12,
+                };
+            });
+            const before = structuredClone(c);
+            prepareV08A19RoleCandidate(c, side);
+            expect(c[`${side}Augments`]).toEqual([
+                { kind: "Sniper", value: 3 },
+                { kind: "Armor", value: 1 },
+                { kind: "Might", value: 3 },
+            ]);
+            expect(c[side === "green" ? "roster" : "redRoster"]).toEqual(
+                before[side === "green" ? "roster" : "redRoster"],
+            );
+            expect(c[`${side}TacticalSplitStacks`]).toEqual(before[`${side}TacticalSplitStacks`]);
+            const enemy = side === "green" ? "red" : "green";
+            expect(c[`${enemy}Augments`]).toEqual(before[`${enemy}Augments`]);
+            expect(c[enemy === "green" ? "roster" : "redRoster"]).toEqual(
+                before[enemy === "green" ? "roster" : "redRoster"],
+            );
+        }
+    });
     it("prepares the candidate's legal7-pointphysicalhealer plan and leaves the opponent setup untouched", () => {
         const c = fixture(),
             before = structuredClone(c);
