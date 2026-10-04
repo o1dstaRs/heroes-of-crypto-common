@@ -26,6 +26,11 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
         !healer &&
         !spellCarry &&
         !infos.some((i) => i.level === 4 && i.abilities.includes("Dense Flesh"));
+    const blockedSparseGroundMovement =
+        gridType === PBTypes.GridVals.BLOCK_CENTER &&
+        magic === 1 &&
+        ranged === 2 &&
+        infos.some((info) => info.level === 4 && info.melee && !info.canFly);
     const blockedPhysicalHealerMovement =
         gridType === PBTypes.GridVals.BLOCK_CENTER && healer && magic === 0 && ranged === 3;
     const lowPhysicalMagic = magic >= 2 && ranged <= 2;
@@ -97,7 +102,8 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
                   mixedBattery ||
                   screenPhysical ||
                   narrowCaster ||
-                  blockedPhysicalHealerMovement
+                  blockedPhysicalHealerMovement ||
+                  blockedSparseGroundMovement
                 ? 4
                 : 1,
         shortlist:
@@ -106,7 +112,8 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
             mixedBattery ||
             screenPhysical ||
             narrowCaster ||
-            blockedPhysicalHealerMovement
+            blockedPhysicalHealerMovement ||
+            blockedSparseGroundMovement
                 ? 24
                 : 12,
         throws: densePhysicalArea ? 16 : 4,

@@ -3,6 +3,30 @@ import { roleSearchPlan, v08A19RoleSearchOverrides } from "../../src/ai/versions
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 const mage = ["Dryad", "Troll", "Fairy", "Medusa", "Monk", "Magic Dragon"];
 describe("A19 optional own-army role search plan", () => {
+    it("widens blocked sparse ground movement while preserving its measured depth and other maps", () => {
+        const family = ["Wandering Mage", "Pikeman", "Arbalester", "Valkyrie", "Zena"];
+        for (const [carry, rollouts, horizon] of [
+            ["Frenzied Boar", 128, 128],
+            ["Behemoth", 32, 64],
+        ] as const) {
+            const names = [...family, carry];
+            const blocked = roleSearchPlan(names, PBTypes.GridVals.BLOCK_CENTER);
+            expect(blocked.moves).toBe(4);
+            expect(blocked.shortlist).toBe(24);
+            expect(blocked.rollouts).toBe(rollouts);
+            expect(blocked.horizon).toBe(horizon);
+            for (const map of [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER]) {
+                const native = roleSearchPlan(names, map);
+                expect(native.moves).toBe(1);
+                expect(native.shortlist).toBe(12);
+            }
+        }
+        const healer = roleSearchPlan([...family, "Angel"], PBTypes.GridVals.BLOCK_CENTER);
+        expect(healer.moves).toBe(4);
+        expect(healer.shortlist).toBe(24);
+        expect(healer.rollouts).toBe(32);
+        expect(healer.horizon).toBe(64);
+    });
     it("widens blocked physical healer movement while retaining other maps and ranged or magic profiles", () => {
         const healer = ["Squire", "Wyvern", "Orc", "Elf", "Cyclops", "Angel"];
         const blocked = roleSearchPlan(healer, PBTypes.GridVals.BLOCK_CENTER);
