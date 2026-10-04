@@ -351,19 +351,47 @@ export function createV08A19RoleStrategy(
               decideTurn: (unit: Unit, context: IDecisionContext) => splash.decideTurn(unit, context),
           }
         : splash;
-    if (gridType !== PBTypes.GridVals.BLOCK_CENTER || plan.magic < 3 || plan.ranged !== 1) return finalStrategy;
+    const blockedCasterBattery = plan.magic >= 3 && plan.ranged === 1;
+    const blockedSpellBattery = plan.magic === 1 && plan.ranged >= 4 && spellCarry;
+    const volleySupport = reflectionOwn.some((info) => info.abilities.includes("Rallying Volley Aura"));
+    const meleeFlyer = reflectionOwn.some((info) => info.melee && info.canFly);
+    const blockedFlyingVolley = plan.artillery && plan.magic === 1 && plan.ranged === 3 && volleySupport && meleeFlyer;
+    const blockedSplashBattery =
+        plan.magic === 1 &&
+        plan.ranged <= 3 &&
+        ((plan.artillery && !volleySupport && !meleeFlyer) ||
+            (plan.ranged <= 2 &&
+                reflectionOwn.some((info) => info.level === 4 && info.abilities.includes("AI Driven"))));
+    if (
+        gridType !== PBTypes.GridVals.BLOCK_CENTER ||
+        !(blockedCasterBattery || blockedSpellBattery || blockedFlyingVolley || blockedSplashBattery)
+    )
+        return finalStrategy;
     return {
         version: finalStrategy.version,
         placeArmy: (units: Unit[], context: IPlacementContext) => {
             const incumbent = finalStrategy.placeArmy(units, context);
-            if (context.team !== PBTypes.TeamVals.LEFT || context.grid.getGridType() !== gridType) return incumbent;
-            const selected = layoutRevealPlacement(units, context, {
-                gap: 3,
-                screenShooters: true,
-                cornerShift: false,
-                physicalMeleeMagicRoles: true,
-                screenBacklineProtectors: true,
-            });
+            if (context.grid.getGridType() !== gridType) return incumbent;
+            const spreadBattery = () =>
+                layoutRevealPlacement(units, context, {
+                    gap: 3,
+                    screenShooters: true,
+                    cornerShift: false,
+                    physicalMeleeMagicRoles: true,
+                    screenBacklineProtectors: true,
+                });
+            const selected =
+                blockedCasterBattery && context.team === PBTypes.TeamVals.LEFT
+                    ? spreadBattery()
+                    : blockedSpellBattery
+                      ? context.team === PBTypes.TeamVals.RIGHT
+                          ? spreadBattery()
+                          : reflectIncumbentPlacement(units, context, incumbent)
+                      : blockedFlyingVolley
+                        ? spreadBattery()
+                        : blockedSplashBattery
+                          ? disperseRevealedSplashArmy(units, context, incumbent)
+                          : incumbent;
             if (selected.size !== units.length) return incumbent;
             const legal = context.placement.possibleCellHashes(),
                 occupied = new Set<number>();
