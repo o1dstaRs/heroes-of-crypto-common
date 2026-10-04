@@ -607,6 +607,42 @@ function isPositiveDirectCombatCandidate(candidate: Pick<IEnumeratedCandidate, "
     );
 }
 
+/** A generated obstacle hit whose target is a deployment barrel, not a map mountain. */
+function isArtifactBarrelMine(
+    barrels: readonly { cell: { x: number; y: number } }[],
+    candidate: Pick<IEnumeratedCandidate, "kind" | "targetCell">,
+): boolean {
+    const cell = candidate.targetCell;
+    return (
+        candidate.kind === "mine" &&
+        !!cell &&
+        barrels.some((barrel) => barrel.cell.x === cell.x && barrel.cell.y === cell.y)
+    );
+}
+
+function isBetween(value: number, start: number, end: number): boolean {
+    return (value - start) * (value - end) < 0;
+}
+
+/** True when the barrel sits on the orthogonal line between a shooter cell and an enemy cell. */
+function barrelBlocksShotLine(
+    barrel: { x: number; y: number },
+    origins: readonly { x: number; y: number }[],
+    targets: readonly { x: number; y: number }[],
+): boolean {
+    for (const origin of origins) {
+        for (const target of targets) {
+            if (barrel.y === origin.y && barrel.y === target.y && isBetween(barrel.x, origin.x, target.x)) {
+                return true;
+            }
+            if (barrel.x === origin.x && barrel.x === target.x && isBetween(barrel.y, origin.y, target.y)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 function isPositiveV08DamageSpellCandidate(unit: Unit, candidate: IEnumeratedCandidate): boolean {
     if (
         !candidate.actions.some((action) => action.type === "cast_spell") ||
@@ -2537,8 +2573,14 @@ export class SearchDriver {
                     return false;
                 }
                 // Search may compare a strategic wait, but it must never introduce a new Luck Shield or mountain
-                // hit. Retaining candidate zero above still permits either action as a fail-closed/true fallback.
-                if (isV08Search && (candidate.kind === "mine" || candidate.kind === "defend")) {
+                // hit. Deployment barrels are the exception: they are one-hit screens, and a shot or advance
+                // that they block is otherwise invisible. Retaining candidate zero above still permits a
+                // mountain or Luck Shield as a fail-closed fallback.
+                if (
+                    isV08Search &&
+                    (candidate.kind === "mine" || candidate.kind === "defend") &&
+                    !this.keepsArtifactBarrelMine(unit, candidate)
+                ) {
                     return false;
                 }
                 // Every v0.8 search keeps the enumerator's nearest legal move even when the catalog arm does not
@@ -4335,6 +4377,94 @@ export class SearchDriver {
 
         return this.firstEngineValidCandidate(unit, [stationaryMountain], seedBase);
     }
+    /**
+     * Cells a barrel can sit on and still stop a shot: this unit, plus every ally who can fire right now.
+     * A pinned or empty-quiver shooter is omitted — clearing the barrel would not give them a shot.
+     */
+    private friendlyShotOrigins(unit: Unit): { x: number; y: number }[] {
+        const origins = unit.getCells().map((cell) => ({ x: cell.x, y: cell.y }));
+        const seen = new Set(origins.map((cell) => `${cell.x},${cell.y}`));
+        for (const ally of this.deps.unitsHolder.getAllAllies(unit.getTeam())) {
+            if (ally.getId() === unit.getId() || ally.isDead()) continue;
+            if (
+                !this.deps.attackHandler.canLandRangeAttack(
+                    ally,
+                    this.deps.grid.getEnemyAggrMatrixByUnitId(ally.getId()),
+                )
+            ) {
+                continue;
+            }
+            for (const cell of ally.getCells()) {
+                const key = `${cell.x},${cell.y}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                origins.push({ x: cell.x, y: cell.y });
+            }
+        }
+        return origins;
+    }
+    /**
+     * Enemy barrels are legal challengers. A friendly barrel is legal only when it stands on a friendly
+     * shot, because deleting the screen is otherwise a wasted turn.
+     */
+    private keepsArtifactBarrelMine(unit: Unit, candidate: Pick<IEnumeratedCandidate, "kind" | "targetCell">): boolean {
+        if (!this.a19ArtifactBarrelAttackCoverage) return false;
+        const barrels = this.deps.grid.getArtifactBarrels();
+        if (!isArtifactBarrelMine(barrels, candidate) || !candidate.targetCell) return false;
+        const barrel = barrels.find(
+            (entry) => entry.cell.x === candidate.targetCell?.x && entry.cell.y === candidate.targetCell?.y,
+        );
+        if (!barrel || barrel.team !== unit.getTeam()) return true;
+        const enemies = this.deps.unitsHolder
+            .getAllEnemyUnits(unit.getTeam())
+            .filter((enemy) => !enemy.isDead())
+            .flatMap((enemy) => enemy.getCells());
+        return barrelBlocksShotLine(barrel.cell, this.friendlyShotOrigins(unit), enemies);
+    }
+    /**
+     * A barrel on a friendly shot scores no damage on the immediate leaf, so the top-K drops it. Keep one
+     * horizon comparison for the blocking barrel (an enemy screen before our own). With no damaging attack
+     * at all, the nearest enemy barrel is the fallback. An own barrel that blocks nobody is never reserved.
+     */
+    private reservedArtifactBarrelMine(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        allowNearestWhenIdle: boolean,
+    ): IEnumeratedCandidate | undefined {
+        const barrels = this.deps.grid.getArtifactBarrels();
+        const enemies = this.deps.unitsHolder
+            .getAllEnemyUnits(unit.getTeam())
+            .filter((enemy) => !enemy.isDead())
+            .flatMap((enemy) => enemy.getCells());
+        const origins = this.friendlyShotOrigins(unit);
+        const base = unit.getBaseCell();
+        let blocking: IEnumeratedCandidate | undefined;
+        let nearestEnemy: IEnumeratedCandidate | undefined;
+        let blockingDistance = Number.POSITIVE_INFINITY;
+        let blockingIsEnemy = false;
+        let nearestDistance = Number.POSITIVE_INFINITY;
+        for (const candidate of candidates) {
+            if (!isArtifactBarrelMine(barrels, candidate) || !candidate.targetCell) continue;
+            const barrel = barrels.find(
+                (entry) => entry.cell.x === candidate.targetCell?.x && entry.cell.y === candidate.targetCell?.y,
+            );
+            if (!barrel) continue;
+            const isEnemy = barrel.team !== unit.getTeam();
+            const distance = Math.abs(candidate.targetCell.x - base.x) + Math.abs(candidate.targetCell.y - base.y);
+            if (isEnemy && distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestEnemy = candidate;
+            }
+            if (!barrelBlocksShotLine(candidate.targetCell, origins, enemies)) continue;
+            const closer = distance < blockingDistance;
+            if (blocking === undefined || (isEnemy && !blockingIsEnemy) || (isEnemy === blockingIsEnemy && closer)) {
+                blocking = candidate;
+                blockingDistance = distance;
+                blockingIsEnemy = isEnemy;
+            }
+        }
+        return blocking ?? (allowNearestWhenIdle ? nearestEnemy : undefined);
+    }
     /** Immediate-leaf pre-pass used only when SEARCH_SHORTLIST is explicitly configured. */
     private shortlistCandidates(
         unit: Unit,
@@ -4504,6 +4634,19 @@ export class SearchDriver {
             : undefined;
         if (reservedVine && !challengers.includes(reservedVine)) {
             challengers = [...challengers, reservedVine];
+        }
+        // An immediate leaf scores a barrel hit as zero damage, so the top-K drops it under any real attack.
+        // A barrel on a friendly shot is still worth one horizon comparison. With no damaging attack at
+        // all, the nearest enemy barrel is the fallback.
+        if (this.a19ArtifactBarrelAttackCoverage) {
+            const reservedBarrel = this.reservedArtifactBarrelMine(
+                unit,
+                candidates,
+                !candidates.some((candidate) => isPositiveDirectCombatCandidate(candidate)),
+            );
+            if (reservedBarrel && !challengers.includes(reservedBarrel)) {
+                challengers = [...challengers, reservedBarrel];
+            }
         }
         challengers = reserveResearchRapidChargeShortlist(candidates, challengers);
         return [candidates[0], ...challengers];

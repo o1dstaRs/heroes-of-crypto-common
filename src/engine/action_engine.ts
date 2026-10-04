@@ -354,7 +354,16 @@ export class GameActionEngine {
             const cells = artifactBarrelPlacementCells(this.context.grid, this.context.fightProperties, team).filter(
                 (cell) => !this.context.canPlaceBarrel || this.context.canPlaceBarrel(team, cell),
             );
-            autoPlaceArtifactBarrels(this.context.grid, this.context.fightProperties, team, cells);
+            const shooterCells = this.context.unitsHolder
+                .getAllAllies(team)
+                .filter(
+                    (unit) =>
+                        !unit.isDead() &&
+                        (unit.getAttackType() === PBTypes.AttackVals.RANGE ||
+                            unit.getPossibleAttackTypes().includes(PBTypes.AttackVals.RANGE)),
+                )
+                .flatMap((unit) => unit.getCells());
+            autoPlaceArtifactBarrels(this.context.grid, this.context.fightProperties, team, cells, shooterCells);
         }
         this.context.fightProperties.startFight();
         this.context.fightProperties.setTeamUnitsAlive(PBTypes.TeamVals.LEFT, leftUnitsAlive);

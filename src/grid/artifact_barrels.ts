@@ -47,20 +47,67 @@ export function reconcileArtifactBarrels(
     }
 }
 
+/**
+ * A barrel on a shooter's file, between that shooter and the enemy, blocks the shot until it dies.
+ * `shooterCells` are friendly ranged footprints. Omit them to keep the historical inward-edge order.
+ */
+function barrelBlocksShooter(cell: XY, shooterCells: readonly XY[], team: TeamType, side: boolean): boolean {
+    for (const shooter of shooterCells) {
+        if (side) {
+            if (cell.y !== shooter.y) continue;
+            if (team === PBTypes.TeamVals.LEFT ? cell.x > shooter.x : cell.x < shooter.x) return true;
+        } else if (cell.x === shooter.x && (team === PBTypes.TeamVals.LEFT ? cell.y > shooter.y : cell.y < shooter.y)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Lower is a better screen: a neighboring file just in front of a shooter, not a cell behind the army
+ * and not the far end of the deployment edge.
+ */
+function barrelScreenRank(cell: XY, shooterCells: readonly XY[], team: TeamType, side: boolean): number {
+    if (shooterCells.length === 0) return 0;
+    let best = Number.POSITIVE_INFINITY;
+    for (const shooter of shooterCells) {
+        const cross = side ? Math.abs(cell.y - shooter.y) : Math.abs(cell.x - shooter.x);
+        const inward = side
+            ? team === PBTypes.TeamVals.LEFT
+                ? cell.x - shooter.x
+                : shooter.x - cell.x
+            : team === PBTypes.TeamVals.LEFT
+              ? cell.y - shooter.y
+              : shooter.y - cell.y;
+        const rank = (inward < 0 ? 100 : 0) + cross * 2 + Math.max(0, inward - 1);
+        if (rank < best) best = rank;
+    }
+    return best;
+}
+
 /** Reserve an adjacent pair during deployment, keeping any positions the player has chosen. */
 export function autoPlaceArtifactBarrels(
     grid: Grid,
     fp: FightProperties,
     team: TeamType,
     allowedCells?: readonly XY[],
+    shooterCells?: readonly XY[],
 ): void {
     if (fp.hasFightStarted() || fp.hasFightFinished() || !fp.hasArtifactTier1(team, Tier1Artifact.BARREL_BARRICADE))
         return;
     const cells = [...(allowedCells ?? artifactBarrelPlacementCells(grid, fp, team))];
-    // Favor the inward deployment edge, with two orthogonally adjacent free cells whenever possible.
+    // Favor a screen beside the shooters, on the inward edge, and never on a friendly shot file.
+    // With no shooters the order stays the historical inward edge.
     const side = fp.isSideOrientedPlacement();
+    const shooters = shooterCells ?? [];
     cells.sort(
-        (a, b) => (team === PBTypes.TeamVals.LEFT ? -1 : 1) * (side ? a.x - b.x : a.y - b.y) || a.x - b.x || a.y - b.y,
+        (a, b) =>
+            (barrelBlocksShooter(a, shooters, team, side) ? 1 : 0) -
+                (barrelBlocksShooter(b, shooters, team, side) ? 1 : 0) ||
+            barrelScreenRank(a, shooters, team, side) - barrelScreenRank(b, shooters, team, side) ||
+            (team === PBTypes.TeamVals.LEFT ? -1 : 1) * (side ? a.x - b.x : a.y - b.y) ||
+            a.x - b.x ||
+            a.y - b.y,
     );
     for (let index = 0; index < ARTIFACT_POWER.BARREL_BARRICADE_COUNT; index++) {
         if (grid.getArtifactBarrels(team).some((barrel) => barrel.index === index)) continue;

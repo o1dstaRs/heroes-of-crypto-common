@@ -124,6 +124,37 @@ describe("Barrel Barricade", () => {
             "placement_not_available",
         );
     });
+    it("keeps the screen off a friendly ranged file and still takes the inward edge", () => {
+        const { grid, fp } = fixture();
+        fp.setSideOrientedPlacement(true);
+        autoPlaceArtifactBarrels(
+            grid,
+            fp,
+            LEFT,
+            [
+                { x: 4, y: 3 },
+                { x: 3, y: 3 },
+                { x: 4, y: 1 },
+                { x: 4, y: 2 },
+                { x: 2, y: 5 },
+            ],
+            [{ x: 2, y: 3 }],
+        );
+        expect(grid.getArtifactBarrels(LEFT).map((barrel) => barrel.cell)).toEqual([
+            { x: 4, y: 2 },
+            { x: 4, y: 1 },
+        ]);
+    });
+    it("screens the shooter instead of the far end of the deployment edge", () => {
+        const { grid, fp } = fixture();
+        fp.setSideOrientedPlacement(true);
+        const front = [6, 7, 8, 9, 1].map((y) => ({ x: 4, y }));
+        autoPlaceArtifactBarrels(grid, fp, LEFT, [...front, { x: 4, y: 8 }, { x: 3, y: 8 }], [{ x: 2, y: 8 }]);
+        expect(grid.getArtifactBarrels(LEFT).map((barrel) => barrel.cell)).toEqual([
+            { x: 4, y: 7 },
+            { x: 4, y: 6 },
+        ]);
+    });
     it("chooses an adjacent free pair instead of an isolated first cell, without overwriting units", () => {
         const { grid, fp, attacker } = fixture();
         autoPlaceArtifactBarrels(grid, fp, LEFT, [

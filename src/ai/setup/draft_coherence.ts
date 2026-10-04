@@ -100,6 +100,12 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
         affinity += 0.45;
         if (hasMultiHitMeleePressure(creatureId)) affinity += 0.75;
         if (hasMobilePressure(creatureId)) affinity += 0.15;
+    } else if (context.tier1ArtifactId === Tier1Artifact.BARREL_BARRICADE && info.ranged) {
+        // Two one-hit barrels are a screen. They pay off for units that shoot from behind them.
+        affinity += 0.55;
+    } else if (context.tier1ArtifactId === Tier1Artifact.AMULET_OF_RESOLVE && info.abilities.includes("Mechanism")) {
+        // Mechanism takes extra status and extra physical area damage. The amulet offsets both.
+        affinity += 0.8;
     }
 
     const ownInfos = context.ownCreatureIds.flatMap((id) => {
@@ -193,7 +199,9 @@ export function draftBundleCoherenceAffinity(
     const planSeed =
         artifactId === Tier1Artifact.HUNTERS_LONGBOW ||
         artifactId === Tier1Artifact.WINGED_BOOTS ||
-        artifactId === Tier1Artifact.WOUNDING_CHARM
+        artifactId === Tier1Artifact.WOUNDING_CHARM ||
+        artifactId === Tier1Artifact.BARREL_BARRICADE ||
+        artifactId === Tier1Artifact.AMULET_OF_RESOLVE
             ? 0.12
             : 0;
     const creatureFit = creatures.reduce(

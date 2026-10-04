@@ -79,7 +79,9 @@ const creatureArchetypes = (creatureId: number): RankedDraftArchetype[] => {
 };
 
 const artifactArchetype = (tier1ArtifactId: number | undefined): RankedDraftArchetype | undefined => {
-    if (tier1ArtifactId === Tier1Artifact.HUNTERS_LONGBOW) return "ranged";
+    if (tier1ArtifactId === Tier1Artifact.HUNTERS_LONGBOW || tier1ArtifactId === Tier1Artifact.BARREL_BARRICADE) {
+        return "ranged";
+    }
     if (tier1ArtifactId === Tier1Artifact.WINGED_BOOTS) return "mobile";
     if (tier1ArtifactId === Tier1Artifact.WOUNDING_CHARM) return "frontline";
     return undefined;

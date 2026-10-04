@@ -109,6 +109,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_A19_SCORED_ARBITRATION",
     "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY",
     "SEARCH_A19_FAST_FLYER_COHESION",
+    "SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE",
     "SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES",
     "V08_AGGRESSIVE",
     "SEARCH_OBSERVE_ONLY",
@@ -5801,6 +5802,288 @@ describe("Q2 gate-2 — deployed wait-scorer wiring (v0.6 decideTurn, live battl
         findEligibleActPoint(b);
         setEnv({ V07_WAIT_SCORER: "on", V07_WAIT_WEIGHTS: armedBias(0) });
         expect(JSON.stringify(b.decideActive())).toBe(offDecision);
+    });
+});
+
+describe("a19 artifact barrel attacks", () => {
+    const barrelSearchEnv = (coverage: boolean): Record<string, string> => ({
+        V07_SEARCH: "1",
+        SEARCH_VERSIONS: "v0.8",
+        ...(coverage ? { SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: "1" } : {}),
+    });
+    const offeredMines = (coverage: boolean): IEnumeratedCandidate[] => {
+        setEnv(barrelSearchEnv(coverage));
+        const harness = buildBattle(7, "v0.8");
+        const unit = harness.activeUnit();
+        expect(unit).toBeDefined();
+        if (!unit) return [];
+        const enemyTeam = unit.getTeam() === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
+        const base = unit.getBaseCell();
+        let barrelCell: { x: number; y: number } | undefined;
+        for (const cell of [
+            { x: base.x + 1, y: base.y },
+            { x: base.x - 1, y: base.y },
+            { x: base.x, y: base.y + 1 },
+            { x: base.x, y: base.y - 1 },
+            { x: base.x + 1, y: base.y + 1 },
+            { x: base.x - 1, y: base.y + 1 },
+        ]) {
+            if (harness.grid.placeArtifactBarrel(enemyTeam, 0, cell)) {
+                barrelCell = cell;
+                break;
+            }
+        }
+        expect(barrelCell).toBeDefined();
+        const driver = harness.makeDriver();
+        const seen: IEnumeratedCandidate[][] = [];
+        (
+            driver as unknown as {
+                search(unit: Unit, candidates: IEnumeratedCandidate[], incumbent: GameAction[]): GameAction[];
+            }
+        ).search = (_unit, candidates, incumbent) => {
+            seen.push(candidates);
+            return incumbent;
+        };
+        driver.chooseDecision(unit, "v0.8", [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }]);
+        expect(seen.length).toBeGreaterThan(0);
+        return seen[0].filter(
+            (candidate) =>
+                candidate.kind === "mine" &&
+                candidate.targetCell?.x === barrelCell?.x &&
+                candidate.targetCell?.y === barrelCell?.y,
+        );
+    };
+
+    it("offers an enemy barrel strike to v0.8 search when coverage is on", () => {
+        expect(offeredMines(true).length).toBeGreaterThan(0);
+    });
+
+    it("does not offer a barrel strike when coverage is off", () => {
+        expect(offeredMines(false)).toEqual([]);
+    });
+
+    it("does not offer a strike on the army's own barrel unless that barrel blocks a shot", () => {
+        setEnv(barrelSearchEnv(true));
+        const harness = buildBattle(7, "v0.8");
+        const unit = harness.activeUnit();
+        expect(unit).toBeDefined();
+        if (!unit) return;
+        const enemies = harness.unitsHolder
+            .getAllEnemyUnits(unit.getTeam())
+            .filter((enemy) => !enemy.isDead())
+            .flatMap((enemy) => enemy.getCells());
+        const origins = unit.getCells();
+        const base = unit.getBaseCell();
+        let ownCell: { x: number; y: number } | undefined;
+        for (const cell of [
+            { x: base.x + 1, y: base.y + 1 },
+            { x: base.x - 1, y: base.y + 1 },
+            { x: base.x + 1, y: base.y - 1 },
+            { x: base.x - 1, y: base.y - 1 },
+            { x: base.x, y: base.y + 1 },
+            { x: base.x, y: base.y - 1 },
+            { x: base.x + 1, y: base.y },
+            { x: base.x - 1, y: base.y },
+        ]) {
+            const blocks = origins.some((origin) =>
+                enemies.some(
+                    (enemy) =>
+                        (cell.y === origin.y && cell.y === enemy.y && (cell.x - origin.x) * (cell.x - enemy.x) < 0) ||
+                        (cell.x === origin.x && cell.x === enemy.x && (cell.y - origin.y) * (cell.y - enemy.y) < 0),
+                ),
+            );
+            if (!blocks && harness.grid.placeArtifactBarrel(unit.getTeam(), 0, cell)) {
+                ownCell = cell;
+                break;
+            }
+        }
+        expect(ownCell).toBeDefined();
+        const driver = harness.makeDriver();
+        const seen: IEnumeratedCandidate[][] = [];
+        (
+            driver as unknown as {
+                search(unit: Unit, candidates: IEnumeratedCandidate[], incumbent: GameAction[]): GameAction[];
+            }
+        ).search = (_unit, candidates, incumbent) => {
+            seen.push(candidates);
+            return incumbent;
+        };
+        driver.chooseDecision(unit, "v0.8", [{ type: "end_turn", unitId: unit.getId(), reason: "manual" }]);
+        expect(
+            seen[0]?.some(
+                (candidate) =>
+                    candidate.kind === "mine" &&
+                    candidate.targetCell?.x === ownCell?.x &&
+                    candidate.targetCell?.y === ownCell?.y,
+            ),
+        ).toBe(false);
+    });
+
+    const barrelScreenRoster: readonly IArmyUnitSpec[] = [
+        { faction: "Chaos", creatureName: "Orc", level: 1, size: 1, amount: 40 },
+        { faction: "Might", creatureName: "Berserker", level: 1, size: 1, amount: 40 },
+    ];
+    const standOn = (unit: Unit, cell: { x: number; y: number }): void => {
+        const settings = simulationGridSettings();
+        const position = getPositionForCell(cell, settings.getMinX(), settings.getStep(), settings.getHalfStep());
+        unit.setPosition(position.x, position.y);
+    };
+    const insideBoard = (cell: { x: number; y: number }): boolean =>
+        cell.x >= 0 && cell.y >= 0 && cell.x < 16 && cell.y < 16;
+    const blocksLine = (
+        barrel: { x: number; y: number },
+        origins: readonly { x: number; y: number }[],
+        targets: readonly { x: number; y: number }[],
+    ): boolean =>
+        origins.some((origin) =>
+            targets.some(
+                (target) =>
+                    (barrel.y === origin.y &&
+                        barrel.y === target.y &&
+                        (barrel.x - origin.x) * (barrel.x - target.x) < 0) ||
+                    (barrel.x === origin.x &&
+                        barrel.x === target.x &&
+                        (barrel.y - origin.y) * (barrel.y - target.y) < 0),
+            ),
+        );
+
+    /**
+     * Diagonal barrel next to the berserker, with the orc and one enemy stood so only the orc's shot
+     * crosses it. The berserker's own cells stay off that line.
+     */
+    const teammateScreen = (
+        harness: Harness,
+    ): { melee: Unit; shooter: Unit; barrel: { x: number; y: number } } | undefined => {
+        const melee = [...harness.unitsHolder.getAllUnits().values()].find(
+            (unit) => unit.getTeam() === GREEN_TEAM && unit.getName() === "Berserker",
+        );
+        const shooter = [...harness.unitsHolder.getAllUnits().values()].find(
+            (unit) => unit.getTeam() === GREEN_TEAM && unit.getName() === "Orc",
+        );
+        const reds = [...harness.unitsHolder.getAllUnits().values()].filter((unit) => unit.getTeam() === RED_TEAM);
+        if (!melee || !shooter || reds.length < 2) return undefined;
+        const base = melee.getBaseCell();
+        const diagonals = [
+            { x: base.x + 1, y: base.y + 1 },
+            { x: base.x - 1, y: base.y + 1 },
+            { x: base.x + 1, y: base.y - 1 },
+            { x: base.x - 1, y: base.y - 1 },
+        ];
+        const directions = [
+            { x: 1, y: 0 },
+            { x: -1, y: 0 },
+            { x: 0, y: 1 },
+            { x: 0, y: -1 },
+        ];
+        for (const barrel of diagonals) {
+            if (!insideBoard(barrel)) continue;
+            for (const direction of directions) {
+                const shooterCell = { x: barrel.x - direction.x * 2, y: barrel.y - direction.y * 2 };
+                const enemyCell = { x: barrel.x + direction.x * 4, y: barrel.y + direction.y * 4 };
+                const parkedCell =
+                    direction.y === 0 ? { x: enemyCell.x, y: enemyCell.y + 3 } : { x: enemyCell.x + 3, y: enemyCell.y };
+                if (![shooterCell, enemyCell, parkedCell].every(insideBoard)) continue;
+                standOn(shooter, shooterCell);
+                standOn(reds[0], enemyCell);
+                standOn(reds[1], parkedCell);
+                const targets = reds.flatMap((unit) => unit.getCells());
+                if (blocksLine(barrel, melee.getCells(), targets)) continue;
+                if (!blocksLine(barrel, shooter.getCells(), targets)) continue;
+                if (
+                    !harness.attackHandler.canLandRangeAttack(
+                        shooter,
+                        harness.grid.getEnemyAggrMatrixByUnitId(shooter.getId()),
+                    )
+                ) {
+                    continue;
+                }
+                return { melee, shooter, barrel };
+            }
+        }
+        return undefined;
+    };
+
+    it("offers a strike on the army's own barrel when that barrel blocks a teammate's shot", () => {
+        setEnv(barrelSearchEnv(true));
+        const harness = buildBattle(7, "v0.8", undefined, barrelScreenRoster);
+        const layout = teammateScreen(harness);
+        expect(layout).toBeDefined();
+        if (!layout) return;
+        expect(harness.grid.placeArtifactBarrel(layout.melee.getTeam(), 0, layout.barrel)).toBe(true);
+        harness.setActiveUnitId(layout.melee.getId());
+        const seen: IEnumeratedCandidate[][] = [];
+        const driver = harness.makeDriver();
+        (
+            driver as unknown as {
+                search(unit: Unit, candidates: IEnumeratedCandidate[], incumbent: GameAction[]): GameAction[];
+            }
+        ).search = (_unit, candidates, incumbent) => {
+            seen.push(candidates);
+            return incumbent;
+        };
+        const targetsBarrel = (candidates: readonly IEnumeratedCandidate[] | undefined): boolean =>
+            !!candidates?.some(
+                (candidate) =>
+                    candidate.kind === "mine" &&
+                    candidate.targetCell?.x === layout.barrel.x &&
+                    candidate.targetCell?.y === layout.barrel.y,
+            );
+        driver.chooseDecision(layout.melee, "v0.8", [
+            { type: "end_turn", unitId: layout.melee.getId(), reason: "manual" },
+        ]);
+        expect(targetsBarrel(seen[0])).toBe(true);
+
+        standOn(layout.shooter, { x: layout.barrel.x + 1, y: layout.barrel.y + 2 });
+        driver.chooseDecision(layout.melee, "v0.8", [
+            { type: "end_turn", unitId: layout.melee.getId(), reason: "manual" },
+        ]);
+        expect(targetsBarrel(seen[1])).toBe(false);
+    });
+
+    it("reserves an enemy barrel that blocks a teammate's shot even when another attack deals damage", () => {
+        setEnv(barrelSearchEnv(true));
+        const harness = buildBattle(7, "v0.8", undefined, barrelScreenRoster);
+        const layout = teammateScreen(harness);
+        expect(layout).toBeDefined();
+        if (!layout) return;
+        const enemyTeam =
+            layout.melee.getTeam() === PBTypes.TeamVals.LEFT ? PBTypes.TeamVals.RIGHT : PBTypes.TeamVals.LEFT;
+        expect(harness.grid.placeArtifactBarrel(enemyTeam, 0, layout.barrel)).toBe(true);
+        const driver = harness.makeDriver();
+        const mine = {
+            kind: "mine",
+            actions: [],
+            targetCell: layout.barrel,
+            features: { expectedDamage: 0 },
+        } as IEnumeratedCandidate;
+        const damaging = {
+            kind: "melee",
+            actions: [],
+            features: { expectedDamage: 4 },
+        } as IEnumeratedCandidate;
+        const reserve = (
+            driver as unknown as {
+                reservedArtifactBarrelMine(
+                    unit: Unit,
+                    candidates: readonly IEnumeratedCandidate[],
+                    allowNearestWhenIdle: boolean,
+                ): IEnumeratedCandidate | undefined;
+            }
+        ).reservedArtifactBarrelMine(layout.melee, [damaging, mine], false);
+        expect(reserve?.targetCell).toEqual(layout.barrel);
+
+        standOn(layout.shooter, { x: layout.barrel.x + 1, y: layout.barrel.y + 2 });
+        expect(
+            (
+                driver as unknown as {
+                    reservedArtifactBarrelMine(
+                        unit: Unit,
+                        candidates: readonly IEnumeratedCandidate[],
+                        allowNearestWhenIdle: boolean,
+                    ): IEnumeratedCandidate | undefined;
+                }
+            ).reservedArtifactBarrelMine(layout.melee, [damaging, mine], false),
+        ).toBeUndefined();
     });
 });
 

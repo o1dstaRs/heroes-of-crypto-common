@@ -76,6 +76,9 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY: "1",
     SEARCH_A19_ADAPTIVE_BUDGET: "1",
     SEARCH_A19_SCORED_ARBITRATION: "1",
+    // One-hit deployment barrels. Search compares a barrel that blocks a friendly shot, and otherwise
+    // the nearest enemy barrel only when nothing else deals damage. Classic mountain mining stays banned.
+    SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -104,7 +107,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "068bbf98f6179ade6c6d314dc9c889a5686d60ae9e031aec918d4e4c21b79410" as const;
+    "2c7cb098c460667fa51058ea94e0ce0231fee09da36f23ba1d9d9ea8bf020798" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -137,7 +140,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for opt-in material evidence, opening healer cohesion, and public barrel coverage.
-        sha256: "9ca9e193762c17e6d829d0579f4d5d1c12233c0a4a60b5ce6bd5e290cc9a5b39" as const,
+        sha256: "4093156063d40171046b367d13b123a34f7a39bfe1c5ff17bed59de3291cf93c" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,

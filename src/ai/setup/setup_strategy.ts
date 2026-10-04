@@ -166,7 +166,9 @@ export const TIER1_ARTIFACT_WINRATE: Record<number, number> = {
     [Tier1Artifact.VETERAN_HELM]: 49.3,
     [Tier1Artifact.DUAL_STRIKE_CHARM]: 47.2,
     [Tier1Artifact.SWIFT_BOOTS]: 46.6,
-    [Tier1Artifact.BARREL_BARRICADE]: 46.1, // Frozen historical id-11 Helm prior; barrels have not been measured.
+    // Id 11's frozen Helm prior. Barrel Barricade has not been measured, so this is not its win rate.
+    [Tier1Artifact.BARREL_BARRICADE]: 46.1,
+    // Not remeasured after the item became +25% status resistance and +25% mind resistance.
     [Tier1Artifact.AMULET_OF_RESOLVE]: 45.4,
     [Tier1Artifact.HUNTERS_LONGBOW]: 45.0,
     [Tier1Artifact.WINGED_BOOTS]: 44.5,
