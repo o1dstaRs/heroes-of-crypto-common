@@ -378,6 +378,8 @@ export function createV08A19RoleStrategy(
         reflectionFlyer;
     const lavaRangedArtillery =
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.artillery && plan.magic === 0 && plan.ranged >= 4;
+    const lavaHybridArtillery =
+        gridType === PBTypes.GridVals.LAVA_CENTER && plan.artillery && plan.magic === 1 && plan.ranged >= 4;
     const volleySupport = reflectionOwn.some((info) => info.abilities.includes("Rallying Volley Aura"));
     const meleeFlyer = reflectionOwn.some((info) => info.melee && info.canFly);
     const blockedFlyingVolley = plan.artillery && plan.magic === 1 && plan.ranged === 3 && volleySupport && meleeFlyer;
@@ -392,6 +394,7 @@ export function createV08A19RoleStrategy(
         !lavaUnbuffedAreaBattery &&
         !lavaNarrowSpellWithFlyingProtector &&
         !lavaRangedArtillery &&
+        !lavaHybridArtillery &&
         (gridType !== PBTypes.GridVals.BLOCK_CENTER ||
             !(
                 blockedCasterBattery ||
@@ -435,7 +438,9 @@ export function createV08A19RoleStrategy(
                             : incumbent;
             const selected =
                 !lavaUnbuffedAreaBattery &&
-                (blockedAreaBattery || (lavaRangedArtillery && context.team === PBTypes.TeamVals.LEFT))
+                (blockedAreaBattery ||
+                    lavaHybridArtillery ||
+                    (lavaRangedArtillery && context.team === PBTypes.TeamVals.LEFT))
                     ? disperseRevealedSplashArmy(units, context, batteryFormation)
                     : batteryFormation;
             if (selected.size !== units.length) return incumbent;
