@@ -7,9 +7,91 @@ import { Grid } from "../../src/grid/grid";
 import { createTestUnit, testGridSettings } from "../helpers/combat";
 import { creatureInfo, creatureIdForName } from "../../src/ai/setup/creature_score";
 import { footprintCellsForAnchor } from "../../src/simulation/footprint";
-import { V08A19PublicSplashDispersionStrategy } from "../../src/ai/versions/v0_8_a19_public_placement";
+import {
+    V08A19PublicSplashDispersionStrategy,
+    reflectIncumbentPlacement,
+} from "../../src/ai/versions/v0_8_a19_public_placement";
 const names = ["Dryad", "Troll", "Fairy", "Medusa", "Monk", "Magic Dragon"];
 describe("A19 optional role placement composition", () => {
+    it("reflects a Lava area battery without amplifiable buffs while retaining buff casters and other maps", () => {
+        const families = [
+            ["Blacksmith", "Battle Mage", "Orc", "Elf", "Cyclops", "Gargantuan"],
+            ["Wandering Mage", "Medusa", "Peasant", "Elf", "Cyclops", "Gargantuan"],
+        ];
+        for (const [index, family] of families.entries())
+            for (const gridType of [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER])
+                for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT])
+                    for (const publicOpponentCreatureIds of [[], [creatureIdForName("Cyclops")!]]) {
+                        const left = team === PBTypes.TeamVals.LEFT;
+                        const units = family.map((name) => {
+                            const info = creatureInfo(creatureIdForName(name)!)!;
+                            return createTestUnit({
+                                name,
+                                team,
+                                size: info.footprintWidth as 1 | 2,
+                                footprintWidth: info.footprintWidth,
+                                footprintHeight: info.footprintHeight,
+                                attackType: info.ranged ? PBTypes.AttackVals.RANGE : PBTypes.AttackVals.MELEE,
+                            });
+                        });
+                        const incumbent = new Map(
+                            units.map((unit, i) => [unit.getId(), { x: left ? 1 : 14, y: 2 * i + 1 }]),
+                        );
+                        let initialized = 0;
+                        const base: IAIStrategy = {
+                            version: "v0.8",
+                            placeArmy: () => {
+                                initialized++;
+                                return incumbent;
+                            },
+                            decideTurn: (unit) => {
+                                expect(initialized).toBe(1);
+                                return [{ type: "defend_turn", unitId: unit.getId() }];
+                            },
+                        };
+                        const legal = new Set(
+                            Array.from(
+                                { length: 64 },
+                                (_, i) => (((left ? 0 : 12) + (i % 4)) << 4) | Math.floor(i / 4),
+                            ),
+                        );
+                        const context = {
+                            team,
+                            grid: new Grid(testGridSettings, gridType),
+                            sideOrientedPlacement: true,
+                            publicOpponentCreatureIds,
+                            placement: { possibleCellHashes: () => legal },
+                            unitsHolder: { getAllAllies: () => units },
+                        } as unknown as IPlacementContext;
+                        const existingSplash = new V08A19PublicSplashDispersionStrategy(
+                            { version: "v0.8", placeArmy: () => incumbent, decideTurn: () => [] },
+                            true,
+                        );
+                        const existing = existingSplash.placeArmy(units, context);
+                        const strategy = createV08A19RoleStrategy(family, gridType, base);
+                        const selected = strategy.placeArmy(units, context);
+                        expect(initialized).toBe(1);
+                        expect(selected).toEqual(
+                            gridType === PBTypes.GridVals.LAVA_CENTER && index === 0
+                                ? reflectIncumbentPlacement(units, context, existing)
+                                : existing,
+                        );
+                        const occupied = new Set<number>();
+                        for (const unit of units)
+                            for (const cell of footprintCellsForAnchor(unit, selected.get(unit.getId())!)) {
+                                const hash = (cell.x << 4) | cell.y;
+                                expect(legal.has(hash)).toBe(true);
+                                expect(occupied.has(hash)).toBe(false);
+                                occupied.add(hash);
+                            }
+                        expect(strategy.decideTurn(units[0], {} as never)).toEqual([
+                            { type: "defend_turn", unitId: units[0].getId() },
+                        ]);
+                        expect(strategy.decideTurn(units[1], { decisionOrigin: "rollout" } as never)).toEqual([
+                            { type: "defend_turn", unitId: units[1].getId() },
+                        ]);
+                    }
+    });
     it("disperses a Blocked ground physical healer while preserving a flying protector and other maps", () => {
         for (const protector of ["Trent", "Harpy"])
             for (const gridType of [

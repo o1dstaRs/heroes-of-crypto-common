@@ -364,6 +364,12 @@ export function createV08A19RoleStrategy(
     const blockedGroundPhysicalHealer = plan.healer && plan.magic === 0 && plan.ranged === 3 && !reflectionFlyer;
     const lavaSparseAreaBattery =
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.areaCarry && plan.magic >= 2 && plan.ranged <= 2;
+    const lavaUnbuffedAreaBattery =
+        gridType === PBTypes.GridVals.LAVA_CENTER &&
+        plan.areaCarry &&
+        plan.magic === 1 &&
+        plan.ranged >= 4 &&
+        !reflectionOwn.some((info) => info.castsAmplifiableBuff);
     const lavaNarrowSpellWithFlyingProtector =
         gridType === PBTypes.GridVals.LAVA_CENTER &&
         plan.magic === 1 &&
@@ -383,6 +389,7 @@ export function createV08A19RoleStrategy(
                 reflectionOwn.some((info) => info.level === 4 && info.abilities.includes("AI Driven"))));
     if (
         !lavaSparseAreaBattery &&
+        !lavaUnbuffedAreaBattery &&
         !lavaNarrowSpellWithFlyingProtector &&
         !lavaRangedArtillery &&
         (gridType !== PBTypes.GridVals.BLOCK_CENTER ||
@@ -411,7 +418,7 @@ export function createV08A19RoleStrategy(
                     screenBacklineProtectors: true,
                 });
             const batteryFormation =
-                blockedPhysicalBattery && context.team === PBTypes.TeamVals.RIGHT
+                lavaUnbuffedAreaBattery || (blockedPhysicalBattery && context.team === PBTypes.TeamVals.RIGHT)
                     ? reflectIncumbentPlacement(units, context, incumbent)
                     : lavaSparseAreaBattery ||
                         lavaNarrowSpellWithFlyingProtector ||
@@ -427,7 +434,8 @@ export function createV08A19RoleStrategy(
                             ? disperseRevealedSplashArmy(units, context, incumbent)
                             : incumbent;
             const selected =
-                blockedAreaBattery || (lavaRangedArtillery && context.team === PBTypes.TeamVals.LEFT)
+                !lavaUnbuffedAreaBattery &&
+                (blockedAreaBattery || (lavaRangedArtillery && context.team === PBTypes.TeamVals.LEFT))
                     ? disperseRevealedSplashArmy(units, context, batteryFormation)
                     : batteryFormation;
             if (selected.size !== units.length) return incumbent;
