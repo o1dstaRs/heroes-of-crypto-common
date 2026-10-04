@@ -99,6 +99,10 @@ export {
     V08_A19_SOURCE_LEDGER,
 } from "./versions/v0_8_a19_profile";
 
+export { createV08A19RoleStrategy } from "./versions/v0_8_a19_role_strategy";
+export { roleSearchPlan, v08A19RoleSearchOverrides } from "./versions/v0_8_a19_role_plan";
+export type { V08A19RoleSearchPlan } from "./versions/v0_8_a19_role_plan";
+
 // F4 — the shared enumerated candidate generator (./candidates.ts): every engine-legal candidate turn
 // for the acting unit (moves, melee target x stand-cell, shot aims, area throws, all castable spells,
 // defend, wait) with candidate 0 always the incumbent decision, per-candidate morale/luck-economy +

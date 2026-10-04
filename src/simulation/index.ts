@@ -27,3 +27,9 @@ export {
     withScopedAIEnvironment,
 } from "./v0_8_a13_search";
 export { createV08A19SearchDriver, shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
+
+export {
+    prepareV08A19RoleCandidate,
+    withV08A19RoleCandidate,
+    V08_A19_ROLE_CANDIDATE_ID,
+} from "./v0_8_a19_role_candidate";
