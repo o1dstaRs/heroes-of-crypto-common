@@ -65,11 +65,12 @@ describe("A19 optional role placement composition", () => {
             }
         }
     });
-    it("keeps blocked spell, volley, and splash formations legal on either side after native initialization", () => {
+    it("keeps blocked spell, volley, splash, and area formations legal on either side after native initialization", () => {
         const families = [
             ["Arbalester", "Elf", "Berserker", "Medusa", "Monk", "Magic Dragon"],
             ["Wandering Mage", "Valkyrie", "Centaur", "Trent", "Zena", "Tsar Cannon"],
             ["Leprechaun", "Medusa", "Wandering Mage", "Pikeman", "Cyclops", "Frenzied Boar"],
+            ["Wandering Mage", "Elf", "Squire", "Beholder", "Cyclops", "Gargantuan"],
         ];
         for (const family of families)
             for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {

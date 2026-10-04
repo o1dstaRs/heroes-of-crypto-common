@@ -353,6 +353,7 @@ export function createV08A19RoleStrategy(
         : splash;
     const blockedCasterBattery = plan.magic >= 3 && plan.ranged === 1;
     const blockedSpellBattery = plan.magic === 1 && plan.ranged >= 4 && spellCarry;
+    const blockedAreaBattery = plan.areaCarry && plan.magic === 1 && plan.ranged >= 4;
     const volleySupport = reflectionOwn.some((info) => info.abilities.includes("Rallying Volley Aura"));
     const meleeFlyer = reflectionOwn.some((info) => info.melee && info.canFly);
     const blockedFlyingVolley = plan.artillery && plan.magic === 1 && plan.ranged === 3 && volleySupport && meleeFlyer;
@@ -364,7 +365,13 @@ export function createV08A19RoleStrategy(
                 reflectionOwn.some((info) => info.level === 4 && info.abilities.includes("AI Driven"))));
     if (
         gridType !== PBTypes.GridVals.BLOCK_CENTER ||
-        !(blockedCasterBattery || blockedSpellBattery || blockedFlyingVolley || blockedSplashBattery)
+        !(
+            blockedCasterBattery ||
+            blockedSpellBattery ||
+            blockedFlyingVolley ||
+            blockedSplashBattery ||
+            blockedAreaBattery
+        )
     )
         return finalStrategy;
     return {
@@ -380,7 +387,7 @@ export function createV08A19RoleStrategy(
                     physicalMeleeMagicRoles: true,
                     screenBacklineProtectors: true,
                 });
-            const selected =
+            const batteryFormation =
                 blockedCasterBattery && context.team === PBTypes.TeamVals.LEFT
                     ? spreadBattery()
                     : blockedSpellBattery
@@ -392,6 +399,9 @@ export function createV08A19RoleStrategy(
                         : blockedSplashBattery
                           ? disperseRevealedSplashArmy(units, context, incumbent)
                           : incumbent;
+            const selected = blockedAreaBattery
+                ? disperseRevealedSplashArmy(units, context, batteryFormation)
+                : batteryFormation;
             if (selected.size !== units.length) return incumbent;
             const legal = context.placement.possibleCellHashes(),
                 occupied = new Set<number>();
