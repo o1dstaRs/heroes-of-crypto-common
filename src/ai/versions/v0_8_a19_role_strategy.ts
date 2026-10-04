@@ -7,6 +7,7 @@ import { creatureInfo, creatureIdForName } from "../setup/creature_score";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import type { GridType } from "../../generated/protobuf/v1/types_gen";
 import type { Unit } from "../../units/unit";
+import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { StrategyV0_7 } from "./v0_7";
 import { layoutRevealPlacement, SPLASH_AOE_ABILITIES } from "./v0_7_placement_reveal";
 import { withAreaThrow } from "./area_throw_router";
@@ -350,5 +351,33 @@ export function createV08A19RoleStrategy(
               decideTurn: (unit: Unit, context: IDecisionContext) => splash.decideTurn(unit, context),
           }
         : splash;
-    return finalStrategy;
+    if (gridType !== PBTypes.GridVals.BLOCK_CENTER || plan.magic < 3 || plan.ranged !== 1) return finalStrategy;
+    return {
+        version: finalStrategy.version,
+        placeArmy: (units: Unit[], context: IPlacementContext) => {
+            const incumbent = finalStrategy.placeArmy(units, context);
+            if (context.team !== PBTypes.TeamVals.LEFT || context.grid.getGridType() !== gridType) return incumbent;
+            const selected = layoutRevealPlacement(units, context, {
+                gap: 3,
+                screenShooters: true,
+                cornerShift: false,
+                physicalMeleeMagicRoles: true,
+                screenBacklineProtectors: true,
+            });
+            if (selected.size !== units.length) return incumbent;
+            const legal = context.placement.possibleCellHashes(),
+                occupied = new Set<number>();
+            for (const unit of units) {
+                const anchor = selected.get(unit.getId());
+                if (!anchor) return incumbent;
+                for (const cell of footprintCellsForAnchor(unit, anchor)) {
+                    const hash = (cell.x << 4) | cell.y;
+                    if (!legal.has(hash) || occupied.has(hash)) return incumbent;
+                    occupied.add(hash);
+                }
+            }
+            return selected;
+        },
+        decideTurn: (unit: Unit, context: IDecisionContext) => finalStrategy.decideTurn(unit, context),
+    };
 }
