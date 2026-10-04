@@ -8,6 +8,7 @@ import {
 } from "../../src/artifacts/artifact_properties";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
+import { DefaultPlacementLevel1 } from "../../src/augments/augment_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { autoPlaceArtifactBarrels, reconcileArtifactBarrels } from "../../src/grid/artifact_barrels";
 import { getPositionForCell } from "../../src/grid/grid_math";
@@ -23,6 +24,8 @@ const fixture = (gridType = PBTypes.GridVals.NORMAL, ranged = false) => {
     const context = createCombatTestContext(gridType);
     const fp = FightStateManager.getInstance().getFightProperties();
     fp.setGridType(gridType);
+    fp.setDefaultPlacementPerTeam(LEFT, DefaultPlacementLevel1.THREE_BY_THREE);
+    fp.setDefaultPlacementPerTeam(RIGHT, DefaultPlacementLevel1.THREE_BY_THREE);
     fp.setArtifactPerTeam(LEFT, ArtifactTier.TIER_1, Tier1Artifact.BARREL_BARRICADE);
     if (gridType === PBTypes.GridVals.BLOCK_CENTER)
         context.grid.setScatteredMountains(scatteredMountainsForSeed("barrel-test").map((barrel) => barrel.cell));
@@ -120,6 +123,63 @@ describe("Barrel Barricade", () => {
         expect(engine.apply({ type: "unplace_barrel", team: LEFT, barrelIndex: 0 }).rejectionReason).toBe(
             "placement_not_available",
         );
+    });
+    it("chooses an adjacent free pair instead of an isolated first cell, without overwriting units", () => {
+        const { grid, fp, attacker } = fixture();
+        autoPlaceArtifactBarrels(grid, fp, LEFT, [
+            { x: 1, y: 5 },
+            { x: 4, y: 3 },
+            { x: 2, y: 2 },
+            { x: 3, y: 2 },
+        ]);
+        const barrels = grid.getArtifactBarrels(LEFT);
+        expect(barrels.map((barrel) => barrel.cell)).toEqual([
+            { x: 2, y: 2 },
+            { x: 3, y: 2 },
+        ]);
+        expect(grid.getOccupantUnitId({ x: 4, y: 3 })).toBe(attacker.getId());
+        autoPlaceArtifactBarrels(grid, fp, LEFT);
+        expect(grid.getArtifactBarrels(LEFT)).toEqual(barrels);
+    });
+    it("fills the missing slot next to a manually moved barrel and preserves a separated manual pair", () => {
+        const { grid, fp, engine } = fixture();
+        place(engine, 0, 2, 2);
+        autoPlaceArtifactBarrels(grid, fp, LEFT, [
+            { x: 1, y: 5 },
+            { x: 3, y: 2 },
+        ]);
+        expect(grid.getArtifactBarrels(LEFT)[1].cell).toEqual({ x: 3, y: 2 });
+        expect(place(engine, 1, 1, 5).completed).toBe(true);
+        const chosen = grid.getArtifactBarrels(LEFT);
+        autoPlaceArtifactBarrels(grid, fp, LEFT);
+        expect(grid.getArtifactBarrels(LEFT)).toEqual(chosen);
+    });
+    it("falls back to available cells on a crowded board and never re-creates destroyed barrels in combat", () => {
+        const { grid, fp } = fixture();
+        autoPlaceArtifactBarrels(grid, fp, LEFT, [
+            { x: 1, y: 1 },
+            { x: 3, y: 5 },
+        ]);
+        expect(grid.getArtifactBarrels(LEFT)).toHaveLength(2);
+        fp.startFight();
+        grid.clearScatteredMountainAt(1, 1);
+        autoPlaceArtifactBarrels(grid, fp, LEFT);
+        expect(grid.getArtifactBarrels(LEFT)).toHaveLength(1);
+    });
+    it("rejects placing a unit onto a reserved barrel and keeps both original occupants intact", () => {
+        const { grid, engine, attacker } = fixture();
+        place(engine, 0);
+        const result = engine.apply({
+            type: "place_unit",
+            unitId: attacker.getId(),
+            team: LEFT,
+            unitName: attacker.getName(),
+            cells: [{ x: 3, y: 3 }],
+        });
+        expect(result.rejectionReason).toBe("placement_blocked");
+        expect(grid.getOccupantUnitId({ x: 3, y: 3 })).toBe("B");
+        expect(grid.getOccupantUnitId({ x: 4, y: 3 })).toBe(attacker.getId());
+        expect(grid.getArtifactBarrels(LEFT)).toEqual([{ team: LEFT, index: 0, cell: { x: 3, y: 3 } }]);
     });
     it("restores barrel ownership and blocked terrain after an AI rollout destroys a barrel", () => {
         const { grid, fp, unitsHolder, engine } = fixture();

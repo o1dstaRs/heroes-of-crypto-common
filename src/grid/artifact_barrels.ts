@@ -47,16 +47,17 @@ export function reconcileArtifactBarrels(
     }
 }
 
-/** AI and Ready auto-fill missing slots after creatures have been placed. Human positions are retained. */
+/** Reserve an adjacent pair during deployment, keeping any positions the player has chosen. */
 export function autoPlaceArtifactBarrels(
     grid: Grid,
     fp: FightProperties,
     team: TeamType,
     allowedCells?: readonly XY[],
 ): void {
-    if (!fp.hasArtifactTier1(team, Tier1Artifact.BARREL_BARRICADE)) return;
+    if (fp.hasFightStarted() || fp.hasFightFinished() || !fp.hasArtifactTier1(team, Tier1Artifact.BARREL_BARRICADE))
+        return;
     const cells = [...(allowedCells ?? artifactBarrelPlacementCells(grid, fp, team))];
-    // Favor the inward deployment edge, separating the two barrels so they do not form a wall around a stack.
+    // Favor the inward deployment edge, with two orthogonally adjacent free cells whenever possible.
     const side = fp.isSideOrientedPlacement();
     cells.sort(
         (a, b) => (team === PBTypes.TeamVals.LEFT ? -1 : 1) * (side ? a.x - b.x : a.y - b.y) || a.x - b.x || a.y - b.y,
@@ -64,14 +65,11 @@ export function autoPlaceArtifactBarrels(
     for (let index = 0; index < ARTIFACT_POWER.BARREL_BARRICADE_COUNT; index++) {
         if (grid.getArtifactBarrels(team).some((barrel) => barrel.index === index)) continue;
         const placed = grid.getArtifactBarrels(team);
-        const target =
-            cells.find(
-                (cell) =>
-                    grid.areAllCellsEmpty([cell]) &&
-                    placed.every(
-                        (barrel) => Math.max(Math.abs(barrel.cell.x - cell.x), Math.abs(barrel.cell.y - cell.y)) > 1,
-                    ),
-            ) ?? cells.find((cell) => grid.areAllCellsEmpty([cell]));
+        const free = cells.filter((cell) => grid.areAllCellsEmpty([cell]));
+        const adjacent = (a: XY, b: XY) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1;
+        const target = placed.length
+            ? (free.find((cell) => placed.some((barrel) => adjacent(barrel.cell, cell))) ?? free[0])
+            : (free.find((cell) => free.some((other) => adjacent(cell, other))) ?? free[0]);
         if (target) grid.placeArtifactBarrel(team, index, target);
     }
 }
