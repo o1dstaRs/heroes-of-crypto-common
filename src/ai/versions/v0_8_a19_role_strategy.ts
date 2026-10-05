@@ -463,10 +463,28 @@ export function createV08A19RoleStrategy(
     gridType: GridType,
     base: IAIStrategy = createRoleBaseStrategy(),
 ): IAIStrategy {
-    const strategy = createIncumbentRoleStrategy(names, gridType, base);
+    const strategy = createIncumbentRoleStrategy(names, gridType, base),
+        plan = roleSearchPlan(names, gridType);
+    const reflectLavaArtillery =
+        gridType === PBTypes.GridVals.LAVA_CENTER && plan.artillery && plan.magic === 1 && plan.ranged >= 4;
+    const reflectLavaHealer =
+        gridType === PBTypes.GridVals.LAVA_CENTER && plan.healer && plan.magic >= 2 && plan.ranged >= 3;
+    if (reflectLavaArtillery || reflectLavaHealer)
+        return {
+            version: strategy.version,
+            placeArmy: (units: Unit[], context: IPlacementContext) => {
+                const incumbent = strategy.placeArmy(units, context);
+                if (
+                    context.grid.getGridType() !== gridType ||
+                    (reflectLavaHealer && context.team !== PBTypes.TeamVals.LEFT)
+                )
+                    return incumbent;
+                return reflectIncumbentPlacement(units, context, incumbent);
+            },
+            decideTurn: (unit: Unit, context: IDecisionContext) => strategy.decideTurn(unit, context),
+        };
     if (gridType !== PBTypes.GridVals.BLOCK_CENTER) return strategy;
-    const plan = roleSearchPlan(names, gridType),
-        own = [...new Set(names)].map((name) => creatureInfo(creatureIdForName(name)!)!);
+    const own = [...new Set(names)].map((name) => creatureInfo(creatureIdForName(name)!)!);
     const compactMagicBattery = plan.magic >= 3 && plan.ranged === 1;
     const reflectHybridHealer = plan.healer && plan.magic === 1 && plan.ranged === 3;
     const disperseSpellBattery =
@@ -513,7 +531,9 @@ export function createV08A19RoleStrategy(
                     occupied.add(hash);
                 }
             }
-            return selected;
+            return reflectHybridHealer && context.team === PBTypes.TeamVals.RIGHT
+                ? reflectIncumbentPlacement(units, context, selected)
+                : selected;
         },
         decideTurn: (unit: Unit, context: IDecisionContext) => strategy.decideTurn(unit, context),
     };
