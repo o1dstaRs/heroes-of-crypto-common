@@ -13,6 +13,75 @@ import {
 } from "../../src/ai/versions/v0_8_a19_public_placement";
 const names = ["Dryad", "Troll", "Fairy", "Medusa", "Monk", "Magic Dragon"];
 describe("A19 optional role placement composition", () => {
+    it("preserves native initialization and turn delegation for refined Blocked batteries on either side", () => {
+        const families = [
+            ["Wandering Mage", "Wyvern", "Berserker", "Battle Mage", "Zena", "Magic Dragon"],
+            ["Wandering Mage", "Valkyrie", "Centaur", "Trent", "Zena", "Tsar Cannon"],
+            ["Berserker", "Battle Mage", "Centaur", "Medusa", "Cyclops", "Abomination"],
+        ];
+        for (const family of families)
+            for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
+                const left = team === PBTypes.TeamVals.LEFT;
+                const units = family.map((name) => {
+                    const info = creatureInfo(creatureIdForName(name)!)!;
+                    return createTestUnit({
+                        name,
+                        team,
+                        size: info.footprintWidth as 1 | 2,
+                        footprintWidth: info.footprintWidth,
+                        footprintHeight: info.footprintHeight,
+                        attackType: info.ranged ? PBTypes.AttackVals.RANGE : PBTypes.AttackVals.MELEE,
+                    });
+                });
+                const incumbent = new Map(units.map((unit, i) => [unit.getId(), { x: left ? 1 : 14, y: 2 * i + 1 }]));
+                let initialized = 0;
+                const decisions: unknown[] = [];
+                const base: IAIStrategy = {
+                    version: "v0.8",
+                    placeArmy: () => {
+                        initialized++;
+                        return incumbent;
+                    },
+                    decideTurn: (unit, context) => {
+                        expect(initialized).toBe(1);
+                        decisions.push(context);
+                        return [{ type: "defend_turn", unitId: unit.getId() }];
+                    },
+                };
+                const legal = new Set(
+                    Array.from({ length: 64 }, (_, i) => (((left ? 0 : 12) + (i % 4)) << 4) | Math.floor(i / 4)),
+                );
+                const context = {
+                    team,
+                    grid: new Grid(testGridSettings, PBTypes.GridVals.BLOCK_CENTER),
+                    sideOrientedPlacement: true,
+                    publicOpponentCreatureIds: [creatureIdForName("Tsar Cannon")!],
+                    placement: { possibleCellHashes: () => legal },
+                    unitsHolder: { getAllAllies: () => units },
+                } as unknown as IPlacementContext;
+                const strategy = createV08A19RoleStrategy(family, PBTypes.GridVals.BLOCK_CENTER, base);
+                const selected = strategy.placeArmy(units, context);
+                expect(initialized).toBe(1);
+                expect(new Set(selected.keys())).toEqual(new Set(units.map((unit) => unit.getId())));
+                const occupied = new Set<number>();
+                for (const unit of units)
+                    for (const cell of footprintCellsForAnchor(unit, selected.get(unit.getId())!)) {
+                        const hash = (cell.x << 4) | cell.y;
+                        expect(legal.has(hash)).toBe(true);
+                        expect(occupied.has(hash)).toBe(false);
+                        occupied.add(hash);
+                    }
+                const liveContext = {} as never,
+                    rolloutContext = { decisionOrigin: "rollout" } as never;
+                for (const decisionContext of [liveContext, rolloutContext])
+                    expect(strategy.decideTurn(units[0], decisionContext)).toEqual([
+                        { type: "defend_turn", unitId: units[0].getId() },
+                    ]);
+                expect(decisions[0]).toBe(liveContext);
+                expect(decisions[1]).toBe(rolloutContext);
+                expect(initialized).toBe(1);
+            }
+    });
     it("reflects a Lava area battery without amplifiable buffs while retaining buff casters and other maps", () => {
         const families = [
             ["Blacksmith", "Battle Mage", "Orc", "Elf", "Cyclops", "Gargantuan"],
@@ -429,7 +498,7 @@ describe("A19 optional role placement composition", () => {
                 ]);
             }
     });
-    it("spreads a left blocked caster battery legally while preserving other seats and maps", () => {
+    it("spreads blocked caster batteries legally on either side while preserving other maps", () => {
         const battery = ["Wandering Mage", "Wyvern", "Berserker", "Battle Mage", "Zena", "Magic Dragon"];
         const units = battery.map((name) => {
             const info = creatureInfo(creatureIdForName(name)!)!;
@@ -468,7 +537,7 @@ describe("A19 optional role placement composition", () => {
                 const strategy = createV08A19RoleStrategy(battery, gridType, base);
                 const selected = strategy.placeArmy(units, context);
                 expect(initialized).toBe(1);
-                if (gridType === PBTypes.GridVals.BLOCK_CENTER && team === PBTypes.TeamVals.LEFT) {
+                if (gridType === PBTypes.GridVals.BLOCK_CENTER) {
                     expect(selected).not.toEqual(incumbent);
                     const occupied = new Set<number>();
                     for (const unit of units)

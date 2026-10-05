@@ -84,12 +84,8 @@ function blockedGroundHealerFormation(names: readonly string[], gridType: GridTy
     });
 }
 
-/** Explicit opt-in. Caller supplies only its own completed roster and the public map; placement reads public opponent identities. */
-export function createV08A19RoleStrategy(
-    names: readonly string[],
-    gridType: GridType,
-    base: IAIStrategy = createRoleBaseStrategy(),
-): IAIStrategy {
+/** Composes the incumbent placement while preserving native initialization and combat decisions. */
+function createIncumbentRoleStrategy(names: readonly string[], gridType: GridType, base: IAIStrategy): IAIStrategy {
     if (base.version !== "v0.8") throw new Error("A19 role placement requires a native v0.8 base");
     const ownNames = [...new Set(names)],
         plan = roleSearchPlan(ownNames, gridType);
@@ -458,5 +454,60 @@ export function createV08A19RoleStrategy(
             return selected;
         },
         decideTurn: (unit: Unit, context: IDecisionContext) => finalStrategy.decideTurn(unit, context),
+    };
+}
+
+/** Explicit opt-in. Uses the own completed roster, public map and revealed opponent identities. */
+export function createV08A19RoleStrategy(
+    names: readonly string[],
+    gridType: GridType,
+    base: IAIStrategy = createRoleBaseStrategy(),
+): IAIStrategy {
+    const strategy = createIncumbentRoleStrategy(names, gridType, base);
+    if (gridType !== PBTypes.GridVals.BLOCK_CENTER) return strategy;
+    const plan = roleSearchPlan(names, gridType),
+        own = [...new Set(names)].map((name) => creatureInfo(creatureIdForName(name)!)!);
+    const compactMagicBattery = plan.magic >= 3 && plan.ranged === 1;
+    const reflectPhysicalBattery =
+        plan.magic === 1 &&
+        plan.ranged === 3 &&
+        ((plan.artillery &&
+            own.some((info) => info.castsAmplifiableBuff) &&
+            own.some((info) => info.abilities.includes("Rallying Volley Aura"))) ||
+            (!plan.artillery &&
+                !plan.healer &&
+                !plan.areaCarry &&
+                own.some((info) => info.level === 4 && info.abilities.includes("Dense Flesh"))));
+    if (!compactMagicBattery && !reflectPhysicalBattery) return strategy;
+    return {
+        version: strategy.version,
+        placeArmy: (units: Unit[], context: IPlacementContext) => {
+            const incumbent = strategy.placeArmy(units, context);
+            if (context.grid.getGridType() !== gridType) return incumbent;
+            if (reflectPhysicalBattery && context.team !== PBTypes.TeamVals.LEFT) return incumbent;
+            const selected = reflectPhysicalBattery
+                ? reflectIncumbentPlacement(units, context, incumbent)
+                : layoutRevealPlacement(units, context, {
+                      gap: 2,
+                      screenShooters: true,
+                      cornerShift: false,
+                      physicalMeleeMagicRoles: true,
+                      screenBacklineProtectors: true,
+                  });
+            if (selected.size !== units.length) return incumbent;
+            const legal = context.placement.possibleCellHashes(),
+                occupied = new Set<number>();
+            for (const unit of units) {
+                const anchor = selected.get(unit.getId());
+                if (!anchor) return incumbent;
+                for (const cell of footprintCellsForAnchor(unit, anchor)) {
+                    const hash = (cell.x << 4) | cell.y;
+                    if (!legal.has(hash) || occupied.has(hash)) return incumbent;
+                    occupied.add(hash);
+                }
+            }
+            return selected;
+        },
+        decideTurn: (unit: Unit, context: IDecisionContext) => strategy.decideTurn(unit, context),
     };
 }
