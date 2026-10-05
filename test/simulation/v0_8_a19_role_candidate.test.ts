@@ -40,6 +40,62 @@ const fixture = (): IMatchConfig => ({
     redTacticalSplitStacks: [],
 });
 describe("A19 opt-in complete ranked simulation candidate", () => {
+    it("armors a Blocked sparse caster army with an autonomous carry while preserving its models and the opponent", () => {
+        const names = ["Arbalester", "Trent", "Wandering Mage", "Valkyrie", "Zena", "Frenzied Boar"];
+        for (const side of ["green", "red"] as const)
+            for (const gridType of [
+                PBTypes.GridVals.NORMAL,
+                PBTypes.GridVals.LAVA_CENTER,
+                PBTypes.GridVals.BLOCK_CENTER,
+            ]) {
+                const c = fixture(),
+                    rosterKey = side === "green" ? "roster" : "redRoster";
+                c.gridType = gridType;
+                c[rosterKey] = names.map((creatureName) => {
+                    const info = creatureInfo(creatureIdForName(creatureName)!)!;
+                    return {
+                        faction: ToFactionName[info.faction],
+                        creatureName,
+                        level: info.level,
+                        size: info.footprintWidth,
+                        amount: 12,
+                    };
+                });
+                c[`${side}Augments`] = [
+                    { kind: "Sniper", value: 3 },
+                    { kind: "Armor", value: 1 },
+                    { kind: "Might", value: 3 },
+                ];
+                const before = structuredClone(c),
+                    environment = prepareV08A19RoleCandidate(c, side);
+                expect(c[`${side}Augments`]).toEqual(
+                    gridType === PBTypes.GridVals.BLOCK_CENTER
+                        ? [
+                              { kind: "Sniper", value: 3 },
+                              { kind: "Armor", value: 3 },
+                              { kind: "Might", value: 1 },
+                          ]
+                        : before[`${side}Augments`],
+                );
+                expect(c[`${side}Augments`]!.reduce((sum, augment) => sum + augment.value, 0)).toBe(7);
+                expect(c[rosterKey]).toEqual(before[rosterKey]);
+                expect(c[`${side}TacticalSplitStacks`]).toEqual(before[`${side}TacticalSplitStacks`]);
+                const enemy = side === "green" ? "red" : "green";
+                for (const field of [
+                    "Augments",
+                    "Doctrine",
+                    "ArtifactT1",
+                    "ArtifactT2",
+                    "Synergies",
+                    "TacticalSplitStacks",
+                ] as const)
+                    expect(c[`${enemy}${field}`]).toEqual(before[`${enemy}${field}`]);
+                expect(c[enemy === "green" ? "roster" : "redRoster"]).toEqual(
+                    before[enemy === "green" ? "roster" : "redRoster"],
+                );
+                expect(environment.SEARCH_A19_HEALER_OPENING_COHESION).toBe("1");
+            }
+    });
     it("protects a Blocked caster-heavy army with a legal armor plan while preserving its models and the opponent", () => {
         const names = ["Wandering Mage", "Wyvern", "Berserker", "Battle Mage", "Zena", "Magic Dragon"];
         for (const side of ["green", "red"] as const)

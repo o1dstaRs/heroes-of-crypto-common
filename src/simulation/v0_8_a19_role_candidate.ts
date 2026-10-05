@@ -258,8 +258,8 @@ export function prepareV08A19RoleCandidate(config: IMatchConfig, side: Side): Re
         config[splitKey] = inputSplits;
         config[augmentKey] = [
             { kind: "Sniper", value: 3 },
-            { kind: "Armor", value: 1 },
-            { kind: "Might", value: 3 },
+            { kind: "Armor", value: 3 },
+            { kind: "Might", value: 1 },
         ];
     }
 
