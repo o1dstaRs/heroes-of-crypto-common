@@ -468,6 +468,8 @@ export function createV08A19RoleStrategy(
     const plan = roleSearchPlan(names, gridType),
         own = [...new Set(names)].map((name) => creatureInfo(creatureIdForName(name)!)!);
     const compactMagicBattery = plan.magic >= 3 && plan.ranged === 1;
+    const disperseSpellBattery =
+        plan.magic === 1 && plan.ranged >= 4 && own.some((info) => info.level === 4 && info.rangedSpellDamage);
     const reflectPhysicalBattery =
         plan.magic === 1 &&
         plan.ranged === 3 &&
@@ -478,7 +480,7 @@ export function createV08A19RoleStrategy(
                 !plan.healer &&
                 !plan.areaCarry &&
                 own.some((info) => info.level === 4 && info.abilities.includes("Dense Flesh"))));
-    if (!compactMagicBattery && !reflectPhysicalBattery) return strategy;
+    if (!compactMagicBattery && !reflectPhysicalBattery && !disperseSpellBattery) return strategy;
     return {
         version: strategy.version,
         placeArmy: (units: Unit[], context: IPlacementContext) => {
@@ -487,13 +489,15 @@ export function createV08A19RoleStrategy(
             if (reflectPhysicalBattery && context.team !== PBTypes.TeamVals.LEFT) return incumbent;
             const selected = reflectPhysicalBattery
                 ? reflectIncumbentPlacement(units, context, incumbent)
-                : layoutRevealPlacement(units, context, {
-                      gap: 2,
-                      screenShooters: true,
-                      cornerShift: false,
-                      physicalMeleeMagicRoles: true,
-                      screenBacklineProtectors: true,
-                  });
+                : disperseSpellBattery
+                  ? disperseRevealedSplashArmy(units, context, incumbent)
+                  : layoutRevealPlacement(units, context, {
+                        gap: 2,
+                        screenShooters: true,
+                        cornerShift: false,
+                        physicalMeleeMagicRoles: true,
+                        screenBacklineProtectors: true,
+                    });
             if (selected.size !== units.length) return incumbent;
             const legal = context.placement.possibleCellHashes(),
                 occupied = new Set<number>();

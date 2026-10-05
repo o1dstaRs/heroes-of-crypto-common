@@ -18,6 +18,7 @@ describe("A19 optional role placement composition", () => {
             ["Wandering Mage", "Wyvern", "Berserker", "Battle Mage", "Zena", "Magic Dragon"],
             ["Wandering Mage", "Valkyrie", "Centaur", "Trent", "Zena", "Tsar Cannon"],
             ["Berserker", "Battle Mage", "Centaur", "Medusa", "Cyclops", "Abomination"],
+            ["Arbalester", "Elf", "Berserker", "Medusa", "Monk", "Magic Dragon"],
         ];
         for (const family of families)
             for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
