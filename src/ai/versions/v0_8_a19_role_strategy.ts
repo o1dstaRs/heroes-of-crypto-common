@@ -495,7 +495,7 @@ export function createV08A19RoleStrategy(
                     : disperseSpellBattery
                       ? disperseRevealedSplashArmy(units, context, incumbent)
                       : layoutRevealPlacement(units, context, {
-                            gap: 2,
+                            gap: 3,
                             screenShooters: true,
                             cornerShift: false,
                             physicalMeleeMagicRoles: true,
