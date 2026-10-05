@@ -468,6 +468,7 @@ export function createV08A19RoleStrategy(
     const plan = roleSearchPlan(names, gridType),
         own = [...new Set(names)].map((name) => creatureInfo(creatureIdForName(name)!)!);
     const compactMagicBattery = plan.magic >= 3 && plan.ranged === 1;
+    const reflectHybridHealer = plan.healer && plan.magic === 1 && plan.ranged === 3;
     const disperseSpellBattery =
         plan.magic === 1 && plan.ranged >= 4 && own.some((info) => info.level === 4 && info.rangedSpellDamage);
     const reflectPhysicalBattery =
@@ -480,24 +481,26 @@ export function createV08A19RoleStrategy(
                 !plan.healer &&
                 !plan.areaCarry &&
                 own.some((info) => info.level === 4 && info.abilities.includes("Dense Flesh"))));
-    if (!compactMagicBattery && !reflectPhysicalBattery && !disperseSpellBattery) return strategy;
+    if (!compactMagicBattery && !reflectPhysicalBattery && !disperseSpellBattery && !reflectHybridHealer)
+        return strategy;
     return {
         version: strategy.version,
         placeArmy: (units: Unit[], context: IPlacementContext) => {
             const incumbent = strategy.placeArmy(units, context);
             if (context.grid.getGridType() !== gridType) return incumbent;
             if (reflectPhysicalBattery && context.team !== PBTypes.TeamVals.LEFT) return incumbent;
-            const selected = reflectPhysicalBattery
-                ? reflectIncumbentPlacement(units, context, incumbent)
-                : disperseSpellBattery
-                  ? disperseRevealedSplashArmy(units, context, incumbent)
-                  : layoutRevealPlacement(units, context, {
-                        gap: 2,
-                        screenShooters: true,
-                        cornerShift: false,
-                        physicalMeleeMagicRoles: true,
-                        screenBacklineProtectors: true,
-                    });
+            const selected =
+                reflectPhysicalBattery || reflectHybridHealer
+                    ? reflectIncumbentPlacement(units, context, incumbent)
+                    : disperseSpellBattery
+                      ? disperseRevealedSplashArmy(units, context, incumbent)
+                      : layoutRevealPlacement(units, context, {
+                            gap: 2,
+                            screenShooters: true,
+                            cornerShift: false,
+                            physicalMeleeMagicRoles: true,
+                            screenBacklineProtectors: true,
+                        });
             if (selected.size !== units.length) return incumbent;
             const legal = context.placement.possibleCellHashes(),
                 occupied = new Set<number>();

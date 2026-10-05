@@ -13,12 +13,14 @@ import {
 } from "../../src/ai/versions/v0_8_a19_public_placement";
 const names = ["Dryad", "Troll", "Fairy", "Medusa", "Monk", "Magic Dragon"];
 describe("A19 optional role placement composition", () => {
-    it("preserves native initialization and turn delegation for refined Blocked batteries on either side", () => {
+    it("preserves native initialization and turn delegation for refined Blocked formations on either side", () => {
         const families = [
             ["Wandering Mage", "Wyvern", "Berserker", "Battle Mage", "Zena", "Magic Dragon"],
             ["Wandering Mage", "Valkyrie", "Centaur", "Trent", "Zena", "Tsar Cannon"],
             ["Berserker", "Battle Mage", "Centaur", "Medusa", "Cyclops", "Abomination"],
             ["Arbalester", "Elf", "Berserker", "Medusa", "Monk", "Magic Dragon"],
+            ["Wandering Mage", "Trent", "Arbalester", "Elf", "Monk", "Angel"],
+            ["Squire", "Battle Mage", "Centaur", "Elf", "Monk", "Angel"],
         ];
         for (const family of families)
             for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
