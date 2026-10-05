@@ -485,6 +485,28 @@ export function createV08A19RoleStrategy(
         };
     if (gridType !== PBTypes.GridVals.BLOCK_CENTER) return strategy;
     const own = [...new Set(names)].map((name) => creatureInfo(creatureIdForName(name)!)!);
+    const sparseSpellCarry = own.some((info) => info.level === 4 && info.rangedSpellDamage);
+    const reflectSparseCaster =
+        plan.magic === 1 &&
+        plan.ranged === 2 &&
+        !own.some((info) => info.level === 4 && info.abilities.includes("AI Driven")) &&
+        (sparseSpellCarry
+            ? own.some((info) => info.level < 4 && info.canFly && info.melee)
+            : plan.healer || plan.artillery || own.some((info) => info.level === 4 && !info.canFly));
+    if (reflectSparseCaster)
+        return {
+            version: strategy.version,
+            placeArmy: (units: Unit[], context: IPlacementContext) => {
+                const incumbent = strategy.placeArmy(units, context);
+                if (
+                    context.grid.getGridType() !== gridType ||
+                    (!sparseSpellCarry && context.team !== PBTypes.TeamVals.RIGHT)
+                )
+                    return incumbent;
+                return reflectIncumbentPlacement(units, context, incumbent);
+            },
+            decideTurn: (unit: Unit, context: IDecisionContext) => strategy.decideTurn(unit, context),
+        };
     const compactMagicBattery = plan.magic >= 3 && plan.ranged === 1;
     const reflectHybridHealer = plan.healer && plan.magic === 1 && plan.ranged === 3;
     const disperseSpellBattery =
