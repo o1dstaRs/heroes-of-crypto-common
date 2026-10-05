@@ -151,6 +151,32 @@ import {
 } from "./value_features";
 import { assertNoLegacySeatEnv, seatEnvName } from "../ai/seat_env";
 
+/**
+ * Search reads its switches at construction and again on a few later decisions. Node tests seal those
+ * switches by writing process.env. The browser bundle replaces process.env with a fresh empty object, so
+ * those writes never stick and production search stays off. An active overlay wins; otherwise the read
+ * falls through to process.env, which keeps every existing Node scope byte-identical.
+ */
+let searchEnvOverlay: Readonly<Record<string, string | undefined>> | null = null;
+
+function searchEnv(name: string): string | undefined {
+    if (searchEnvOverlay !== null && Object.prototype.hasOwnProperty.call(searchEnvOverlay, name)) {
+        return searchEnvOverlay[name];
+    }
+    return process.env[name];
+}
+
+/** Bind SearchDriver's env reads to `environment` for `run`, then restore the previous overlay. */
+export function withSearchEnvironment<T>(environment: Readonly<Record<string, string | undefined>>, run: () => T): T {
+    const previous = searchEnvOverlay;
+    searchEnvOverlay = environment;
+    try {
+        return run();
+    } finally {
+        searchEnvOverlay = previous;
+    }
+}
+
 export const V08_RAPID_CHARGE_RESERVATION_ENV = "SEARCH_V08_RAPID_CHARGE_RESERVATION";
 export const V08_RAPID_CHARGE_RESERVATION_VERSIONS_ENV = "SEARCH_V08_RAPID_CHARGE_RESERVATION_VERSIONS";
 export const SEARCH_RESEARCH_HORIZON_ENV = "SEARCH_RESEARCH_HORIZON";
@@ -443,7 +469,7 @@ function parseLearnedValue(raw: string | undefined): ILearnedValue | null {
 }
 
 const envNum = (name: string, fallback: number, min: number): number => {
-    const v = Number(process.env[name]);
+    const v = Number(searchEnv(name));
     return Number.isFinite(v) && v >= min ? v : fallback;
 };
 
@@ -463,9 +489,9 @@ function parseSearchResearchHorizon(
     mode: SearchMode,
     searchVersions: ReadonlySet<string>,
 ): ISearchResearchHorizon | null {
-    const rawHorizon = process.env[SEARCH_RESEARCH_HORIZON_ENV];
-    const rawVersions = process.env[SEARCH_RESEARCH_HORIZON_VERSIONS_ENV];
-    const rawMinRangedTypes = process.env[SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV];
+    const rawHorizon = searchEnv(SEARCH_RESEARCH_HORIZON_ENV);
+    const rawVersions = searchEnv(SEARCH_RESEARCH_HORIZON_VERSIONS_ENV);
+    const rawMinRangedTypes = searchEnv(SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV);
     if (rawHorizon === undefined && rawVersions === undefined && rawMinRangedTypes === undefined) return null;
     if (rawMinRangedTypes !== undefined && rawHorizon === undefined) {
         throw new Error(`${SEARCH_RESEARCH_HORIZON_MIN_RANGED_TYPES_ENV} requires ${SEARCH_RESEARCH_HORIZON_ENV}`);
@@ -512,8 +538,8 @@ function parseSearchResearchShortlist(
     searchVersions: ReadonlySet<string>,
     baseShortlist: number | null,
 ): ISearchResearchShortlist | null {
-    const rawShortlist = process.env[SEARCH_RESEARCH_SHORTLIST_ENV];
-    const rawVersions = process.env[SEARCH_RESEARCH_SHORTLIST_VERSIONS_ENV];
+    const rawShortlist = searchEnv(SEARCH_RESEARCH_SHORTLIST_ENV);
+    const rawVersions = searchEnv(SEARCH_RESEARCH_SHORTLIST_VERSIONS_ENV);
     if (rawShortlist === undefined && rawVersions === undefined) return null;
     if (mode !== "search") {
         throw new Error(`${SEARCH_RESEARCH_SHORTLIST_ENV} requires V07_SEARCH=1`);
@@ -1456,22 +1482,22 @@ export class SearchDriver {
         this.scoredDecisionObserver = scoredDecisionObserver;
         this.passiveProductiveProbeObserver = passiveProductiveProbeObserver;
         const configuredRollbackStrategy =
-            rollbackStrategy ?? resolveRollbackStrategy(process.env.SEARCH_ROLLBACK_STRATEGY);
+            rollbackStrategy ?? resolveRollbackStrategy(searchEnv("SEARCH_ROLLBACK_STRATEGY"));
         if (configuredRollbackStrategy !== "checkpoint" && configuredRollbackStrategy !== "snapshot") {
             throw new Error("Search rollback strategy must be checkpoint or snapshot");
         }
         this.rollbackStrategy = configuredRollbackStrategy;
         this.mode =
-            process.env.Q2_WAIT_ABLATION === "1"
+            searchEnv("Q2_WAIT_ABLATION") === "1"
                 ? "ablation"
-                : process.env.Q2_ORACLE === "1"
+                : searchEnv("Q2_ORACLE") === "1"
                   ? "oracle"
-                  : process.env.V07_SEARCH === "1"
+                  : searchEnv("V07_SEARCH") === "1"
                     ? "search"
                     : "off";
         this.enabled = this.mode !== "off";
         this.versions = new Set(
-            (process.env.SEARCH_VERSIONS ?? (this.mode === "ablation" ? "v0.6" : "v0.6s"))
+            (searchEnv("SEARCH_VERSIONS") ?? (this.mode === "ablation" ? "v0.6" : "v0.6s"))
                 .split(",")
                 .map((v) => v.trim())
                 .filter(Boolean),
@@ -1490,7 +1516,7 @@ export class SearchDriver {
         if (this.rankedReplayTiebreakEpsilon > 0.05) {
             throw new Error(`${V08_RANKED_REPLAY_TIEBREAK_EPSILON_ENV} must be between 0 and 0.05`);
         }
-        const rawRankedReplayTiebreakVersions = process.env[V08_RANKED_REPLAY_TIEBREAK_VERSIONS_ENV];
+        const rawRankedReplayTiebreakVersions = searchEnv(V08_RANKED_REPLAY_TIEBREAK_VERSIONS_ENV);
         this.rankedReplayTiebreakVersions =
             this.rankedReplayTiebreakEpsilon === 0 || rawRankedReplayTiebreakVersions === ""
                 ? new Set()
@@ -1500,11 +1526,11 @@ export class SearchDriver {
                           .map((version) => version.trim())
                           .filter(Boolean),
                   );
-        const rapidChargeReservation = process.env[V08_RAPID_CHARGE_RESERVATION_ENV];
+        const rapidChargeReservation = searchEnv(V08_RAPID_CHARGE_RESERVATION_ENV);
         if (rapidChargeReservation !== undefined && rapidChargeReservation !== "0" && rapidChargeReservation !== "1") {
             throw new Error(`${V08_RAPID_CHARGE_RESERVATION_ENV} must be 0 or 1`);
         }
-        const rawRapidChargeVersions = process.env[V08_RAPID_CHARGE_RESERVATION_VERSIONS_ENV];
+        const rawRapidChargeVersions = searchEnv(V08_RAPID_CHARGE_RESERVATION_VERSIONS_ENV);
         this.rapidChargeReservationVersions =
             rapidChargeReservation !== "1" || rawRapidChargeVersions === ""
                 ? new Set()
@@ -1514,7 +1540,7 @@ export class SearchDriver {
                           .map((version) => version.trim())
                           .filter(Boolean),
                   );
-        const rawFastFlyerCohesion = process.env.SEARCH_A19_FAST_FLYER_COHESION;
+        const rawFastFlyerCohesion = searchEnv("SEARCH_A19_FAST_FLYER_COHESION");
         if (
             rawFastFlyerCohesion !== undefined &&
             rawFastFlyerCohesion !== "" &&
@@ -1524,8 +1550,9 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_FAST_FLYER_COHESION must be 0 or 1");
         }
         this.fastFlyerCohesion = this.mode === "search" && rawFastFlyerCohesion === "1";
-        const rawSoleAbominationArmageddonDefendPolicy =
-            process.env[SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV];
+        const rawSoleAbominationArmageddonDefendPolicy = searchEnv(
+            SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY_ENV,
+        );
         if (
             rawSoleAbominationArmageddonDefendPolicy !== undefined &&
             rawSoleAbominationArmageddonDefendPolicy !== "" &&
@@ -1536,7 +1563,7 @@ export class SearchDriver {
         }
         this.soleAbominationArmageddonDefendPolicy =
             this.mode === "search" && rawSoleAbominationArmageddonDefendPolicy === "1";
-        const rawAbominationMirrorRelease = process.env.SEARCH_A19_ABOMINATION_MIRROR_RELEASE;
+        const rawAbominationMirrorRelease = searchEnv("SEARCH_A19_ABOMINATION_MIRROR_RELEASE");
         if (
             rawAbominationMirrorRelease !== undefined &&
             rawAbominationMirrorRelease !== "" &&
@@ -1546,7 +1573,7 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_ABOMINATION_MIRROR_RELEASE must be 0 or 1");
         }
         this.abominationMirrorRelease = this.mode === "search" && rawAbominationMirrorRelease === "1";
-        const rawStrictAggressiveWaitTies = process.env.SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES;
+        const rawStrictAggressiveWaitTies = searchEnv("SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES");
         if (
             rawStrictAggressiveWaitTies !== undefined &&
             rawStrictAggressiveWaitTies !== "" &&
@@ -1556,7 +1583,7 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES must be 0 or 1");
         }
         this.strictAggressiveWaitTies = this.mode === "search" && rawStrictAggressiveWaitTies === "1";
-        const rawNonregressiveProductiveOverride = process.env.SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE;
+        const rawNonregressiveProductiveOverride = searchEnv("SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE");
         if (
             rawNonregressiveProductiveOverride !== undefined &&
             rawNonregressiveProductiveOverride !== "" &&
@@ -1566,7 +1593,7 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_NONREGRESSIVE_PRODUCTIVE_OVERRIDE must be 0 or 1");
         }
         this.nonregressiveProductiveOverride = this.mode === "search" && rawNonregressiveProductiveOverride === "1";
-        const rawExactTerminalResults = process.env.SEARCH_A19_EXACT_TERMINAL_RESULTS;
+        const rawExactTerminalResults = searchEnv("SEARCH_A19_EXACT_TERMINAL_RESULTS");
         if (
             rawExactTerminalResults !== undefined &&
             rawExactTerminalResults !== "" &&
@@ -1576,7 +1603,7 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_EXACT_TERMINAL_RESULTS must be 0 or 1");
         }
         this.exactTerminalResults = this.mode === "search" && rawExactTerminalResults === "1";
-        const rawScoredArbitration = process.env.SEARCH_A19_SCORED_ARBITRATION;
+        const rawScoredArbitration = searchEnv("SEARCH_A19_SCORED_ARBITRATION");
         if (
             rawScoredArbitration !== undefined &&
             rawScoredArbitration !== "" &&
@@ -1586,7 +1613,7 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_SCORED_ARBITRATION must be 0 or 1");
         }
         this.a19ScoredArbitration = this.mode === "search" && rawScoredArbitration === "1";
-        const materialMode = process.env.SEARCH_A19_MATERIAL_ARBITRATION;
+        const materialMode = searchEnv("SEARCH_A19_MATERIAL_ARBITRATION");
         if (
             materialMode !== undefined &&
             materialMode !== "" &&
@@ -1610,7 +1637,7 @@ export class SearchDriver {
                 materialMode === "sample-relative")
                 ? materialMode
                 : undefined;
-        const lowEvidenceWinningSamples = Number(process.env.SEARCH_A19_MATERIAL_LOW_EVIDENCE_WINS ?? "1");
+        const lowEvidenceWinningSamples = Number(searchEnv("SEARCH_A19_MATERIAL_LOW_EVIDENCE_WINS") ?? "1");
         if (
             !Number.isInteger(lowEvidenceWinningSamples) ||
             lowEvidenceWinningSamples < 1 ||
@@ -1619,12 +1646,12 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_MATERIAL_LOW_EVIDENCE_WINS must be an integer from 1 to 8");
         }
         this.a19MaterialLowEvidenceWinningSamples = lowEvidenceWinningSamples;
-        const barrelCoverage = process.env.SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE;
+        const barrelCoverage = searchEnv("SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE");
         if (barrelCoverage !== undefined && barrelCoverage !== "" && barrelCoverage !== "0" && barrelCoverage !== "1") {
             throw new Error("SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE must be 0 or 1");
         }
         this.a19ArtifactBarrelAttackCoverage = this.mode === "search" && barrelCoverage === "1";
-        const rawAdaptiveBudget = process.env.SEARCH_A19_ADAPTIVE_BUDGET;
+        const rawAdaptiveBudget = searchEnv("SEARCH_A19_ADAPTIVE_BUDGET");
         if (
             rawAdaptiveBudget !== undefined &&
             rawAdaptiveBudget !== "" &&
@@ -1640,8 +1667,8 @@ export class SearchDriver {
         this.researchHorizonVersions = researchHorizon?.versions ?? new Set();
         this.researchHorizonMinRangedTypes = researchHorizon?.minRangedTypes ?? null;
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
-        this.includeMoves = process.env.SEARCH_INCLUDE_MOVES === "1";
-        const rawMaxMoveShots = process.env.SEARCH_MAX_MOVE_SHOTS;
+        this.includeMoves = searchEnv("SEARCH_INCLUDE_MOVES") === "1";
+        const rawMaxMoveShots = searchEnv("SEARCH_MAX_MOVE_SHOTS");
         if (this.mode !== "search" || rawMaxMoveShots === undefined || rawMaxMoveShots === "") {
             this.maxMoveShotComposites = 0;
         } else {
@@ -1651,7 +1678,7 @@ export class SearchDriver {
             }
             this.maxMoveShotComposites = maxMoveShots;
         }
-        const rawMoveShotVersions = process.env.SEARCH_MOVE_SHOT_VERSIONS;
+        const rawMoveShotVersions = searchEnv("SEARCH_MOVE_SHOT_VERSIONS");
         if (this.maxMoveShotComposites === 0) {
             this.moveShotVersions = new Set();
         } else if (rawMoveShotVersions === undefined) {
@@ -1667,24 +1694,24 @@ export class SearchDriver {
             }
             this.moveShotVersions = new Set(moveShotVersions);
         }
-        this.activeChallengers = this.mode === "search" && process.env.SEARCH_ACTIVE_CHALLENGERS === "1";
-        this.aggressiveV08 = this.mode === "search" && process.env.V08_AGGRESSIVE === "1";
-        const rawObserveOnly = process.env.SEARCH_OBSERVE_ONLY;
+        this.activeChallengers = this.mode === "search" && searchEnv("SEARCH_ACTIVE_CHALLENGERS") === "1";
+        this.aggressiveV08 = this.mode === "search" && searchEnv("V08_AGGRESSIVE") === "1";
+        const rawObserveOnly = searchEnv("SEARCH_OBSERVE_ONLY");
         if (rawObserveOnly !== undefined && rawObserveOnly !== "" && rawObserveOnly !== "0" && rawObserveOnly !== "1") {
             throw new Error("SEARCH_OBSERVE_ONLY must be 0 or 1");
         }
         this.observeOnly = rawObserveOnly === "1";
         this.incumbentKinds = parseKindFilter<IncumbentKind>(
             "SEARCH_INCUMBENT_KINDS",
-            process.env.SEARCH_INCUMBENT_KINDS,
+            searchEnv("SEARCH_INCUMBENT_KINDS"),
             INCUMBENT_KINDS,
         );
         this.challengerKinds = parseKindFilter<CandidateKind>(
             "SEARCH_CHALLENGER_KINDS",
-            process.env.SEARCH_CHALLENGER_KINDS,
+            searchEnv("SEARCH_CHALLENGER_KINDS"),
             CHALLENGER_KINDS,
         );
-        const rawValidationRollouts = process.env.SEARCH_VALIDATION_ROLLOUTS;
+        const rawValidationRollouts = searchEnv("SEARCH_VALIDATION_ROLLOUTS");
         if (rawValidationRollouts === undefined || rawValidationRollouts === "") {
             this.validationRollouts = null;
         } else {
@@ -1702,12 +1729,12 @@ export class SearchDriver {
                 "SEARCH_INCUMBENT_KINDS, SEARCH_CHALLENGER_KINDS, and SEARCH_VALIDATION_ROLLOUTS require SEARCH_OBSERVE_ONLY=1",
             );
         }
-        if (this.validationRollouts !== null && process.env.SEARCH_IL_DATASET) {
+        if (this.validationRollouts !== null && searchEnv("SEARCH_IL_DATASET")) {
             throw new Error(
                 "SEARCH_VALIDATION_ROLLOUTS cannot be combined with SEARCH_IL_DATASET; use SEARCH_AUDIT_TURNS",
             );
         }
-        const rawShortlist = process.env.SEARCH_SHORTLIST;
+        const rawShortlist = searchEnv("SEARCH_SHORTLIST");
         if (this.mode !== "search" || rawShortlist === undefined || rawShortlist === "") {
             this.shortlist = null;
         } else {
@@ -1720,7 +1747,7 @@ export class SearchDriver {
         const researchShortlist = parseSearchResearchShortlist(this.mode, this.versions, this.shortlist);
         this.researchShortlist = researchShortlist?.shortlist ?? null;
         this.researchShortlistVersions = researchShortlist?.versions ?? new Set();
-        const rawDecisionDeadline = process.env.SEARCH_DECISION_DEADLINE_MS;
+        const rawDecisionDeadline = searchEnv("SEARCH_DECISION_DEADLINE_MS");
         if (this.mode !== "search" || rawDecisionDeadline === undefined || rawDecisionDeadline === "") {
             this.decisionDeadlineMs = null;
         } else {
@@ -1731,12 +1758,12 @@ export class SearchDriver {
             this.decisionDeadlineMs = decisionDeadlineMs;
         }
         const rawWaitDeadlinePolicy =
-            this.mode === "search" ? process.env.SEARCH_WAIT_DEADLINE_POLICY?.trim() || "profile" : "profile";
+            this.mode === "search" ? searchEnv("SEARCH_WAIT_DEADLINE_POLICY")?.trim() || "profile" : "profile";
         if (rawWaitDeadlinePolicy !== "profile" && rawWaitDeadlinePolicy !== "operation_bounded") {
             throw new Error("SEARCH_WAIT_DEADLINE_POLICY must be profile or operation_bounded");
         }
         this.waitDeadlinePolicy = rawWaitDeadlinePolicy;
-        const circuitBreakerMs = Number(process.env.SEARCH_CIRCUIT_BREAKER_MS);
+        const circuitBreakerMs = Number(searchEnv("SEARCH_CIRCUIT_BREAKER_MS"));
         this.circuitBreakerMs =
             this.mode === "search" && Number.isFinite(circuitBreakerMs) && circuitBreakerMs > 0
                 ? circuitBreakerMs
@@ -1748,7 +1775,7 @@ export class SearchDriver {
         ) {
             throw new Error("SEARCH_DECISION_DEADLINE_MS must be below SEARCH_CIRCUIT_BREAKER_MS");
         }
-        const rawFinishWeight = process.env.SEARCH_LATE_RANGED_FINISH_WEIGHT;
+        const rawFinishWeight = searchEnv("SEARCH_LATE_RANGED_FINISH_WEIGHT");
         if (this.mode !== "search" || rawFinishWeight === undefined || rawFinishWeight === "") {
             this.lateRangedFinishWeight = 0;
         } else {
@@ -1758,7 +1785,7 @@ export class SearchDriver {
             }
             this.lateRangedFinishWeight = finishWeight;
         }
-        const rawPureRangedTerminalWeight = process.env.SEARCH_PURE_RANGED_TERMINAL_WEIGHT;
+        const rawPureRangedTerminalWeight = searchEnv("SEARCH_PURE_RANGED_TERMINAL_WEIGHT");
         if (this.mode !== "search" || rawPureRangedTerminalWeight === undefined || rawPureRangedTerminalWeight === "") {
             this.pureRangedTerminalWeight = 0;
         } else {
@@ -1768,7 +1795,7 @@ export class SearchDriver {
             }
             this.pureRangedTerminalWeight = terminalWeight;
         }
-        const rawPureRangedNoMeleePressure = process.env.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE;
+        const rawPureRangedNoMeleePressure = searchEnv("SEARCH_PURE_RANGED_NO_MELEE_PRESSURE");
         if (
             this.mode === "search" &&
             rawPureRangedNoMeleePressure !== undefined &&
@@ -1779,7 +1806,7 @@ export class SearchDriver {
             throw new Error("SEARCH_PURE_RANGED_NO_MELEE_PRESSURE must be 0 or 1");
         }
         this.pureRangedNoMeleePressure = this.mode === "search" && rawPureRangedNoMeleePressure === "1";
-        const rawPureRangedNoMeleePressureVersions = process.env.SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS;
+        const rawPureRangedNoMeleePressureVersions = searchEnv("SEARCH_PURE_RANGED_NO_MELEE_PRESSURE_VERSIONS");
         if (!this.pureRangedNoMeleePressure) {
             this.pureRangedNoMeleePressureVersions = new Set();
         } else if (rawPureRangedNoMeleePressureVersions === undefined) {
@@ -1797,7 +1824,7 @@ export class SearchDriver {
             }
             this.pureRangedNoMeleePressureVersions = new Set(versions);
         }
-        const rawPureRangedDeadlineFinisher = process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER;
+        const rawPureRangedDeadlineFinisher = searchEnv("SEARCH_PURE_RANGED_DEADLINE_FINISHER");
         if (
             this.mode === "search" &&
             rawPureRangedDeadlineFinisher !== undefined &&
@@ -1808,7 +1835,7 @@ export class SearchDriver {
             throw new Error("SEARCH_PURE_RANGED_DEADLINE_FINISHER must be 0 or 1");
         }
         this.pureRangedDeadlineFinisher = this.mode === "search" && rawPureRangedDeadlineFinisher === "1";
-        const rawPureRangedDeadlineFinisherVersions = process.env.SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS;
+        const rawPureRangedDeadlineFinisherVersions = searchEnv("SEARCH_PURE_RANGED_DEADLINE_FINISHER_VERSIONS");
         if (!this.pureRangedDeadlineFinisher) {
             this.pureRangedDeadlineFinisherVersions = new Set();
         } else if (rawPureRangedDeadlineFinisherVersions === undefined) {
@@ -1826,7 +1853,7 @@ export class SearchDriver {
             }
             this.pureRangedDeadlineFinisherVersions = new Set(versions);
         }
-        const rawPureRangedParetoNoMeleeFocus = process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS;
+        const rawPureRangedParetoNoMeleeFocus = searchEnv("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS");
         if (
             this.mode === "search" &&
             rawPureRangedParetoNoMeleeFocus !== undefined &&
@@ -1837,7 +1864,7 @@ export class SearchDriver {
             throw new Error("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS must be 0 or 1");
         }
         this.pureRangedParetoNoMeleeFocus = this.mode === "search" && rawPureRangedParetoNoMeleeFocus === "1";
-        const rawPureRangedParetoNoMeleeFocusScope = process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE;
+        const rawPureRangedParetoNoMeleeFocusScope = searchEnv("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE");
         if (
             !this.pureRangedParetoNoMeleeFocus ||
             rawPureRangedParetoNoMeleeFocusScope === undefined ||
@@ -1855,7 +1882,7 @@ export class SearchDriver {
                 "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_SCOPE must be pure_ranged, any_board, or mixed_supported",
             );
         }
-        const rawPureRangedParetoNoMeleeFocusVersions = process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS;
+        const rawPureRangedParetoNoMeleeFocusVersions = searchEnv("SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_VERSIONS");
         if (!this.pureRangedParetoNoMeleeFocus) {
             this.pureRangedParetoNoMeleeFocusVersions = new Set();
         } else if (rawPureRangedParetoNoMeleeFocusVersions === undefined) {
@@ -1873,8 +1900,9 @@ export class SearchDriver {
             }
             this.pureRangedParetoNoMeleeFocusVersions = new Set(versions);
         }
-        const rawPureRangedParetoNoMeleeFocusDamageFloor =
-            process.env.SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR;
+        const rawPureRangedParetoNoMeleeFocusDamageFloor = searchEnv(
+            "SEARCH_PURE_RANGED_PARETO_NO_MELEE_FOCUS_DAMAGE_FLOOR",
+        );
         if (!this.pureRangedParetoNoMeleeFocus) {
             this.pureRangedParetoNoMeleeFocusDamageFloor = 1;
         } else if (
@@ -1898,7 +1926,7 @@ export class SearchDriver {
                     "requires damage floor 1",
             );
         }
-        const rawPureRangedJitNoMeleeFocus = process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS;
+        const rawPureRangedJitNoMeleeFocus = searchEnv("SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS");
         if (
             this.mode === "search" &&
             rawPureRangedJitNoMeleeFocus !== undefined &&
@@ -1909,7 +1937,7 @@ export class SearchDriver {
             throw new Error("SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS must be 0 or 1");
         }
         this.pureRangedJitNoMeleeFocus = this.mode === "search" && rawPureRangedJitNoMeleeFocus === "1";
-        const rawPureRangedJitNoMeleeFocusVersions = process.env.SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS;
+        const rawPureRangedJitNoMeleeFocusVersions = searchEnv("SEARCH_PURE_RANGED_JIT_NO_MELEE_FOCUS_VERSIONS");
         if (!this.pureRangedJitNoMeleeFocus) {
             this.pureRangedJitNoMeleeFocusVersions = new Set();
         } else if (rawPureRangedJitNoMeleeFocusVersions === undefined) {
@@ -1941,7 +1969,7 @@ export class SearchDriver {
                     "are mutually exclusive",
             );
         }
-        const rawValueWeights = process.env.V07_VALUE_WEIGHTS;
+        const rawValueWeights = searchEnv("V07_VALUE_WEIGHTS");
         this.learned =
             rawValueWeights === "material"
                 ? null
@@ -1950,7 +1978,7 @@ export class SearchDriver {
                   : { b: DEFAULT_V07_VALUE_WEIGHTS.b, w: [...DEFAULT_V07_VALUE_WEIGHTS.w] };
         // V2 leaf candidate: absent, malformed, or all-zero falls back to the prior leaf. Two explicit leaf
         // selectors are ambiguous experiment provenance, so reject the combination instead of guessing.
-        const parsedV2 = parseLearnedValueWidth(process.env.V07_VALUE_WEIGHTS_V2, VALUE_FEATURE_NAMES_V2.length);
+        const parsedV2 = parseLearnedValueWidth(searchEnv("V07_VALUE_WEIGHTS_V2"), VALUE_FEATURE_NAMES_V2.length);
         this.learnedV2 = parsedV2 && (parsedV2.b !== 0 || parsedV2.w.some((weight) => weight !== 0)) ? parsedV2 : null;
         if (this.learnedV2 && rawValueWeights !== undefined) {
             throw new Error("V07_VALUE_WEIGHTS_V2 cannot be combined with explicit V07_VALUE_WEIGHTS");
@@ -1965,24 +1993,24 @@ export class SearchDriver {
         };
         assertNoLegacySeatEnv("V07_VALUE_WEIGHTS_V2");
         for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
-            this.learnedV2ByTeam.set(team, parseTeamLeaf(process.env[seatEnvName("V07_VALUE_WEIGHTS_V2", team)]));
+            this.learnedV2ByTeam.set(team, parseTeamLeaf(searchEnv(seatEnvName("V07_VALUE_WEIGHTS_V2", team))));
         }
-        const rawOppModel = this.enabled ? process.env.SEARCH_OPP_MODEL?.trim() : undefined;
+        const rawOppModel = this.enabled ? searchEnv("SEARCH_OPP_MODEL")?.trim() : undefined;
         this.oppModel = rawOppModel ? getAIStrategy(rawOppModel) : null; // throws on an unknown version
-        const rawAudit = process.env.SEARCH_AUDIT;
+        const rawAudit = searchEnv("SEARCH_AUDIT");
         this.auditPath =
             !rawAudit || rawAudit === "0"
                 ? undefined
                 : rawAudit === "1"
                   ? join(process.cwd(), "search_audit.jsonl")
                   : rawAudit;
-        this.auditTurns = process.env.SEARCH_AUDIT_TURNS === "1";
-        this.datasetPath = this.mode === "oracle" ? process.env.Q2_DATASET || undefined : undefined;
-        this.datasetV2 = process.env.Q2_DATASET_V2 === "1";
-        this.ilPath = this.mode === "search" ? process.env.SEARCH_IL_DATASET || undefined : undefined;
+        this.auditTurns = searchEnv("SEARCH_AUDIT_TURNS") === "1";
+        this.datasetPath = this.mode === "oracle" ? searchEnv("Q2_DATASET") || undefined : undefined;
+        this.datasetV2 = searchEnv("Q2_DATASET_V2") === "1";
+        this.ilPath = this.mode === "search" ? searchEnv("SEARCH_IL_DATASET") || undefined : undefined;
         if (this.ilPath) {
-            this.ilRunFingerprint = requireIlRunFingerprint(process.env.SEARCH_IL_RUN_FINGERPRINT);
-            this.ilCohort = process.env.SEARCH_IL_COHORT?.trim() || null;
+            this.ilRunFingerprint = requireIlRunFingerprint(searchEnv("SEARCH_IL_RUN_FINGERPRINT"));
+            this.ilCohort = searchEnv("SEARCH_IL_COHORT")?.trim() || null;
             if (!this.ilCohort) {
                 throw new Error("SEARCH_IL_COHORT is required with SEARCH_IL_DATASET");
             }
@@ -2001,7 +2029,7 @@ export class SearchDriver {
             this.ilCohort = null;
         }
         if (this.datasetPath && this.datasetV2) {
-            this.datasetFingerprint = requirePhaseBRunFingerprint(process.env.PHASE_B_RUN_FINGERPRINT);
+            this.datasetFingerprint = requirePhaseBRunFingerprint(searchEnv("PHASE_B_RUN_FINGERPRINT"));
             this.datasetSeed = canonicalPhaseBSeed(this.match.seed, "Q2 dataset seed");
             if (!this.match.greenVersion || !this.match.redVersion) {
                 throw new Error("Phase-B Q2 dataset rows require green and red strategy versions");
@@ -2128,7 +2156,7 @@ export class SearchDriver {
         rootDecisionContext?: IDecisionContext,
     ): GameAction[] {
         const healerWaitGuard =
-            process.env.SEARCH_A19_HEALER_OPENING_COHESION === "1" &&
+            searchEnv("SEARCH_A19_HEALER_OPENING_COHESION") === "1" &&
             this.enabled &&
             version === "v0.8" &&
             this.versions.has(version) &&
@@ -2532,7 +2560,7 @@ export class SearchDriver {
             const keepCandidate = (candidate: IEnumeratedCandidate): boolean => {
                 if (candidate.kind === "incumbent") return true;
                 if (
-                    process.env.SEARCH_A19_HEALER_OPENING_COHESION === "1" &&
+                    searchEnv("SEARCH_A19_HEALER_OPENING_COHESION") === "1" &&
                     isV08Search &&
                     rootDecisionContext?.fightProperties &&
                     canWaitOnHourglass(
@@ -4840,7 +4868,7 @@ export class SearchDriver {
             // channel carries the exact action it replaced — score {wait, replaced} to the same
             // end-of-lap horizon and label whether keeping the wait was right. Collection-only: the
             // live decision is never changed here, so trajectories stay on-policy.
-            const replaced = process.env.B2_ORACLE === "1" ? consumeWaitReplacement(unit.getId()) : undefined;
+            const replaced = searchEnv("B2_ORACLE") === "1" ? consumeWaitReplacement(unit.getId()) : undefined;
             if (replaced && !replaced.some((a) => a.type === "wait_turn")) {
                 c.q2oPoints += 1;
                 c.q2oIncumbentWait += 1;

@@ -32,9 +32,15 @@ import {
     V08_A19_SOURCE_LEDGER,
 } from "../../src/ai/versions/v0_8_a19_profile";
 import { V08A19RankedPlacementStrategy } from "../../src/ai/versions/v0_8_a19_ranked_placement";
+import type { ILookaheadDeps } from "../../src/simulation/lookahead";
 import { runMatch } from "../../src/simulation/battle_engine";
 import { fingerprintV08AlignedV1 } from "../../src/simulation/optimizer/v0_8_aligned_96h_v1_protocol";
-import { shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "../../src/simulation/v0_8_a19_search";
+import { SearchDriver, withSearchEnvironment } from "../../src/simulation/search_driver";
+import {
+    createV08A19SearchDriver,
+    shouldUseDefaultV08A19Search,
+    V08_A19_SEARCH_OVERRIDE_ENV,
+} from "../../src/simulation/v0_8_a19_search";
 import { V08_A13_SEARCH_OVERRIDE_ENV } from "../../src/simulation/v0_8_a13_search";
 
 const ENV_KEYS = [
@@ -247,5 +253,22 @@ describe("v0.8+A19 production profile", () => {
         expect(observedDynamicFlags.length).toBeGreaterThan(0);
         expect(observedDynamicFlags.every((value) => value === undefined)).toBe(true);
         expect(process.env.V08_VISIBLE_EDGE_SCREEN_PRESSURE).toBe("1");
+    });
+
+    it("reads the sealed A19 search switches from the overlay when process.env cannot hold them", () => {
+        delete process.env.V07_SEARCH;
+        const match = { greenVersion: "v0.8", redVersion: "v0.8" };
+        const outside = new SearchDriver({} as ILookaheadDeps, match);
+        expect(outside.appliesTo("v0.8")).toBe(false);
+
+        withSearchEnvironment(buildV08A19SearchEnvironment(), () => {
+            const inside = new SearchDriver({} as ILookaheadDeps, match);
+            expect(inside.appliesTo("v0.8")).toBe(true);
+            expect(process.env.V07_SEARCH).toBeUndefined();
+        });
+
+        const driver = createV08A19SearchDriver({} as ILookaheadDeps, match);
+        expect(driver.appliesTo("v0.8")).toBe(true);
+        expect(process.env.V07_SEARCH).toBeUndefined();
     });
 });

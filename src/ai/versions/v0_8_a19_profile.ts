@@ -139,8 +139,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for opt-in material evidence, opening healer cohesion, and public barrel coverage.
-        sha256: "4093156063d40171046b367d13b123a34f7a39bfe1c5ff17bed59de3291cf93c" as const,
+        // Re-pinned for the browser-safe search env overlay. Node still falls through to process.env.
+        sha256: "7377c1ce44d0cfcc6eec4d389fdd399b63909aae8f6db9f90af3721ee53088f9" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,
@@ -185,7 +185,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "default-search-factory" as const,
         source: "src/simulation/v0_8_a19_search.ts" as const,
-        sha256: "9c1d70f719c8f6db786a0d00b04a40e4bfa9b90b22c0f22d1ae4374905faf134" as const,
+        sha256: "77d6ffbfbf9a2ad74e2b7a995875ceec71b35bd663831e1f92c7ac337dbff860" as const,
     }),
     Object.freeze({
         role: "default-search-routing" as const,
