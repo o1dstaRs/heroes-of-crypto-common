@@ -139,8 +139,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for the browser-safe search env overlay. Node still falls through to process.env.
-        sha256: "7377c1ce44d0cfcc6eec4d389fdd399b63909aae8f6db9f90af3721ee53088f9" as const,
+        // Re-pinned for the search env overlay follow-ups (a13/a19 search wiring).
+        sha256: "02863bc67d001d6f5bfae476b9017e08b4e39216ece763238605fdbee2daca10" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,
