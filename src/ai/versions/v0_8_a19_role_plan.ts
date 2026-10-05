@@ -58,6 +58,12 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
             infos.some((info) => info.level === 4 && info.abilities.includes("AI Driven")));
     const deepBlockedArea = areaCarry && magic === 1 && ranged >= 4 && gridType === PBTypes.GridVals.BLOCK_CENTER;
     const deepNormalArtillery = artillery && magic === 1 && ranged >= 4 && gridType === PBTypes.GridVals.NORMAL;
+    const deepNormalSupportedArtillery =
+        gridType === PBTypes.GridVals.NORMAL &&
+        artillery &&
+        magic === 1 &&
+        ranged === 3 &&
+        infos.some((info) => info.level < 4 && info.canFly && info.melee && info.castsAmplifiableBuff);
     const deepBlockedSpell = spellCarry && magic === 1 && ranged >= 3 && gridType === PBTypes.GridVals.BLOCK_CENTER;
     const deepBufferedArtillery =
         gridType === PBTypes.GridVals.BLOCK_CENTER &&
@@ -91,11 +97,19 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
                 ? 128
                 : deepNormalArtillery
                   ? 96
-                  : (artillery && ranged >= 4) || lavaMixedArtillery || normalLavaPhysicalDepth
+                  : deepNormalSupportedArtillery ||
+                      (artillery && ranged >= 4) ||
+                      lavaMixedArtillery ||
+                      normalLavaPhysicalDepth
                     ? 64
                     : 32,
         horizon:
-            deepSparseAnchor || deepBlockedArea || deepNormalArtillery || deepBlockedSpell || deepBufferedArtillery
+            deepSparseAnchor ||
+            deepBlockedArea ||
+            deepNormalArtillery ||
+            deepNormalSupportedArtillery ||
+            deepBlockedSpell ||
+            deepBufferedArtillery
                 ? 128
                 : (artillery && ranged >= 4) || lavaMixedArtillery || normalLavaPhysicalDepth
                   ? 128

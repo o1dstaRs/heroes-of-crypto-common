@@ -90,6 +90,33 @@ describe("A19 optional own-army role search plan", () => {
         const plain = ["Wandering Mage", "Beholder", "Peasant", "Hyena", "Cyclops", "Tsar Cannon"];
         expect(roleSearchPlan(plain, PBTypes.GridVals.BLOCK_CENTER).rollouts).toBe(32);
     });
+    it("deepens Normal sparse artillery with flying melee buff support while preserving unsupported and other-map plans", () => {
+        const supported = ["Orc", "Valkyrie", "Wandering Mage", "Pikeman", "Zena", "Tsar Cannon"];
+        const plan = roleSearchPlan(supported, PBTypes.GridVals.NORMAL);
+        const overrides = v08A19RoleSearchOverrides(plan);
+        expect(overrides.SEARCH_ROLLOUTS).toBe("64");
+        expect(overrides.SEARCH_HORIZON).toBe("128");
+        expect(plan.moves).toBe(4);
+        expect(plan.shortlist).toBe(24);
+        expect(plan.material).toBe("sample-relative");
+        expect(roleSearchPlan([...supported, "Valkyrie", "Pikeman"])).toEqual(plan);
+        const unsupported = ["Orc", "Harpy", "Wandering Mage", "Trent", "Zena", "Tsar Cannon"];
+        const noArtillery = [...supported.slice(0, -1), "Angel"];
+        const noMagic = supported.map((name) => (name === "Wandering Mage" ? "Squire" : name));
+        for (const names of [unsupported, noArtillery, noMagic]) {
+            const native = roleSearchPlan(names, PBTypes.GridVals.NORMAL);
+            expect(native.rollouts).toBe(32);
+            expect(native.horizon).toBe(64);
+        }
+        for (const [map, rollouts] of [
+            [PBTypes.GridVals.LAVA_CENTER, 64],
+            [PBTypes.GridVals.BLOCK_CENTER, 128],
+        ] as const) {
+            const native = roleSearchPlan(supported, map);
+            expect(native.rollouts).toBe(rollouts);
+            expect(native.horizon).toBe(128);
+        }
+    });
     it("expands ground hybrid movement without applying that change to a Dense Flesh carry", () => {
         const ground = ["Leprechaun", "Medusa", "Wandering Mage", "Elf", "Monk", "Frenzied Boar"];
         expect(roleSearchPlan(ground, PBTypes.GridVals.BLOCK_CENTER).moves).toBe(8);
