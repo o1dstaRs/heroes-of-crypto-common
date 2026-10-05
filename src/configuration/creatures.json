@@ -175,7 +175,7 @@
         "Battle Mage": {
             "name": "Battle Mage",
             "hp": 12,
-            "steps": 3.3,
+            "steps": 3.4,
             "initiative": 2.1,
             "armor": 9,
             "attack_type": "MELEE_MAGIC",
@@ -942,8 +942,8 @@
         "Wandering Mage": {
             "name": "Wandering Mage",
             "hp": 6,
-            "steps": 4.1,
-            "initiative": 4.1,
+            "steps": 4.2,
+            "initiative": 2.3,
             "armor": 8,
             "attack_type": "MELEE",
             "attack": 8,

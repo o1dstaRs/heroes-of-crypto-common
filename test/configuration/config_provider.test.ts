@@ -200,18 +200,18 @@ describe("config_provider", () => {
         expect(magicDragon.initiative).toBe(2.4);
     });
 
-    it("loads Wandering Mage's reduced walking movement and initiative", () => {
+    it("loads Wandering Mage's walking movement and reduced initiative", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Chaos", "Wandering Mage", "wandering_mage_512", 1);
 
-        expect(creature.steps).toBe(4.1);
-        expect(creature.initiative).toBe(4.1);
+        expect(creature.steps).toBe(4.2);
+        expect(creature.initiative).toBe(2.3);
         expect(creature.movement_type).toBe(PBTypes.MovementVals.WALK);
     });
 
     it("preserves Battle Mage's walking movement", () => {
         const creature = getCreatureConfig(PBTypes.TeamVals.RIGHT, "Life", "Battle Mage", "battle_mage_512", 1);
 
-        expect(creature.steps).toBe(3.3);
+        expect(creature.steps).toBe(3.4);
         expect(creature.movement_type).toBe(PBTypes.MovementVals.WALK);
     });
 
