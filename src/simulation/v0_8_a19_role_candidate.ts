@@ -275,17 +275,40 @@ export function prepareV08A19RoleCandidate(config: IMatchConfig, side: Side): Re
             config[augmentKey] = empowered;
     }
 
+    const blockedHybridArtillery =
+        config.gridType === PBTypes.GridVals.BLOCK_CENTER && plan.artillery && plan.magic === 2 && plan.ranged === 3;
+    if (
+        blockedHybridArtillery &&
+        ownNames.some((name) => {
+            const info = creatureInfo(creatureIdForName(name)!)!;
+            return (
+                info.level < 4 && info.canFly && info.melee && info.footprintWidth === 1 && info.footprintHeight === 1
+            );
+        })
+    ) {
+        const empowered: ISetupAugment[] = [
+            { kind: "Sniper", value: 3 },
+            { kind: "Armor", value: 3 },
+            { kind: "Empower", value: 1 },
+        ];
+        const roster = config[ownRosterKey],
+            identities = [...new Set(roster.map((unit) => creatureIdForName(unit.creatureName)!))];
+        if (roster.length <= rankedDraftStackCapacity(identities, empowered, config.synergyVariants ?? {}))
+            config[augmentKey] = empowered;
+    }
+
     config.searchEnvOverrideTeams = [side === "green" ? PBTypes.TeamVals.LEFT : PBTypes.TeamVals.RIGHT];
     const strategy = createV08A19RoleStrategy(ownNames, config.gridType ?? PBTypes.GridVals.NORMAL);
     if (side === "green") config.greenStrategyOverride = strategy;
     else config.redStrategyOverride = strategy;
     const overrides = v08A19RoleSearchOverrides(plan);
     if (
-        side === "green" &&
-        config.gridType === PBTypes.GridVals.LAVA_CENTER &&
-        plan.magic === 0 &&
-        plan.ranged >= 4 &&
-        plan.artillery
+        (side === "green" &&
+            config.gridType === PBTypes.GridVals.LAVA_CENTER &&
+            plan.magic === 0 &&
+            plan.ranged >= 4 &&
+            plan.artillery) ||
+        (side === "red" && blockedHybridArtillery)
     )
         return Object.freeze({ ...overrides, SEARCH_ROLLOUTS: "128", SEARCH_HORIZON: "256" });
     return overrides;

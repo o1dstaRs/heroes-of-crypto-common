@@ -4,6 +4,8 @@ import { buildV08A19SearchEnvironment, V08_A19_SEARCH_RULES } from "../../src/ai
 import type { IMatchConfig } from "../../src/simulation/battle_engine";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { creatureInfo, creatureIdForName } from "../../src/ai/setup/creature_score";
+import { roleSearchPlan, v08A19RoleSearchOverrides } from "../../src/ai/versions/v0_8_a19_role_plan";
+import { rankedDraftStackCapacity } from "../../src/simulation/ranked_draft_eval";
 import { ToFactionName } from "../../src/factions/faction_type";
 import { createV08A19SearchDriver } from "../../src/simulation/v0_8_a19_search";
 const fixture = (): IMatchConfig => ({
@@ -41,6 +43,156 @@ const fixture = (): IMatchConfig => ({
     redTacticalSplitStacks: [],
 });
 describe("A19 opt-in complete ranked simulation candidate", () => {
+    it("scopes Blocked hybrid artillery depth and small flying support empowerment while preserving ranked setup", () => {
+        for (const support of ["Harpy", "Manticore", "Berserker"])
+            for (const side of ["green", "red"] as const)
+                for (const gridType of [
+                    PBTypes.GridVals.NORMAL,
+                    PBTypes.GridVals.LAVA_CENTER,
+                    PBTypes.GridVals.BLOCK_CENTER,
+                ]) {
+                    const c = fixture(),
+                        own = side === "green" ? "roster" : "redRoster",
+                        enemy = side === "green" ? "red" : "green";
+                    c.gridType = gridType;
+                    c.greenVersion = side === "green" ? "v0.8" : "v0.7";
+                    c.redVersion = side === "red" ? "v0.8" : "v0.7";
+                    c[own] = ["Orc", support, "Wandering Mage", "Battle Mage", "Cyclops", "Tsar Cannon"].map(
+                        (creatureName) => {
+                            const info = creatureInfo(creatureIdForName(creatureName)!)!;
+                            return {
+                                faction: ToFactionName[info.faction],
+                                creatureName,
+                                level: info.level,
+                                size: info.footprintWidth,
+                                amount: 12,
+                            };
+                        },
+                    );
+                    c[`${side}Augments`] = [
+                        { kind: "Sniper", value: 3 },
+                        { kind: "Armor", value: 3 },
+                        { kind: "Might", value: 1 },
+                    ];
+                    const before = structuredClone(c),
+                        deep = gridType === PBTypes.GridVals.BLOCK_CENTER && side === "red",
+                        empower = gridType === PBTypes.GridVals.BLOCK_CENTER && support === "Harpy";
+                    withV08A19RoleCandidate(c, side, () => {
+                        const environment = buildV08A19SearchEnvironment();
+                        expect(environment.SEARCH_ROLLOUTS).toBe(deep ? "128" : "32");
+                        expect(environment.SEARCH_HORIZON).toBe(deep ? "256" : "64");
+                        const driver = createV08A19SearchDriver({} as any, {
+                            greenVersion: c.greenVersion,
+                            redVersion: c.redVersion,
+                            offlineDeterministicWork: true,
+                        }) as any;
+                        expect(driver.rollouts).toBe(deep ? 128 : 32);
+                        expect(driver.horizon).toBe(deep ? 256 : 64);
+                        expect([...driver.versions]).toEqual(["v0.8"]);
+                        for (const flag of [
+                            "fastFlyerCohesion",
+                            "abominationMirrorRelease",
+                            "strictAggressiveWaitTies",
+                            "nonregressiveProductiveOverride",
+                            "exactTerminalResults",
+                            "soleAbominationArmageddonDefendPolicy",
+                            "adaptiveBudget",
+                            "a19ScoredArbitration",
+                            "a19ArtifactBarrelAttackCoverage",
+                        ])
+                            expect(driver[flag]).toBe(true);
+                    });
+                    expect(c[`${side}Augments`]).toEqual(
+                        empower
+                            ? [
+                                  { kind: "Sniper", value: 3 },
+                                  { kind: "Armor", value: 3 },
+                                  { kind: "Empower", value: 1 },
+                              ]
+                            : before[`${side}Augments`],
+                    );
+                    expect(c[`${side}Augments`]!.reduce((sum, augment) => sum + augment.value, 0)).toBe(7);
+                    expect(c[own]).toEqual(before[own]);
+                    expect(c[`${side}TacticalSplitStacks`]).toEqual(before[`${side}TacticalSplitStacks`]);
+                    for (const field of [
+                        "Augments",
+                        "Doctrine",
+                        "ArtifactT1",
+                        "ArtifactT2",
+                        "Synergies",
+                        "TacticalSplitStacks",
+                    ] as const)
+                        expect(c[`${enemy}${field}`]).toEqual(before[`${enemy}${field}`]);
+                    expect(c[enemy === "green" ? "roster" : "redRoster"]).toEqual(
+                        before[enemy === "green" ? "roster" : "redRoster"],
+                    );
+                }
+    });
+    it("retains a necessary placement augment when hybrid empowerment would exceed ranked stack capacity", () => {
+        for (const side of ["green", "red"] as const) {
+            const c = fixture(),
+                own = side === "green" ? "roster" : "redRoster";
+            c.gridType = PBTypes.GridVals.BLOCK_CENTER;
+            c[own] = ["Orc", "Harpy", "Wandering Mage", "Battle Mage", "Cyclops", "Tsar Cannon"].map((creatureName) => {
+                const info = creatureInfo(creatureIdForName(creatureName)!)!;
+                return {
+                    faction: ToFactionName[info.faction],
+                    creatureName,
+                    level: info.level,
+                    size: info.footprintWidth,
+                    amount: 12,
+                };
+            });
+            c[own].push({ ...c[own][0], amount: 1 });
+            c[`${side}Augments`] = [
+                { kind: "Placement", value: 1 },
+                { kind: "Sniper", value: 3 },
+                { kind: "Armor", value: 3 },
+            ];
+            c.synergyVariants = {};
+            const ids = [...new Set(c[own].map((u) => creatureIdForName(u.creatureName)!))];
+            expect(c[own].length).toBeGreaterThan(
+                rankedDraftStackCapacity(
+                    ids,
+                    [
+                        { kind: "Sniper", value: 3 },
+                        { kind: "Armor", value: 3 },
+                        { kind: "Empower", value: 1 },
+                    ],
+                    {},
+                ),
+            );
+            const before = structuredClone(c);
+            prepareV08A19RoleCandidate(c, side);
+            expect(c[`${side}Augments`]).toEqual(before[`${side}Augments`]);
+            expect(c[own]).toEqual(before[own]);
+            expect(c[`${side}TacticalSplitStacks`]).toEqual(before[`${side}TacticalSplitStacks`]);
+        }
+    });
+    it("preserves native search budgets for neighbouring Blocked magic, ranged and carry roles", () => {
+        const neighbours = [
+            ["Orc", "Harpy", "Berserker", "Battle Mage", "Cyclops", "Tsar Cannon"],
+            ["Orc", "Medusa", "Wandering Mage", "Battle Mage", "Cyclops", "Tsar Cannon"],
+            ["Orc", "Harpy", "Wandering Mage", "Battle Mage", "Cyclops", "Gargantuan"],
+        ];
+        for (const names of neighbours) {
+            const c = fixture();
+            c.gridType = PBTypes.GridVals.BLOCK_CENTER;
+            c.redRoster = names.map((creatureName) => {
+                const info = creatureInfo(creatureIdForName(creatureName)!)!;
+                return {
+                    faction: ToFactionName[info.faction],
+                    creatureName,
+                    level: info.level,
+                    size: info.footprintWidth,
+                    amount: 12,
+                };
+            });
+            const original = v08A19RoleSearchOverrides(roleSearchPlan(names, c.gridType));
+            expect(prepareV08A19RoleCandidate(c, "red")).toEqual(original);
+        }
+    });
+
     it("deepens only physical LEFT Lava artillery and preserves all advancements in the actual search driver", () => {
         for (const fifthRanged of [false, true])
             for (const split of [false, true])
