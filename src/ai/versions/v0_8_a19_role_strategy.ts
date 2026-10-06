@@ -520,16 +520,20 @@ export function createV08A19RoleStrategy(
     const reflectHybridHealer = plan.healer && plan.magic === 1 && plan.ranged === 3;
     const disperseSpellBattery =
         plan.magic === 1 && plan.ranged >= 4 && own.some((info) => info.level === 4 && info.rangedSpellDamage);
-    const reflectPhysicalBattery =
+    const reflectBufferedArtillery =
         plan.magic === 1 &&
         plan.ranged === 3 &&
-        ((plan.artillery &&
-            own.some((info) => info.castsAmplifiableBuff) &&
-            own.some((info) => info.abilities.includes("Rallying Volley Aura"))) ||
-            (!plan.artillery &&
-                !plan.healer &&
-                !plan.areaCarry &&
-                own.some((info) => info.level === 4 && info.abilities.includes("Dense Flesh"))));
+        plan.artillery &&
+        own.some((info) => info.castsAmplifiableBuff) &&
+        own.some((info) => info.abilities.includes("Rallying Volley Aura"));
+    const reflectPhysicalBattery =
+        reflectBufferedArtillery ||
+        (plan.magic === 1 &&
+            plan.ranged === 3 &&
+            !plan.artillery &&
+            !plan.healer &&
+            !plan.areaCarry &&
+            own.some((info) => info.level === 4 && info.abilities.includes("Dense Flesh")));
     if (!compactMagicBattery && !reflectPhysicalBattery && !disperseSpellBattery && !reflectHybridHealer)
         return strategy;
     return {
@@ -537,7 +541,8 @@ export function createV08A19RoleStrategy(
         placeArmy: (units: Unit[], context: IPlacementContext) => {
             const incumbent = strategy.placeArmy(units, context);
             if (context.grid.getGridType() !== gridType) return incumbent;
-            if (reflectPhysicalBattery && context.team !== PBTypes.TeamVals.LEFT) return incumbent;
+            if (reflectPhysicalBattery && !reflectBufferedArtillery && context.team !== PBTypes.TeamVals.LEFT)
+                return incumbent;
             const selected =
                 reflectPhysicalBattery || reflectHybridHealer
                     ? reflectIncumbentPlacement(units, context, incumbent)

@@ -13,6 +13,144 @@ import {
 } from "../../src/ai/versions/v0_8_a19_public_placement";
 const names = ["Dryad", "Troll", "Fairy", "Medusa", "Monk", "Magic Dragon"];
 describe("A19 optional role placement composition", () => {
+    it("reflects Blocked buff and volley artillery on both sides while preserving split units and combat initialization", () => {
+        for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT])
+            for (const split of [false, true]) {
+                const ownNames = ["Wandering Mage", "Beholder", "Peasant", "Hyena", "Zena", "Tsar Cannon"];
+                if (split) ownNames.push(ownNames[0]);
+                const units = ownNames.map((name) => {
+                    const info = creatureInfo(creatureIdForName(name)!)!;
+                    return createTestUnit({
+                        name,
+                        team,
+                        size: info.footprintWidth as 1 | 2,
+                        footprintWidth: info.footprintWidth,
+                        footprintHeight: info.footprintHeight,
+                        attackType: info.ranged ? PBTypes.AttackVals.RANGE : PBTypes.AttackVals.MELEE,
+                    });
+                });
+                const left = team === PBTypes.TeamVals.LEFT;
+                const incumbent = new Map(
+                    units.map((unit, index) => [unit.getId(), { x: left ? 1 : 14, y: 2 * index + 1 }]),
+                );
+                let initialized = 0;
+                const decisions: unknown[] = [];
+                const base: IAIStrategy = {
+                    version: "v0.8",
+                    placeArmy: () => {
+                        initialized++;
+                        return incumbent;
+                    },
+                    decideTurn: (unit, context) => {
+                        expect(initialized).toBe(1);
+                        decisions.push(context);
+                        return [{ type: "defend_turn", unitId: unit.getId() }];
+                    },
+                };
+                const legal = new Set(
+                    Array.from({ length: 64 }, (_, i) => (((left ? 0 : 12) + (i % 4)) << 4) | Math.floor(i / 4)),
+                );
+                const context = {
+                    team,
+                    grid: new Grid(testGridSettings, PBTypes.GridVals.BLOCK_CENTER),
+                    sideOrientedPlacement: true,
+                    publicOpponentCreatureIds: [],
+                    placement: { possibleCellHashes: () => legal },
+                    unitsHolder: { getAllAllies: () => units },
+                } as unknown as IPlacementContext;
+                const strategy = createV08A19RoleStrategy(ownNames, PBTypes.GridVals.BLOCK_CENTER, base);
+                const selected = strategy.placeArmy(units, context);
+                expect(selected).toEqual(reflectIncumbentPlacement(units, context, incumbent));
+                expect(initialized).toBe(1);
+                expect(selected.size).toBe(units.length);
+                const occupied = new Set<number>();
+                for (const unit of units)
+                    for (const cell of footprintCellsForAnchor(unit, selected.get(unit.getId())!)) {
+                        const hash = (cell.x << 4) | cell.y;
+                        expect(legal.has(hash)).toBe(true);
+                        expect(occupied.has(hash)).toBe(false);
+                        occupied.add(hash);
+                    }
+                const live = {} as never,
+                    rollout = { decisionOrigin: "rollout" } as never;
+                for (const decisionContext of [live, rollout])
+                    expect(strategy.decideTurn(units[0], decisionContext)).toEqual([
+                        { type: "defend_turn", unitId: units[0].getId() },
+                    ]);
+                expect(decisions).toEqual([live, rollout]);
+                expect(initialized).toBe(1);
+            }
+    });
+    it("retains Dense Flesh RIGHT and unbuffered artillery, and rolls back a mismatched or illegal reflected footprint", () => {
+        const families = [
+            ["Berserker", "Battle Mage", "Centaur", "Medusa", "Cyclops", "Abomination"],
+            ["Battle Mage", "Beholder", "Peasant", "Hyena", "Zena", "Tsar Cannon"],
+            ["Wandering Mage", "Beholder", "Peasant", "Hyena", "Medusa", "Tsar Cannon"],
+        ];
+        for (const ownNames of families) {
+            const units = ownNames.map((name) => {
+                const info = creatureInfo(creatureIdForName(name)!)!;
+                return createTestUnit({
+                    name,
+                    team: PBTypes.TeamVals.RIGHT,
+                    size: info.footprintWidth as 1 | 2,
+                    footprintWidth: info.footprintWidth,
+                    footprintHeight: info.footprintHeight,
+                    attackType: info.ranged ? PBTypes.AttackVals.RANGE : PBTypes.AttackVals.MELEE,
+                });
+            });
+            const incumbent = new Map(units.map((unit, index) => [unit.getId(), { x: 14, y: 2 * index + 1 }]));
+            const base: IAIStrategy = { version: "v0.8", placeArmy: () => incumbent, decideTurn: () => [] };
+            const context = {
+                team: PBTypes.TeamVals.RIGHT,
+                grid: new Grid(testGridSettings, PBTypes.GridVals.BLOCK_CENTER),
+                sideOrientedPlacement: true,
+                publicOpponentCreatureIds: [],
+                placement: {
+                    possibleCellHashes: () =>
+                        new Set(Array.from({ length: 64 }, (_, i) => ((12 + (i % 4)) << 4) | Math.floor(i / 4))),
+                },
+                unitsHolder: { getAllAllies: () => units },
+            } as unknown as IPlacementContext;
+            expect(
+                createV08A19RoleStrategy(ownNames, PBTypes.GridVals.BLOCK_CENTER, base).placeArmy(units, context),
+            ).toEqual(incumbent);
+        }
+        const unit = createTestUnit({
+            name: "Tsar Cannon",
+            team: PBTypes.TeamVals.RIGHT,
+            size: 2,
+            footprintWidth: 2,
+            footprintHeight: 1,
+        });
+        const incumbent = new Map([[unit.getId(), { x: 14, y: 1 }]]);
+        let initialized = 0;
+        const base: IAIStrategy = {
+            version: "v0.8",
+            placeArmy: () => {
+                initialized++;
+                return incumbent;
+            },
+            decideTurn: () => [],
+        };
+        const strategy = createV08A19RoleStrategy(
+            ["Wandering Mage", "Beholder", "Peasant", "Hyena", "Zena", "Tsar Cannon"],
+            PBTypes.GridVals.BLOCK_CENTER,
+            base,
+        );
+        const context = {
+            team: PBTypes.TeamVals.RIGHT,
+            grid: new Grid(testGridSettings, PBTypes.GridVals.NORMAL),
+            sideOrientedPlacement: true,
+            publicOpponentCreatureIds: [],
+            placement: { possibleCellHashes: () => new Set([(14 << 4) | 1, (15 << 4) | 1]) },
+            unitsHolder: { getAllAllies: () => [unit] },
+        } as unknown as IPlacementContext;
+        expect(strategy.placeArmy([unit], context)).toEqual(incumbent);
+        context.grid = new Grid(testGridSettings, PBTypes.GridVals.BLOCK_CENTER);
+        expect(strategy.placeArmy([unit], context)).toEqual(incumbent);
+        expect(initialized).toBe(2);
+    });
     it("reflects a Normal physical battery only on RIGHT while preserving other maps, split identities and its combat delegate", () => {
         for (const gridType of [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER, PBTypes.GridVals.BLOCK_CENTER])
             for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT])
