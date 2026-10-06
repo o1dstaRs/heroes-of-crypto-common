@@ -1,11 +1,7 @@
 /*
  * -----------------------------------------------------------------------------
- * Zena's Rallying Volley Aura: ranged allies standing in range have their quiver
- * topped up ONCE by a flat number of shots.
- *
- * Regression guard: ADDITIONAL_RANGE_SHOTS was missing from calculateAuraPower, so
- * it fell through to that function's percentage tail and resolved to a power of 0.
- * The aura was applied to the right units and still granted them nothing.
+ * Zena's Rallying Volley Blessing: every ranged ally, including Zena, receives a
+ * once-only flat top-up anywhere on the board.
  * -----------------------------------------------------------------------------
  */
 
@@ -20,7 +16,7 @@ import { getCreatureConfig } from "../../src/configuration/config_provider";
 import { MAX_UNIT_STACK_POWER } from "../../src/constants";
 import { Unit } from "../../src/units/unit";
 
-const AURA_SHOTS = getAbilityConfig("Rallying Volley Aura").power;
+const BLESSING_SHOTS = getAbilityConfig("Rallying Volley Blessing").power;
 
 const makeZena = () =>
     createTestUnit({
@@ -28,10 +24,7 @@ const makeZena = () =>
         team: PBTypes.TeamVals.LEFT,
         attackType: PBTypes.AttackVals.RANGE,
         rangeShots: 8,
-        abilities: ["Rallying Volley Aura"],
-        auraEffects: ["Rallying Volley"],
-        auraRanges: [2],
-        auraIsBuff: [true],
+        abilities: ["Rallying Volley Blessing"],
     });
 
 const makeArcher = (name: string) =>
@@ -42,13 +35,13 @@ const makeArcher = (name: string) =>
         rangeShots: 5,
     });
 
-describe("Rallying Volley Aura", () => {
+describe("Rallying Volley Blessing", () => {
     it("is configured as a flat, non-stack-powered grant", () => {
-        expect(AURA_SHOTS).toBe(2);
-        expect(getAbilityConfig("Rallying Volley Aura").stack_powered).toBe(false);
+        expect(BLESSING_SHOTS).toBe(2);
+        expect(getAbilityConfig("Rallying Volley Blessing").stack_powered).toBe(false);
     });
 
-    it("tops up a ranged ally standing in range, and only that ally", () => {
+    it("tops up every ranged ally, including the bearer and distant allies", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const zena = makeZena();
         const nearArcher = makeArcher("Near Archer");
@@ -67,16 +60,18 @@ describe("Rallying Volley Aura", () => {
         unitsHolder.refreshAuraEffectsForAllUnits();
         unitsHolder.refreshStackPowerForAllUnits();
 
-        // The aura resolves to its configured power rather than the 0 the percentage tail produced.
-        expect(nearArcher.getAppliedAuraEffect("Rallying Volley Aura")?.getPower()).toBe(AURA_SHOTS);
-        expect(nearArcher.getRangeShots()).toBe(5 + AURA_SHOTS);
-        // Extra shots mean nothing to a unit that cannot shoot, so melee allies are skipped entirely.
-        expect(meleeAlly.getAppliedAuraEffect("Rallying Volley Aura")).toBeUndefined();
-        // Out of range: no aura, no shots.
-        expect(farArcher.getRangeShots()).toBe(5);
+        // The board-wide marker carries the flat configured shot count.
+        expect(nearArcher.getBuff("Rallying Volley Blessing")?.getPower()).toBe(BLESSING_SHOTS);
+        expect(nearArcher.getRangeShots()).toBe(5 + BLESSING_SHOTS);
+        // Every ally carries the marker, but melee-only units receive no ammunition.
+        expect(meleeAlly.getBuff("Rallying Volley Blessing")?.getPower()).toBe(BLESSING_SHOTS);
+        expect(meleeAlly.getRangeShots()).toBe(0);
+        // Board-wide reach, and the source receives its own top-up.
+        expect(farArcher.getRangeShots()).toBe(5 + BLESSING_SHOTS);
+        expect(zena.getRangeShots()).toBe(8 + BLESSING_SHOTS);
     });
 
-    it("tops the quiver up once, however many times auras refresh", () => {
+    it("tops the quiver up once, however many times blessings refresh", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const zena = makeZena();
         const archer = makeArcher("Archer");
@@ -88,9 +83,9 @@ describe("Rallying Volley Aura", () => {
             unitsHolder.refreshStackPowerForAllUnits();
         }
 
-        // A plain "+N while in range" would re-gift on every refresh; the grant is tracked instead.
-        expect(archer.getRangeShots()).toBe(5 + AURA_SHOTS);
-        expect(archer.getUnitProperties().rallying_volley_granted).toBe(AURA_SHOTS);
+        // The ledger prevents any refresh from handing out another pair of arrows.
+        expect(archer.getRangeShots()).toBe(5 + BLESSING_SHOTS);
+        expect(archer.getUnitProperties().rallying_volley_granted).toBe(BLESSING_SHOTS);
     });
 
     it("never refills shots that were already fired", () => {
@@ -102,9 +97,9 @@ describe("Rallying Volley Aura", () => {
 
         unitsHolder.refreshAuraEffectsForAllUnits();
         unitsHolder.refreshStackPowerForAllUnits();
-        expect(archer.getRangeShots()).toBe(5 + AURA_SHOTS);
+        expect(archer.getRangeShots()).toBe(5 + BLESSING_SHOTS);
 
-        // Spend the granted shots, then let the aura refresh again: the quiver is topped up, never refilled.
+        // Spend the granted shots, then refresh: the quiver is topped up once, never refilled.
         archer.decreaseNumberOfShots();
         archer.decreaseNumberOfShots();
         unitsHolder.refreshAuraEffectsForAllUnits();
@@ -115,13 +110,13 @@ describe("Rallying Volley Aura", () => {
 
 // A Limited Supply archer only carries a stack-power fraction of its own quiver, and that ceiling is derived
 // from maxRangeShots — the archer's OWN arrows. The rally's arrows are not the archer's, so they belong on
-// top of the cap. Before this, the aura handed an Arbalester two arrows and the cap clamped them straight
+// top of the cap. Before this, the blessing handed an Arbalester two arrows and the cap clamped them straight
 // back off, while rallying_volley_granted still recorded the grant as spent — and because the top-up is
 // once-only, it could never be handed over again. That is what "Rallying Volley does nothing" looked like.
 //
 // Built from the real creature configs rather than the synthetic helper: only a real Ability carries the
 // Limited Supply power type the clamp keys off, so the synthetic path cannot reproduce this at all.
-describe("Rallying Volley Aura vs Limited Supply", () => {
+describe("Rallying Volley Blessing vs Limited Supply", () => {
     it("adds its shots on top of Arbalester's supply cap instead of being clamped away", () => {
         const ctx = createCombatTestContext();
         const effectFactory = new EffectFactory();
@@ -150,7 +145,7 @@ describe("Rallying Volley Aura vs Limited Supply", () => {
         ctx.unitsHolder.refreshAuraEffectsForAllUnits();
         ctx.unitsHolder.refreshStackPowerForAllUnits();
 
-        const granted = getAbilityConfig("Rallying Volley Aura").power;
+        const granted = getAbilityConfig("Rallying Volley Blessing").power;
         const cap = Math.floor((ownQuiver * arbalester.getStackPower()) / MAX_UNIT_STACK_POWER);
         // The archer keeps its capped share of its OWN arrows and the rally's on top — never fewer than the
         // cap alone, which is what the clamp used to leave it with.

@@ -179,8 +179,10 @@ export const getHeroConfig = (
 };
 
 export const getAbilityConfig = (abilityName: string): AbilityProperties => {
+    // Saved units may still carry the former local-aura name. Return the canonical blessing card.
+    const canonicalName = abilityName === "Rallying Volley Aura" ? "Rallying Volley Blessing" : abilityName;
     // @ts-ignore: we do not know the type here yet
-    const ability = abilitiesJson[abilityName];
+    const ability = abilitiesJson[canonicalName];
     if (!ability) {
         throw TypeError(`Unknown ability - ${abilityName}`);
     }
@@ -214,7 +216,7 @@ export const getAbilityConfig = (abilityName: string): AbilityProperties => {
     }
 
     return new AbilityProperties(
-        abilityName,
+        canonicalName,
         abilityType,
         ability.desc,
         ability.power,

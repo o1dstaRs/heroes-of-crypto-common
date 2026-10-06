@@ -190,6 +190,7 @@ const ENGINE_MARKER_SPELL_NAMES: ReadonlySet<string> = new Set([
     "Arcane Ward Blessing",
     "Warding Mane Blessing",
     "Arrows Wingshield Blessing",
+    "Rallying Volley Blessing",
     "Water Shield",
 ]);
 

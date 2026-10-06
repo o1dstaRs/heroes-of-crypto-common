@@ -679,10 +679,9 @@ const isShortBow = (unit: Unit, reflected: readonly XY[], board: IBoard): boolea
     return nearestReflected(anchor, reflected) > reachOf(unit);
 };
 
+// Rallying Volley Blessing reaches the whole army, so only Guiding Winds needs a nearby carrier.
 const auraCarriers = (units: readonly Unit[]): Unit[] =>
-    units.filter(
-        (unit) => unit.hasAbilityActive("Guiding Winds Aura") || unit.hasAbilityActive("Rallying Volley Aura"),
-    );
+    units.filter((unit) => unit.hasAbilityActive("Guiding Winds Aura"));
 
 const applyShortBowPull = (range: readonly Unit[], locked: readonly Unit[], board: IBoard): void => {
     const carriers = auraCarriers(board.units).filter((unit) => board.footprint(unit).length > 0);
@@ -2474,8 +2473,7 @@ const bowIsShort = (unit: Unit, board: IBoard, context: IPlacementContext, oppos
     return bowReach(unit) < nearestCellDistance(anchor, opposite);
 };
 
-const isAuraCarrier = (unit: Unit): boolean =>
-    unit.hasAbilityActive("Guiding Winds Aura") || unit.hasAbilityActive("Rallying Volley Aura");
+const isAuraCarrier = (unit: Unit): boolean => unit.hasAbilityActive("Guiding Winds Aura");
 
 const footprintFits = (unit: Unit, anchor: XY, geom: IGeom): boolean => {
     const footprint = footprintCellsForAnchor(unit, anchor);
@@ -6811,7 +6809,7 @@ const c41Splash = (unit: Unit): boolean => r3HasAbility(unit, "Area Throw") || r
 
 const c41Leather = (unit: Unit): boolean => r3HasAbility(unit, "Leather Armor");
 
-const c41Aura = (unit: Unit): boolean => r3HasAbility(unit, "Guiding Winds") || r3HasAbility(unit, "Rallying Volley");
+const c41Aura = (unit: Unit): boolean => r3HasAbility(unit, "Guiding Winds");
 
 const c41Blast = (threats: IPublicPlacementThreats): boolean =>
     threats.fireball || threats.ringOfFire || threats.meteorShower;
@@ -13406,8 +13404,12 @@ const c71Bodies = (board: IBoard): Unit[] =>
         .filter((unit) => c71GroundBody(unit) && board.footprint(unit).length > 0)
         .sort((a, b) => b.getArmor() - a.getArmor() || byId(a, b));
 
+// Keep the historical local-volley candidate dormant for the army-wide Blessing.
 const c71IsZena = (unit: Unit): boolean =>
-    unit.getName() === "Zena" && unit.getAttackType() === RANGE && r3HasAbility(unit, "Rallying Volley");
+    unit.getName() === "Zena" &&
+    unit.getAttackType() === RANGE &&
+    r3HasAbility(unit, "Rallying Volley") &&
+    !r3HasAbility(unit, "Rallying Volley Blessing");
 
 const c71IsArb = (unit: Unit): boolean =>
     unit.getName() === "Arbalester" && unit.getAttackType() === RANGE && r3HasAbility(unit, "Limited Supply");
@@ -14285,8 +14287,9 @@ const c71Handy = (board: IBoard, range: readonly Unit[], threats: IPublicPlaceme
 };
 
 /**
- * r7c1 post-pass. Today's placeArmy has already run. A Zena and an Arbalester stand at
- * Chebyshev 2, a Monk keeps a cleansed lane, one floor-11 bow takes an inner front file,
+ * r7c1 post-pass. Today's placeArmy has already run. The historical local Volley paired
+ * Zena and Arbalester at Chebyshev 2; the army-wide Blessing skips that pass. A Monk keeps
+ * a cleansed lane, one floor-11 bow takes an inner front file,
  * or Handyman bows step to the front. The first branch that matches is the only one.
  * The zone and the augment spend stay.
  */
@@ -18416,7 +18419,7 @@ const c91Guard = (unit: Unit): boolean => !c91Still(unit) && !unit.canFly() && u
 
 const c91Leather = (unit: Unit): boolean => r3HasAbility(unit, "Leather Armor");
 
-const c91Aura = (unit: Unit): boolean => r3HasAbility(unit, "Guiding Winds") || r3HasAbility(unit, "Rallying Volley");
+const c91Aura = (unit: Unit): boolean => r3HasAbility(unit, "Guiding Winds");
 
 const c91Sniper = (unit: Unit): boolean => r3HasAbility(unit, "Sniper");
 

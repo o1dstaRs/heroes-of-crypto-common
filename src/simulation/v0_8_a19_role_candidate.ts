@@ -119,7 +119,7 @@ export function prepareV08A19RoleCandidate(config: IMatchConfig, side: Side): Re
             plan.ranged === 3 &&
             plan.magic >= 1 &&
             ownNames.some((name) =>
-                creatureInfo(creatureIdForName(name)!)?.abilities.includes("Rallying Volley Aura"),
+                creatureInfo(creatureIdForName(name)!)?.abilities.includes("Rallying Volley Blessing"),
             ) &&
             (ownNames.some((name) => creatureInfo(creatureIdForName(name)!)?.castsAmplifiableBuff) ||
                 (plan.magic === 1 &&

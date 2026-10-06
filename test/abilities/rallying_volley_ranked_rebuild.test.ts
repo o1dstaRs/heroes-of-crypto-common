@@ -7,7 +7,7 @@
  *  - re-running the Limited Supply cap compounds it, because the rebuilt unit's maxRangeShots is only the
  *    remaining count rather than the full quiver — a stack-power-1 Arbalester the server had at 4 (2 capped
  *    + Zena's 2) showed 2, its base cap, which is what "Zena gives no extra shots" looked like;
- *  - re-running the aura top-up double-grants — a 20-quiver Elf the server had at 22 showed 24.
+ *  - re-running the blessing top-up double-grants — a 20-quiver Elf the server had at 22 showed 24.
  *
  * Locally simulated units (no flag) keep deriving both themselves; rallying_volley_aura.test.ts covers them.
  * -----------------------------------------------------------------------------
@@ -23,7 +23,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { Unit } from "../../src/units/unit";
 import { createCombatTestContext, placeUnit } from "../helpers/combat";
 
-const AURA_SHOTS = getAbilityConfig("Rallying Volley Aura").power;
+const BLESSING_SHOTS = getAbilityConfig("Rallying Volley Blessing").power;
 
 interface IArcherBuild {
     faction: string;
@@ -72,7 +72,7 @@ const buildArmy = (archer: IArcherBuild) => {
 const ARBALESTER: IArcherBuild = { faction: "Life", name: "Arbalester", texture: "arbalester_512", amount: 12 };
 const ELF: IArcherBuild = { faction: "Nature", name: "Elf", texture: "elf_512", amount: 12 };
 
-describe("Rallying Volley Aura on a ranked client rebuilt from the snapshot", () => {
+describe("Rallying Volley Blessing on a ranked client rebuilt from the snapshot", () => {
     it("keeps a Limited Supply archer at the server's count instead of capping it a second time", () => {
         // The server: full quiver, capped by stack power, plus Zena's shots on top.
         const server = buildArmy(ARBALESTER);
@@ -87,35 +87,37 @@ describe("Rallying Volley Aura on a ranked client rebuilt from the snapshot", ()
         expect(server.hasAbilityActive("Limited Supply")).toBe(true);
         expect(server.getStackPower()).toBeLessThan(MAX_UNIT_STACK_POWER);
         const cap = Math.floor((ownQuiver * server.getStackPower()) / MAX_UNIT_STACK_POWER);
-        expect(server.getRangeShots()).toBe(cap + AURA_SHOTS);
+        expect(server.getRangeShots()).toBe(cap + BLESSING_SHOTS);
 
         // The client: the same archer rebuilt from that remaining count. Before the flag was honoured this
         // came out as floor(count × coeff) + 2 — the base cap again, with Zena's shots invisible.
         const client = buildArmy({ ...ARBALESTER, authoritativeShots: server.getRangeShots() });
         expect(client.getStackPower()).toBe(server.getStackPower());
         expect(client.getRangeShots()).toBe(server.getRangeShots());
-        expect(client.getAppliedAuraEffect("Rallying Volley Aura")?.getPower()).toBe(AURA_SHOTS);
+        expect(client.getBuff("Rallying Volley Blessing")?.getPower()).toBe(BLESSING_SHOTS);
     });
 
     it("does not top a plain archer up a second time", () => {
         const server = buildArmy(ELF);
         const ownQuiver = getCreatureConfig(PBTypes.TeamVals.LEFT, "Nature", "Elf", "elf_512", 12, 0).range_shots;
-        expect(server.getRangeShots()).toBe(ownQuiver + AURA_SHOTS);
+        expect(server.getRangeShots()).toBe(ownQuiver + BLESSING_SHOTS);
 
         const client = buildArmy({ ...ELF, authoritativeShots: server.getRangeShots() });
         expect(client.getRangeShots()).toBe(server.getRangeShots());
-        // The aura itself still lands (it is what the HUD lists); only the quiver is left to the server.
-        expect(client.getAppliedAuraEffect("Rallying Volley Aura")?.getPower()).toBe(AURA_SHOTS);
+        // The blessing marker still lands (it is what the HUD lists); only the quiver is left to the server.
+        expect(client.getBuff("Rallying Volley Blessing")?.getPower()).toBe(BLESSING_SHOTS);
         expect(client.getUnitProperties().rallying_volley_granted).toBe(0);
     });
 
     it("still tops up and caps a locally simulated archer (no flag)", () => {
         const local = buildArmy({ ...ARBALESTER, amount: 12 });
-        expect(local.getUnitProperties().rallying_volley_granted).toBe(AURA_SHOTS);
+        expect(local.getUnitProperties().rallying_volley_granted).toBe(BLESSING_SHOTS);
         const spentTwo = buildArmy(ELF);
         spentTwo.decreaseNumberOfShots();
         expect(spentTwo.getRangeShots()).toBe(
-            getCreatureConfig(PBTypes.TeamVals.LEFT, "Nature", "Elf", "elf_512", 12, 0).range_shots + AURA_SHOTS - 1,
+            getCreatureConfig(PBTypes.TeamVals.LEFT, "Nature", "Elf", "elf_512", 12, 0).range_shots +
+                BLESSING_SHOTS -
+                1,
         );
     });
 });

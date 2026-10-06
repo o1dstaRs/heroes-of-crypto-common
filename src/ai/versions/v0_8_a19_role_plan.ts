@@ -70,7 +70,7 @@ export function roleSearchPlan(names: readonly string[], gridType: number = PBTy
         artillery &&
         magic === 1 &&
         ranged === 3 &&
-        infos.some((i) => i.abilities.includes("Rallying Volley Aura")) &&
+        infos.some((i) => i.abilities.includes("Rallying Volley Blessing")) &&
         infos.some((i) => i.castsAmplifiableBuff);
     const relative =
         lavaMixedArtillery ||

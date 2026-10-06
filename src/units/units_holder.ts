@@ -59,13 +59,15 @@ const ANGELIC_HOST_BLESSING_BIT = 1;
 const ARCANE_WARD_BLESSING_BIT = 2;
 const WARDING_MANE_BLESSING_BIT = 4;
 const ARROWS_WINGSHIELD_BLESSING_BIT = 8;
+const RALLYING_VOLLEY_BLESSING_BIT = 16;
 
-/** The four board-wide blessings as seen at the start of one stack-power refresh. */
+/** The board-wide blessings as seen at the start of one stack-power refresh. */
 interface IBlessingCensus {
     angelicHost: Map<TeamType, number>;
     arcaneWard: Map<TeamType, number>;
     wardingMane: Map<TeamType, number>;
     arrowsWingshield: Map<TeamType, number>;
+    rallyingVolley: Map<TeamType, number>;
     /** Per unit, in allUnits order: the blessing bits it carries as a buff object or a display entry. */
     carriers: number[];
     /** Every blessing bit carried by any unit. */
@@ -82,6 +84,8 @@ function blessingBit(name: string): number {
             return WARDING_MANE_BLESSING_BIT;
         case "Arrows Wingshield Blessing":
             return ARROWS_WINGSHIELD_BLESSING_BIT;
+        case "Rallying Volley Blessing":
+            return RALLYING_VOLLEY_BLESSING_BIT;
         default:
             return 0;
     }
@@ -974,9 +978,9 @@ export class UnitsHolder {
         };
     }
     /**
-     * One pass over the army for all four board-wide blessings: each team's strongest living source and which
+     * One pass over the army for all board-wide blessings: each team's strongest living source and which
      * units already carry each blessing. Everything it reads — death, board position, abilities, Break, luck,
-     * stack power — is untouched by the blessing buffs the four refreshes delete and re-apply, so reading it once
+     * stack power — is untouched by the blessing buffs the refreshes delete and re-apply, so reading it once
      * equals re-reading it before each refresh. Each refresh used to walk the army twice and probe every unit
      * with deleteBuff, although most boards carry one blessing at most and most units carry none.
      */
@@ -986,6 +990,7 @@ export class UnitsHolder {
             arcaneWard: new Map(),
             wardingMane: new Map(),
             arrowsWingshield: new Map(),
+            rallyingVolley: new Map(),
             carriers: [],
             carried: 0,
         };
@@ -1029,6 +1034,13 @@ export class UnitsHolder {
                 census.arrowsWingshield.set(
                     team,
                     Math.max(census.arrowsWingshield.get(team) ?? 0, unit.calculateArrowsWingshieldBlessingPower()),
+                );
+            }
+            const rallyingVolleyAbility = unit.getAbility("Rallying Volley Blessing");
+            if (rallyingVolleyAbility) {
+                census.rallyingVolley.set(
+                    team,
+                    Math.max(census.rallyingVolley.get(team) ?? 0, rallyingVolleyAbility.getPower()),
                 );
             }
         }
@@ -1138,6 +1150,12 @@ export class UnitsHolder {
         this.refreshArcaneWardBlessingForAllUnits(blessingCensus);
         this.refreshWardingManeBlessingForAllUnits(blessingCensus);
         this.refreshArrowsWingshieldBlessingForAllUnits(blessingCensus);
+        this.reapplyTeamBlessing(
+            blessingCensus,
+            blessingCensus.rallyingVolley,
+            RALLYING_VOLLEY_BLESSING_BIT,
+            "Rallying Volley Blessing",
+        );
         this.refreshWaterShieldForAllUnits();
         // This loop runs after EVERY engine action, so a19 rollouts walk it millions of times. The fight
         // scalars are the same for every unit, and the per-team modifiers are the same for every unit on a

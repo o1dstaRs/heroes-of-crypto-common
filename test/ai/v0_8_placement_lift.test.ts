@@ -18,6 +18,7 @@ import {
     placeArmyR5C1,
     placeArmyR5C3,
     placeArmyR6C3,
+    placeArmyR7C1,
     PlacementLiftStrategy,
     publicPlacementThreats,
     separationGapForThreats,
@@ -237,6 +238,25 @@ describe("r1c1 threat files", () => {
         expect(cell(next, extra)).toEqual({ x: 2, y: 7 });
     });
 
+    test.each([3, 8, 12])(
+        "the whole-army Volley Blessing does not pull a short bow toward Zena at lateral %s",
+        (lateral) => {
+            const left = makeUnit("Left", RANGE, 16, WALK, ["Sniper"]);
+            const right = makeUnit("Right", RANGE, 16, WALK, ["Sniper"]);
+            const extra = makeUnit("Extra", RANGE, 4);
+            const zena = makeUnit("Zena", RANGE, 6, WALK, ["Rallying Volley Blessing"]);
+            const units = [left, right, extra, zena];
+            const placed = at(units, [
+                { x: 1, y: 1 },
+                { x: 1, y: 14 },
+                { x: 1, y: 7 },
+                { x: 1, y: lateral },
+            ]);
+
+            expect(placeArmyR1C1(placed, units, contextFor(units, ["Elf", "Arbalester"]))).toEqual(placed);
+        },
+    );
+
     test("the wrapper keeps combat and only replaces placeArmy", () => {
         const bow = makeUnit("Only", RANGE, 5);
         const units = [bow];
@@ -259,6 +279,20 @@ describe("r1c1 threat files", () => {
             { type: "defend_turn", unitId: bow.getId() },
         ]);
         expect(() => new PlacementLiftStrategy(base, "nope" as "r1c1")).toThrow(/Unknown placement lift candidate/);
+    });
+});
+
+describe("whole-army Volley Blessing placement", () => {
+    test.each(["Gargantuan", "Tsar Cannon"])("Zena and Arbalester keep independent cells against %s", (enemy) => {
+        const zena = makeUnit("Zena", RANGE, 6, WALK, ["Rallying Volley Blessing"]);
+        const arbalester = makeUnit("Arbalester", RANGE, 16, WALK, ["Sniper", "Limited Supply"]);
+        const units = [zena, arbalester];
+        const placed = at(units, [
+            { x: 1, y: 3 },
+            { x: 1, y: 12 },
+        ]);
+
+        expect(placeArmyR7C1(placed, units, contextFor(units, [enemy]))).toEqual(placed);
     });
 });
 
@@ -2446,6 +2480,22 @@ describe("r4c1 pierce files, back-rank thirds, and HP corners", () => {
         expect(cell(next, light)).toEqual({ x: 1, y: 14 });
         expect(cell(next, carrier)).toEqual({ x: 1, y: 2 });
         expect(cell(next, guard)).toEqual({ x: 3, y: 6 });
+    });
+
+    test("Volley Blessing does not seat Zena next to a corner bow against Chakram", () => {
+        const heavy = stack("Heavy", 40, RANGE, [], 20);
+        const light = stack("Light", 35, RANGE, [], 1);
+        const zena = stack("Zena", 10, RANGE, ["Rallying Volley Blessing"]);
+        const guard = stack("Guard", 12, MELEE);
+        const units = [heavy, light, zena, guard];
+        const placed = at(units, [
+            { x: 1, y: 1 },
+            { x: 1, y: 14 },
+            { x: 1, y: 8 },
+            { x: 3, y: 6 },
+        ]);
+
+        expect(placeArmyR4C1(placed, units, contextFor(units, ["Zena", "Monk"]))).toEqual(placed);
     });
 
     test("with no public branch an own splash bow takes the centre and a one-cell bow may refill", () => {

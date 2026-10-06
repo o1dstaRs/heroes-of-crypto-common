@@ -20,7 +20,7 @@ import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/
 import { getCraftChances } from "../abilities/craft_ability";
 import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { empowerMultiplier } from "../augments/augment_properties";
-import { getSpellConfig } from "../configuration/config_provider";
+import { getAbilityConfig, getSpellConfig } from "../configuration/config_provider";
 import {
     LUCK_CHANGE_FOR_SHIELD,
     LUCK_MAX_CHANGE_FOR_TURN,
@@ -333,7 +333,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // `abilities_descriptions` / ... arrays. Without this clone, grantAbility() pushing to one unit's
         // `abilities` leaked onto every same-type unit (e.g. Craft's Crafted Frozen Bow on ALL Elves).
         this.unitProperties = structuredClone(unitProperties);
-        this.initialUnitProperties = structuredClone(unitProperties);
+        this.normalizeLegacyRallyingVolley();
+        this.initialUnitProperties = structuredClone(this.unitProperties);
         this.gridSettings = gridSettings;
         this.teamType = teamType;
         this.unitType = unitType;
@@ -365,6 +366,49 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.parseAbilities(addConfiguredAbilitySpells);
         this.unitProperties.spell_entries_authoritative = true;
         this.parseAuraEffects();
+    }
+    /** Keep old saved cards/markers readable without restoring the retired local aura or gifting ammo twice. */
+    private normalizeLegacyRallyingVolley(): void {
+        const properties = this.unitProperties;
+        const oldName = "Rallying Volley Aura";
+        const blessingName = "Rallying Volley Blessing";
+        if (
+            !properties.abilities.includes(oldName) &&
+            !properties.applied_buffs.includes(oldName) &&
+            !properties.aura_effects.includes("Rallying Volley") &&
+            !properties.stolen_abilities?.includes(oldName) &&
+            !properties.artifact_granted_abilities?.includes(oldName)
+        ) {
+            properties.rallying_volley_granted ??= 0;
+            return;
+        }
+        const config = properties.abilities.includes(oldName) ? getAbilityConfig(blessingName) : undefined;
+        for (let i = 0; i < properties.abilities.length; i++) {
+            if (properties.abilities[i] !== oldName || !config) continue;
+            properties.abilities[i] = blessingName;
+            properties.abilities_descriptions[i] = config.desc.join("\n").replace(/\{\}/g, config.power.toString());
+            properties.abilities_stack_powered[i] = false;
+            properties.abilities_auras[i] = false;
+            properties.aura_ranges[i] = 0;
+            properties.aura_is_buff[i] = true;
+        }
+        properties.aura_effects = properties.aura_effects.filter((name) => name !== "Rallying Volley");
+        properties.stolen_abilities = (properties.stolen_abilities ?? []).map((name) =>
+            name === oldName ? blessingName : name,
+        );
+        properties.artifact_granted_abilities = properties.artifact_granted_abilities?.map((name) =>
+            name === oldName ? blessingName : name,
+        );
+        let legacyGrant = 0;
+        for (let i = 0; i < properties.applied_buffs.length; i++) {
+            if (properties.applied_buffs[i] !== oldName) continue;
+            const power = properties.applied_buffs_powers[i] ?? 0;
+            legacyGrant = Math.max(legacyGrant, power);
+            properties.applied_buffs[i] = blessingName;
+            properties.applied_buffs_descriptions[i] =
+                `Rallying Volley Blessing grants +${power} ranged shots once, anywhere on the battlefield.;;`;
+        }
+        properties.rallying_volley_granted ??= Math.max(0, Math.floor(legacyGrant));
     }
     public static createUnit(
         unitProperties: UnitProperties,
@@ -477,6 +521,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // real Ability (with its effect) via the ability factory and registers it in both lists so getAbility /
     // hasAbilityActive / processDeepWoundsAbility all see it.
     public grantAbility(abilityName: string, options: { restoreStolen?: boolean; spellEntries?: string[] } = {}): void {
+        if (abilityName === "Rallying Volley Aura") abilityName = "Rallying Volley Blessing";
         if (this.abilities.some((ability) => ability.getName() === abilityName)) {
             return;
         }
@@ -2116,10 +2161,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return auraEffect.getPower();
         }
 
-        // Rallying Volley (Zena) hands over a flat COUNT of shots, not a percentage and not stack-powered,
-        // so the stored aura power is the raw configured value. Every power type missing from this function
-        // falls through to the percentage tail at the end, which returns (1 * 100) - 100 = 0 — that is why
-        // the aura applied to ranged allies but granted them nothing.
+        // Extra-shot aura powers are flat counts, rather than percentage multipliers.
         if (auraEffect.getPowerType() === AbilityPowerType.ADDITIONAL_RANGE_SHOTS) {
             return auraEffect.getPower();
         }
@@ -2844,20 +2886,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         const lapsTotal = Number.MAX_SAFE_INTEGER;
         const applied = new AppliedSpell(auraEffectName, power, lapsTotal, firstSpellProperty, secondSpellProperty);
-        // AURA Rallying Volley (Zena): hand the ranged ally its extra shots HERE, as the aura lands. It cannot
-        // be done in adjustBaseStats — that pass runs before the aura refresh, so it would never see one — and
-        // the top-up must happen exactly once: rallying_volley_granted makes stepping out and back in, a
-        // second Zena, or another refresh a no-op, so shots already FIRED stay spent. The quiver is topped up,
-        // never refilled. Effect-helper scoping already guarantees only RANGED allies get here.
-        // A ranked client's count is authoritative (range_shots_authoritative): the server already handed
-        // the shots over, so topping up again here showed an extra +2 until the next snapshot corrected it.
-        if (isBuff && auraEffectName === "Rallying Volley Aura" && !this.unitProperties.range_shots_authoritative) {
-            const bonus = Math.max(0, Math.floor(power));
-            if (bonus > this.unitProperties.rallying_volley_granted) {
-                this.unitProperties.range_shots += bonus - this.unitProperties.rallying_volley_granted;
-                this.unitProperties.rallying_volley_granted = bonus;
-            }
-        }
         if (isBuff) {
             this.deleteBuff(auraEffectName);
             this.buffs.push(applied);
@@ -2880,6 +2908,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         secondBuffProperty?: number,
         extend: boolean = false,
     ): void {
+        if (buff.getName() === "Rallying Volley Blessing") this.tryGrantRallyingVolleyShots(buff.getPower());
         // not checking for duplicates here, do it on a caller side
         const lapsTotal = buff.getLapsTotal() + (extend ? 1 : 0);
         const firstBuffPropertyString = firstBuffProperty === undefined ? "" : firstBuffProperty.toString();
@@ -2904,6 +2933,21 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Keep the wire/snapshot representation aligned with the AppliedSpell. This matters for buffs whose
         // cast-time power differs from configuration (for example, Tome-amplified castable buffs).
         this.unitProperties.applied_buffs_powers.push(buff.getPower());
+    }
+    /** Once-only ammunition; the army marker itself may also land on allies that cannot shoot. */
+    private tryGrantRallyingVolleyShots(power: number): void {
+        if (
+            this.unitProperties.range_shots_authoritative ||
+            (!this.isRangeCapable() && !this.hasAbilityActive("Endless Quiver"))
+        ) {
+            return;
+        }
+        const bonus = Math.max(0, Math.floor(power));
+        const alreadyGranted = this.unitProperties.rallying_volley_granted;
+        if (bonus > alreadyGranted) {
+            this.unitProperties.range_shots += bonus - alreadyGranted;
+            this.unitProperties.rallying_volley_granted = bonus;
+        }
     }
     public getBuffProperties(buffName: string): [string, string] {
         const buffProperties: [string, string] = ["", ""];
@@ -3118,6 +3162,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.range_shots = arrows - movedArrows;
         other.unitProperties.range_shots =
             (addToOther ? Math.floor(other.unitProperties.range_shots) : 0) + movedArrows;
+        // Splitting/merging transfers existing arrows, never a fresh entitlement to the army top-up.
+        other.unitProperties.rallying_volley_granted = Math.max(
+            other.unitProperties.rallying_volley_granted,
+            this.unitProperties.rallying_volley_granted,
+        );
     }
     public useSpell(spellName: string): void {
         for (const s of this.spells) {
@@ -3810,12 +3859,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             !this.unitProperties.range_shots_authoritative
         ) {
             const actualStackPowerCoeff = this.getStackPower() / MAX_UNIT_STACK_POWER;
-            // Rallying Volley's arrows sit ON TOP of the supply cap rather than inside it. The ceiling is
-            // derived from maxRangeShots — the unit's OWN quiver — so without this the aura handed an
-            // Arbalester two arrows and this line immediately clamped them away again, while
-            // rallying_volley_granted still recorded the grant as spent: the top-up is once-only, so the
-            // bonus could never be handed over again. A Limited Supply archer standing in the aura simply
-            // never got it, which is exactly what "Rallying Volley does nothing" looked like.
+            // Rallying Volley's once-only arrows sit above the unit's own Limited Supply cap.
             this.unitProperties.range_shots = Math.min(
                 this.unitProperties.range_shots,
                 Math.floor(this.maxRangeShots * actualStackPowerCoeff) + this.unitProperties.rallying_volley_granted,

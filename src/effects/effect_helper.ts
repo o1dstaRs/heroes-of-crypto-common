@@ -64,7 +64,7 @@ export function canApplyAuraEffect(unit: Unit, auraEffectProperties: AuraEffectP
         return true;
     }
 
-    // AURA Rallying Volley (Zena) and Guiding Winds (Dryad): extra shots and extra shot range are only
+    // Ranged-only auras such as Guiding Winds (Dryad): extra shots and extra shot range are only
     // meaningful to a unit that SHOOTS, so they land on ranged allies alone — the same shape as the
     // DISABLE_RANGE_ATTACK rule just below. An aura power type absent from these lists is silently never
     // applied, which is why a new aura shows up on nobody.

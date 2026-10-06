@@ -438,6 +438,27 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Rallying Volley Blessing": {
+            "name": "Rallying Volley Blessing",
+            "level": 0,
+            "desc": [
+                "Rallying Volley Blessing grants +{} ranged shots once, anywhere on the battlefield.",
+                "Does not stack or refill spent shots."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 2,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Arrows Wingshield Blessing": {
             "name": "Arrows Wingshield Blessing",
             "level": 0,

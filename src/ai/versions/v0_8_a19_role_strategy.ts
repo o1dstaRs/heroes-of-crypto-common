@@ -376,7 +376,7 @@ function createIncumbentRoleStrategy(names: readonly string[], gridType: GridTyp
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.artillery && plan.magic === 0 && plan.ranged >= 4;
     const lavaHybridArtillery =
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.artillery && plan.magic === 1 && plan.ranged >= 4;
-    const volleySupport = reflectionOwn.some((info) => info.abilities.includes("Rallying Volley Aura"));
+    const volleySupport = reflectionOwn.some((info) => info.abilities.includes("Rallying Volley Blessing"));
     const meleeFlyer = reflectionOwn.some((info) => info.melee && info.canFly);
     const blockedFlyingVolley = plan.artillery && plan.magic === 1 && plan.ranged === 3 && volleySupport && meleeFlyer;
     const blockedSplashBattery =
@@ -525,7 +525,7 @@ export function createV08A19RoleStrategy(
         plan.ranged === 3 &&
         plan.artillery &&
         own.some((info) => info.castsAmplifiableBuff) &&
-        own.some((info) => info.abilities.includes("Rallying Volley Aura"));
+        own.some((info) => info.abilities.includes("Rallying Volley Blessing"));
     const reflectPhysicalBattery =
         reflectBufferedArtillery ||
         (plan.magic === 1 &&

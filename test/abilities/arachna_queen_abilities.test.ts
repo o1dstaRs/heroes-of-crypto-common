@@ -396,26 +396,26 @@ describe("Predatory Assimilation", () => {
         // part, but its Arrows Wingshield is a board-wide blessing now and owns no aura slot to restore.
         const carrier = createTestUnit({
             name: "Elf",
-            abilities: ["Resurrection", "Rallying Volley Aura"],
-            auraEffects: ["Rallying Volley"],
+            abilities: ["Resurrection", "Guiding Winds Aura"],
+            auraEffects: ["Guiding Winds"],
             auraRanges: [0, 2],
             auraIsBuff: [true, true],
             spells: [":Resurrection"],
         });
 
-        expect(carrier.disableAbilityAsStolen("Rallying Volley Aura")).toBeDefined();
-        expect(carrier.getAllProperties().abilities).toEqual(["Resurrection", "Rallying Volley Aura"]);
+        expect(carrier.disableAbilityAsStolen("Guiding Winds Aura")).toBeDefined();
+        expect(carrier.getAllProperties().abilities).toEqual(["Resurrection", "Guiding Winds Aura"]);
         expect(carrier.getAllProperties().aura_ranges).toEqual([0, 0]);
         expect(carrier.getAuraEffects()).toHaveLength(0);
 
-        carrier.grantAbility("Rallying Volley Aura");
-        expect(carrier.hasAbilityActive("Rallying Volley Aura")).toBe(false);
+        carrier.grantAbility("Guiding Winds Aura");
+        expect(carrier.hasAbilityActive("Guiding Winds Aura")).toBe(false);
         expect(carrier.getAllProperties().aura_ranges).toEqual([0, 0]);
 
-        carrier.grantStolenAbility("Rallying Volley Aura");
-        expect(carrier.hasAbilityActive("Rallying Volley Aura")).toBe(true);
+        carrier.grantStolenAbility("Guiding Winds Aura");
+        expect(carrier.hasAbilityActive("Guiding Winds Aura")).toBe(true);
         expect(carrier.getAllProperties().aura_ranges).toEqual([0, 2]);
-        expect(carrier.getAuraEffects().map((aura) => aura.getName())).toEqual(["Rallying Volley"]);
+        expect(carrier.getAuraEffects().map((aura) => aura.getName())).toEqual(["Guiding Winds"]);
     });
 });
 
