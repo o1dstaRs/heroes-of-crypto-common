@@ -45,7 +45,7 @@ export enum Tier1Artifact {
 
 export enum Tier2Artifact {
     NO_ARTIFACT = 0,
-    WARLORDS_EDGE = 1, // +15% attack (all)
+    WARLORDS_EDGE = 1, // +16% ranged attack / +12% melee attack
     TITAN_PLATE = 2, // +15% defense (all)
     HOLY_CROSS = 3, // +50% heal & resurrection; cast Troll ability without consuming it
     CLOVER_OF_FORTUNE = 4, // +10 luck
@@ -109,6 +109,7 @@ export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
 export const ARTIFACT_POWER = {
     VETERAN_HELM_PERCENT: 4,
     WARLORDS_EDGE_PERCENT: 12,
+    WARLORDS_EDGE_RANGED_PERCENT: 16,
     TITAN_PLATE_PERCENT: 12,
     KEEN_BLADE_FLAT: 0.7,
     KEEN_BLADE_RANGED_FLAT: 1,
@@ -214,7 +215,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "amulet_of_resolve",
         "Amulet of Resolve",
         "Amulet of Resolve",
-        "Increases the army's status resistance by {}%. Increases the army's mind resistance by []%.",
+        "Grants your army +{}% status and mind resistance.",
     ),
     [Tier1Artifact.KEEN_BLADE]: t1(
         Tier1Artifact.KEEN_BLADE,
@@ -302,7 +303,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "warlords_edge",
         "Warlord's Edge",
         "Warlords Edge",
-        "Grants the whole army an additional {}% attack.",
+        "Grants your army +{}% ranged attack and +[]% melee attack.",
     ),
     [Tier2Artifact.TITAN_PLATE]: t2(
         Tier2Artifact.TITAN_PLATE,
@@ -400,7 +401,7 @@ export const getTier2ArtifactProperties = (id: Tier2Artifact): ArtifactPropertie
 const AP = ARTIFACT_POWER;
 const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] } = {
     veteran_helm: [AP.VETERAN_HELM_PERCENT],
-    amulet_of_resolve: [AP.AMULET_OF_RESOLVE_RESIST_PERCENT, AP.AMULET_OF_RESOLVE_RESIST_PERCENT],
+    amulet_of_resolve: [AP.AMULET_OF_RESOLVE_RESIST_PERCENT],
     keen_blade: [AP.KEEN_BLADE_RANGED_FLAT, AP.KEEN_BLADE_FLAT],
     iron_plate: [AP.IRON_PLATE_FLAT],
     swift_boots: [AP.SWIFT_BOOTS_STEPS],
@@ -411,7 +412,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     hunters_longbow: [AP.LONGBOW_ATTACK_FLAT_PER_ARCHER],
     barrel_barricade: [AP.BARREL_BARRICADE_COUNT],
     broken_aegis: [AP.AEGIS_AREA_REDUCTION_PERCENT],
-    warlords_edge: [AP.WARLORDS_EDGE_PERCENT],
+    warlords_edge: [AP.WARLORDS_EDGE_RANGED_PERCENT, AP.WARLORDS_EDGE_PERCENT],
     titan_plate: [AP.TITAN_PLATE_PERCENT],
     farsight_quiver: [AP.FARSIGHT_QUIVER_RANGE_PERCENT],
     holy_cross: [AP.HOLY_CROSS_HEAL_RES_PERCENT],

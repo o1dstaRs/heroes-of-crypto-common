@@ -314,6 +314,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // engine actions; clients cannot inflate it because GameActionEngine records the resolved known route.
     protected movedRouteCellsThisTurn = 0;
     protected currentAttackModIncrease = 0;
+    protected warlordsEdgeAttackBase = 0;
+    protected warlordsEdgeAppliedAttackBonus = 0;
     protected adjustedBaseStatsLaps: number[] = [];
     protected luckPerTurn: number = 0;
     protected constructor(
@@ -1365,13 +1367,25 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ? this.unitProperties.magic_resist_mod
             : this.unitProperties.magic_resist;
     }
-    // Chance-reduction (%) against STATUS effects — Stun and Paralysis. Granted by the Amulet of Resolve
+    private getAmuletOfResolveResistance(): number {
+        const power = this.getBuffPower("Amulet of Resolve");
+        if (power === undefined) {
+            return 0;
+        }
+        if (power !== 0 || this.getBuff("Amulet of Resolve")) {
+            return power;
+        }
+        // Ranked snapshots carry zero in the display power array. The actual resistance travels as the
+        // first stored property in the server's description (`description;25;`).
+        const storedPower = Number(this.getBuffProperties("Amulet of Resolve")[0]);
+        return Number.isFinite(storedPower) ? storedPower : 0;
+    }
+    // Chance-reduction (%) against STATUS effects — Stun, Freeze and Paralysis. Granted by the Amulet of Resolve
     // artifact. Deliberately SEPARATE from magic resist (which governs magic damage and spell debuffs):
     // status resistance only lowers the odds a status effect lands. Read as a per-unit artifact "marker"
     // buff, like Broken Aegis / Giant's Maul. 0 when the unit carries no status-resist source.
     public getStatusResist(): number {
-        const amuletOfResolveBuff = this.getBuff("Amulet of Resolve");
-        return amuletOfResolveBuff ? amuletOfResolveBuff.getPower() : 0;
+        return this.getAmuletOfResolveResistance();
     }
     // Multiplier applied to PHYSICAL area-of-effect damage this unit TAKES (Area Throw, Large Caliber,
     // Lightning Spin, Skewer Strike, Through Shot). Status resistance (Amulet of Resolve) hardens the army
@@ -1389,8 +1403,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // magic damage); mind resistance only lowers the odds a MIND effect lands. Read as a per-unit artifact
     // "marker" buff, exactly like getStatusResist above. 0 when the unit carries no mind-resist source.
     public getMindResist(): number {
-        const amuletOfResolveBuff = this.getBuff("Amulet of Resolve");
-        return amuletOfResolveBuff ? amuletOfResolveBuff.getPower() : 0;
+        return this.getAmuletOfResolveResistance();
     }
     public getSpellsCount(): number {
         if (this.unitType === PBTypes.UnitVals.CREATURE && this.hasEffectActive("Break")) {
@@ -2476,6 +2489,20 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         return combinedPower;
     }
+    private adjustWarlordsEdgeAttackRate(attackRate: number, isRangeAttack: boolean): number {
+        const buff = this.getBuff("Warlords Edge");
+        if (!buff || !this.warlordsEdgeAttackBase) {
+            return attackRate;
+        }
+        const percent = isRangeAttack ? buff.getPower() : (buff.getSecondSpellProperty() ?? buff.getPower());
+        const bonus = roundUnitStat((this.warlordsEdgeAttackBase / 100) * percent, 2);
+        if (bonus === this.warlordsEdgeAppliedAttackBonus) {
+            return attackRate;
+        }
+        // A shooter can retaliate in melee while RANGE remains selected. Price the actual strike type
+        // using the same pre-aura base as the stat bonus, including damage previews and AI estimates.
+        return roundUnitStat(attackRate - this.warlordsEdgeAppliedAttackBonus + bonus, 2);
+    }
     public calculateAttackDamageMin(
         attackRate: number,
         enemyUnit: Unit,
@@ -2485,6 +2512,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         abilityMultiplier = 1,
         amountAliveOverride?: number,
     ): number {
+        attackRate = this.adjustWarlordsEdgeAttackRate(attackRate, isRangeAttack);
         if (divisor <= 0) {
             divisor = 1;
         }
@@ -2512,6 +2540,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         abilityMultiplier = 1,
         amountAliveOverride?: number,
     ): number {
+        attackRate = this.adjustWarlordsEdgeAttackRate(attackRate, isRangeAttack);
         if (divisor <= 0) {
             divisor = 1;
         }
@@ -3985,11 +4014,18 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Veteran Helm grants NO attack — it is a DEFENSE-ONLY artifact (armor_mod block above).
         // Warlord's Edge: +% attack as an ADDITIONAL stat (attack_mod), not folded into base_attack — so it never
         // compounds with the Sharpened Weapons aura multiplier and isn't amplified by base_attack-derived effects
-        // (Riot/Weakness). Capture 15% of base here (pre-aura); apply into attack_mod after those overwrites below.
+        // (Riot/Weakness). The power holds the ranged percentage; the second property holds the melee percentage.
+        // A legacy single-value buff retains its original percentage for both modes.
         const warlordsEdgeBuff = statBuffs.get("Warlords Edge");
+        const warlordsEdgePercent =
+            this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE
+                ? warlordsEdgeBuff?.getPower()
+                : (warlordsEdgeBuff?.getSecondSpellProperty() ?? warlordsEdgeBuff?.getPower());
         const warlordsEdgeAttackBonus = warlordsEdgeBuff
-            ? roundUnitStat((this.unitProperties.base_attack / 100) * warlordsEdgeBuff.getPower(), 2)
+            ? roundUnitStat((this.unitProperties.base_attack / 100) * (warlordsEdgePercent ?? 0), 2)
             : 0;
+        this.warlordsEdgeAttackBase = warlordsEdgeBuff ? this.unitProperties.base_attack : 0;
+        this.warlordsEdgeAppliedAttackBonus = warlordsEdgeAttackBonus;
         const huntersLongbowAttackBuff = statBuffs.get("Hunters Longbow");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && huntersLongbowAttackBuff) {
             // Flat additional attack (NOT a percent of base attack) for ranged units.

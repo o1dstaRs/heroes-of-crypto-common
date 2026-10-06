@@ -1,5 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 
+import { processBlindnessAbility } from "../../src/abilities/blindness_ability";
+import { processStunAbility } from "../../src/abilities/stun_ability";
 import {
     ArtifactTier,
     Tier1Artifact,
@@ -16,6 +18,7 @@ import { scatteredMountainsForSeed } from "../../src/grid/scattered_mountains";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { BattleRollbackJournal, snapshotBattle, restoreBattle } from "../../src/simulation/battle_snapshot";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { getRandomInt, setDeterministicRandomSource } from "../../src/utils/lib";
 import { createCombatTestContext, createTestUnit, placeUnit } from "../helpers/combat";
 
 const LEFT = PBTypes.TeamVals.LEFT;
@@ -56,9 +59,7 @@ describe("Barrel Barricade", () => {
         expect(TIER1_ARTIFACT_LIST.some((artifact) => artifact.name === "Helm of Focus")).toBe(false);
         expect(TIER1_ARTIFACT_LIST.find((artifact) => artifact.id === 11)?.name).toBe("Barrel Barricade");
         const amulet = TIER1_ARTIFACT_LIST.find((artifact) => artifact.id === Tier1Artifact.AMULET_OF_RESOLVE)!;
-        expect(formatArtifactDescription(amulet)).toBe(
-            "Increases the army's status resistance by 25%. Increases the army's mind resistance by 25%.",
-        );
+        expect(formatArtifactDescription(amulet)).toBe("Grants your army +25% status and mind resistance.");
     });
     it("owns exactly two terrain slots without adding creatures or consuming unit capacity", () => {
         const { grid, unitsHolder, engine } = fixture();
@@ -315,6 +316,28 @@ describe("Barrel Barricade", () => {
 });
 
 describe("Amulet of Resolve", () => {
+    afterEach(() => setDeterministicRandomSource(undefined));
+
+    for (const snapshotPower of [0, 25]) {
+        it(`keeps both resistances in snapshot state with display power ${snapshotPower}`, () => {
+            const { unitsHolder, fp, attacker: unit } = fixture();
+            fp.setArtifactPerTeam(LEFT, ArtifactTier.TIER_1, Tier1Artifact.AMULET_OF_RESOLVE);
+            unitsHolder.applyArtifacts(fp);
+            const properties = unit.getUnitProperties();
+            unit.getBuffs().splice(0);
+            properties.applied_buffs_powers[0] = snapshotPower;
+            expect(unit.getBuff("Amulet of Resolve")).toBeUndefined();
+            expect(unit.getStatusResist()).toBe(25);
+            expect(unit.getMindResist()).toBe(25);
+            expect(unit.getPhysicalAoeDamageMultiplier()).toBe(0.75);
+
+            properties.applied_buffs_laps[0] = 0;
+            expect(unit.getStatusResist()).toBe(0);
+            expect(unit.getMindResist()).toBe(0);
+            expect(unit.getPhysicalAoeDamageMultiplier()).toBe(1);
+        });
+    }
+
     it("gives the whole army 25% status and 25% mind resistance through a single marker, with no magic boost", () => {
         const { grid, unitsHolder, fp } = fixture();
         fp.setArtifactPerTeam(LEFT, ArtifactTier.TIER_1, Tier1Artifact.AMULET_OF_RESOLVE);
@@ -330,9 +353,40 @@ describe("Amulet of Resolve", () => {
         }
         expect(summoned.getMagicResist()).toBe(10);
         expect(unitsHolder.getAllAllies(RIGHT)[0].getMindResist()).toBe(0);
+        const snapshot = snapshotBattle(unitsHolder, grid, fp);
         fp.setArtifactPerTeam(LEFT, ArtifactTier.TIER_1, Tier1Artifact.BARREL_BARRICADE);
         unitsHolder.applyArtifacts(fp);
         expect(summoned.getStatusResist()).toBe(0);
         expect(summoned.getMindResist()).toBe(0);
+        restoreBattle(snapshot, unitsHolder, grid, fp);
+        for (const ally of unitsHolder.getAllAllies(LEFT)) {
+            expect(ally.getStatusResist()).toBe(25);
+            expect(ally.getMindResist()).toBe(25);
+        }
     });
+
+    for (const { effect, roll, lands, process } of [
+        { effect: "Stun", roll: 26, lands: true, process: processStunAbility },
+        { effect: "Stun", roll: 27, lands: false, process: processStunAbility },
+        { effect: "Blindness", roll: 18, lands: true, process: processBlindnessAbility },
+        { effect: "Blindness", roll: 19, lands: false, process: processBlindnessAbility },
+    ]) {
+        it(`uses 25% resistance for ${effect} with a d100 roll of ${roll}`, () => {
+            const { grid, unitsHolder, fp, attacker: target } = fixture();
+            const source = createTestUnit({ team: RIGHT, abilities: [effect], stackPower: 5 });
+            placeUnit(grid, unitsHolder, source, { x: 10, y: 10 });
+            // Keep the 21 high bits zero and put the requested roll in the 32 low bits.
+            setDeterministicRandomSource(() => roll / 2 ** 32);
+            expect(getRandomInt(0, 100)).toBe(roll);
+            const log = new SceneLogMock();
+            process(source, target, source, log);
+            expect(target.hasEffectActive(effect)).toBe(true);
+
+            target.deleteEffect(effect);
+            fp.setArtifactPerTeam(LEFT, ArtifactTier.TIER_1, Tier1Artifact.AMULET_OF_RESOLVE);
+            unitsHolder.applyArtifacts(fp);
+            process(source, target, source, log);
+            expect(target.hasEffectActive(effect)).toBe(lands);
+        });
+    }
 });

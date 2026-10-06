@@ -689,7 +689,7 @@ export class UnitsHolder {
             // ---- Tier 2 stat artifacts ----
             switch (tier2) {
                 case Tier2Artifact.WARLORDS_EDGE:
-                    applyArtifactBuff("Warlords Edge", AP.WARLORDS_EDGE_PERCENT);
+                    applyArtifactBuff("Warlords Edge", AP.WARLORDS_EDGE_RANGED_PERCENT, AP.WARLORDS_EDGE_PERCENT);
                     break;
                 case Tier2Artifact.TITAN_PLATE:
                     applyArtifactBuff("Titan Plate", AP.TITAN_PLATE_PERCENT);

@@ -109,6 +109,8 @@ const UNIT_FIELDS = [
     "movedThisTurn",
     "movedRouteCellsThisTurn",
     "currentAttackModIncrease",
+    "warlordsEdgeAttackBase",
+    "warlordsEdgeAppliedAttackBonus",
     "adjustedBaseStatsLaps",
     "luckPerTurn",
 ] as const;

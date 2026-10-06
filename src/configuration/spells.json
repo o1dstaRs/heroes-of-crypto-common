@@ -519,7 +519,7 @@
         "Amulet of Resolve": {
             "name": "Amulet of Resolve",
             "level": 0,
-            "desc": ["Artifact. Increases status and mind resistance by {}%.", "Lasts till the end of the fight."],
+            "desc": ["Artifact. Grants your army +{}% status and mind resistance.", "Lasts till the end of the fight."],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",
@@ -537,7 +537,10 @@
         "Warlords Edge": {
             "name": "Warlords Edge",
             "level": 0,
-            "desc": ["Artifact. Grants the whole army an additional {}% attack.", "Lasts till the end of the fight."],
+            "desc": [
+                "Artifact. Grants your army +{}% ranged attack and +[]% melee attack.",
+                "Lasts till the end of the fight."
+            ],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",
