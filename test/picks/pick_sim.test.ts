@@ -12,7 +12,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { Doctrine } from "../../src/doctrines/doctrine_properties";
+import { Doctrine, getUpgradePoints } from "../../src/doctrines/doctrine_properties";
 import {
     createPickSimState,
     getKnownOpponentCreatures,
@@ -127,7 +127,7 @@ describe("pick_sim", () => {
         const rejectedBundle = apply(state, { type: "select_bundle", team: LEFT, bundleIndex: 1 });
         expect(rejectedBundle).toMatchObject({ status: "rejected", reason: "wrong_phase" });
         state = accept(state, { type: "select_doctrine", team: LEFT, doctrine: Doctrine.THREE_REVEALS }, last);
-        // By-level reveal (server arango_hoc.ts): one L1 slot (rng(2)->1), one L2 slot (2+1=3),
+        // By-level reveal: one L1 slot (rng(2)->1), one L2 slot (2+1=3),
         // and the L3 slot (rng(2)->1 truthy -> 4); sorted [1, 3, 4].
         expect(state.left.revealedOpponentSlots).toEqual([1, 3, 4]);
         expect(state.phaseSequence).toBe(0);
@@ -151,6 +151,63 @@ describe("pick_sim", () => {
         expect(state.left.creatures).toEqual([2, 5]);
         expect(state.right.creatures).toEqual([3, 6]);
         expect(getPickTeamView(state, LEFT).bundles).toEqual([]);
+    });
+
+    it.each([
+        { team: LEFT, roll: 0, slots: [0, 2, 5] },
+        { team: LEFT, roll: 1, slots: [1, 3, 4] },
+        { team: RIGHT, roll: 0, slots: [0, 2, 4] },
+        { team: RIGHT, roll: 1, slots: [1, 3, 4] },
+    ])("keeps three useful Scout reveals for team $team with roll $roll", ({ team, roll, slots }) => {
+        const before = createPickSimState(first);
+        const drawPoolSizes: number[] = [];
+        const result = apply(before, { type: "select_doctrine", team, doctrine: Doctrine.THREE_REVEALS }, (max) => {
+            drawPoolSizes.push(max);
+            return roll;
+        });
+        expect(result.status).toBe("accepted");
+        if (result.status !== "accepted") {
+            throw new Error("Expected Scout doctrine to be accepted");
+        }
+        const own = team === LEFT ? result.state.left : result.state.right;
+        expect(own.revealedOpponentSlots).toEqual(slots);
+        expect(new Set(own.revealedOpponentSlots).size).toBe(3);
+        expect(getUpgradePoints(own.doctrine)).toBe(6);
+        expect(drawPoolSizes).toEqual([2, 2, 2]);
+        expect(result.event).toMatchObject({ type: "doctrine_selected", revealedOpponentSlots: slots });
+        expect(result.state.transcript.at(-1)).toMatchObject({ revealedOpponentSlots: slots });
+        expect(before.left.revealedOpponentSlots).toEqual([]);
+        expect(before.right.revealedOpponentSlots).toEqual([]);
+    });
+
+    it("reveals the opponent's L3 before Scout's remaining picks when their L4 ends the draft", () => {
+        let state = createPickSimState(first);
+        state = accept(state, { type: "select_doctrine", team: RIGHT, doctrine: Doctrine.THREE_REVEALS });
+        state = accept(state, { type: "select_doctrine", team: LEFT, doctrine: Doctrine.SEE_NONE });
+        state = finishBundlePhase(state);
+        for (const action of [
+            { type: "pick_creature", team: LEFT, creatureId: 2 },
+            { type: "pick_creature", team: RIGHT, creatureId: 11 },
+            { type: "pick_creature", team: RIGHT, creatureId: 5 },
+            { type: "pick_creature", team: LEFT, creatureId: 14 },
+            { type: "pick_creature", team: LEFT, creatureId: 18 },
+        ] satisfies PickAction[]) {
+            state = accept(state, action);
+        }
+        // The opponent's L3 is already known while Scout can still choose its own L3, T2 artifact and L4.
+        expect(state.phaseSequence).toBe(7);
+        expect(getPickTeamView(state, RIGHT).knownOpponentCreatures).toEqual([1, 4, 18]);
+        expect(getVisibleCreatureChoices(state, RIGHT)).not.toContain(18);
+        state = accept(state, { type: "pick_creature", team: RIGHT, creatureId: 27 });
+        state = accept(state, { type: "select_tier2", team: LEFT, artifactId: 1 });
+        state = accept(state, { type: "select_tier2", team: RIGHT, artifactId: 1 });
+        expect(state.phaseSequence).toBe(9);
+        expect(getPickTeamView(state, RIGHT).knownOpponentCreatures).toEqual([1, 4, 18]);
+        state = accept(state, { type: "pick_creature", team: RIGHT, creatureId: 40 });
+        state = accept(state, { type: "pick_creature", team: LEFT, creatureId: 39 });
+        expect(isPickSimComplete(state)).toBe(true);
+        expect(state.right.revealedOpponentSlots).toEqual([0, 2, 4]);
+        expect(getKnownOpponentCreatures(state, RIGHT)).toEqual([1, 4, 18]);
     });
 
     it("reads watched slots off the six-slot board, not off the list of picks so far", () => {

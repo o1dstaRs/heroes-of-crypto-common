@@ -466,13 +466,20 @@ const applyDoctrine = (
     // The fixed six-slot creature layout by level is [L1@0, L1@1, L2@2, L2@3, L3@4, L4@5]
     // (CreaturePoolByLevel = [2, 2, 1, 1]). The "random3" doctrine reveals ONE slot per tier block rather than
     // drawing three uniformly: one of the two L1 slots, one of the two L2 slots, and either the L3 or L4 slot.
-    // This mirrors the ranked server's legacy seeding in arango_hoc.ts (pickPhaseLogic slotsSeen seeding).
+    // When the opponent makes the draft's final creature pick, watch L3 instead: their L4 arrives too late
+    // to inform another draft choice. The ranked server persists these exact slots from this reducer.
     const totalSlots = CreaturePoolByLevel.reduce((total, count) => total + count, 0);
     const revealMode = getDoctrineRevealMode(action.doctrine);
     if (revealMode === "all") {
         nextOwn.revealedOpponentSlots = Array.from({ length: totalSlots }, (_, index) => index);
     } else if (revealMode === "random3") {
         const slots = [draw(rng, 2), 2 + draw(rng, 2), draw(rng, 2) ? 4 : 5];
+        const opponentTeam = action.team === LEFT ? RIGHT : LEFT;
+        const finalCreaturePick = LIVE_PICK_PHASES.filter(({ phase }) => phase === PBTypes.PickPhaseVals.PICK).at(-1);
+        if (finalCreaturePick?.actors.includes(opponentTeam)) {
+            // Still consume the third draw so later seeded draft decisions retain their RNG sequence.
+            slots[2] = 4;
+        }
         slots.sort((a, b) => a - b);
         nextOwn.revealedOpponentSlots = slots;
     }

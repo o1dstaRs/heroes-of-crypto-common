@@ -127,6 +127,8 @@ describe("ranked draft doctrine policies", () => {
         expect(state.left.revealedOpponentSlots).toEqual([0, 1, 2, 3, 4, 5]);
         expect(state.right.doctrine).toBe(Doctrine.THREE_REVEALS);
         expect(state.right.revealedOpponentSlots.length).toBeGreaterThanOrEqual(3);
+        expect(state.right.revealedOpponentSlots).toContain(4);
+        expect(state.right.revealedOpponentSlots).not.toContain(5);
     });
 
     it("draws the live bot's per-match variety from the board's pick seed and the seat", () => {
