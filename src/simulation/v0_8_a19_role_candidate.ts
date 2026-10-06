@@ -279,7 +279,16 @@ export function prepareV08A19RoleCandidate(config: IMatchConfig, side: Side): Re
     const strategy = createV08A19RoleStrategy(ownNames, config.gridType ?? PBTypes.GridVals.NORMAL);
     if (side === "green") config.greenStrategyOverride = strategy;
     else config.redStrategyOverride = strategy;
-    return v08A19RoleSearchOverrides(plan);
+    const overrides = v08A19RoleSearchOverrides(plan);
+    if (
+        side === "green" &&
+        config.gridType === PBTypes.GridVals.LAVA_CENTER &&
+        plan.magic === 0 &&
+        plan.ranged >= 4 &&
+        plan.artillery
+    )
+        return Object.freeze({ ...overrides, SEARCH_ROLLOUTS: "128", SEARCH_HORIZON: "256" });
+    return overrides;
 }
 
 /** Scope research settings to this synchronous simulation; the caller's ambient profile is restored on exit. */

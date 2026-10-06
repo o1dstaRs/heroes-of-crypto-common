@@ -469,14 +469,23 @@ export function createV08A19RoleStrategy(
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.artillery && plan.magic === 1 && plan.ranged >= 4;
     const reflectLavaHealer =
         gridType === PBTypes.GridVals.LAVA_CENTER && plan.healer && plan.magic >= 2 && plan.ranged >= 3;
-    if (reflectLavaArtillery || reflectLavaHealer)
+    const reflectNormalPhysical =
+        gridType === PBTypes.GridVals.NORMAL &&
+        plan.magic === 0 &&
+        plan.ranged === 3 &&
+        !plan.artillery &&
+        !plan.areaCarry &&
+        !plan.healer &&
+        !plan.screenPhysical;
+    if (reflectLavaArtillery || reflectLavaHealer || reflectNormalPhysical)
         return {
             version: strategy.version,
             placeArmy: (units: Unit[], context: IPlacementContext) => {
                 const incumbent = strategy.placeArmy(units, context);
                 if (
                     context.grid.getGridType() !== gridType ||
-                    (reflectLavaHealer && context.team !== PBTypes.TeamVals.LEFT)
+                    (reflectLavaHealer && context.team !== PBTypes.TeamVals.LEFT) ||
+                    (reflectNormalPhysical && context.team !== PBTypes.TeamVals.RIGHT)
                 )
                     return incumbent;
                 return reflectIncumbentPlacement(units, context, incumbent);

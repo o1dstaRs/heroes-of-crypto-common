@@ -13,6 +13,141 @@ import {
 } from "../../src/ai/versions/v0_8_a19_public_placement";
 const names = ["Dryad", "Troll", "Fairy", "Medusa", "Monk", "Magic Dragon"];
 describe("A19 optional role placement composition", () => {
+    it("reflects a Normal physical battery only on RIGHT while preserving other maps, split identities and its combat delegate", () => {
+        for (const gridType of [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER, PBTypes.GridVals.BLOCK_CENTER])
+            for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT])
+                for (const split of [false, true]) {
+                    const ownNames = ["Mermaid", "Hyena", "Arbalester", "Medusa", "Cyclops", "Frenzied Boar"];
+                    if (split) ownNames.push(ownNames[0]);
+                    const units = ownNames.map((name) => {
+                        const info = creatureInfo(creatureIdForName(name)!)!;
+                        return createTestUnit({
+                            name,
+                            team,
+                            size: info.footprintWidth as 1 | 2,
+                            footprintWidth: info.footprintWidth,
+                            footprintHeight: info.footprintHeight,
+                            attackType: info.ranged ? PBTypes.AttackVals.RANGE : PBTypes.AttackVals.MELEE,
+                        });
+                    });
+                    const left = team === PBTypes.TeamVals.LEFT;
+                    const incumbent = new Map(
+                        units.map((unit, index) => [unit.getId(), { x: left ? 1 : 14, y: 2 * index + 1 }]),
+                    );
+                    let initialized = 0;
+                    const decisions: unknown[] = [];
+                    const base: IAIStrategy = {
+                        version: "v0.8",
+                        placeArmy: () => {
+                            initialized++;
+                            return incumbent;
+                        },
+                        decideTurn: (unit, context) => {
+                            expect(initialized).toBe(1);
+                            decisions.push(context);
+                            return [{ type: "defend_turn", unitId: unit.getId() }];
+                        },
+                    };
+                    const legal = new Set(
+                        Array.from(
+                            { length: 64 },
+                            (_, index) => (((left ? 0 : 12) + (index % 4)) << 4) | Math.floor(index / 4),
+                        ),
+                    );
+                    const context = {
+                        team,
+                        grid: new Grid(testGridSettings, gridType),
+                        sideOrientedPlacement: true,
+                        publicOpponentCreatureIds: [],
+                        placement: { possibleCellHashes: () => legal },
+                        unitsHolder: { getAllAllies: () => units },
+                    } as unknown as IPlacementContext;
+                    const strategy = createV08A19RoleStrategy(ownNames, gridType, base);
+                    const selected = strategy.placeArmy(units, context);
+                    // Blocked already has its independently measured RIGHT reflection.
+                    const reflect = !left && gridType !== PBTypes.GridVals.LAVA_CENTER;
+                    expect(selected).toEqual(
+                        reflect ? reflectIncumbentPlacement(units, context, incumbent) : incumbent,
+                    );
+                    expect(initialized).toBe(1);
+                    const occupied = new Set<number>();
+                    for (const unit of units)
+                        for (const cell of footprintCellsForAnchor(unit, selected.get(unit.getId())!)) {
+                            const hash = (cell.x << 4) | cell.y;
+                            expect(legal.has(hash)).toBe(true);
+                            expect(occupied.has(hash)).toBe(false);
+                            occupied.add(hash);
+                        }
+                    const live = {} as any,
+                        rollout = { forRollout: true } as any;
+                    expect(strategy.decideTurn(units[0], live)).toEqual([
+                        { type: "defend_turn", unitId: units[0].getId() },
+                    ]);
+                    expect(strategy.decideTurn(units[0], rollout)).toEqual([
+                        { type: "defend_turn", unitId: units[0].getId() },
+                    ]);
+                    expect(decisions).toEqual([live, rollout]);
+                }
+    });
+    it("retains other Normal roles, mismatched contexts and an incumbent whose reflected footprint is illegal", () => {
+        const families = [
+            ["Wandering Mage", "Hyena", "Arbalester", "Medusa", "Cyclops", "Frenzied Boar"],
+            ["Elf", "Hyena", "Arbalester", "Medusa", "Cyclops", "Frenzied Boar"],
+            ["Mermaid", "Hyena", "Wolf", "Medusa", "Cyclops", "Frenzied Boar"],
+            ["Mermaid", "Hyena", "Arbalester", "Medusa", "Cyclops", "Angel"],
+            ["Mermaid", "Hyena", "Arbalester", "Wolf", "Cyclops", "Gargantuan"],
+            ["Mermaid", "Hyena", "Arbalester", "Wolf", "Cyclops", "Tsar Cannon"],
+            ["Mermaid", "Hyena", "Arbalester", "Medusa", "Cyclops", "Abomination"],
+        ];
+        for (const ownNames of families) {
+            const units = ownNames.map((name) => {
+                const i = creatureInfo(creatureIdForName(name)!)!;
+                return createTestUnit({
+                    name,
+                    team: PBTypes.TeamVals.RIGHT,
+                    size: i.footprintWidth as 1 | 2,
+                    footprintWidth: i.footprintWidth,
+                    footprintHeight: i.footprintHeight,
+                    attackType: i.ranged ? PBTypes.AttackVals.RANGE : PBTypes.AttackVals.MELEE,
+                });
+            });
+            const incumbent = new Map(units.map((u, index) => [u.getId(), { x: 14, y: 2 * index + 1 }]));
+            const base: IAIStrategy = { version: "v0.8", placeArmy: () => incumbent, decideTurn: () => [] };
+            const context = {
+                team: PBTypes.TeamVals.RIGHT,
+                grid: new Grid(testGridSettings, PBTypes.GridVals.NORMAL),
+                sideOrientedPlacement: true,
+                publicOpponentCreatureIds: [],
+                placement: {
+                    possibleCellHashes: () =>
+                        new Set(Array.from({ length: 64 }, (_, i) => ((12 + (i % 4)) << 4) | Math.floor(i / 4))),
+                },
+                unitsHolder: { getAllAllies: () => units },
+            } as unknown as IPlacementContext;
+            expect(createV08A19RoleStrategy(ownNames, PBTypes.GridVals.NORMAL, base).placeArmy(units, context)).toEqual(
+                incumbent,
+            );
+        }
+        const unit = createTestUnit({ name: "Arbalester", team: PBTypes.TeamVals.RIGHT });
+        const incumbent = new Map([[unit.getId(), { x: 14, y: 1 }]]);
+        const base: IAIStrategy = { version: "v0.8", placeArmy: () => incumbent, decideTurn: () => [] };
+        const strategy = createV08A19RoleStrategy(
+            ["Mermaid", "Hyena", "Arbalester", "Medusa", "Cyclops", "Frenzied Boar"],
+            PBTypes.GridVals.NORMAL,
+            base,
+        );
+        const context = {
+            team: PBTypes.TeamVals.RIGHT,
+            grid: new Grid(testGridSettings, PBTypes.GridVals.LAVA_CENTER),
+            sideOrientedPlacement: true,
+            publicOpponentCreatureIds: [],
+            placement: { possibleCellHashes: () => new Set([(14 << 4) | 1]) },
+            unitsHolder: { getAllAllies: () => [unit] },
+        } as unknown as IPlacementContext;
+        expect(strategy.placeArmy([unit], context)).toEqual(incumbent);
+        context.grid = new Grid(testGridSettings, PBTypes.GridVals.NORMAL);
+        expect(strategy.placeArmy([unit], context)).toEqual(incumbent);
+    });
     it("protects a sparse Blocked spell carry with flying melee support and reflects other carries only on RIGHT", () => {
         const families: { names: string[]; reflection: "both" | "right" | "none" }[] = [
             { names: ["Wolf", "Medusa", "Fairy", "Troll", "Zena", "Magic Dragon"], reflection: "both" },
@@ -388,7 +523,7 @@ describe("A19 optional role placement composition", () => {
                     ]);
                 }
     });
-    it("reflects an ordinary Blocked physical battery on RIGHT while retaining LEFT and other maps", () => {
+    it("reflects an ordinary physical battery on Normal and Blocked RIGHT while retaining LEFT and Lava", () => {
         const family = ["Peasant", "Trent", "Orc", "Elf", "Cyclops", "Behemoth"];
         for (const gridType of [PBTypes.GridVals.NORMAL, PBTypes.GridVals.LAVA_CENTER, PBTypes.GridVals.BLOCK_CENTER])
             for (const team of [PBTypes.TeamVals.LEFT, PBTypes.TeamVals.RIGHT]) {
@@ -431,7 +566,7 @@ describe("A19 optional role placement composition", () => {
                 const strategy = createV08A19RoleStrategy(family, gridType, base),
                     selected = strategy.placeArmy(units, context);
                 expect(initialized).toBe(1);
-                if (gridType === PBTypes.GridVals.BLOCK_CENTER && !left) {
+                if (gridType !== PBTypes.GridVals.LAVA_CENTER && !left) {
                     expect(selected).not.toEqual(incumbent);
                     const occupied = new Set<number>();
                     for (const unit of units)

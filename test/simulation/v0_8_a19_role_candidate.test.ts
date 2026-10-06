@@ -5,6 +5,7 @@ import type { IMatchConfig } from "../../src/simulation/battle_engine";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { creatureInfo, creatureIdForName } from "../../src/ai/setup/creature_score";
 import { ToFactionName } from "../../src/factions/faction_type";
+import { createV08A19SearchDriver } from "../../src/simulation/v0_8_a19_search";
 const fixture = (): IMatchConfig => ({
     greenVersion: "v0.8",
     redVersion: "v0.7",
@@ -40,6 +41,129 @@ const fixture = (): IMatchConfig => ({
     redTacticalSplitStacks: [],
 });
 describe("A19 opt-in complete ranked simulation candidate", () => {
+    it("deepens only physical LEFT Lava artillery and preserves all advancements in the actual search driver", () => {
+        for (const fifthRanged of [false, true])
+            for (const split of [false, true])
+                for (const side of ["green", "red"] as const)
+                    for (const gridType of [
+                        PBTypes.GridVals.NORMAL,
+                        PBTypes.GridVals.LAVA_CENTER,
+                        PBTypes.GridVals.BLOCK_CENTER,
+                    ]) {
+                        const c = fixture();
+                        c.gridType = gridType;
+                        c.searchOfflineDeterministicWork = true;
+                        const own = side === "green" ? "roster" : "redRoster";
+                        c[own] = [
+                            "Arbalester",
+                            "Harpy",
+                            fifthRanged ? "Beholder" : "Trent",
+                            "Medusa",
+                            "Cyclops",
+                            "Tsar Cannon",
+                        ].map((creatureName) => {
+                            const info = creatureInfo(creatureIdForName(creatureName)!)!;
+                            return {
+                                faction: ToFactionName[info.faction],
+                                creatureName,
+                                level: info.level,
+                                size: info.footprintWidth,
+                                amount: 12,
+                            };
+                        });
+                        c[`${side}Augments`] = [
+                            { kind: "Placement", value: 2 },
+                            { kind: "Sniper", value: 3 },
+                            { kind: "Armor", value: 2 },
+                        ];
+                        if (split) {
+                            c[own][0].amount--;
+                            c[own].push({ ...c[own][0], amount: 1 });
+                        }
+                        const before = structuredClone(c),
+                            previous = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+                        const deep = side === "green" && gridType === PBTypes.GridVals.LAVA_CENTER;
+                        withV08A19RoleCandidate(c, side, () => {
+                            const environment = buildV08A19SearchEnvironment();
+                            expect(environment.SEARCH_ROLLOUTS).toBe(deep ? "128" : "64");
+                            expect(environment.SEARCH_HORIZON).toBe(deep ? "256" : "128");
+                            const driver = createV08A19SearchDriver({} as any, {
+                                greenVersion: c.greenVersion,
+                                redVersion: c.redVersion,
+                                offlineDeterministicWork: true,
+                            }) as any;
+                            expect(driver.rollouts).toBe(deep ? 128 : 64);
+                            expect(driver.horizon).toBe(deep ? 256 : 128);
+                            expect([...driver.versions]).toEqual(["v0.8"]);
+                            for (const flag of [
+                                "fastFlyerCohesion",
+                                "abominationMirrorRelease",
+                                "strictAggressiveWaitTies",
+                                "nonregressiveProductiveOverride",
+                                "exactTerminalResults",
+                                "soleAbominationArmageddonDefendPolicy",
+                                "adaptiveBudget",
+                                "a19ScoredArbitration",
+                                "a19ArtifactBarrelAttackCoverage",
+                            ])
+                                expect(driver[flag]).toBe(true);
+                        });
+                        expect(process.env.V08_A19_SEARCH_ENV_OVERRIDES).toBe(previous);
+                        expect(c[own]).toEqual(before[own]);
+                        expect(c[`${side}Augments`]).toEqual(before[`${side}Augments`]);
+                        const enemy = side === "green" ? "red" : "green";
+                        for (const field of [
+                            "Augments",
+                            "Doctrine",
+                            "ArtifactT1",
+                            "ArtifactT2",
+                            "Synergies",
+                            "TacticalSplitStacks",
+                        ] as const)
+                            expect(c[`${enemy}${field}`]).toEqual(before[`${enemy}${field}`]);
+                        expect(c[enemy === "green" ? "roster" : "redRoster"]).toEqual(
+                            before[enemy === "green" ? "roster" : "redRoster"],
+                        );
+                    }
+    });
+    it("preserves native Lava budgets when artillery lacks four physical shooters or has a magic unit", () => {
+        const families = [
+            {
+                names: ["Arbalester", "Harpy", "Trent", "Medusa", "Goblin Knight", "Tsar Cannon"],
+                rollouts: "32",
+                horizon: "64",
+            },
+            {
+                names: ["Wandering Mage", "Harpy", "Beholder", "Medusa", "Cyclops", "Tsar Cannon"],
+                rollouts: "64",
+                horizon: "128",
+            },
+            { names: ["Arbalester", "Harpy", "Beholder", "Medusa", "Cyclops", "Angel"], rollouts: "32", horizon: "64" },
+            {
+                names: ["Arbalester", "Harpy", "Beholder", "Medusa", "Cyclops", "Gargantuan"],
+                rollouts: "32",
+                horizon: "64",
+            },
+        ];
+        for (const family of families)
+            for (const side of ["green", "red"] as const) {
+                const c = fixture();
+                c.gridType = PBTypes.GridVals.LAVA_CENTER;
+                c[side === "green" ? "roster" : "redRoster"] = family.names.map((creatureName) => {
+                    const info = creatureInfo(creatureIdForName(creatureName)!)!;
+                    return {
+                        faction: ToFactionName[info.faction],
+                        creatureName,
+                        level: info.level,
+                        size: info.footprintWidth,
+                        amount: 12,
+                    };
+                });
+                const env = prepareV08A19RoleCandidate(c, side);
+                expect(env.SEARCH_ROLLOUTS).toBe(family.rollouts);
+                expect(env.SEARCH_HORIZON).toBe(family.horizon);
+            }
+    });
     it("armors a Blocked sparse caster army with an autonomous carry while preserving its models and the opponent", () => {
         const names = ["Arbalester", "Trent", "Wandering Mage", "Valkyrie", "Zena", "Frenzied Boar"];
         for (const side of ["green", "red"] as const)
