@@ -327,7 +327,7 @@
         "Keen Blade": {
             "name": "Keen Blade",
             "level": 0,
-            "desc": ["Artifact. Increases the army's attack by {}.", "Lasts till the end of the fight."],
+            "desc": ["Artifact. Increases this unit's base attack by {}.", "Lasts till the end of the fight."],
             "target": "ALL_ALLIES",
             "power": 0,
             "power_type": "COMMON",

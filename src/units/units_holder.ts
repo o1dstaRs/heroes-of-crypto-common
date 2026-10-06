@@ -601,7 +601,7 @@ export class UnitsHolder {
                     applyArtifactBuff("Veteran Helm", AP.VETERAN_HELM_PERCENT);
                     break;
                 case Tier1Artifact.KEEN_BLADE:
-                    applyArtifactBuff("Keen Blade", AP.KEEN_BLADE_FLAT);
+                    applyArtifactBuff("Keen Blade", isRange ? AP.KEEN_BLADE_RANGED_FLAT : AP.KEEN_BLADE_FLAT);
                     break;
                 case Tier1Artifact.IRON_PLATE:
                     applyArtifactBuff("Iron Plate", AP.IRON_PLATE_FLAT);

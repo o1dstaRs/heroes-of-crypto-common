@@ -30,7 +30,7 @@ export enum Tier1Artifact {
     NO_ARTIFACT = 0,
     VETERAN_HELM = 1, // +4% defense (all)
     AMULET_OF_RESOLVE = 2, // +25% status and mind resist
-    KEEN_BLADE = 3, // +1 attack (flat)
+    KEEN_BLADE = 3, // +1 ranged attack / +0.7 melee attack (flat)
     IRON_PLATE = 4, // +1 defense (flat)
     SWIFT_BOOTS = 5, // +1 movement to melee units
     WINGED_BOOTS = 6, // +1 movement and +1 armor to flying units
@@ -111,6 +111,7 @@ export const ARTIFACT_POWER = {
     WARLORDS_EDGE_PERCENT: 12,
     TITAN_PLATE_PERCENT: 12,
     KEEN_BLADE_FLAT: 0.7,
+    KEEN_BLADE_RANGED_FLAT: 1,
     IRON_PLATE_FLAT: 1,
     BERSERKERS_BOND_ATTACK: 3,
     BERSERKERS_BOND_DEFENSE_PENALTY: 1,
@@ -220,7 +221,7 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "keen_blade",
         "Keen Blade",
         "Keen Blade",
-        "Increases the army's base attack (both ranged and melee) by {}.",
+        "Increases ranged units' base attack by {} and melee units' base attack by [].",
     ),
     [Tier1Artifact.IRON_PLATE]: t1(
         Tier1Artifact.IRON_PLATE,
@@ -400,7 +401,7 @@ const AP = ARTIFACT_POWER;
 const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] } = {
     veteran_helm: [AP.VETERAN_HELM_PERCENT],
     amulet_of_resolve: [AP.AMULET_OF_RESOLVE_RESIST_PERCENT, AP.AMULET_OF_RESOLVE_RESIST_PERCENT],
-    keen_blade: [AP.KEEN_BLADE_FLAT],
+    keen_blade: [AP.KEEN_BLADE_RANGED_FLAT, AP.KEEN_BLADE_FLAT],
     iron_plate: [AP.IRON_PLATE_FLAT],
     swift_boots: [AP.SWIFT_BOOTS_STEPS],
     winged_boots: [AP.WINGED_BOOTS_STEPS, AP.WINGED_BOOTS_ARMOR],
