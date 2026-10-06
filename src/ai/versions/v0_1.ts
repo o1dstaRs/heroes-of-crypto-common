@@ -326,7 +326,16 @@ export class StrategyV0_1 implements IAIStrategy {
             const through = unit.hasAbilityActive("Through Shot");
             for (const cell of target.getCells()) {
                 for (const side of RANGE_ATTACK_CELL_SIDES) {
-                    if (!isRangeAttackSideObservable(matrix, cell, side, unit.getTeam(), through)) {
+                    if (
+                        !isRangeAttackSideObservable(
+                            matrix,
+                            cell,
+                            side,
+                            unit.getTeam(),
+                            through,
+                            unit.hasAbilityActive("Large Caliber") || unit.hasAbilityActive("Area Throw"),
+                        )
+                    ) {
                         continue;
                     }
                     const aimedShot: Extract<GameAction, { type: "range_attack" }> = {
@@ -385,6 +394,7 @@ export class StrategyV0_1 implements IAIStrategy {
             through,
             action.aimCell,
             action.aimSide,
+            isAOE,
         );
         if (!edge) {
             return false; // no visible edge: the engine refuses the shot outright

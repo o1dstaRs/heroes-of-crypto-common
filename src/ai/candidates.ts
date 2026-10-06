@@ -490,7 +490,7 @@ function prepareStationaryRangeAttackSearch(
         if (isHidden(aimTarget) || shooter.cannotAttackUnitId(aimTargetId)) continue;
         for (const aimCell of aimTarget.getCells()) {
             for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
-                if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot)) continue;
+                if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot, isAOE)) continue;
                 const toPosition = getRangeAttackSideCenter(gridSettings, aimCell, aimSide, shooterPosition);
                 probes.push({
                     aimTargetId,
@@ -631,7 +631,7 @@ export function findBestLegalStationaryRangeAttack(
         if (isHidden(aimTarget) || shooter.cannotAttackUnitId(aimTargetId)) continue;
         for (const aimCell of aimTarget.getCells()) {
             for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
-                if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot)) continue;
+                if (!isRangeAttackSideObservable(matrix, aimCell, aimSide, shooterTeam, isThroughShot, isAOE)) continue;
                 const to = getRangeAttackSideCenter(gridSettings, aimCell, aimSide, shooterPosition);
                 const evaluation = attackHandler.evaluateRangeAttack(
                     allUnits,
@@ -1907,6 +1907,7 @@ class CandidateGenerator {
                 shot.aimSide as RangeAttackCellSide,
                 this.unit.getTeam(),
                 isThroughShot,
+                isLargeCaliber,
             )
         ) {
             return;
@@ -2097,7 +2098,7 @@ class CandidateGenerator {
             }
             for (const cell of enemy.getCells()) {
                 for (const side of RANGE_ATTACK_CELL_SIDES) {
-                    if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot)) {
+                    if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot, isAOE)) {
                         continue;
                     }
                     const to = getRangeAttackSideCenter(gs, cell, side, from);
@@ -2370,7 +2371,8 @@ class CandidateGenerator {
                     if (isHidden(enemy) || this.unit.cannotAttackUnitId(enemy.getId())) continue;
                     for (const cell of enemy.getCells()) {
                         for (const side of RANGE_ATTACK_CELL_SIDES) {
-                            if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot)) continue;
+                            if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot, isAOE))
+                                continue;
                             const to = getRangeAttackSideCenter(gs, cell, side, origin);
                             const evaluation = attackHandler.evaluateRangeAttack(
                                 allUnits,

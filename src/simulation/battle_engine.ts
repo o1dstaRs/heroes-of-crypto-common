@@ -167,7 +167,14 @@ function resolveRangeAttackPrimary(
 
     const throughShot = attacker.hasAbilityActive("Through Shot");
     const observableSides = RANGE_ATTACK_CELL_SIDES.filter((side) =>
-        isRangeAttackSideObservable(grid.getMatrix(), cell, side, attacker.getTeam(), throughShot),
+        isRangeAttackSideObservable(
+            grid.getMatrix(),
+            cell,
+            side,
+            attacker.getTeam(),
+            throughShot,
+            attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
+        ),
     );
     let targetPosition = target.getPosition();
     if (observableSides.length) {

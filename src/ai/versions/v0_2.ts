@@ -643,7 +643,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             }
             for (const cell of enemy.getCells()) {
                 for (const side of RANGE_ATTACK_CELL_SIDES) {
-                    if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot)) {
+                    if (!isRangeAttackSideObservable(matrix, cell, side, fromTeam, isThroughShot, isAOE)) {
                         continue;
                     }
                     const to = getRangeAttackSideCenter(gridSettings, cell, side, from);

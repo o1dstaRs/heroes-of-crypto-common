@@ -857,7 +857,7 @@ function findIndependentRangeOption(
     for (const aimedEnemy of enemies) {
         for (const aimCell of aimedEnemy.getCells()) {
             for (const aimSide of RANGE_ATTACK_CELL_SIDES) {
-                if (!isRangeAttackSideObservable(context.matrix, aimCell, aimSide, unit.getTeam(), isThrough)) {
+                if (!isRangeAttackSideObservable(context.matrix, aimCell, aimSide, unit.getTeam(), isThrough, isArea)) {
                     continue;
                 }
                 const targetPosition = getRangeAttackSideCenter(

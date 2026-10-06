@@ -1026,6 +1026,7 @@ export class GameActionEngine {
             attacker.hasAbilityActive("Through Shot"),
             aimCell,
             aimSide,
+            attacker.hasAbilityActive("Large Caliber") || attacker.hasAbilityActive("Area Throw"),
         )?.position;
     }
     private obstacleAttack(action: Extract<GameAction, { type: "obstacle_attack" }>): IGameActionResult {

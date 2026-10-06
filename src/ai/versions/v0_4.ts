@@ -245,7 +245,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             return false;
         }
         const observableSides = RANGE_ATTACK_CELL_SIDES.filter((s) =>
-            isRangeAttackSideObservable(matrix, cell, s, fromTeam, through),
+            isRangeAttackSideObservable(matrix, cell, s, fromTeam, through, isAOE),
         );
         const to = !observableSides.length
             ? target.getPosition()
