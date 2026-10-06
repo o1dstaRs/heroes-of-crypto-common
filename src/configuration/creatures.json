@@ -441,7 +441,7 @@
             "attack_type": "RANGE",
             "attack": 17,
             "attack_damage_min": 4,
-            "attack_damage_max": 6,
+            "attack_damage_max": 7,
             "attack_range": 1,
             "range_shots": 20,
             "shot_distance": 7.75,

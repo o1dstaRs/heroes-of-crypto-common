@@ -2336,6 +2336,59 @@ describe("GameActionEngine", () => {
         expect(noShots.fightProperties.hasAlreadyMadeTurn(noShots.left.getId())).toBe(false);
     });
 
+    for (const gridType of [PBTypes.GridVals.NORMAL, PBTypes.GridVals.BLOCK_CENTER]) {
+        it(`lands Gargantuan's two throws behind barrels on map ${gridType} without spending boulders on the screen`, () => {
+            const setup = setupActionFight({
+                gridType,
+                leftAttackType: PBTypes.AttackVals.RANGE,
+                leftAttack: 20,
+                leftAbilities: ["Area Throw", "Double Throw"],
+                leftDamageMin: 10,
+                leftDamageMax: 10,
+                leftRangeShots: 3,
+                leftSize: PBTypes.UnitSizeVals.LARGE,
+                leftCell: { x: 3, y: 3 },
+                supportCell: { x: 2, y: 8 },
+                rightCell: { x: 10, y: 3 },
+                rightAmountAlive: 100,
+                rightMaxHp: 100,
+            });
+            const screen = [
+                { x: 6, y: 3 },
+                { x: 8, y: 3 },
+            ];
+            const blastBarrel = { x: 9, y: 4 };
+            if (gridType === PBTypes.GridVals.NORMAL) {
+                screen.forEach((cell, index) => {
+                    expect(setup.grid.placeArtifactBarrel(PBTypes.TeamVals.RIGHT, index, cell)).toBe(true);
+                });
+                expect(setup.grid.placeArtifactBarrel(PBTypes.TeamVals.LEFT, 0, blastBarrel)).toBe(true);
+            } else {
+                setup.grid.setScatteredMountains([...screen, blastBarrel]);
+            }
+            setup.left.refreshPossibleAttackTypes(true);
+            const hpBefore = setup.right.getCumulativeHp();
+            const shotsBefore = setup.left.getRangeShots();
+
+            const result = setup.engine.apply({
+                type: "range_attack",
+                attackerId: setup.left.getId(),
+                targetId: setup.right.getId(),
+            });
+
+            expect(result.completed).toBe(true);
+            const attack = result.events.find((event) => event.type === "unit_attacked");
+            if (attack?.type !== "unit_attacked") throw new Error("expected unit_attacked event");
+            expect(attack.targetId).toBe(setup.right.getId());
+            expect(attack.damage.splash?.filter((entry) => entry.unitId === setup.right.getId())).toHaveLength(2);
+            expect(setup.right.getCumulativeHp()).toBeLessThan(hpBefore);
+            expect(setup.grid.getScatteredMountainsStanding()).toEqual(screen);
+            expect(result.events.filter((event) => event.type === "obstacle_attacked")).toHaveLength(1);
+            expect(setup.left.getRangeShots()).toBe(shotsBefore - 2);
+            expect(setup.fightProperties.hasAlreadyMadeTurn(setup.left.getId())).toBe(true);
+        });
+    }
+
     it("rejects area throws aimed at occupied unit cells", () => {
         const setup = setupActionFight({
             leftAttackType: PBTypes.AttackVals.RANGE,
