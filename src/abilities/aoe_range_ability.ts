@@ -30,6 +30,7 @@ import { processStunAbility } from "./stun_ability";
 import { processFreezeAbility } from "./freeze_ability";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { processPoisonAuraAbility } from "./poison_aura_ability";
+import { processBorrowedGraceAbility } from "./borrowed_grace_ability";
 
 export interface IAOERangeAttackResult {
     landed: boolean;
@@ -286,6 +287,7 @@ export function processRangeAOEAbility(
             processFreezeAbility(attackerUnit, unit, currentActiveUnit, sceneLog);
             processRimeCharmAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
             processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
+            processBorrowedGraceAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
         }
         attackerUnit.increaseMorale(
             increaseMoraleTotal,

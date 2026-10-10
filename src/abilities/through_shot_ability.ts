@@ -30,6 +30,7 @@ import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
 import { processFreezeAbility } from "./freeze_ability";
 import { processPoisonAuraAbility } from "./poison_aura_ability";
+import { processBorrowedGraceAbility } from "./borrowed_grace_ability";
 
 export interface IThroughShotResult {
     landed: boolean;
@@ -259,6 +260,7 @@ export function processThroughShotAbility(
             processFreezeAbility(attackerUnit, unit, attackerUnit, sceneLog);
             processRimeCharmAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
             processSpitBallAbility(attackerUnit, unit, currentActiveUnit, unitsHolder, grid, sceneLog);
+            processBorrowedGraceAbility(attackerUnit, unit, sceneLog, currentActiveUnit);
         }
     }
 

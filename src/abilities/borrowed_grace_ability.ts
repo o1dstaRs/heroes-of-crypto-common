@@ -10,6 +10,7 @@
  */
 
 import { MAX_UNIT_STACK_POWER } from "../constants";
+import { getSpellConfig } from "../configuration/config_provider";
 import { FightStateManager } from "../fights/fight_state_manager";
 import type { ISceneLog } from "../scene/scene_log_interface";
 import type { AppliedSpell } from "../spells/applied_spell";
@@ -36,7 +37,7 @@ export interface IBuffStolen {
     buffName: string;
 }
 
-/** The theft chance at this Monk's current stack, with luck and the team's ability power folded in. */
+/** The current stack's base theft chance, boosted by Made of Fire, then luck and the team's ability power. */
 export function borrowedGraceChance(thief: Unit, synergyAbilityPowerIncrease: number): number {
     const ability = thief.getAbility(BORROWED_GRACE_NAME);
     if (!ability) {
@@ -45,10 +46,15 @@ export function borrowedGraceChance(thief: Unit, synergyAbilityPowerIncrease: nu
 
     const stackPower = Math.max(1, Math.min(MAX_UNIT_STACK_POWER, thief.getStackPower()));
     const perStack = (ability.getPower() - BORROWED_GRACE_MIN_CHANCE) / (MAX_UNIT_STACK_POWER - 1);
-    const chance =
-        BORROWED_GRACE_MIN_CHANCE + perStack * (stackPower - 1) + thief.getLuck() + synergyAbilityPowerIncrease;
+    const baseChance = BORROWED_GRACE_MIN_CHANCE + perStack * (stackPower - 1);
+    const storedFirePower = thief.getBuffPower("Made of Fire");
+    const firePower =
+        storedFirePower === 0 && !thief.getBuff("Made of Fire")
+            ? getSpellConfig("System", "Made of Fire").power
+            : (storedFirePower ?? 0);
+    const chance = baseChance * (1 + firePower / 100) + thief.getLuck() + synergyAbilityPowerIncrease;
 
-    return Math.max(0, Math.min(100, chance));
+    return Number(Math.max(0, Math.min(100, chance)).toFixed(2));
 }
 
 /**
@@ -67,11 +73,17 @@ export function isTakeableBuff(buff: AppliedSpell): boolean {
 
 /**
  * Resolves the theft for ONE landed shot: with the stack-scaled chance above, one random active buff is
- * taken off the target and worn by the Monk for whatever duration the buff had left. Nothing happens when
+ * taken off the target and worn by the Monk for whatever duration the buff had left. The active thief's
+ * end-of-turn tick is compensated; a counter-shot does not extend the duration. Nothing happens when
  * the target carries no takeable buff — the shot is not "wasted", it simply had nothing to take.
  */
-export function processBorrowedGraceAbility(thief: Unit, target: Unit, sceneLog: ISceneLog): IBuffStolen | undefined {
-    if (!thief.getAbility(BORROWED_GRACE_NAME)) {
+export function processBorrowedGraceAbility(
+    thief: Unit,
+    target: Unit,
+    sceneLog: ISceneLog,
+    currentActiveUnit?: Unit,
+): IBuffStolen | undefined {
+    if (thief.isDead() || target.isDead() || !thief.getAbility(BORROWED_GRACE_NAME)) {
         return undefined;
     }
 
@@ -84,12 +96,12 @@ export function processBorrowedGraceAbility(thief: Unit, target: Unit, sceneLog:
         thief,
         FightStateManager.getInstance().getFightProperties().getAdditionalAbilityPowerPerTeam(thief.getTeam()),
     );
-    if (getRandomInt(0, 100) >= chance) {
+    if (getRandomInt(0, 10_000) / 100 >= chance) {
         return undefined;
     }
 
     const selected = candidates[getRandomInt(0, candidates.length)];
-    if (!selected || !thief.takeBuffFrom(target, selected.getName())) {
+    if (!selected || !thief.takeBuffFrom(target, selected.getName(), thief.getId() === currentActiveUnit?.getId())) {
         return undefined;
     }
 
