@@ -10,8 +10,13 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { renderAiMetaReport } from "../../src/simulation/render_ai_meta_report";
+
+const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 
 describe("render_ai_meta_report", () => {
     test("renders sparse mixed rankings as a standalone interactive document", () => {
@@ -117,12 +122,19 @@ describe("render_ai_meta_report", () => {
         expect(html).toContain('"map":"all"');
         expect(html).toMatch(/data:image\/(?:webp|svg\+xml);base64,/);
         expect(html).toContain("function mountArt(parent,row)");
-        // Portrait art embeds read site/public from the CLIENT checkout. Inside the client workspace
-        // they embed; the common package's standalone CI has no such checkout, and the renderer then
-        // (correctly) falls back to non-portrait art. Assert the full embed only when it is there.
-        if (html.includes('"portraits"')) {
+        // Portrait art embeds read site/public from the CLIENT checkout (the renderer resolves it via
+        // DEFAULT_REPOSITORY_ROOT). Inside the client workspace they embed; the common package's
+        // standalone CI has no such checkout, and the renderer then (correctly) emits art-less rows.
+        // Gate on the portrait art directory, not on the serialized key — an empty "portraits":{}
+        // ships either way.
+        const clientPortraitArt = existsSync(
+            resolve(MODULE_DIR, "../../../..", "site/public/assets/images/units/portraits"),
+        );
+        if (clientPortraitArt) {
             expect(html).toContain('"portraits":{"tsar_cannon_512":{"art":"data:image/webp;base64,');
             expect(html).toContain('"fit":"contain","scale":2.16,"offsetX":-44,"offsetY":-14');
+        } else {
+            expect(html).toContain('"portraits":{}');
         }
         expect(html).not.toContain("<script src=");
         expect(html).not.toContain('<link rel="stylesheet"');
