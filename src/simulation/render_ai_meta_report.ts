@@ -11,7 +11,7 @@
 
 import { Buffer } from "node:buffer";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, extname, resolve } from "node:path";
+import { basename, dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 type UnknownRecord = Record<string, unknown>;
@@ -100,6 +100,31 @@ interface INormalizedUnitInteractions {
 interface IEmbeddedAsset {
     id: string;
     uri: string;
+}
+
+/** Same fields the site composes from, with the art already inlined and the background stored once. */
+interface IEmbeddedPortrait {
+    art: string;
+    backgroundId: string | null;
+    backgroundOpacity: number;
+    shadeAlpha: number;
+    blurBackdrop: boolean;
+    fit: "cover" | "contain";
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+}
+
+interface IPortraitRecipe {
+    art: string;
+    background: string | null;
+    backgroundOpacity: number;
+    shadeAlpha: number;
+    blurBackdrop: boolean;
+    fit: string;
+    scale: number;
+    offsetX: number;
+    offsetY: number;
 }
 
 export interface IRenderAiMetaReportOptions {
@@ -469,10 +494,97 @@ const assetCandidates = (root: string, category: RankingCategory, token: string)
     ];
 };
 
-const embedAssets = (root: string, rows: readonly INormalizedRow[]): IEmbeddedAsset[] => {
-    const assets = new Map<string, string>();
+const portraitFileName = (value: unknown): string | null =>
+    typeof value === "string" && value.length > 0 && value === basename(value) && !value.includes("..") ? value : null;
+
+const portraitNumber = (value: unknown, fallback: number): number =>
+    typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+/**
+ * Raw `*_512` files are not one portrait set: medallions, sparse cutouts, and baked interface bars
+ * sit in the same folder. The site composes each creature from the published recipe instead.
+ */
+const loadPortraitRecipes = (root: string): Record<string, IPortraitRecipe> => {
+    const path = resolve(root, "site/src/lib/generated/portrait-recipes.json");
+    if (!existsSync(path)) return {};
+    try {
+        const parsed = JSON.parse(readFileSync(path, "utf8")) as { creatures?: unknown };
+        if (!isRecord(parsed.creatures)) return {};
+        const recipes: Record<string, IPortraitRecipe> = {};
+        for (const [slug, value] of Object.entries(parsed.creatures)) {
+            if (!isRecord(value)) continue;
+            const art = portraitFileName(value.art);
+            if (!art) continue;
+            const background = value.background === null ? null : portraitFileName(value.background);
+            if (value.background !== null && !background) continue;
+            recipes[slug] = {
+                art,
+                background,
+                backgroundOpacity: portraitNumber(value.backgroundOpacity, 1),
+                shadeAlpha: portraitNumber(value.shadeAlpha, 0),
+                blurBackdrop: value.blurBackdrop === true,
+                fit: value.fit === "contain" ? "contain" : "cover",
+                scale: portraitNumber(value.scale, 1),
+                offsetX: portraitNumber(value.offsetX, 0),
+                offsetY: portraitNumber(value.offsetY, 0),
+            };
+        }
+        return recipes;
+    } catch {
+        return {};
+    }
+};
+
+const portraitSlug = (imageId: string): string => imageId.replace(/_\d+$/, "");
+
+const embedUnitPortraits = (
+    root: string,
+    rows: readonly INormalizedRow[],
+    assets: Map<string, string>,
+): Record<string, IEmbeddedPortrait> => {
+    const recipes = loadPortraitRecipes(root);
+    const portraits: Record<string, IEmbeddedPortrait> = {};
+    const artDir = resolve(root, "site/public/assets/images/units/portraits");
+    const backgroundDir = resolve(root, "site/public/assets/images/units/portrait-backgrounds");
     for (const row of rows) {
-        if (assets.has(row.imageId)) continue;
+        if (row.category !== "units" || portraits[row.imageId]) continue;
+        const recipe = recipes[portraitSlug(row.imageId)];
+        if (!recipe) continue;
+        const artUri = dataUri(resolve(artDir, recipe.art));
+        if (!artUri) continue;
+        let backgroundId: string | null = null;
+        if (recipe.background) {
+            backgroundId = `portrait-bg:${recipe.background}`;
+            if (!assets.has(backgroundId)) {
+                const backgroundUri = dataUri(resolve(backgroundDir, recipe.background));
+                // A recipe names its faction plate. Shipping the creature without it is a different picture.
+                if (!backgroundUri) continue;
+                assets.set(backgroundId, backgroundUri);
+            }
+        }
+        portraits[row.imageId] = {
+            art: artUri,
+            backgroundId,
+            backgroundOpacity: recipe.backgroundOpacity,
+            shadeAlpha: recipe.shadeAlpha,
+            blurBackdrop: recipe.blurBackdrop,
+            fit: recipe.fit === "contain" ? "contain" : "cover",
+            scale: recipe.scale,
+            offsetX: recipe.offsetX,
+            offsetY: recipe.offsetY,
+        };
+    }
+    return portraits;
+};
+
+const embedReportImages = (
+    root: string,
+    rows: readonly INormalizedRow[],
+): { assets: IEmbeddedAsset[]; portraits: Record<string, IEmbeddedPortrait> } => {
+    const assets = new Map<string, string>();
+    const portraits = embedUnitPortraits(root, rows, assets);
+    for (const row of rows) {
+        if (assets.has(row.imageId) || portraits[row.imageId]) continue;
         const uri = firstDataUri(assetCandidates(root, row.category, row.imageId)) ?? placeholderUri(row.name);
         assets.set(row.imageId, uri);
     }
@@ -480,7 +592,7 @@ const embedAssets = (root: string, rows: readonly INormalizedRow[]): IEmbeddedAs
         const fallback = firstDataUri(assetCandidates(root, "units", "unknown_creature_512"));
         assets.set("unknown_creature_512", fallback ?? placeholderUri("Unknown"));
     }
-    return [...assets.entries()].map(([id, uri]) => ({ id, uri }));
+    return { assets: [...assets.entries()].map(([id, uri]) => ({ id, uri })), portraits };
 };
 
 const stringifyCompact = (value: unknown): string => {
@@ -522,10 +634,28 @@ const formatInteger = (value: number): string => new Intl.NumberFormat("en-US").
 export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMetaReportOptions = {}): string {
     const summary = asRecord(summaryValue);
     const rows = normalizeRows(summary);
+    const studyProfile = String(asRecord(asRecord(summary.provenance).fightProfile).studyProfile);
+    const premiumStudy = ["premium-ranked-v1", "premium-ranked-v2", "premium-ranked-v3"].includes(studyProfile);
+    const premiumSetupNotice =
+        studyProfile === "premium-ranked-v1"
+            ? "This historical profile restricts opponent identities during augment setup; it does not match current ranked public-roster Setup. "
+            : "Augment setup uses the public opponent roster; opponent positions, artifacts, augments and splits stay private. ";
+    const augmentDomainNotice =
+        studyProfile === "premium-ranked-v3"
+            ? "All six augment axes, including Empower, are eligible for collection. "
+            : "Historical collection covers five augment axes only; Empower allocations are unmeasured. ";
+    if (premiumStudy)
+        for (const row of rows) {
+            if (row.rate === null || !row.pairs) continue;
+            // A two-family all-win/all-loss pilot must not imply a zero-width confidence interval.
+            const radius = Math.sqrt(Math.log(40) / (2 * row.pairs));
+            row.ciLow = Math.max(0, row.rate - radius);
+            row.ciHigh = Math.min(1, row.rate + radius);
+        }
     const interactions = normalizeUnitInteractions(summary);
     const cohorts = normalizeCohorts(summary, rows);
     const root = options.repositoryRoot ? resolve(options.repositoryRoot) : DEFAULT_REPOSITORY_ROOT;
-    const assets = embedAssets(root, rows);
+    const { assets, portraits } = embedReportImages(root, rows);
     const assetMap = Object.fromEntries(assets.map((asset) => [asset.id, asset.uri]));
     const logo =
         firstDataUri([resolve(root, "game/core/images/logo_hoc.webp")]) ??
@@ -579,6 +709,7 @@ export function renderAiMetaReport(summaryValue: unknown, options: IRenderAiMeta
         rows,
         cohorts,
         assets: assetMap,
+        portraits,
         categories: RANKING_DEFINITIONS,
         mapDefinitions,
         interactions,
@@ -697,6 +828,19 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
 @media(max-width:460px){.leaders{grid-template-columns:1fr}.leader-art{height:235px}.forest-row{grid-template-columns:112px minmax(90px,1fr) 49px}.forest-label{grid-template-columns:29px minmax(0,1fr)}.forest-label img{width:29px;height:29px}.hero-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.leader,.leader-art img,.report-jump{transition:none}.leader:hover,.report-jump:hover{transform:none}}
 @media print{.sticky-filter{display:none}.report-main section{scroll-margin-top:0}}
+.portrait{position:relative;display:block;overflow:hidden;background:#090806;isolation:isolate}
+.leader-art .portrait{position:absolute;top:0;bottom:0;left:50%;height:100%;width:auto;aspect-ratio:190 / 256;transform:translateX(-50%)}
+.forest-label .portrait{width:48px;height:48px;border:1px solid rgba(205,160,120,.28);border-radius:9px}
+.table-entry .portrait{width:46px;height:46px;flex:0 0 auto;border:1px solid rgba(205,160,120,.25);border-radius:9px}
+.portrait__bg,.portrait__art,.portrait__blur{position:absolute;inset:0;z-index:0;display:block;width:100%;height:100%;max-width:none;padding:0;border:0;border-radius:0;background:transparent;object-position:center;transform-origin:center}
+.portrait__shade{position:absolute;inset:0;z-index:1;background:#000;pointer-events:none}
+.portrait__art{z-index:3}
+.leader-art .portrait img,.forest-label .portrait img,.table-entry .portrait img{width:100%;height:100%;max-width:none;padding:0;border:0;border-radius:0;background:transparent;filter:none}
+.leader-art .portrait__bg,.forest-label .portrait__bg,.table-entry .portrait__bg{object-fit:cover}
+.portrait img.portrait__blur{z-index:2;object-fit:cover;transform:scale(1.2);filter:blur(14px) brightness(.42) saturate(.78)}
+.leader:hover .leader-art .portrait img.portrait__blur{transform:scale(1.2)}
+@media(max-width:720px){.forest-label .portrait{width:36px;height:36px}}
+@media(max-width:460px){.forest-label .portrait{width:29px;height:29px}}
 </style>
 </head>
 <body>
@@ -719,7 +863,7 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
 <main class="shell report-main">
   <aside class="notice" aria-label="Interpretation caveat">
     <div class="notice-mark">!</div>
-    <div><h2>Controlled strength and associative composition</h2><p>Artifact and augment score rates use the policy's 20% uniform exploration assignments, breaking the link between a strong army and its usual item choice. Synergy rows instead track exact faction, choice, and active level under the deployed deterministic setup policy; they remain composition-confounded associations, not randomized causal effects. Augment plans are the causal unit; individual levels remain compositional diagnostics.</p></div>
+    <div><h2>${premiumStudy ? "Premium coverage study · exploratory evidence" : "Controlled strength and associative composition"}</h2><p>${premiumStudy ? premiumSetupNotice + augmentDomainNotice + "Ranked draft artifacts are retained from visible offers; their setup rows have no randomized artifact assignments and must not be read as zero strength. Synthetic cohorts explore setup artifacts. Augment exploration spans the actual 5/6/7-point doctrine budgets. Unit and synergy results are composition-confounded associations; no Premium advisor has been fitted or evaluated. This coverage pilot does not establish counter-pick gains or optimal formations. Premium charts use conservative family-bounded 95% intervals instead of the legacy summary variance intervals." : "Artifact and augment score rates use the policy's 20% uniform exploration assignments, breaking the link between a strong army and its usual item choice. Synergy rows instead track exact faction, choice, and active level under the deployed deterministic setup policy; they remain composition-confounded associations, not randomized causal effects. Augment plans are the causal unit; individual levels remain compositional diagnostics."}</p></div>
   </aside>
   ${
       partialRun
@@ -743,7 +887,7 @@ body{overflow-x:clip;background:radial-gradient(circle at 50% -12%,rgba(255,143,
   </div>
 
   <section id="overview" data-report-section aria-labelledby="leaders-title">
-    <div class="section-head"><div><p class="eyebrow">At a glance</p><h2 id="leaders-title">Category leaders</h2></div><p>Highest observed draw-aware score rate in the selected cohort and map set. Treat close results as a tier rather than a proven unique winner: confidence intervals can overlap, synergy rows inherit roster composition, and the augment-plan view compares 96 candidates.</p></div>
+    <div class="section-head"><div><p class="eyebrow">At a glance</p><h2 id="leaders-title">Category leaders</h2></div><p>Highest observed draw-aware score rate in the selected cohort and map set. Treat close results as a tier rather than a proven unique winner: confidence intervals can overlap, synergy rows inherit roster composition, ${premiumStudy ? "and augment plans must be compared within their doctrine budget." : "and the augment-plan view compares 96 candidates."}</p></div>
     <div class="leaders" id="leaders"></div>
   </section>
 
@@ -801,6 +945,7 @@ var rows=Array.isArray(DATA.rows)?DATA.rows:[];
 var categories=Array.isArray(DATA.categories)?DATA.categories:[];
 var cohorts=Array.isArray(DATA.cohorts)?DATA.cohorts:[];
 var assets=DATA.assets||{};
+var portraits=DATA.portraits||{};
 var mapDefinitions=Array.isArray(DATA.mapDefinitions)?DATA.mapDefinitions:[];
 var interactions=DATA.interactions&&typeof DATA.interactions==="object"?DATA.interactions:null;
 var reportedMaps=new Set(rows.map(function(row){return row.map||"all"}));
@@ -817,6 +962,7 @@ function rate(value){return finite(value)?(value*100).toFixed(1)+"%":"—"}
 function lift(value){if(!finite(value))return "—";return (value>0?"+":"")+value.toFixed(1)+"pp"}
 function sample(row){return finite(row.sample)?numberFormat.format(row.sample):"—"}
 function image(row){return assets[row.imageId]||assets.unknown_creature_512||""}
+function mountArt(parent,row){var spec=portraits[row.imageId];if(!spec||typeof spec.art!=="string"){var img=node("img");img.src=image(row);img.alt="";parent.append(img);return}var card=node("span","portrait");if(spec.backgroundId&&assets[spec.backgroundId]){var bg=node("img","portrait__bg");bg.src=assets[spec.backgroundId];bg.alt="";if(spec.backgroundOpacity!==1)bg.style.opacity=String(spec.backgroundOpacity);var shade=node("span","portrait__shade");shade.style.opacity=String(spec.shadeAlpha);card.append(bg,shade)}if(spec.blurBackdrop){var blur=node("img","portrait__blur");blur.src=spec.art;blur.alt="";card.append(blur)}var art=node("img","portrait__art");art.src=spec.art;art.alt=row.name||"";art.style.objectFit=spec.fit==="contain"?"contain":"cover";art.style.transform="translate("+Number(spec.offsetX)+"%, "+Number(spec.offsetY)+"%) scale("+Number(spec.scale)+")";card.append(art);parent.append(card)}
 function tone(value){return !finite(value)||Math.abs(value)<.05?"neutral":value>0?"positive":"negative"}
 function cohortLabel(id){var found=cohorts.find(function(item){return item.id===id});return found?found.label:(id==="all"?"All cohorts":id)}
 function categoryLabel(key){var found=categories.find(function(item){return item.key===key});return found?found.label:key}
@@ -833,8 +979,8 @@ function coverageForCohort(cohort){var mapGames=cohort.mapGames||{};if(state.map
 function selectedCoverage(){var selected=state.cohort==="all"?cohorts:cohorts.filter(function(cohort){return cohort.id===state.cohort});if(!selected.length)return null;var values=selected.map(coverageForCohort);return values.every(finite)?values.reduce(function(sum,value){return sum+value},0):null}
 function renderCoverage(){var host=document.getElementById("filter-coverage");var coverage=selectedCoverage();host.className="filter-coverage"+(mapIsNonLive(state.map)?" non-live":"");host.replaceChildren();host.append(node("strong","",finite(coverage)?numberFormat.format(coverage)+" fights":"Coverage unavailable"));var context=cohortLabel(state.cohort)+" · "+mapLabel(state.map);if(mapIsNonLive(state.map))context+=" · research only";host.append(node("span","",context))}
 function eligibleLeader(row,category){return supported(row)&&finite(row.rate)&&(category.key!=="augmentLevels"||String(row.level)!=="0")}
-function renderLeaders(){var host=document.getElementById("leaders");host.replaceChildren();categories.forEach(function(category){var candidates=exactCohortRows(category.key).filter(function(row){return eligibleLeader(row,category)}).sort(function(a,b){return b.rate-a.rate});var row=candidates[0];if(!row)return;var card=node("article","leader");var art=node("div","leader-art");var img=node("img");img.src=image(row);img.alt="";art.append(img);var copy=node("div","leader-copy");copy.append(node("span","leader-type",category.label));copy.append(node("h3","",row.name));var metric=node("div","leader-metric");metric.append(node("strong","leader-rate",rate(row.rate)));metric.append(node("span","leader-lift "+tone(row.liftPp),lift(row.liftPp)));copy.append(metric);var basis=finite(row.scoreRate)?"Score rate":"Win-rate fallback";copy.append(node("div","leader-meta",basis+" · "+cohortLabel(row.cohort)+" · "+mapLabel(row.map)+" · n "+sample(row)));card.append(art,copy);host.append(card)});if(!host.children.length)host.append(node("div","empty","No ranking rows with a reported rate are available for the selected cohort and map."))}
-function renderForest(category,host){var candidates=exactCohortRows(category.key).filter(function(row){return eligibleLeader(row,category)}).sort(function(a,b){return b.rate-a.rate});if(category.key!=="units"&&category.key!=="synergies")candidates=candidates.slice(0,12);host.replaceChildren();if(!candidates.length){host.append(node("div","empty","No rate data for "+category.label+" in the selected cohort and map."));return}var forest=node("div","forest");candidates.forEach(function(row){var line=node("div","forest-row");var label=node("div","forest-label");var img=node("img");img.src=image(row);img.alt="";var labelText=node("div");labelText.append(node("span","forest-name",row.name));var unitLevel=row.category==="units"&&row.level?"L"+row.level+" · ":"";labelText.append(node("span","forest-sample",unitLevel+"n "+sample(row)));label.append(img,labelText);var track=node("div","forest-track");var low=finite(row.ciLow)?row.ciLow:row.rate;var high=finite(row.ciHigh)?row.ciHigh:row.rate;var ci=node("span","forest-ci");ci.style.left=(Math.max(0,Math.min(1,low))*100)+"%";ci.style.width=(Math.max(0,Math.min(1,high)-Math.max(0,Math.min(1,low)))*100)+"%";var dot=node("span","forest-dot");dot.style.left=(Math.max(0,Math.min(1,row.rate))*100)+"%";var basis=finite(row.scoreRate)?"score rate":"win-rate fallback";track.title=row.name+" · "+mapLabel(row.map)+" · "+basis+" "+rate(row.rate)+" · decisive win rate "+rate(row.winRate)+" · CI "+rate(low)+"–"+rate(high);track.append(ci,dot);line.append(label,track,node("span","forest-rate",rate(row.rate)));forest.append(line)});host.append(forest)}
+function renderLeaders(){var host=document.getElementById("leaders");host.replaceChildren();categories.forEach(function(category){var candidates=exactCohortRows(category.key).filter(function(row){return eligibleLeader(row,category)}).sort(function(a,b){return b.rate-a.rate});var row=candidates[0];if(!row)return;var card=node("article","leader");var art=node("div","leader-art");mountArt(art,row);var copy=node("div","leader-copy");copy.append(node("span","leader-type",category.label));copy.append(node("h3","",row.name));var metric=node("div","leader-metric");metric.append(node("strong","leader-rate",rate(row.rate)));metric.append(node("span","leader-lift "+tone(row.liftPp),lift(row.liftPp)));copy.append(metric);var basis=finite(row.scoreRate)?"Score rate":"Win-rate fallback";copy.append(node("div","leader-meta",basis+" · "+cohortLabel(row.cohort)+" · "+mapLabel(row.map)+" · n "+sample(row)));card.append(art,copy);host.append(card)});if(!host.children.length)host.append(node("div","empty","No ranking rows with a reported rate are available for the selected cohort and map."))}
+function renderForest(category,host){var candidates=exactCohortRows(category.key).filter(function(row){return eligibleLeader(row,category)}).sort(function(a,b){return b.rate-a.rate});if(category.key!=="units"&&category.key!=="synergies")candidates=candidates.slice(0,12);host.replaceChildren();if(!candidates.length){host.append(node("div","empty","No rate data for "+category.label+" in the selected cohort and map."));return}var forest=node("div","forest");candidates.forEach(function(row){var line=node("div","forest-row");var label=node("div","forest-label");mountArt(label,row);var labelText=node("div");labelText.append(node("span","forest-name",row.name));var unitLevel=row.category==="units"&&row.level?"L"+row.level+" · ":"";labelText.append(node("span","forest-sample",unitLevel+"n "+sample(row)));label.append(labelText);var track=node("div","forest-track");var low=finite(row.ciLow)?row.ciLow:row.rate;var high=finite(row.ciHigh)?row.ciHigh:row.rate;var ci=node("span","forest-ci");ci.style.left=(Math.max(0,Math.min(1,low))*100)+"%";ci.style.width=(Math.max(0,Math.min(1,high)-Math.max(0,Math.min(1,low)))*100)+"%";var dot=node("span","forest-dot");dot.style.left=(Math.max(0,Math.min(1,row.rate))*100)+"%";var basis=finite(row.scoreRate)?"score rate":"win-rate fallback";track.title=row.name+" · "+mapLabel(row.map)+" · "+basis+" "+rate(row.rate)+" · decisive win rate "+rate(row.winRate)+" · CI "+rate(low)+"–"+rate(high);track.append(ci,dot);line.append(label,track,node("span","forest-rate",rate(row.rate)));forest.append(line)});host.append(forest)}
 function renderForests(){var grid=document.getElementById("forest-grid");grid.replaceChildren();categories.forEach(function(category){var card=node("article","chart-card");var heading=node("header","chart-title");heading.append(node("h3","",category.label));var count=exactCohortRows(category.key).filter(function(row){return eligibleLeader(row,category)}).length;heading.append(node("span","chart-count",numberFormat.format(count)+" supported"));var host=node("div");card.append(heading,host);grid.append(card);renderForest(category,host)})}
 function scatterColor(category){return category==="units"?"#67aef6":category==="synergies"?"#ff7db8":category==="artifactsT1"?"#f2c75d":category==="artifactsT2"?"#ffe4a3":category==="augmentPlans"?"#b98cff":"#63d28a"}
 function renderScatter(){var host=document.getElementById("scatter");host.replaceChildren();var points=categories.flatMap(function(category){return exactCohortRows(category.key)}).filter(function(row){return finite(row.pickRate)&&finite(row.rate)});if(points.length<2){host.append(node("div","empty","Pick-rate data is not available for enough entries in the selected cohort and map."));return}var width=760,height=340,p={left:54,right:20,top:18,bottom:45};var maxX=Math.max(.1,Math.min(1,Math.max.apply(null,points.map(function(row){return row.pickRate}))*1.08));var rates=points.map(function(row){return row.rate});var minY=Math.max(0,Math.min(.5,Math.min.apply(null,rates))-.04);var maxY=Math.min(1,Math.max(.5,Math.max.apply(null,rates))+.04);if(maxY-minY<.1){minY=Math.max(0,minY-.05);maxY=Math.min(1,maxY+.05)}var x=function(value){return p.left+(value/maxX)*(width-p.left-p.right)};var y=function(value){return p.top+(maxY-value)/(maxY-minY)*(height-p.top-p.bottom)};var chart=svg("svg",{viewBox:"0 0 "+width+" "+height,class:"scatter-svg",role:"img","aria-label":"Scatter plot of pick rate versus score rate"});for(var i=0;i<=5;i+=1){var gx=p.left+i*(width-p.left-p.right)/5;chart.append(svg("line",{x1:gx,y1:p.top,x2:gx,y2:height-p.bottom,class:"scatter-grid"}));var xt=svg("text",{x:gx,y:height-19,class:"scatter-label","text-anchor":"middle"});xt.textContent=((maxX*i/5)*100).toFixed(0)+"%";chart.append(xt);var gy=p.top+i*(height-p.top-p.bottom)/5;chart.append(svg("line",{x1:p.left,y1:gy,x2:width-p.right,y2:gy,class:"scatter-grid"}));var value=maxY-i*(maxY-minY)/5;var yt=svg("text",{x:p.left-9,y:gy+4,class:"scatter-label","text-anchor":"end"});yt.textContent=(value*100).toFixed(0)+"%";chart.append(yt)}chart.append(svg("line",{x1:p.left,y1:height-p.bottom,x2:width-p.right,y2:height-p.bottom,class:"scatter-axis"}));chart.append(svg("line",{x1:p.left,y1:p.top,x2:p.left,y2:height-p.bottom,class:"scatter-axis"}));if(.5>=minY&&.5<=maxY)chart.append(svg("line",{x1:p.left,y1:y(.5),x2:width-p.right,y2:y(.5),class:"scatter-parity"}));points.forEach(function(row){var circle=svg("circle",{cx:x(row.pickRate),cy:y(row.rate),r:6,fill:scatterColor(row.category),class:"scatter-dot"});var tooltip=svg("title",{});tooltip.textContent=row.name+" · "+mapLabel(row.map)+" · pick "+rate(row.pickRate)+" · score "+rate(row.rate)+" · decisive win "+rate(row.winRate);circle.append(tooltip);chart.append(circle)});var xLabel=svg("text",{x:(p.left+width-p.right)/2,y:height-2,class:"scatter-label","text-anchor":"middle"});xLabel.textContent="Pick rate";chart.append(xLabel);var yLabel=svg("text",{x:13,y:(p.top+height-p.bottom)/2,class:"scatter-label",transform:"rotate(-90 13 "+((p.top+height-p.bottom)/2)+")","text-anchor":"middle"});yLabel.textContent="Score rate";chart.append(yLabel);host.append(chart)}
@@ -847,7 +993,7 @@ function renderInteractionRows(host,values,limit,emptyText){host.replaceChildren
 function renderInteractions(){if(!interactions)return;var pairRows=interactionRows("allyPairs"),trioRows=interactionRows("allyTrios"),counterRows=interactionRows("counters");var pairNote=document.getElementById("ally-pair-note"),trioNote=document.getElementById("ally-trio-note"),counterNote=document.getElementById("counter-note");var pairMinimum=finite(interactions.minimumPairSupport)?interactions.minimumPairSupport:0,trioMinimum=finite(interactions.minimumTrioSupport)?interactions.minimumTrioSupport:0,counterMinimum=finite(interactions.minimumCounterSupport)?interactions.minimumCounterSupport:0;var scope=finite(interactions.scopePairs)?numberFormat.format(interactions.scopePairs)+" live-map matchup pairs":"pooled live-map matchups";pairNote.textContent="Top adjusted co-play residuals from "+scope+" · minimum n "+numberFormat.format(pairMinimum)+".";trioNote.textContent="Top adjusted three-unit residuals · minimum n "+numberFormat.format(trioMinimum)+".";counterNote.textContent="Choose any unit to see its five strongest adjusted edges against enemy units · minimum n "+numberFormat.format(counterMinimum)+".";renderInteractionRows(document.getElementById("ally-pairs"),pairRows,20,"No two-unit combinations meet the support threshold.");renderInteractionRows(document.getElementById("ally-trios"),trioRows,20,"No three-unit combinations meet the support threshold.");var select=document.getElementById("counter-unit"),host=document.getElementById("counter-leaders");select.replaceChildren();var declaredUnits=Array.isArray(interactions.counterUnits)?interactions.counterUnits:[];var units=Array.from(new Set(declaredUnits.concat(counterRows.map(function(row){return row.unit}).filter(Boolean)))).sort(function(left,right){return left.localeCompare(right)});if(!units.length){renderInteractionRows(host,[],5,"No unit counter rows meet the support threshold.");return}units.forEach(function(unit){var option=document.createElement("option");option.value=unit;option.textContent=unit;select.append(option)});var renderUnit=function(){var unit=select.value;var rowsForUnit=counterRows.filter(function(row){return row.unit===unit}).map(function(row){return Object.assign({},row,{name:unit+" → "+(row.enemyUnit||row.name)})});renderInteractionRows(host,rowsForUnit,5,"No supported counter edges for this unit.")};select.addEventListener("change",renderUnit);renderUnit()}
 function renderTypeFilter(){var select=document.getElementById("type-filter");if(select.options.length>1)return;categories.forEach(function(category){var option=document.createElement("option");option.value=category.key;option.textContent=category.label;select.append(option)})}
 function td(text,className){return node("td",className||"",text)}
-function renderTable(){var body=document.getElementById("ranking-body");var values=tableRows();body.replaceChildren();values.forEach(function(row){var line=node("tr");var hasSupport=supported(row);line.append(td(row.categoryLabel));var entry=td("");var wrap=node("div","table-entry");var img=node("img");img.src=image(row);img.alt="";var copy=node("div");copy.append(node("strong","",row.name));copy.append(node("span","type-chip",row.key));wrap.append(img,copy);entry.append(wrap);line.append(entry);line.append(td(cohortLabel(row.cohort)));line.append(td(mapLabel(row.map),mapIsNonLive(row.map)?"negative":""));line.append(td(sample(row)));line.append(td(finite(row.wins)?numberFormat.format(row.wins):"—"));line.append(td(finite(row.losses)?numberFormat.format(row.losses):"—"));line.append(td(finite(row.draws)?numberFormat.format(row.draws):"—"));line.append(td(hasSupport?rate(row.scoreRate):"—","rate-cell"));line.append(td(hasSupport?rate(row.winRate):"—"));line.append(td(hasSupport&&finite(row.ciLow)&&finite(row.ciHigh)?rate(row.ciLow)+" – "+rate(row.ciHigh):"—"));line.append(td(rate(row.pickRate)));line.append(td(hasSupport?lift(row.liftPp):"—",hasSupport?tone(row.liftPp):"neutral"));body.append(line)});if(!values.length){var line=node("tr");var empty=td("No ranking rows match the selected cohort, map, and table filters.","empty");empty.colSpan=13;line.append(empty);body.append(line)}document.getElementById("table-total").textContent=numberFormat.format(values.length)+" rows"}
+function renderTable(){var body=document.getElementById("ranking-body");var values=tableRows();body.replaceChildren();values.forEach(function(row){var line=node("tr");var hasSupport=supported(row);line.append(td(row.categoryLabel));var entry=td("");var wrap=node("div","table-entry");mountArt(wrap,row);var copy=node("div");copy.append(node("strong","",row.name));copy.append(node("span","type-chip",row.key));wrap.append(copy);entry.append(wrap);line.append(entry);line.append(td(cohortLabel(row.cohort)));line.append(td(mapLabel(row.map),mapIsNonLive(row.map)?"negative":""));line.append(td(sample(row)));line.append(td(finite(row.wins)?numberFormat.format(row.wins):"—"));line.append(td(finite(row.losses)?numberFormat.format(row.losses):"—"));line.append(td(finite(row.draws)?numberFormat.format(row.draws):"—"));line.append(td(hasSupport?rate(row.scoreRate):"—","rate-cell"));line.append(td(hasSupport?rate(row.winRate):"—"));line.append(td(hasSupport&&finite(row.ciLow)&&finite(row.ciHigh)?rate(row.ciLow)+" – "+rate(row.ciHigh):"—"));line.append(td(rate(row.pickRate)));line.append(td(hasSupport?lift(row.liftPp):"—",hasSupport?tone(row.liftPp):"neutral"));body.append(line)});if(!values.length){var line=node("tr");var empty=td("No ranking rows match the selected cohort, map, and table filters.","empty");empty.colSpan=13;line.append(empty);body.append(line)}document.getElementById("table-total").textContent=numberFormat.format(values.length)+" rows"}
 function bindTable(){var search=document.getElementById("table-search");search.addEventListener("input",function(){state.query=search.value.trim();renderTable()});var select=document.getElementById("type-filter");select.addEventListener("change",function(){state.type=select.value;renderTable()});document.querySelectorAll("[data-sort]").forEach(function(button){button.addEventListener("click",function(){var key=button.getAttribute("data-sort");if(state.sort===key)state.direction*=-1;else{state.sort=key;state.direction=key==="name"||key==="categoryLabel"||key==="cohort"||key==="map"?1:-1}renderTable()})})}
 function renderAll(){renderTabs();renderCoverage();renderLeaders();renderForests();renderScatter();renderHeatmap();renderTable()}
 function initReportNavigation(){var links=Array.from(document.querySelectorAll("[data-report-jump]"));var sections=Array.from(document.querySelectorAll("[data-report-section]"));if(!links.length||!sections.length||!("IntersectionObserver" in window))return;var setActive=function(id){links.forEach(function(link){var active=link.getAttribute("data-report-jump")===id;link.classList.toggle("active",active);if(active)link.setAttribute("aria-current","true");else link.removeAttribute("aria-current")})};var observer=new IntersectionObserver(function(entries){var visible=entries.filter(function(entry){return entry.isIntersecting}).sort(function(left,right){return left.boundingClientRect.top-right.boundingClientRect.top})[0];if(visible)setActive(visible.target.id)},{rootMargin:"-28% 0px -62% 0px",threshold:0});sections.forEach(function(section){observer.observe(section)})}

@@ -1829,7 +1829,9 @@ export class AttackHandler {
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
                 // ABILITY Borrowed Grace (Monk): a landed shot takes one active buff off the target and
                 // wears it. An on-hit rider like the ones above — a missed or lethal shot takes nothing.
-                AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog);
+                if (!splashLanded) {
+                    AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                }
             }
             if (recordPrimaryTargetDeath()) {
                 switchTargetUnit = true;
@@ -1898,7 +1900,12 @@ export class AttackHandler {
                     );
                     // A Monk that shoots BACK steals just the same — the theft rides the landed shot, not
                     // the initiative (mirrors Predatory Assimilation's response branch).
-                    AllAbilities.processBorrowedGraceAbility(targetUnit, rangeResponseUnit, this.sceneLog);
+                    AllAbilities.processBorrowedGraceAbility(
+                        targetUnit,
+                        rangeResponseUnit,
+                        this.sceneLog,
+                        attackerUnit,
+                    );
                     if (rangeResponseUnit.isDead()) {
                         if (!unitIdsDied.includes(rangeResponseUnit.getId())) {
                             this.sceneLog.updateLog(`${rangeResponseUnit.getName()} died`);
@@ -2121,6 +2128,7 @@ export class AttackHandler {
                     this.sceneLog,
                 );
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, secondShotResult.damage, this.sceneLog);
+                AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
             }
             recordPrimaryTargetDeath();
         }

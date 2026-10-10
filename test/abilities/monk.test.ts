@@ -41,7 +41,7 @@ beforeEach(() => FightStateManager.getInstance().reset());
 afterEach(() => setDeterministicRandomSource(undefined));
 
 /**
- * Pin the exact value each getRandomInt(0, 100) call returns, in order. getRandomInt combines one 21-bit
+ * Pin the raw integer used by each getRandomInt call, in order. getRandomInt combines one 21-bit
  * and one 32-bit source draw, so an exact raw integer keeps the percentage boundary explicit (same trick
  * as the Predatory Assimilation tests). A single-candidate pick consumes no draw at all — getRandomInt
  * returns min when the span is 1.
@@ -165,7 +165,7 @@ describe("Borrowed Grace", () => {
         const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.RIGHT });
         castBuff(target, "Life", "Blessing");
 
-        setRolls(20); // the boundary itself misses
+        setRolls(2_000); // the 20% boundary itself misses
         expect(processBorrowedGraceAbility(monk, target, new SceneLogMock())).toBeUndefined();
         expect(target.getBuff("Blessing")).toBeDefined();
     });

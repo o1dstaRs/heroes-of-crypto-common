@@ -280,3 +280,15 @@ test("rejects duplicate raw pairs before publishing an enriched summary", async 
         rmSync(run.directory, { recursive: true, force: true });
     }
 });
+
+test("rejects an evidence-enabled summary whose raw records omit the capture", async () => {
+    const run = fixture();
+    try {
+        const summary = JSON.parse(run.summaryText) as IAiMetaSummary;
+        summary.provenance.evidenceCollection = { schema: "premium-cohort-evidence-v1" };
+        writeFileSync(run.summaryPath, JSON.stringify(summary));
+        await expect(reaggregateAiMetaSummary(run.summaryPath)).rejects.toThrow("missing declared evidence");
+    } finally {
+        rmSync(run.directory, { recursive: true, force: true });
+    }
+});

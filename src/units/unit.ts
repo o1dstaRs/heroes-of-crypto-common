@@ -10,11 +10,13 @@
  */
 
 import Denque from "denque";
+import { observeUnitHpChange } from "./hp_change_capture";
 import { Ability } from "../abilities/ability";
 import { BLIND_FURY_ABILITY_NAME, blindFuryDescription } from "../abilities/blind_fury_ability";
 import { AbilityFactory } from "../abilities/ability_factory";
 import { AbilityPowerType } from "../abilities/ability_properties";
 import { ABSOLVING_ARROW_NAME, absolvingArrowFirstLiftChance } from "../abilities/absolving_arrow_ability";
+import { BORROWED_GRACE_NAME, borrowedGraceChance } from "../abilities/borrowed_grace_ability";
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
 import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/double_shot_names";
 import { getCraftChances } from "../abilities/craft_ability";
@@ -748,6 +750,12 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 .join("\n")
                 .replace(/\{\}/g, Number(absolvingArrowFirstLiftChance(this, 0).toFixed(2)).toString());
         }
+        if (ability.getName() === BORROWED_GRACE_NAME) {
+            return ability
+                .getDesc()
+                .join("\n")
+                .replace(/\{\}/g, Number(borrowedGraceChance(this, 0).toFixed(2)).toString());
+        }
         if (
             ability.getName() === "Stun Aura" ||
             ability.getName() === "Guiding Winds Aura" ||
@@ -973,7 +981,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.web_movement_locked = this.canFly() && this.hasDebuffActive("Web Aura");
         if (this.unitProperties.hp !== this.unitProperties.max_hp && this.hasAbilityActive("Wild Regeneration")) {
             const healedHp = this.unitProperties.max_hp - this.unitProperties.hp;
+            const observed = observeUnitHpChange(this, "regeneration", healedHp, this);
             this.unitProperties.hp = this.unitProperties.max_hp;
+            observed?.();
             sceneLog.updateLog(`${this.getName()} auto regenerated to its maximum hp (+${healedHp})`);
         }
         this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
@@ -1799,92 +1809,97 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         extendBreak = false,
         attacker?: Unit,
     ): number {
-        if (minusHp <= 0) {
-            return 0;
-        }
+        const observed = observeUnitHpChange(this, "damage", minusHp, attacker);
+        try {
+            if (minusHp <= 0) {
+                return 0;
+            }
 
-        // Water Shield: once per battle, the first incoming damage instance is fully absorbed (0 damage taken)
-        // and the shield breaks. Sits above the Break roll and the HP subtraction so an absorbed hit lands
-        // nothing at all; `waterShieldSpent` stops the seeding refresh from re-granting the buff afterwards.
-        // FIRE IGNORES IT: a Fire Element attacker (and the fire abilities they cast — Fire Breath, Fire
-        // Shield) passes straight through, dealing full damage without absorbing OR consuming the shield.
-        if (this.willWaterShieldAbsorb(attacker)) {
-            this.waterShieldSpent = true;
-            this.deleteBuff("Water Shield");
-            // Name the striker when the caller passed one — "the shield broke" without a culprit reads
-            // like a bug. The capture below is what carries this to RANKED: its log rebuilds from events,
-            // so the engine drains the record into the action's damage payload (source "water_shield").
-            sceneLog.updateLog(
-                `${this.getName()}'s Water Shield absorbs ${
-                    attacker ? `${attacker.getName()}'s hit` : "the hit"
-                } and breaks`,
-            );
-            recordWaterShieldAbsorb({ unitId: this.getId(), amount: minusHp });
-            return 0;
-        }
+            // Water Shield: once per battle, the first incoming damage instance is fully absorbed (0 damage taken)
+            // and the shield breaks. Sits above the Break roll and the HP subtraction so an absorbed hit lands
+            // nothing at all; `waterShieldSpent` stops the seeding refresh from re-granting the buff afterwards.
+            // FIRE IGNORES IT: a Fire Element attacker (and the fire abilities they cast — Fire Breath, Fire
+            // Shield) passes straight through, dealing full damage without absorbing OR consuming the shield.
+            if (this.willWaterShieldAbsorb(attacker)) {
+                this.waterShieldSpent = true;
+                this.deleteBuff("Water Shield");
+                // Name the striker when the caller passed one — "the shield broke" without a culprit reads
+                // like a bug. The capture below is what carries this to RANKED: its log rebuilds from events,
+                // so the engine drains the record into the action's damage payload (source "water_shield").
+                sceneLog.updateLog(
+                    `${this.getName()}'s Water Shield absorbs ${
+                        attacker ? `${attacker.getName()}'s hit` : "the hit"
+                    } and breaks`,
+                );
+                recordWaterShieldAbsorb({ unitId: this.getId(), amount: minusHp });
+                return 0;
+            }
 
-        // Break-on-attack: `chanceToBreak` is the ATTACKER's team break chance (Chaos synergy + the
-        // Broken Aegis artifact — see FightProperties.getBreakChancePerTeam), applied to the unit being
-        // hit (`this`). Break is OFFENSIVE: it mutes the ENEMY the wielder struck, never the wielder.
-        // Break doesn't stack: if the unit is already Broken, don't attempt it again — re-applying would
-        // just reset the same 1-lap effect and spam a duplicate "got Break" log (e.g. a Double Shot's two
-        // hits, or a hit + counter). Skip the whole thing (including the RNG draw) when it's already active,
-        // unless a caller explicitly wants to extend it.
-        // The break RNG is drawn ONCE (only when a break is actually possible), then used for both the live
-        // decision and the diagnostic below — so the two can never disagree, and production's draw count is
-        // unchanged (the draw still happens iff chance>0 and the unit isn't already Broken / we're extending).
-        const breakPossible = chanceToBreak > 0 && (extendBreak || !this.hasEffectActive("Break"));
-        const breakRoll = breakPossible ? getRandomInt(0, 100) : -1;
+            // Break-on-attack: `chanceToBreak` is the ATTACKER's team break chance (Chaos synergy + the
+            // Broken Aegis artifact — see FightProperties.getBreakChancePerTeam), applied to the unit being
+            // hit (`this`). Break is OFFENSIVE: it mutes the ENEMY the wielder struck, never the wielder.
+            // Break doesn't stack: if the unit is already Broken, don't attempt it again — re-applying would
+            // just reset the same 1-lap effect and spam a duplicate "got Break" log (e.g. a Double Shot's two
+            // hits, or a hit + counter). Skip the whole thing (including the RNG draw) when it's already active,
+            // unless a caller explicitly wants to extend it.
+            // The break RNG is drawn ONCE (only when a break is actually possible), then used for both the live
+            // decision and the diagnostic below — so the two can never disagree, and production's draw count is
+            // unchanged (the draw still happens iff chance>0 and the unit isn't already Broken / we're extending).
+            const breakPossible = chanceToBreak > 0 && (extendBreak || !this.hasEffectActive("Break"));
+            const breakRoll = breakPossible ? getRandomInt(0, 100) : -1;
 
-        // Diagnostic (env-gated, off by default): trace every break-on-attack decision so a live ranked game
-        // can show whether Break was even ATTEMPTED (chance>0 => the attacker's team really has Broken Aegis /
-        // Chaos BREAK_ON_ATTACK), the exact RNG roll, and the outcome. Answers "break didn't apply to X":
-        // chance=0 => seeding gap; roll>=chance => just RNG; applied=true => it worked (a VFX/log gap, not a
-        // mechanics bug). Magic immunity is intentionally irrelevant here — see break_magic_immunity.test.
-        if (typeof process !== "undefined" && process.env?.HOC_BREAK_DEBUG === "1") {
-            console.warn(
-                `[BREAK-DEBUG] target=${this.getName()} magicResist=${this.getMagicResist()} ` +
-                    `chance=${chanceToBreak} alreadyBroken=${this.hasEffectActive("Break")} roll=${breakRoll} ` +
-                    `applied=${breakPossible && breakRoll < Math.min(chanceToBreak, 100)}`,
-            );
-        }
-        if (breakPossible && breakRoll < Math.min(chanceToBreak, 100)) {
-            const breakEffect = this.effectFactory.makeEffect("Break");
-            if (breakEffect) {
-                if (extendBreak) {
-                    breakEffect.extend();
-                }
-                const laps = breakEffect.getLaps();
-                if (this.applyEffect(breakEffect)) {
-                    sceneLog.updateLog(`${this.getName()} got Break for ${getLapString(laps)}`);
+            // Diagnostic (env-gated, off by default): trace every break-on-attack decision so a live ranked game
+            // can show whether Break was even ATTEMPTED (chance>0 => the attacker's team really has Broken Aegis /
+            // Chaos BREAK_ON_ATTACK), the exact RNG roll, and the outcome. Answers "break didn't apply to X":
+            // chance=0 => seeding gap; roll>=chance => just RNG; applied=true => it worked (a VFX/log gap, not a
+            // mechanics bug). Magic immunity is intentionally irrelevant here — see break_magic_immunity.test.
+            if (typeof process !== "undefined" && process.env?.HOC_BREAK_DEBUG === "1") {
+                console.warn(
+                    `[BREAK-DEBUG] target=${this.getName()} magicResist=${this.getMagicResist()} ` +
+                        `chance=${chanceToBreak} alreadyBroken=${this.hasEffectActive("Break")} roll=${breakRoll} ` +
+                        `applied=${breakPossible && breakRoll < Math.min(chanceToBreak, 100)}`,
+                );
+            }
+            if (breakPossible && breakRoll < Math.min(chanceToBreak, 100)) {
+                const breakEffect = this.effectFactory.makeEffect("Break");
+                if (breakEffect) {
+                    if (extendBreak) {
+                        breakEffect.extend();
+                    }
+                    const laps = breakEffect.getLaps();
+                    if (this.applyEffect(breakEffect)) {
+                        sceneLog.updateLog(`${this.getName()} got Break for ${getLapString(laps)}`);
+                    }
                 }
             }
+
+            const damage = projectStackDamage(
+                {
+                    hp: this.unitProperties.hp,
+                    maxHp: this.unitProperties.max_hp,
+                    amountAlive: this.unitProperties.amount_alive,
+                    amountDied: this.unitProperties.amount_died,
+                },
+                minusHp,
+            );
+            this.unitProperties.hp = damage.state.hp;
+            this.unitProperties.max_hp = damage.state.maxHp;
+            this.unitProperties.amount_alive = damage.state.amountAlive;
+            this.unitProperties.amount_died = damage.state.amountDied;
+            this.handleDamageAnimation(damage.animationDeaths);
+
+            // Apply "Bitter Experience" if available
+            if (!damage.dead && damage.unitsDied > 0 && this.hasAbilityActive("Bitter Experience")) {
+                this.unitProperties.base_armor += 1;
+                this.initialUnitProperties.base_armor += 1;
+                this.unitProperties.steps += 1;
+                this.initialUnitProperties.steps += 1;
+            }
+
+            return damage.appliedDamage;
+        } finally {
+            observed?.();
         }
-
-        const damage = projectStackDamage(
-            {
-                hp: this.unitProperties.hp,
-                maxHp: this.unitProperties.max_hp,
-                amountAlive: this.unitProperties.amount_alive,
-                amountDied: this.unitProperties.amount_died,
-            },
-            minusHp,
-        );
-        this.unitProperties.hp = damage.state.hp;
-        this.unitProperties.max_hp = damage.state.maxHp;
-        this.unitProperties.amount_alive = damage.state.amountAlive;
-        this.unitProperties.amount_died = damage.state.amountDied;
-        this.handleDamageAnimation(damage.animationDeaths);
-
-        // Apply "Bitter Experience" if available
-        if (!damage.dead && damage.unitsDied > 0 && this.hasAbilityActive("Bitter Experience")) {
-            this.unitProperties.base_armor += 1;
-            this.initialUnitProperties.base_armor += 1;
-            this.unitProperties.steps += 1;
-            this.initialUnitProperties.steps += 1;
-        }
-
-        return damage.appliedDamage;
     }
     public isDead(): boolean {
         return this.unitProperties.amount_alive <= 0;
@@ -3002,7 +3017,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * duration and lose any cast-time power (a Tome-amplified buff, an artifact's `;primary;secondary`
      * suffix). An identically named buff already on the thief is replaced, never doubled.
      */
-    public takeBuffFrom(from: Unit, buffName: string): boolean {
+    public takeBuffFrom(from: Unit, buffName: string, extend: boolean = false): boolean {
         const applied = from.getBuff(buffName);
         if (!applied) {
             return false;
@@ -3019,7 +3034,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             return false;
         }
 
-        const laps = from.unitProperties.applied_buffs_laps[index];
+        const laps =
+            applied.getLaps() +
+            (extend && !this.getBuff("Morale") && applied.getLaps() > 0 && applied.getLaps() < NUMBER_OF_LAPS_TOTAL
+                ? 1
+                : 0);
         const description = from.unitProperties.applied_buffs_descriptions[index];
         const power = from.unitProperties.applied_buffs_powers[index];
 
@@ -3029,7 +3048,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             new AppliedSpell(
                 buffName,
                 applied.getPower(),
-                applied.getLaps(),
+                laps,
                 applied.getFirstSpellProperty(),
                 applied.getSecondSpellProperty(),
             ),
@@ -3038,6 +3057,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.unitProperties.applied_buffs_laps.push(laps);
         this.unitProperties.applied_buffs_descriptions.push(description);
         this.unitProperties.applied_buffs_powers.push(power);
+        recordEffectApplication({
+            unitId: this.getId(),
+            name: buffName,
+            kind: "buff",
+            laps,
+            sourceUnitId: from.getId(),
+        });
 
         return true;
     }
@@ -3196,52 +3222,62 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     // returns number of units resurrected
     public applyResurrection(resurrectionPower: number): number {
-        const hpDiff = this.unitProperties.max_hp - this.unitProperties.hp;
-        if (hpDiff >= resurrectionPower) {
-            this.unitProperties.hp += resurrectionPower;
-            return 0;
-        } else {
-            this.unitProperties.hp = this.unitProperties.max_hp;
-            resurrectionPower -= hpDiff;
+        const observed = observeUnitHpChange(this, "resurrection", resurrectionPower);
+        try {
+            const hpDiff = this.unitProperties.max_hp - this.unitProperties.hp;
+            if (hpDiff >= resurrectionPower) {
+                this.unitProperties.hp += resurrectionPower;
+                return 0;
+            } else {
+                this.unitProperties.hp = this.unitProperties.max_hp;
+                resurrectionPower -= hpDiff;
+            }
+
+            const projectedAmountResurrected = Math.ceil(resurrectionPower / this.unitProperties.max_hp);
+            const actualAmountResurrected = Math.min(this.unitProperties.amount_died, projectedAmountResurrected);
+
+            if (projectedAmountResurrected > actualAmountResurrected) {
+                this.unitProperties.hp = this.unitProperties.max_hp;
+            } else {
+                // Health left over after the whole members the budget paid for; it belongs to the last one
+                // raised, which becomes the stack's wounded front member. A remainder of ZERO means the budget
+                // covered that member exactly, so it comes back at FULL health — writing the bare remainder
+                // here resurrected the stack with a 0 hp front member ("resurrection doesn't recover hp").
+                const hpStillToHeal = resurrectionPower % this.unitProperties.max_hp;
+                this.unitProperties.hp = hpStillToHeal === 0 ? this.unitProperties.max_hp : hpStillToHeal;
+            }
+
+            const newAmountDied = this.unitProperties.amount_died - actualAmountResurrected;
+            this.unitProperties.amount_alive += actualAmountResurrected;
+            this.unitProperties.amount_died = newAmountDied < 0 ? 0 : newAmountDied;
+
+            return actualAmountResurrected;
+        } finally {
+            observed?.();
         }
-
-        const projectedAmountResurrected = Math.ceil(resurrectionPower / this.unitProperties.max_hp);
-        const actualAmountResurrected = Math.min(this.unitProperties.amount_died, projectedAmountResurrected);
-
-        if (projectedAmountResurrected > actualAmountResurrected) {
-            this.unitProperties.hp = this.unitProperties.max_hp;
-        } else {
-            // Health left over after the whole members the budget paid for; it belongs to the last one
-            // raised, which becomes the stack's wounded front member. A remainder of ZERO means the budget
-            // covered that member exactly, so it comes back at FULL health — writing the bare remainder
-            // here resurrected the stack with a 0 hp front member ("resurrection doesn't recover hp").
-            const hpStillToHeal = resurrectionPower % this.unitProperties.max_hp;
-            this.unitProperties.hp = hpStillToHeal === 0 ? this.unitProperties.max_hp : hpStillToHeal;
-        }
-
-        const newAmountDied = this.unitProperties.amount_died - actualAmountResurrected;
-        this.unitProperties.amount_alive += actualAmountResurrected;
-        this.unitProperties.amount_died = newAmountDied < 0 ? 0 : newAmountDied;
-
-        return actualAmountResurrected;
     }
     public applyHeal(healPower: number): number {
-        // Mechanism units (e.g. Tsar Cannon) cannot be healed — enforce it at the HP-restore chokepoint so
-        // NO path (single Heal, Mass Heal, Devour Essence, or any future caller) can restore their HP, even
-        // if a caller forgets the canBeHealed() pre-check.
-        if (healPower < 0 || !this.canBeHealed()) {
-            return 0;
-        }
+        const observed = observeUnitHpChange(this, "heal", healPower);
+        try {
+            // Mechanism units (e.g. Tsar Cannon) cannot be healed — enforce it at the HP-restore chokepoint so
+            // NO path (single Heal, Mass Heal, Devour Essence, or any future caller) can restore their HP, even
+            // if a caller forgets the canBeHealed() pre-check.
+            if (healPower < 0 || !this.canBeHealed()) {
+                return 0;
+            }
 
-        let healedFor = Math.floor(healPower);
-        const wasHp = this.unitProperties.hp;
-        this.unitProperties.hp += healedFor;
-        if (this.unitProperties.hp > this.unitProperties.max_hp) {
-            healedFor = this.unitProperties.max_hp - wasHp;
-            this.unitProperties.hp = this.unitProperties.max_hp;
-        }
+            let healedFor = Math.floor(healPower);
+            const wasHp = this.unitProperties.hp;
+            this.unitProperties.hp += healedFor;
+            if (this.unitProperties.hp > this.unitProperties.max_hp) {
+                healedFor = this.unitProperties.max_hp - wasHp;
+                this.unitProperties.hp = this.unitProperties.max_hp;
+            }
 
-        return healedFor;
+            return healedFor;
+        } finally {
+            observed?.();
+        }
     }
     public handleResurrectionAnimation(): void {}
     public reduceBaseAttack(reduceBy: number): number {
@@ -4469,6 +4505,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         let hasParalysis = false;
         let hasDoubleShot = false;
         let hasMaulAoe = false;
+        let hasBorrowedGrace = false;
         for (const abilityName of this.unitProperties.abilities) {
             switch (abilityName) {
                 case BLIND_FURY_ABILITY_NAME:
@@ -4485,6 +4522,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                     break;
                 case "Paralysis":
                     hasParalysis = true;
+                    break;
+                case BORROWED_GRACE_NAME:
+                    hasBorrowedGrace = true;
                     break;
                 default:
                     if (DOUBLE_SHOT_ABILITY_NAMES.includes(abilityName)) {
@@ -4521,6 +4561,19 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Paralysis's chance and damage cut both follow the live stack tier, luck and synergy.
         if (hasParalysis) {
             this.refreshParalysisDescription(_synergyAbilityPowerIncrease);
+        }
+        if (hasBorrowedGrace) {
+            const ability = this.getAbility(BORROWED_GRACE_NAME);
+            if (ability) {
+                const index = this.unitProperties.abilities.indexOf(BORROWED_GRACE_NAME);
+                this.unitProperties.abilities_descriptions[index] = ability
+                    .getDesc()
+                    .join("\n")
+                    .replace(
+                        /\{\}/g,
+                        Number(borrowedGraceChance(this, _synergyAbilityPowerIncrease).toFixed(2)).toString(),
+                    );
+            }
         }
         // The second-shot cards are a live percentage too: the ability's power plus the owner's CURRENT
         // luck, and for the stack-powered members its current stack tier on top.

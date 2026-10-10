@@ -93,6 +93,8 @@ export type GameEvent =
               name: string;
               kind: "buff" | "debuff" | "effect";
               laps?: number;
+              /** Previous owner when this application transfers a buff. */
+              sourceUnitId?: string;
               resisted?: boolean;
           }[];
       }

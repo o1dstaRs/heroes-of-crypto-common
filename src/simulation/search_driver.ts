@@ -51,7 +51,10 @@ import {
     preservesV08BacklineWardIntent,
 } from "../ai/versions/v0_8_backline_protector";
 import { v08ArmageddonPreservationOpportunity } from "../ai/versions/v0_8_armageddon_endgame";
-import { selectV08A19ScoredCandidateIndex } from "../ai/versions/v0_8_a19_scored_arbitration";
+import {
+    selectV08A19ScoredCandidateIndex,
+    V08_A19_SCORED_ARBITRATION_POLICY,
+} from "../ai/versions/v0_8_a19_scored_arbitration";
 import { applyV08FlyerBacklinePriority } from "../ai/versions/v0_8_flyer_backline_priority";
 import { isV08DirectCombatDecision, v08DominantFinishState } from "../ai/versions/v0_8_dominant_finish";
 import {
@@ -1240,6 +1243,34 @@ const emptyCounters = (): ISearchCounters => ({
 const bump = (rec: Record<string, number>, key: string): void => {
     rec[key] = (rec[key] ?? 0) + 1;
 };
+
+/**
+ * True when every unplayed leaf in [0, 1] still leaves this candidate strictly more than `margin` below
+ * `bestFinishedMean`. The caller must record `sum / rolloutCount` (unplayed leaves count as 0). A partial
+ * average can reorder a near tie, a gate, or scored arbitration. Do not call this once any leaf was above 1.
+ */
+export function remainingRolloutsCannotWin(
+    sum: number,
+    completedRollouts: number,
+    rolloutCount: number,
+    bestFinishedMean: number,
+    margin: number,
+): boolean {
+    if (
+        !Number.isFinite(sum) ||
+        !Number.isFinite(bestFinishedMean) ||
+        !Number.isFinite(margin) ||
+        margin < 0 ||
+        completedRollouts < 1 ||
+        rolloutCount < 2 ||
+        completedRollouts >= rolloutCount
+    ) {
+        return false;
+    }
+    const remaining = rolloutCount - completedRollouts;
+    const maxMean = (sum + remaining) / rolloutCount;
+    return maxMean + margin < bestFinishedMean;
+}
 
 export interface ISearchMatchInfo {
     seed?: number;
@@ -3837,6 +3868,14 @@ export class SearchDriver {
                 this.effectiveRollouts(),
                 deadlineAt,
                 turnHorizon,
+                this.canBoundHopelessSearchTails(
+                    deadlineAt,
+                    prioritizeProductiveActions,
+                    prioritizeDominantFinish,
+                    prioritizeV08STargetPressure,
+                    prioritizeV08SUrgency,
+                    aggressiveWaitComparison,
+                ),
             );
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
             const legalProductiveIndices = scoredCandidates
@@ -4985,6 +5024,40 @@ export class SearchDriver {
         return overridden ? candidates[1].actions : incumbent;
     }
     // ---- rollout scoring --------------------------------------------------------------------------
+    /**
+     * Offline unrestricted search may skip a hopeless tail. Restricted selection (productive repair, dominant
+     * finish, target pressure, urgency, aggressive wait) can keep an action that is not the raw best mean, so
+     * those decisions stay fully scored. Live and ranked deadlines never take this path.
+     */
+    private canBoundHopelessSearchTails(
+        deadlineAt: number | null,
+        prioritizeProductiveActions: boolean,
+        prioritizeDominantFinish: boolean,
+        prioritizeV08STargetPressure: boolean,
+        prioritizeV08SUrgency: boolean,
+        aggressiveWaitComparison: boolean,
+    ): boolean {
+        return (
+            this.match.offlineDeterministicWork === true &&
+            deadlineAt === null &&
+            !this.captureA19Material &&
+            this.ilPath === undefined &&
+            this.scoredDecisionObserver === undefined &&
+            !prioritizeProductiveActions &&
+            !prioritizeDominantFinish &&
+            !prioritizeV08STargetPressure &&
+            !prioritizeV08SUrgency &&
+            !aggressiveWaitComparison
+        );
+    }
+    /** Gate, replay near-tie, and scored-arbitration gaps. A lower bound inside this margin can still win. */
+    private hopelessTailMargin(): number {
+        return Math.max(
+            this.gate,
+            this.rankedReplayTiebreakEpsilon,
+            this.a19ScoredArbitration ? V08_A19_SCORED_ARBITRATION_POLICY.valueGain : 0,
+        );
+    }
     /** Mean leaf value per candidate over SEARCH_ROLLOUTS paired-seed rollouts (-Infinity = illegal). */
     private scoreCandidates(
         unit: Unit,
@@ -4994,6 +5067,7 @@ export class SearchDriver {
         rolloutCount = this.rollouts,
         deadlineAt: number | null = null,
         turnHorizon = this.horizon,
+        boundHopelessTails = false,
     ): number[] {
         this.assertBeforeDecisionDeadline(deadlineAt);
         const journal =
@@ -5007,11 +5081,17 @@ export class SearchDriver {
         this.assertBeforeDecisionDeadline(deadlineAt);
         const means: number[] = [];
         const captureMaterial = this.captureA19Material && horizonMode === "turns";
+        // Partial material counts are stored as -Infinity evidence. Never bound those samples.
+        const boundTails = boundHopelessTails && !captureMaterial;
+        let leafOutsideUnitInterval = false;
+        let bestFinishedMean = Number.NEGATIVE_INFINITY;
+        const margin = boundTails ? this.hopelessTailMargin() : 0;
         const materials: number[] = [];
         const actingTeam = captureMaterial ? unit.getTeam() : undefined;
         for (const cand of candidates) {
             this.assertBeforeDecisionDeadline(deadlineAt);
             let sum = 0;
+            let completed = 0;
             let materialSum = 0;
             let materialCount = 0;
             let illegal = false;
@@ -5058,8 +5138,27 @@ export class SearchDriver {
                     break;
                 }
                 sum += score;
+                completed += 1;
+                if (!Number.isFinite(score) || score > 1) {
+                    leafOutsideUnitInterval = true;
+                } else if (
+                    boundTails &&
+                    !leafOutsideUnitInterval &&
+                    remainingRolloutsCannotWin(sum, completed, rolloutCount, bestFinishedMean, margin)
+                ) {
+                    break;
+                }
             }
             means.push(illegal ? -Infinity : sum / rolloutCount);
+            if (
+                boundTails &&
+                !leafOutsideUnitInterval &&
+                !illegal &&
+                completed === rolloutCount &&
+                sum / rolloutCount > bestFinishedMean
+            ) {
+                bestFinishedMean = sum / rolloutCount;
+            }
             if (captureMaterial)
                 materials.push(!illegal && materialCount === rolloutCount ? materialSum / rolloutCount : -Infinity);
         }

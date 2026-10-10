@@ -14,6 +14,7 @@ import { Worker } from "node:worker_threads";
 
 import { LEAGUE_ROUND1_DRAFT_SPEC } from "../../src/ai/setup/draft_ship";
 import { isBacklineProtectionBeneficiaryCreature } from "../../src/ai/setup/creature_score";
+import { CreatureFactions } from "../../src/generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { creaturesByLevel, DEFAULT_ROSTER_COMPOSITION } from "../../src/simulation/army";
 import {
@@ -134,12 +135,16 @@ describe("AI meta cohort generation", () => {
                 }
                 const chaos = army.synergies.find((choice) => choice.faction === PBTypes.FactionVals.CHAOS);
                 if (!chaos) continue;
-                const creatureId = army.creatureIds.find((id) => aiMetaSynergyLevel([id, id], chaos.faction) === 1);
+                const creatureId = army.creatureIds.find((id) => CreatureFactions[id] === chaos.faction);
                 expect(creatureId).toBeDefined();
                 expect(aiMetaSynergyLevel([creatureId!], chaos.faction)).toBe(0);
-                expect(aiMetaSynergyLevel([creatureId!, creatureId!], chaos.faction)).toBe(1);
-                expect(aiMetaSynergyLevel(Array(4).fill(creatureId!), chaos.faction)).toBe(2);
-                expect(aiMetaSynergyLevel(Array(6).fill(creatureId!), chaos.faction)).toBe(3);
+                expect(aiMetaSynergyLevel(Array(6).fill(creatureId!), chaos.faction)).toBe(0);
+                const distinct = Object.entries(CreatureFactions)
+                    .filter(([, faction]) => faction === chaos.faction)
+                    .map(([id]) => Number(id));
+                expect(aiMetaSynergyLevel(distinct.slice(0, 2), chaos.faction)).toBe(1);
+                expect(aiMetaSynergyLevel(distinct.slice(0, 4), chaos.faction)).toBe(2);
+                expect(aiMetaSynergyLevel(distinct.slice(0, 6), chaos.faction)).toBe(3);
             }
         }
         expect(seenVariants).toEqual(expectedVariants);

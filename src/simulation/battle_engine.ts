@@ -96,6 +96,7 @@ import { createV08A13SearchDriver, shouldUseDefaultV08A13Search, withScopedAIEnv
 import { createV08A19SearchDriver, shouldUseDefaultV08A19Search, V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
 import { footprintCellsForAnchor, footprintLabel } from "./footprint";
 import { advanceTowardEnemyAction, forceStalledLap } from "./turn_recovery";
+import { observeCommittedHealth, type IPremiumHealthObservation } from "./ai_meta_health_ledger";
 import { extractValueFeatures, extractValueFeaturesV2Raw } from "./value_features";
 
 // Learned-value data capture (gated by VALUE_DATA=<jsonl path>). When set, every acting turn snapshots the
@@ -394,6 +395,10 @@ export interface IMatchConfig {
     policyEventObserver?: (event: IAIPolicyEvent) => void;
     /** Optional post-execution instrumentation. The observation is detached from engine-owned values. */
     turnExecutionObserver?: (observation: ITurnExecutionObservation) => void;
+    /** Detached committed fight events, including start and turn activation. Never includes search/probe rollouts. */
+    committedEventsObserver?: (observation: { lap: number; events: readonly GameEvent[] }) => void;
+    /** Offline health instrumentation around committed execution only; never strategy/search/probe calls. */
+    committedHealthObserver?: (observation: IPremiumHealthObservation) => void;
     /**
      * Optional detached turn-activation events emitted before strategy selection. Diagnostics need this narrow
      * seam to distinguish an hourglass unit legitimately skipped by Stun/Freeze/Blindness from a living waiter
@@ -1252,7 +1257,28 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         unitsKilledByNarrowing: 0,
         decidedByArmageddon: false,
     };
+    const applyWithHealth = <T extends { events: GameEvent[]; completed?: boolean }>(
+        operation: string,
+        apply: () => T,
+    ): T => {
+        if (!config.committedHealthObserver) return apply();
+        const captured = observeCommittedHealth(
+            () => unitsHolder.getAllUnits(),
+            () => fightProperties.getCurrentLap(),
+            operation,
+            apply,
+        );
+        config.committedHealthObserver(captured.observation);
+        return captured.value;
+    };
+    const applyCommittedAction = (action: GameAction) => applyWithHealth(action.type, () => engine.apply(action));
     const applyEvents = (events: GameEvent[]): void => {
+        if (config.committedEventsObserver && events.length) {
+            config.committedEventsObserver({
+                lap: fightProperties.getCurrentLap(),
+                events: structuredClone(events),
+            });
+        }
         for (const event of events) {
             if (event.type === "turn_completed") {
                 if (currentActiveUnitId === event.unitId) {
@@ -1282,7 +1308,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         }
     };
 
-    const startResult = engine.apply({ type: "start_fight" });
+    const startResult = applyCommittedAction({ type: "start_fight" });
     applyEvents(startResult.events);
     search.onFightReady();
     v08A13TrajectorySearch?.onFightReady();
@@ -1290,9 +1316,11 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
     const advance = (): void => {
         const maxAttempts = unitsHolder.getAllUnits().size + 2;
         for (let i = 0; i < maxAttempts && !finished && !currentActiveUnitId; i += 1) {
-            const result = turnEngine.advanceAfterNoActiveUnit({
-                damageDealtThisLap: damageStatisticHolder.has(fightProperties.getCurrentLap()),
-            });
+            const result = applyWithHealth("advance", () =>
+                turnEngine.advanceAfterNoActiveUnit({
+                    damageDealtThisLap: damageStatisticHolder.has(fightProperties.getCurrentLap()),
+                }),
+            );
             if (config.turnActivationObserver) {
                 const skipped = result.events.filter((event) => event.type === "unit_skipped");
                 if (skipped.length) config.turnActivationObserver(structuredClone(skipped));
@@ -1549,7 +1577,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         for (let actionIndex = 0; actionIndex < decided.length; actionIndex += 1) {
             const action = decided[actionIndex];
             const fromCell = { ...unit.getBaseCell() };
-            const result = engine.apply(action);
+            const result = applyCommittedAction(action);
             if (turnExecutionObserver) {
                 const observedEvents = structuredClone(result.events);
                 strategyActionsForObservation!.push({
@@ -1693,7 +1721,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
                     return false;
                 }
                 const fromCell = { ...unit.getBaseCell() };
-                const r = engine.apply(action);
+                const r = applyCommittedAction(action);
                 if (!r.completed && source === "v0.1_retry") {
                     if (unit.getTeam() === GREEN_TEAM) {
                         rejectedGreen += 1;
@@ -1774,7 +1802,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
             }
         }
         if (!finished && currentActiveUnitId === actingUnitId) {
-            const endResult = engine.apply({ type: "end_turn", unitId: actingUnitId, reason: "manual" });
+            const endResult = applyCommittedAction({ type: "end_turn", unitId: actingUnitId, reason: "manual" });
             if (turnExecutionObserver) {
                 turnEventsForObservation!.push(...structuredClone(endResult.events));
             }

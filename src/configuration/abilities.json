@@ -1449,8 +1449,8 @@
         "name": "Borrowed Grace",
         "type": "ATTACK",
         "desc": [
-            "Each landed shot has a {}% chance to take one random active buff off the target",
-            "and wear it for the rest of its duration. Auras and equipment cannot be taken"
+            "Each landed shot or counter-shot has a {}% chance to take one random active buff off the target",
+            "and wear it for the rest of its duration. Auras, army blessings, Water Shield, artifacts and augments cannot be taken"
         ],
         "power": 70,
         "power_type": "STEAL_BUFF",

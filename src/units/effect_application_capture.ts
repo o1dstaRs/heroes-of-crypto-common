@@ -24,6 +24,8 @@ export interface IEffectApplicationRecord {
     name: string;
     kind: "buff" | "debuff" | "effect";
     laps?: number;
+    /** Previous owner of a transferred buff, rather than the caster of a new buff. */
+    sourceUnitId?: string;
     /** A debuff that ROLLED but was resisted — recorded so the log can say the target shrugged it off. */
     resisted?: boolean;
 }

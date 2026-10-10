@@ -139,8 +139,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for the search env overlay follow-ups (a13/a19 search wiring).
-        sha256: "02863bc67d001d6f5bfae476b9017e08b4e39216ece763238605fdbee2daca10" as const,
+        // Re-pinned for the offline hopeless-tail skip. Live and ranked decisions stay fully scored.
+        sha256: "9e330f0d5a464c3849a784efc06e1bd7a9ac7f9608a2c2adc1e6d14e1b8528d3" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,
@@ -190,7 +190,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
-        sha256: "d657665cc95c20b345726e457a510fb04f725c23bb71b28cf69a741ac2acc881" as const,
+        // Re-pinned for opt-in committed health diagnostics; capture parity verifies unchanged decisions.
+        sha256: "9afb1418304e5e8bf7e9a29071ddc3c9db19332fc800c2894c8cf29b21a7e35d" as const,
     }),
 ] as const);
 

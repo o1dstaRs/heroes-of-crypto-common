@@ -20,24 +20,35 @@ import {
     draftGenomeCreatureScore,
     parseDraftGenome,
     pickDraftGenomeCreature,
+    pickRankedLiveDraftBundle,
+    pickRankedLiveDraftCreature,
 } from "../ai/setup/draft_ship";
 import { creatureInfo } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
 import { TIER1_ARTIFACT_WINRATE, TIER2_ARTIFACT_WINRATE } from "../ai/setup/setup_strategy";
 import {
-    augmentPlanId,
     enumerateFullBudgetAugmentPlans,
-    setupAugmentsForPlan,
     setupCohort,
     setupRosterFeatures,
-    type IAugmentPlan,
     type ISetupAugmentChoice,
     type SetupCohort,
 } from "../ai/setup/setup_ship";
-import { getArmorPower, getMightPower, getMovementPower, getSniperPower } from "../augments/augment_properties";
+import {
+    enumeratePremiumAugmentPlans,
+    premiumAugmentPlanId as augmentPlanId,
+    premiumSetupAugmentsForPlan as setupAugmentsForPlan,
+    type IPremiumAugmentPlan as IAugmentPlan,
+} from "../ai/setup/premium_augment_plans";
+import {
+    getEmpowerPower,
+    getArmorPower,
+    getMightPower,
+    getMovementPower,
+    getSniperPower,
+} from "../augments/augment_properties";
 import { CreatureFactions } from "../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../generated/protobuf/v1/types";
-import { Doctrine } from "../doctrines/doctrine_properties";
+import { Doctrine, getUpgradePoints } from "../doctrines/doctrine_properties";
 import {
     createPickSimState,
     getCurrentPickPhase,
@@ -68,6 +79,28 @@ import {
     type IArmyUnitSpec,
 } from "./army";
 import { creatureIdForName } from "./draft";
+import {
+    AI_META_EVIDENCE_SCHEMA,
+    aiMetaChoiceEvidence,
+    aiMetaDraftArtifacts,
+    aiMetaEvidencePartition,
+    cloneAiMetaDraftObservation,
+    type IAiMetaChoiceEvidence,
+    type IAiMetaDraftEvidence,
+    type IAiMetaEvidence,
+} from "./ai_meta_evidence";
+
+import {
+    PREMIUM_META_FULL_AUGMENTS_STUDY,
+    isPublicSetupStudy,
+    isPremiumMetaStudy,
+    PREMIUM_META_DRAFT_SPEC,
+    premiumStudyEvidenceSchema,
+    premiumStudyChoice,
+    premiumStudyDoctrine,
+    type AiMetaStudy,
+} from "./ai_meta_study";
+import { scatteredMountainsForSeed } from "../grid/scattered_mountains";
 
 /**
  * Post-draft contextual-oracle meta measurement.
@@ -203,7 +236,7 @@ export function aiMetaSynergiesForVariants(
     variants: ReturnType<typeof synergyVariantsForSeed>,
 ): { faction: number; synergy: number }[] {
     const counts = new Map<number, number>();
-    for (const creatureId of creatureIds) {
+    for (const creatureId of new Set(creatureIds)) {
         const faction = CreatureFactions[creatureId];
         if (faction) {
             counts.set(faction, (counts.get(faction) ?? 0) + 1);
@@ -223,9 +256,9 @@ export function aiMetaSynergyDefinition(faction: number, synergy: number): IAiMe
     );
 }
 
-/** Match FightProperties' 2/4/6-stack activation thresholds exactly. */
+/** Match FightProperties' 2/4/6 distinct-creature activation thresholds exactly. */
 export function aiMetaSynergyLevel(creatureIds: readonly number[], faction: number): 0 | 1 | 2 | 3 {
-    const stacks = creatureIds.reduce(
+    const stacks = [...new Set(creatureIds)].reduce(
         (count, creatureId) => count + Number(CreatureFactions[creatureId] === faction),
         0,
     );
@@ -271,9 +304,11 @@ export interface IAiMetaArmyFeatures {
 
 export interface IAiMetaArtifactChoice {
     id: number;
+    source?: "draft-retained";
     mode: AiMetaSelectionMode;
     propensity: number;
     contextualScore: number;
+    evidence?: IAiMetaChoiceEvidence;
 }
 
 export interface IAiMetaAugmentChoice {
@@ -283,6 +318,7 @@ export interface IAiMetaAugmentChoice {
     mode: AiMetaSelectionMode;
     propensity: number;
     contextualScore: number;
+    evidence?: IAiMetaChoiceEvidence;
 }
 
 export interface IAiMetaArmy {
@@ -323,12 +359,16 @@ export interface IAiMetaPairRecord {
     armyA: IAiMetaArmy;
     armyB: IAiMetaArmy;
     games: [IAiMetaGameOutcome, IAiMetaGameOutcome];
+    evidence?: IAiMetaEvidence;
 }
 
 export interface IAiMetaRunOptions {
     cohort: AiMetaCohort;
     games: number;
     baseSeed: number;
+    /** Opt-in archive capture; does not change roster/setup selection policies. */
+    collectEvidence?: boolean;
+    studyProfile?: AiMetaStudy;
 }
 
 interface ICatalogEntry {
@@ -346,6 +386,7 @@ interface IGeneratedMatchup {
     archetypeB: AiMetaArchetype;
     rosterA: IArmyUnitSpec[];
     rosterB: IArmyUnitSpec[];
+    rankedDraft?: IAiMetaDraftEvidence;
 }
 
 const TIER1_IDS = TIER1_ARTIFACT_LIST.map((artifact) => artifact.id);
@@ -462,6 +503,7 @@ function generateSyntheticRoster(
 }
 
 const AI_META_RANKED_DRAFT_GENOME = parseDraftGenome(AI_META_RANKED_DRAFT_POLICY_SPEC, "ai-meta-ranked-draft");
+const PREMIUM_DRAFT_GENOME = parseDraftGenome(PREMIUM_META_DRAFT_SPEC, "premium-meta-ranked-draft");
 const LEFT = PBTypes.TeamVals.LEFT;
 const RIGHT = PBTypes.TeamVals.RIGHT;
 
@@ -470,14 +512,6 @@ const rankedTeamState = (state: IPickSimState, team: PickTeam) => (team === LEFT
 const rankedPickRandomInt = (seed: number): PickRandomInt => {
     const rng = makeRng(seed);
     return (maxExclusive) => Math.floor(rng() * maxExclusive);
-};
-
-const applyRankedPick = (state: IPickSimState, action: PickAction, rng: PickRandomInt): IPickSimState => {
-    const result = transitionServerPersistedPickSim(state, action, rng);
-    if (result.status !== "accepted") {
-        throw new Error(`AI meta ranked draft ${action.type} was ${result.status}: ${result.reason}`);
-    }
-    return result.state;
 };
 
 const pickRankedBundle = (bundles: readonly (readonly [number, number, number])[]): number => {
@@ -534,18 +568,82 @@ const materializeRankedRoster = (creatureIds: readonly number[]): IArmyUnitSpec[
  * sees the acting team's prior picks plus only opponent identities legitimately revealed at that point.
  * Collisions are persisted/revealed and retried just as on the server, preserving global roster exclusivity.
  */
-function generateRankedRosters(seed: number): [IArmyUnitSpec[], IArmyUnitSpec[]] {
+function generateRankedRosters(
+    seed: number,
+    map: AiMetaMap,
+    variants: ReturnType<typeof synergyVariantsForSeed>,
+    collectEvidence: boolean,
+    studyProfile?: AiMetaStudy,
+): { rosters: [IArmyUnitSpec[], IArmyUnitSpec[]]; rankedDraft?: IAiMetaDraftEvidence } {
+    const premiumStudy = Boolean(studyProfile);
     const rng = rankedPickRandomInt(seed);
     let state = createPickSimState(rng);
-    const doctrine = SETUP_POLICY_V0.pickDoctrine();
-    state = applyRankedPick(state, { type: "select_doctrine", team: LEFT, doctrine }, rng);
-    state = applyRankedPick(state, { type: "select_doctrine", team: RIGHT, doctrine }, rng);
+    const decisions: IAiMetaDraftEvidence["decisions"] = [];
+    const choose = (ids: readonly number[], preferred: number, team: PickTeam, kind: string, epsilon = 0.2) =>
+        premiumStudyChoice(
+            ids,
+            preferred,
+            hashSimulationParts(seed, "premium-draft", state.phaseSequence, team, kind, state.transcript.length),
+            epsilon,
+        );
+    const apply = (action: PickAction, observedState = state, choice?: IAiMetaChoiceEvidence): void => {
+        const observation = collectEvidence
+            ? cloneAiMetaDraftObservation({
+                  ...getPickTeamView(observedState, action.team),
+                  availableCreatureIds: getVisibleCreatureChoices(observedState, action.team),
+                  revealedOpponentSlots: [...rankedTeamState(observedState, action.team).revealedOpponentSlots],
+                  revealedMap: observedState.phaseSequence >= 6 ? map : null,
+                  synergyVariants: variants,
+              })
+            : undefined;
+        const result = transitionServerPersistedPickSim(state, action, rng);
+        if (result.status === "rejected") throw new Error(`AI meta ranked ${action.type}: ${result.reason}`);
+        if (observation)
+            decisions.push({
+                index: decisions.length,
+                observation,
+                action: { ...action },
+                status: result.status,
+                behaviorProbability: choice?.behaviorProbability ?? 1,
+                ...(choice ? { choice, scoreMeaning: "baseline-policy-preference" as const } : {}),
+            });
+        state = result.state;
+    };
+    const doctrineState = state;
+    for (const [team, side] of [
+        [LEFT, "a"],
+        [RIGHT, "b"],
+    ] as const) {
+        const doctrine = premiumStudy ? premiumStudyDoctrine(seed, side) : SETUP_POLICY_V0.pickDoctrine();
+        const choice = premiumStudy
+            ? aiMetaChoiceEvidence(
+                  [1, 2, 3].map((id) => ({ key: String(id), score: 0 })),
+                  String(doctrine),
+                  String(doctrine),
+                  "explore",
+                  1,
+              )
+            : undefined;
+        apply({ type: "select_doctrine", team, doctrine }, doctrineState, choice);
+    }
 
-    // Both simultaneous bundle decisions consume the same pre-commit state, matching the live timeout policy.
-    const leftBundle = pickRankedBundle(getPickTeamView(state, LEFT).bundles);
-    const rightBundle = pickRankedBundle(getPickTeamView(state, RIGHT).bundles);
-    state = applyRankedPick(state, { type: "select_bundle", team: LEFT, bundleIndex: leftBundle }, rng);
-    state = applyRankedPick(state, { type: "select_bundle", team: RIGHT, bundleIndex: rightBundle }, rng);
+    const bundleState = state;
+    const bundles = ([LEFT, RIGHT] as const).map((team) => {
+        const offers = getPickTeamView(bundleState, team).bundles;
+        const preferred = premiumStudy
+            ? pickRankedLiveDraftBundle(PREMIUM_DRAFT_GENOME, offers, variants)
+            : pickRankedBundle(offers);
+        return premiumStudy
+            ? choose(
+                  offers.map((_, index) => index),
+                  preferred,
+                  team,
+                  "bundle",
+              )
+            : { selected: preferred, evidence: undefined };
+    });
+    apply({ type: "select_bundle", team: LEFT, bundleIndex: bundles[0].selected }, bundleState, bundles[0].evidence);
+    apply({ type: "select_bundle", team: RIGHT, bundleIndex: bundles[1].selected }, bundleState, bundles[1].evidence);
 
     let transitions = 0;
     while (!isPickSimComplete(state)) {
@@ -554,10 +652,24 @@ function generateRankedRosters(seed: number): [IArmyUnitSpec[], IArmyUnitSpec[]]
         }
         const phase = getCurrentPickPhase(state);
         if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
-            const leftArtifact = SETUP_POLICY_V0.pickArtifactT2(getPickTeamView(state, LEFT).tier2Offers);
-            const rightArtifact = SETUP_POLICY_V0.pickArtifactT2(getPickTeamView(state, RIGHT).tier2Offers);
-            state = applyRankedPick(state, { type: "select_tier2", team: LEFT, artifactId: leftArtifact }, rng);
-            state = applyRankedPick(state, { type: "select_tier2", team: RIGHT, artifactId: rightArtifact }, rng);
+            const artifactState = state;
+            const choices = ([LEFT, RIGHT] as const).map((team) => {
+                const offers = getPickTeamView(artifactState, team).tier2Offers;
+                const preferred = SETUP_POLICY_V0.pickArtifactT2(offers);
+                return premiumStudy
+                    ? choose(offers, preferred, team, "tier2")
+                    : { selected: preferred, evidence: undefined };
+            });
+            apply(
+                { type: "select_tier2", team: LEFT, artifactId: choices[0].selected },
+                artifactState,
+                choices[0].evidence,
+            );
+            apply(
+                { type: "select_tier2", team: RIGHT, artifactId: choices[1].selected },
+                artifactState,
+                choices[1].evidence,
+            );
             continue;
         }
         if (phase.phase !== PBTypes.PickPhaseVals.PICK || phase.actors.length !== 1) {
@@ -567,23 +679,52 @@ function generateRankedRosters(seed: number): [IArmyUnitSpec[], IArmyUnitSpec[]]
         const teamState = rankedTeamState(state, team);
         const ownCreatureIds = teamState.creatures;
         const knownOpponentCreatureIds = getKnownOpponentCreatures(state, team);
-        const creatureId = pickAiMetaRankedCreature(
-            getVisibleCreatureChoices(state, team),
-            ownCreatureIds,
-            knownOpponentCreatureIds,
-            teamState.tier1Artifact,
-        );
-        if (creatureId === undefined) {
+        const available = getVisibleCreatureChoices(state, team);
+        const preferred = premiumStudy
+            ? pickRankedLiveDraftCreature(
+                  PREMIUM_DRAFT_GENOME,
+                  available,
+                  ownCreatureIds,
+                  knownOpponentCreatureIds,
+                  teamState.tier1Artifact,
+                  state.phaseSequence >= 6 ? map : undefined,
+                  variants,
+              )
+            : pickAiMetaRankedCreature(available, ownCreatureIds, knownOpponentCreatureIds, teamState.tier1Artifact);
+        if (preferred === undefined)
             throw new Error(`AI meta ranked draft found no visible L${phase.creatureLevel} creature`);
-        }
-        const result = transitionServerPersistedPickSim(state, { type: "pick_creature", team, creatureId }, rng);
-        if (result.status === "rejected") {
-            throw new Error(`AI meta ranked creature pick was rejected as ${result.reason}`);
-        }
-        state = result.state;
+        const selection = premiumStudy
+            ? choose(available, preferred, team, "creature")
+            : { selected: preferred, evidence: undefined };
+        apply({ type: "pick_creature", team, creatureId: selection.selected }, state, selection.evidence);
     }
 
-    return [materializeRankedRoster(state.left.creatures), materializeRankedRoster(state.right.creatures)];
+    return {
+        rosters: [materializeRankedRoster(state.left.creatures), materializeRankedRoster(state.right.creatures)],
+        ...(collectEvidence
+            ? {
+                  rankedDraft: {
+                      seed,
+                      policy: premiumStudy ? PREMIUM_META_DRAFT_SPEC : AI_META_RANKED_DRAFT_POLICY_SPEC,
+                      unusedObservationFeatures: premiumStudy ? [] : ["synergyVariants", "revealedMap"],
+                      doctrines: { a: state.left.doctrine, b: state.right.doctrine },
+                      knownOpponentCreatureIds: {
+                          a: getKnownOpponentCreatures(state, LEFT),
+                          b: getKnownOpponentCreatures(state, RIGHT),
+                      },
+                      optionalBans: "skipped",
+                      decisions,
+                      transcript: structuredClone(state.transcript),
+                      draftedArtifacts: aiMetaDraftArtifacts(state),
+                      outcomeContinuation: premiumStudy
+                          ? isPublicSetupStudy(studyProfile)
+                              ? "retained-draft-artifacts-public-setup-v2"
+                              : "retained-draft-artifacts-private-setup-v1"
+                          : "post-draft-artifact-and-augment-oracle",
+                  },
+              }
+            : {}),
+    };
 }
 
 const CROSS_ARCHETYPES = ["ranged", "melee", "flyer", "caster"] as const;
@@ -612,18 +753,31 @@ export function cohortMap(cohort: AiMetaCohort, pair: number): AiMetaMap {
 }
 
 /** Build two globally creature-exclusive armies. Every resulting battle is therefore strictly non-mirrored. */
-export function generateMetaMatchup(options: IAiMetaRunOptions, pair: number): IGeneratedMatchup {
+export function generateMetaMatchup(
+    options: IAiMetaRunOptions,
+    pair: number,
+    mapOverride?: AiMetaMap,
+): IGeneratedMatchup {
     if (!Number.isInteger(pair) || pair < 0 || pair >= options.games / AI_META_GAMES_PER_MATCHUP) {
         throw new RangeError(`pair ${pair} is outside this ${options.games}-game cohort`);
     }
     const setupSeed = hashSimulationParts("ai-meta-setup", options.baseSeed, options.cohort, pair);
     const combatSeed = hashSimulationParts("ai-meta-combat", options.baseSeed, options.cohort, pair);
-    const map = cohortMap(options.cohort, pair);
+    const map = mapOverride ?? cohortMap(options.cohort, pair);
     const [archetypeA, archetypeB] = cohortArchetypes(options.cohort, pair);
     let rosterA: IArmyUnitSpec[];
     let rosterB: IArmyUnitSpec[];
+    let rankedDraft: IAiMetaDraftEvidence | undefined;
     if (archetypeA === "ranked" && archetypeB === "ranked") {
-        [rosterA, rosterB] = generateRankedRosters(hashSimulationParts(setupSeed, "live-ranked-pick"));
+        const generated = generateRankedRosters(
+            hashSimulationParts(setupSeed, "live-ranked-pick"),
+            map,
+            aiMetaSynergyVariantsForPair(setupSeed, combatSeed),
+            options.collectEvidence === true,
+            options.studyProfile,
+        );
+        [rosterA, rosterB] = generated.rosters;
+        rankedDraft = generated.rankedDraft;
     } else {
         if (archetypeA === "ranked" || archetypeB === "ranked") {
             throw new Error("AI meta ranked rosters must be generated as one live pick");
@@ -635,7 +789,16 @@ export function generateMetaMatchup(options: IAiMetaRunOptions, pair: number): I
     if (!rostersAreStrictlyDistinct(rosterA, rosterB)) {
         throw new Error(`Generated mirrored/overlapping rosters for ${options.cohort} pair ${pair}`);
     }
-    return { setupSeed, combatSeed, map, archetypeA, archetypeB, rosterA, rosterB };
+    return {
+        setupSeed,
+        combatSeed,
+        map,
+        archetypeA,
+        archetypeB,
+        rosterA,
+        rosterB,
+        ...(rankedDraft ? { rankedDraft } : {}),
+    };
 }
 
 function tier1ContextScore(id: number, own: IAiMetaArmyFeatures, opponent: IAiMetaArmyFeatures): number {
@@ -730,6 +893,7 @@ function chooseArtifact(
     opponent: IAiMetaArmyFeatures,
     map: AiMetaRecordedMap,
     rng: () => number,
+    collectEvidence = false,
 ): IAiMetaArtifactChoice {
     const ids = tier === 1 ? TIER1_IDS : TIER2_IDS;
     const score = (id: number): number =>
@@ -739,15 +903,16 @@ function chooseArtifact(
     // contribute an even, unbiased artifact sample — for measuring raw artifact PERFORMANCE rather than the
     // draft scorer's preference. Pick% collapses to ~1/N per artifact (as expected under uniform).
     const forceUniform = process.env.AI_META_ARTIFACT_UNIFORM === "1";
-    if (forceUniform || rng() < AI_META_EXPLORATION_RATE) {
-        const id = ids[Math.floor(rng() * ids.length)];
+    const explore = forceUniform || rng() < AI_META_EXPLORATION_RATE;
+    const exploredId = explore ? ids[Math.floor(rng() * ids.length)] : undefined;
+    // Preserve the RNG sequence and legacy propensity field; the additive evidence records the full marginal.
+    if (exploredId !== undefined && !collectEvidence)
         return {
-            id,
+            id: exploredId,
             mode: "explore",
             propensity: forceUniform ? 1 / ids.length : AI_META_EXPLORATION_RATE / ids.length,
-            contextualScore: score(id),
+            contextualScore: score(exploredId),
         };
-    }
     let id = ids[0];
     let bestScore = -Infinity;
     for (const candidate of ids) {
@@ -757,11 +922,26 @@ function chooseArtifact(
             bestScore = candidateScore;
         }
     }
+    const selectedId = exploredId ?? id;
+    const mode = explore ? "explore" : "exploit";
     return {
-        id,
-        mode: "exploit",
-        propensity: 1 - AI_META_EXPLORATION_RATE + AI_META_EXPLORATION_RATE / ids.length,
-        contextualScore: bestScore,
+        id: selectedId,
+        mode,
+        propensity: explore
+            ? (forceUniform ? 1 : AI_META_EXPLORATION_RATE) / ids.length
+            : 1 - AI_META_EXPLORATION_RATE + AI_META_EXPLORATION_RATE / ids.length,
+        contextualScore: explore ? score(selectedId) : bestScore,
+        ...(collectEvidence
+            ? {
+                  evidence: aiMetaChoiceEvidence(
+                      ids.map((candidate) => ({ key: String(candidate), score: score(candidate) })),
+                      String(id),
+                      String(selectedId),
+                      mode,
+                      forceUniform ? 1 : AI_META_EXPLORATION_RATE,
+                  ),
+              }
+            : {}),
     };
 }
 
@@ -780,28 +960,40 @@ export function augmentContextScore(
     const sniper = (sniperAttack + sniperDistance * 0.16) * ownRanged;
     const movement = getMovementPower(plan.movement) * 11 * ownGround * (0.55 + opponentRanged);
     const placement = plan.placement * 6 * (ownRanged + fraction(own.large, own.total));
-    return armor + might + sniper + movement + placement;
+    // Explicit collection heuristic, not an estimated benefit: scale Empower by magic-capable roster share.
+    const empower = getEmpowerPower(plan.empower ?? 0) * fraction(own.casters + own.meleeMagic, own.total);
+    return armor + might + sniper + movement + placement + empower;
 }
 
 function chooseAugments(
     own: IAiMetaArmyFeatures,
     opponent: IAiMetaArmyFeatures,
     rng: () => number,
+    collectEvidence = false,
+    budget = AI_META_AUGMENT_BUDGET,
+    fullAugmentDomain = false,
 ): IAiMetaAugmentChoice {
-    if (rng() < AI_META_EXPLORATION_RATE) {
-        const plan = FULL_AUGMENT_PLANS[Math.floor(rng() * FULL_AUGMENT_PLANS.length)];
+    const plans = fullAugmentDomain
+        ? enumeratePremiumAugmentPlans(budget)
+        : budget === AI_META_AUGMENT_BUDGET
+          ? FULL_AUGMENT_PLANS
+          : enumerateFullBudgetAugmentPlans(budget);
+    const explore = rng() < AI_META_EXPLORATION_RATE;
+    const exploredPlan = explore ? plans[Math.floor(rng() * plans.length)] : undefined;
+    if (exploredPlan && !collectEvidence) {
+        const plan = exploredPlan;
         return {
             plan: { ...plan },
             planId: augmentPlanId(plan),
             augments: setupAugmentsForPlan(plan),
             mode: "explore",
-            propensity: AI_META_EXPLORATION_RATE / FULL_AUGMENT_PLANS.length,
+            propensity: AI_META_EXPLORATION_RATE / plans.length,
             contextualScore: augmentContextScore(plan, own, opponent),
         };
     }
-    let plan = FULL_AUGMENT_PLANS[0];
+    let plan = plans[0];
     let bestScore = -Infinity;
-    for (const candidate of FULL_AUGMENT_PLANS) {
+    for (const candidate of plans) {
         const score = augmentContextScore(candidate, own, opponent);
         const candidateId = augmentPlanId(candidate);
         if (score > bestScore || (score === bestScore && candidateId < augmentPlanId(plan))) {
@@ -809,13 +1001,29 @@ function chooseAugments(
             bestScore = score;
         }
     }
+    const selectedPlan = exploredPlan ?? plan;
+    const mode = explore ? "explore" : "exploit";
     return {
-        plan: { ...plan },
-        planId: augmentPlanId(plan),
-        augments: setupAugmentsForPlan(plan),
-        mode: "exploit",
-        propensity: 1 - AI_META_EXPLORATION_RATE + AI_META_EXPLORATION_RATE / FULL_AUGMENT_PLANS.length,
-        contextualScore: bestScore,
+        plan: { ...selectedPlan },
+        planId: augmentPlanId(selectedPlan),
+        augments: setupAugmentsForPlan(selectedPlan),
+        mode,
+        propensity: (explore ? 0 : 1 - AI_META_EXPLORATION_RATE) + AI_META_EXPLORATION_RATE / plans.length,
+        contextualScore: explore ? augmentContextScore(selectedPlan, own, opponent) : bestScore,
+        ...(collectEvidence
+            ? {
+                  evidence: aiMetaChoiceEvidence(
+                      plans.map((candidate) => ({
+                          key: augmentPlanId(candidate),
+                          score: augmentContextScore(candidate, own, opponent),
+                      })),
+                      augmentPlanId(plan),
+                      augmentPlanId(selectedPlan),
+                      mode,
+                      AI_META_EXPLORATION_RATE,
+                  ),
+              }
+            : {}),
     };
 }
 
@@ -826,13 +1034,47 @@ export function chooseMetaArmy(
     map: AiMetaRecordedMap,
     seed: number,
     synergyVariants = synergyVariantsForSeed(`ai-meta:${seed}`),
+    collectEvidence = false,
+    setup?: {
+        doctrine: Doctrine;
+        fullAugmentDomain?: boolean;
+        knownOpponentCreatureIds: readonly number[];
+        artifacts?: { tier1: number; tier2: number };
+    },
 ): IAiMetaArmy {
     const creatureIds = creatureIdsForRoster(roster);
     const features = armyFeatures(roster);
-    const opponent = armyFeatures(opponentRoster);
-    const artifactT1 = chooseArtifact(1, features, opponent, map, makeRng(hashSimulationParts(seed, "t1")));
-    const artifactT2 = chooseArtifact(2, features, opponent, map, makeRng(hashSimulationParts(seed, "t2")));
-    const augment = chooseAugments(features, opponent, makeRng(hashSimulationParts(seed, "augment")));
+    const opponent = armyFeatures(
+        setup
+            ? opponentRoster.filter((unit) =>
+                  setup.knownOpponentCreatureIds.includes(creatureIdForName(unit.creatureName)),
+              )
+            : opponentRoster,
+    );
+    const retainedArtifact = (id: number): IAiMetaArtifactChoice => ({
+        id,
+        source: "draft-retained",
+        mode: "exploit",
+        propensity: 1,
+        contextualScore: 0,
+        evidence: aiMetaChoiceEvidence([{ key: String(id), score: 0 }], String(id), String(id), "exploit", 0),
+    });
+    // Synthetic artifacts have no live draft history: do not grant their sampler future enemy identities.
+    const artifactOpponent = setup ? armyFeatures([]) : opponent;
+    const artifactT1 = setup?.artifacts
+        ? retainedArtifact(setup.artifacts.tier1)
+        : chooseArtifact(1, features, artifactOpponent, map, makeRng(hashSimulationParts(seed, "t1")), collectEvidence);
+    const artifactT2 = setup?.artifacts
+        ? retainedArtifact(setup.artifacts.tier2)
+        : chooseArtifact(2, features, artifactOpponent, map, makeRng(hashSimulationParts(seed, "t2")), collectEvidence);
+    const augment = chooseAugments(
+        features,
+        opponent,
+        makeRng(hashSimulationParts(seed, "augment")),
+        collectEvidence,
+        getUpgradePoints(setup?.doctrine ?? Doctrine.SEE_NONE),
+        setup?.fullAugmentDomain,
+    );
     return {
         archetype,
         roster,
@@ -842,7 +1084,7 @@ export function chooseMetaArmy(
         artifactT1,
         artifactT2,
         augment,
-        doctrine: Doctrine.SEE_NONE,
+        doctrine: setup?.doctrine ?? Doctrine.SEE_NONE,
         synergies: aiMetaSynergiesForVariants(creatureIds, synergyVariants),
     };
 }
@@ -852,7 +1094,25 @@ export function prepareMetaPair(
     pair: number,
     mapOverride?: AiMetaMap,
 ): Omit<IAiMetaPairRecord, "games"> {
-    const matchup = generateMetaMatchup(options, pair);
+    if (options.studyProfile && !isPremiumMetaStudy(options.studyProfile))
+        throw new Error("Unknown AI meta study profile");
+    const premiumStudy = Boolean(options.studyProfile);
+    const publicSetup = isPublicSetupStudy(options.studyProfile);
+    if (premiumStudy && process.env.AI_META_ARTIFACT_UNIFORM === "1")
+        throw new Error("Premium study fixes artifact exploration at 20%");
+    if (premiumStudy && !options.collectEvidence) throw new Error("Premium study requires evidence capture");
+    const matchup = generateMetaMatchup(options, pair, mapOverride);
+    const setup = (side: "a" | "b") =>
+        premiumStudy
+            ? {
+                  fullAugmentDomain: options.studyProfile === PREMIUM_META_FULL_AUGMENTS_STUDY,
+                  doctrine: matchup.rankedDraft?.doctrines?.[side] ?? premiumStudyDoctrine(matchup.setupSeed, side),
+                  knownOpponentCreatureIds: publicSetup
+                      ? creatureIdsForRoster(side === "a" ? matchup.rosterB : matchup.rosterA)
+                      : (matchup.rankedDraft?.knownOpponentCreatureIds?.[side] ?? []),
+                  artifacts: matchup.rankedDraft?.draftedArtifacts[side],
+              }
+            : undefined;
     const map = mapOverride ?? matchup.map;
     const synergyVariants = aiMetaSynergyVariantsForPair(matchup.setupSeed, matchup.combatSeed);
     return {
@@ -869,6 +1129,8 @@ export function prepareMetaPair(
             map,
             hashSimulationParts(matchup.setupSeed, "a"),
             synergyVariants,
+            options.collectEvidence,
+            setup("a"),
         ),
         armyB: chooseMetaArmy(
             matchup.archetypeB,
@@ -877,7 +1139,65 @@ export function prepareMetaPair(
             map,
             hashSimulationParts(matchup.setupSeed, "b"),
             synergyVariants,
+            options.collectEvidence,
+            setup("b"),
         ),
+        ...(options.collectEvidence
+            ? {
+                  evidence: {
+                      schema: options.studyProfile
+                          ? premiumStudyEvidenceSchema(options.studyProfile)
+                          : AI_META_EVIDENCE_SCHEMA,
+                      studyProfile: options.studyProfile,
+                      scenarioId: `ai-meta:${options.baseSeed}:${options.cohort}:${pair}`,
+                      partition: aiMetaEvidencePartition(options.baseSeed, options.cohort, pair),
+                      lane: "baseline" as const,
+                      synergyVariants,
+                      rankedDraft: matchup.rankedDraft ?? null,
+                      setupVisibility: premiumStudy
+                          ? publicSetup
+                              ? ("post-draft-public-roster" as const)
+                              : ("draft-reveals-only" as const)
+                          : ("post-draft-full-roster-oracle" as const),
+                      ...(premiumStudy
+                          ? {
+                                setupObservations: {
+                                    a: {
+                                        knownOpponentCreatureIds: [...setup("a")!.knownOpponentCreatureIds],
+                                        opponentRosterVisibility: publicSetup
+                                            ? ("complete" as const)
+                                            : ("partial" as const),
+                                    },
+                                    b: {
+                                        knownOpponentCreatureIds: [...setup("b")!.knownOpponentCreatureIds],
+                                        opponentRosterVisibility: publicSetup
+                                            ? ("complete" as const)
+                                            : ("partial" as const),
+                                    },
+                                },
+                            }
+                          : {}),
+                      geometry: {
+                          gridType: map,
+                          orientation: premiumStudy ? ("ranked-sides" as const) : ("legacy-corners" as const),
+                          seed: matchup.combatSeed,
+                          recipe: premiumStudy
+                              ? ("ranked-side-grid-sim-seed-v1" as const)
+                              : ("battle-engine-default-grid-v1" as const),
+                          ...(premiumStudy
+                              ? {
+                                    mountainCells:
+                                        map === PBTypes.GridVals.BLOCK_CENTER
+                                            ? scatteredMountainsForSeed(`sim-${matchup.combatSeed}`).map(
+                                                  (stone) => stone.cell,
+                                              )
+                                            : [],
+                                }
+                              : {}),
+                      },
+                  },
+              }
+            : {}),
     };
 }
 
@@ -891,6 +1211,6 @@ export function artifactImageKey(tier: 1 | 2, id: number): string {
     return list.find((artifact) => artifact.id === id)?.imageKey ?? "";
 }
 
-export function allAugmentPlans(): readonly IAugmentPlan[] {
-    return FULL_AUGMENT_PLANS;
+export function allAugmentPlans(budget = AI_META_AUGMENT_BUDGET): readonly IAugmentPlan[] {
+    return budget === AI_META_AUGMENT_BUDGET ? FULL_AUGMENT_PLANS : enumerateFullBudgetAugmentPlans(budget);
 }
