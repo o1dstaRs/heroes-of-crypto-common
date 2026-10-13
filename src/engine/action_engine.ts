@@ -3117,7 +3117,9 @@ export class GameActionEngine {
             return this.reject(refusal ?? "invalid_placement");
         }
 
-        // The peeled stack takes its share of the spell charges and arrows; nothing is duplicated.
+        // The peeled stack takes its share of the spell charges; a one-per-fight cast is never duplicated.
+        // Arrows are copied, not divided: the new stack gets the source's remaining quiver, and the source
+        // keeps its own.
         sourceUnit.shareResourcesWithSplit(splitUnit, action.amount);
         const sourceAmount = sourceUnit.getAmountAlive() - action.amount;
         sourceUnit.setAmountAlive(sourceAmount);

@@ -3135,11 +3135,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
     }
     /**
-     * A split peels `amount` creatures off this stack into `part`, a fresh stack of the same creature. What
-     * the stack carries is shared out, never duplicated: `part` gets its share of every spell charge and of
-     * the arrows, in proportion to the creatures it takes and rounded down, and this stack keeps the rest —
-     * so splitting can't multiply a spell book, a quiver or a one-per-fight cast (a single Resurrection,
-     * Castling or Battle Roar charge always stays here). Call it before this stack's count is reduced.
+     * A split peels `amount` creatures off this stack into `part`. Spell charges are shared, never
+     * duplicated: `part` gets its share of every charge, in proportion to the creatures it takes and
+     * rounded down, and this stack keeps the rest — a single Resurrection, Castling or Battle Roar charge
+     * always stays here. Arrows are not shared: `part` copies this stack's remaining quiver, and this stack
+     * keeps every arrow it has left. Call it before this stack's count is reduced.
      */
     public shareResourcesWithSplit(part: Unit, amount: number): void {
         const total = this.getAmountAlive();
@@ -3150,8 +3150,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     /**
      * Merging `moved` of `from`'s creatures back into this stack brings their share of `from`'s spell
-     * charges and arrows along (all of them when the whole stack merges). Call it before `from`'s count is
-     * reduced.
+     * charges along (all of them when the whole stack merges). Arrows stay where they are: the absorbed
+     * stack's quiver is not added to this one. Call it before `from`'s count is reduced.
      */
     public takeResourcesFromMerge(from: Unit, moved: number): void {
         const total = from.getAmountAlive();
@@ -3183,16 +3183,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         this.syncAuthoritativeSpellEntries(kept);
         other.syncAuthoritativeSpellEntries(addToOther ? [...other.unitProperties.spells, ...moved] : moved);
 
-        const arrows = Math.max(0, Math.floor(this.unitProperties.range_shots));
-        const movedArrows = Math.floor(arrows * share);
-        this.unitProperties.range_shots = arrows - movedArrows;
-        other.unitProperties.range_shots =
-            (addToOther ? Math.floor(other.unitProperties.range_shots) : 0) + movedArrows;
-        // Splitting/merging transfers existing arrows, never a fresh entitlement to the army top-up.
-        other.unitProperties.rallying_volley_granted = Math.max(
-            other.unitProperties.rallying_volley_granted,
-            this.unitProperties.rallying_volley_granted,
-        );
+        // Arrows are not a shared pool. A split copies this stack's remaining quiver (and the blessing
+        // ledger already counted in it, so those arrows are not granted a second time) and leaves this
+        // stack's arrows untouched. A merge does not move them: absorbing a stack must not refill this one.
+        if (!addToOther) {
+            other.unitProperties.range_shots = Math.max(0, Math.floor(this.unitProperties.range_shots));
+            other.unitProperties.rallying_volley_granted = this.unitProperties.rallying_volley_granted;
+        }
     }
     public useSpell(spellName: string): void {
         for (const s of this.spells) {

@@ -170,7 +170,7 @@ describe(BLESSING, () => {
         expect(archer.getRangeShots()).toBe(6);
     });
 
-    it("preserves the grant ledger and total remaining arrows through split and merge refreshes", () => {
+    it("copies the remaining quiver and its grant through a split, and a merge does not add arrows", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const zena = bearer(PBTypes.TeamVals.LEFT);
         const archer = shooter(PBTypes.TeamVals.LEFT);
@@ -184,7 +184,8 @@ describe(BLESSING, () => {
         split.setAmountAlive(4);
         placeUnit(grid, unitsHolder, split, { x: 14, y: 13 });
         unitsHolder.refreshStackPowerForAllUnits();
-        expect(archer.getRangeShots() + split.getRangeShots()).toBe(6);
+        expect(archer.getRangeShots()).toBe(6);
+        expect(split.getRangeShots()).toBe(6);
         expect(split.getUnitProperties().rallying_volley_granted).toBe(2);
         archer.takeResourcesFromMerge(split, 4);
         split.setAmountAlive(0);

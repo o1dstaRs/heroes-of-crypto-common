@@ -87,21 +87,24 @@ const setupSplit = (source: TestUnitOptions) => {
 const spellCount = (unit: Unit, name: string): number =>
     unit.getUnitProperties().spells.filter((entry) => entry.substring(entry.indexOf(":") + 1) === name).length;
 
-describe("S3: a split shares what the stack carries instead of duplicating it", () => {
-    it("shares the arrows: two halves carry the stack's quiver between them", () => {
+describe("S3: a split shares spell charges instead of duplicating them, and copies the quiver", () => {
+    it("copies the arrows: each part keeps the quiver, and the original is not reduced", () => {
         const { unit, split } = setupSplit({
             name: "Arbalester",
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 10,
             amountAlive: 124,
         });
+        unit.decreaseNumberOfShots();
 
         const half = split(62);
 
-        expect(half.getRangeShots()).toBe(5);
-        expect(unit.getRangeShots()).toBe(5);
+        expect(half.getRangeShots()).toBe(9);
+        expect(unit.getRangeShots()).toBe(9);
         const quarter = split(31);
-        expect(quarter.getRangeShots() + unit.getRangeShots() + half.getRangeShots()).toBe(10);
+        expect(quarter.getRangeShots()).toBe(9);
+        expect(half.getRangeShots()).toBe(9);
+        expect(unit.getRangeShots()).toBe(9);
     });
 
     it("shares every spell charge and keeps a single charge with the source", () => {
@@ -137,7 +140,7 @@ describe("S3: a split shares what the stack carries instead of duplicating it", 
         expect(unit.canSelfResurrect()).toBe(true);
     });
 
-    it("merging a part back returns its charges and arrows", () => {
+    it("merging a part back returns its charges but not its arrows", () => {
         const { unit, split } = setupSplit({
             name: "Healer",
             spells: HEALER_BOOK,
@@ -146,14 +149,17 @@ describe("S3: a split shares what the stack carries instead of duplicating it", 
             amountAlive: 40,
         });
         const half = split(20);
+        half.decreaseNumberOfShots();
+        unit.decreaseNumberOfShots();
+        unit.decreaseNumberOfShots();
 
         unit.takeResourcesFromMerge(half, half.getAmountAlive());
 
         expect(spellCount(unit, "Heal")).toBe(4);
         expect(spellCount(unit, "Blessing")).toBe(2);
-        expect(unit.getRangeShots()).toBe(10);
+        expect(unit.getRangeShots()).toBe(8);
         expect(spellCount(half, "Heal")).toBe(0);
-        expect(half.getRangeShots()).toBe(0);
+        expect(half.getRangeShots()).toBe(9);
     });
 });
 

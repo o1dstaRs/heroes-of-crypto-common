@@ -328,7 +328,7 @@ export function processLightningSpinAbility(
                             (moraleDecreaseForTheUnitTeam[unitNameKey] ?? 0) + moraleDecrease;
                     }
 
-                    for (const uId in fireShieldResult.unitIdsDied) {
+                    for (const uId of fireShieldResult.unitIdsDied) {
                         if (!unitIdsDied.includes(uId)) {
                             unitIdsDied.push(uId);
                         }
