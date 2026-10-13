@@ -126,6 +126,45 @@ describe("S3: a split shares spell charges instead of duplicating them, and copi
         expect(unit.hasSpellRemaining("Resurrection")).toBe(true);
     });
 
+    it("a one-creature Wandering Mage split can still cast Fireforged Sword", () => {
+        const { unit, split } = setupSplit({
+            name: "Wandering Mage",
+            spells: [
+                "Chaos:Smoke",
+                "Chaos:Misfortune",
+                "Chaos:Fireforged Sword",
+                "Chaos:Fireforged Sword",
+                "Chaos:Fireball",
+            ],
+            amountAlive: 10,
+        });
+
+        const lone = split(1);
+
+        expect(spellCount(lone, "Fireforged Sword")).toBe(1);
+        expect(spellCount(unit, "Fireforged Sword")).toBe(1);
+        expect(spellCount(lone, "Misfortune")).toBe(0);
+        expect(spellCount(unit, "Misfortune")).toBe(1);
+        expect(spellCount(lone, "Smoke")).toBe(0);
+        expect(spellCount(lone, "Fireball")).toBe(0);
+        lone.setStackPower(1);
+        const sword = lone.getSpells().find((spell) => spell.getName() === "Fireforged Sword");
+        expect(sword && isSpellUsableByCaster(lone, sword)).toBe(true);
+    });
+
+    it("a one-creature split does not take the last charge of a basic buff", () => {
+        const { unit, split } = setupSplit({
+            name: "Wandering Mage",
+            spells: ["Chaos:Fireforged Sword"],
+            amountAlive: 10,
+        });
+
+        const lone = split(1);
+
+        expect(spellCount(lone, "Fireforged Sword")).toBe(0);
+        expect(spellCount(unit, "Fireforged Sword")).toBe(1);
+    });
+
     it("a split-off Angel gets no Resurrection charge, so it can't raise itself as well", () => {
         const { unit, split } = setupSplit({
             name: "Angel",

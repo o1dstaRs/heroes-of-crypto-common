@@ -2454,10 +2454,18 @@ export class GameActionEngine {
         const victims = this.resolveSpellVictims(caster, spell, rawDamage, enemies);
         const { damaged, unitIdsDied, killed } = this.applySpellDamageToUnits(caster, victims);
         caster.useSpell(spell.getName());
-        this.context.sceneLog.updateLog(
-            // Post-resistance total, as with Ring of Fire above.
-            `${caster.getName()} called a Meteor Shower onto ${enemies.length} target(s) (${spellDamageTotal(damaged)})`,
-        );
+        // One line per victim, same as Fireball. A summed "across N units" hides who actually took the
+        // stone — each resists separately, and an Earth Element takes none of it.
+        this.context.sceneLog.updateLog(`${caster.getName()} cast Meteor Shower`);
+        for (const entry of damaged) {
+            if (entry.rebounded) {
+                continue;
+            }
+            const victim = this.context.unitsHolder.getAllUnits().get(entry.unitId);
+            this.context.sceneLog.updateLog(
+                `${victim?.getName() ?? "Unit"} hit for (${entry.amount}) by Meteor Shower${killTag(entry.unitsDied)}`,
+            );
+        }
 
         const events: GameEvent[] = [
             {
@@ -3118,6 +3126,7 @@ export class GameActionEngine {
         }
 
         // The peeled stack takes its share of the spell charges; a one-per-fight cast is never duplicated.
+        // A one-creature split still receives one charge of each basic buff the source has more than one of.
         // Arrows are copied, not divided: the new stack gets the source's remaining quiver, and the source
         // keeps its own.
         sourceUnit.shareResourcesWithSplit(splitUnit, action.amount);

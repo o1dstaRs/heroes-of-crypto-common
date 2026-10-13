@@ -3138,15 +3138,17 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * A split peels `amount` creatures off this stack into `part`. Spell charges are shared, never
      * duplicated: `part` gets its share of every charge, in proportion to the creatures it takes and
      * rounded down, and this stack keeps the rest — a single Resurrection, Castling or Battle Roar charge
-     * always stays here. Arrows are not shared: `part` copies this stack's remaining quiver, and this stack
-     * keeps every arrow it has left. Call it before this stack's count is reduced.
+     * always stays here. A one-creature split is the exception for a basic buff (stack power 1) this
+     * stack has more than one charge of: that lone caster takes one, so a single Wandering Mage can
+     * still cast Fireforged Sword. Arrows are not shared: `part` copies this stack's remaining quiver,
+     * and this stack keeps every arrow it has left. Call it before this stack's count is reduced.
      */
     public shareResourcesWithSplit(part: Unit, amount: number): void {
         const total = this.getAmountAlive();
         if (total <= 0 || amount <= 0 || amount >= total) {
             return;
         }
-        this.moveResourcesTo(part, amount / total, false);
+        this.moveResourcesTo(part, amount / total, false, amount);
     }
     /**
      * Merging `moved` of `from`'s creatures back into this stack brings their share of `from`'s spell
@@ -3160,14 +3162,26 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         from.moveResourcesTo(this, Math.min(1, moved / total), true);
     }
-    private moveResourcesTo(other: Unit, share: number, addToOther: boolean): void {
+    private moveResourcesTo(other: Unit, share: number, addToOther: boolean, peeledCreatures = 0): void {
         const counts = new Map<string, number>();
         for (const entry of this.unitProperties.spells) {
             counts.set(entry, (counts.get(entry) ?? 0) + 1);
         }
+        // A one-creature peel of a large stack rounds every share to 0. Basic buffs are the casts that
+        // stack can still make, so it takes one charge of each when this stack has a spare.
+        const basicBuffs = new Set(
+            this.spells
+                .filter((spell) => spell.isBuff() && spell.getMinimalCasterStackPower() <= 1)
+                .map((spell) => spell.getName()),
+        );
         const toMove = new Map<string, number>();
         for (const [entry, count] of counts) {
-            toMove.set(entry, Math.floor(count * share));
+            let moving = Math.floor(count * share);
+            const spellName = entry.substring(entry.indexOf(":") + 1);
+            if (moving === 0 && peeledCreatures === 1 && count > 1 && basicBuffs.has(spellName)) {
+                moving = 1;
+            }
+            toMove.set(entry, moving);
         }
         const moved: string[] = [];
         const kept: string[] = [];
