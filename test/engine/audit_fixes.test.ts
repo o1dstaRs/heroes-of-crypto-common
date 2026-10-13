@@ -152,6 +152,67 @@ describe("S3: a split shares spell charges instead of duplicating them, and copi
         expect(sword && isSpellUsableByCaster(lone, sword)).toBe(true);
     });
 
+    it("a one-creature split keeps a spare charge of every stack-power-1 spell, buff or not", () => {
+        const battle = setupSplit({
+            name: "Battle Mage",
+            spells: ["Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Fire Strike", "Chaos:Meteorite"],
+            amountAlive: 10,
+        });
+        const loneMage = battle.split(1);
+        expect(spellCount(loneMage, "Fire Strike")).toBe(1);
+        expect(spellCount(battle.unit, "Fire Strike")).toBe(2);
+        expect(spellCount(loneMage, "Meteorite")).toBe(0);
+        expect(spellCount(battle.unit, "Meteorite")).toBe(1);
+        loneMage.setStackPower(1);
+        const fireStrike = loneMage.getSpells().find((spell) => spell.getName() === "Fire Strike");
+        expect(fireStrike && isSpellUsableByCaster(loneMage, fireStrike)).toBe(true);
+
+        const dragon = setupSplit({
+            name: "Magic Dragon",
+            spells: [
+                "Nature:Whirlpool",
+                "Nature:Lightning Strike",
+                "Nature:Lightning Strike",
+                "Nature:Lightning Strike",
+                "Nature:Lightning Strike",
+                "Nature:Ring of Fire",
+                "Nature:Ring of Fire",
+                "Nature:Meteor Shower",
+            ],
+            amountAlive: 10,
+        });
+        const loneDragon = dragon.split(1);
+        expect(spellCount(loneDragon, "Lightning Strike")).toBe(1);
+        expect(spellCount(dragon.unit, "Lightning Strike")).toBe(3);
+        expect(spellCount(loneDragon, "Whirlpool")).toBe(0);
+        expect(spellCount(loneDragon, "Ring of Fire")).toBe(0);
+        expect(spellCount(loneDragon, "Meteor Shower")).toBe(0);
+        loneDragon.setStackPower(1);
+        const lightning = loneDragon.getSpells().find((spell) => spell.getName() === "Lightning Strike");
+        expect(lightning && isSpellUsableByCaster(loneDragon, lightning)).toBe(true);
+
+        const satyr = setupSplit({
+            name: "Satyr",
+            spells: [
+                "Life:Courage",
+                "Life:Courage",
+                "Life:Courage",
+                "Life:Helping Hand",
+                "Nature:Summon Wolves",
+                "Nature:Summon Wolves",
+            ],
+            amountAlive: 8,
+        });
+        const loneSatyr = satyr.split(1);
+        expect(spellCount(loneSatyr, "Summon Wolves")).toBe(1);
+        expect(spellCount(satyr.unit, "Summon Wolves")).toBe(1);
+        expect(spellCount(loneSatyr, "Courage")).toBe(1);
+        expect(spellCount(loneSatyr, "Helping Hand")).toBe(0);
+        loneSatyr.setStackPower(1);
+        const wolves = loneSatyr.getSpells().find((spell) => spell.getName() === "Summon Wolves");
+        expect(wolves && isSpellUsableByCaster(loneSatyr, wolves)).toBe(true);
+    });
+
     it("a one-creature split does not take the last charge of a basic buff", () => {
         const { unit, split } = setupSplit({
             name: "Wandering Mage",
