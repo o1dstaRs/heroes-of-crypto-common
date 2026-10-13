@@ -29,6 +29,8 @@ export interface IArmyUnitSpec {
     size: number;
     /** Number of creatures in the stack. */
     amount: number;
+    /** Exact remaining spell charges after a pre-fight split; absent uses the creature's initial book. */
+    initialSpellEntries?: readonly string[];
     /**
      * The stack's footprint when it is NOT the square `size x size` block — e.g. 1x2 or 2x1. Absent for the
      * two shipped shapes, so every roster artifact ever written (and every JSONL a trainer reads back) stays
@@ -456,7 +458,7 @@ export function createUnitFromSpec(
         Object.defineProperty(properties, "footprint_width", { value: width, enumerable: true, writable: true });
         Object.defineProperty(properties, "footprint_height", { value: height, enumerable: true, writable: true });
     }
-    return Unit.createUnit(
+    const unit = Unit.createUnit(
         properties,
         gridSettings,
         team,
@@ -465,6 +467,10 @@ export function createUnitFromSpec(
         effectFactory,
         summoned,
     );
+    if (spec.initialSpellEntries !== undefined) {
+        unit.syncAuthoritativeSpellEntries([...spec.initialSpellEntries]);
+    }
+    return unit;
 }
 
 export function createCombatFactories(): { abilityFactory: AbilityFactory; effectFactory: EffectFactory } {

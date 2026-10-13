@@ -66,7 +66,7 @@ import {
     type PickRandomInt,
     type PickTeam,
 } from "../picks/pick_sim";
-import { NatureSynergy } from "../synergies/synergy_properties";
+import { NatureSynergy, SynergyKeysToPower } from "../synergies/synergy_properties";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import { buildV08A13SearchEnvironment } from "../ai/versions/v0_8_a13_profile";
@@ -488,14 +488,15 @@ const maximumStacks = (
     synergies: readonly ISetupSynergyChoice[],
 ): number => {
     const placement = augments.find((augment) => augment.kind === "Placement")?.value ?? 0;
-    const natureCount = creatureIds.filter(
-        (creatureId) => CreatureFactions[creatureId] === PBTypes.FactionVals.NATURE,
-    ).length;
+    const natureCount = new Set(
+        creatureIds.filter((creatureId) => CreatureFactions[creatureId] === PBTypes.FactionVals.NATURE),
+    ).size;
+    const natureLevel = Math.min(3, Math.floor(natureCount / 2));
     const boardUnits = synergies.some(
         (synergy) =>
             synergy.faction === PBTypes.FactionVals.NATURE && synergy.synergy === NatureSynergy.INCREASE_BOARD_UNITS,
     )
-        ? Math.min(3, Math.floor(natureCount / 2))
+        ? (SynergyKeysToPower[`Nature:${NatureSynergy.INCREASE_BOARD_UNITS}:${natureLevel}`]?.[0] ?? 0)
         : 0;
     return 6 + placement + boardUnits;
 };
@@ -549,7 +550,17 @@ export function materializeTacticalSplitRoster(
     for (const plan of plans) {
         const index = sourceIndex.get(plan.sourceUnitId)!;
         if (expanded[index].amount < 1) throw new Error("Replay A/B split exhausted its source stack");
-        expanded.push({ ...roster[index], amount: 1 });
+        const child = createUnitFromSpec(
+            { ...roster[index], amount: 1 },
+            LEFT,
+            gridSettings,
+            factories.abilityFactory,
+            factories.effectFactory,
+        );
+        units[index].shareResourcesWithSplit(child, 1);
+        units[index].setAmountAlive(units[index].getAmountAlive() - 1);
+        expanded[index].initialSpellEntries = [...units[index].getUnitProperties().spells];
+        expanded.push({ ...roster[index], amount: 1, initialSpellEntries: [...child.getUnitProperties().spells] });
         splitRoles.push({ rosterIndex: expanded.length - 1, role: plan.role });
     }
     return { roster: expanded, splitRoles };
