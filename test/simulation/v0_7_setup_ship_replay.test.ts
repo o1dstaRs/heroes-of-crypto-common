@@ -119,7 +119,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // (df07612) — each moves the seeded setup traces. Two isolated runs reproduce the new trace, and CI
 // (which checks out the pinned submodule directly) received the same digest byte-for-byte.
 // Previous approved digest: d1aab87bed24cbd7a6e26a3c824504819639631057b28e98c869377aba922ee3
-const EXPECTED_REPLAY_SHA256 = "ca158ed411bbd95b0391bd67a55b6ddeddd6e5d2fc202ac070db5be92c21b44d";
+// Re-pinned 2026-10-13 for Arachna Queen armor 35 -> 40 (561639d). The frozen 4a2bb2e
+// source still reproduces the prior digest; only creatures.json changes between those commits.
+// Two fresh runs reproduce this digest with zero rejected actions in all eight fights.
+// Previous approved digest: ca158ed411bbd95b0391bd67a55b6ddeddd6e5d2fc202ac070db5be92c21b44d
+const EXPECTED_REPLAY_SHA256 = "debd6769f2961bfeae111d859aac0ac52a9bcf1666e2b54f319bff5045305f85";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
