@@ -1389,7 +1389,8 @@
         "name": "Predatory Assimilation",
         "type": "ATTACK",
         "desc": [
-            "Each landed direct attack has a {}% chance to permanently disable and steal one random active ability from the target"
+            "Each landed direct attack has a {}% chance to permanently disable and steal one random active ability from the target.",
+            "The same hit poisons the target for 25% of the damage dealt, plus the attacker's luck. It is not an aura and stacks with Venom Cloud"
         ],
         "power": 25,
         "power_type": "STEAL_ABILITY",

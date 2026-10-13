@@ -123,7 +123,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // source still reproduces the prior digest; only creatures.json changes between those commits.
 // Two fresh runs reproduce this digest with zero rejected actions in all eight fights.
 // Previous approved digest: ca158ed411bbd95b0391bd67a55b6ddeddd6e5d2fc202ac070db5be92c21b44d
-const EXPECTED_REPLAY_SHA256 = "debd6769f2961bfeae111d859aac0ac52a9bcf1666e2b54f319bff5045305f85";
+// Re-pinned 2026-10-13 for Predatory Assimilation's direct-hit poison. The prior armor-only
+// revision passes the previous digest; the poison changes the seeded combat traces.
+// Two isolated runs reproduce this digest with zero rejected actions in all eight fights.
+// Previous approved digest: debd6769f2961bfeae111d859aac0ac52a9bcf1666e2b54f319bff5045305f85
+const EXPECTED_REPLAY_SHA256 = "be18d60390a885664fda366264f653c56097838c5e5bc3411402fa32d5061a74";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

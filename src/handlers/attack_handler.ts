@@ -1632,6 +1632,12 @@ export class AttackHandler {
                         damageFromResponse,
                         this.sceneLog,
                     );
+                    AllAbilities.processPredatoryAssimilationPoison(
+                        targetUnit,
+                        rangeResponseUnit,
+                        damageFromResponse,
+                        this.sceneLog,
+                    );
                     // ...and so does the responder's Fireforged Sword, for the same reason: the card says
                     // "the ally's attacks", and a counter-shot is one of them.
                     const rangeResponseSwordResult = AllAbilities.processFireforgedSwordAbility(
@@ -1827,6 +1833,12 @@ export class AttackHandler {
                     this.sceneLog,
                 );
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
+                AllAbilities.processPredatoryAssimilationPoison(
+                    attackerUnit,
+                    targetUnit,
+                    damageFromAttack,
+                    this.sceneLog,
+                );
                 // ABILITY Borrowed Grace (Monk): a landed shot takes one active buff off the target and
                 // wears it. An on-hit rider like the ones above — a missed or lethal shot takes nothing.
                 if (!splashLanded) {
@@ -2128,6 +2140,7 @@ export class AttackHandler {
                     this.sceneLog,
                 );
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, secondShotResult.damage, this.sceneLog);
+                // A second shot is an extra hit. Venom Cloud poisons it; Predatory Assimilation does not.
                 AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
             }
             recordPrimaryTargetDeath();
@@ -2902,6 +2915,12 @@ export class AttackHandler {
                             damageFromResponse,
                             this.sceneLog,
                         );
+                        AllAbilities.processPredatoryAssimilationPoison(
+                            targetUnit,
+                            attackerUnit,
+                            damageFromResponse,
+                            this.sceneLog,
+                        );
                         AllAbilities.processPegasusLightAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processParalysisAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog, attackerUnit);
@@ -3036,6 +3055,12 @@ export class AttackHandler {
                     this.sceneLog,
                 );
                 AllAbilities.processPoisonAuraAbility(attackerUnit, targetUnit, damageFromAttack, this.sceneLog);
+                AllAbilities.processPredatoryAssimilationPoison(
+                    attackerUnit,
+                    targetUnit,
+                    damageFromAttack,
+                    this.sceneLog,
+                );
                 AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
                 // Blindness rides the blow the Unicorn strikes as well as the one it answers — it used to
                 // fire only from the response path, so a Unicorn that opened the exchange blinded nobody.
@@ -3219,6 +3244,7 @@ export class AttackHandler {
                     secondPunchResult.damage,
                     this.sceneLog,
                 );
+                // A second punch is an extra hit. Venom Cloud poisons it; Predatory Assimilation does not.
                 AllAbilities.processBlindnessAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
             }
 
