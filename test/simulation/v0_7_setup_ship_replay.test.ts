@@ -127,7 +127,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // revision passes the previous digest; the poison changes the seeded combat traces.
 // Two isolated runs reproduce this digest with zero rejected actions in all eight fights.
 // Previous approved digest: debd6769f2961bfeae111d859aac0ac52a9bcf1666e2b54f319bff5045305f85
-const EXPECTED_REPLAY_SHA256 = "be18d60390a885664fda366264f653c56097838c5e5bc3411402fa32d5061a74";
+// Re-pinned 2026-10-13 for Barrel Barricade collision on non-barrel maps. The prior grid source
+// reproduces the old digest; only the two normal-map fights at seed 2147640168 change. Two isolated
+// corrected runs are byte-identical, with zero rejected actions across all eight fights.
+// Previous approved digest: be18d60390a885664fda366264f653c56097838c5e5bc3411402fa32d5061a74
+const EXPECTED_REPLAY_SHA256 = "84e8cbcb4be169a34bc510c7c334cf3a14a7ef5e6c0c52dfc4eef080c1593bc2";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

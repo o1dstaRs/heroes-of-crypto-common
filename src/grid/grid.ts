@@ -923,6 +923,12 @@ export class Grid {
             }
         }
 
+        // Artifact barrels can stand on every map, outside its built-in centre terrain. Read the
+        // occupied cell first so pathfinding and line-of-sight agree with canOccupyCells there.
+        if (r[column] === "B") {
+            return ObstacleType.BLOCK;
+        }
+
         if (!this.cleanedUpCenter && this.isCenterObstacleCell(row, column)) {
             const obstacleType = this.getObstacleTypePerGrid();
             if (obstacleType !== undefined) {
