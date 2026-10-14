@@ -176,6 +176,11 @@ function topCounts(counts: Record<string, number>, limit: number): { key: string
 }
 
 async function main(argv: readonly string[]): Promise<void> {
+    if (argv[0] === "--compare") {
+        const { runBarrelPolicyComparison } = await import("./barrel_policy_comparison");
+        await runBarrelPolicyComparison(argv.slice(1));
+        return;
+    }
     if (argv[0] === "--help" || argv[0] === "-h") {
         console.log(USAGE);
         return;

@@ -1034,7 +1034,7 @@
             "name": "Aegis of the Arcane",
             "level": 0,
             "desc": [
-                "Artifact. Grants the whole army +{} percentage points of magic defense.",
+                "Artifact. Grants the whole army an extra {}% magic defense roll, combined with each unit's own defense instead of added to it.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",

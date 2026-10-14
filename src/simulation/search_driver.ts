@@ -9,6 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
+import { friendlyShotBlockingBarrels } from "../ai/artifact_barrel_tactics";
 import { canWaitOnHourglass } from "../engine/hourglass";
 import {
     selectV08A19MaterialCandidateIndex,
@@ -1404,6 +1405,7 @@ export class SearchDriver {
     private readonly a19MaterialArbitration: A19MaterialArbitrationMode | undefined;
     private readonly a19MaterialLowEvidenceWinningSamples: number;
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
+    private readonly a19ArtifactBarrelShotProjection: boolean;
     private captureA19Material = false;
     private a19MaterialEvidence:
         | {
@@ -1682,6 +1684,16 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE must be 0 or 1");
         }
         this.a19ArtifactBarrelAttackCoverage = this.mode === "search" && barrelCoverage === "1";
+        const barrelProjection = searchEnv("SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION");
+        if (
+            barrelProjection !== undefined &&
+            barrelProjection !== "" &&
+            barrelProjection !== "0" &&
+            barrelProjection !== "1"
+        ) {
+            throw new Error("SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION must be 0 or 1");
+        }
+        this.a19ArtifactBarrelShotProjection = this.a19ArtifactBarrelAttackCoverage && barrelProjection === "1";
         const rawAdaptiveBudget = searchEnv("SEARCH_A19_ADAPTIVE_BUDGET");
         if (
             rawAdaptiveBudget !== undefined &&
@@ -2534,6 +2546,7 @@ export class SearchDriver {
                           },
                       }
                     : undefined;
+            let rootBarrelShotBlockers: ReadonlySet<string> | undefined;
             const preservesBacklineIntent = (candidate: Pick<IEnumeratedCandidate, "actions">): boolean =>
                 (!backlineProtectorIntent ||
                     (preservesV08BacklineProtectorIntent(backlineProtectorIntent, unit, context, candidate.actions) &&
@@ -2638,7 +2651,18 @@ export class SearchDriver {
                 if (
                     isV08Search &&
                     (candidate.kind === "mine" || candidate.kind === "defend") &&
-                    !this.keepsArtifactBarrelMine(unit, candidate)
+                    !this.keepsArtifactBarrelMine(
+                        unit,
+                        candidate,
+                        this.a19ArtifactBarrelShotProjection
+                            ? (rootBarrelShotBlockers ??= friendlyShotBlockingBarrels(
+                                  unit.getTeam(),
+                                  this.deps.grid,
+                                  this.deps.unitsHolder,
+                                  this.deps.attackHandler,
+                              ))
+                            : undefined,
+                    )
                 ) {
                     return false;
                 }
@@ -4474,7 +4498,11 @@ export class SearchDriver {
      * Enemy barrels are legal challengers. A friendly barrel is legal only when it stands on a friendly
      * shot, because deleting the screen is otherwise a wasted turn.
      */
-    private keepsArtifactBarrelMine(unit: Unit, candidate: Pick<IEnumeratedCandidate, "kind" | "targetCell">): boolean {
+    private keepsArtifactBarrelMine(
+        unit: Unit,
+        candidate: Pick<IEnumeratedCandidate, "kind" | "targetCell">,
+        projectedBlockers?: ReadonlySet<string>,
+    ): boolean {
         if (!this.a19ArtifactBarrelAttackCoverage) return false;
         const barrels = this.deps.grid.getArtifactBarrels();
         if (!isArtifactBarrelMine(barrels, candidate) || !candidate.targetCell) return false;
@@ -4482,6 +4510,17 @@ export class SearchDriver {
             (entry) => entry.cell.x === candidate.targetCell?.x && entry.cell.y === candidate.targetCell?.y,
         );
         if (!barrel || barrel.team !== unit.getTeam()) return true;
+        if (this.a19ArtifactBarrelShotProjection) {
+            return (
+                projectedBlockers ??
+                friendlyShotBlockingBarrels(
+                    unit.getTeam(),
+                    this.deps.grid,
+                    this.deps.unitsHolder,
+                    this.deps.attackHandler,
+                )
+            ).has(`${barrel.cell.x},${barrel.cell.y}`);
+        }
         const enemies = this.deps.unitsHolder
             .getAllEnemyUnits(unit.getTeam())
             .filter((enemy) => !enemy.isDead())
@@ -4504,6 +4543,14 @@ export class SearchDriver {
             .filter((enemy) => !enemy.isDead())
             .flatMap((enemy) => enemy.getCells());
         const origins = this.friendlyShotOrigins(unit);
+        const projectedBlockers = this.a19ArtifactBarrelShotProjection
+            ? friendlyShotBlockingBarrels(
+                  unit.getTeam(),
+                  this.deps.grid,
+                  this.deps.unitsHolder,
+                  this.deps.attackHandler,
+              )
+            : undefined;
         const base = unit.getBaseCell();
         let blocking: IEnumeratedCandidate | undefined;
         let nearestEnemy: IEnumeratedCandidate | undefined;
@@ -4522,7 +4569,12 @@ export class SearchDriver {
                 nearestDistance = distance;
                 nearestEnemy = candidate;
             }
-            if (!barrelBlocksShotLine(candidate.targetCell, origins, enemies)) continue;
+            if (
+                projectedBlockers
+                    ? !projectedBlockers.has(`${candidate.targetCell.x},${candidate.targetCell.y}`)
+                    : !barrelBlocksShotLine(candidate.targetCell, origins, enemies)
+            )
+                continue;
             const closer = distance < blockingDistance;
             if (blocking === undefined || (isEnemy && !blockingIsEnemy) || (isEnemy === blockingIsEnemy && closer)) {
                 blocking = candidate;

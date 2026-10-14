@@ -3879,13 +3879,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 2,
             );
         }
-        const arcaneAegis = statBuffs.get("Aegis of the Arcane");
-        if (arcaneAegis) {
-            this.unitProperties.magic_resist = Math.min(
-                100,
-                this.unitProperties.magic_resist + Math.max(0, arcaneAegis.getPower()),
-            );
-        }
         enchantedSkinAbility = getStatAbility(enchantedSkinAbility, "Enchanted Skin");
         if (enchantedSkinAbility) {
             this.unitProperties.magic_resist_mod = enchantedSkinAbility.getPower();
@@ -3916,6 +3909,16 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             const arcaneWardBlessing = statBuffs.get("Arcane Ward Blessing");
             if (arcaneWardBlessing) {
                 magicResists.push(Math.max(0, arcaneWardBlessing.getPower()) / 100);
+            }
+
+            // Aegis of the Arcane is the same kind of roll, not points added onto the base the way the Armor
+            // augment is. A unit with 15 and this 18% roll lands on 30.3 — 1 − 0.85 × 0.82 — not 33.
+            const arcaneAegis = statBuffs.get("Aegis of the Arcane");
+            if (arcaneAegis) {
+                const chance = Math.min(1, Math.max(0, arcaneAegis.getPower()) / 100);
+                if (chance > 0) {
+                    magicResists.push(chance);
+                }
             }
 
             this.unitProperties.magic_resist = roundUnitStat(winningAtLeastOneEventProbability(magicResists) * 100, 2);

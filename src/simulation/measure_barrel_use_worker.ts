@@ -15,13 +15,14 @@ import type { GridSettings } from "../grid/grid_settings";
 import { getCellForPosition } from "../grid/grid_math";
 import type { XY } from "../utils/math";
 import type { GameAction } from "../engine/actions";
-import { GREEN_TEAM, runMatch, type Side } from "./battle_engine";
+import { GREEN_TEAM, RED_TEAM, runMatch, type Side } from "./battle_engine";
 import {
     AI_META_FIGHT_VERSION,
     aiMetaSynergyVariantsForPair,
     prepareMetaPair,
     type AiMetaCohort,
     type IAiMetaArmy,
+    type AiMetaMap,
 } from "./ai_meta_cohorts_core";
 import {
     AI_META_REGISTERED_VERSION_STRATEGY_PROFILE,
@@ -41,12 +42,26 @@ export interface BarrelFightRequest {
     matchupGames: number;
     baseSeed: number;
     greenIsArmyA: boolean;
+    experiment?: {
+        id: string;
+        cluster: number;
+        treatment: boolean;
+        ownership: "both" | "candidate" | "opponent" | "neither";
+        map: 1 | 2 | 3 | 4;
+        timing: "work" | "live";
+    };
 }
 
 export interface BarrelFightResult {
     cohort: AiMetaCohort;
     pair: number;
     map: number;
+    experiment?: BarrelFightRequest["experiment"];
+    winner: Side | "draw";
+    candidateSide: Side;
+    candidateScore: number;
+    elapsedMs: number;
+    ownBarrelStrikesBySide: Record<Side, number>;
     placed: number;
     placedGreen: number;
     placedRed: number;
@@ -128,9 +143,16 @@ function bump(counts: Record<string, number>, key: string): void {
 
 function play(request: BarrelFightRequest): BarrelFightResult {
     resetLive();
+    const started = performance.now();
+    const experiment = request.experiment;
+    const candidateSide: Side = request.greenIsArmyA ? "green" : "red";
+    const candidateTeam = request.greenIsArmyA ? GREEN_TEAM : RED_TEAM;
+    const ownBarrelStrikesBySide = { green: 0, red: 0 };
     const prepared = prepareMetaPair(
         { cohort: request.cohort, games: request.matchupGames, baseSeed: request.baseSeed },
         request.pair,
+        // Water is an explicit qualification map, outside the ordinary three-map meta schedule.
+        experiment?.map as AiMetaMap | undefined,
     );
     const greenArmy = request.greenIsArmyA ? prepared.armyA : prepared.armyB;
     const redArmy = request.greenIsArmyA ? prepared.armyB : prepared.armyA;
@@ -185,8 +207,10 @@ function play(request: BarrelFightRequest): BarrelFightResult {
             barrelStrikes += 1;
             const team = live.teamByCell.get(key!);
             const barrelSide: Side = team === GREEN_TEAM ? "green" : "red";
-            if (barrelSide === side) ownBarrelStrikes += 1;
-            else enemyBarrelStrikes += 1;
+            if (barrelSide === side) {
+                ownBarrelStrikes += 1;
+                ownBarrelStrikesBySide[side] += 1;
+            } else enemyBarrelStrikes += 1;
             return;
         }
         if (!countsAsRejection) return;
@@ -199,6 +223,11 @@ function play(request: BarrelFightRequest): BarrelFightResult {
         }
     };
 
+    const hasBarrels = (side: Side): boolean =>
+        !experiment ||
+        experiment.ownership === "both" ||
+        (experiment.ownership === "candidate" && side === candidateSide) ||
+        (experiment.ownership === "opponent" && side !== candidateSide);
     const synergyVariants = aiMetaSynergyVariantsForPair(prepared.setupSeed, prepared.combatSeed);
     const configFor = (green: IAiMetaArmy, red: IAiMetaArmy) => {
         const greenSplit = materializeReplayAbSplits(
@@ -219,8 +248,8 @@ function play(request: BarrelFightRequest): BarrelFightResult {
             redDoctrine: red.doctrine,
             greenAugments: green.augment.augments,
             redAugments: red.augment.augments,
-            greenArtifactT1: Tier1Artifact.BARREL_BARRICADE,
-            redArtifactT1: Tier1Artifact.BARREL_BARRICADE,
+            greenArtifactT1: hasBarrels("green") ? Tier1Artifact.BARREL_BARRICADE : 0,
+            redArtifactT1: hasBarrels("red") ? Tier1Artifact.BARREL_BARRICADE : 0,
             greenArtifactT2: green.artifactT2.id,
             redArtifactT2: red.artifactT2.id,
             greenSynergies: green.synergies,
@@ -230,7 +259,8 @@ function play(request: BarrelFightRequest): BarrelFightResult {
             redTacticalSplitStacks: redSplit.splitRoles,
             placementAugmentTiming: "setup-before-placement" as const,
             sideOrientedPlacement: true,
-            searchOfflineDeterministicWork: true,
+            searchOfflineDeterministicWork: experiment?.timing !== "live",
+            ...(experiment?.treatment ? { searchEnvOverrideTeams: [candidateTeam as TeamType] } : {}),
             headlessEvents: true,
             ...createAiMetaMatchStrategyOverrides(AI_META_REGISTERED_VERSION_STRATEGY_PROFILE, {
                 greenOpponentCreatureIds: red.creatureIds,
@@ -239,33 +269,44 @@ function play(request: BarrelFightRequest): BarrelFightResult {
         };
     };
 
-    const result = runMatch({
-        ...configFor(greenArmy, redArmy),
-        turnExecutionObserver: (observation) => {
-            for (const executed of observation.strategyActions) {
-                note(
-                    observation.side,
-                    observation.creatureName,
-                    executed.action,
-                    executed.completed,
-                    executed.rejectionReason,
-                    !executed.completed,
-                );
-            }
-            for (const recovery of observation.recoveryAttempts) {
-                if (!recovery.action || recovery.source !== "v0.1_retry") continue;
-                note(
-                    observation.side,
-                    observation.creatureName,
-                    recovery.action,
-                    recovery.completed,
-                    recovery.rejectionReason,
-                    !recovery.completed,
-                );
-            }
-        },
-    });
-
+    const previousOverrides = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+    if (experiment?.treatment)
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({
+            SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "1",
+        });
+    else delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+    let result: ReturnType<typeof runMatch>;
+    try {
+        result = runMatch({
+            ...configFor(greenArmy, redArmy),
+            turnExecutionObserver: (observation) => {
+                for (const executed of observation.strategyActions) {
+                    note(
+                        observation.side,
+                        observation.creatureName,
+                        executed.action,
+                        executed.completed,
+                        executed.rejectionReason,
+                        !executed.completed,
+                    );
+                }
+                for (const recovery of observation.recoveryAttempts) {
+                    if (!recovery.action || recovery.source !== "v0.1_retry") continue;
+                    note(
+                        observation.side,
+                        observation.creatureName,
+                        recovery.action,
+                        recovery.completed,
+                        recovery.rejectionReason,
+                        !recovery.completed,
+                    );
+                }
+            },
+        });
+    } finally {
+        if (previousOverrides === undefined) delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
+        else process.env.V08_A19_SEARCH_ENV_OVERRIDES = previousOverrides;
+    }
     let placedGreen = 0;
     let placedRed = 0;
     for (const team of live.bySlot.values()) {
@@ -277,6 +318,12 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     return {
         cohort: request.cohort,
         pair: request.pair,
+        experiment,
+        winner: result.winner,
+        candidateSide,
+        candidateScore: result.winner === "draw" ? 0.5 : Number(result.winner === candidateSide),
+        elapsedMs: performance.now() - started,
+        ownBarrelStrikesBySide,
         map: prepared.map,
         placed: placedGreen + placedRed,
         placedGreen,

@@ -20,7 +20,11 @@ import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { processCraftAbility } from "../abilities/craft_ability";
 import * as EffectHelper from "../effects/effect_helper";
 import { Tier1Artifact, ARTIFACT_POWER } from "../artifacts/artifact_properties";
-import { artifactBarrelPlacementCells, autoPlaceArtifactBarrels } from "../grid/artifact_barrels";
+import {
+    artifactBarrelPlacementCells,
+    artifactBarrelShooterCells,
+    autoPlaceArtifactBarrels,
+} from "../grid/artifact_barrels";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { AttackType, FactionType, TeamType } from "../generated/protobuf/v1/types_gen";
 import {
@@ -354,15 +358,11 @@ export class GameActionEngine {
             const cells = artifactBarrelPlacementCells(this.context.grid, this.context.fightProperties, team).filter(
                 (cell) => !this.context.canPlaceBarrel || this.context.canPlaceBarrel(team, cell),
             );
-            const shooterCells = this.context.unitsHolder
-                .getAllAllies(team)
-                .filter(
-                    (unit) =>
-                        !unit.isDead() &&
-                        (unit.getAttackType() === PBTypes.AttackVals.RANGE ||
-                            unit.getPossibleAttackTypes().includes(PBTypes.AttackVals.RANGE)),
-                )
-                .flatMap((unit) => unit.getCells());
+            const shooterCells = artifactBarrelShooterCells(
+                this.context.grid,
+                this.context.unitsHolder.getAllUnits().values(),
+                team,
+            );
             autoPlaceArtifactBarrels(this.context.grid, this.context.fightProperties, team, cells, shooterCells);
         }
         this.context.fightProperties.startFight();

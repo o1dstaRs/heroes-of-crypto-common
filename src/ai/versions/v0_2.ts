@@ -27,7 +27,13 @@ import type { AttackHandler } from "../../handlers/attack_handler";
 import { footprintCellsForAnchor } from "../../simulation/footprint";
 import { getCreatureFootprint } from "../../configuration/config_provider";
 import { ToFactionName } from "../../factions/faction_type";
-import { canCastSpell, canCastSummon, canMassCastSpell, firstSummonableAnchor } from "../../spells/spell_helper";
+import {
+    canCastSpell,
+    canCastSummon,
+    canMassCastSpell,
+    firstSummonableAnchor,
+    isSpellUsableByCaster,
+} from "../../spells/spell_helper";
 import type { Spell } from "../../spells/spell";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
@@ -316,10 +322,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
         };
 
         for (const spell of spells) {
-            if (spell.getLapsTotal() <= 0 || !spell.isRemaining()) {
-                continue;
-            }
-            if (spell.getMinimalCasterStackPower() > unit.getStackPower()) {
+            if (!isSpellUsableByCaster(unit, spell)) {
                 continue;
             }
             const targetType = spell.getSpellTargetType();
@@ -948,12 +951,7 @@ export class StrategyV0_2 extends StrategyV0_1 {
             return undefined;
         }
         const spell = unit.getSpells().find((s) => s.getName() === spellName);
-        if (
-            !spell ||
-            spell.getLapsTotal() <= 0 ||
-            !spell.isRemaining() ||
-            spell.getMinimalCasterStackPower() > unit.getStackPower()
-        ) {
+        if (!spell || !isSpellUsableByCaster(unit, spell)) {
             return undefined;
         }
         // These are ALL_ALLIES mass buffs: only cast while the team isn't already covered (this is also

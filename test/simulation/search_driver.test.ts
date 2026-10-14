@@ -110,6 +110,7 @@ const SEARCH_ENV_KEYS = [
     "SEARCH_A19_SOLE_ABOMINATION_ARMAGEDDON_DEFEND_POLICY",
     "SEARCH_A19_FAST_FLYER_COHESION",
     "SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE",
+    "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
     "SEARCH_A19_STRICT_AGGRESSIVE_WAIT_TIES",
     "V08_AGGRESSIVE",
     "SEARCH_OBSERVE_ONLY",
@@ -6002,6 +6003,34 @@ describe("a19 artifact barrel attacks", () => {
         }
         return undefined;
     };
+
+    it("routes exact diagonal shot projection only through its research flag", () => {
+        const run = (projection: boolean) => {
+            setEnv({ ...barrelSearchEnv(true), SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: projection ? "1" : "0" });
+            const harness = buildBattle(7, "v0.8", undefined, barrelScreenRoster);
+            const allies = harness.unitsHolder.getAllAllies(GREEN_TEAM);
+            const shooter = allies.find((unit) => unit.getName() === "Orc")!;
+            const melee = allies.find((unit) => unit.getName() === "Berserker")!;
+            const enemies = harness.unitsHolder.getAllEnemyUnits(GREEN_TEAM);
+            for (const unit of harness.unitsHolder.getAllUnits().values())
+                harness.grid.cleanupAll(unit.getId(), unit.getAttackRange(), unit.isSmallSize());
+            standOn(shooter, { x: 3, y: 3 });
+            standOn(melee, { x: 2, y: 5 });
+            standOn(enemies[0], { x: 9, y: 9 });
+            standOn(enemies[1], { x: 13, y: 12 });
+            const barrel = { x: 5, y: 5 };
+            expect(harness.grid.placeArtifactBarrel(GREEN_TEAM, 0, barrel)).toBe(true);
+            const driver = harness.makeDriver() as unknown as {
+                keepsArtifactBarrelMine(
+                    unit: Unit,
+                    candidate: Pick<IEnumeratedCandidate, "kind" | "targetCell">,
+                ): boolean;
+            };
+            return driver.keepsArtifactBarrelMine(melee, { kind: "mine", targetCell: barrel });
+        };
+        expect(run(false)).toBe(false);
+        expect(run(true)).toBe(true);
+    });
 
     it("offers a strike on the army's own barrel when that barrel blocks a teammate's shot", () => {
         setEnv(barrelSearchEnv(true));

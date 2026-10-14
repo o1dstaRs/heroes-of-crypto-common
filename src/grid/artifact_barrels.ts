@@ -2,11 +2,25 @@ import { ARTIFACT_POWER, Tier1Artifact } from "../artifacts/artifact_properties"
 import type { FightProperties } from "../fights/fight_properties";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
+import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import { Grid } from "./grid";
 import { PlacementPositionType, PlacementType } from "./placement_properties";
 import { RectanglePlacement } from "./rectangle_placement";
 import { SquarePlacement } from "./square_placement";
+
+/** Deployment uses only friendly units actually on the board, never hidden enemy positions. */
+export function artifactBarrelShooterCells(grid: Grid, units: Iterable<Unit>, team: TeamType): XY[] {
+    return [...units]
+        .filter(
+            (unit) =>
+                unit.getTeam() === team &&
+                !unit.isDead() &&
+                (unit.getAttackType() === PBTypes.AttackVals.RANGE ||
+                    unit.getPossibleAttackTypes().includes(PBTypes.AttackVals.RANGE)),
+        )
+        .flatMap((unit) => unit.getCells().filter((cell) => grid.getOccupantUnitId(cell) === unit.getId()));
+}
 
 export function artifactBarrelPlacementCells(grid: Grid, fp: FightProperties, team: TeamType): XY[] {
     if (team !== PBTypes.TeamVals.LEFT && team !== PBTypes.TeamVals.RIGHT) return [];

@@ -62,7 +62,7 @@ export enum Tier2Artifact {
     RIME_CHARM = 11, // 30% chance to apply a 3-turn slow on any attack
     LAVA_STRIDERS = 12, // all units may move over lava
     QUIVER_OF_ECHOES = 15, // One extra ranged attack, 40% + current luck chance
-    AEGIS_OF_THE_ARCANE = 14, // +18 magic defense (army-wide)
+    AEGIS_OF_THE_ARCANE = 14, // extra magic-defense roll (army-wide), combined, not added
     ARCHMAGES_RING = 13, // +20% magic damage (army-wide); Tier-2 half of the arcane pair
 }
 
@@ -162,6 +162,8 @@ export const ARTIFACT_POWER = {
     // as a plain "+N%". Tier 2 is deliberately double Tier 1, matching the Warlord's Edge / Keen Blade gap.
     MAGES_RING_MAGIC_PERCENT: 10,
     ARCHMAGES_RING_MAGIC_PERCENT: 20,
+    // An independent magic-defense roll for every unit, combined with the defense it already has by
+    // 1 − Π(1 − p) — the same formula as Magic Shield. Not points added onto that defense.
     AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE: 18,
     QUIVER_OF_ECHOES_CHANCE: 40,
 } as const;
@@ -416,7 +418,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "aegis_of_the_arcane",
         "Aegis of the Arcane",
         "Aegis of the Arcane",
-        "Grants the whole army +{} percentage points of magic defense.",
+        "Grants the whole army an extra {}% magic defense roll, combined with each unit's own defense instead of added to it.",
     ),
     [Tier2Artifact.ARCHMAGES_RING]: t2(
         Tier2Artifact.ARCHMAGES_RING,

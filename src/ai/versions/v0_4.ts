@@ -20,7 +20,7 @@ import {
     type RangeAttackCellSide,
 } from "../../grid/grid_math";
 import { footprintCellsForAnchor } from "../../simulation/footprint";
-import { canCastSpell, canMassCastSpell } from "../../spells/spell_helper";
+import { canCastSpell, canMassCastSpell, isSpellUsableByCaster } from "../../spells/spell_helper";
 import { SpellPowerType, SpellTargetType } from "../../spells/spell_properties";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
@@ -1014,15 +1014,7 @@ export class StrategyV0_4 extends StrategyV0_3 {
             return undefined;
         }
         const usable = (name: string) =>
-            unit
-                .getSpells()
-                .find(
-                    (s) =>
-                        s.getName() === name &&
-                        s.getLapsTotal() > 0 &&
-                        s.isRemaining() &&
-                        s.getMinimalCasterStackPower() <= unit.getStackPower(),
-                );
+            unit.getSpells().find((s) => s.getName() === name && isSpellUsableByCaster(unit, s));
         const fullCap = (a: Unit): number => a.getMaxHp() * Math.max(1, a.getAmountAlive() + a.getAmountDied());
         const lostFrac = (a: Unit): number => {
             const cap = fullCap(a);

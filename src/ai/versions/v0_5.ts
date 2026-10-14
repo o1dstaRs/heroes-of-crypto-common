@@ -21,7 +21,7 @@ import type { AttackHandler } from "../../handlers/attack_handler";
 import { canUnitRespondToMelee } from "../../handlers/melee_response";
 import type { Unit } from "../../units/unit";
 import { getDistance, type XY } from "../../utils/math";
-import { canCastSpell } from "../../spells/spell_helper";
+import { canCastSpell, isSpellUsableByCaster } from "../../spells/spell_helper";
 import { getPositionForCell } from "../../grid/grid_math";
 import { MAX_HITS_MOUNTAIN } from "../../constants";
 import {
@@ -982,15 +982,7 @@ export class StrategyV0_5 extends StrategyV0_4 {
         const team = unit.getTeam();
         const allies = unitsHolder.getAllAllies(team).filter((a) => !a.isDead());
         const usable = (name: string) =>
-            unit
-                .getSpells()
-                .find(
-                    (s) =>
-                        s.getName() === name &&
-                        s.getLapsTotal() > 0 &&
-                        s.isRemaining() &&
-                        s.getMinimalCasterStackPower() <= unit.getStackPower(),
-                );
+            unit.getSpells().find((s) => s.getName() === name && isSpellUsableByCaster(unit, s));
         const canCastOn = (spell: ReturnType<typeof usable>, t: Unit): boolean =>
             !!spell &&
             !!canCastSpell(

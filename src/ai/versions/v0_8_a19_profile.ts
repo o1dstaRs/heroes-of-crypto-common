@@ -139,8 +139,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for the offline hopeless-tail skip. Live and ranked decisions stay fully scored.
-        sha256: "9e330f0d5a464c3849a784efc06e1bd7a9ac7f9608a2c2adc1e6d14e1b8528d3" as const,
+        // Re-pinned for opt-in barrel ray projection; the released flag remains off.
+        sha256: "41a45305efa288de3b7ae206e21d87d36338e9bb4f5f6e470c58b80ce92342be" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,
