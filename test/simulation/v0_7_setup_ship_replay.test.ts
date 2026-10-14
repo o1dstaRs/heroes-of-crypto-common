@@ -131,7 +131,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // reproduces the old digest; only the two normal-map fights at seed 2147640168 change. Two isolated
 // corrected runs are byte-identical, with zero rejected actions across all eight fights.
 // Previous approved digest: be18d60390a885664fda366264f653c56097838c5e5bc3411402fa32d5061a74
-const EXPECTED_REPLAY_SHA256 = "84e8cbcb4be169a34bc510c7c334cf3a14a7ef5e6c0c52dfc4eef080c1593bc2";
+// Re-pinned 2026-10-14: Tome of Amplification is tier 1 at 40%, and tier-2 id 10 is retired.
+// Seeded setups can draft it as a tier-1 artifact, and the weaker buffs change the combat traces.
+// Two runs of that tree reproduced this digest byte-identically.
+// Previous approved digest: 84e8cbcb4be169a34bc510c7c334cf3a14a7ef5e6c0c52dfc4eef080c1593bc2
+const EXPECTED_REPLAY_SHA256 = "2b0b1de14709f12542a68ee29f8911acc6eb4cf53ab5d3a60bcd11d08368dcf2";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;
