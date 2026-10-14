@@ -83,16 +83,16 @@ describe("pick_sim", () => {
             15,
             14,
             13, // four globally distinct L2 offers (16-creature pool: Battle Mage in, Zena out to L3)
-            13,
-            12, // left's distinct T1 pair (13-artifact live pool: Tome of Amplification joined tier 1)
-            13,
-            12, // right's distinct T1 pair
-            13,
+            14,
+            13, // left's distinct T1 pair (14-artifact live pool: Rime Charm joined tier 1)
+            14,
+            13, // right's distinct T1 pair
             12,
-            11, // lower T2 offer (13-artifact live pool: Quiver of Echoes joined tier 2)
-            13,
+            11,
+            10, // lower T2 offer (12-artifact live pool: Rime Charm left tier 2)
             12,
-            11, // upper T2 offer
+            11,
+            10, // upper T2 offer
             12,
             11,
             10,
