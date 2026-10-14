@@ -409,7 +409,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "quiver_of_echoes",
         "Quiver of Echoes",
         "Quiver of Echoes",
-        "Ranged units have a {}% + current luck chance to fire one extra full-strength attack. Rolls once per ranged attack action, stacks with Double Shot and Double Throw, and uses normal ammunition.",
+        "Ranged units have a {}% chance to make one extra attack.",
     ),
     [Tier2Artifact.AEGIS_OF_THE_ARCANE]: t2(
         Tier2Artifact.AEGIS_OF_THE_ARCANE,

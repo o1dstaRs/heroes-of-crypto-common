@@ -1013,7 +1013,7 @@
             "name": "Quiver of Echoes",
             "level": 0,
             "desc": [
-                "Artifact. Ranged attacks have a {}% + current luck chance to fire one extra full-strength attack. Rolls once per ranged attack action, stacks with Double Shot and Double Throw, and uses normal ammunition.",
+                "Artifact. Ranged attacks have a {}% chance to make one extra attack.",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",

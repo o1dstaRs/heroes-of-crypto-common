@@ -1409,7 +1409,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (index < 0) return;
         const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
         this.unitProperties.applied_buffs_descriptions[index] =
-            `Artifact. Ranged attacks have a ${this.getBonusRangedAttackChance()}% chance to fire one extra full-strength attack (${ARTIFACT_POWER.QUIVER_OF_ECHOES_CHANCE}% + current luck ${this.getLuck()}). Rolls once per ranged attack action, stacks with Double Shot and Double Throw, and uses normal ammunition.;${properties.join(";")}`;
+            `Artifact. Ranged attacks have a ${this.getBonusRangedAttackChance()}% chance to make one extra attack.;${properties.join(";")}`;
     }
     public projectRangeShotsAfterVolleys(target?: Unit, volleys = 1): number {
         const cost = projectShotCost(this, target) * Math.max(0, volleys);

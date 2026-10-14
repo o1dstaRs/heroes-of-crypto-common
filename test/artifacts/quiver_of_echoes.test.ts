@@ -84,7 +84,7 @@ test("is draftable with a new wire id and honest base description", () => {
     expect(TIER2_ARTIFACT_LIST.some((item) => item.id === Tier2Artifact.QUIVER_OF_ECHOES)).toBe(true);
     expect(
         formatArtifactDescription(getArtifactProperties(ArtifactTier.TIER_2, Tier2Artifact.QUIVER_OF_ECHOES)),
-    ).toContain("40% + current luck");
+    ).toContain("40% chance to make one extra attack");
 });
 test("buffs allied ranged units only, recomputes once, and clears on deselection", () => {
     const { shooter, target, ally, fight, unitsHolder } = fixture();
@@ -109,6 +109,7 @@ test("uses current positive or negative luck and displays the actual chance", ()
         expect(props.applied_buffs_descriptions[props.applied_buffs.indexOf("Quiver of Echoes")]).toContain(
             `a ${40 + luck}% chance`,
         );
+        expect(props.applied_buffs_descriptions[props.applied_buffs.indexOf("Quiver of Echoes")]).not.toContain("luck");
     }
 });
 test("fires exactly one extra ordinary attack on success and spends ammunition", () => {
