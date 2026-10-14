@@ -1,4 +1,5 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { arch, cpus, platform } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -80,6 +81,31 @@ export function summarizeBarrelComparison(results: readonly BarrelFightResult[])
                 engineRejections: rows.reduce((sum, game) => sum + game.engineRejections, 0),
                 nonElimination: rows.filter((game) => game.endReason !== "elimination").length,
                 elapsedMs: rows.reduce((sum, game) => sum + game.elapsedMs, 0),
+                diagnosticGames: rows.filter((game) => game.diagnostics).length,
+                ownClearsOpeningShot: rows.reduce(
+                    (sum, game) => sum + (game.diagnostics?.ownClears[game.candidateSide].opensShot ?? 0),
+                    0,
+                ),
+                ownClearsRemovingCover: rows.reduce(
+                    (sum, game) => sum + (game.diagnostics?.ownClears[game.candidateSide].removesCover ?? 0),
+                    0,
+                ),
+                ownClearsWithoutCurrentShotEffect: rows.reduce(
+                    (sum, game) => sum + (game.diagnostics?.ownClears[game.candidateSide].neither ?? 0),
+                    0,
+                ),
+                searchDecisions: rows.reduce(
+                    (sum, game) => sum + (game.diagnostics?.searchTiming[game.candidateSide].decisions ?? 0),
+                    0,
+                ),
+                searchDecisionsOver1000Ms: rows.reduce(
+                    (sum, game) => sum + (game.diagnostics?.searchTiming[game.candidateSide].over1000Ms ?? 0),
+                    0,
+                ),
+                maxSearchDecisionMs: Math.max(
+                    0,
+                    ...rows.map((game) => game.diagnostics?.searchTiming[game.candidateSide].maxMs ?? 0),
+                ),
             };
         };
         return {
@@ -87,7 +113,9 @@ export function summarizeBarrelComparison(results: readonly BarrelFightResult[])
             scoreDelta: mean,
             // Descriptive normal CI only; small/degenerate samples never qualify a policy for release.
             approximate95CI:
-                mean !== null && se !== null ? [Math.max(-1, mean - 1.96 * se), Math.min(1, mean + 1.96 * se)] : null,
+                mean !== null && se !== null && se > 0
+                    ? [Math.max(-1, mean - 1.96 * se), Math.min(1, mean + 1.96 * se)]
+                    : null,
             control: arm(false),
             treatment: arm(true),
         };
@@ -101,6 +129,27 @@ export function summarizeBarrelComparison(results: readonly BarrelFightResult[])
     return {
         completedGames: results.length,
         incompleteClusters: clusters.size - complete.length,
+        noBarrelTracePairsChecked:
+            complete.filter(
+                (group) =>
+                    group[0].experiment!.ownership === "neither" &&
+                    group[0].experiment!.timing === "work" &&
+                    group.every((game) => game.diagnostics),
+            ).length * 2,
+        noBarrelTraceMismatches: complete
+            .filter((group) => group[0].experiment!.ownership === "neither" && group[0].experiment!.timing === "work")
+            .reduce(
+                (sum, group) =>
+                    sum +
+                    (["green", "red"] as const).filter((side) => {
+                        const rows = group.filter((game) => game.candidateSide === side);
+                        return (
+                            rows.every((game) => game.diagnostics) &&
+                            rows[0].diagnostics!.actionSha256 !== rows[1].diagnostics!.actionSha256
+                        );
+                    }).length,
+                0,
+            ),
         overall: tally(complete),
         liveMaps: tally(complete.filter((group) => group[0].map !== 2)),
         historicalWater: tally(complete.filter((group) => group[0].map === 2)),
@@ -127,7 +176,9 @@ export async function runBarrelPolicyComparison(argv: readonly string[]): Promis
     const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
     const fingerprint = () => fingerprintSourceTree(root, ["src"], ["package.json", "bun.lock"]);
     const manifest = {
-        schema: 1,
+        schema: 2,
+        concurrency,
+        host: { platform: platform(), arch: arch(), cpu: cpus()[0]?.model ?? "unknown" },
         clusters,
         seed,
         timing,
@@ -163,7 +214,11 @@ export async function runBarrelPolicyComparison(argv: readonly string[]): Promis
             result.cohort !== request.cohort ||
             result.pair !== request.pair ||
             result.map !== request.experiment!.map ||
-            result.candidateSide !== (request.greenIsArmyA ? "green" : "red")
+            result.candidateSide !== (request.greenIsArmyA ? "green" : "red") ||
+            !["green", "red", "draw"].includes(result.winner) ||
+            result.candidateScore !==
+                (result.winner === "draw" ? 0.5 : Number(result.winner === result.candidateSide)) ||
+            !result.diagnostics
         )
             throw new Error("Invalid checkpoint result");
         seen.add(id!);

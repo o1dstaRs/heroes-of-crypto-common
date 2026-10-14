@@ -67,6 +67,14 @@ describe("barrel policy paired measurement", () => {
         expect(summary.overall.treatment.candidateOwnBarrelStrikes).toBe(6);
     });
 
+    test("an all-equal pilot does not report a zero-width confidence interval", () => {
+        const games = results().map((game) => ({ ...game, candidateScore: 0.5 }));
+        const summary = summarizeBarrelComparison(games);
+        expect(summary.overall.scoreDelta).toBe(0);
+        expect(summary.overall.approximate95CI).toBeNull();
+        expect(summary.noBarrelTracePairsChecked).toBe(0);
+    });
+
     test("partial clusters never bias the interim result and duplicates are rejected", () => {
         const games = results();
         const summary = summarizeBarrelComparison(games.slice(0, 7));

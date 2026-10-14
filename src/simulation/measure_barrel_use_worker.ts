@@ -6,6 +6,9 @@
  * completed obstacle_attack whose target cell was recorded by that patch. Map cemetery stones never go
  * through placeArtifactBarrel, so they stay out of the barrel tally.
  */
+import { createHash } from "node:crypto";
+import { friendlyShotBlockingBarrels } from "../ai/artifact_barrel_tactics";
+import { SearchDriver } from "./search_driver";
 import { parentPort } from "node:worker_threads";
 
 import { Tier1Artifact } from "../artifacts/artifact_properties";
@@ -62,6 +65,11 @@ export interface BarrelFightResult {
     candidateScore: number;
     elapsedMs: number;
     ownBarrelStrikesBySide: Record<Side, number>;
+    diagnostics?: {
+        actionSha256: string;
+        ownClears: Record<Side, { opensShot: number; removesCover: number; neither: number; both: number }>;
+        searchTiming: Record<Side, { decisions: number; p95Ms: number; maxMs: number; over1000Ms: number }>;
+    };
     placed: number;
     placedGreen: number;
     placedRed: number;
@@ -94,6 +102,19 @@ const live: LiveBarrels = {
     cells: new Set(),
     teamByCell: new Map(),
     bySlot: new Map(),
+};
+
+// Worker-local, observational timing: no callback runs inside the timed production selector.
+let decisionTimes: Record<Side, number[]> | undefined;
+const originalChoose = SearchDriver.prototype.chooseDecision;
+SearchDriver.prototype.chooseDecision = function (...args: Parameters<typeof originalChoose>) {
+    if (!decisionTimes) return originalChoose.apply(this, args);
+    const start = performance.now();
+    try {
+        return originalChoose.apply(this, args);
+    } finally {
+        decisionTimes[args[0].getTeam() === GREEN_TEAM ? "green" : "red"].push(performance.now() - start);
+    }
 };
 
 const originalPlace = Grid.prototype.placeArtifactBarrel;
@@ -148,6 +169,14 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     const candidateSide: Side = request.greenIsArmyA ? "green" : "red";
     const candidateTeam = request.greenIsArmyA ? GREEN_TEAM : RED_TEAM;
     const ownBarrelStrikesBySide = { green: 0, red: 0 };
+    const ownClears = {
+        green: { opensShot: 0, removesCover: 0, neither: 0, both: 0 },
+        red: { opensShot: 0, removesCover: 0, neither: 0, both: 0 },
+    };
+    let shotBlockers: Record<Side, ReadonlySet<string>> = { green: new Set(), red: new Set() };
+    const actionHash = createHash("sha256");
+    const times: Record<Side, number[]> = { green: [], red: [] };
+    decisionTimes = experiment ? times : undefined;
     const prepared = prepareMetaPair(
         { cohort: request.cohort, games: request.matchupGames, baseSeed: request.baseSeed },
         request.pair,
@@ -210,6 +239,12 @@ function play(request: BarrelFightRequest): BarrelFightResult {
             if (barrelSide === side) {
                 ownBarrelStrikes += 1;
                 ownBarrelStrikesBySide[side] += 1;
+                const opensShot = shotBlockers[side].has(key!);
+                const removesCover = shotBlockers[side === "green" ? "red" : "green"].has(key!);
+                if (opensShot) ownClears[side].opensShot += 1;
+                if (removesCover) ownClears[side].removesCover += 1;
+                if (opensShot && removesCover) ownClears[side].both += 1;
+                if (!opensShot && !removesCover) ownClears[side].neither += 1;
             } else enemyBarrelStrikes += 1;
             return;
         }
@@ -279,7 +314,39 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     try {
         result = runMatch({
             ...configFor(greenArmy, redArmy),
+            decisionObserver: experiment
+                ? ({ context }) => {
+                      if (!context.attackHandler)
+                          throw new Error("Barrel diagnostics require the combat attack handler");
+                      shotBlockers = {
+                          green: friendlyShotBlockingBarrels(
+                              GREEN_TEAM,
+                              context.grid,
+                              context.unitsHolder,
+                              context.attackHandler,
+                          ),
+                          red: friendlyShotBlockingBarrels(
+                              RED_TEAM,
+                              context.grid,
+                              context.unitsHolder,
+                              context.attackHandler,
+                          ),
+                      };
+                  }
+                : undefined,
             turnExecutionObserver: (observation) => {
+                if (experiment)
+                    actionHash.update(
+                        JSON.stringify([
+                            observation.side,
+                            observation.creatureName,
+                            observation.chosenDecision,
+                            observation.strategyActions.map(({ completed, rejectionReason }) => [
+                                completed,
+                                rejectionReason,
+                            ]),
+                        ]),
+                    );
                 for (const executed of observation.strategyActions) {
                     note(
                         observation.side,
@@ -304,6 +371,7 @@ function play(request: BarrelFightRequest): BarrelFightResult {
             },
         });
     } finally {
+        decisionTimes = undefined;
         if (previousOverrides === undefined) delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
         else process.env.V08_A19_SEARCH_ENV_OVERRIDES = previousOverrides;
     }
@@ -324,6 +392,28 @@ function play(request: BarrelFightRequest): BarrelFightResult {
         candidateScore: result.winner === "draw" ? 0.5 : Number(result.winner === candidateSide),
         elapsedMs: performance.now() - started,
         ownBarrelStrikesBySide,
+        ...(experiment
+            ? {
+                  diagnostics: {
+                      actionSha256: actionHash.digest("hex"),
+                      ownClears,
+                      searchTiming: Object.fromEntries(
+                          (["green", "red"] as const).map((side) => {
+                              const sorted = times[side].sort((a, b) => a - b);
+                              return [
+                                  side,
+                                  {
+                                      decisions: sorted.length,
+                                      p95Ms: sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)] ?? 0,
+                                      maxMs: sorted.at(-1) ?? 0,
+                                      over1000Ms: sorted.filter((ms) => ms > 1000).length,
+                                  },
+                              ];
+                          }),
+                      ) as NonNullable<BarrelFightResult["diagnostics"]>["searchTiming"],
+                  },
+              }
+            : {}),
         map: prepared.map,
         placed: placedGreen + placedRed,
         placedGreen,

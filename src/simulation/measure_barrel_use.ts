@@ -5,6 +5,11 @@
  *
  *   bun src/simulation/measure_barrel_use.ts [games=10000] [concurrency=12] [baseSeed=1] [outDir]
  *
+ *   bun src/simulation/measure_barrel_use.ts --compare [clusters=112] [concurrency=12] [seed=1] [outDir] [work|live]
+ * Comparison uses four fights per cluster (both seats, control/treatment), seven army cohorts, four maps
+ * (water reported separately as historical), and four barrel ownerships. Use frozen source and separate
+ * tuning/held-out seeds; 112 clusters is coverage smoke, not evidence of a small win-rate gain.
+ *
  * Cohorts, in order: half ranged-heavy, a quarter cross-archetype, a quarter uniform-mixed. One fight per
  * pair; odd pairs swap which army sits on the green seat. Concurrency 12 matches this machine's perf cores.
  */
@@ -18,7 +23,8 @@ import { resolveAiMetaFightProfile, sanitizedAiMetaEnvironment } from "./measure
 import { PersistentWorkerPool } from "./persistent_worker_pool";
 import type { BarrelFightRequest, BarrelFightResult } from "./measure_barrel_use_worker";
 
-const USAGE = "Usage: bun src/simulation/measure_barrel_use.ts [games=10000] [concurrency=12] [baseSeed=1] [outDir]";
+const USAGE =
+    "Usage: bun src/simulation/measure_barrel_use.ts [games=10000] [concurrency=12] [baseSeed=1] [outDir]\n       bun src/simulation/measure_barrel_use.ts --compare [clusters=112] [concurrency=12] [seed=1] [outDir] [work|live]";
 
 interface CohortTotals {
     games: number;

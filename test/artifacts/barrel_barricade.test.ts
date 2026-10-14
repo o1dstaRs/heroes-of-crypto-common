@@ -157,6 +157,33 @@ describe("Barrel Barricade", () => {
             { x: 4, y: 1 },
         ]);
     });
+    for (const map of [1, 2, 3, 4] as const)
+        for (const team of [LEFT, RIGHT])
+            for (const side of [true, false]) {
+                it(`keeps a shooter lane open on map ${map}, team ${team}, side axis ${side}`, () => {
+                    const { grid, fp } = fixture(map);
+                    fp.setSideOrientedPlacement(side);
+                    fp.setArtifactPerTeam(team, ArtifactTier.TIER_1, Tier1Artifact.BARREL_BARRICADE);
+                    const direction = team === LEFT ? 1 : -1;
+                    const axis = team === LEFT ? 2 : 13;
+                    const shooter = side ? { x: axis, y: 5 } : { x: 5, y: axis };
+                    const blocked = side ? { x: axis + direction, y: 5 } : { x: 5, y: axis + direction };
+                    const safe = side
+                        ? [
+                              { x: axis + direction, y: 6 },
+                              { x: axis + direction, y: 7 },
+                          ]
+                        : [
+                              { x: 6, y: axis + direction },
+                              { x: 7, y: axis + direction },
+                          ];
+                    autoPlaceArtifactBarrels(grid, fp, team, [blocked, ...safe], [shooter]);
+                    const cells = grid.getArtifactBarrels(team).map((barrel) => barrel.cell);
+                    expect(cells).toHaveLength(2);
+                    expect(cells).not.toContainEqual(blocked);
+                    for (const cell of cells) expect(safe).toContainEqual(cell);
+                });
+            }
     it("screens the shooter instead of the far end of the deployment edge", () => {
         const { grid, fp } = fixture();
         fp.setSideOrientedPlacement(true);
