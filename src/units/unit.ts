@@ -1404,12 +1404,29 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ARTIFACT_POWER.QUIVER_OF_ECHOES_CHANCE;
         return Math.max(0, Math.min(100, power + this.getLuck()));
     }
+    /** Artifact chance is per landed hit, independent of stack power. Luck is this unit's current luck. */
+    public getRimeCharmChance(): number {
+        if (!this.hasBuffActive("Rime Charm")) return 0;
+        const power =
+            this.getBuffPower("Rime Charm") ||
+            Number(this.getBuffProperties("Rime Charm")[0]) ||
+            ARTIFACT_POWER.RIME_PROC_PERCENT;
+        return Math.max(0, Math.min(100, power + this.getLuck()));
+    }
     private refreshQuiverOfEchoesDescription(): void {
         const index = this.unitProperties.applied_buffs.indexOf("Quiver of Echoes");
         if (index < 0) return;
         const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
         this.unitProperties.applied_buffs_descriptions[index] =
             `Artifact. Ranged attacks have a ${this.getBonusRangedAttackChance()}% chance to make one extra attack.;${properties.join(";")}`;
+    }
+    private refreshRimeCharmDescription(): void {
+        const index = this.unitProperties.applied_buffs.indexOf("Rime Charm");
+        if (index < 0) return;
+        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        const laps = Number(properties[1]) || ARTIFACT_POWER.RIME_SLOW_LAPS;
+        this.unitProperties.applied_buffs_descriptions[index] =
+            `Artifact. ${this.getRimeCharmChance()}% chance for any attack to slow the target for ${laps} laps.;${properties.join(";")}`;
     }
     public projectRangeShotsAfterVolleys(target?: Unit, volleys = 1): number {
         const cost = projectShotCost(this, target) * Math.max(0, volleys);
@@ -3860,6 +3877,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         this.refreshQuiverOfEchoesDescription();
+        this.refreshRimeCharmDescription();
 
         // MDEF
         this.unitProperties.magic_resist = madeOfFireBuff

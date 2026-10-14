@@ -689,6 +689,9 @@ export class UnitsHolder {
                 case Tier1Artifact.TOME_OF_AMPLIFICATION:
                     applyArtifactBuff("Tome of Amplification", AP.TOME_BUFF_POWER_PERCENT);
                     break;
+                case Tier1Artifact.RIME_CHARM:
+                    applyArtifactBuff("Rime Charm", AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS);
+                    break;
                 default:
                     break;
             }
@@ -746,6 +749,8 @@ export class UnitsHolder {
                     applyArtifactBuff("Tome of Amplification", AP.TOME_BUFF_POWER_PERCENT);
                     break;
                 case Tier2Artifact.RIME_CHARM:
+                    // Retired id. A saved game that drafted the charm as Tier 2 still receives the buff,
+                    // at the current 30% plus the attacker's luck, not the flat 60% it was drafted under.
                     applyArtifactBuff("Rime Charm", AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS);
                     break;
                 case Tier2Artifact.LAVA_STRIDERS:

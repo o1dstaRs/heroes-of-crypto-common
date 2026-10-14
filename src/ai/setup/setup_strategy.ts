@@ -177,6 +177,9 @@ export const TIER1_ARTIFACT_WINRATE: Record<number, number> = {
     // 2026-07-15 Tier-2 measurement under the old augment-amplifying mechanic. It was already stale after
     // the castable-buffs-only change and has not been remeasured as a Tier-1 artifact or at 40%.
     [Tier1Artifact.TOME_OF_AMPLIFICATION]: 68.8,
+    // Moved from Tier 2 on 2026-10-14, when the proc went from a flat 60% to 30% plus the attacking
+    // unit's current luck. 46.3 is the 2026-07-15 Tier-2 measurement at 60%. It has not been remeasured.
+    [Tier1Artifact.RIME_CHARM]: 46.3,
 };
 
 /**
@@ -213,6 +216,8 @@ export const TIER2_ARTIFACT_WINRATE: Record<number, number> = {
     [Tier2Artifact.WARLORDS_EDGE]: 63.7,
     [Tier2Artifact.CLOVER_OF_FORTUNE]: 62.2,
     [Tier2Artifact.FARSIGHT_QUIVER]: 47.1,
+    // Left the live pool on 2026-10-14 (new drafts pick Tier 1 id 15). This 46.3 stays for a saved offer
+    // of id 11. It was measured at a flat 60%, not at 30% plus luck.
     [Tier2Artifact.RIME_CHARM]: 46.3,
     [Tier2Artifact.HOLY_CROSS]: 46.1,
     [Tier2Artifact.LAVA_STRIDERS]: 45.4,

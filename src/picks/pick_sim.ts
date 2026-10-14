@@ -30,7 +30,7 @@ export type PickRandomInt = (maxExclusive: number) => number;
  * agree and refuses to build a pick if they drift, so these move together or not at all.
  */
 export const LIVE_AUTO_BANS_BY_LEVEL = [6, 6, 3, 5] as const;
-export const LIVE_TIER1_ARTIFACT_COUNT = 14;
+export const LIVE_TIER1_ARTIFACT_COUNT = 15;
 export const LIVE_TIER2_ARTIFACT_COUNT = 15;
 export const LIVE_TIER1_ARTIFACT_IDS = TIER1_ARTIFACT_LIST.map((artifact) => artifact.id);
 export const LIVE_TIER2_ARTIFACT_IDS = TIER2_ARTIFACT_LIST.map((artifact) => artifact.id);

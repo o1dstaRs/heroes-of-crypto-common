@@ -846,6 +846,8 @@ function tier1ContextScore(id: number, own: IAiMetaArmyFeatures, opponent: IAiMe
             return base + 8 * fraction(opponent.auraCarriers + opponent.buffers, opponent.total);
         case Tier1Artifact.TOME_OF_AMPLIFICATION:
             return base + 15 * fraction(own.buffers, own.total);
+        case Tier1Artifact.RIME_CHARM:
+            return base + 13 * opponentGround;
         default:
             return base;
     }

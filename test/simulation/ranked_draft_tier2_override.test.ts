@@ -117,7 +117,14 @@ describe("ranked draft candidate Tier-2 override", () => {
         });
         expect(LIVE_TIER2_ARTIFACT_IDS).not.toContain(Tier2Artifact.HOLY_CROSS);
         expect(LIVE_TIER2_ARTIFACT_IDS).not.toContain(Tier2Artifact.TOME_OF_AMPLIFICATION);
-        for (const invalid of [Tier2Artifact.HOLY_CROSS, Tier2Artifact.TOME_OF_AMPLIFICATION, 0, 99]) {
+        expect(LIVE_TIER2_ARTIFACT_IDS).not.toContain(Tier2Artifact.RIME_CHARM);
+        for (const invalid of [
+            Tier2Artifact.HOLY_CROSS,
+            Tier2Artifact.TOME_OF_AMPLIFICATION,
+            Tier2Artifact.RIME_CHARM,
+            0,
+            99,
+        ]) {
             expect(() =>
                 playRankedDraftGame(candidate, opponent, { ...base, candidateTier2Override: invalid }, 0),
             ).toThrow("candidateTier2Override");

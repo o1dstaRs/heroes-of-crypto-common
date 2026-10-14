@@ -15,10 +15,10 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { Spell } from "../spells/spell";
 import { getSpellConfig } from "../configuration/config_provider";
 
-// ARTIFACT Rime Charm: any attack from a unit carrying the Rime Charm buff has a chance (buff power, e.g.
-// 60%) to chill the target — applying a Quagmire slow (movement reduction) for a number of laps stored as
-// the buff's second property (e.g. 3). Reuses the existing "Quagmire" spell debuff so no new effect config
-// is required.
+// ARTIFACT Rime Charm: any attack from a unit carrying the Rime Charm buff has a chance — the buff's base
+// power plus that unit's current luck — to chill the target. The slow is Quagmire for the number of laps
+// stored as the buff's second property (e.g. 3). Reuses the existing "Quagmire" spell debuff so no new
+// effect config is required.
 export function processRimeCharmAbility(
     fromUnit: Unit,
     targetUnit: Unit,
@@ -38,7 +38,7 @@ export function processRimeCharmAbility(
         return;
     }
 
-    if (HoCLib.getRandomInt(0, 100) >= rimeCharmBuff.getPower()) {
+    if (HoCLib.getRandomInt(0, 100) >= fromUnit.getRimeCharmChance()) {
         return;
     }
 

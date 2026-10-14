@@ -43,6 +43,8 @@ export enum Tier1Artifact {
     MAGES_RING = 13, // +10% magic damage (army-wide); Tier-1 half of the arcane pair
     // Was Tier 2 id 10. That id stays addressable for saved games; new drafts pick this one.
     TOME_OF_AMPLIFICATION = 14, // +35% power to non-healing castable buffs allied units apply to allies
+    // Was Tier 2 id 11. That id stays addressable for saved games; new drafts pick this one.
+    RIME_CHARM = 15, // 30% plus the attacking unit's current luck to slow a target for 3 laps
 }
 
 export enum Tier2Artifact {
@@ -59,7 +61,9 @@ export enum Tier2Artifact {
     // Retired from the live Tier-2 pool (2026-10-14). New drafts pick Tier1Artifact.TOME_OF_AMPLIFICATION.
     // This id still applies the same buff, so a saved game or replay that drafted it does not lose it.
     TOME_OF_AMPLIFICATION = 10,
-    RIME_CHARM = 11, // 30% chance to apply a 3-turn slow on any attack
+    // Retired from the live Tier-2 pool (2026-10-14). New drafts pick Tier1Artifact.RIME_CHARM.
+    // This id still applies the same buff, so a saved game or replay that drafted it does not lose it.
+    RIME_CHARM = 11, // 30% plus the attacking unit's current luck to slow a target for 3 laps
     LAVA_STRIDERS = 12, // all units may move over lava
     QUIVER_OF_ECHOES = 15, // One extra ranged attack, 40% + current luck chance
     AEGIS_OF_THE_ARCANE = 14, // extra magic-defense roll (army-wide), combined, not added
@@ -72,6 +76,7 @@ export const DISABLED_TIER1_ARTIFACT_IDS: ReadonlySet<Tier1Artifact> = new Set([
 export const DISABLED_TIER2_ARTIFACT_IDS: ReadonlySet<Tier2Artifact> = new Set([
     Tier2Artifact.HOLY_CROSS,
     Tier2Artifact.TOME_OF_AMPLIFICATION,
+    Tier2Artifact.RIME_CHARM,
 ]);
 
 export type ArtifactType =
@@ -95,6 +100,7 @@ export const ToTier1Artifact: { [key: string]: Tier1Artifact } = {
     "12": Tier1Artifact.BROKEN_AEGIS,
     "13": Tier1Artifact.MAGES_RING,
     "14": Tier1Artifact.TOME_OF_AMPLIFICATION,
+    "15": Tier1Artifact.RIME_CHARM,
 };
 
 export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
@@ -147,7 +153,9 @@ export const ARTIFACT_POWER = {
     AMULET_OF_RESOLVE_RESIST_PERCENT: 25,
     AEGIS_AREA_REDUCTION_PERCENT: 0,
     GIANTS_MAUL_AOE_PERCENT: 40,
-    RIME_PROC_PERCENT: 60,
+    // Base chance only. The attacking unit's current luck is added when the attack rolls, then clamped
+    // to 0–100. The unit's buff hover shows that sum, not this base and not the words "plus luck".
+    RIME_PROC_PERCENT: 30,
     RIME_SLOW_LAPS: 3,
     HOLY_CROSS_HEAL_RES_PERCENT: 50,
     TOME_BUFF_POWER_PERCENT: 35,
@@ -318,6 +326,17 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         ),
         imageKey: "artifact_t2_tome_of_amplification_256",
     },
+    // The portrait already ships as the Tier-2 cutout. Keep that file; a Tier-1 filename was never drawn.
+    [Tier1Artifact.RIME_CHARM]: {
+        ...t1(
+            Tier1Artifact.RIME_CHARM,
+            "rime_charm",
+            "Rime Charm",
+            "Rime Charm",
+            "{}% chance, plus the attacking unit's current luck, for any attack to slow the target for [] laps.",
+        ),
+        imageKey: "artifact_t2_rime_charm_256",
+    },
 };
 
 export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
@@ -397,7 +416,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "rime_charm",
         "Rime Charm",
         "Rime Charm",
-        "{}% chance for any attack to slow the target for [] laps.",
+        "{}% chance, plus the attacking unit's current luck, for any attack to slow the target for [] laps.",
     ),
     [Tier2Artifact.LAVA_STRIDERS]: t2(
         Tier2Artifact.LAVA_STRIDERS,
