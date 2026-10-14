@@ -2998,14 +2998,14 @@ describe("GameActionEngine", () => {
 
         expect(result.completed).toBe(true);
         expect(sourceSpell.getPower()).toBe(25);
-        expect(setup.left.getBuff("Mass Riot")?.getPower()).toBe(35);
-        expect(setup.leftSupport.getBuff("Mass Riot")?.getPower()).toBe(35);
-        expect(setup.leftSupport.getUnitProperties().applied_buffs_powers).toContain(35);
-        expect(setup.leftSupport.getBuff("Mass Riot")?.getPower()).not.toBe(49);
+        expect(setup.left.getBuff("Mass Riot")?.getPower()).toBe(33.75);
+        expect(setup.leftSupport.getBuff("Mass Riot")?.getPower()).toBe(33.75);
+        expect(setup.leftSupport.getUnitProperties().applied_buffs_powers).toContain(33.75);
+        expect(setup.leftSupport.getBuff("Mass Riot")?.getPower()).not.toBe(45.5625);
         setup.leftSupport.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-        expect(setup.leftSupport.getAttack()).toBeCloseTo(13.5);
+        expect(setup.leftSupport.getAttack()).toBeCloseTo(13.375);
         setup.leftSupport.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-        expect(setup.leftSupport.getAttack()).toBeCloseTo(13.5);
+        expect(setup.leftSupport.getAttack()).toBeCloseTo(13.375);
     });
 
     it("amplifies a cast Wind Flow only for allied flyers", () => {
@@ -3031,7 +3031,7 @@ describe("GameActionEngine", () => {
         expect(result.completed).toBe(true);
         expect(setup.leftSupport.hasBuffActive("Wind Flow")).toBe(true);
         expect(setup.right.hasBuffActive("Wind Flow")).toBe(true);
-        expect(setup.leftSupport.getBuff("Wind Flow")?.getPower()).toBe(5.6);
+        expect(setup.leftSupport.getBuff("Wind Flow")?.getPower()).toBe(5.4);
         expect(setup.right.getBuff("Wind Flow")?.getPower()).toBe(4);
         expect(setup.left.hasSpellRemaining("Wind Flow")).toBe(false);
     });

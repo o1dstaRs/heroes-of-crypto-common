@@ -454,7 +454,7 @@ describe("AttackHandler", () => {
             setDeterministicRandomSource(undefined);
         });
 
-        it("Tome of Amplification raises a Fireforged Sword from 20% to 28% of the hit", () => {
+        it("Tome of Amplification raises a Fireforged Sword from 20% to 27% of the hit", () => {
             setDeterministicRandomSource(() => 0);
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
@@ -502,10 +502,10 @@ describe("AttackHandler", () => {
 
             expect(cast.completed).toBe(true);
             expect(sourceSpell.getPower()).toBe(20);
-            expect(ally.getBuff("Fireforged Sword")?.getPower()).toBe(28);
+            expect(ally.getBuff("Fireforged Sword")?.getPower()).toBe(27);
             const swordIndex = ally.getUnitProperties().applied_buffs.indexOf("Fireforged Sword");
             const shown = ally.getUnitProperties().applied_buffs_descriptions[swordIndex]?.split(";")[0] ?? "";
-            expect(shown).toContain("for 28%");
+            expect(shown).toContain("for 27%");
             expect(ally.getMagicDamageBonusPercentage()).toBeGreaterThan(0);
 
             const damage = createVisibleDamage(enemy);
@@ -521,7 +521,7 @@ describe("AttackHandler", () => {
             expect(burns[0]?.amount).toBe(
                 fireforgedSwordDamage({
                     damageDealt: damage.amount,
-                    swordPercentage: 28,
+                    swordPercentage: 27,
                     targetMagicResist: 0,
                     targetIsFireElement: false,
                     targetIsWaterElement: false,
@@ -558,10 +558,10 @@ describe("AttackHandler", () => {
 
             expect(result.completed).toBe(true);
             expect(sourceSpell.getPower()).toBe(30);
-            expect(target.getBuff("Spiritual Armor")?.getPower()).toBe(42);
-            expect(target.getUnitProperties().applied_buffs_powers).toContain(42);
+            expect(target.getBuff("Spiritual Armor")?.getPower()).toBe(40.5);
+            expect(target.getUnitProperties().applied_buffs_powers).toContain(40.5);
             target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-            expect(target.getArmor()).toBeCloseTo(28.4);
+            expect(target.getArmor()).toBeCloseTo(28.1);
         });
 
         it("amplifies Helping Hand's allied benefit but not its caster debuff", () => {
@@ -597,13 +597,13 @@ describe("AttackHandler", () => {
 
             expect(result.completed).toBe(true);
             expect(sourceSpell.getPower()).toBe(30);
-            expect(target.getBuff("Helping Hand")?.getPower()).toBe(42);
+            expect(target.getBuff("Helping Hand")?.getPower()).toBe(40.5);
             expect(caster.getDebuff("Helping Hand")?.getPower()).toBe(30);
-            expect(target.getUnitProperties().applied_buffs_powers).toContain(42);
+            expect(target.getUnitProperties().applied_buffs_powers).toContain(40.5);
             target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
             caster.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-            expect(target.getMaxHp()).toBe(52);
-            // 42% of the Satyr's 20 armor is 8.4, and Helping Hand ceils that gift before adding it to the target's 10.
+            expect(target.getMaxHp()).toBe(51);
+            // 40.5% of the Satyr's 20 armor is 8.1, and Helping Hand ceils that gift before adding it to the target's 10.
             expect(target.getBaseArmor()).toBe(19);
             expect(caster.getMaxHp()).toBe(70);
             expect(caster.getBaseArmor()).toBe(14);

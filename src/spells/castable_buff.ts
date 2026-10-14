@@ -41,7 +41,7 @@ export function rewriteCastBuffPowerText(
 /**
  * A cast buff's power after Tome of Amplification.
  *
- * 40% on a Fireforged Sword's 20 is 28. A missing or non-positive tome leaves the power alone.
+ * 35% on a Fireforged Sword's 20 is 27. A missing or non-positive tome leaves the power alone.
  * Healing and resurrection never call this: the tome does not strengthen them.
  */
 export function tomeAmplifiedBuffPower(basePower: number, tomePercent: number): number {

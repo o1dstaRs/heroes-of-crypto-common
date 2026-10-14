@@ -42,7 +42,7 @@ export enum Tier1Artifact {
     BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 20% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
     MAGES_RING = 13, // +10% magic damage (army-wide); Tier-1 half of the arcane pair
     // Was Tier 2 id 10. That id stays addressable for saved games; new drafts pick this one.
-    TOME_OF_AMPLIFICATION = 14, // +40% power to non-healing castable buffs allied units apply to allies
+    TOME_OF_AMPLIFICATION = 14, // +35% power to non-healing castable buffs allied units apply to allies
 }
 
 export enum Tier2Artifact {
@@ -148,7 +148,7 @@ export const ARTIFACT_POWER = {
     RIME_PROC_PERCENT: 60,
     RIME_SLOW_LAPS: 3,
     HOLY_CROSS_HEAL_RES_PERCENT: 50,
-    TOME_BUFF_POWER_PERCENT: 40,
+    TOME_BUFF_POWER_PERCENT: 35,
     DUAL_STRIKE_SECOND_ATTACK_PERCENT: 50,
     // Base amplification of the "Deep Wounds Level 1" card the charm grants army-wide. Mirrors that
     // ability's power in configuration/abilities.json — the displayed figure only, since the applied
