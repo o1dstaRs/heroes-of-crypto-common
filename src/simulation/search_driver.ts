@@ -1406,6 +1406,7 @@ export class SearchDriver {
     private readonly a19MaterialLowEvidenceWinningSamples: number;
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
     private readonly a19ArtifactBarrelShotProjection: boolean;
+    private readonly a19ArtifactBarrelOwnShotProjectionOnly: boolean;
     private captureA19Material = false;
     private a19MaterialEvidence:
         | {
@@ -1689,11 +1690,14 @@ export class SearchDriver {
             barrelProjection !== undefined &&
             barrelProjection !== "" &&
             barrelProjection !== "0" &&
-            barrelProjection !== "1"
+            barrelProjection !== "1" &&
+            barrelProjection !== "own"
         ) {
-            throw new Error("SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION must be 0 or 1");
+            throw new Error("SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION must be 0, 1 or own");
         }
-        this.a19ArtifactBarrelShotProjection = this.a19ArtifactBarrelAttackCoverage && barrelProjection === "1";
+        this.a19ArtifactBarrelShotProjection =
+            this.a19ArtifactBarrelAttackCoverage && (barrelProjection === "1" || barrelProjection === "own");
+        this.a19ArtifactBarrelOwnShotProjectionOnly = barrelProjection === "own";
         const rawAdaptiveBudget = searchEnv("SEARCH_A19_ADAPTIVE_BUDGET");
         if (
             rawAdaptiveBudget !== undefined &&
@@ -4570,7 +4574,7 @@ export class SearchDriver {
                 nearestEnemy = candidate;
             }
             if (
-                projectedBlockers
+                projectedBlockers && (!this.a19ArtifactBarrelOwnShotProjectionOnly || !isEnemy)
                     ? !projectedBlockers.has(`${candidate.targetCell.x},${candidate.targetCell.y}`)
                     : !barrelBlocksShotLine(candidate.targetCell, origins, enemies)
             )

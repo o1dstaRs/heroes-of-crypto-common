@@ -6005,8 +6005,8 @@ describe("a19 artifact barrel attacks", () => {
     };
 
     it("routes exact diagonal shot projection only through its research flag", () => {
-        const run = (projection: boolean) => {
-            setEnv({ ...barrelSearchEnv(true), SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: projection ? "1" : "0" });
+        const run = (projection: "0" | "1" | "own", owner: TeamType = GREEN_TEAM) => {
+            setEnv({ ...barrelSearchEnv(true), SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: projection });
             const harness = buildBattle(7, "v0.8", undefined, barrelScreenRoster);
             const allies = harness.unitsHolder.getAllAllies(GREEN_TEAM);
             const shooter = allies.find((unit) => unit.getName() === "Orc")!;
@@ -6019,17 +6019,33 @@ describe("a19 artifact barrel attacks", () => {
             standOn(enemies[0], { x: 9, y: 9 });
             standOn(enemies[1], { x: 13, y: 12 });
             const barrel = { x: 5, y: 5 };
-            expect(harness.grid.placeArtifactBarrel(GREEN_TEAM, 0, barrel)).toBe(true);
+            expect(harness.grid.placeArtifactBarrel(owner, 0, barrel)).toBe(true);
             const driver = harness.makeDriver() as unknown as {
                 keepsArtifactBarrelMine(
                     unit: Unit,
                     candidate: Pick<IEnumeratedCandidate, "kind" | "targetCell">,
                 ): boolean;
+                reservedArtifactBarrelMine(
+                    unit: Unit,
+                    candidates: IEnumeratedCandidate[],
+                    idle: boolean,
+                ): IEnumeratedCandidate | undefined;
             };
-            return driver.keepsArtifactBarrelMine(melee, { kind: "mine", targetCell: barrel });
+            return {
+                keeps: driver.keepsArtifactBarrelMine(melee, { kind: "mine", targetCell: barrel }),
+                reserves: !!driver.reservedArtifactBarrelMine(
+                    melee,
+                    [{ kind: "mine", targetCell: barrel } as IEnumeratedCandidate],
+                    false,
+                ),
+            };
         };
-        expect(run(false)).toBe(false);
-        expect(run(true)).toBe(true);
+        expect(run("0")).toEqual({ keeps: false, reserves: false });
+        expect(run("1")).toEqual({ keeps: true, reserves: true });
+        expect(run("own")).toEqual({ keeps: true, reserves: true });
+        expect(run("0", RED_TEAM)).toEqual({ keeps: true, reserves: false });
+        expect(run("1", RED_TEAM)).toEqual({ keeps: true, reserves: true });
+        expect(run("own", RED_TEAM)).toEqual({ keeps: true, reserves: false });
     });
 
     it("offers a strike on the army's own barrel when that barrel blocks a teammate's shot", () => {

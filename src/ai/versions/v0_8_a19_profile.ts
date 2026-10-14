@@ -140,7 +140,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for opt-in barrel ray projection; the released flag remains off.
-        sha256: "41a45305efa288de3b7ae206e21d87d36338e9bb4f5f6e470c58b80ce92342be" as const,
+        sha256: "67bcb7d22d7de8709990e2f6fdfcc9fac0aa8f43c02c27562ef7effafd698bf9" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,

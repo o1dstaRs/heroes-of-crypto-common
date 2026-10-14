@@ -52,6 +52,7 @@ export interface BarrelFightRequest {
         ownership: "both" | "candidate" | "opponent" | "neither";
         map: 1 | 2 | 3 | 4;
         timing: "work" | "live";
+        policy?: "exact" | "own";
     };
 }
 
@@ -307,7 +308,7 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     const previousOverrides = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
     if (experiment?.treatment)
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({
-            SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "1",
+            SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: experiment.policy === "own" ? "own" : "1",
         });
     else delete process.env.V08_A19_SEARCH_ENV_OVERRIDES;
     let result: ReturnType<typeof runMatch>;

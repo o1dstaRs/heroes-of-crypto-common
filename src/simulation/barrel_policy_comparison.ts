@@ -17,6 +17,7 @@ export function barrelComparisonPlan(
     clusters: number,
     baseSeed: number,
     timing: Experiment["timing"],
+    policy: "exact" | "own" = "exact",
 ): BarrelFightRequest[] {
     if (!Number.isSafeInteger(clusters) || clusters < 1) throw new RangeError("clusters must be a positive integer");
     if (!Number.isSafeInteger(baseSeed)) throw new RangeError("seed must be an integer");
@@ -40,6 +41,7 @@ export function barrelComparisonPlan(
                         ownership,
                         map,
                         timing,
+                        policy,
                     },
                 }),
             ),
@@ -175,7 +177,9 @@ export async function runBarrelPolicyComparison(argv: readonly string[]): Promis
     const timing = argv[4] ?? "work";
     if (timing !== "work" && timing !== "live") throw new Error("timing must be work or live");
     if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new RangeError("concurrency must be positive");
-    const requests = barrelComparisonPlan(clusters, seed, timing);
+    const policy = argv[5] ?? "exact";
+    if (policy !== "exact" && policy !== "own") throw new Error("policy must be exact or own");
+    const requests = barrelComparisonPlan(clusters, seed, timing, policy);
     const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
     const fingerprint = () => fingerprintSourceTree(root, ["src"], ["package.json", "bun.lock"]);
     const manifest = {
@@ -187,7 +191,7 @@ export async function runBarrelPolicyComparison(argv: readonly string[]): Promis
         timing,
         runtime: process.versions.bun,
         sourceSha256: fingerprint(),
-        policy: "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION=1",
+        policy,
         schedule: "7 cohorts x 4 maps x 4 ownerships; four games/cluster; army A treated; order counterbalanced",
     };
     mkdirSync(outDir, { recursive: true });

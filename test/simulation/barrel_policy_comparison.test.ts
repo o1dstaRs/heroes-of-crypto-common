@@ -26,6 +26,12 @@ describe("barrel policy paired measurement", () => {
         expect(conditions.size).toBe(112);
     });
 
+    test("records the narrower candidate separately from full shot projection", () => {
+        expect(
+            barrelComparisonPlan(1, 42, "work", "own").every((request) => request.experiment!.policy === "own"),
+        ).toBe(true);
+    });
+
     const results = () =>
         barrelComparisonPlan(2, 42, "work").map((request): BarrelFightResult => ({
             cohort: request.cohort,
