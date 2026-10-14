@@ -21,6 +21,7 @@ describe("barrel policy paired measurement", () => {
             expect(
                 new Set(games.map((request) => `${request.greenIsArmyA}:${request.experiment!.treatment}`)).size,
             ).toBe(4);
+            expect(games[0].experiment!.treatment).not.toBe(games[2].experiment!.treatment);
         }
         expect(conditions.size).toBe(112);
     });

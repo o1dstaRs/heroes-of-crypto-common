@@ -107,7 +107,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "2c7cb098c460667fa51058ea94e0ce0231fee09da36f23ba1d9d9ea8bf020798" as const;
+    "dca5d47276b2ac3fa3020b65f5d4588ce1b0cfc6d71988439c53184cbb8f8cfe" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -223,6 +223,8 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         SEARCH_DECISION_DEADLINE_MS: String(V08_A19_SEARCH.decisionDeadlineMs),
         SEARCH_CIRCUIT_BREAKER_MS: String(V08_A19_SEARCH.circuitBreakerMs),
         ...V08_A19_SEARCH_RULES,
+        // Only the explicit JSON research override may enable this unqualified candidate.
+        SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
     });
 }
 

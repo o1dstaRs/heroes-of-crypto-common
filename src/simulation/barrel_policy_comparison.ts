@@ -25,21 +25,24 @@ export function barrelComparisonPlan(
         const map = AI_META_RECORDED_MAPS[Math.floor(cluster / AI_META_COHORTS.length) % 4];
         const ownership = ownerships[Math.floor(cluster / (AI_META_COHORTS.length * 4)) % 4];
         return [true, false].flatMap((greenIsArmyA) =>
-            [false, true].map((treatment) => ({
-                cohort,
-                pair: cluster,
-                matchupGames: clusters * 2,
-                baseSeed,
-                greenIsArmyA,
-                experiment: {
-                    id: `${cluster}:${Number(greenIsArmyA)}:${Number(treatment)}`,
-                    cluster,
-                    treatment,
-                    ownership,
-                    map,
-                    timing,
-                },
-            })),
+            // Counterbalance order for wall-clock runs (JIT warmup and changing host load).
+            [(cluster + Number(greenIsArmyA)) % 2 === 0, (cluster + Number(greenIsArmyA)) % 2 !== 0].map(
+                (treatment) => ({
+                    cohort,
+                    pair: cluster,
+                    matchupGames: clusters * 2,
+                    baseSeed,
+                    greenIsArmyA,
+                    experiment: {
+                        id: `${cluster}:${Number(greenIsArmyA)}:${Number(treatment)}`,
+                        cluster,
+                        treatment,
+                        ownership,
+                        map,
+                        timing,
+                    },
+                }),
+            ),
         );
     }).flat();
 }
@@ -185,7 +188,7 @@ export async function runBarrelPolicyComparison(argv: readonly string[]): Promis
         runtime: process.versions.bun,
         sourceSha256: fingerprint(),
         policy: "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION=1",
-        schedule: "7 cohorts x 4 maps x 4 ownerships; four games/cluster; army A treated",
+        schedule: "7 cohorts x 4 maps x 4 ownerships; four games/cluster; army A treated; order counterbalanced",
     };
     mkdirSync(outDir, { recursive: true });
     const manifestPath = join(outDir, "manifest.json");

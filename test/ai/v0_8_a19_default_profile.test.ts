@@ -51,6 +51,7 @@ const ENV_KEYS = [
     "Q2_WAIT_ABLATION",
     "Q2_ORACLE",
     "V08_VISIBLE_EDGE_SCREEN_PRESSURE",
+    "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
 ] as const;
 const savedEnvironment = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
 
@@ -127,6 +128,13 @@ describe("v0.8+A19 production profile", () => {
             }
             expect(environment[key]).toBe(value);
         }
+    });
+
+    it("keeps the unqualified barrel candidate off unless explicitly overridden for research", () => {
+        process.env.SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION = "1";
+        expect(buildV08A19SearchEnvironment().SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION).toBe("0");
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "1" });
+        expect(buildV08A19SearchEnvironment().SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION).toBe("1");
     });
 
     it("fingerprints its genome and sealed environment", () => {
