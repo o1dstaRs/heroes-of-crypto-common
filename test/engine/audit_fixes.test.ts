@@ -773,7 +773,7 @@ describe("C2: Swift Boots count melee-magic walkers as melee", () => {
 });
 
 describe("C3: Tome of Amplification strengthens Wind Flow's armor, not its slow", () => {
-    it("an amplified Wind Flow gives +6 armor but still only −4 movement", () => {
+    it("an amplified Wind Flow gives +5.6 armor but still only −4 movement", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const pegasus = realUnit("Nature", "Pegasus", 3, 2);
         placeUnit(grid, unitsHolder, pegasus, { x: 6, y: 6 });
@@ -781,13 +781,13 @@ describe("C3: Tome of Amplification strengthens Wind Flow's armor, not its slow"
         const stepsBefore = pegasus.getSteps();
         const armorBefore = pegasus.getBaseArmor();
         const windFlow = new Spell({ spellProperties: getSpellConfig("System", "Wind Flow"), amount: 1 });
-        windFlow.setPower(6);
+        windFlow.setPower(5.6);
         pegasus.applyBuff(windFlow);
 
         unitsHolder.refreshStackPowerForAllUnits();
 
         expect(pegasus.getSteps()).toBeCloseTo(stepsBefore - 4, 5);
-        expect(pegasus.getBaseArmor()).toBeCloseTo(armorBefore + 6, 5);
+        expect(pegasus.getBaseArmor()).toBeCloseTo(armorBefore + 5.6, 5);
     });
 });
 

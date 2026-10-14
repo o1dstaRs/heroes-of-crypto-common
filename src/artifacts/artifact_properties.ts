@@ -41,6 +41,8 @@ export enum Tier1Artifact {
     BARREL_BARRICADE = 11, // two deployable single-hit barrels
     BROKEN_AEGIS = 12, // Broken Aegis (offensive): wielder's attacks 20% break-the-enemy / 4% self-miss. Numeric id 12 is unchanged for wire/DB compat with stored picks; slug/buff = "broken_aegis".
     MAGES_RING = 13, // +10% magic damage (army-wide); Tier-1 half of the arcane pair
+    // Was Tier 2 id 10. That id stays addressable for saved games; new drafts pick this one.
+    TOME_OF_AMPLIFICATION = 14, // +40% power to non-healing castable buffs allied units apply to allies
 }
 
 export enum Tier2Artifact {
@@ -54,7 +56,9 @@ export enum Tier2Artifact {
     PENDANT_OF_VITALITY = 7, // +25% HP (all) / -20% attack
     FARSIGHT_QUIVER = 8, // all allied archers shoot at full arrow (no range falloff)
     BERSERKERS_BOND = 9, // +3 attack / -1 defense (flat)
-    TOME_OF_AMPLIFICATION = 10, // +50% power to non-healing castable buffs allied units apply to allies
+    // Retired from the live Tier-2 pool (2026-10-14). New drafts pick Tier1Artifact.TOME_OF_AMPLIFICATION.
+    // This id still applies the same buff, so a saved game or replay that drafted it does not lose it.
+    TOME_OF_AMPLIFICATION = 10,
     RIME_CHARM = 11, // 30% chance to apply a 3-turn slow on any attack
     LAVA_STRIDERS = 12, // all units may move over lava
     ARCHMAGES_RING = 13, // +20% magic damage (army-wide); Tier-2 half of the arcane pair
@@ -63,7 +67,10 @@ export enum Tier2Artifact {
 // Keep retired artifacts addressable for saved games, replays, and balance history, but exclude them from every
 // live selection pool. New ranked drafts and the sandbox both build their choices from the lists below.
 export const DISABLED_TIER1_ARTIFACT_IDS: ReadonlySet<Tier1Artifact> = new Set([Tier1Artifact.BROKEN_AEGIS]);
-export const DISABLED_TIER2_ARTIFACT_IDS: ReadonlySet<Tier2Artifact> = new Set([Tier2Artifact.HOLY_CROSS]);
+export const DISABLED_TIER2_ARTIFACT_IDS: ReadonlySet<Tier2Artifact> = new Set([
+    Tier2Artifact.HOLY_CROSS,
+    Tier2Artifact.TOME_OF_AMPLIFICATION,
+]);
 
 export type ArtifactType =
     { tier: ArtifactTier.TIER_1; value: Tier1Artifact } | { tier: ArtifactTier.TIER_2; value: Tier2Artifact };
@@ -85,6 +92,7 @@ export const ToTier1Artifact: { [key: string]: Tier1Artifact } = {
     "11": Tier1Artifact.BARREL_BARRICADE,
     "12": Tier1Artifact.BROKEN_AEGIS,
     "13": Tier1Artifact.MAGES_RING,
+    "14": Tier1Artifact.TOME_OF_AMPLIFICATION,
 };
 
 export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
@@ -141,7 +149,7 @@ export const ARTIFACT_POWER = {
     // Farsight Quiver extends an archer's BASIC shot range by this % (additive off base shot_distance; it
     // pushes the range-falloff threshold out rather than removing falloff, and does NOT compound with Sniper Augment).
     FARSIGHT_QUIVER_RANGE_PERCENT: 50,
-    TOME_BUFF_POWER_PERCENT: 50,
+    TOME_BUFF_POWER_PERCENT: 40,
     DUAL_STRIKE_SECOND_ATTACK_PERCENT: 50,
     // Base amplification of the "Deep Wounds Level 1" card the charm grants army-wide. Mirrors that
     // ability's power in configuration/abilities.json — the displayed figure only, since the applied
@@ -294,6 +302,17 @@ export const TIER1_ARTIFACTS: { [key in Tier1Artifact]: ArtifactProperties } = {
         "Mages Ring",
         "Increases all magic damage the army deals by {}%.",
     ),
+    // The portrait already ships as the Tier-2 cutout. Keep that file; a Tier-1 filename was never drawn.
+    [Tier1Artifact.TOME_OF_AMPLIFICATION]: {
+        ...t1(
+            Tier1Artifact.TOME_OF_AMPLIFICATION,
+            "tome_of_amplification",
+            "Tome of Amplification",
+            "Tome of Amplification",
+            "Increases the power of non-healing castable buffs allied units apply to allies by {}%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.",
+        ),
+        imageKey: "artifact_t2_tome_of_amplification_256",
+    },
 };
 
 export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {

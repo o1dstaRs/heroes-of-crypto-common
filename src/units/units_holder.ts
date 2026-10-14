@@ -686,6 +686,9 @@ export class UnitsHolder {
                     // casts, the AI's estimates and the sidebar card all pick the ring up from one place.
                     applyArtifactBuff("Mages Ring", AP.MAGES_RING_MAGIC_PERCENT);
                     break;
+                case Tier1Artifact.TOME_OF_AMPLIFICATION:
+                    applyArtifactBuff("Tome of Amplification", AP.TOME_BUFF_POWER_PERCENT);
+                    break;
                 default:
                     break;
             }
@@ -733,6 +736,8 @@ export class UnitsHolder {
                     applyArtifactBuff("Farsight Quiver", AP.FARSIGHT_QUIVER_RANGE_PERCENT);
                     break;
                 case Tier2Artifact.TOME_OF_AMPLIFICATION:
+                    // Retired id. A saved game that drafted the tome as Tier 2 still receives the buff,
+                    // at the current power, not the 50% it was drafted under.
                     applyArtifactBuff("Tome of Amplification", AP.TOME_BUFF_POWER_PERCENT);
                     break;
                 case Tier2Artifact.RIME_CHARM:

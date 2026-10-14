@@ -11,7 +11,7 @@
 
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { ArtifactTier, Tier2Artifact } from "../../src/artifacts/artifact_properties";
+import { ArtifactTier, Tier1Artifact } from "../../src/artifacts/artifact_properties";
 import {
     HITS_PER_MOUNTAIN,
     LUCK_MAX_VALUE_TOTAL,
@@ -2951,8 +2951,8 @@ describe("GameActionEngine", () => {
         });
         setup.fightProperties.setArtifactPerTeam(
             PBTypes.TeamVals.LEFT,
-            ArtifactTier.TIER_2,
-            Tier2Artifact.TOME_OF_AMPLIFICATION,
+            ArtifactTier.TIER_1,
+            Tier1Artifact.TOME_OF_AMPLIFICATION,
         );
         setup.unitsHolder.applyArtifacts(setup.fightProperties);
         setup.leftSupport.applyDamage(6, 0, setup.sceneLog);
@@ -2984,8 +2984,8 @@ describe("GameActionEngine", () => {
         });
         setup.fightProperties.setArtifactPerTeam(
             PBTypes.TeamVals.LEFT,
-            ArtifactTier.TIER_2,
-            Tier2Artifact.TOME_OF_AMPLIFICATION,
+            ArtifactTier.TIER_1,
+            Tier1Artifact.TOME_OF_AMPLIFICATION,
         );
         setup.unitsHolder.applyArtifacts(setup.fightProperties);
         const sourceSpell = setup.left.getSpells()[0];
@@ -2998,14 +2998,14 @@ describe("GameActionEngine", () => {
 
         expect(result.completed).toBe(true);
         expect(sourceSpell.getPower()).toBe(25);
-        expect(setup.left.getBuff("Mass Riot")?.getPower()).toBe(37.5);
-        expect(setup.leftSupport.getBuff("Mass Riot")?.getPower()).toBe(37.5);
-        expect(setup.leftSupport.getUnitProperties().applied_buffs_powers).toContain(37.5);
-        expect(setup.leftSupport.getBuff("Mass Riot")?.getPower()).not.toBe(56.25);
+        expect(setup.left.getBuff("Mass Riot")?.getPower()).toBe(35);
+        expect(setup.leftSupport.getBuff("Mass Riot")?.getPower()).toBe(35);
+        expect(setup.leftSupport.getUnitProperties().applied_buffs_powers).toContain(35);
+        expect(setup.leftSupport.getBuff("Mass Riot")?.getPower()).not.toBe(49);
         setup.leftSupport.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-        expect(setup.leftSupport.getAttack()).toBeCloseTo(13.75);
+        expect(setup.leftSupport.getAttack()).toBeCloseTo(13.5);
         setup.leftSupport.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-        expect(setup.leftSupport.getAttack()).toBeCloseTo(13.75);
+        expect(setup.leftSupport.getAttack()).toBeCloseTo(13.5);
     });
 
     it("amplifies a cast Wind Flow only for allied flyers", () => {
@@ -3017,8 +3017,8 @@ describe("GameActionEngine", () => {
         });
         setup.fightProperties.setArtifactPerTeam(
             PBTypes.TeamVals.LEFT,
-            ArtifactTier.TIER_2,
-            Tier2Artifact.TOME_OF_AMPLIFICATION,
+            ArtifactTier.TIER_1,
+            Tier1Artifact.TOME_OF_AMPLIFICATION,
         );
         setup.unitsHolder.applyArtifacts(setup.fightProperties);
 
@@ -3031,7 +3031,7 @@ describe("GameActionEngine", () => {
         expect(result.completed).toBe(true);
         expect(setup.leftSupport.hasBuffActive("Wind Flow")).toBe(true);
         expect(setup.right.hasBuffActive("Wind Flow")).toBe(true);
-        expect(setup.leftSupport.getBuff("Wind Flow")?.getPower()).toBe(6);
+        expect(setup.leftSupport.getBuff("Wind Flow")?.getPower()).toBe(5.6);
         expect(setup.right.getBuff("Wind Flow")?.getPower()).toBe(4);
         expect(setup.left.hasSpellRemaining("Wind Flow")).toBe(false);
     });

@@ -173,6 +173,10 @@ export const TIER1_ARTIFACT_WINRATE: Record<number, number> = {
     [Tier1Artifact.HUNTERS_LONGBOW]: 45.0,
     [Tier1Artifact.WINGED_BOOTS]: 44.5,
     [Tier1Artifact.BROKEN_AEGIS]: 42.8,
+    // Moved with the pick from Tier 2 on 2026-10-14, when the bonus went from 50% to 40%. This is the
+    // 2026-07-15 Tier-2 measurement under the old augment-amplifying mechanic. It was already stale after
+    // the castable-buffs-only change and has not been remeasured as a Tier-1 artifact or at 40%.
+    [Tier1Artifact.TOME_OF_AMPLIFICATION]: 68.8,
 };
 
 /**
@@ -198,8 +202,10 @@ export const TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED: Record<number, number
  * See measure_artifacts.ts --tier=2. REFRESHED 2026-07-15 — see the TIER1_ARTIFACT_WINRATE docstring above
  * for the full provenance (same bugfix, same bake). Historical headline rerank: Tome of Amplification
  * #9(41.7%)->#1(68.8%) under its former augment-amplifying mechanic; Farsight Quiver
- * #4(62.5%)->#5(47.1%). Tome's row is stale after the 2026-07-18 castable-buffs-only change and remains
- * here only until the Tier-2 table is remeasured and re-gated.
+ * #4(62.5%)->#5(47.1%). Tome left the live Tier-2 pool on 2026-10-14 (new drafts pick Tier 1 id 14, and
+ * the same stale 68.8 moved with it). This row stays so a frozen policy or a saved offer of id 10 still
+ * ranks the artifact it was measured as. It was already stale after the 2026-07-18 castable-buffs-only
+ * change and has not been remeasured.
  */
 export const TIER2_ARTIFACT_WINRATE: Record<number, number> = {
     [Tier2Artifact.TOME_OF_AMPLIFICATION]: 68.8,

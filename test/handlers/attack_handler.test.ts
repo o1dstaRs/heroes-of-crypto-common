@@ -11,9 +11,9 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { ArtifactTier, Tier2Artifact } from "../../src/artifacts/artifact_properties";
+import { ArtifactTier, Tier1Artifact } from "../../src/artifacts/artifact_properties";
 import { getSpellConfig } from "../../src/configuration/config_provider";
-import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_KILL } from "../../src/constants";
+import { HITS_PER_MOUNTAIN, MORALE_CHANGE_FOR_KILL, NUMBER_OF_LAPS_TOTAL } from "../../src/constants";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { getPositionForCell } from "../../src/grid/grid_math";
@@ -400,7 +400,7 @@ describe("AttackHandler", () => {
             setDeterministicRandomSource(undefined);
         });
 
-        it("Tome of Amplification raises a Fireforged Sword from 20% to 30% of the hit", () => {
+        it("Tome of Amplification raises a Fireforged Sword from 20% to 28% of the hit", () => {
             setDeterministicRandomSource(() => 0);
             const { grid, unitsHolder, attackHandler } = createCombatTestContext();
             const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
@@ -436,8 +436,8 @@ describe("AttackHandler", () => {
             const fightProperties = FightStateManager.getInstance().getFightProperties();
             fightProperties.setArtifactPerTeam(
                 PBTypes.TeamVals.RIGHT,
-                ArtifactTier.TIER_2,
-                Tier2Artifact.TOME_OF_AMPLIFICATION,
+                ArtifactTier.TIER_1,
+                Tier1Artifact.TOME_OF_AMPLIFICATION,
             );
             unitsHolder.applyArtifacts(fightProperties);
             // Empower is a magic-damage bonus. It must not move the blade on top of the tome.
@@ -448,10 +448,10 @@ describe("AttackHandler", () => {
 
             expect(cast.completed).toBe(true);
             expect(sourceSpell.getPower()).toBe(20);
-            expect(ally.getBuff("Fireforged Sword")?.getPower()).toBe(30);
+            expect(ally.getBuff("Fireforged Sword")?.getPower()).toBe(28);
             const swordIndex = ally.getUnitProperties().applied_buffs.indexOf("Fireforged Sword");
             const shown = ally.getUnitProperties().applied_buffs_descriptions[swordIndex]?.split(";")[0] ?? "";
-            expect(shown).toContain("for 30%");
+            expect(shown).toContain("for 28%");
             expect(ally.getMagicDamageBonusPercentage()).toBeGreaterThan(0);
 
             const damage = createVisibleDamage(enemy);
@@ -467,7 +467,7 @@ describe("AttackHandler", () => {
             expect(burns[0]?.amount).toBe(
                 fireforgedSwordDamage({
                     damageDealt: damage.amount,
-                    swordPercentage: 30,
+                    swordPercentage: 28,
                     targetMagicResist: 0,
                     targetIsFireElement: false,
                     targetIsWaterElement: false,
@@ -494,8 +494,8 @@ describe("AttackHandler", () => {
             placeUnit(grid, unitsHolder, target, { x: 2, y: 1 });
             fightProperties.setArtifactPerTeam(
                 PBTypes.TeamVals.RIGHT,
-                ArtifactTier.TIER_2,
-                Tier2Artifact.TOME_OF_AMPLIFICATION,
+                ArtifactTier.TIER_1,
+                Tier1Artifact.TOME_OF_AMPLIFICATION,
             );
             unitsHolder.applyArtifacts(fightProperties);
 
@@ -504,10 +504,10 @@ describe("AttackHandler", () => {
 
             expect(result.completed).toBe(true);
             expect(sourceSpell.getPower()).toBe(30);
-            expect(target.getBuff("Spiritual Armor")?.getPower()).toBe(45);
-            expect(target.getUnitProperties().applied_buffs_powers).toContain(45);
+            expect(target.getBuff("Spiritual Armor")?.getPower()).toBe(42);
+            expect(target.getUnitProperties().applied_buffs_powers).toContain(42);
             target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-            expect(target.getArmor()).toBeCloseTo(29);
+            expect(target.getArmor()).toBeCloseTo(28.4);
         });
 
         it("amplifies Helping Hand's allied benefit but not its caster debuff", () => {
@@ -533,8 +533,8 @@ describe("AttackHandler", () => {
             placeUnit(grid, unitsHolder, target, { x: 2, y: 1 });
             fightProperties.setArtifactPerTeam(
                 PBTypes.TeamVals.RIGHT,
-                ArtifactTier.TIER_2,
-                Tier2Artifact.TOME_OF_AMPLIFICATION,
+                ArtifactTier.TIER_1,
+                Tier1Artifact.TOME_OF_AMPLIFICATION,
             );
             unitsHolder.applyArtifacts(fightProperties);
 
@@ -543,12 +543,13 @@ describe("AttackHandler", () => {
 
             expect(result.completed).toBe(true);
             expect(sourceSpell.getPower()).toBe(30);
-            expect(target.getBuff("Helping Hand")?.getPower()).toBe(45);
+            expect(target.getBuff("Helping Hand")?.getPower()).toBe(42);
             expect(caster.getDebuff("Helping Hand")?.getPower()).toBe(30);
-            expect(target.getUnitProperties().applied_buffs_powers).toContain(45);
+            expect(target.getUnitProperties().applied_buffs_powers).toContain(42);
             target.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
             caster.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
-            expect(target.getMaxHp()).toBe(55);
+            expect(target.getMaxHp()).toBe(52);
+            // 42% of the Satyr's 20 armor is 8.4, and Helping Hand ceils that gift before adding it to the target's 10.
             expect(target.getBaseArmor()).toBe(19);
             expect(caster.getMaxHp()).toBe(70);
             expect(caster.getBaseArmor()).toBe(14);

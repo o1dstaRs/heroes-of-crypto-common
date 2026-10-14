@@ -15,6 +15,7 @@ import { ArmorAugment, MightAugment, MovementAugment, SniperAugment } from "../.
 import {
     ArtifactTier,
     formatArtifactDescription,
+    getTier1ArtifactProperties,
     getTier2ArtifactProperties,
     Tier1Artifact,
     Tier2Artifact,
@@ -351,6 +352,7 @@ describe("UnitsHolder", () => {
         ranged.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
 
         expect(melee.hasBuffActive("Tome of Amplification")).toBe(true);
+        expect(melee.getBuff("Tome of Amplification")?.getPower()).toBe(40);
         expect(melee.getBaseArmor()).toBeCloseTo(10.6);
         expect(melee.getBaseAttack()).toBeCloseTo(11.5);
         expect(melee.getSteps()).toBe(4);
@@ -361,8 +363,14 @@ describe("UnitsHolder", () => {
     });
 
     it("describes Tome as affecting only allied unit-cast buffs", () => {
+        const description =
+            "Increases the power of non-healing castable buffs allied units apply to allies by 40%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.";
+        expect(formatArtifactDescription(getTier1ArtifactProperties(Tier1Artifact.TOME_OF_AMPLIFICATION))).toBe(
+            description,
+        );
+        // A saved Tier-2 pick still names the same artifact, at the current power.
         expect(formatArtifactDescription(getTier2ArtifactProperties(Tier2Artifact.TOME_OF_AMPLIFICATION))).toBe(
-            "Increases the power of non-healing castable buffs allied units apply to allies by 50%. Does not affect healing, resurrection, augments, artifacts, auras, or passive effects.",
+            description,
         );
     });
 

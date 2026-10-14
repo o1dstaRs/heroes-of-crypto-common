@@ -807,7 +807,12 @@ function tier1ContextScore(id: number, own: IAiMetaArmyFeatures, opponent: IAiMe
     const ownGround = fraction(own.groundMelee, own.total);
     const opponentRanged = fraction(opponent.ranged, opponent.total);
     const opponentGround = fraction(opponent.groundMelee, opponent.total);
-    const base = id === Tier1Artifact.BARREL_BARRICADE ? 50 : (TIER1_ARTIFACT_WINRATE[id] ?? 50);
+    // Barrel Barricade has no measurement. Tome's 68.8 is the stale Tier-2 augment-amplifying bake, so the
+    // cohort scorer keeps it neutral and adds only the roster's castable-buff signal below.
+    const base =
+        id === Tier1Artifact.BARREL_BARRICADE || id === Tier1Artifact.TOME_OF_AMPLIFICATION
+            ? 50
+            : (TIER1_ARTIFACT_WINRATE[id] ?? 50);
     switch (id) {
         case Tier1Artifact.VETERAN_HELM:
             return base + 5 * (opponentGround + opponentRanged);
@@ -839,6 +844,8 @@ function tier1ContextScore(id: number, own: IAiMetaArmyFeatures, opponent: IAiMe
             return base + 8 * ownRanged;
         case Tier1Artifact.BROKEN_AEGIS:
             return base + 8 * fraction(opponent.auraCarriers + opponent.buffers, opponent.total);
+        case Tier1Artifact.TOME_OF_AMPLIFICATION:
+            return base + 15 * fraction(own.buffers, own.total);
         default:
             return base;
     }

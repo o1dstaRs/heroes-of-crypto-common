@@ -112,11 +112,12 @@ describe("ranked draft candidate Tier-2 override", () => {
                 playPanel(options).map((game) => game.record),
             ).options;
         expect(summarize(base)).not.toHaveProperty("candidateTier2Override");
-        expect(summarize({ ...base, candidateTier2Override: Tier2Artifact.TOME_OF_AMPLIFICATION })).toMatchObject({
-            candidateTier2Override: Tier2Artifact.TOME_OF_AMPLIFICATION,
+        expect(summarize({ ...base, candidateTier2Override: Tier2Artifact.ARCHMAGES_RING })).toMatchObject({
+            candidateTier2Override: Tier2Artifact.ARCHMAGES_RING,
         });
         expect(LIVE_TIER2_ARTIFACT_IDS).not.toContain(Tier2Artifact.HOLY_CROSS);
-        for (const invalid of [Tier2Artifact.HOLY_CROSS, 0, 99]) {
+        expect(LIVE_TIER2_ARTIFACT_IDS).not.toContain(Tier2Artifact.TOME_OF_AMPLIFICATION);
+        for (const invalid of [Tier2Artifact.HOLY_CROSS, Tier2Artifact.TOME_OF_AMPLIFICATION, 0, 99]) {
             expect(() =>
                 playRankedDraftGame(candidate, opponent, { ...base, candidateTier2Override: invalid }, 0),
             ).toThrow("candidateTier2Override");
