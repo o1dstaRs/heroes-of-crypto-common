@@ -20,6 +20,8 @@ import {
     getPickTeamView,
     getVisibleCreatureChoices,
     isPickSimComplete,
+    LIVE_TIER1_ARTIFACT_IDS,
+    LIVE_TIER2_ARTIFACT_IDS,
     transitionPickSim,
     type IPickSimState,
     type PickAction,
@@ -83,16 +85,16 @@ describe("pick_sim", () => {
             15,
             14,
             13, // four globally distinct L2 offers (16-creature pool: Battle Mage in, Zena out to L3)
-            14,
-            13, // left's distinct T1 pair (14-artifact live pool: Rime Charm joined tier 1)
-            14,
-            13, // right's distinct T1 pair
-            13,
-            12,
-            11, // lower T2 offer (13-artifact live pool: Gravechain joined tier 2)
-            13,
-            12,
-            11, // upper T2 offer
+            LIVE_TIER1_ARTIFACT_IDS.length,
+            LIVE_TIER1_ARTIFACT_IDS.length - 1, // left's distinct T1 pair
+            LIVE_TIER1_ARTIFACT_IDS.length,
+            LIVE_TIER1_ARTIFACT_IDS.length - 1, // right's distinct T1 pair
+            LIVE_TIER2_ARTIFACT_IDS.length,
+            LIVE_TIER2_ARTIFACT_IDS.length - 1,
+            LIVE_TIER2_ARTIFACT_IDS.length - 2, // lower T2 offer
+            LIVE_TIER2_ARTIFACT_IDS.length,
+            LIVE_TIER2_ARTIFACT_IDS.length - 1,
+            LIVE_TIER2_ARTIFACT_IDS.length - 2, // upper T2 offer
             12,
             11,
             10,

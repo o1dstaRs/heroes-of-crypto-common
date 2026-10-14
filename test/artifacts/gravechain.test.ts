@@ -512,3 +512,76 @@ for (const pierce of [false, true]) {
         expect(run(true) - ordinary).toBe(3);
     });
 }
+
+for (const ability of ["Double Punch", "Double Shot", "Crafted Double Shot", "Double Throw"]) {
+    test(`${ability} gives a failed chain a fresh independent roll on the next strike`, () => {
+        const melee = ability === "Double Punch";
+        const area = ability === "Double Throw";
+        const f = fixture({
+            attackType: melee ? PBTypes.AttackVals.MELEE : PBTypes.AttackVals.RANGE,
+            abilities: area ? ["Area Throw", ability] : [ability],
+        });
+        const target = f.add("Target", { x: melee ? 4 : 8, y: 7 });
+        const neighbor = f.add("Neighbor", { x: melee ? 5 : 9, y: 7 });
+        f.arm();
+        const initialHp = target.getCumulativeHp();
+        let firstHitHp: number | undefined;
+        let draw = 0;
+        setDeterministicRandomSource(() => {
+            const hp = target.getCumulativeHp();
+            if (hp < initialHp && firstHitHp === undefined) firstHitHp = hp;
+            const roll = firstHitHp !== undefined && hp < firstHitHp ? 0 : 99;
+            return draw++ % 2 === 0 ? 0 : roll / 0x100000000;
+        });
+        const damage = createVisibleDamage(target);
+        const result = melee
+            ? f.attackHandler.handleMeleeAttack(
+                  f.unitsHolder,
+                  new MoveHandler(f.grid.getSettings(), f.grid, f.unitsHolder),
+                  damage,
+                  undefined,
+                  f.attacker,
+                  target,
+                  f.attacker.getBaseCell(),
+              )
+            : f.attackHandler.handleRangeAttack(
+                  f.unitsHolder,
+                  [1],
+                  1,
+                  damage,
+                  f.attacker,
+                  [[target]],
+                  undefined,
+                  target.getPosition(),
+                  area,
+              );
+        expect(result.completed).toBe(true);
+        expect(firstHitHp).toBeDefined();
+        expect(target.getCumulativeHp()).toBeLessThan(firstHitHp!);
+        expect(target.hasDebuffActive("Gravebound")).toBe(true);
+        expect(neighbor.hasDebuffActive("Gravebound")).toBe(true);
+    });
+}
+
+test("a ranged counter-shot chains back onto the active attacker with the extra lap", () => {
+    const f = fixture({ attackType: PBTypes.AttackVals.RANGE });
+    const target = f.add("Responder", { x: 8, y: 7 }, { attackType: PBTypes.AttackVals.RANGE, rangeShots: 20 });
+    const ally = f.add("Ally", { x: 2, y: 7 }, { team: LEFT });
+    f.fight.setArtifactPerTeam(RIGHT, 2, Tier2Artifact.GRAVECHAIN);
+    f.unitsHolder.applyArtifacts(f.fight);
+    f.unitsHolder.refreshStackPowerForAllUnits();
+    setDeterministicRandomSource(() => 0);
+    const result = f.attackHandler.handleRangeAttack(
+        f.unitsHolder,
+        [1],
+        1,
+        createVisibleDamage(target),
+        f.attacker,
+        [[target]],
+        [f.attacker],
+        target.getPosition(),
+    );
+    expect(result.completed).toBe(true);
+    expect(f.attacker.getDebuff("Gravebound")?.getLaps()).toBe(4);
+    expect(ally.getDebuff("Gravebound")?.getLaps()).toBe(3);
+});
