@@ -578,6 +578,7 @@ export class UnitsHolder {
                 debuffDesc: string,
                 primary: number,
                 secondary?: number,
+                penaltyPower?: number,
             ): void => {
                 const buff = new Spell({
                     spellProperties: getSpellConfig("System", buffName, NUMBER_OF_LAPS_TOTAL),
@@ -592,11 +593,11 @@ export class UnitsHolder {
                     amount: 1,
                 });
                 debuff.setDesc([
-                    debuffDesc.replace(/\{\}/g, (secondary ?? primary).toString()),
+                    debuffDesc.replace(/\{\}/g, (penaltyPower ?? secondary ?? primary).toString()),
                     "Lasts till the end of the fight.",
                 ]);
                 debuff.setPower(0);
-                unit.applyDebuff(debuff, secondary);
+                unit.applyDebuff(debuff, penaltyPower ?? secondary);
             };
 
             // ---- Tier 1 stat artifacts ----
@@ -765,6 +766,16 @@ export class UnitsHolder {
                     break;
                 case Tier2Artifact.QUIVER_OF_ECHOES:
                     if (isRange) applyArtifactBuff("Quiver of Echoes", AP.QUIVER_OF_ECHOES_CHANCE);
+                    break;
+                case Tier2Artifact.GRAVECHAIN:
+                    applyDualArtifact(
+                        "Gravechain",
+                        `Artifact. Attacks have a {}% chance per enemy to inflict Gravebound, chaining through connected enemies up to ${AP.GRAVECHAIN_CONNECTIONS} links away: −25% movement for ${AP.GRAVECHAIN_SLOW_LAPS} laps. Failed rolls do not stop the chain.`,
+                        "Cursed: −{} movement step for every unit in the army.",
+                        AP.GRAVECHAIN_CHANCE,
+                        AP.GRAVECHAIN_SLOW_LAPS,
+                        AP.GRAVECHAIN_STEPS_PENALTY,
+                    );
                     break;
                 case Tier2Artifact.AEGIS_OF_THE_ARCANE:
                     applyArtifactBuff("Aegis of the Arcane", AP.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE);

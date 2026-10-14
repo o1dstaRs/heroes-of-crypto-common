@@ -31,6 +31,7 @@ export * from "./petrifying_gaze_ability";
 export * from "./predatory_assimilation_ability";
 export * from "./rapid_charge_ability";
 export * from "./rime_charm_ability";
+export * from "./gravechain_ability";
 export * from "./shatter_armor_ability";
 export * from "./skewer_strike_ability";
 export * from "./spit_ball_ability";

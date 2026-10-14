@@ -888,6 +888,7 @@ function tier2ContextScore(
         case Tier2Artifact.TOME_OF_AMPLIFICATION:
             return base + 15 * fraction(own.buffers, own.total);
         case Tier2Artifact.RIME_CHARM:
+        case Tier2Artifact.GRAVECHAIN:
             return base + 13 * opponentGround;
         case Tier2Artifact.LAVA_STRIDERS:
             return base + (map === PBTypes.GridVals.LAVA_CENTER ? 48 : 0);

@@ -87,12 +87,12 @@ describe("pick_sim", () => {
             13, // left's distinct T1 pair (14-artifact live pool: Rime Charm joined tier 1)
             14,
             13, // right's distinct T1 pair
+            13,
             12,
-            11,
-            10, // lower T2 offer (12-artifact live pool: Rime Charm left tier 2)
+            11, // lower T2 offer (13-artifact live pool: Gravechain joined tier 2)
+            13,
             12,
-            11,
-            10, // upper T2 offer
+            11, // upper T2 offer
             12,
             11,
             10,

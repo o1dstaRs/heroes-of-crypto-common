@@ -171,7 +171,7 @@ describe("Arcane rings — draft pool", () => {
     it("is offered by the live pick, both tiers", () => {
         expect(LIVE_TIER1_ARTIFACT_IDS).toContain(Tier1Artifact.MAGES_RING);
         expect(LIVE_TIER1_ARTIFACT_COUNT).toBe(Tier1Artifact.RIME_CHARM);
-        expect(LIVE_TIER2_ARTIFACT_COUNT).toBe(Tier2Artifact.QUIVER_OF_ECHOES);
+        expect(LIVE_TIER2_ARTIFACT_COUNT).toBe(Math.max(...TIER2_ARTIFACT_LIST.map((artifact) => artifact.id)));
     });
 
     it("shows up in the selection lists the pick UI builds", () => {

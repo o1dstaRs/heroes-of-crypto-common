@@ -66,6 +66,7 @@ export enum Tier2Artifact {
     RIME_CHARM = 11, // 30% plus the attacking unit's current luck to slow a target for 3 laps
     LAVA_STRIDERS = 12, // all units may move over lava
     QUIVER_OF_ECHOES = 15, // One extra ranged attack, 40% + current luck chance
+    GRAVECHAIN = 16,
     AEGIS_OF_THE_ARCANE = 14, // extra magic-defense roll (army-wide), combined, not added
     ARCHMAGES_RING = 13, // +20% magic damage (army-wide); Tier-2 half of the arcane pair
 }
@@ -121,6 +122,7 @@ export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
     "13": Tier2Artifact.ARCHMAGES_RING,
     "14": Tier2Artifact.AEGIS_OF_THE_ARCANE,
     "15": Tier2Artifact.QUIVER_OF_ECHOES,
+    "16": Tier2Artifact.GRAVECHAIN,
 };
 
 // Effect magnitudes. Centralised here so balance tuning happens in one place.
@@ -174,6 +176,10 @@ export const ARTIFACT_POWER = {
     // 1 − Π(1 − p) — the same formula as Magic Shield. Not points added onto that defense.
     AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE: 18,
     QUIVER_OF_ECHOES_CHANCE: 40,
+    GRAVECHAIN_CHANCE: 50,
+    GRAVECHAIN_SLOW_LAPS: 3,
+    GRAVECHAIN_CONNECTIONS: 3,
+    GRAVECHAIN_STEPS_PENALTY: 1,
 } as const;
 
 export interface ArtifactProperties {
@@ -432,6 +438,13 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "Quiver of Echoes",
         "Ranged units have a {}% chance to make one extra attack.",
     ),
+    [Tier2Artifact.GRAVECHAIN]: t2(
+        Tier2Artifact.GRAVECHAIN,
+        "gravechain",
+        "Gravechain",
+        "Gravechain",
+        "Cursed: attacks have a {}% chance per enemy to inflict Gravebound on the target and connected enemies up to <> links away, reducing movement by 25% for [] laps. Failed rolls do not stop the chain. Every unit in your army loses {} movement step.",
+    ),
     [Tier2Artifact.AEGIS_OF_THE_ARCANE]: t2(
         Tier2Artifact.AEGIS_OF_THE_ARCANE,
         "aegis_of_the_arcane",
@@ -483,6 +496,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     archmages_ring: [AP.ARCHMAGES_RING_MAGIC_PERCENT],
     aegis_of_the_arcane: [AP.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE],
     quiver_of_echoes: [AP.QUIVER_OF_ECHOES_CHANCE],
+    gravechain: [AP.GRAVECHAIN_CHANCE, AP.GRAVECHAIN_CONNECTIONS, AP.GRAVECHAIN_SLOW_LAPS, AP.GRAVECHAIN_STEPS_PENALTY],
 };
 
 // Human-readable effect text with the real numbers substituted in (the raw `description` keeps `{}`/`[]`

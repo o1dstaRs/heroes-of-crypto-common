@@ -35,6 +35,7 @@ import { processParalysisAbility } from "./paralysis_ability";
 import { processPegasusLightAbility } from "./pegasus_light_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
+import { processGravechainAbility } from "./gravechain_ability";
 import { processShatterArmorAbility } from "./shatter_armor_ability";
 import { processStunAbility } from "./stun_ability";
 import { processFreezeAbility } from "./freeze_ability";
@@ -65,6 +66,8 @@ export function processSkewerStrikeAbility(
     targetMovePosition?: HoCMath.XY,
     isAttack = true,
     secondaryDamage?: ISecondaryDamage[],
+    currentActiveUnit: Unit = fromUnit,
+    gravechainTargets = new Set<string>(),
 ): ISkewerStrikeResult {
     if (!fromUnit.getAbility("Skewer Strike")) {
         return { increaseMorale: 0, unitIdsDied: [], moraleDecreaseForTheUnitTeam: {}, secondaryDamages: [] };
@@ -88,6 +91,8 @@ export function processSkewerStrikeAbility(
         damageStatisticHolder,
         isAttack,
         secondaryDamage,
+        currentActiveUnit,
+        gravechainTargets,
     );
 }
 
@@ -105,6 +110,8 @@ export function strikeSkewerTargets(
     damageStatisticHolder: IStatisticHolder<IDamageStatistic>,
     isAttack = true,
     secondaryDamage?: ISecondaryDamage[],
+    currentActiveUnit: Unit = fromUnit,
+    gravechainTargets = new Set<string>(),
 ): ISkewerStrikeResult {
     const unitIdsDied: string[] = [];
     const skewerStrikeAbility = fromUnit.getAbility("Skewer Strike");
@@ -224,6 +231,17 @@ export function strikeSkewerTargets(
                 HoCLib.killTag(Math.max(0, amountBefore - amountAfter)),
         );
 
+        if (!waterShieldAbsorbed) {
+            processGravechainAbility(
+                fromUnit,
+                nextStandingTarget,
+                grid,
+                unitsHolder,
+                sceneLog,
+                currentActiveUnit,
+                gravechainTargets,
+            );
+        }
         if (nextStandingTarget.isDead()) {
             unitsDead.push(nextStandingTarget);
         }

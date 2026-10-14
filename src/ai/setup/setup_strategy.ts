@@ -211,6 +211,8 @@ export const TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED: Record<number, number
  * change and has not been remeasured.
  */
 export const TIER2_ARTIFACT_WINRATE: Record<number, number> = {
+    // Unmeasured artifact: neutral prior until cohort evidence is available.
+    [Tier2Artifact.GRAVECHAIN]: 50,
     [Tier2Artifact.TOME_OF_AMPLIFICATION]: 68.8,
     [Tier2Artifact.TITAN_PLATE]: 63.9,
     [Tier2Artifact.WARLORDS_EDGE]: 63.7,

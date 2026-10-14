@@ -25,6 +25,7 @@ import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processPetrifyingGazeAbility } from "./petrifying_gaze_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
+import { processGravechainAbility } from "./gravechain_ability";
 import { processSpitBallAbility } from "./spit_ball_ability";
 import { processStunAbility } from "./stun_ability";
 import { processFreezeAbility } from "./freeze_ability";
@@ -264,7 +265,19 @@ export function processRangeAOEAbility(
             }
         }
 
+        const gravechainTargets = new Set<string>();
         for (const unit of affectedUnits) {
+            if (landedHitUnitIds.has(unit.getId())) {
+                processGravechainAbility(
+                    attackerUnit,
+                    unit,
+                    grid,
+                    unitsHolder,
+                    sceneLog,
+                    currentActiveUnit,
+                    gravechainTargets,
+                );
+            }
             if (unit.isDead()) {
                 if (!wasDead.includes(unit)) {
                     if (!unitIdsDied.includes(unit.getId())) {

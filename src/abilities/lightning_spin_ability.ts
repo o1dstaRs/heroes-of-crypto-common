@@ -27,6 +27,7 @@ import { processFireShieldAbility } from "./fire_shield_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
 import { processOneInTheFieldAbility } from "./one_in_the_field_ability";
 import { processRimeCharmAbility } from "./rime_charm_ability";
+import { processGravechainAbility } from "./gravechain_ability";
 import { processStunAbility } from "./stun_ability";
 import { processFreezeAbility } from "./freeze_ability";
 import { processBlindnessAbility } from "./blindness_ability";
@@ -84,6 +85,7 @@ export function processLightningSpinAbility(
     // The unit whose turn it is. A retaliating spin also strikes the attacker, and a Stun, Freeze or Rime Charm
     // landed on it then gets the extra lap every effect landed mid-turn gets.
     currentActiveUnit: Unit = fromUnit,
+    gravechainTargets = new Set<string>(),
 ): ILightningSpinResult {
     const unitIdsDied: string[] = [];
     let lightningSpinLanded = false;
@@ -263,6 +265,17 @@ export function processLightningSpinAbility(
                     HoCLib.killTag(unitsKilled),
             );
 
+            if (grid && !waterShieldAbsorbed) {
+                processGravechainAbility(
+                    fromUnit,
+                    enemy,
+                    grid,
+                    unitsHolder,
+                    sceneLog,
+                    currentActiveUnit,
+                    gravechainTargets,
+                );
+            }
             if (enemy.isDead()) {
                 unitsDead.push(enemy);
             } else if (!waterShieldAbsorbed) {

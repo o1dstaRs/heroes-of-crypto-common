@@ -1873,6 +1873,16 @@ export class AttackHandler {
                 }
             }
 
+            if (!isAttackMissed && !rangeAttackAbsorbed && !aoeRangeAttackResult?.landed) {
+                AllAbilities.processGravechainAbility(
+                    attackerUnit,
+                    targetUnit,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    attackerUnit,
+                );
+            }
             if (!targetUnit.isDead() && !isAttackMissed && !rangeAttackAbsorbed) {
                 // On-hit effects only land when the shot itself did: a dodged/missed shot (Dodge /
                 // Small Specie / Boar Saliva) must not stun/petrify/etc. — mirrors the melee path,
@@ -1963,6 +1973,16 @@ export class AttackHandler {
         }
 
         if (rangeResponseUnit) {
+            if (!aoeRangeResponseResult?.landed && !isResponseMissed && !rangeResponseAbsorbed) {
+                AllAbilities.processGravechainAbility(
+                    targetUnit,
+                    rangeResponseUnit,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    attackerUnit,
+                );
+            }
             if (aoeRangeResponseResult?.landed) {
                 if (rangeResponseUnit.isDead() && attackerUnit.getId() === rangeResponseUnit.getId()) {
                     unitIdsDied.push(rangeResponseUnit.getId());
@@ -2204,6 +2224,16 @@ export class AttackHandler {
         }
 
         if (!secondShotResult.aoeRangeAttackLanded) {
+            if (secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
+                AllAbilities.processGravechainAbility(
+                    attackerUnit,
+                    targetUnit,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    attackerUnit,
+                );
+            }
             if (!targetUnit.isDead() && secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
                 // The second shot is a second attack, so it sets the target alight again on its own
                 // damage. It rides with the other on-hit riders here and under the same gate.
@@ -2598,6 +2628,7 @@ export class AttackHandler {
 
         // Everything the three sweeping abilities below damage gets the blade afterwards; remember where
         // their entries start so the burn only reads this exchange's victims.
+        const gravechainAttackTargets = new Set<string>();
         const sweepSecondaryFromIndex = (damageForAnimation.secondary ??= []).length;
         const lightningSpinAttackResult = AllAbilities.processLightningSpinAbility(
             attackerUnit,
@@ -2609,6 +2640,8 @@ export class AttackHandler {
             true,
             (damageForAnimation.secondary ??= []),
             this.grid,
+            attackerUnit,
+            gravechainAttackTargets,
         );
         const hasLightningSpinAttackLanded = lightningSpinAttackResult.landed;
         updateUnitsDied(lightningSpinAttackResult.unitIdsDied);
@@ -2649,6 +2682,8 @@ export class AttackHandler {
             attackFromCell,
             true,
             (damageForAnimation.secondary ??= []),
+            attackerUnit,
+            gravechainAttackTargets,
         );
         updateUnitsDied(skewerStrikeAttackResult.unitIdsDied);
         this.updateMoraleDecreaseForTheUnitTeam(
@@ -2768,6 +2803,7 @@ export class AttackHandler {
                     );
 
                 // Same as the attack side: mark where the response sweeps' victims begin.
+                const gravechainResponseTargets = new Set<string>();
                 const responseSweepSecondaryFromIndex = (damageForAnimation.secondary ??= []).length;
                 const fireBreathResponseResult = AllAbilities.processFireBreathAbility(
                     targetUnit,
@@ -2797,6 +2833,8 @@ export class AttackHandler {
                     targetUnit.getBaseCell(),
                     false,
                     (damageForAnimation.secondary ??= []),
+                    attackerUnit,
+                    gravechainResponseTargets,
                 );
                 updateUnitsDied(skewerStrikeResponseResult.unitIdsDied);
                 this.updateMoraleDecreaseForTheUnitTeam(
@@ -2825,6 +2863,7 @@ export class AttackHandler {
                     (damageForAnimation.secondary ??= []),
                     this.grid,
                     attackerUnit,
+                    gravechainResponseTargets,
                 );
                 hasLightningSpinResponseLanded = lightningSpinResponseResult.landed;
                 updateUnitsDied(lightningSpinResponseResult.unitIdsDied);
@@ -3032,6 +3071,15 @@ export class AttackHandler {
                         AllAbilities.processPegasusLightAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processParalysisAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         AllAbilities.processRimeCharmAbility(targetUnit, attackerUnit, this.sceneLog, attackerUnit);
+                        AllAbilities.processGravechainAbility(
+                            targetUnit,
+                            attackerUnit,
+                            this.grid,
+                            unitsHolder,
+                            this.sceneLog,
+                            attackerUnit,
+                            gravechainResponseTargets,
+                        );
                         AllAbilities.processBlindnessAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         updateUnitsDied(
                             AllAbilities.processChainLightningAbility(
@@ -3170,6 +3218,15 @@ export class AttackHandler {
                     this.sceneLog,
                 );
                 AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                AllAbilities.processGravechainAbility(
+                    attackerUnit,
+                    targetUnit,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    attackerUnit,
+                    gravechainAttackTargets,
+                );
                 // Blindness rides the blow the Unicorn strikes as well as the one it answers — it used to
                 // fire only from the response path, so a Unicorn that opened the exchange blinded nobody.
                 AllAbilities.processBlindnessAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
@@ -3317,6 +3374,14 @@ export class AttackHandler {
                 AllAbilities.processFreezeAbility(attackerUnit, targetUnit, attackerUnit, this.sceneLog);
                 // Rime Charm rolls on every hit your units land — the second punch included.
                 AllAbilities.processRimeCharmAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
+                AllAbilities.processGravechainAbility(
+                    attackerUnit,
+                    targetUnit,
+                    this.grid,
+                    unitsHolder,
+                    this.sceneLog,
+                    attackerUnit,
+                );
                 AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
                     attackerUnit,

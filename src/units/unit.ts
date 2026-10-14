@@ -1413,6 +1413,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             ARTIFACT_POWER.RIME_PROC_PERCENT;
         return Math.max(0, Math.min(100, power + this.getLuck()));
     }
+    public getGravechainChance(): number {
+        if (!this.hasBuffActive("Gravechain")) return 0;
+        const power = this.getBuffPower("Gravechain") ?? ARTIFACT_POWER.GRAVECHAIN_CHANCE;
+        return Math.max(0, Math.min(100, power + this.getLuck()));
+    }
     private refreshQuiverOfEchoesDescription(): void {
         const index = this.unitProperties.applied_buffs.indexOf("Quiver of Echoes");
         if (index < 0) return;
@@ -1427,6 +1432,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const laps = Number(properties[1]) || ARTIFACT_POWER.RIME_SLOW_LAPS;
         this.unitProperties.applied_buffs_descriptions[index] =
             `Artifact. ${this.getRimeCharmChance()}% chance for any attack to slow the target for ${laps} laps.;${properties.join(";")}`;
+    }
+    private refreshGravechainDescription(): void {
+        const index = this.unitProperties.applied_buffs.indexOf("Gravechain");
+        if (index < 0) return;
+        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        const laps = Number(properties[1]) || ARTIFACT_POWER.GRAVECHAIN_SLOW_LAPS;
+        this.unitProperties.applied_buffs_descriptions[index] =
+            `Artifact. Attacks have a ${this.getGravechainChance()}% chance per enemy to inflict Gravebound, chaining through connected enemies up to ${ARTIFACT_POWER.GRAVECHAIN_CONNECTIONS} links away: −25% movement for ${laps} laps. Failed rolls do not stop the chain.;${properties.join(";")}`;
     }
     public projectRangeShotsAfterVolleys(target?: Unit, volleys = 1): number {
         const cost = projectShotCost(this, target) * Math.max(0, volleys);
@@ -3878,6 +3891,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         this.refreshQuiverOfEchoesDescription();
         this.refreshRimeCharmDescription();
+        this.refreshGravechainDescription();
 
         // MDEF
         this.unitProperties.magic_resist = madeOfFireBuff
@@ -4022,6 +4036,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (crownOfCommandStepsBuff) {
             this.unitProperties.steps += crownOfCommandStepsBuff.getPower();
         }
+        if (statBuffs.has("Gravechain")) {
+            this.unitProperties.steps -= ARTIFACT_POWER.GRAVECHAIN_STEPS_PENALTY;
+        }
         const battleRoarBuff = statBuffs.get("Battle Roar");
         if (battleRoarBuff) {
             this.unitProperties.steps_mod += battleRoarBuff.getPower();
@@ -4042,10 +4059,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         const quagmireDebuff = this.getDebuff("Quagmire");
+        const graveboundDebuff = this.getDebuff("Gravebound");
         const hamstrungDebuff = this.getDebuff("Hamstrung");
         let stepsMultiplier = 1;
         if (quagmireDebuff) {
             stepsMultiplier *= (100 - quagmireDebuff.getPower()) / 100;
+        }
+        if (graveboundDebuff) {
+            stepsMultiplier *= (100 - graveboundDebuff.getPower()) / 100;
         }
         if (hamstrungDebuff) {
             stepsMultiplier *= (100 - hamstrungDebuff.getPower()) / 100;
