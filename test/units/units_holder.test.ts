@@ -423,6 +423,7 @@ describe("UnitsHolder", () => {
             team: PBTypes.TeamVals.LEFT,
             attackType: PBTypes.AttackVals.RANGE,
             rangeShots: 3,
+            shotDistance: 4,
         });
         const melee = createTestUnit({ team: PBTypes.TeamVals.LEFT });
         const fightProperties = FightStateManager.getInstance().getFightProperties();
@@ -437,8 +438,13 @@ describe("UnitsHolder", () => {
         // Swift Boots grants movement to melee units only.
         expect(melee.hasBuffActive("Swift Boots")).toBe(true);
         expect(ranged.hasBuffActive("Swift Boots")).toBe(false);
-        // Farsight Quiver is applied to every unit as a marker (read at range-attack time).
+        // Farsight Quiver is a marker read at range-attack time. It does not extend shot distance.
         expect(ranged.hasBuffActive("Farsight Quiver")).toBe(true);
+        ranged.adjustBaseStats(false, 1, 0, 0, 0, 0, 0, 0);
+        expect(ranged.getRangeShotDistance()).toBe(4);
+        expect(formatArtifactDescription(getTier2ArtifactProperties(Tier2Artifact.FARSIGHT_QUIVER))).toBe(
+            "Allied archers ignore the range penalty and always deal full damage (1/1). A shot through Smoke is still halved (1/2).",
+        );
     });
 
     it("clears artifact buffs when the selection is reset", () => {

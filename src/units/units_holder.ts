@@ -733,7 +733,12 @@ export class UnitsHolder {
                     applyArtifactBuff("Giants Maul", AP.GIANTS_MAUL_AOE_PERCENT);
                     break;
                 case Tier2Artifact.FARSIGHT_QUIVER:
-                    applyArtifactBuff("Farsight Quiver", AP.FARSIGHT_QUIVER_RANGE_PERCENT);
+                    // Use native shooting or its ability grant, not the selected attack or stale stats:
+                    // artifacts refresh before stats after gaining/losing a stolen Endless Quiver.
+                    if (isRange || unit.hasAbilityActive("Endless Quiver")) {
+                        // Marker only. Range falloff skips its bands; smoke still doubles.
+                        applyArtifactBuff("Farsight Quiver", 0);
+                    }
                     break;
                 case Tier2Artifact.TOME_OF_AMPLIFICATION:
                     // Retired id. A saved game that drafted the tome as Tier 2 still receives the buff,

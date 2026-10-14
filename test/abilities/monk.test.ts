@@ -146,7 +146,7 @@ describe("Borrowed Grace", () => {
         expect(borrowedGraceChance(makeMonk(5), 0)).toBe(70);
     });
 
-    it("takes a cast buff off the target and wears it with the laps it had left", () => {
+    it("copies a cast buff and leaves it on the target with the laps it had left", () => {
         const monk = makeMonk(5);
         const target = createTestUnit({ name: "Target", team: PBTypes.TeamVals.RIGHT });
         castBuff(target, "Life", "Blessing");
@@ -156,7 +156,7 @@ describe("Borrowed Grace", () => {
         const stolen = processBorrowedGraceAbility(monk, target, new SceneLogMock());
 
         expect(stolen?.buffName).toBe("Blessing");
-        expect(target.getBuff("Blessing")).toBeUndefined();
+        expect(target.getBuff("Blessing")?.getLaps()).toBe(laps);
         expect(monk.getBuff("Blessing")?.getLaps()).toBe(laps);
     });
 
@@ -386,8 +386,8 @@ describe("Absolving Arrow", () => {
         expect(enemy.isDead()).toBe(false);
         // Absolving Arrow cleansed the ally the arrow crossed...
         expect(ally.hasEffectActive("Stun")).toBe(false);
-        // ...and Borrowed Grace moved the target's blessing onto the Monk.
-        expect(enemy.getBuff("Blessing")).toBeUndefined();
+        // ...and Borrowed Grace copied the target's blessing onto the Monk.
+        expect(enemy.getBuff("Blessing")).toBeDefined();
         expect(monk.getBuff("Blessing")).toBeDefined();
     });
 

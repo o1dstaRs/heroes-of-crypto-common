@@ -205,9 +205,9 @@ export class AttackHandler {
         // whole cells, not circles — the board floors the fractional shot_distance stat (which the unit card
         // and the left sidebar keep showing unrounded) and measures in king moves, so a 6.5 archer deals a
         // full 1/1 to every cell inside the 6-cell square around it, 1/2 out to 12 cells, and so on.
-        // Only the Sniper ability negates falloff entirely. Farsight Quiver no longer removes falloff —
-        // instead it extends the archer's basic shot_distance (adjustBaseStats), pushing these bands out.
-        if (!attackerUnit.hasAbilityActive("Sniper")) {
+        // Sniper and Farsight Quiver both skip these bands, so the shot stays 1/1 at any distance.
+        // Smoke is applied later, on the ray, and still doubles this divisor once.
+        if (!attackerUnit.hasAbilityActive("Sniper") && !attackerUnit.hasBuffActive("Farsight Quiver")) {
             const bandCells = GridMath.getWholeCellShotDistance(attackerUnit.getRangeShotDistance());
             if (bandCells > 0) {
                 let cellsAway = GridMath.getShotCellDistance(
@@ -1839,8 +1839,8 @@ export class AttackHandler {
                     damageFromAttack,
                     this.sceneLog,
                 );
-                // ABILITY Borrowed Grace (Monk): a landed shot takes one active buff off the target and
-                // wears it. An on-hit rider like the ones above — a missed or lethal shot takes nothing.
+                // ABILITY Borrowed Grace (Monk): a landed shot copies one active buff from the target and
+                // wears the copy. The target keeps the original. A missed or lethal shot copies nothing.
                 if (!splashLanded) {
                     AllAbilities.processBorrowedGraceAbility(attackerUnit, targetUnit, this.sceneLog, attackerUnit);
                 }
@@ -1910,7 +1910,7 @@ export class AttackHandler {
                         this.grid,
                         this.sceneLog,
                     );
-                    // A Monk that shoots BACK steals just the same — the theft rides the landed shot, not
+                    // A Monk that shoots BACK copies just the same — the copy rides the landed shot, not
                     // the initiative (mirrors Predatory Assimilation's response branch).
                     AllAbilities.processBorrowedGraceAbility(
                         targetUnit,
@@ -3975,8 +3975,9 @@ export class AttackHandler {
         // Smoke (Smoke spell): once the ray has crossed ANY smoked cell, every subsequent target on this shot
         // takes half damage. The cloud is neutral — applies to ranged attacks of BOTH teams. We track the flag
         // across the whole trajectory (not per-cell) so a single arrow piercing multiple targets after the
-        // smoke stays halved for all of them, matching the user's "arrow becomes 1/2, then 1/4..." intent: the
-        // existing range-falloff divisor already doubles per shot-distance, and smoke doubles it once more.
+        // smoke stays halved for all of them. Falloff has already doubled per band, and smoke doubles that
+        // once more (1/1 becomes 1/2, 1/2 becomes 1/4). Farsight Quiver skips the bands, so smoke alone
+        // makes its shot 1/2.
         const smokeClouds = FightStateManager.getInstance().getFightProperties().getSmokeClouds();
         // AI planning can project a not-yet-cast cloud without touching FightProperties. Hypothetical cells
         // supplement (rather than replace) live smoke, so the same evaluator is truthful in later laps too.

@@ -435,7 +435,7 @@ function logAction(action: BasicAIAction | undefined, debug: boolean) {
  * Pick the best range-attack target for a ranged unit.
  *
  * Scoring accounts for the unit's passive abilities:
- * - Sniper: ignores distance penalty
+ * - Sniper and Farsight Quiver: ignore the distance penalty (smoke is not scored here)
  * - Large Caliber / Area Throw (Cyclops, Gargantuan): bonus for clustered enemies around the target
  * - Through Shot (Tsar Cannon): bonus for enemies lined up beyond the target
  * - Double Shot (Gargantuan, other double shotters): flat damage multiplier
@@ -469,6 +469,7 @@ function findRangeAttackAction(
     const isThroughShot = unit.hasAbilityActive("Through Shot");
     const isDoubleShot = hasDoubleShotAbility(unit);
     const isSniper = unit.hasAbilityActive("Sniper");
+    const ignoresDistancePenalty = isSniper || unit.hasBuffActive?.("Farsight Quiver") === true;
     const shotDistance = unit.getRangeShotDistance();
     if (shotDistance <= 0 && !isSniper) {
         return undefined;
@@ -479,7 +480,7 @@ function findRangeAttackAction(
     // a band worse than the engine actually resolves them.
     const shotBandCells = GridMath.getWholeCellShotDistance(shotDistance);
     // Range attacks cap the divisor at 8x (every additional shotDistance beyond the 3rd is wasted).
-    const maxRangeCells = isSniper ? Infinity : shotBandCells * 4;
+    const maxRangeCells = ignoresDistancePenalty ? Infinity : shotBandCells * 4;
 
     let bestTarget: HoCMath.XY | undefined;
     let bestScore = -1;
@@ -496,7 +497,7 @@ function findRangeAttackAction(
             const targetCell = { x: x, y: y };
             const distanceCells = Math.max(Math.abs(targetCell.x - unitCell.x), Math.abs(targetCell.y - unitCell.y));
 
-            if (!isSniper && distanceCells > maxRangeCells) {
+            if (!ignoresDistancePenalty && distanceCells > maxRangeCells) {
                 continue;
             }
 
@@ -530,7 +531,7 @@ function findRangeAttackAction(
             }
 
             let divisor = 1;
-            if (!isSniper && shotBandCells > 0) {
+            if (!ignoresDistancePenalty && shotBandCells > 0) {
                 let d = distanceCells;
                 while (d > shotBandCells) {
                     d -= shotBandCells;

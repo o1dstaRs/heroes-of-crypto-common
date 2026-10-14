@@ -22,7 +22,7 @@ import { isEquipmentOrMarkerSpellName } from "./ability_helper";
 export const BORROWED_GRACE_NAME = "Borrowed Grace";
 
 /**
- * The chance a single-stack Monk lands the theft. The ability's own power is the chance at
+ * The chance a single-stack Monk lands the copy. The ability's own power is the chance at
  * MAX_UNIT_STACK_POWER, and the stacks in between interpolate — 20 / 32.5 / 45 / 57.5 / 70.
  *
  * This is deliberately NOT Unit.calculateAbilityApplyChance (power/5 * stack, i.e. 14 at one stack): the
@@ -58,10 +58,9 @@ export function borrowedGraceChance(thief: Unit, synergyAbilityPowerIncrease: nu
 }
 
 /**
- * Whether one applied buff can be taken off its owner: a cast blessing can, worn equipment and engine
- * markers cannot (isEquipmentOrMarkerSpellName), and neither can an aura's grant — an aura is re-applied
- * on the very next refresh with Number.MAX_SAFE_INTEGER laps, so "stealing" it would be a no-op that
- * still burned the roll.
+ * Whether one applied buff can be copied: a cast blessing can, worn equipment and engine markers cannot
+ * (isEquipmentOrMarkerSpellName), and neither can an aura's grant — an aura is re-applied on the very
+ * next refresh with Number.MAX_SAFE_INTEGER laps, so copying it would be a no-op that still burned the roll.
  */
 export function isTakeableBuff(buff: AppliedSpell): boolean {
     if (buff.getLaps() <= 0 || buff.getLaps() === Number.MAX_SAFE_INTEGER) {
@@ -72,10 +71,10 @@ export function isTakeableBuff(buff: AppliedSpell): boolean {
 }
 
 /**
- * Resolves the theft for ONE landed shot: with the stack-scaled chance above, one random active buff is
- * taken off the target and worn by the Monk for whatever duration the buff had left. The active thief's
- * end-of-turn tick is compensated; a counter-shot does not extend the duration. Nothing happens when
- * the target carries no takeable buff — the shot is not "wasted", it simply had nothing to take.
+ * Resolves the copy for ONE landed shot: with the stack-scaled chance above, one random active buff is
+ * worn by the Monk for whatever duration the buff had left. The target keeps the original. The active
+ * copier's end-of-turn tick is compensated; a counter-shot does not extend the duration. Nothing happens
+ * when the target carries no copyable buff — the shot is not "wasted", it simply had nothing to copy.
  */
 export function processBorrowedGraceAbility(
     thief: Unit,
@@ -105,7 +104,7 @@ export function processBorrowedGraceAbility(
         return undefined;
     }
 
-    sceneLog.updateLog(`${thief.getName()} took ${selected.getName()} from ${target.getName()}`);
+    sceneLog.updateLog(`${thief.getName()} copied ${selected.getName()} from ${target.getName()}`);
 
     return { thiefId: thief.getId(), targetId: target.getId(), buffName: selected.getName() };
 }

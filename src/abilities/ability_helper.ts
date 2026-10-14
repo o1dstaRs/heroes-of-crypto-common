@@ -159,7 +159,7 @@ export const abilityToTextureName = (abilityName: string): string =>
 /**
  * Buffs and debuffs that are NOT a cast blessing or a landed curse: army equipment (artifacts, augments)
  * and the engine's own per-lap markers. They live in the same applied_buffs/applied_debuffs lists as real
- * spells, so anything that moves or lifts an entry (Borrowed Grace, Absolving Arrow) has to skip them —
+ * spells, so anything that copies or lifts an entry (Borrowed Grace, Absolving Arrow) has to skip them —
  * an artifact is worn, not cast, and a marker is rewritten by the next stat recompute anyway.
  *
  * Aura-applied entries are NOT listed here: they are recognised by their Number.MAX_SAFE_INTEGER laps

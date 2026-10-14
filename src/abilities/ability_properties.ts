@@ -74,8 +74,9 @@ export enum AbilityPowerType {
     // Projected magic armor from an aura or army passive. Unlike the fixed MAGIC_RESIST_25/50/100 abilities,
     // this is a stack-powered percentage folded into the holder's own magic resist as an independent roll.
     ADDITIONAL_MAGIC_RESIST_PERCENTAGE = 61,
-    // Takes an active (spell-cast) buff off the unit that was just shot and wears it for the rest of its
-    // duration. Auras, artifacts and augments are not takeable — see borrowed_grace_ability.ts.
+    // Copies an active (spell-cast) buff from the unit that was just shot and wears the copy for the rest
+    // of its duration. The target keeps the original. Auras, artifacts and augments are not copyable — see
+    // borrowed_grace_ability.ts.
     STEAL_BUFF = 62,
     // Lifts negative effects off the ALLIES a shot flies through, on the way to the enemy it was aimed at.
     DISPEL_ON_TRAJECTORY = 63,
@@ -84,9 +85,9 @@ export enum AbilityPowerType {
     // shield the holder: the spell still lands on it in full, and the caster takes the same damage and effects
     // on top.
     MAGIC_MIRROR_REFLECT = 64,
-    // Aura-only shot range. A percentage added onto the affected archer's BASE shot_distance, the same
-    // shape as the Farsight Quiver artifact — it pushes the range-falloff threshold out rather than
-    // removing falloff.
+    // Aura-only shot range. A percentage added onto the affected archer's BASE shot_distance. It
+    // pushes the range-falloff threshold out rather than removing falloff. Farsight Quiver is the
+    // artifact that removes falloff; a shot through smoke is still halved.
     ADDITIONAL_SHOT_DISTANCE_PERCENTAGE = 65,
     // Throws a vine that both paints the board and snares. The behaviour lives in the cast
     // (action_engine.vineThrowCast) rather than in a stat hook, but the type still has to be declared:

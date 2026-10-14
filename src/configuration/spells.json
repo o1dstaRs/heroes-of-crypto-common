@@ -775,7 +775,7 @@
             "name": "Farsight Quiver",
             "level": 0,
             "desc": [
-                "Artifact. Extends allied archers' basic shot range by an additional {}%.",
+                "Artifact. Allied archers ignore the range penalty and always deal full damage (1/1). A shot through Smoke is still halved (1/2).",
                 "Lasts till the end of the fight."
             ],
             "target": "ALL_ALLIES",

@@ -25,7 +25,7 @@ import {
 import { createTestUnit } from "../helpers/combat";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
 
-// Borrowed Grace (the Monk's buff-steal shot) must never take team-setup state off a unit: augment
+// Borrowed Grace (the Monk's buff-copy shot) must never copy team-setup state off a unit: augment
 // buffs are worn "* Augment" System spells, and synergies must never exist as unit buffs at all.
 describe("Borrowed Grace setup-state exclusions", () => {
     const AUGMENT_BUFFS = ["Armor Augment", "Might Augment", "Empower Augment", "Sniper Augment", "Movement Augment"];

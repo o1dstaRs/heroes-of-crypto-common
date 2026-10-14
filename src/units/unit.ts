@@ -217,6 +217,7 @@ export interface IUnitAIRepr {
     getAttackType(): AttackType;
     hasAbilityActive(abilityName: string): boolean;
     hasDebuffActive(debuffName: string): boolean;
+    hasBuffActive?(buffName: string): boolean;
     /**
      * Debuff/effect check that also reads the authoritative display list, so the rule holds for a ranked
      * client (which leaves the OBJECT arrays empty) as well as for the engine and the simulator.
@@ -3011,11 +3012,11 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         return Number.isFinite(stored) ? stored : 0;
     }
     /**
-     * Moves ONE applied buff off `from` and onto this unit, carrying its power, the laps it has LEFT and
-     * its rendered description across. Borrowed Grace (Monk) takes a blessing rather than copying it, so
-     * the entry has to survive the move intact — rebuilding it from configuration would hand back a full
-     * duration and lose any cast-time power (a Tome-amplified buff, an artifact's `;primary;secondary`
-     * suffix). An identically named buff already on the thief is replaced, never doubled.
+     * Copies ONE applied buff from `from` onto this unit, leaving it on the donor, and carries its power,
+     * the laps it has LEFT and its rendered description across. Borrowed Grace (Monk) wears a copy rather
+     * than stripping the blessing, so the entry has to survive intact — rebuilding it from configuration
+     * would hand back a full duration and lose any cast-time power (a Tome-amplified buff, an artifact's
+     * `;primary;secondary` suffix). An identically named buff already on the copier is replaced, never doubled.
      */
     public takeBuffFrom(from: Unit, buffName: string, extend: boolean = false): boolean {
         const applied = from.getBuff(buffName);
@@ -3042,7 +3043,6 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const description = from.unitProperties.applied_buffs_descriptions[index];
         const power = from.unitProperties.applied_buffs_powers[index];
 
-        from.deleteBuff(buffName);
         this.deleteBuff(buffName);
         this.buffs.push(
             new AppliedSpell(
@@ -4069,22 +4069,10 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             }
         }
 
-        // ARTIFACT Farsight Quiver: extend an archer's BASIC shot range by +% as an ADDITIONAL modifier. Added
-        // off the INITIAL shot_distance (not the Sniper-Augment-boosted value above), so it doesn't compound with
-        // Sniper Augment. This pushes out the range-falloff threshold (attack_handler.getRangeAttackDivisor)
-        // rather than removing falloff entirely (which is what it used to do).
-        const farsightQuiverBuff = statBuffs.get("Farsight Quiver");
-        if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && farsightQuiverBuff) {
-            this.unitProperties.shot_distance += roundUnitStat(
-                (this.initialUnitProperties.shot_distance / 100) * farsightQuiverBuff.getPower(),
-                2,
-            );
-        }
-
-        // AURA Guiding Winds (Dryad): ranged allies within 2 cells shoot +% further. Same shape as the
-        // Farsight Quiver above — added off the INITIAL shot_distance so it neither compounds with Sniper
-        // Augment nor with the quiver, and so it self-reverts the moment the archer leaves the aura
-        // (shot_distance is rebuilt from initialUnitProperties on every pass).
+        // AURA Guiding Winds (Dryad): ranged allies within 2 cells shoot +% further. Added off the
+        // INITIAL shot_distance so it does not compound with Sniper Augment, and so it self-reverts
+        // the moment the archer leaves the aura (shot_distance is rebuilt from initialUnitProperties
+        // on every pass). It widens falloff bands; it does not remove them. Farsight Quiver does that.
         const guidingWindsAura = this.getAppliedAuraEffect("Guiding Winds Aura");
         if (this.getAttackTypeSelection() === PBTypes.AttackVals.RANGE && guidingWindsAura) {
             this.unitProperties.shot_distance += roundUnitStat(

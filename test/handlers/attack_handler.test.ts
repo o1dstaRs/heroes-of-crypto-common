@@ -106,6 +106,60 @@ describe("AttackHandler", () => {
             expect(attackHandler.getRangeAttackDivisor(sniper, center({ x: 15, y: 15 }))).toBe(1);
         });
 
+        it("keeps a Farsight Quiver shot at full damage except through smoke", () => {
+            const { grid, unitsHolder, attackHandler } = createCombatTestContext();
+            const attacker = createTestUnit({
+                team: PBTypes.TeamVals.RIGHT,
+                attackType: PBTypes.AttackVals.RANGE,
+                rangeShots: 3,
+                shotDistance: 2,
+            });
+            const target = createTestUnit({ team: PBTypes.TeamVals.LEFT });
+            placeUnit(grid, unitsHolder, attacker, { x: 1, y: 1 });
+            placeUnit(grid, unitsHolder, target, { x: 8, y: 1 });
+            const aim = target.getPosition();
+
+            expect(attackHandler.getRangeAttackDivisor(attacker, aim)).toBe(8);
+            expect(
+                attackHandler.evaluateRangeAttack(
+                    unitsHolder.getAllUnits(),
+                    attacker,
+                    attacker.getPosition(),
+                    aim,
+                    false,
+                    false,
+                    false,
+                    [{ x: 4, y: 1 }],
+                ).rangeAttackDivisors,
+            ).toEqual([8]);
+
+            const buff = new Spell({
+                spellProperties: getSpellConfig("System", "Farsight Quiver", NUMBER_OF_LAPS_TOTAL),
+                amount: 1,
+            });
+            buff.setPower(0);
+            attacker.applyBuff(buff);
+
+            expect(attackHandler.getRangeAttackDivisor(attacker, aim)).toBe(1);
+            expect(attacker.getRangeShotDistance()).toBe(2);
+            expect(
+                attackHandler.evaluateRangeAttack(unitsHolder.getAllUnits(), attacker, attacker.getPosition(), aim)
+                    .rangeAttackDivisors,
+            ).toEqual([1]);
+            expect(
+                attackHandler.evaluateRangeAttack(
+                    unitsHolder.getAllUnits(),
+                    attacker,
+                    attacker.getPosition(),
+                    aim,
+                    false,
+                    false,
+                    false,
+                    [{ x: 4, y: 1 }],
+                ).rangeAttackDivisors,
+            ).toEqual([2]);
+        });
+
         it("measures a large attacker's square from its footprint, not from its center", () => {
             const { attackHandler } = createCombatTestContext();
             const attacker = createTestUnit({

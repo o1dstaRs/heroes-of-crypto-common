@@ -128,15 +128,16 @@ function counterFixture(attackerAbilities: string[] = [], defenderAbilities: str
 }
 
 describe("Borrowed Grace through real fight actions", () => {
-    it("keeps a stolen one-turn blessing through the attacking turn's handoff", () => {
+    it("keeps a copied one-turn blessing through the attacking turn's handoff", () => {
         const f = fixture();
         bless(f.enemy, "Blessing", 1, 73);
         expect(f.fire().completed).toBe(true);
-        expect(f.enemy.getBuff("Blessing")).toBeUndefined();
+        expect(f.enemy.getBuff("Blessing")?.getLaps()).toBe(1);
         expect(f.monk.getBuff("Blessing")?.getLaps()).toBe(1);
         expect(f.monk.getBuff("Blessing")?.getPower()).toBe(73);
         f.monk.minusLap();
         expect(f.monk.getBuff("Blessing")).toBeUndefined();
+        expect(f.enemy.getBuff("Blessing")?.getLaps()).toBe(1);
     });
 
     it("does not add an extra turn when Morale already pauses the thief's buff countdown", () => {
@@ -171,15 +172,22 @@ describe("Borrowed Grace through real fight actions", () => {
         );
     });
 
-    it("a Crafted Double Shot rolls one theft for each landed arrow", () => {
+    it("a Crafted Double Shot rolls one copy for each landed arrow", () => {
         const f = fixture(["Crafted Double Shot"]);
         bless(f.enemy, "Blessing");
         bless(f.enemy, "Spiritual Armor");
-        expect(f.fire().completed).toBe(true);
-        expect(f.enemy.getBuff("Blessing")).toBeUndefined();
-        expect(f.enemy.getBuff("Spiritual Armor")).toBeUndefined();
-        expect(f.monk.getBuff("Blessing")).toBeDefined();
-        expect(f.monk.getBuff("Spiritual Armor")).toBeDefined();
+        const result = f.fire();
+        expect(result.completed).toBe(true);
+        expect(f.enemy.getBuff("Blessing")).toBeDefined();
+        expect(f.enemy.getBuff("Spiritual Armor")).toBeDefined();
+        // A zero roll keeps picking the first buff, and the first copy no longer removes it.
+        expect(f.monk.getBuff("Blessing")?.getLaps()).toBe(3);
+        expect(f.monk.getBuff("Spiritual Armor")).toBeUndefined();
+        expect(
+            result.events.flatMap((event) =>
+                event.type === "effects_applied" ? event.applications.filter((entry) => entry.sourceUnitId) : [],
+            ),
+        ).toHaveLength(2);
     });
 
     it("an acquired Borrowed Grace works on each enemy a Through Shot actually hits", () => {
@@ -189,14 +197,14 @@ describe("Borrowed Grace through real fight actions", () => {
         bless(f.enemy, "Blessing");
         bless(behind, "Spiritual Armor");
         expect(f.fire().completed).toBe(true);
-        expect(f.enemy.getBuff("Blessing")).toBeUndefined();
-        expect(behind.getBuff("Spiritual Armor")).toBeUndefined();
+        expect(f.enemy.getBuff("Blessing")).toBeDefined();
+        expect(behind.getBuff("Spiritual Armor")).toBeDefined();
         expect(f.monk.getBuff("Blessing")).toBeDefined();
         expect(f.monk.getBuff("Spiritual Armor")).toBeDefined();
     });
 
     it.each(["Area Throw", "Large Caliber", "Chakram"])(
-        "%s steals once per struck enemy without rolling twice on the primary",
+        "%s copies once per struck enemy without rolling twice on the primary",
         (ability) => {
             const f = fixture([ability]);
             const bystander = createTestUnit({
@@ -211,9 +219,9 @@ describe("Borrowed Grace through real fight actions", () => {
             bless(bystander, "Weapon Rune", NUMBER_OF_LAPS_TOTAL, undefined, 3, 1);
             const result = f.fire();
             expect(result.completed).toBe(true);
-            expect(f.enemy.getBuff("Blessing")).toBeUndefined();
+            expect(f.enemy.getBuff("Blessing")).toBeDefined();
             expect(f.enemy.getBuff("Spiritual Armor")).toBeDefined();
-            expect(bystander.getBuff("Weapon Rune")).toBeUndefined();
+            expect(bystander.getBuff("Weapon Rune")).toBeDefined();
             expect(f.monk.getBuff("Weapon Rune")?.getFirstSpellProperty()).toBe(3);
             expect(f.monk.getBuff("Blessing")?.getLaps()).toBe(3);
             const thefts = result.events.flatMap((event) =>
@@ -227,10 +235,17 @@ describe("Borrowed Grace through real fight actions", () => {
         const f = fixture(["Through Shot", "Crafted Double Shot"]);
         bless(f.enemy, "Blessing");
         bless(f.enemy, "Spiritual Armor");
-        expect(f.fire().completed).toBe(true);
-        expect(f.enemy.getBuffs()).toHaveLength(0);
+        const result = f.fire();
+        expect(result.completed).toBe(true);
+        expect(f.enemy.getBuff("Blessing")).toBeDefined();
+        expect(f.enemy.getBuff("Spiritual Armor")).toBeDefined();
         expect(f.monk.getBuff("Blessing")?.getLaps()).toBe(3);
-        expect(f.monk.getBuff("Spiritual Armor")?.getLaps()).toBe(3);
+        expect(f.monk.getBuff("Spiritual Armor")).toBeUndefined();
+        expect(
+            result.events.flatMap((event) =>
+                event.type === "effects_applied" ? event.applications.filter((entry) => entry.sourceUnitId) : [],
+            ),
+        ).toHaveLength(2);
     });
 
     it("Through Shot takes nothing from an enemy behind Arrows Wingshield", () => {
@@ -241,13 +256,13 @@ describe("Borrowed Grace through real fight actions", () => {
         bless(f.enemy, "Blessing");
         bless(behind, "Spiritual Armor");
         expect(f.fire().completed).toBe(true);
-        expect(f.enemy.getBuff("Blessing")).toBeUndefined();
+        expect(f.enemy.getBuff("Blessing")).toBeDefined();
         expect(behind.getBuff("Spiritual Armor")).toBeDefined();
         expect(f.monk.getBuff("Spiritual Armor")).toBeUndefined();
         expect(behind.getCumulativeHp()).toBe(25_000);
     });
 
-    it("a splash volley steals only from the victims whose own hit lands", () => {
+    it("a splash volley copies only from the victims whose own hit lands", () => {
         const f = fixture(["Area Throw"]);
         const dodger = createTestUnit({
             name: "Dodger",
@@ -260,7 +275,8 @@ describe("Borrowed Grace through real fight actions", () => {
         bless(f.enemy, "Blessing");
         bless(dodger, "Spiritual Armor");
         expect(f.fire().completed).toBe(true);
-        expect(f.enemy.getBuff("Blessing")).toBeUndefined();
+        expect(f.enemy.getBuff("Blessing")).toBeDefined();
+        expect(f.monk.getBuff("Blessing")).toBeDefined();
         expect(dodger.getBuff("Spiritual Armor")).toBeDefined();
         expect(f.monk.getBuff("Spiritual Armor")).toBeUndefined();
     });
@@ -269,11 +285,17 @@ describe("Borrowed Grace through real fight actions", () => {
         const f = fixture(["Area Throw", "Crafted Double Shot"]);
         bless(f.enemy, "Blessing");
         bless(f.enemy, "Spiritual Armor");
-        expect(f.fire().completed).toBe(true);
-        expect(f.enemy.getBuff("Blessing")).toBeUndefined();
-        expect(f.enemy.getBuff("Spiritual Armor")).toBeUndefined();
+        const result = f.fire();
+        expect(result.completed).toBe(true);
+        expect(f.enemy.getBuff("Blessing")).toBeDefined();
+        expect(f.enemy.getBuff("Spiritual Armor")).toBeDefined();
         expect(f.monk.getBuff("Blessing")?.getLaps()).toBe(3);
-        expect(f.monk.getBuff("Spiritual Armor")?.getLaps()).toBe(3);
+        expect(f.monk.getBuff("Spiritual Armor")).toBeUndefined();
+        expect(
+            result.events.flatMap((event) =>
+                event.type === "effects_applied" ? event.applications.filter((entry) => entry.sourceUnitId) : [],
+            ),
+        ).toHaveLength(2);
     });
 
     it("a missed second arrow leaves the second buff on its owner", () => {
@@ -285,6 +307,7 @@ describe("Borrowed Grace through real fight actions", () => {
         expect(f.fire().completed).toBe(true);
         expect(f.monk.getBuff("Blessing")).toBeDefined();
         expect(f.monk.getBuff("Spiritual Armor")).toBeUndefined();
+        expect(f.enemy.getBuff("Blessing")).toBeDefined();
         expect(f.enemy.getBuff("Spiritual Armor")).toBeDefined();
     });
 
@@ -308,7 +331,7 @@ describe("Borrowed Grace through real fight actions", () => {
         const result = f.fire();
         expect(result.completed).toBe(true);
         expect(f.enemy.hasBuffActive("Water Shield")).toBe(false);
-        expect(f.enemy.getBuff("Blessing")).toBeUndefined();
+        expect(f.enemy.getBuff("Blessing")).toBeDefined();
         expect(f.monk.getBuff("Blessing")?.getLaps()).toBe(3);
         expect(
             result.events.flatMap((event) =>
@@ -359,7 +382,7 @@ describe("Borrowed Grace through real fight actions", () => {
         expect(f.monk.getBuff("Blessing")).toBeUndefined();
     });
 
-    it("takes the entire permanent rune total and keeps its stats and serialization stable", () => {
+    it("copies the entire permanent rune total and keeps its stats and serialization stable", () => {
         const f = fixture();
         const baseArmor = f.monk.getArmor();
         const enemyArmor = f.enemy.getArmor();
@@ -367,8 +390,8 @@ describe("Borrowed Grace through real fight actions", () => {
         f.unitsHolder.refreshStackPowerForAllUnits();
         expect(f.enemy.getArmor()).toBe(enemyArmor + 4);
         expect(f.fire().completed).toBe(true);
-        expect(f.enemy.getBuff("Armor Rune")).toBeUndefined();
-        expect(f.enemy.getArmor()).toBe(enemyArmor);
+        expect(f.enemy.getBuff("Armor Rune")).toBeDefined();
+        expect(f.enemy.getArmor()).toBe(enemyArmor + 4);
         expect(f.monk.getArmor()).toBe(baseArmor + 4);
         expect(f.monk.getBuff("Armor Rune")?.getLaps()).toBe(NUMBER_OF_LAPS_TOTAL);
         expect(f.monk.getBuff("Armor Rune")?.getFirstSpellProperty()).toBe(4);
@@ -387,6 +410,8 @@ describe("Borrowed Grace through real fight actions", () => {
         bless(f.enemy, "Blessing", 3, 73);
         const stolen = processBorrowedGraceAbility(f.monk, f.enemy, new SceneLogMock());
         expect(stolen?.buffName).toBe("Blessing");
+        expect(f.enemy.getBuff("Blessing")?.getPower()).toBe(73);
+        expect(f.enemy.getBuff("Blessing")?.getLaps()).toBe(3);
         expect(f.monk.getBuffs().filter((entry) => entry.getName() === "Blessing")).toHaveLength(1);
         expect(f.monk.getBuff("Blessing")?.getPower()).toBe(73);
         expect(f.monk.getBuff("Blessing")?.getLaps()).toBe(3);
@@ -406,10 +431,10 @@ describe("Borrowed Grace through real fight actions", () => {
         expect(stored.applied_buffs_descriptions[index]).toBe(description);
         expect(f.monk.getBuff("Blessing")?.getFirstSpellProperty()).toBe(11);
         expect(f.monk.getBuff("Blessing")?.getSecondSpellProperty()).toBe(7);
-        expect(source.applied_buffs).toHaveLength(0);
-        expect(source.applied_buffs_laps).toHaveLength(0);
-        expect(source.applied_buffs_descriptions).toHaveLength(0);
-        expect(source.applied_buffs_powers).toHaveLength(0);
+        expect(source.applied_buffs).toEqual(["Blessing"]);
+        expect(source.applied_buffs_laps).toHaveLength(1);
+        expect(source.applied_buffs_descriptions).toEqual([description]);
+        expect(source.applied_buffs_powers).toHaveLength(1);
     });
 
     it("an acquired ability follows the same theft rules as a native Monk", () => {
@@ -418,17 +443,17 @@ describe("Borrowed Grace through real fight actions", () => {
         f.monk.grantStolenAbility("Borrowed Grace");
         bless(f.enemy, "Made of Fire", NUMBER_OF_LAPS_TOTAL);
         expect(f.fire().completed).toBe(true);
-        expect(f.enemy.getBuff("Made of Fire")).toBeUndefined();
+        expect(f.enemy.getBuff("Made of Fire")).toBeDefined();
         expect(f.monk.getBuff("Made of Fire")?.getLaps()).toBe(NUMBER_OF_LAPS_TOTAL);
     });
 
-    it("a landed counter-shot steals for the defending Monk", () => {
+    it("a landed counter-shot copies for the defending Monk", () => {
         const f = counterFixture();
         bless(f.attacker);
         expect(f.monk.canRespond(PBTypes.AttackVals.RANGE)).toBe(true);
         const result = f.shootMonk();
         expect(result.completed).toBe(true);
-        expect(f.attacker.getBuff("Blessing")).toBeUndefined();
+        expect(f.attacker.getBuff("Blessing")).toBeDefined();
         expect(f.monk.getBuff("Blessing")?.getLaps()).toBe(3);
         expect(
             result.events.flatMap((event) => (event.type === "effects_applied" ? event.applications : [])),
@@ -468,10 +493,11 @@ describe("Borrowed Grace through real fight actions", () => {
 
     it("an acquired splash counter-shot keeps the donor's duration without adding a turn", () => {
         const f = counterFixture([], ["Area Throw"]);
-        bless(f.attacker, "Blessing", 1);
+        bless(f.attacker, "Blessing", 2);
         expect(f.shootMonk().completed).toBe(true);
-        expect(f.attacker.getBuff("Blessing")).toBeUndefined();
-        expect(f.monk.getBuff("Blessing")?.getLaps()).toBe(1);
+        // The attacker's own turn consumes one lap. The copy is taken before that tick and is not extended.
+        expect(f.attacker.getBuff("Blessing")?.getLaps()).toBe(1);
+        expect(f.monk.getBuff("Blessing")?.getLaps()).toBe(2);
     });
 
     it("Crafted Double Shot does not create a second counter-shot theft", () => {
@@ -479,8 +505,9 @@ describe("Borrowed Grace through real fight actions", () => {
         bless(f.attacker, "Blessing");
         bless(f.attacker, "Spiritual Armor");
         expect(f.shootMonk().completed).toBe(true);
-        expect(f.attacker.getBuff("Blessing")).toBeUndefined();
+        expect(f.attacker.getBuff("Blessing")).toBeDefined();
         expect(f.attacker.getBuff("Spiritual Armor")).toBeDefined();
+        expect(f.monk.getBuff("Blessing")).toBeDefined();
         expect(f.monk.getBuff("Spiritual Armor")).toBeUndefined();
     });
 
@@ -564,7 +591,14 @@ describe("Borrowed Grace chance and eligibility", () => {
         rawRolls(0, 1);
         expect(processBorrowedGraceAbility(f.monk, f.enemy, new SceneLogMock())?.buffName).toBe("Spiritual Armor");
         expect(f.enemy.getBuff("Blessing")).toBeDefined();
+        expect(f.enemy.getBuff("Spiritual Armor")).toBeDefined();
         expect(f.enemy.getBuff("Luck Aura")).toBeDefined();
+        rawRolls(0, 0);
+        expect(processBorrowedGraceAbility(f.monk, f.enemy, new SceneLogMock())?.buffName).toBe("Blessing");
+        expect(f.enemy.getBuff("Blessing")).toBeDefined();
+        expect(f.enemy.getBuff("Spiritual Armor")).toBeDefined();
+        expect(f.monk.getBuff("Blessing")).toBeDefined();
+        expect(f.monk.getBuff("Spiritual Armor")).toBeDefined();
     });
 
     it("does not spend a random roll when only ineligible buffs exist", () => {
@@ -616,9 +650,12 @@ describe("Borrowed Grace chance and eligibility", () => {
         bearer.grantAbility("Borrowed Grace");
         const index = bearer.getUnitProperties().abilities.indexOf("Borrowed Grace");
         expect(bearer.getUnitProperties().abilities_descriptions[index]).toContain("42.5% chance");
+        expect(bearer.getUnitProperties().abilities_descriptions[index]).toContain("The target keeps the buff");
         bearer.setStackPower(4);
         bearer.adjustBaseStats(false, 1, 8, 0, 0, 0, 0, 0);
         const chance = borrowedGraceChance(bearer, 8);
         expect(bearer.getUnitProperties().abilities_descriptions[index]).toContain(`${chance}% chance`);
+        expect(bearer.getUnitProperties().abilities_descriptions[index]).toContain("copy one random active buff");
+        expect(bearer.getUnitProperties().abilities_descriptions[index]).not.toContain("off the target");
     });
 });

@@ -54,7 +54,7 @@ export enum Tier2Artifact {
     CROWN_OF_COMMAND = 5, // +1 movement, +8 morale, and +1 armor (all)
     GIANTS_MAUL = 6, // +50% non-magical (physical) AOE damage, resisted by status resistance
     PENDANT_OF_VITALITY = 7, // +25% HP (all) / -20% attack
-    FARSIGHT_QUIVER = 8, // all allied archers shoot at full arrow (no range falloff)
+    FARSIGHT_QUIVER = 8, // allied archers ignore range falloff (always 1/1); a shot through smoke is still 1/2
     BERSERKERS_BOND = 9, // +3 attack / -1 defense (flat)
     // Retired from the live Tier-2 pool (2026-10-14). New drafts pick Tier1Artifact.TOME_OF_AMPLIFICATION.
     // This id still applies the same buff, so a saved game or replay that drafted it does not lose it.
@@ -146,9 +146,6 @@ export const ARTIFACT_POWER = {
     RIME_PROC_PERCENT: 60,
     RIME_SLOW_LAPS: 3,
     HOLY_CROSS_HEAL_RES_PERCENT: 50,
-    // Farsight Quiver extends an archer's BASIC shot range by this % (additive off base shot_distance; it
-    // pushes the range-falloff threshold out rather than removing falloff, and does NOT compound with Sniper Augment).
-    FARSIGHT_QUIVER_RANGE_PERCENT: 50,
     TOME_BUFF_POWER_PERCENT: 40,
     DUAL_STRIKE_SECOND_ATTACK_PERCENT: 50,
     // Base amplification of the "Deep Wounds Level 1" card the charm grants army-wide. Mirrors that
@@ -371,7 +368,7 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "farsight_quiver",
         "Farsight Quiver",
         "Farsight Quiver",
-        "Extends all allied archers' basic shot range by an additional {}%.",
+        "Allied archers ignore the range penalty and always deal full damage (1/1). A shot through Smoke is still halved (1/2).",
     ),
     [Tier2Artifact.BERSERKERS_BOND]: t2(
         Tier2Artifact.BERSERKERS_BOND,
@@ -433,7 +430,6 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     broken_aegis: [AP.AEGIS_AREA_REDUCTION_PERCENT],
     warlords_edge: [AP.WARLORDS_EDGE_RANGED_PERCENT, AP.WARLORDS_EDGE_PERCENT],
     titan_plate: [AP.TITAN_PLATE_PERCENT],
-    farsight_quiver: [AP.FARSIGHT_QUIVER_RANGE_PERCENT],
     holy_cross: [AP.HOLY_CROSS_HEAL_RES_PERCENT],
     clover_of_fortune: [AP.CLOVER_LUCK],
     crown_of_command: [AP.CROWN_STEPS, AP.CROWN_MORALE, AP.CROWN_ARMOR],
