@@ -12,7 +12,11 @@ import { GameActionEngine } from "../../src/engine/action_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { DefaultPlacementLevel1 } from "../../src/augments/augment_properties";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
-import { autoPlaceArtifactBarrels, reconcileArtifactBarrels } from "../../src/grid/artifact_barrels";
+import {
+    artifactBarrelShooterCells,
+    autoPlaceArtifactBarrels,
+    reconcileArtifactBarrels,
+} from "../../src/grid/artifact_barrels";
 import { getPositionForCell } from "../../src/grid/grid_math";
 import { scatteredMountainsForSeed } from "../../src/grid/scattered_mountains";
 import { MoveHandler } from "../../src/handlers/move_handler";
@@ -124,6 +128,13 @@ describe("Barrel Barricade", () => {
         expect(engine.apply({ type: "unplace_barrel", team: LEFT, barrelIndex: 0 }).rejectionReason).toBe(
             "placement_not_available",
         );
+    });
+    it("shares only placed friendly shooter footprints with every deployment caller", () => {
+        const { grid, unitsHolder, attacker } = fixture(PBTypes.GridVals.NORMAL, true);
+        expect(artifactBarrelShooterCells(grid, unitsHolder.getAllUnits().values(), LEFT)).toEqual(attacker.getCells());
+        expect(artifactBarrelShooterCells(grid, unitsHolder.getAllUnits().values(), RIGHT)).toEqual([]);
+        grid.cleanupAll(attacker.getId(), attacker.getAttackRange(), attacker.isSmallSize());
+        expect(artifactBarrelShooterCells(grid, unitsHolder.getAllUnits().values(), LEFT)).toEqual([]);
     });
     it("keeps the screen off a friendly ranged file and still takes the inward edge", () => {
         const { grid, fp } = fixture();
