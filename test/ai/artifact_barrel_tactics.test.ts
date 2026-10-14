@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { friendlyShotBlockingBarrels } from "../../src/ai/artifact_barrel_tactics";
+import { FightStateManager } from "../../src/fights/fight_state_manager";
+import { snapshotBattle } from "../../src/simulation/battle_snapshot";
 import { Spell } from "../../src/spells/spell";
 import { getSpellConfig } from "../../src/configuration/config_provider";
 import { PBTypes } from "../../src/generated/protobuf/v1/types";
@@ -57,6 +59,13 @@ describe("barrel shot projection", () => {
                         expect([...h.blockers()]).toEqual([]);
                     });
             }
+    test("projecting shots leaves authoritative combat state unchanged", () => {
+        const h = fixture(1, teams[0], 1, 1);
+        const fp = FightStateManager.getInstance().getFightProperties();
+        const before = snapshotBattle(h.unitsHolder, h.grid, fp);
+        expect([...h.blockers()]).toEqual([h.key]);
+        expect(snapshotBattle(h.unitsHolder, h.grid, fp)).toEqual(before);
+    });
     test("does not mistake a melee unit's file for a shot", () => {
         const context = createCombatTestContext();
         const melee = createTestUnit({ team: teams[0] });
