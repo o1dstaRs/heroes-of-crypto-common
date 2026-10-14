@@ -87,12 +87,12 @@ describe("pick_sim", () => {
             12, // left's distinct T1 pair (13-artifact live pool: Tome of Amplification joined tier 1)
             13,
             12, // right's distinct T1 pair
+            13,
             12,
-            11,
-            10, // lower T2 offer (12-artifact live pool: Aegis of the Arcane joined tier 2)
+            11, // lower T2 offer (13-artifact live pool: Quiver of Echoes joined tier 2)
+            13,
             12,
-            11,
-            10, // upper T2 offer
+            11, // upper T2 offer
             12,
             11,
             10,

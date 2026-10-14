@@ -64,7 +64,7 @@ export interface IChakramFlight {
     attackerId: string;
     primaryTargetId: string;
     response: boolean;
-    hitIndex: 0 | 1;
+    hitIndex: number;
     missed: boolean;
     arcs: NonNullable<IVisibleDamage["chakramArcs"]>;
     splash: NonNullable<IVisibleDamage["splash"]>;
@@ -84,7 +84,11 @@ export interface IVisibleDamage {
     // Drives the ranked scene-log line and the gold proc VFX: the engine's own sceneLog text
     // never reaches ranked, which rebuilds its log from these event payloads.
     luckyStrikeBy?: string[];
-    hits?: { amount: number; unitsDied: number }[];
+    /** Actual outgoing volleys, including artifact echoes and misses; authoritative for replay. */
+    rangedVolleyCount?: number;
+    /** Chance that succeeded for the artifact volley, recorded for ranked logs and replays. */
+    extraRangedAttackChance?: number;
+    hits?: { amount: number; unitsDied: number; missed?: boolean }[];
     /**
      * Zena's Chakram: one entry per bounce, in flight order (see resolveChakramTrajectory).
      * `cells` contains the departure footprint cell, the empty bridge and the arrival footprint cell.

@@ -907,6 +907,107 @@ export class AttackHandler {
         decreaseNumberOfShots = true,
         suppressDoubleShot = false,
     ): IAttackResult {
+        const chance = attackerUnit?.getBonusRangedAttackChance() ?? 0;
+        const result = this.resolveRangeAttack(
+            unitsHolder,
+            hoverRangeAttackDivisors,
+            rangeResponseAttackDivisor,
+            damageForAnimation,
+            attackerUnit,
+            targetUnits,
+            rangeResponseUnits,
+            hoverRangeAttackPosition,
+            isAOE,
+            decreaseNumberOfShots,
+            suppressDoubleShot,
+        );
+        if (
+            !result.completed ||
+            !attackerUnit ||
+            chance <= 0 ||
+            attackerUnit.isDead() ||
+            attackerUnit.isSkippingThisTurn() ||
+            attackerUnit.getRangeShots() <= 0
+        )
+            return result;
+        const liveGroups = (targetUnits ?? [])
+            .map((units, index) => ({
+                units: units.filter((unit) => !unit.isDead()),
+                divisor: hoverRangeAttackDivisors[index],
+            }))
+            .filter((group) => group.units.length > 0);
+        if (!liveGroups.length || !hoverRangeAttackPosition || HoCLib.getRandomInt(0, 100) >= chance) return result;
+        const outgoingCount = (animations: IAnimationData[] = []): number =>
+            animations.filter(
+                (animation) =>
+                    animation.fromPosition?.x === attackerUnit.getPosition().x &&
+                    animation.fromPosition?.y === attackerUnit.getPosition().y,
+            ).length;
+        const initialVolleys = Math.max(1, outgoingCount(result.animationData));
+        const bonus: IVisibleDamage = {
+            amount: 0,
+            render: false,
+            unitPosition: { ...hoverRangeAttackPosition },
+            unitIsSmall: true,
+            hits: [],
+        };
+        // Exactly one ordinary volley: no native second volley, extra retaliation or recursive artifact roll.
+        const extra = this.resolveRangeAttack(
+            unitsHolder,
+            liveGroups.map((group) => group.divisor),
+            1,
+            bonus,
+            attackerUnit,
+            liveGroups.map((group) => group.units),
+            undefined,
+            hoverRangeAttackPosition,
+            isAOE,
+            true,
+            true,
+        );
+        if (!extra.completed || !outgoingCount(extra.animationData)) return result;
+        this.sceneLog.updateLog(
+            `${attackerUnit.getName()} fires an extra attack with Quiver of Echoes (${chance}% chance)`,
+        );
+        damageForAnimation.rangedVolleyCount = initialVolleys + outgoingCount(extra.animationData);
+        damageForAnimation.extraRangedAttackChance = chance;
+        // Preserve every impact, including a missed volley, in firing order.
+        while ((damageForAnimation.hits?.length ?? 0) < initialVolleys) {
+            (damageForAnimation.hits ??= []).push({ amount: 0, unitsDied: 0, missed: damageForAnimation.missed });
+        }
+        (damageForAnimation.hits ??= []).push(
+            ...(bonus.hits?.length ? bonus.hits : [{ amount: bonus.amount, unitsDied: 0, missed: bonus.missed }]),
+        );
+        for (const key of ["splash", "secondary", "deepWounds", "luckyStrikeBy", "chakramArcs"] as const) {
+            const entries = bonus[key];
+            if (entries?.length)
+                (damageForAnimation as unknown as Record<string, unknown[]>)[key] = [
+                    ...(damageForAnimation[key] ?? []),
+                    ...entries,
+                ];
+        }
+        if (bonus.chakramFlights?.length)
+            (damageForAnimation.chakramFlights ??= []).push(
+                ...bonus.chakramFlights.map((flight) => ({ ...flight, hitIndex: flight.hitIndex + initialVolleys })),
+            );
+        result.animationData = [...(result.animationData ?? []), ...(extra.animationData ?? [])];
+        result.unitIdsDied = [...new Set([...result.unitIdsDied, ...extra.unitIdsDied])];
+        result.abilityStolen = [...(result.abilityStolen ?? []), ...(extra.abilityStolen ?? [])];
+        return result;
+    }
+    private resolveRangeAttack(
+        unitsHolder: UnitsHolder,
+        hoverRangeAttackDivisors: number[],
+        rangeResponseAttackDivisor: number,
+        damageForAnimation: IVisibleDamage,
+        attackerUnit?: Unit,
+        targetUnits?: Array<Unit[]>,
+        rangeResponseUnits?: Unit[],
+        hoverRangeAttackPosition?: HoCMath.XY,
+        isAOE = false,
+        decreaseNumberOfShots = true,
+        suppressDoubleShot = false,
+    ): IAttackResult {
         const unitIdsDied: string[] = [];
         const animationData: IAnimationData[] = [];
         const abilityStolen: AllAbilities.IAbilityStolen[] = [];
@@ -968,6 +1069,13 @@ export class AttackHandler {
             // Finalize after the last arrow (or a lethal early return), so no later single hit is lost.
             if (chakramResponseHits?.length) {
                 (damageForAnimation.splash ??= []).push(...initiatingSingleHits, ...chakramResponseHits);
+            } else if (
+                attackerUnit.getBonusRangedAttackChance() > 0 &&
+                !damageForAnimation.splash?.length &&
+                initiatingSingleHits.length
+            ) {
+                // Explicit per-volley misses keep an echo after a dodged native shot in the right slot.
+                damageForAnimation.splash = [...initiatingSingleHits];
             }
             if (responseAssimilationTarget) {
                 const responseStolen = AllAbilities.processPredatoryAssimilationAbility(
@@ -3651,6 +3759,43 @@ export class AttackHandler {
             }
             attackerUnit.decreaseNumberOfShots();
             rangeLanded = trajectoryTargets.length > 0;
+            const echoChance = attackerUnit.getBonusRangedAttackChance();
+            const echoPosition = this.grid.hasScatteredMountains()
+                ? this.getObstacleIntersections(attackerUnit.getPosition(), targetPosition)[0]?.position
+                : this.obstacleStillStands()
+                  ? targetPosition
+                  : undefined;
+            if (
+                rangeLanded &&
+                echoPosition &&
+                echoChance > 0 &&
+                attackerUnit.getRangeShots() > 0 &&
+                HoCLib.getRandomInt(0, 100) < echoChance
+            ) {
+                const cell = GridMath.getCellForPosition(this.gridSettings, echoPosition);
+                const right = cell.x >= this.gridSettings.getGridSize() >> 1;
+                const remaining =
+                    this.grid.hasScatteredMountains() ||
+                    (right
+                        ? FightStateManager.getInstance().getFightProperties().getObstacleHitsLeftRight()
+                        : FightStateManager.getInstance().getFightProperties().getObstacleHitsLeftLeft()) > 0;
+                if (remaining) {
+                    animationData.push({
+                        fromPosition: attackerUnit.getPosition(),
+                        toPosition: echoPosition,
+                        affectedUnit: new AttackTarget(echoPosition, 1),
+                    });
+                    this.spendObstacleHit(cell, right);
+                    attackerUnit.decreaseNumberOfShots();
+                    this.sceneLog.updateLog(
+                        `${attackerUnit.getName()} fires an extra attack with Quiver of Echoes (${echoChance}% chance)`,
+                    );
+                    if (damageForAnimation) {
+                        damageForAnimation.rangedVolleyCount = trajectoryTargets.length + 1;
+                        damageForAnimation.extraRangedAttackChance = echoChance;
+                    }
+                }
+            }
         }
 
         // land melee attack

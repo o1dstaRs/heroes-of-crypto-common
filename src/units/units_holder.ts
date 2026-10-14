@@ -758,6 +758,9 @@ export class UnitsHolder {
                     // BUFF, applied by applyLavaWaterModifier when a move route actually touches lava.
                     applyArtifactBuff("Lava Striders", 0);
                     break;
+                case Tier2Artifact.QUIVER_OF_ECHOES:
+                    if (isRange) applyArtifactBuff("Quiver of Echoes", AP.QUIVER_OF_ECHOES_CHANCE);
+                    break;
                 case Tier2Artifact.AEGIS_OF_THE_ARCANE:
                     applyArtifactBuff("Aegis of the Arcane", AP.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE);
                     break;

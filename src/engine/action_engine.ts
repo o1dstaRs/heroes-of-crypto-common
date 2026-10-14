@@ -1170,7 +1170,7 @@ export class GameActionEngine {
         const unitIdsDied = [...new Set(result.unitIdsDied)];
         // The spin's unit hits have no unit target to ride on, so the action's first obstacle event carries them.
         const unitDamage =
-            unitIdsDied.length || damage.secondary?.length
+            unitIdsDied.length || damage.secondary?.length || damage.extraRangedAttackChance !== undefined
                 ? { damage: this.cloneVisibleDamage(damage), unitIdsDied }
                 : {};
         const serializedAnimations = this.serializeAnimations(result.animationData ?? []);

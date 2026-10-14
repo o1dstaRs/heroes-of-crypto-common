@@ -20,7 +20,7 @@ import { BORROWED_GRACE_NAME, borrowedGraceChance } from "../abilities/borrowed_
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
 import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/double_shot_names";
 import { getCraftChances } from "../abilities/craft_ability";
-import { BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
+import { ARTIFACT_POWER, BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { empowerMultiplier } from "../augments/augment_properties";
 import { getAbilityConfig, getSpellConfig } from "../configuration/config_provider";
 import {
@@ -1395,6 +1395,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
      * pure counterpart, so a preview can gate a follow-up volley (Double Shot's second arrow) on exactly
      * the `getRangeShots() <= 0` bail calculateAttackDamage will hit. Nothing is spent here.
      */
+    /** Artifact chance is per ranged attack action, independent of stack power and ability amplification. */
+    public getBonusRangedAttackChance(): number {
+        if (this.getAttackType() !== PBTypes.AttackVals.RANGE || !this.hasBuffActive("Quiver of Echoes")) return 0;
+        const power =
+            this.getBuffPower("Quiver of Echoes") ||
+            Number(this.getBuffProperties("Quiver of Echoes")[0]) ||
+            ARTIFACT_POWER.QUIVER_OF_ECHOES_CHANCE;
+        return Math.max(0, Math.min(100, power + this.getLuck()));
+    }
+    private refreshQuiverOfEchoesDescription(): void {
+        const index = this.unitProperties.applied_buffs.indexOf("Quiver of Echoes");
+        if (index < 0) return;
+        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        this.unitProperties.applied_buffs_descriptions[index] =
+            `Artifact. Ranged attacks have a ${this.getBonusRangedAttackChance()}% chance to fire one extra full-strength attack (${ARTIFACT_POWER.QUIVER_OF_ECHOES_CHANCE}% + current luck ${this.getLuck()}). Rolls once per ranged attack action, stacks with Double Shot and Double Throw, and uses normal ammunition.;${properties.join(";")}`;
+    }
     public projectRangeShotsAfterVolleys(target?: Unit, volleys = 1): number {
         const cost = projectShotCost(this, target) * Math.max(0, volleys);
         if (cost <= 0) {
@@ -3842,6 +3858,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         if (arrowsWingshieldBlessing) {
             rangeArmorMultiplier = rangeArmorMultiplier * (1 + Math.max(0, arrowsWingshieldBlessing.getPower()) / 100);
         }
+
+        this.refreshQuiverOfEchoesDescription();
 
         // MDEF
         this.unitProperties.magic_resist = madeOfFireBuff

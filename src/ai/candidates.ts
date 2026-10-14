@@ -216,6 +216,8 @@ interface IPreparedRangeCandidateDamage {
     reducesBrokenAegis: boolean;
     secondVolleyMultiplier: number;
     sharedAbilityMultiplier: number;
+    bonusVolleyChance: number;
+    spentVolleys: number;
 }
 
 /** Attacker-only terms shared by every aim considered during one immutable decision. */
@@ -261,6 +263,8 @@ function prepareRangeCandidateDamage(
         reducesBrokenAegis: !!aoeAbility,
         secondVolleyMultiplier,
         sharedAbilityMultiplier,
+        bonusVolleyChance: unit.getBonusRangedAttackChance() / 100,
+        spentVolleys: throughShotAbility ? 1 : doubleShotAbility ? 2 : 1,
     };
 }
 
@@ -382,12 +386,38 @@ function evaluatePreparedRangeCandidateDamage(
             const hitChance =
                 1 - Math.min(100, Math.max(0, unit.calculateMissChance(target, defenderAbilityPower))) / 100;
             const missChance = 1 - hitChance;
-            const effective =
+            let effective =
                 prepared.secondVolleyMultiplier > 0
                     ? hitChance * missChance * Math.min(firstConditionalDamage, hp) +
                       missChance * hitChance * Math.min(secondConditionalDamage, hp) +
                       hitChance * hitChance * Math.min(firstConditionalDamage + secondConditionalDamage, hp)
                     : hitChance * Math.min(firstConditionalDamage, hp);
+            if (
+                prepared.bonusVolleyChance > 0 &&
+                unit.projectRangeShotsAfterVolleys(target, prepared.spentVolleys) > 0
+            ) {
+                const firstOutcomes = [
+                    [0, missChance],
+                    [firstConditionalDamage, hitChance],
+                ];
+                const secondOutcomes =
+                    prepared.secondVolleyMultiplier > 0
+                        ? [
+                              [0, missChance],
+                              [secondConditionalDamage, hitChance],
+                          ]
+                        : [[0, 1]];
+                for (const [first, firstProbability] of firstOutcomes) {
+                    for (const [second, secondProbability] of secondOutcomes) {
+                        effective +=
+                            firstProbability *
+                            secondProbability *
+                            prepared.bonusVolleyChance *
+                            hitChance *
+                            (Math.min(first + second + firstConditionalDamage, hp) - Math.min(first + second, hp));
+                    }
+                }
+            }
             if (targetTeam === prepared.enemyTeam) {
                 value += effective;
                 enemyDamage += effective;

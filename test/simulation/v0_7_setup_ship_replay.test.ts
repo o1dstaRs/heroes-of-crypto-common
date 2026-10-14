@@ -139,7 +139,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // deleted stack's remaining spell charges. Seeded setups can draft the new artifact, and the
 // charge fix changes combat traces. Two runs reproduced this digest byte-identically.
 // Previous approved digest: 2b0b1de14709f12542a68ee29f8911acc6eb4cf53ab5d3a60bcd11d08368dcf2
-const EXPECTED_REPLAY_SHA256 = "0c89c8d9586bec1f697581a8a99ffbff62887c9c809817ce14ba37dcca0c781b";
+// Quiver of Echoes adds a live Tier-2 draft option (2026-10-14). Two isolated runs reproduce this digest;
+// removing only that option from the live lists restores the previous digest exactly.
+// Previous digest: 0c89c8d9586bec1f697581a8a99ffbff62887c9c809817ce14ba37dcca0c781b
+const EXPECTED_REPLAY_SHA256 = "8a627bec8c276376a0ad66277c6b7c9acd13d5cc7052680266d97a99e0400729";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

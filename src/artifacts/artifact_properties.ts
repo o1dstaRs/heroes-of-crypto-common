@@ -61,6 +61,7 @@ export enum Tier2Artifact {
     TOME_OF_AMPLIFICATION = 10,
     RIME_CHARM = 11, // 30% chance to apply a 3-turn slow on any attack
     LAVA_STRIDERS = 12, // all units may move over lava
+    QUIVER_OF_ECHOES = 15, // One extra ranged attack, 40% + current luck chance
     AEGIS_OF_THE_ARCANE = 14, // +18 magic defense (army-wide)
     ARCHMAGES_RING = 13, // +20% magic damage (army-wide); Tier-2 half of the arcane pair
 }
@@ -113,6 +114,7 @@ export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
     "12": Tier2Artifact.LAVA_STRIDERS,
     "13": Tier2Artifact.ARCHMAGES_RING,
     "14": Tier2Artifact.AEGIS_OF_THE_ARCANE,
+    "15": Tier2Artifact.QUIVER_OF_ECHOES,
 };
 
 // Effect magnitudes. Centralised here so balance tuning happens in one place.
@@ -161,6 +163,7 @@ export const ARTIFACT_POWER = {
     MAGES_RING_MAGIC_PERCENT: 10,
     ARCHMAGES_RING_MAGIC_PERCENT: 20,
     AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE: 18,
+    QUIVER_OF_ECHOES_CHANCE: 40,
 } as const;
 
 export interface ArtifactProperties {
@@ -401,6 +404,13 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "Lava Striders",
         "All army units may move over and stand in lava; while on central lava they gain Made of Fire (+10% to all stats and abilities).",
     ),
+    [Tier2Artifact.QUIVER_OF_ECHOES]: t2(
+        Tier2Artifact.QUIVER_OF_ECHOES,
+        "quiver_of_echoes",
+        "Quiver of Echoes",
+        "Quiver of Echoes",
+        "Ranged units have a {}% + current luck chance to fire one extra full-strength attack. Rolls once per ranged attack action, stacks with Double Shot and Double Throw, and uses normal ammunition.",
+    ),
     [Tier2Artifact.AEGIS_OF_THE_ARCANE]: t2(
         Tier2Artifact.AEGIS_OF_THE_ARCANE,
         "aegis_of_the_arcane",
@@ -451,6 +461,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     mages_ring: [AP.MAGES_RING_MAGIC_PERCENT],
     archmages_ring: [AP.ARCHMAGES_RING_MAGIC_PERCENT],
     aegis_of_the_arcane: [AP.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE],
+    quiver_of_echoes: [AP.QUIVER_OF_ECHOES_CHANCE],
 };
 
 // Human-readable effect text with the real numbers substituted in (the raw `description` keeps `{}`/`[]`

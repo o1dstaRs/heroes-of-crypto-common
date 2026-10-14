@@ -1009,6 +1009,27 @@
             "is_giftable": false,
             "maximum_gift_level": 0
         },
+        "Quiver of Echoes": {
+            "name": "Quiver of Echoes",
+            "level": 0,
+            "desc": [
+                "Artifact. Ranged attacks have a {}% + current luck chance to fire one extra full-strength attack. Rolls once per ranged attack action, stacks with Double Shot and Double Throw, and uses normal ammunition.",
+                "Lasts till the end of the fight."
+            ],
+            "target": "ALL_ALLIES",
+            "power": 0,
+            "power_type": "COMMON",
+            "element": "",
+            "multiplier_type": "NO_MULTIPLIER",
+            "laps": 15,
+            "is_buff": true,
+            "self_cast_allowed": false,
+            "self_debuff_applies": false,
+            "minimal_caster_stack_power": 1,
+            "conflicts_with": [],
+            "is_giftable": false,
+            "maximum_gift_level": 0
+        },
         "Aegis of the Arcane": {
             "name": "Aegis of the Arcane",
             "level": 0,
