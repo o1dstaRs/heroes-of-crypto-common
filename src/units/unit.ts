@@ -3165,7 +3165,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     }
     private moveResourcesTo(other: Unit, share: number, addToOther: boolean, peeledCreatures = 0): void {
         const counts = new Map<string, number>();
-        for (const entry of this.unitProperties.spells) {
+        for (const rawEntry of this.unitProperties.spells) {
+            const entry = normalizeSpellEntry(rawEntry);
             counts.set(entry, (counts.get(entry) ?? 0) + 1);
         }
         // A one-creature peel of a large stack rounds every share to 0. Any spell whose own
@@ -3185,13 +3186,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         const moved: string[] = [];
         const kept: string[] = [];
-        for (const entry of this.unitProperties.spells) {
+        for (const rawEntry of this.unitProperties.spells) {
+            const entry = normalizeSpellEntry(rawEntry);
             const left = toMove.get(entry) ?? 0;
             if (left > 0) {
-                moved.push(entry);
+                moved.push(rawEntry);
                 toMove.set(entry, left - 1);
             } else {
-                kept.push(entry);
+                kept.push(rawEntry);
             }
         }
         this.syncAuthoritativeSpellEntries(kept);
@@ -3227,6 +3229,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
                 this.deleteAbility("Resurrection");
             }
         }
+        this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
     }
     public getAllProperties(): UnitProperties {
         return structuredClone(this.unitProperties);
@@ -3856,6 +3859,13 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.magic_resist = roundUnitStat(
                 this.unitProperties.magic_resist + armorAugmentMagicBuff.getPower(),
                 2,
+            );
+        }
+        const arcaneAegis = statBuffs.get("Aegis of the Arcane");
+        if (arcaneAegis) {
+            this.unitProperties.magic_resist = Math.min(
+                100,
+                this.unitProperties.magic_resist + Math.max(0, arcaneAegis.getPower()),
             );
         }
         enchantedSkinAbility = getStatAbility(enchantedSkinAbility, "Enchanted Skin");
@@ -4821,6 +4831,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             newSpells.push(new Spell({ spellProperties: spellProperties, amount: v }));
         }
         this.spells = newSpells;
+        this.unitProperties.can_cast_spells = this.unitProperties.spells.length > 0;
     }
     protected parseAuraEffects(): void {
         const activeAuraEffectNames = new Set(

@@ -61,6 +61,7 @@ export enum Tier2Artifact {
     TOME_OF_AMPLIFICATION = 10,
     RIME_CHARM = 11, // 30% chance to apply a 3-turn slow on any attack
     LAVA_STRIDERS = 12, // all units may move over lava
+    AEGIS_OF_THE_ARCANE = 14, // +18 magic defense (army-wide)
     ARCHMAGES_RING = 13, // +20% magic damage (army-wide); Tier-2 half of the arcane pair
 }
 
@@ -111,6 +112,7 @@ export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
     "11": Tier2Artifact.RIME_CHARM,
     "12": Tier2Artifact.LAVA_STRIDERS,
     "13": Tier2Artifact.ARCHMAGES_RING,
+    "14": Tier2Artifact.AEGIS_OF_THE_ARCANE,
 };
 
 // Effect magnitudes. Centralised here so balance tuning happens in one place.
@@ -158,6 +160,7 @@ export const ARTIFACT_POWER = {
     // as a plain "+N%". Tier 2 is deliberately double Tier 1, matching the Warlord's Edge / Keen Blade gap.
     MAGES_RING_MAGIC_PERCENT: 10,
     ARCHMAGES_RING_MAGIC_PERCENT: 20,
+    AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE: 18,
 } as const;
 
 export interface ArtifactProperties {
@@ -398,6 +401,13 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "Lava Striders",
         "All army units may move over and stand in lava; while on central lava they gain Made of Fire (+10% to all stats and abilities).",
     ),
+    [Tier2Artifact.AEGIS_OF_THE_ARCANE]: t2(
+        Tier2Artifact.AEGIS_OF_THE_ARCANE,
+        "aegis_of_the_arcane",
+        "Aegis of the Arcane",
+        "Aegis of the Arcane",
+        "Grants the whole army +{} percentage points of magic defense.",
+    ),
     [Tier2Artifact.ARCHMAGES_RING]: t2(
         Tier2Artifact.ARCHMAGES_RING,
         "archmages_ring",
@@ -440,6 +450,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     rime_charm: [AP.RIME_PROC_PERCENT, AP.RIME_SLOW_LAPS],
     mages_ring: [AP.MAGES_RING_MAGIC_PERCENT],
     archmages_ring: [AP.ARCHMAGES_RING_MAGIC_PERCENT],
+    aegis_of_the_arcane: [AP.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE],
 };
 
 // Human-readable effect text with the real numbers substituted in (the raw `description` keeps `{}`/`[]`

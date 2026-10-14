@@ -135,7 +135,11 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Seeded setups can draft it as a tier-1 artifact, and the weaker buffs change the combat traces.
 // Two runs of that tree reproduced this digest byte-identically.
 // Previous approved digest: 84e8cbcb4be169a34bc510c7c334cf3a14a7ef5e6c0c52dfc4eef080c1593bc2
-const EXPECTED_REPLAY_SHA256 = "2b0b1de14709f12542a68ee29f8911acc6eb4cf53ab5d3a60bcd11d08368dcf2";
+// Re-pinned 2026-10-14: Aegis of the Arcane joined the live tier-2 pool, and a merge keeps the
+// deleted stack's remaining spell charges. Seeded setups can draft the new artifact, and the
+// charge fix changes combat traces. Two runs reproduced this digest byte-identically.
+// Previous approved digest: 2b0b1de14709f12542a68ee29f8911acc6eb4cf53ab5d3a60bcd11d08368dcf2
+const EXPECTED_REPLAY_SHA256 = "0c89c8d9586bec1f697581a8a99ffbff62887c9c809817ce14ba37dcca0c781b";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

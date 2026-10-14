@@ -99,6 +99,8 @@ export const T2_RANGED_TABLE_MIN_RANGED = 2;
  * must be remeasured before they are treated as current evidence.
  */
 export const TIER2_ARTIFACT_WINRATE_MELEE: Record<number, number> = {
+    // Provisional neutral prior for the new artifact; not a measured win rate.
+    [Tier2Artifact.AEGIS_OF_THE_ARCANE]: 50,
     [Tier2Artifact.TOME_OF_AMPLIFICATION]: 74.7,
     [Tier2Artifact.TITAN_PLATE]: 68.0,
     [Tier2Artifact.WARLORDS_EDGE]: 67.5,
@@ -119,6 +121,8 @@ export const TIER2_ARTIFACT_WINRATE_MELEE: Record<number, number> = {
  * (post-fix). Farsight Quiver — 4th in the blind table (62.5) — is THE ranged pick at 88.8 +/- 1.4.
  */
 export const TIER2_ARTIFACT_WINRATE_RANGED: Record<number, number> = {
+    // Provisional neutral prior for the new artifact; not a measured win rate.
+    [Tier2Artifact.AEGIS_OF_THE_ARCANE]: 50,
     [Tier2Artifact.FARSIGHT_QUIVER]: 88.8,
     [Tier2Artifact.TOME_OF_AMPLIFICATION]: 71.3,
     [Tier2Artifact.TITAN_PLATE]: 67.2,
@@ -142,6 +146,8 @@ export const TIER2_ARTIFACT_WINRATE_RANGED: Record<number, number> = {
  * Berserker's Bond's change and Archmage's Ring; here Crown leads and Tome is second from the bottom.
  */
 export const TIER2_ARTIFACT_SCORE_A19_RANGED: Record<number, number> = {
+    // Provisional neutral prior for the new artifact; not a measured win rate.
+    [Tier2Artifact.AEGIS_OF_THE_ARCANE]: 50,
     [Tier2Artifact.CROWN_OF_COMMAND]: 56.53,
     [Tier2Artifact.GIANTS_MAUL]: 54.3,
     [Tier2Artifact.CLOVER_OF_FORTUNE]: 53.55,

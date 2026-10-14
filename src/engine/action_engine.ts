@@ -3063,6 +3063,7 @@ export class GameActionEngine {
             return this.reject("delete_not_available");
         }
         if (mergeTarget && deletedAmount > 0) {
+            mergeTarget.takeResourcesFromMerge(unit, deletedAmount);
             mergeTarget.setAmountAlive(mergeTarget.getAmountAlive() + deletedAmount);
         }
 
