@@ -32,7 +32,12 @@ import {
     eligibleBacklineProtectorChoices,
 } from "./creature_score";
 import { pickCoherentDraftBundle, pickCoherentDraftCreature, type DraftBundle } from "./draft_coherence";
-import { tier1ArtifactFitScore, tier1ArtifactFitScoreV2 } from "./artifact_fit";
+import {
+    tier1ArtifactFitScore,
+    tier1ArtifactFitScoreV2,
+    tier1ArtifactFitScoreV3,
+    type ArtifactFitVersion,
+} from "./artifact_fit";
 import {
     applyRankedDraftRangedFloor,
     isRankedDraftStrengthPolicy,
@@ -364,6 +369,7 @@ export function pickRankedLiveDraftCreature(
     revealedGridType?: number,
     synergyVariants?: RankedDraftSynergyVariants,
     tier2ArtifactId?: number,
+    artifactFitVersion: ArtifactFitVersion = 3,
 ): number | undefined {
     const eligible = applyRankedDraftRangedFloor(
         genome.draftStrengthPolicy,
@@ -389,6 +395,7 @@ export function pickRankedLiveDraftCreature(
         {
             ownCreatureIds,
             tier1ArtifactId,
+            artifactFitVersion,
             ...(tier2ArtifactId === undefined ? {} : { tier2ArtifactId }),
             knownOpponentCreatureIds,
             ...(revealedGridType === undefined ? {} : { revealedGridType }),
@@ -409,13 +416,17 @@ export function pickRankedLiveDraftBundle(
     genome: ILeagueGenome,
     bundles: readonly DraftBundle[],
     synergyVariants?: RankedDraftSynergyVariants,
-    artifactFitVersion: 1 | 2 = 2,
+    artifactFitVersion: ArtifactFitVersion = 3,
 ): number {
     return pickCoherentDraftBundle(
         bundles,
         (creatureId) => draftGenomeCreatureScore(genome, creatureId),
         (artifactId, ownCreatureIds) =>
-            (artifactFitVersion === 1 ? tier1ArtifactFitScore : tier1ArtifactFitScoreV2)(
+            (artifactFitVersion === 1
+                ? tier1ArtifactFitScore
+                : artifactFitVersion === 2
+                  ? tier1ArtifactFitScoreV2
+                  : tier1ArtifactFitScoreV3)(
                 artifactId,
                 ownCreatureIds,
                 (rankedDraftUsesCorrectedTier1Table(genome.draftStrengthPolicy)
@@ -423,6 +434,7 @@ export function pickRankedLiveDraftBundle(
                     : TIER1_ARTIFACT_WINRATE)[artifactId] ?? 50,
             ),
         {
+            artifactFitVersion,
             ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
             ...(genome.draftStrengthPolicy ? { draftStrengthPolicy: genome.draftStrengthPolicy } : {}),
             ...(synergyVariants === undefined ? {} : { synergyVariants }),

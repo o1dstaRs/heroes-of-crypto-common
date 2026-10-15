@@ -57,6 +57,7 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { AppliedSpell } from "../spells/applied_spell";
 import { fillEffectPowerPlaceholders, positionalPropertyCount } from "../spells/effect_description";
 import { Spell } from "../spells/spell";
+import { isMagicDamageAbility } from "../spells/spell_damage";
 import { recordEffectApplication, recordWaterShieldAbsorb } from "./effect_application_capture";
 import { calculateBuffsDebuffsEffect } from "../spells/spell_helper";
 import { getLapString, getRandomInt } from "../utils/lib";
@@ -76,13 +77,6 @@ const MECHANISM_AOE_STATUS_RESIST_PENALTY = 50;
 // Assimilation): the quiver's native owner's (Medusa's) shot_distance from creatures.json. Applied in
 // adjustBaseStats only while the initial shot_distance is 0, so natural shooters keep their own range.
 const STOLEN_ENDLESS_QUIVER_SHOT_DISTANCE = 6.5;
-
-// The abilities whose damage is MAGIC and therefore scales with the team's Empower Augment. Everything else
-// that goes through calculateAbilityMultiplier (Double Punch, Lightning Spin, Through Shot, Boost Health,
-// Magic Shield, …) is physical output or a defensive figure and is deliberately left alone — Empower buys
-// magic damage, not a blanket ability buff. Fire Shield is included even though it triggers on being hit:
-// the flames it throws back are the holder's own magic damage.
-const EMPOWERED_MAGIC_ABILITIES: ReadonlySet<string> = new Set(["Chain Lightning", "Fire Breath", "Fire Shield"]);
 
 // SPELLBOOK cards own these faction-prefixed spell charges. Keep the mapping explicit: a unit can have
 // unrelated castable abilities (stored with a leading colon) or, in the future, more than one spell source,
@@ -802,7 +796,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // see the RAISED figure or the card would promise 40% while the flames throw back 49.6%. Chain
         // Lightning needs no branch here: its percentages already come from calculateAbilityMultiplier above,
         // which applies Empower itself.
-        if (EMPOWERED_MAGIC_ABILITIES.has(ability.getName()) && ability.getName() !== "Chain Lightning") {
+        if (isMagicDamageAbility(ability.getName()) && ability.getName() !== "Chain Lightning") {
             const empowered = ability.getPower() * empowerMultiplier(this.getEmpowerPercentage());
             return ability
                 .getDesc()
@@ -2559,7 +2553,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // to the finished coefficient (not folded into combinedPower) so it reads as exactly "+X% damage",
         // and applied HERE so the engine's cast, the AI's damage estimate and the card in the sidebar all
         // pick it up from one place — every one of them calls this method.
-        if (EMPOWERED_MAGIC_ABILITIES.has(ability.getName())) {
+        if (isMagicDamageAbility(ability.getName())) {
             calculatedCoeff *= empowerMultiplier(this.getEmpowerPercentage());
         }
 

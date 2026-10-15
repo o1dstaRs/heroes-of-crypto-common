@@ -87,6 +87,7 @@ export class SetupPolicyV0 implements ISetupPolicy {
         knownOpponentCreatureIds: readonly number[],
         tier1ArtifactId?: number,
         tier2ArtifactId?: number,
+        artifactFitVersion?: 1 | 2 | 3,
     ): number {
         const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
         const baseScore = (id: number): number =>
@@ -96,7 +97,12 @@ export class SetupPolicyV0 implements ISetupPolicy {
             );
         if (!this.draftCoherence) return bestBy(eligible, baseScore) ?? available[0] ?? 0;
         return (
-            pickCoherentDraftCreature(eligible, baseScore, { ownCreatureIds, tier1ArtifactId, tier2ArtifactId }) ??
+            pickCoherentDraftCreature(eligible, baseScore, {
+                ownCreatureIds,
+                tier1ArtifactId,
+                tier2ArtifactId,
+                artifactFitVersion,
+            }) ??
             available[0] ??
             0
         );

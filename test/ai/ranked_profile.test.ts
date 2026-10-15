@@ -29,7 +29,7 @@ describe("full-ranked AI profiles", () => {
         for (const profile of RANKED_AI_PROFILES) {
             expect(getRankedAIProfile(profile.version)).toBe(profile);
             expect(profile.setupPolicyVersion).toBe(profile.setupPolicy.version);
-            expect(profile.setupPolicyVersion).toBe("setup-v0+artifact-fit-v2");
+            expect(profile.setupPolicyVersion).toBe("setup-v0+artifact-fit-v3");
             expect(profile.setupPolicy.placement).toBe("baseline");
             expect(profile.setupPolicy.placementAugmentTiming).toBe("setup-before-placement");
             expect(Object.isFrozen(profile)).toBe(true);

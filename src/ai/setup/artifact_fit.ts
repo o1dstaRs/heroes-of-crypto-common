@@ -11,6 +11,11 @@ import type { IResolvedSetupPolicy } from "./setup_ship";
 
 export const ARTIFACT_FIT_SETUP_PREFIX = "artifact-fit-v1:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V2 = "artifact-fit-v2:";
+export const ARTIFACT_FIT_SETUP_PREFIX_V3 = "artifact-fit-v3:";
+export type ArtifactFitVersion = 1 | 2 | 3;
+
+export const artifactFitVersionForSetupSpec = (spec: string): ArtifactFitVersion =>
+    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3) ? 3 : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2) ? 2 : 1;
 
 const roster = (ids: readonly number[]): ICreatureInfo[] =>
     [...new Set(ids)].flatMap((id) => {
@@ -84,6 +89,13 @@ export function tier1ArtifactFitScoreV2(id: number, ownIds: readonly number[], b
                 unit.melee || unit.ranged ? procPerTurn(ARTIFACT_POWER.RIME_PROC_PERCENT, unit) : 0,
             )
     );
+}
+
+export function tier1ArtifactFitScoreV3(id: number, ownIds: readonly number[], baseline: number): number {
+    const own = roster(ownIds);
+    if (id !== Tier1Artifact.MAGES_RING || !own.length) return tier1ArtifactFitScoreV2(id, ownIds, baseline);
+    const share = average(own, (unit) => Number(unit.dealsMagicDamage));
+    return share > 0 ? 50 + ARTIFACT_POWER.MAGES_RING_MAGIC_PERCENT * share : 0;
 }
 
 const FIT_TIER2_IDS: ReadonlySet<number> = new Set([
@@ -163,6 +175,23 @@ export function tier2ArtifactFitScoreV2(
     ownIds: readonly number[],
     context?: Readonly<ITier2ArtifactDecisionContext>,
 ): number {
+    return tier2ArtifactFitScoreWithMagicPressure(id, ownIds, context, magicPressureV2);
+}
+
+export function tier2ArtifactFitScoreV3(
+    id: number,
+    ownIds: readonly number[],
+    context?: Readonly<ITier2ArtifactDecisionContext>,
+): number {
+    return tier2ArtifactFitScoreWithMagicPressure(id, ownIds, context, (unit) => Number(unit.dealsMagicDamage));
+}
+
+function tier2ArtifactFitScoreWithMagicPressure(
+    id: number,
+    ownIds: readonly number[],
+    context: Readonly<ITier2ArtifactDecisionContext> | undefined,
+    magicPressureForUnit: (unit: ICreatureInfo) => number,
+): number {
     const own = roster(ownIds);
     if (!own.length) return 50;
     const enemy = roster(context?.publicOpponentCreatureIds ?? []);
@@ -173,7 +202,7 @@ export function tier2ArtifactFitScoreV2(
         enemy.reduce((sum, unit) => sum + value(unit), 0) / Math.max(5, enemy.length);
     switch (id) {
         case Tier2Artifact.ARCHMAGES_RING: {
-            const share = average(own, magicPressureV2);
+            const share = average(own, magicPressureForUnit);
             const existing = tier1 === Tier1Artifact.MAGES_RING ? ARTIFACT_POWER.MAGES_RING_MAGIC_PERCENT / 100 : 0;
             // Anchor to the actual A19 prior instead of treating a damage percentage as win-rate points.
             // A token caster must not displace a strong whole-army item in an otherwise physical draft.
@@ -186,7 +215,7 @@ export function tier2ArtifactFitScoreV2(
             const defense = ARTIFACT_POWER.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE / 100;
             const beneficiaries = average(own, (unit) => Number(!unit.magicImmune));
             return beneficiaries > 0
-                ? 50 + ((100 * defense) / (1 - defense)) * knownEnemyShare(magicPressureV2) * beneficiaries
+                ? 50 + ((100 * defense) / (1 - defense)) * knownEnemyShare(magicPressureForUnit) * beneficiaries
                 : 0;
         }
         case Tier2Artifact.QUIVER_OF_ECHOES: {
@@ -260,9 +289,14 @@ export function tier2ArtifactFitScoreV2(
 /** Keep the base policy's ordering of established items; compare only the new items against that incumbent. */
 export function withArtifactFitSetupPolicy(
     base: Readonly<IResolvedSetupPolicy>,
-    version: 1 | 2 = 1,
+    version: ArtifactFitVersion = 1,
 ): IResolvedSetupPolicy {
-    const prefix = version === 1 ? ARTIFACT_FIT_SETUP_PREFIX : ARTIFACT_FIT_SETUP_PREFIX_V2;
+    const prefix =
+        version === 1
+            ? ARTIFACT_FIT_SETUP_PREFIX
+            : version === 2
+              ? ARTIFACT_FIT_SETUP_PREFIX_V2
+              : ARTIFACT_FIT_SETUP_PREFIX_V3;
     if (base.spec.startsWith(prefix)) return base;
     return Object.freeze({
         ...base,
@@ -284,7 +318,7 @@ export function withArtifactFitSetupPolicy(
             const table =
                 base.rules.includes("t2a19") && ranged
                     ? TIER2_ARTIFACT_SCORE_A19_RANGED
-                    : base.rules.includes("t2") || (version === 2 && base.rules.includes("t2a19"))
+                    : base.rules.includes("t2") || (version >= 2 && base.rules.includes("t2a19"))
                       ? ranged
                           ? TIER2_ARTIFACT_WINRATE_RANGED
                           : TIER2_ARTIFACT_WINRATE_MELEE
@@ -293,7 +327,13 @@ export function withArtifactFitSetupPolicy(
             let bestScore = established.length ? (table[best] ?? 50) : -Infinity;
             for (const id of legal) {
                 if (!FIT_TIER2_IDS.has(id)) continue;
-                const score = (version === 1 ? tier2ArtifactFitScore : tier2ArtifactFitScoreV2)(id, ownIds, context);
+                const score = (
+                    version === 1
+                        ? tier2ArtifactFitScore
+                        : version === 2
+                          ? tier2ArtifactFitScoreV2
+                          : tier2ArtifactFitScoreV3
+                )(id, ownIds, context);
                 if (score > bestScore) {
                     best = id;
                     bestScore = score;

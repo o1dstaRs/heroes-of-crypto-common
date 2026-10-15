@@ -13,7 +13,12 @@ import CREATURES_JSON from "../../configuration/creatures.json";
 import { Tier2Artifact } from "../../artifacts/artifact_properties";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { creatureInfo } from "./creature_score";
-import { ARTIFACT_FIT_SETUP_PREFIX, ARTIFACT_FIT_SETUP_PREFIX_V2, withArtifactFitSetupPolicy } from "./artifact_fit";
+import {
+    ARTIFACT_FIT_SETUP_PREFIX,
+    ARTIFACT_FIT_SETUP_PREFIX_V2,
+    ARTIFACT_FIT_SETUP_PREFIX_V3,
+    withArtifactFitSetupPolicy,
+} from "./artifact_fit";
 import {
     CONDITIONAL_SETUP_RULES,
     KNOWN_CONDITIONAL_SETUP_RULES,
@@ -823,6 +828,11 @@ function compileNonFightAugmentOverridePolicy(spec: string, suffix: string): IRe
 
 export function resolveSetupPolicy(spec: string | undefined): IResolvedSetupPolicy {
     const normalized = (spec ?? "").trim().toLowerCase();
+    if (normalized.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3)) {
+        const baseSpec = normalized.slice(ARTIFACT_FIT_SETUP_PREFIX_V3.length);
+        if (!baseSpec) throw new Error("Artifact fit setup requires an explicit base policy");
+        return withArtifactFitSetupPolicy(resolveSetupPolicy(baseSpec), 3);
+    }
     if (normalized.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)) {
         const baseSpec = normalized.slice(ARTIFACT_FIT_SETUP_PREFIX_V2.length);
         if (!baseSpec) throw new Error("Artifact fit setup requires an explicit base policy");

@@ -26,7 +26,7 @@ import {
 } from "../ai/setup/draft_ship";
 import { RANKED_A19_DRAFT_CANDIDATE, RANKED_A19_DRAFT_CANDIDATE_ID } from "../ai/setup/ranked_a19_draft_candidate";
 import { pickCoherentDraftBundle } from "../ai/setup/draft_coherence";
-import { ARTIFACT_FIT_SETUP_PREFIX_V2 } from "../ai/setup/artifact_fit";
+import { artifactFitVersionForSetupSpec, type ArtifactFitVersion } from "../ai/setup/artifact_fit";
 import { isRankedDraftInteractionPrior, RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../ai/setup/draft_interaction_prior";
 import { isRankedDraftVarietyPolicy, RANKED_DRAFT_VARIETY_POLICY_ID } from "../ai/setup/draft_variety";
 import type { RankedDraftSynergyVariants } from "../ai/setup/draft_synergy_variants";
@@ -958,6 +958,7 @@ export function resolveRankedDraftPick(
         tier1ArtifactId?: number,
         revealedGridType?: number,
         tier2ArtifactId?: number,
+        artifactFitVersion: ArtifactFitVersion = 1,
     ): number | undefined =>
         rules.liveDraftRules
             ? pickRankedLiveDraftCreature(
@@ -969,6 +970,7 @@ export function resolveRankedDraftPick(
                   revealedGridType,
                   rules.synergyVariants,
                   tier2ArtifactId,
+                  artifactFitVersion,
               )
             : pickDraftGenomeCreature(
                   genome,
@@ -1016,7 +1018,7 @@ export function resolveRankedDraftPick(
                   leftGenome,
                   state.left.bundles,
                   rules.synergyVariants,
-                  leftSetupPolicy.spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2) ? 2 : 1,
+                  artifactFitVersionForSetupSpec(leftSetupPolicy.spec),
               )
             : pickCoherentDraftBundle(
                   state.left.bundles,
@@ -1041,7 +1043,7 @@ export function resolveRankedDraftPick(
                   rightGenome,
                   state.right.bundles,
                   rules.synergyVariants,
-                  rightSetupPolicy.spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2) ? 2 : 1,
+                  artifactFitVersionForSetupSpec(rightSetupPolicy.spec),
               )
             : pickCoherentDraftBundle(
                   state.right.bundles,
@@ -1111,9 +1113,10 @@ export function resolveRankedDraftPick(
                       getKnownOpponentCreatures(state, team),
                       own.tier1Artifact,
                       phase.creatureLevel >= 3 ? rules.gridType : undefined,
-                      (team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
+                      artifactFitVersionForSetupSpec((team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec) >= 2
                           ? own.tier2Artifact
                           : undefined,
+                      artifactFitVersionForSetupSpec((team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec),
                   );
         if (creatureId === undefined) {
             throw new Error(`Ranked draft creature policy found no visible L${phase.creatureLevel} creature`);

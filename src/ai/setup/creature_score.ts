@@ -16,7 +16,7 @@ import { getAbilityConfig, getCreatureConfig, getSpellConfig } from "../../confi
 import { CreatureFactions, CreatureLevels } from "../../generated/protobuf/v1/creature_gen";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { normalizeFootprintSide } from "../../grid/grid_math";
-import { isOffensiveSpellMultiplier } from "../../spells/spell_damage";
+import { isMagicDamageAbility, isOffensiveSpellMultiplier } from "../../spells/spell_damage";
 import { SpellPowerType } from "../../spells/spell_properties";
 
 /**
@@ -65,7 +65,10 @@ export interface ICreatureInfo {
     /** Printed draft-time movement and luck, before artifacts or placement-dependent auras. */
     movementSteps?: number;
     luck?: number;
+    /** Legacy v1/v2 artifact signal, retained for exact policy replay. MELEE_MAGIC is not magic damage. */
     magicAttack?: boolean;
+    /** Has an offensive spell or a magic-damage ability, using the combat engine's damage contract. */
+    dealsMagicDamage?: boolean;
     /** Fire Breath / Fire Shield are magic damage even though their configured power is a damage percentage. */
     magicalSplash?: boolean;
     magicImmune?: boolean;
@@ -286,6 +289,8 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 caster: spellList.length > 0 || abilityList.some(isCastableAbility),
                 nativeSpellbook: spellList.length > 0,
                 rangedSpellDamage: spellList.some(isRangedDamageSpellbookEntry),
+                dealsMagicDamage:
+                    spellList.some(isRangedDamageSpellbookEntry) || abilityList.some(isMagicDamageAbility),
                 maxDamage: cfg.attack_damage_max ?? 0,
                 shots: cfg.range_shots ?? 0,
                 distance: cfg.shot_distance ?? 0,

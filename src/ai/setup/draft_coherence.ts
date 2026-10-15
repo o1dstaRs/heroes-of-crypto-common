@@ -10,6 +10,7 @@
  */
 
 import { Tier1Artifact, Tier2Artifact } from "../../artifacts/artifact_properties";
+import type { ArtifactFitVersion } from "./artifact_fit";
 import {
     backlineProtectionBeneficiaryCount,
     creatureInfo,
@@ -40,6 +41,8 @@ export interface IDraftCoherenceContext {
     tier1ArtifactId?: number;
     /** Own Tier-2 choice, only after the simultaneous artifact phase has finished. */
     tier2ArtifactId?: number;
+    /** Omitted retains the historical coherence head used by research and explicit v1/v2 policies. */
+    artifactFitVersion?: ArtifactFitVersion;
     /** Only public enemy picks. Required when an interaction-prior candidate uses counter evidence. */
     knownOpponentCreatureIds?: readonly number[];
     /** Candidate-only evidence overlay; omitted preserves the existing coherence policy exactly. */
@@ -94,6 +97,8 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
     if (!info) return 0;
 
     let affinity = 0;
+    const ringBeneficiary =
+        context.artifactFitVersion === 3 ? info.dealsMagicDamage : info.rangedSpellDamage || info.magicAttack;
     if (context.tier1ArtifactId === Tier1Artifact.HUNTERS_LONGBOW && info.ranged) {
         affinity += 1.2;
     } else if (context.tier1ArtifactId === Tier1Artifact.WINGED_BOOTS && info.canFly) {
@@ -108,7 +113,7 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
     } else if (context.tier1ArtifactId === Tier1Artifact.AMULET_OF_RESOLVE && info.abilities.includes("Mechanism")) {
         // Mechanism takes extra status and extra physical area damage. The amulet offsets both.
         affinity += 0.8;
-    } else if (context.tier1ArtifactId === Tier1Artifact.MAGES_RING && (info.rangedSpellDamage || info.magicAttack)) {
+    } else if (context.tier1ArtifactId === Tier1Artifact.MAGES_RING && ringBeneficiary) {
         affinity += 0.8;
     } else if (context.tier1ArtifactId === Tier1Artifact.TOME_OF_AMPLIFICATION && info.castsAmplifiableBuff) {
         affinity += 0.8;
@@ -124,7 +129,8 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
             if (info.ranged && info.shots > 1) affinity += 0.6;
             break;
         case Tier2Artifact.ARCHMAGES_RING:
-            if (info.rangedSpellDamage || info.magicAttack || info.magicalSplash) affinity += 0.5;
+            if (context.artifactFitVersion === 3 ? info.dealsMagicDamage : ringBeneficiary || info.magicalSplash)
+                affinity += 0.5;
             break;
         case Tier2Artifact.GRAVECHAIN:
             if (info.ranged) affinity += 0.3;
@@ -225,7 +231,10 @@ export function pickCoherentDraftCreature(
 /** Build-plan fit available at bundle time, before later creature offers have resolved. */
 export function draftBundleCoherenceAffinity(
     [level1, level2, artifactId]: DraftBundle,
-    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants"> = {},
+    options: Pick<
+        IDraftCoherenceContext,
+        "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants" | "artifactFitVersion"
+    > = {},
 ): number {
     const creatures = [level1, level2] as const;
     const planSeed =
@@ -253,7 +262,10 @@ export function pickCoherentDraftBundle(
     bundles: readonly DraftBundle[],
     creatureScore: (creatureId: number) => number,
     artifactScore: (artifactId: number, ownCreatureIds: readonly number[]) => number,
-    options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants"> = {},
+    options: Pick<
+        IDraftCoherenceContext,
+        "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants" | "artifactFitVersion"
+    > = {},
 ): number {
     if (!bundles.length) return 0;
     const baseScores = bundles.map(

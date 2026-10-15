@@ -67,6 +67,11 @@ export function fireforgedSwordPower(basePower: number): number {
     return basePower;
 }
 
+/** Shared by combat and artifact drafting; MELEE_MAGIC itself only grants access to castable abilities. */
+const MAGIC_DAMAGE_ABILITIES: ReadonlySet<string> = new Set(["Chain Lightning", "Fire Breath", "Fire Shield"]);
+
+export const isMagicDamageAbility = (abilityName: string): boolean => MAGIC_DAMAGE_ABILITIES.has(abilityName);
+
 /**
  * The offensive spells that are THROWN at their target, as opposed to the ones CALLED DOWN out of the sky.
  *
