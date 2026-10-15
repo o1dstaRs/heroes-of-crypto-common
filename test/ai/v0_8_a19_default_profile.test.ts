@@ -53,6 +53,7 @@ const ENV_KEYS = [
     "V08_VISIBLE_EDGE_SCREEN_PRESSURE",
     "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
     "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
+    "SEARCH_A19_ROLLOUT_ALLOCATION",
 ] as const;
 const savedEnvironment = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
 
@@ -106,6 +107,7 @@ describe("v0.8+A19 production profile", () => {
             V08_AGGRESSIVE: "1",
             ...V08_A19_SEARCH_RULES,
             SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "0",
+            SEARCH_A19_ROLLOUT_ALLOCATION: "uniform",
         });
         for (const value of Object.values(V08_A19_SEARCH_RULES)) expect(value).toBe("1");
         // The re-score bank and the broad Armageddon-defend research arm no longer exist anywhere.
@@ -125,6 +127,7 @@ describe("v0.8+A19 production profile", () => {
                     "SEARCH_DECISION_DEADLINE_MS",
                     "SEARCH_CIRCUIT_BREAKER_MS",
                     "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
+                    "SEARCH_A19_ROLLOUT_ALLOCATION",
                 ].includes(key)
             ) {
                 continue;
@@ -154,6 +157,16 @@ describe("v0.8+A19 production profile", () => {
         );
     });
 
+    it("seals adaptive rollout allocation off unless explicitly overridden for research", () => {
+        process.env.SEARCH_A19_ROLLOUT_ALLOCATION = "validation";
+        expect(buildV08A19SearchEnvironment().SEARCH_A19_ROLLOUT_ALLOCATION).toBe("uniform");
+        expect(buildV08A13SearchEnvironment("v0.8").SEARCH_A19_ROLLOUT_ALLOCATION).toBeUndefined();
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_ROLLOUT_ALLOCATION: "halving" });
+        expect(buildV08A19SearchEnvironment().SEARCH_A19_ROLLOUT_ALLOCATION).toBe("halving");
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_ROLLOUT_ALLOCATION: "adaptive" });
+        expect(() => createV08A19SearchDriver({} as ILookaheadDeps)).toThrow("SEARCH_A19_ROLLOUT_ALLOCATION");
+    });
+
     it("fingerprints its genome and sealed environment", () => {
         expect(V08_A19_GENOME.controls).toMatchObject({
             ...V08_A13_GENOME.controls,
@@ -176,6 +189,7 @@ describe("v0.8+A19 production profile", () => {
         expect(V08_A19_SOURCE_LEDGER.map(({ role }) => role)).toEqual([
             "search-driver",
             "selection-bounds",
+            "rollout-allocation",
             "scored-arbitration",
             "material-arbitration",
             "armageddon-endgame",

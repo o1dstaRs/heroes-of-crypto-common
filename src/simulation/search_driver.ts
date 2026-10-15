@@ -18,6 +18,11 @@ import {
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { SearchSelectionBounds, type ISearchSelectionBoundPlan } from "./search_selection_bounds";
+import {
+    parseSearchRolloutAllocation,
+    selectSearchRolloutSurvivors,
+    type SearchRolloutAllocation,
+} from "./search_rollout_allocation";
 
 import {
     enumerateCandidates,
@@ -402,6 +407,13 @@ type WaitDeadlinePolicy = "profile" | "operation_bounded";
 
 /** The slice of a candidate the rollout scorer actually consumes (lets the oracle skip enumeration). */
 type ISearchCandidate = Pick<IEnumeratedCandidate, "kind" | "actions">;
+
+interface ICachedSearchRollout {
+    readonly score: number;
+    readonly material?: number;
+}
+
+type SearchRolloutCache = Map<ISearchCandidate, Map<number, ICachedSearchRollout>>;
 
 interface IIndexedCandidateScore {
     score: number;
@@ -1437,6 +1449,7 @@ export class SearchDriver {
     private readonly researchHorizonMinRangedTypes: number | null;
     private readonly rollouts: number;
     private readonly certifiedSelectionBounds: boolean;
+    private readonly rolloutAllocation: SearchRolloutAllocation;
     private readonly includeMoves: boolean;
     private readonly maxMoveShotComposites: number;
     private readonly moveShotVersions: ReadonlySet<string>;
@@ -1721,6 +1734,7 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_CERTIFIED_SELECTION_BOUNDS must be 0 or 1");
         }
         this.certifiedSelectionBounds = rawCertifiedBounds === "1";
+        this.rolloutAllocation = parseSearchRolloutAllocation(searchEnv("SEARCH_A19_ROLLOUT_ALLOCATION"));
         this.includeMoves = searchEnv("SEARCH_INCLUDE_MOVES") === "1";
         const rawMaxMoveShots = searchEnv("SEARCH_MAX_MOVE_SHOTS");
         if (this.mode !== "search" || rawMaxMoveShots === undefined || rawMaxMoveShots === "") {
@@ -3895,7 +3909,7 @@ export class SearchDriver {
                 prioritizeV08STargetPressure,
                 prioritizeV08SUrgency,
             );
-            means = this.scoreCandidates(
+            means = this.scoreSearchCandidates(
                 unit,
                 scoredCandidates,
                 seedBase,
@@ -3921,6 +3935,7 @@ export class SearchDriver {
                         prioritizeV08SUrgency,
                         aggressiveWaitComparison,
                     ),
+                version,
             );
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
             const legalProductiveIndices = scoredCandidates
@@ -5199,6 +5214,78 @@ export class SearchDriver {
             this.a19ScoredArbitration ? V08_A19_SCORED_ARBITRATION_POLICY.valueGain : 0,
         );
     }
+    /**
+     * Offline root research only. The 2K pilot plus 4 floor(K/2) continuation samples fit the 4K budget.
+     * Halving reuses all six samples; validation judges survivors using only the four fresh samples.
+     * Full-score observers, alternate material gates, deadlines and historical versions keep uniform work.
+     */
+    private scoreSearchCandidates(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        seedBase: number,
+        horizonMode: HorizonMode,
+        rolloutCount: number,
+        deadlineAt: number | null,
+        turnHorizon: number,
+        boundHopelessTails: boolean | ISearchSelectionBoundPlan,
+        version: string,
+    ): number[] {
+        if (
+            this.rolloutAllocation === "uniform" ||
+            version !== "v0.8" ||
+            this.match.offlineDeterministicWork !== true ||
+            horizonMode !== "turns" ||
+            rolloutCount !== 4 ||
+            candidates.length < 6 ||
+            deadlineAt !== null ||
+            this.observeOnly ||
+            this.validationRollouts !== null ||
+            this.ilPath !== undefined ||
+            this.auditPath !== undefined ||
+            this.scoredDecisionObserver !== undefined ||
+            this.passiveProductiveProbeObserver !== undefined ||
+            (this.captureA19Material && this.a19MaterialArbitration !== "ties")
+        ) {
+            return this.scoreCandidates(
+                unit,
+                candidates,
+                seedBase,
+                horizonMode,
+                rolloutCount,
+                deadlineAt,
+                turnHorizon,
+                boundHopelessTails,
+            );
+        }
+        const cache: SearchRolloutCache = new Map();
+        const pilot = this.scoreCandidates(unit, candidates, seedBase, horizonMode, 2, null, turnHorizon, false, cache);
+        const pilotMaterial = this.captureA19Material ? this.a19MaterialEvidence?.materials : undefined;
+        const indices = selectSearchRolloutSurvivors(pilot, pilotMaterial);
+        const survivors = indices.map((index) => candidates[index]);
+        const final = this.scoreCandidates(unit, survivors, seedBase, horizonMode, 6, null, turnHorizon, false, cache);
+        const means = candidates.map(() => Number.NEGATIVE_INFINITY);
+        const materials = candidates.map(() => Number.NEGATIVE_INFINITY);
+        const start = this.rolloutAllocation === "validation" ? 2 : 0;
+        const samples = 6 - start;
+        for (let index = 0; index < indices.length; index += 1) {
+            const originalIndex = indices[index];
+            if (!Number.isFinite(final[index])) continue;
+            const row = cache.get(candidates[originalIndex])!;
+            let sum = 0,
+                materialSum = 0;
+            for (let r = start; r < 6; r += 1) {
+                const sample = row.get(r)!;
+                sum += sample.score;
+                if (this.captureA19Material) materialSum += sample.material!;
+            }
+            means[originalIndex] = sum / samples;
+            if (this.captureA19Material) materials[originalIndex] = materialSum / samples;
+        }
+        if (this.captureA19Material) {
+            this.a19MaterialEvidence = { unitId: unit.getId(), candidates, means, materials, rolloutCount: samples };
+        }
+        return means;
+    }
     /** Mean leaf value per candidate over SEARCH_ROLLOUTS paired-seed rollouts (-Infinity = illegal). */
     private scoreCandidates(
         unit: Unit,
@@ -5209,6 +5296,7 @@ export class SearchDriver {
         deadlineAt: number | null = null,
         turnHorizon = this.horizon,
         boundHopelessTails: boolean | ISearchSelectionBoundPlan = false,
+        rolloutCache?: SearchRolloutCache,
     ): number[] {
         this.assertBeforeDecisionDeadline(deadlineAt);
         const journal =
@@ -5247,7 +5335,22 @@ export class SearchDriver {
             let illegal = false;
             for (let r = 0; r < rolloutCount; r += 1) {
                 this.assertBeforeDecisionDeadline(deadlineAt);
+                const cached = rolloutCache?.get(cand)?.get(r);
+                if (cached !== undefined) {
+                    if (cached.score === -Infinity) {
+                        illegal = true;
+                        break;
+                    }
+                    sum += cached.score;
+                    completed += 1;
+                    if (captureMaterial && cached.material !== undefined) {
+                        materialSum += cached.material;
+                        materialCount += 1;
+                    }
+                    continue;
+                }
                 let score: number;
+                let material: number | undefined;
                 let checkpoint;
                 try {
                     checkpoint = journal?.checkpoint();
@@ -5262,7 +5365,8 @@ export class SearchDriver {
                             if (remaining.getTeam() === actingTeam) ours += strength;
                             else enemy += strength;
                         }
-                        materialSum += 0.5 * (1 + (ours - enemy) / (ours + enemy + 1000));
+                        material = 0.5 * (1 + (ours - enemy) / (ours + enemy + 1000));
+                        materialSum += material;
                         materialCount += 1;
                     }
                 } finally {
@@ -5282,6 +5386,11 @@ export class SearchDriver {
                         cleanupErrors.push(error);
                     }
                     if (cleanupErrors.length) throw new SearchRollbackError(cleanupErrors);
+                }
+                if (rolloutCache) {
+                    let row = rolloutCache.get(cand);
+                    if (!row) rolloutCache.set(cand, (row = new Map()));
+                    row.set(r, { score, material });
                 }
                 if (score === -Infinity) {
                     illegal = true;

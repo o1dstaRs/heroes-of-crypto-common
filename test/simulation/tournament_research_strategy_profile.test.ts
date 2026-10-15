@@ -69,6 +69,7 @@ describe("tournament entrant-A research strategy profile", () => {
         expect(records[0].entrantAResearchProfile?.runtimeSourceLedger?.map(({ role }) => role)).toEqual([
             "search-driver",
             "selection-bounds",
+            "rollout-allocation",
             "scored-arbitration",
             "material-arbitration",
             "armageddon-endgame",

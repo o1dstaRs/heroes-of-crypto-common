@@ -107,7 +107,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "6db0691c27ecedc377f973c71a9a8f254090bd86ab2c9daa21c39a6ef507faa1" as const;
+    "7737af84baf69db913af2227a68244b6102868702c7689bc902501ec6345cf1f" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -140,12 +140,17 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
         // Re-pinned for offline selector-aware bounds; the released flag remains off.
-        sha256: "87493733c70e5f85eecf31ba191a3290d8de0e5476ebffefaa8423a26614aae5" as const,
+        sha256: "11dad9487dfc27085c705e78e1bca8f44ffa3333b777e3956b6b69bc5c95e36e" as const,
     }),
     Object.freeze({
         role: "selection-bounds" as const,
         source: "src/simulation/search_selection_bounds.ts" as const,
         sha256: "74943cac7cc84fc3d7736805bad4fb621b73b9e00ebd0e4906f093a7c541794c" as const,
+    }),
+    Object.freeze({
+        role: "rollout-allocation" as const,
+        source: "src/simulation/search_rollout_allocation.ts" as const,
+        sha256: "4c63f2d0886f81d49443125414b261055e113b0436fd599b3d35fbd6919000fe" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,
@@ -232,6 +237,8 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
         // Selection-aware tail bounds are an offline, measured research arm. Production stays sealed off.
         SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "0",
+        // Adaptive allocation is an offline experiment; live A19 retains uniform sampling.
+        SEARCH_A19_ROLLOUT_ALLOCATION: "uniform",
     });
 }
 
