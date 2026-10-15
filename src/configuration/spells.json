@@ -1672,7 +1672,7 @@
         "Hamstrung": {
             "name": "Hamstrung",
             "level": 1,
-            "desc": ["The unit's movement range is reduced by 30%.", "Lasts 3 laps."],
+            "desc": ["A flying unit's movement range is reduced by 30%.", "Lasts 3 laps."],
             "target": "ANY_ENEMY",
             "power": 30,
             "power_type": "COMMON",
