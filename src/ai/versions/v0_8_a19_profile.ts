@@ -190,8 +190,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "default-search-routing" as const,
         source: "src/simulation/battle_engine.ts" as const,
-        // Re-pinned for opt-in committed health diagnostics; capture parity verifies unchanged decisions.
-        sha256: "9afb1418304e5e8bf7e9a29071ddc3c9db19332fc800c2894c8cf29b21a7e35d" as const,
+        // Re-pinned for an explicit research deployment intervention; absent hook preserves routing.
+        sha256: "c574631ad6275e2abdb8c87fa733a72aee9d056c045c936165818e1cd415c8a5" as const,
     }),
 ] as const);
 

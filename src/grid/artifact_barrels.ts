@@ -106,6 +106,7 @@ export function autoPlaceArtifactBarrels(
     team: TeamType,
     allowedCells?: readonly XY[],
     shooterCells?: readonly XY[],
+    adjacencyPolicy: "clear-lanes" | "legacy" = "clear-lanes",
 ): void {
     if (fp.hasFightStarted() || fp.hasFightFinished() || !fp.hasArtifactTier1(team, Tier1Artifact.BARREL_BARRICADE))
         return;
@@ -127,10 +128,17 @@ export function autoPlaceArtifactBarrels(
         if (grid.getArtifactBarrels(team).some((barrel) => barrel.index === index)) continue;
         const placed = grid.getArtifactBarrels(team);
         const free = cells.filter((cell) => grid.areAllCellsEmpty([cell]));
+        // Adjacency must not override the primary lane constraint. In particular, an isolated safe
+        // cell plus a safe pair beats a nearer pair whose second barrel blocks a friendly shooter.
+        const safe =
+            adjacencyPolicy === "clear-lanes"
+                ? free.filter((cell) => !barrelBlocksShooter(cell, shooters, team, side))
+                : free;
+        const eligible = safe.length ? safe : free;
         const adjacent = (a: XY, b: XY) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1;
         const target = placed.length
-            ? (free.find((cell) => placed.some((barrel) => adjacent(barrel.cell, cell))) ?? free[0])
-            : (free.find((cell) => free.some((other) => adjacent(cell, other))) ?? free[0]);
+            ? (eligible.find((cell) => placed.some((barrel) => adjacent(barrel.cell, cell))) ?? eligible[0])
+            : (eligible.find((cell) => eligible.some((other) => adjacent(cell, other))) ?? eligible[0]);
         if (target) grid.placeArtifactBarrel(team, index, target);
     }
 }

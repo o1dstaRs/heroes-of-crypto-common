@@ -166,7 +166,10 @@ export const TIER1_ARTIFACT_WINRATE: Record<number, number> = {
     [Tier1Artifact.VETERAN_HELM]: 49.3,
     [Tier1Artifact.DUAL_STRIKE_CHARM]: 47.2,
     [Tier1Artifact.SWIFT_BOOTS]: 46.6,
-    // Id 11's frozen Helm prior. Barrel Barricade has not been measured, so this is not its win rate.
+    // Retained Helm prior, not a measured barrel win rate. A19 artifact-swap calibration at d2181a2
+    // (seeds 2026101411/2026101415; 1176/336 games including self-controls, seven cohorts, three maps)
+    // measured 45.47% [43.20, 47.73] and 43.27% [38.26, 48.28]. Replacing this with 45.47 did not
+    // establish a held-out Brier improvement (95% CI crosses zero); later balance changes need a rerun.
     [Tier1Artifact.BARREL_BARRICADE]: 46.1,
     // Not remeasured after the item became +25% status resistance and +25% mind resistance.
     [Tier1Artifact.AMULET_OF_RESOLVE]: 45.4,

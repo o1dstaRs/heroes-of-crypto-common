@@ -2,6 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeF
 import { arch, cpus, platform } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Tier1Artifact, TIER1_ARTIFACT_LIST } from "../artifacts/artifact_properties";
 
 import { AI_META_COHORTS, AI_META_RECORDED_MAPS } from "./ai_meta_cohorts_core";
 import type { BarrelFightRequest, BarrelFightResult } from "./measure_barrel_use_worker";
@@ -12,12 +13,82 @@ import { fingerprintSourceTree } from "./source_tree_fingerprint";
 type Experiment = NonNullable<BarrelFightRequest["experiment"]>;
 const ownerships = ["both", "candidate", "opponent", "neither"] as const;
 
+/** Each live Tier-1, including a barrel-vs-barrel negative control, in every cohort/live map. */
+export function barrelArtifactValuePlan(
+    clusters: number,
+    baseSeed: number,
+    timing: Experiment["timing"],
+): BarrelFightRequest[] {
+    const plan = barrelComparisonPlan(clusters, baseSeed, timing);
+    const maps = [1, 3, 4] as const;
+    return plan.map((request) => {
+        const cluster = request.experiment!.cluster;
+        return {
+            ...request,
+            experiment: {
+                ...request.experiment!,
+                map: maps[Math.floor(cluster / AI_META_COHORTS.length) % maps.length],
+                ownership: "value-swap" as const,
+                study: "artifact-value" as const,
+                competitorArtifact:
+                    TIER1_ARTIFACT_LIST[
+                        Math.floor(cluster / (AI_META_COHORTS.length * maps.length)) % TIER1_ARTIFACT_LIST.length
+                    ].id,
+            },
+        };
+    });
+}
+
+/** With artifacts swapped, P(barrel) = 1/2 + (score(A with barrel) - score(A without barrel))/2. */
+export function summarizeBarrelArtifactValue(results: readonly BarrelFightResult[]) {
+    const score = (rows: readonly BarrelFightResult[]) => {
+        const summary = summarizeBarrelComparison(rows);
+        return {
+            games: rows.length,
+            clusters: summary.overall.clusters,
+            score: summary.overall.scoreDelta === null ? null : 0.5 + summary.overall.scoreDelta / 2,
+            approximate95CI: summary.overall.approximate95CI?.map((x) => 0.5 + x / 2) ?? null,
+            engineRejections: summary.overall.control.engineRejections + summary.overall.treatment.engineRejections,
+            nonElimination: summary.overall.control.nonElimination + summary.overall.treatment.nonElimination,
+        };
+    };
+    const comparisons = results.filter((row) => row.experiment?.competitorArtifact !== Tier1Artifact.BARREL_BARRICADE);
+    const controls = results.filter((row) => row.experiment?.competitorArtifact === Tier1Artifact.BARREL_BARRICADE);
+    let controlTracePairs = 0;
+    let controlTraceMismatches = 0;
+    for (const control of controls.filter((row) => !row.experiment!.treatment)) {
+        const treatment = controls.find(
+            (row) =>
+                row.experiment!.cluster === control.experiment!.cluster &&
+                row.candidateSide === control.candidateSide &&
+                row.experiment!.treatment,
+        );
+        if (!treatment || !control.diagnostics || !treatment.diagnostics) continue;
+        controlTracePairs++;
+        if (control.diagnostics.actionSha256 !== treatment.diagnostics.actionSha256) controlTraceMismatches++;
+    }
+    return {
+        againstLiveAlternatives: score(comparisons),
+        selfControl: { ...score(controls), controlTracePairs, controlTraceMismatches },
+        byArtifact: Object.fromEntries(
+            TIER1_ARTIFACT_LIST.map((item) => [
+                item.id,
+                { name: item.name, ...score(results.filter((row) => row.experiment?.competitorArtifact === item.id)) },
+            ]),
+        ),
+        byCohort: Object.fromEntries(
+            AI_META_COHORTS.map((cohort) => [cohort, score(comparisons.filter((row) => row.cohort === cohort))]),
+        ),
+        byMap: Object.fromEntries([1, 3, 4].map((map) => [map, score(comparisons.filter((row) => row.map === map))])),
+    };
+}
+
 /** Four games per independent roster pair: control/treatment, each on both seats. */
 export function barrelComparisonPlan(
     clusters: number,
     baseSeed: number,
     timing: Experiment["timing"],
-    policy: "exact" | "own" = "exact",
+    policy: "exact" | "own" | "placement" = "exact",
 ): BarrelFightRequest[] {
     if (!Number.isSafeInteger(clusters) || clusters < 1) throw new RangeError("clusters must be a positive integer");
     if (!Number.isSafeInteger(baseSeed)) throw new RangeError("seed must be an integer");
@@ -111,6 +182,14 @@ export function summarizeBarrelComparison(results: readonly BarrelFightResult[])
                     0,
                     ...rows.map((game) => game.diagnostics?.searchTiming[game.candidateSide].maxMs ?? 0),
                 ),
+                initialBarrelsBlockingShooterFiles: rows.reduce(
+                    (sum, game) => sum + (game.diagnostics?.deployment?.[game.candidateSide].blockedShooterFiles ?? 0),
+                    0,
+                ),
+                initialBarrelsBlockingShots: rows.reduce(
+                    (sum, game) => sum + (game.diagnostics?.deployment?.[game.candidateSide].blockedShots ?? 0),
+                    0,
+                ),
             };
         };
         return {
@@ -169,8 +248,8 @@ function writeJson(path: string, value: unknown): void {
     renameSync(`${path}.tmp`, path);
 }
 
-export async function runBarrelPolicyComparison(argv: readonly string[]): Promise<void> {
-    const clusters = Number(argv[0] ?? 112);
+export async function runBarrelPolicyComparison(argv: readonly string[], study?: "artifact-value"): Promise<void> {
+    const clusters = Number(argv[0] ?? (study ? AI_META_COHORTS.length * 3 * TIER1_ARTIFACT_LIST.length : 112));
     const concurrency = Number(argv[1] ?? 12);
     const seed = Number(argv[2] ?? 1);
     const outDir = resolve(argv[3] ?? `sim-out/barrel-comparison-${clusters}-s${seed}`);
@@ -178,12 +257,17 @@ export async function runBarrelPolicyComparison(argv: readonly string[]): Promis
     if (timing !== "work" && timing !== "live") throw new Error("timing must be work or live");
     if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new RangeError("concurrency must be positive");
     const policy = argv[5] ?? "exact";
-    if (policy !== "exact" && policy !== "own") throw new Error("policy must be exact or own");
-    const requests = barrelComparisonPlan(clusters, seed, timing, policy);
+    if (policy !== "exact" && policy !== "own" && policy !== "placement")
+        throw new Error("policy must be exact, own or placement");
+    const requests = study
+        ? barrelArtifactValuePlan(clusters, seed, timing)
+        : barrelComparisonPlan(clusters, seed, timing, policy);
     const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
     const fingerprint = () => fingerprintSourceTree(root, ["src"], ["package.json", "bun.lock"]);
     const manifest = {
-        schema: 2,
+        schema: 3,
+        study: study ?? "combat-policy",
+        artifactPool: study ? TIER1_ARTIFACT_LIST.map(({ id, name }) => ({ id, name })) : undefined,
         concurrency,
         host: { platform: platform(), arch: arch(), cpu: cpus()[0]?.model ?? "unknown" },
         clusters,
@@ -191,8 +275,10 @@ export async function runBarrelPolicyComparison(argv: readonly string[]): Promis
         timing,
         runtime: process.versions.bun,
         sourceSha256: fingerprint(),
-        policy,
-        schedule: "7 cohorts x 4 maps x 4 ownerships; four games/cluster; army A treated; order counterbalanced",
+        policy: study ? "stock-a19-artifact-swap" : policy,
+        schedule: study
+            ? "7 cohorts x 3 live maps x current Tier-1 pool; artifact swap on both seats; order counterbalanced"
+            : "7 cohorts x 4 maps x 4 ownerships; four games/cluster; army A treated; order counterbalanced",
     };
     mkdirSync(outDir, { recursive: true });
     const manifestPath = join(outDir, "manifest.json");
@@ -228,6 +314,15 @@ export async function runBarrelPolicyComparison(argv: readonly string[]): Promis
             !result.diagnostics
         )
             throw new Error("Invalid checkpoint result");
+        if (study) {
+            const barrelSide = request.greenIsArmyA === request.experiment!.treatment ? "green" : "red";
+            const otherSide = barrelSide === "green" ? "red" : "green";
+            if (
+                result.artifacts?.[barrelSide] !== Tier1Artifact.BARREL_BARRICADE ||
+                result.artifacts?.[otherSide] !== request.experiment!.competitorArtifact
+            )
+                throw new Error("Checkpoint has the wrong artifact assignment");
+        }
         seen.add(id!);
     }
     const pending = requests.filter((request) => !seen.has(request.experiment!.id));
@@ -239,6 +334,7 @@ export async function runBarrelPolicyComparison(argv: readonly string[]): Promis
         elapsedSeconds: (Date.now() - started) / 1000,
         complete: results.length === requests.length,
         ...summarizeBarrelComparison(results),
+        ...(study ? { artifactValue: summarizeBarrelArtifactValue(results) } : {}),
     });
     console.log(
         `Barrel comparison: ${pending.length}/${requests.length} games remaining, ${concurrency} workers, ${timing} timing -> ${outDir}`,

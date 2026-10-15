@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { friendlyShotBlockingBarrels } from "../../src/ai/artifact_barrel_tactics";
+import { friendlyShotBlockingBarrels, projectBarrelShotTradeoff } from "../../src/ai/artifact_barrel_tactics";
+import { PathHelper } from "../../src/grid/path_helper";
+import { findBestLegalStationaryRangeAttack } from "../../src/ai/candidates";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
 import { snapshotBattle } from "../../src/simulation/battle_snapshot";
 import { Spell } from "../../src/spells/spell";
@@ -55,8 +57,17 @@ describe("barrel shot projection", () => {
                     test(`map ${map}, team ${team}, owner ${owner}, ray ${dx}/${dy}`, () => {
                         const h = fixture(map, team, dx, dy, owner);
                         expect([...h.blockers()]).toEqual([h.key]);
+                        const projected = tradeoff(h).find((row) => row.unitId === h.shooter.getId())!;
                         h.grid.clearScatteredMountainAt(h.barrel.x, h.barrel.y);
                         expect([...h.blockers()]).toEqual([]);
+                        const actual =
+                            findBestLegalStationaryRangeAttack(h.shooter, {
+                                ...h,
+                                matrix: h.grid.getMatrix(),
+                                pathHelper: new PathHelper(h.grid.getSettings()),
+                                fightProperties: FightStateManager.getInstance().getFightProperties(),
+                            })?.expectedDamage ?? 0;
+                        expect(projected.after).toBe(actual);
                     });
             }
     test("projecting shots leaves authoritative combat state unchanged", () => {
@@ -88,6 +99,7 @@ describe("barrel shot projection", () => {
     test("Area Throw passes over barrels and never requests a clearing shot", () => {
         const h = fixture(1, teams[0], 1, 1, teams[0], 4, ["Area Throw"]);
         expect([...h.blockers()]).toEqual([]);
+        expect(tradeoff(h).find((row) => row.unitId === h.shooter.getId())!.gain).toBe(0);
     });
     test("does not open a shot at a hidden or forbidden-by-provocation target", () => {
         const h = fixture(1, teams[0], 1, 1);
@@ -103,5 +115,45 @@ describe("barrel shot projection", () => {
         const h = fixture(1, teams[0], 1, 1);
         expect(h.grid.placeArtifactBarrel(teams[1], 0, { x: 6, y: 13 })).toBe(true);
         expect([...h.blockers()]).toEqual([h.key]);
+    });
+
+    const tradeoff = (h: ReturnType<typeof fixture>) =>
+        projectBarrelShotTradeoff(
+            {
+                ...h,
+                matrix: h.grid.getMatrix(),
+                pathHelper: new PathHelper(h.grid.getSettings()),
+                fightProperties: FightStateManager.getInstance().getFightProperties(),
+            },
+            h.barrel,
+        )!;
+
+    test("opening the first of two blocking barrels is not credited as an available shot", () => {
+        const h = fixture(1, teams[0], 1, 0);
+        expect(h.grid.placeArtifactBarrel(teams[1], 0, { x: 6, y: 11 })).toBe(true);
+        expect(tradeoff(h).find((row) => row.unitId === h.shooter.getId())!.gain).toBe(0);
+        h.grid.clearArtifactBarrels(teams[1]);
+        expect(tradeoff(h).find((row) => row.unitId === h.shooter.getId())!.gain).toBeGreaterThan(0);
+    });
+
+    test("clearing a barrel can expose both armies and reports both opportunity changes", () => {
+        const h = fixture(1, teams[0], 1, 0);
+        h.grid.cleanupAll(h.enemy.getId(), h.enemy.getAttackRange(), h.enemy.isSmallSize());
+        h.unitsHolder.getAllUnits().delete(h.enemy.getId());
+        const archer = createTestUnit({ team: teams[1], attackType: PBTypes.AttackVals.RANGE, rangeShots: 4 });
+        placeUnit(h.grid, h.unitsHolder, archer, { x: 7, y: 11 });
+        const opportunities = tradeoff(h);
+        expect(opportunities.find((row) => row.unitId === h.shooter.getId())!.gain).toBeGreaterThan(0);
+        expect(opportunities.find((row) => row.unitId === archer.getId())!.gain).toBeGreaterThan(0);
+    });
+
+    test("counterfactual shots leave the full battle and cached matrix unchanged", () => {
+        const h = fixture(1, teams[0], 1, 1);
+        const fp = FightStateManager.getInstance().getFightProperties();
+        const before = snapshotBattle(h.unitsHolder, h.grid, fp);
+        const matrix = h.grid.getMatrix();
+        tradeoff(h);
+        expect(snapshotBattle(h.unitsHolder, h.grid, fp)).toEqual(before);
+        expect(h.grid.getMatrix()).toEqual(matrix);
     });
 });

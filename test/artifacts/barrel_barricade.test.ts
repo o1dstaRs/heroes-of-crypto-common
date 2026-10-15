@@ -194,6 +194,68 @@ describe("Barrel Barricade", () => {
             { x: 4, y: 6 },
         ]);
     });
+    for (const map of [1, 2, 3, 4] as const)
+        for (const team of [LEFT, RIGHT])
+            for (const side of [true, false]) {
+                it(`never lets adjacency add avoidable shooter-file blockage: map ${map}, team ${team}, side ${side}`, () => {
+                    const { grid, fp } = fixture(map);
+                    fp.setSideOrientedPlacement(side);
+                    fp.setArtifactPerTeam(team, ArtifactTier.TIER_1, Tier1Artifact.BARREL_BARRICADE);
+                    const shooter = { x: 7, y: 7 };
+                    const direction = team === LEFT ? 1 : -1;
+                    const options = [1, 2, 3].flatMap((inward) =>
+                        [-1, 0, 1].map((cross) =>
+                            side
+                                ? { x: shooter.x + inward * direction, y: shooter.y + cross }
+                                : { x: shooter.x + cross, y: shooter.y + inward * direction },
+                        ),
+                    );
+                    const isBlocked = (cell: { x: number; y: number }) =>
+                        side ? cell.y === shooter.y : cell.x === shooter.x;
+                    let legacyAvoidable = 0;
+                    let tested = 0;
+                    const available = options.filter((cell) => grid.areAllCellsEmpty([cell]));
+                    for (let mask = 1; mask < 1 << available.length; mask++) {
+                        const free = available.filter((_cell, index) => mask & (1 << index));
+                        if (free.length < 2) continue;
+                        const unavoidable = Math.max(0, 2 - free.filter((cell) => !isBlocked(cell)).length);
+                        autoPlaceArtifactBarrels(grid, fp, team, free, [shooter], "legacy");
+                        legacyAvoidable += Number(
+                            grid.getArtifactBarrels(team).filter((barrel) => isBlocked(barrel.cell)).length >
+                                unavoidable,
+                        );
+                        grid.clearArtifactBarrels(team);
+                        autoPlaceArtifactBarrels(grid, fp, team, free, [shooter]);
+                        expect(grid.getArtifactBarrels(team)).toHaveLength(2);
+                        expect(grid.getArtifactBarrels(team).filter((barrel) => isBlocked(barrel.cell))).toHaveLength(
+                            unavoidable,
+                        );
+                        grid.clearArtifactBarrels(team);
+                        tested++;
+                    }
+                    expect(tested).toBeGreaterThan(0);
+                    expect(legacyAvoidable).toBeGreaterThan(0);
+                });
+            }
+    it("preserves a manual barrel while filling a safe nonadjacent slot", () => {
+        const { grid, fp } = fixture();
+        fp.setSideOrientedPlacement(true);
+        expect(grid.placeArtifactBarrel(LEFT, 0, { x: 3, y: 6 })).toBe(true);
+        autoPlaceArtifactBarrels(
+            grid,
+            fp,
+            LEFT,
+            [
+                { x: 3, y: 7 },
+                { x: 4, y: 9 },
+            ],
+            [{ x: 2, y: 7 }],
+        );
+        expect(grid.getArtifactBarrels(LEFT).map((barrel) => barrel.cell)).toEqual([
+            { x: 3, y: 6 },
+            { x: 4, y: 9 },
+        ]);
+    });
     it("chooses an adjacent free pair instead of an isolated first cell, without overwriting units", () => {
         const { grid, fp, attacker } = fixture();
         autoPlaceArtifactBarrels(grid, fp, LEFT, [

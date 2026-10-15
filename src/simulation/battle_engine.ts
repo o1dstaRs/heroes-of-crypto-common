@@ -30,7 +30,7 @@ import {
     V08_A19_PRODUCTION_VERSION,
 } from "../ai/versions/v0_8_a19_profile";
 import type { GameAction } from "../engine/actions";
-import { GameActionEngine } from "../engine/action_engine";
+import { GameActionEngine, type IGameActionEngineContext } from "../engine/action_engine";
 import type { GameEvent } from "../engine/events";
 import { createDefaultGameRuntime, type IGameRuntime } from "../engine/runtime";
 import { TurnEngine } from "../engine/turn_engine";
@@ -389,6 +389,10 @@ export interface IMatchConfig {
     redSetupPlacementPolicy?: PlacementPolicyVariant;
     /** Optional simulation instrumentation. Unset by default; observers must not mutate the live unit/context. */
     decisionObserver?: (observation: IDecisionObservation) => void;
+    /** Research-only deployment intervention after normal setup, before the authoritative start action. */
+    beforeFightStart?: (
+        context: Pick<IGameActionEngineContext, "grid" | "fightProperties" | "unitsHolder" | "attackHandler">,
+    ) => void;
     /** Optional pre-search strategy-policy proposals. Unset in live and ordinary simulation calls. */
     policyProposalObserver?: (event: IAIPolicyEvent) => void;
     /** Optional strategy-policy events retained after search arbitration. Unset in live and ordinary calls. */
@@ -1308,6 +1312,7 @@ function runMatchInner(config: IMatchConfig): IMatchResult {
         }
     };
 
+    config.beforeFightStart?.(engineContext);
     const startResult = applyCommittedAction({ type: "start_fight" });
     applyEvents(startResult.events);
     search.onFightReady();

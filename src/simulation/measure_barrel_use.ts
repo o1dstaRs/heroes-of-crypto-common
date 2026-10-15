@@ -5,7 +5,10 @@
  *
  *   bun src/simulation/measure_barrel_use.ts [games=10000] [concurrency=12] [baseSeed=1] [outDir]
  *
- *   bun src/simulation/measure_barrel_use.ts --compare [clusters=112] [concurrency=12] [seed=1] [outDir] [work|live] [exact|own]
+ *   bun src/simulation/measure_barrel_use.ts --compare [clusters=112] [concurrency=12] [seed=1] [outDir] [work|live] [exact|own|placement]
+ *   bun src/simulation/measure_barrel_use.ts --calibrate [clusters=7*3*liveT1Count] [concurrency=12] [seed=1] [outDir] [work|live]
+ * Calibration swaps Barrel Barricade against every live Tier-1 on fixed armies, both seats, with a
+ * barrel-vs-barrel negative control. This measures artifact value, not the combat candidate's lift.
  * Comparison uses four fights per cluster (both seats, control/treatment), seven army cohorts, four maps
  * (water reported separately as historical), and four barrel ownerships. Use frozen source and separate
  * tuning/held-out seeds; 112 clusters is coverage smoke, not evidence of a small win-rate gain.
@@ -24,7 +27,7 @@ import { PersistentWorkerPool } from "./persistent_worker_pool";
 import type { BarrelFightRequest, BarrelFightResult } from "./measure_barrel_use_worker";
 
 const USAGE =
-    "Usage: bun src/simulation/measure_barrel_use.ts [games=10000] [concurrency=12] [baseSeed=1] [outDir]\n       bun src/simulation/measure_barrel_use.ts --compare [clusters=112] [concurrency=12] [seed=1] [outDir] [work|live] [exact|own]";
+    "Usage: bun src/simulation/measure_barrel_use.ts [games=10000] [concurrency=12] [baseSeed=1] [outDir]\n       bun src/simulation/measure_barrel_use.ts --compare [clusters=112] [concurrency=12] [seed=1] [outDir] [work|live] [exact|own|placement]\n       bun src/simulation/measure_barrel_use.ts --calibrate [clusters=7*3*liveT1Count] [concurrency=12] [seed=1] [outDir] [work|live]";
 
 interface CohortTotals {
     games: number;
@@ -182,9 +185,9 @@ function topCounts(counts: Record<string, number>, limit: number): { key: string
 }
 
 async function main(argv: readonly string[]): Promise<void> {
-    if (argv[0] === "--compare") {
+    if (argv[0] === "--compare" || argv[0] === "--calibrate") {
         const { runBarrelPolicyComparison } = await import("./barrel_policy_comparison");
-        await runBarrelPolicyComparison(argv.slice(1));
+        await runBarrelPolicyComparison(argv.slice(1), argv[0] === "--calibrate" ? "artifact-value" : undefined);
         return;
     }
     if (argv[0] === "--help" || argv[0] === "-h") {

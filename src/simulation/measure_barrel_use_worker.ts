@@ -7,13 +7,18 @@
  * through placeArtifactBarrel, so they stay out of the barrel tally.
  */
 import { createHash } from "node:crypto";
-import { friendlyShotBlockingBarrels } from "../ai/artifact_barrel_tactics";
+import { friendlyShotBlockingBarrels, projectBarrelShotTradeoff } from "../ai/artifact_barrel_tactics";
 import { SearchDriver } from "./search_driver";
 import { parentPort } from "node:worker_threads";
 
 import { Tier1Artifact } from "../artifacts/artifact_properties";
 import type { TeamType } from "../generated/protobuf/v1/types_gen";
 import { Grid } from "../grid/grid";
+import {
+    artifactBarrelPlacementCells,
+    artifactBarrelShooterCells,
+    autoPlaceArtifactBarrels,
+} from "../grid/artifact_barrels";
 import type { GridSettings } from "../grid/grid_settings";
 import { getCellForPosition } from "../grid/grid_math";
 import type { XY } from "../utils/math";
@@ -45,14 +50,19 @@ export interface BarrelFightRequest {
     matchupGames: number;
     baseSeed: number;
     greenIsArmyA: boolean;
+    /** Setup-only research probe; its response has kind=deployment-probe and is never a fight result. */
+    deploymentOnly?: boolean;
     experiment?: {
         id: string;
         cluster: number;
         treatment: boolean;
-        ownership: "both" | "candidate" | "opponent" | "neither";
+        ownership: "both" | "candidate" | "opponent" | "neither" | "value-swap";
         map: 1 | 2 | 3 | 4;
         timing: "work" | "live";
-        policy?: "exact" | "own";
+        policy?: "exact" | "own" | "placement";
+        study?: "artifact-value";
+        competitorArtifact?: number;
+        counterfactualShots?: boolean;
     };
 }
 
@@ -66,10 +76,23 @@ export interface BarrelFightResult {
     candidateScore: number;
     elapsedMs: number;
     ownBarrelStrikesBySide: Record<Side, number>;
+    artifacts?: Record<Side, number>;
     diagnostics?: {
         actionSha256: string;
         ownClears: Record<Side, { opensShot: number; removesCover: number; neither: number; both: number }>;
         searchTiming: Record<Side, { decisions: number; p95Ms: number; maxMs: number; over1000Ms: number }>;
+        deployment?: Record<Side, { cells: XY[]; blockedShooterFiles: number; blockedShots: number }>;
+        counterfactualOwnClears?: Record<
+            Side,
+            {
+                clears: number;
+                friendlyDamageGain: number;
+                enemyDamageGain: number;
+                actingUnitShotForgone: number;
+                firstBlockerWithoutGain: number;
+                coverLostWithoutGain: number;
+            }
+        >;
     };
     placed: number;
     placedGreen: number;
@@ -90,6 +113,20 @@ export interface BarrelFightResult {
     barrelRejectionCounts: Record<string, number>;
     otherRejectionCounts: Record<string, number>;
     barrelRejectionSamples: string[];
+}
+
+export interface BarrelDeploymentProbeResult {
+    kind: "deployment-probe";
+    request: BarrelFightRequest;
+    legacy: Record<Side, XY[]>;
+    clearLanes: Record<Side, XY[]>;
+    changedSides: Side[];
+}
+
+class CompletedDeploymentProbe extends Error {
+    public constructor(public readonly result: BarrelDeploymentProbeResult) {
+        super("Deployment probe complete");
+    }
 }
 
 interface LiveBarrels {
@@ -175,8 +212,29 @@ function play(request: BarrelFightRequest): BarrelFightResult {
         red: { opensShot: 0, removesCover: 0, neither: 0, both: 0 },
     };
     let shotBlockers: Record<Side, ReadonlySet<string>> = { green: new Set(), red: new Set() };
+    let shotTradeoffs = new Map<string, ReturnType<typeof projectBarrelShotTradeoff>>();
+    let actingUnitId = "";
+    const counterfactualOwnClears = {
+        green: {
+            clears: 0,
+            friendlyDamageGain: 0,
+            enemyDamageGain: 0,
+            actingUnitShotForgone: 0,
+            firstBlockerWithoutGain: 0,
+            coverLostWithoutGain: 0,
+        },
+        red: {
+            clears: 0,
+            friendlyDamageGain: 0,
+            enemyDamageGain: 0,
+            actingUnitShotForgone: 0,
+            firstBlockerWithoutGain: 0,
+            coverLostWithoutGain: 0,
+        },
+    };
     const actionHash = createHash("sha256");
     const times: Record<Side, number[]> = { green: [], red: [] };
+    let deployment: NonNullable<BarrelFightResult["diagnostics"]>["deployment"];
     decisionTimes = experiment ? times : undefined;
     const prepared = prepareMetaPair(
         { cohort: request.cohort, games: request.matchupGames, baseSeed: request.baseSeed },
@@ -246,6 +304,22 @@ function play(request: BarrelFightRequest): BarrelFightResult {
                 if (removesCover) ownClears[side].removesCover += 1;
                 if (opensShot && removesCover) ownClears[side].both += 1;
                 if (!opensShot && !removesCover) ownClears[side].neither += 1;
+                const tradeoff = shotTradeoffs.get(key!);
+                if (tradeoff) {
+                    const stats = counterfactualOwnClears[side];
+                    const friendlyGain = tradeoff
+                        .filter((row) => row.team === team)
+                        .reduce((sum, row) => sum + row.gain, 0);
+                    const enemyGain = tradeoff
+                        .filter((row) => row.team !== team)
+                        .reduce((sum, row) => sum + row.gain, 0);
+                    stats.clears++;
+                    stats.friendlyDamageGain += friendlyGain;
+                    stats.enemyDamageGain += enemyGain;
+                    stats.actingUnitShotForgone += tradeoff.find((row) => row.unitId === actingUnitId)?.before ?? 0;
+                    stats.firstBlockerWithoutGain += Number(opensShot && friendlyGain <= 1e-9);
+                    stats.coverLostWithoutGain += Number(enemyGain > 1e-9 && friendlyGain <= 1e-9);
+                }
             } else enemyBarrelStrikes += 1;
             return;
         }
@@ -264,6 +338,15 @@ function play(request: BarrelFightRequest): BarrelFightResult {
         experiment.ownership === "both" ||
         (experiment.ownership === "candidate" && side === candidateSide) ||
         (experiment.ownership === "opponent" && side !== candidateSide);
+    // Swap only Tier-1 between the same two armies; setup, Tier-2 and combat RNG stay fixed.
+    const artifactFor = (side: Side): number =>
+        experiment?.study === "artifact-value"
+            ? (side === candidateSide) === experiment.treatment
+                ? Tier1Artifact.BARREL_BARRICADE
+                : experiment.competitorArtifact!
+            : hasBarrels(side)
+              ? Tier1Artifact.BARREL_BARRICADE
+              : 0;
     const synergyVariants = aiMetaSynergyVariantsForPair(prepared.setupSeed, prepared.combatSeed);
     const configFor = (green: IAiMetaArmy, red: IAiMetaArmy) => {
         const greenSplit = materializeReplayAbSplits(
@@ -284,8 +367,8 @@ function play(request: BarrelFightRequest): BarrelFightResult {
             redDoctrine: red.doctrine,
             greenAugments: green.augment.augments,
             redAugments: red.augment.augments,
-            greenArtifactT1: hasBarrels("green") ? Tier1Artifact.BARREL_BARRICADE : 0,
-            redArtifactT1: hasBarrels("red") ? Tier1Artifact.BARREL_BARRICADE : 0,
+            greenArtifactT1: artifactFor("green"),
+            redArtifactT1: artifactFor("red"),
             greenArtifactT2: green.artifactT2.id,
             redArtifactT2: red.artifactT2.id,
             greenSynergies: green.synergies,
@@ -296,7 +379,9 @@ function play(request: BarrelFightRequest): BarrelFightResult {
             placementAugmentTiming: "setup-before-placement" as const,
             sideOrientedPlacement: true,
             searchOfflineDeterministicWork: experiment?.timing !== "live",
-            ...(experiment?.treatment ? { searchEnvOverrideTeams: [candidateTeam as TeamType] } : {}),
+            ...(experiment?.treatment && !experiment.study && experiment.policy !== "placement"
+                ? { searchEnvOverrideTeams: [candidateTeam as TeamType] }
+                : {}),
             headlessEvents: true,
             ...createAiMetaMatchStrategyOverrides(AI_META_REGISTERED_VERSION_STRATEGY_PROFILE, {
                 greenOpponentCreatureIds: red.creatureIds,
@@ -306,7 +391,7 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     };
 
     const previousOverrides = process.env.V08_A19_SEARCH_ENV_OVERRIDES;
-    if (experiment?.treatment)
+    if (experiment?.treatment && !experiment.study && experiment.policy !== "placement")
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({
             SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: experiment.policy === "own" ? "own" : "1",
         });
@@ -315,8 +400,81 @@ function play(request: BarrelFightRequest): BarrelFightResult {
     try {
         result = runMatch({
             ...configFor(greenArmy, redArmy),
+            beforeFightStart:
+                request.deploymentOnly || experiment?.policy === "placement"
+                    ? (context) => {
+                          const { grid, fightProperties: fp, unitsHolder, attackHandler } = context;
+                          if (request.deploymentOnly) {
+                              const place = (policy: "legacy" | "clear-lanes") => {
+                                  for (const team of [GREEN_TEAM, RED_TEAM]) grid.clearArtifactBarrels(team);
+                                  for (const team of [GREEN_TEAM, RED_TEAM])
+                                      autoPlaceArtifactBarrels(
+                                          grid,
+                                          fp,
+                                          team,
+                                          artifactBarrelPlacementCells(grid, fp, team),
+                                          artifactBarrelShooterCells(grid, unitsHolder.getAllUnits().values(), team),
+                                          policy,
+                                      );
+                                  return {
+                                      green: grid.getArtifactBarrels(GREEN_TEAM).map((barrel) => barrel.cell),
+                                      red: grid.getArtifactBarrels(RED_TEAM).map((barrel) => barrel.cell),
+                                  };
+                              };
+                              const legacy = place("legacy");
+                              const clearLanes = place("clear-lanes");
+                              throw new CompletedDeploymentProbe({
+                                  kind: "deployment-probe",
+                                  request,
+                                  legacy,
+                                  clearLanes,
+                                  changedSides: (["green", "red"] as const).filter(
+                                      (side) => JSON.stringify(legacy[side]) !== JSON.stringify(clearLanes[side]),
+                                  ),
+                              });
+                          }
+                          for (const team of [GREEN_TEAM, RED_TEAM]) {
+                              autoPlaceArtifactBarrels(
+                                  grid,
+                                  fp,
+                                  team,
+                                  artifactBarrelPlacementCells(grid, fp, team),
+                                  artifactBarrelShooterCells(grid, unitsHolder.getAllUnits().values(), team),
+                                  experiment!.treatment && team === candidateTeam ? "clear-lanes" : "legacy",
+                              );
+                          }
+                          deployment = Object.fromEntries(
+                              (["green", "red"] as const).map((side) => {
+                                  const team = side === "green" ? GREEN_TEAM : RED_TEAM;
+                                  const cells = grid.getArtifactBarrels(team).map((barrel) => barrel.cell);
+                                  const shooters = artifactBarrelShooterCells(
+                                      grid,
+                                      unitsHolder.getAllUnits().values(),
+                                      team,
+                                  );
+                                  const shots = friendlyShotBlockingBarrels(team, grid, unitsHolder, attackHandler!);
+                                  return [
+                                      side,
+                                      {
+                                          cells,
+                                          blockedShooterFiles: cells.filter((barrel) =>
+                                              shooters.some(
+                                                  (shooter) =>
+                                                      barrel.y === shooter.y &&
+                                                      (team === GREEN_TEAM
+                                                          ? barrel.x > shooter.x
+                                                          : barrel.x < shooter.x),
+                                              ),
+                                          ).length,
+                                          blockedShots: cells.filter((cell) => shots.has(`${cell.x},${cell.y}`)).length,
+                                      },
+                                  ];
+                              }),
+                          ) as NonNullable<BarrelFightResult["diagnostics"]>["deployment"];
+                      }
+                    : undefined,
             decisionObserver: experiment
-                ? ({ context }) => {
+                ? ({ context, unit }) => {
                       if (!context.attackHandler)
                           throw new Error("Barrel diagnostics require the combat attack handler");
                       shotBlockers = {
@@ -333,6 +491,17 @@ function play(request: BarrelFightRequest): BarrelFightResult {
                               context.attackHandler,
                           ),
                       };
+                      actingUnitId = unit.getId();
+                      shotTradeoffs = experiment.counterfactualShots
+                          ? new Map(
+                                context.grid
+                                    .getArtifactBarrels()
+                                    .map(({ cell }) => [
+                                        `${cell.x},${cell.y}`,
+                                        projectBarrelShotTradeoff(context, cell),
+                                    ]),
+                            )
+                          : new Map();
                   }
                 : undefined,
             turnExecutionObserver: (observation) => {
@@ -393,11 +562,14 @@ function play(request: BarrelFightRequest): BarrelFightResult {
         candidateScore: result.winner === "draw" ? 0.5 : Number(result.winner === candidateSide),
         elapsedMs: performance.now() - started,
         ownBarrelStrikesBySide,
+        artifacts: { green: artifactFor("green"), red: artifactFor("red") },
         ...(experiment
             ? {
                   diagnostics: {
                       actionSha256: actionHash.digest("hex"),
                       ownClears,
+                      deployment,
+                      ...(experiment.counterfactualShots ? { counterfactualOwnClears } : {}),
                       searchTiming: Object.fromEntries(
                           (["green", "red"] as const).map((side) => {
                               const sorted = times[side].sort((a, b) => a - b);
@@ -439,4 +611,11 @@ function play(request: BarrelFightRequest): BarrelFightResult {
 }
 
 if (!parentPort) throw new Error("measure_barrel_use_worker must run in a worker thread");
-startPersistentWorker(play);
+startPersistentWorker((request: BarrelFightRequest): BarrelFightResult | BarrelDeploymentProbeResult => {
+    try {
+        return play(request);
+    } catch (error) {
+        if (error instanceof CompletedDeploymentProbe) return error.result;
+        throw error;
+    }
+});
