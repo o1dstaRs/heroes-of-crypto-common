@@ -19,12 +19,14 @@ import {
     LEAGUE_ROUND3_DRAFT_SPEC,
     parseDraftGenome,
     pickDraftGenomeCreature,
+    pickRankedLiveDraftBundle,
     pickRankedLiveDraftCreature,
     projectDraftGenomeForShipping,
     RANKED_VERSATILE_DRAFT_SPEC,
 } from "../ai/setup/draft_ship";
 import { RANKED_A19_DRAFT_CANDIDATE, RANKED_A19_DRAFT_CANDIDATE_ID } from "../ai/setup/ranked_a19_draft_candidate";
 import { pickCoherentDraftBundle } from "../ai/setup/draft_coherence";
+import { ARTIFACT_FIT_SETUP_PREFIX_V2 } from "../ai/setup/artifact_fit";
 import { isRankedDraftInteractionPrior, RANKED_DRAFT_INTERACTION_PRIOR_ID } from "../ai/setup/draft_interaction_prior";
 import { isRankedDraftVarietyPolicy, RANKED_DRAFT_VARIETY_POLICY_ID } from "../ai/setup/draft_variety";
 import type { RankedDraftSynergyVariants } from "../ai/setup/draft_synergy_variants";
@@ -36,11 +38,17 @@ import {
 import { resolveSetupPolicy, type IResolvedSetupPolicy } from "../ai/setup/setup_ship";
 import { creatureInfo } from "../ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../ai/setup/setup_v0";
-import { TIER1_ARTIFACT_WINRATE, TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED } from "../ai/setup/setup_strategy";
+import {
+    createTier2ArtifactDecisionContext,
+    TIER1_ARTIFACT_WINRATE,
+    TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED,
+    type ITier2ArtifactDecisionContext,
+} from "../ai/setup/setup_strategy";
 import { buildV08A19SearchEnvironment } from "../ai/versions/v0_8_a19_profile";
 import { V08_A19_SEARCH_OVERRIDE_ENV } from "./v0_8_a19_search";
 import { pickRankedAIDoctrine } from "../ai/setup/doctrine_variety";
 import { PBTypes } from "../generated/protobuf/v1/types";
+import * as GridConstants from "../grid/grid_constants";
 import { Doctrine, getUpgradePoints } from "../doctrines/doctrine_properties";
 import {
     createPickSimState,
@@ -51,6 +59,7 @@ import {
     LIVE_TIER1_ARTIFACT_IDS,
     LIVE_TIER2_ARTIFACT_IDS,
     transitionPickSim,
+    transitionServerPersistedPickSim,
     type IPickSimState,
     type IPickTeamState,
     type PickAction,
@@ -227,6 +236,8 @@ export interface IRankedDraftRecordedArmy {
     /** With a Tier-2 override only: the three artifacts the draft offered and the one the setup policy took. */
     tier2Offers?: number[];
     policyTier2Artifact?: number;
+    /** Exact public information at the live five-creature decision, before the final level-4 pick. */
+    tier2Decision?: IRankedDraftTier2Decision;
     /** With a synergy override only: the synergies the candidate fought with and the ones its setup policy took. */
     synergies?: ISetupSynergy[];
     policySynergies?: ISetupSynergy[];
@@ -888,14 +899,6 @@ const randomInt = (seed: number): PickRandomInt => {
     return (maxExclusive) => Math.floor(rng() * maxExclusive);
 };
 
-function applyAccepted(state: IPickSimState, action: PickAction, rng: PickRandomInt): IPickSimState {
-    const result = transitionPickSim(state, action, rng);
-    if (result.status !== "accepted") {
-        throw new Error(`Ranked draft policy emitted ${action.type} rejected as ${result.reason}`);
-    }
-    return result.state;
-}
-
 /**
  * Drive the exact ranked pick sequence while restricting each policy difference to the deployable 15-value
  * intrinsic draft head. Tier-2 is selected at live phase sequence 8, when each team has five creatures;
@@ -918,6 +921,16 @@ export interface IRankedDraftPickRules {
     gridType?: number;
     /** The board's synergy variants, public from the first draft screen (live rules only; read by `-sv` policies). */
     synergyVariants?: RankedDraftSynergyVariants;
+    /** Observational trace only; never receives hidden opponent state or a future creature pick. */
+    onTier2Decision?: (decision: IRankedDraftTier2Decision) => void;
+}
+
+export interface IRankedDraftTier2Decision {
+    team: PickTeam;
+    offered: number[];
+    ownCreatureIds: number[];
+    context: Readonly<ITier2ArtifactDecisionContext>;
+    chosen: number;
 }
 
 /** Tier-1 bundle score for a seat: the composition-corrected table when that genome's policy opts in. */
@@ -944,6 +957,7 @@ export function resolveRankedDraftPick(
         knownOpponentCreatureIds: readonly number[],
         tier1ArtifactId?: number,
         revealedGridType?: number,
+        tier2ArtifactId?: number,
     ): number | undefined =>
         rules.liveDraftRules
             ? pickRankedLiveDraftCreature(
@@ -954,6 +968,7 @@ export function resolveRankedDraftPick(
                   tier1ArtifactId,
                   revealedGridType,
                   rules.synergyVariants,
+                  tier2ArtifactId,
               )
             : pickDraftGenomeCreature(
                   genome,
@@ -978,43 +993,74 @@ export function resolveRankedDraftPick(
     const rng = randomInt(seed);
     let state = createPickSimState(rng);
     const teamState = (team: PickTeam): IPickTeamState => (team === LEFT ? state.left : state.right);
+    const transition = (action: PickAction) =>
+        rules.liveDraftRules
+            ? transitionServerPersistedPickSim(state, action, rng)
+            : transitionPickSim(state, action, rng);
+    const accept = (action: PickAction): void => {
+        const result = transition(action);
+        if (result.status !== "accepted") throw new Error(`Ranked draft rejected ${action.type}: ${result.reason}`);
+        state = result.state;
+    };
 
     const leftDoctrine = setupPolicySpecs.leftDoctrine ?? SETUP_POLICY_V0.pickDoctrine();
     const rightDoctrine = setupPolicySpecs.rightDoctrine ?? SETUP_POLICY_V0.pickDoctrine();
-    state = applyAccepted(state, { type: "select_doctrine", team: LEFT, doctrine: leftDoctrine }, rng);
-    state = applyAccepted(state, { type: "select_doctrine", team: RIGHT, doctrine: rightDoctrine }, rng);
+    accept({ type: "select_doctrine", team: LEFT, doctrine: leftDoctrine });
+    accept({ type: "select_doctrine", team: RIGHT, doctrine: rightDoctrine });
 
     // Both simultaneous policies decide from the same pre-commit state.
     const leftBundle =
         explore(state.left.bundles.length) ??
-        pickCoherentDraftBundle(
-            state.left.bundles,
-            (creatureId) => draftGenomeCreatureScore(leftGenome, creatureId),
-            (artifactId) => tier1ArtifactScore(leftGenome, artifactId),
-            {
-                ...(leftGenome.draftSpellRangedPolicy
-                    ? { draftSpellRangedPolicy: leftGenome.draftSpellRangedPolicy }
-                    : {}),
-                ...(leftGenome.draftStrengthPolicy ? { draftStrengthPolicy: leftGenome.draftStrengthPolicy } : {}),
-                ...(rules.liveDraftRules && rules.synergyVariants ? { synergyVariants: rules.synergyVariants } : {}),
-            },
-        );
+        (rules.liveDraftRules
+            ? pickRankedLiveDraftBundle(
+                  leftGenome,
+                  state.left.bundles,
+                  rules.synergyVariants,
+                  leftSetupPolicy.spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2) ? 2 : 1,
+              )
+            : pickCoherentDraftBundle(
+                  state.left.bundles,
+                  (creatureId) => draftGenomeCreatureScore(leftGenome, creatureId),
+                  (artifactId) => tier1ArtifactScore(leftGenome, artifactId),
+                  {
+                      ...(leftGenome.draftSpellRangedPolicy
+                          ? { draftSpellRangedPolicy: leftGenome.draftSpellRangedPolicy }
+                          : {}),
+                      ...(leftGenome.draftStrengthPolicy
+                          ? { draftStrengthPolicy: leftGenome.draftStrengthPolicy }
+                          : {}),
+                      ...(rules.liveDraftRules && rules.synergyVariants
+                          ? { synergyVariants: rules.synergyVariants }
+                          : {}),
+                  },
+              ));
     const rightBundle =
         explore(state.right.bundles.length) ??
-        pickCoherentDraftBundle(
-            state.right.bundles,
-            (creatureId) => draftGenomeCreatureScore(rightGenome, creatureId),
-            (artifactId) => tier1ArtifactScore(rightGenome, artifactId),
-            {
-                ...(rightGenome.draftSpellRangedPolicy
-                    ? { draftSpellRangedPolicy: rightGenome.draftSpellRangedPolicy }
-                    : {}),
-                ...(rightGenome.draftStrengthPolicy ? { draftStrengthPolicy: rightGenome.draftStrengthPolicy } : {}),
-                ...(rules.liveDraftRules && rules.synergyVariants ? { synergyVariants: rules.synergyVariants } : {}),
-            },
-        );
-    state = applyAccepted(state, { type: "select_bundle", team: LEFT, bundleIndex: leftBundle }, rng);
-    state = applyAccepted(state, { type: "select_bundle", team: RIGHT, bundleIndex: rightBundle }, rng);
+        (rules.liveDraftRules
+            ? pickRankedLiveDraftBundle(
+                  rightGenome,
+                  state.right.bundles,
+                  rules.synergyVariants,
+                  rightSetupPolicy.spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2) ? 2 : 1,
+              )
+            : pickCoherentDraftBundle(
+                  state.right.bundles,
+                  (creatureId) => draftGenomeCreatureScore(rightGenome, creatureId),
+                  (artifactId) => tier1ArtifactScore(rightGenome, artifactId),
+                  {
+                      ...(rightGenome.draftSpellRangedPolicy
+                          ? { draftSpellRangedPolicy: rightGenome.draftSpellRangedPolicy }
+                          : {}),
+                      ...(rightGenome.draftStrengthPolicy
+                          ? { draftStrengthPolicy: rightGenome.draftStrengthPolicy }
+                          : {}),
+                      ...(rules.liveDraftRules && rules.synergyVariants
+                          ? { synergyVariants: rules.synergyVariants }
+                          : {}),
+                  },
+              ));
+    accept({ type: "select_bundle", team: LEFT, bundleIndex: leftBundle });
+    accept({ type: "select_bundle", team: RIGHT, bundleIndex: rightBundle });
 
     let transitions = 0;
     while (!isPickSimComplete(state)) {
@@ -1023,10 +1069,29 @@ export function resolveRankedDraftPick(
         if (phase.phase === PBTypes.PickPhaseVals.ARTIFACT_2) {
             const left = teamState(LEFT);
             const right = teamState(RIGHT);
-            const leftArtifact = leftSetupPolicy.pickArtifactT2(left.tier2Offers, left.creatures);
-            const rightArtifact = rightSetupPolicy.pickArtifactT2(right.tier2Offers, right.creatures);
-            state = applyAccepted(state, { type: "select_tier2", team: LEFT, artifactId: leftArtifact }, rng);
-            state = applyAccepted(state, { type: "select_tier2", team: RIGHT, artifactId: rightArtifact }, rng);
+            const decide = (team: PickTeam, own: IPickTeamState, policy: IResolvedSetupPolicy): number => {
+                const context = createTier2ArtifactDecisionContext({
+                    publicOpponentCreatureIds: getKnownOpponentCreatures(state, team),
+                    ...(rules.gridType === undefined
+                        ? {}
+                        : { gridType: rules.gridType, gridSize: GridConstants.GRID_SIZE }),
+                    ownDoctrine: own.doctrine,
+                    ownArtifactIds: own.tier1Artifact === undefined ? [] : [own.tier1Artifact],
+                });
+                const chosen = policy.pickArtifactT2(own.tier2Offers, own.creatures, context);
+                rules.onTier2Decision?.({
+                    team,
+                    offered: [...own.tier2Offers],
+                    ownCreatureIds: [...own.creatures],
+                    context,
+                    chosen,
+                });
+                return chosen;
+            };
+            const leftArtifact = decide(LEFT, left, leftSetupPolicy);
+            const rightArtifact = decide(RIGHT, right, rightSetupPolicy);
+            accept({ type: "select_tier2", team: LEFT, artifactId: leftArtifact });
+            accept({ type: "select_tier2", team: RIGHT, artifactId: rightArtifact });
             continue;
         }
         if (phase.phase !== PBTypes.PickPhaseVals.PICK || phase.actors.length !== 1) {
@@ -1046,11 +1111,14 @@ export function resolveRankedDraftPick(
                       getKnownOpponentCreatures(state, team),
                       own.tier1Artifact,
                       phase.creatureLevel >= 3 ? rules.gridType : undefined,
+                      (team === LEFT ? leftSetupPolicy : rightSetupPolicy).spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
+                          ? own.tier2Artifact
+                          : undefined,
                   );
         if (creatureId === undefined) {
             throw new Error(`Ranked draft creature policy found no visible L${phase.creatureLevel} creature`);
         }
-        const result = transitionPickSim(state, { type: "pick_creature", team, creatureId }, rng);
+        const result = transition({ type: "pick_creature", team, creatureId });
         if (result.status === "rejected") {
             throw new Error(`Ranked draft creature policy was rejected as ${result.reason}`);
         }
@@ -1282,6 +1350,7 @@ export function playRankedDraftGame(
     const rightSetupPolicy = resolveSetupPolicy(rightSetupPolicySpec);
     // The map is fixed when the pick is created, and revealed to the draft before the level-3 picks.
     const gridType = options.mapTypes[(offerBoard + seedLaneIndex) % options.mapTypes.length];
+    const tier2Decisions = new Map<PickTeam, IRankedDraftTier2Decision>();
     const pick = resolveRankedDraftPick(
         pickSeed,
         leftGenome,
@@ -1291,7 +1360,10 @@ export function playRankedDraftGame(
             right: rightSetupPolicy.spec,
             ...rankedDraftSeatDoctrines(options, pickSeed, candidatePickedLeft),
         },
-        rankedDraftPickRules(options, gridType, synergyVariants),
+        {
+            ...rankedDraftPickRules(options, gridType, synergyVariants),
+            onTier2Decision: (decision) => tier2Decisions.set(decision.team, decision),
+        },
     );
     const left = materializeArmy(pick.left, getKnownOpponentCreatures(pick, LEFT), leftSetupPolicy);
     const right = materializeArmy(pick.right, getKnownOpponentCreatures(pick, RIGHT), rightSetupPolicy);
@@ -1426,6 +1498,8 @@ export function playRankedDraftGame(
                   armies: {
                       candidate: {
                           ...recordedArmy(candidateArmy),
+                          tier2Offers: [...(candidatePickedLeft ? pick.left : pick.right).tier2Offers],
+                          tier2Decision: tier2Decisions.get(candidatePickedLeft ? LEFT : RIGHT),
                           ...(options.candidateTier1Override === undefined
                               ? {}
                               : { forcedTier1Artifact: options.candidateTier1Override }),
@@ -1448,7 +1522,11 @@ export function playRankedDraftGame(
                                     policyAugments: candidatePolicyAugments,
                                 }),
                       },
-                      opponent: recordedArmy(candidatePickedLeft ? right : left),
+                      opponent: {
+                          ...recordedArmy(candidatePickedLeft ? right : left),
+                          tier2Offers: [...(candidatePickedLeft ? pick.right : pick.left).tier2Offers],
+                          tier2Decision: tier2Decisions.get(candidatePickedLeft ? RIGHT : LEFT),
+                      },
                   },
               }
             : {}),

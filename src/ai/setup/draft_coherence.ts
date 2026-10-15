@@ -9,7 +9,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import { Tier1Artifact } from "../../artifacts/artifact_properties";
+import { Tier1Artifact, Tier2Artifact } from "../../artifacts/artifact_properties";
 import {
     backlineProtectionBeneficiaryCount,
     creatureInfo,
@@ -38,6 +38,8 @@ export interface IDraftCoherenceContext {
     ownCreatureIds: readonly number[];
     /** The acting seat's selected Tier-1 artifact, when the bundle phase has already resolved. */
     tier1ArtifactId?: number;
+    /** Own Tier-2 choice, only after the simultaneous artifact phase has finished. */
+    tier2ArtifactId?: number;
     /** Only public enemy picks. Required when an interaction-prior candidate uses counter evidence. */
     knownOpponentCreatureIds?: readonly number[];
     /** Candidate-only evidence overlay; omitted preserves the existing coherence policy exactly. */
@@ -113,6 +115,29 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
     } else if (context.tier1ArtifactId === Tier1Artifact.RIME_CHARM && (info.melee || info.ranged)) {
         affinity += 0.3;
         if (hasMultiHitMeleePressure(creatureId)) affinity += 0.3;
+    }
+
+    // The last level-4 pick follows Tier 2. Complete the selected plan without overriding the trained
+    // strength head or inventing future artifacts during earlier picks.
+    switch (context.tier2ArtifactId) {
+        case Tier2Artifact.QUIVER_OF_ECHOES:
+            if (info.ranged && info.shots > 1) affinity += 0.6;
+            break;
+        case Tier2Artifact.ARCHMAGES_RING:
+            if (info.rangedSpellDamage || info.magicAttack || info.magicalSplash) affinity += 0.5;
+            break;
+        case Tier2Artifact.GRAVECHAIN:
+            if (info.ranged) affinity += 0.3;
+            else if (info.melee && (info.movementSteps ?? 4) <= 3) affinity -= 0.4;
+            else if (info.melee && (info.movementSteps ?? 4) >= 6) affinity += 0.15;
+            break;
+        case Tier2Artifact.LAST_FUSE:
+            if (info.melee) {
+                affinity += 0.35;
+                if (info.footprintWidth * info.footprintHeight > 1) affinity += 0.15;
+                if (info.abilities.includes("Resurrection")) affinity -= 0.25;
+            }
+            break;
     }
 
     const ownInfos = context.ownCreatureIds.flatMap((id) => {

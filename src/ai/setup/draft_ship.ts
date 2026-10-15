@@ -32,7 +32,7 @@ import {
     eligibleBacklineProtectorChoices,
 } from "./creature_score";
 import { pickCoherentDraftBundle, pickCoherentDraftCreature, type DraftBundle } from "./draft_coherence";
-import { tier1ArtifactFitScore } from "./artifact_fit";
+import { tier1ArtifactFitScore, tier1ArtifactFitScoreV2 } from "./artifact_fit";
 import {
     applyRankedDraftRangedFloor,
     isRankedDraftStrengthPolicy,
@@ -363,6 +363,7 @@ export function pickRankedLiveDraftCreature(
     tier1ArtifactId?: number,
     revealedGridType?: number,
     synergyVariants?: RankedDraftSynergyVariants,
+    tier2ArtifactId?: number,
 ): number | undefined {
     const eligible = applyRankedDraftRangedFloor(
         genome.draftStrengthPolicy,
@@ -388,6 +389,7 @@ export function pickRankedLiveDraftCreature(
         {
             ownCreatureIds,
             tier1ArtifactId,
+            ...(tier2ArtifactId === undefined ? {} : { tier2ArtifactId }),
             knownOpponentCreatureIds,
             ...(revealedGridType === undefined ? {} : { revealedGridType }),
             ...(synergyVariants === undefined ? {} : { synergyVariants }),
@@ -407,12 +409,13 @@ export function pickRankedLiveDraftBundle(
     genome: ILeagueGenome,
     bundles: readonly DraftBundle[],
     synergyVariants?: RankedDraftSynergyVariants,
+    artifactFitVersion: 1 | 2 = 2,
 ): number {
     return pickCoherentDraftBundle(
         bundles,
         (creatureId) => draftGenomeCreatureScore(genome, creatureId),
         (artifactId, ownCreatureIds) =>
-            tier1ArtifactFitScore(
+            (artifactFitVersion === 1 ? tier1ArtifactFitScore : tier1ArtifactFitScoreV2)(
                 artifactId,
                 ownCreatureIds,
                 (rankedDraftUsesCorrectedTier1Table(genome.draftStrengthPolicy)

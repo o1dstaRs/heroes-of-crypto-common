@@ -66,6 +66,8 @@ export interface ICreatureInfo {
     movementSteps?: number;
     luck?: number;
     magicAttack?: boolean;
+    /** Fire Breath / Fire Shield are magic damage even though their configured power is a damage percentage. */
+    magicalSplash?: boolean;
     magicImmune?: boolean;
     abilities: string;
     /** movement_type === "FLY" — the beneficiary signal for Nature's +Fly-Armor synergy. */
@@ -302,6 +304,7 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                             return false;
                         }
                     }),
+                magicalSplash: abilityList.some((ability) => ability === "Fire Breath" || ability === "Fire Shield"),
                 magicImmune: abilityList.some((ability) => {
                     try {
                         return getAbilityConfig(ability).power_type === AbilityPowerType.MAGIC_RESIST_100;

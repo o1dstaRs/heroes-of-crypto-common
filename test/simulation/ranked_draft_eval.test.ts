@@ -9,6 +9,9 @@
 import { describe, expect, it } from "bun:test";
 
 import { conditionalArtifactT2, parseConditionalRules } from "../../src/ai/setup/setup_conditional";
+import { ARTIFACT_FIT_SETUP_PREFIX } from "../../src/ai/setup/artifact_fit";
+import { resolveSetupPolicy } from "../../src/ai/setup/setup_ship";
+import { Doctrine } from "../../src/doctrines/doctrine_properties";
 import { RANKED_A19_CASTER_EMPOWER_SETUP_SPEC, V07_NONFIGHT_SETUP_SPEC } from "../../src/ai/setup/setup_ship";
 import { creatureInfo } from "../../src/ai/setup/creature_score";
 import { SETUP_POLICY_V0 } from "../../src/ai/setup/setup_v0";
@@ -44,6 +47,7 @@ import {
     evaluateRankedDraftTasks,
     inspectRankedDraftBoard,
     resolveRankedDraftPick,
+    type IRankedDraftTier2Decision,
     summarizeRankedDraftRecords,
 } from "../../src/simulation/ranked_draft_eval";
 
@@ -189,6 +193,55 @@ describe("exact ranked draft evaluator", () => {
             }
         }
         expect(witnessedConditionalOverride).toBeTrue();
+    });
+
+    it("records the ranked artifact decision's public view before the final creature pick", () => {
+        const live = rankedDraftLiveIncumbent();
+        const spec = `${ARTIFACT_FIT_SETUP_PREFIX}conditional-v1:sniper+t2a19`;
+        const decisions: IRankedDraftTier2Decision[] = [];
+        const state = resolveRankedDraftPick(
+            9141515,
+            live,
+            live,
+            { left: spec, right: spec, leftDoctrine: Doctrine.SEE_ALL, rightDoctrine: Doctrine.SEE_NONE },
+            {
+                liveDraftRules: true,
+                gridType: PBTypes.GridVals.BLOCK_CENTER,
+                onTier2Decision: (d) => decisions.push(d),
+            },
+        );
+        expect(decisions).toHaveLength(2);
+        for (const decision of decisions) {
+            const own = decision.team === PBTypes.TeamVals.LEFT ? state.left : state.right;
+            expect(decision.ownCreatureIds).toHaveLength(5);
+            expect(own.creatures).toHaveLength(6);
+            expect(decision.context.ownArtifactIds).toEqual([own.tier1Artifact!]);
+            expect(decision.context.gridType).toBe(PBTypes.GridVals.BLOCK_CENTER);
+            expect(decision.chosen).toBe(
+                resolveSetupPolicy(spec).pickArtifactT2(decision.offered, decision.ownCreatureIds, decision.context),
+            );
+            expect(own.tier2Artifact).toBe(decision.chosen);
+            expect(own.creatures.map((id) => creatureInfo(id)!.level)).toEqual([1, 1, 2, 2, 3, 4]);
+        }
+        expect(decisions[0].context.publicOpponentCreatureIds).toHaveLength(5);
+        expect(decisions[1].context.publicOpponentCreatureIds.length).toBeLessThan(5);
+    });
+
+    it("keeps both artifact decision traces in recorded full-game outcomes", () => {
+        const live = rankedDraftLiveIncumbent();
+        const record = playRankedDraftGame(
+            live,
+            { ...live, id: "artifact-control" },
+            { gamesPerOpponent: 8, baseSeed: 9141500, liveDraftRules: true, recordArmies: true },
+            0,
+            0,
+            { matchRunner: (config) => fakeMatch("green", config) },
+        );
+        for (const army of [record.armies!.candidate, record.armies!.opponent]) {
+            expect(army.tier2Decision!.ownCreatureIds).toHaveLength(5);
+            expect(army.tier2Decision!.offered).toEqual(army.tier2Offers!);
+            expect(army.tier2Decision!.chosen).toBe(army.tier2Artifact);
+        }
     });
 
     it("uses opposite draft seats, exact battle mirrors, and one common battle seed per board", () => {

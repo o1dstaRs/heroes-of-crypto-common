@@ -3,11 +3,14 @@ import { describe, expect, test } from "bun:test";
 import { getRankedAIProfile } from "../../src/ai/ranked_profile";
 import {
     ARTIFACT_FIT_SETUP_PREFIX,
+    ARTIFACT_FIT_SETUP_PREFIX_V2,
     tier1ArtifactFitScore,
+    tier1ArtifactFitScoreV2,
     tier2ArtifactFitScore,
+    tier2ArtifactFitScoreV2,
     withArtifactFitSetupPolicy,
 } from "../../src/ai/setup/artifact_fit";
-import { draftCreatureCoherenceAffinity } from "../../src/ai/setup/draft_coherence";
+import { draftCreatureCoherenceAffinity, pickCoherentDraftCreature } from "../../src/ai/setup/draft_coherence";
 import { parseDraftGenome, pickRankedLiveDraftBundle } from "../../src/ai/setup/draft_ship";
 import { resolveSetupPolicy } from "../../src/ai/setup/setup_ship";
 import { createTier2ArtifactDecisionContext } from "../../src/ai/setup/setup_strategy";
@@ -20,6 +23,7 @@ const melee = [C.WOLF, C.PIKEMAN, C.CRUSADER];
 const magic = [C.WANDERING_MAGE, C.BATTLE_MAGE, C.MAGIC_DRAGON];
 const BASE = "conditional-v1:sniper+t2a19";
 const policy = resolveSetupPolicy(`${ARTIFACT_FIT_SETUP_PREFIX}${BASE}`);
+const v2 = resolveSetupPolicy(`${ARTIFACT_FIT_SETUP_PREFIX_V2}${BASE}`);
 const context = (enemy: readonly number[], tier1?: number) =>
     createTier2ArtifactDecisionContext({
         publicOpponentCreatureIds: enemy,
@@ -143,5 +147,85 @@ describe("current artifact AI fit", () => {
         expect(base.pickArtifactT2(offers, ranged, context(magic))).toBe(T2.CROWN_OF_COMMAND);
         expect(policy.pickArtifactT2(offers, ranged, context(magic))).toBe(T2.AEGIS_OF_THE_ARCANE);
         expect(() => resolveSetupPolicy(ARTIFACT_FIT_SETUP_PREFIX)).toThrow();
+    });
+});
+
+describe("situational artifact selection v2", () => {
+    test("does not extrapolate one scouted magic stack to every hidden enemy slot", () => {
+        const offered = [T2.CROWN_OF_COMMAND, T2.AEGIS_OF_THE_ARCANE];
+        expect(policy.pickArtifactT2(offered, ranged, context([C.BATTLE_MAGE]))).toBe(T2.AEGIS_OF_THE_ARCANE);
+        expect(v2.pickArtifactT2(offered, ranged, context([C.BATTLE_MAGE]))).toBe(T2.CROWN_OF_COMMAND);
+        expect(v2.pickArtifactT2(offered, ranged, context([...magic, C.ANGEL, C.OGRE_MAGE]))).toBe(
+            T2.AEGIS_OF_THE_ARCANE,
+        );
+    });
+
+    test("keeps a whole-army item over an arcane ring for a token caster", () => {
+        const own = [...ranged, C.ORC, C.BATTLE_MAGE];
+        const offered = [T2.CLOVER_OF_FORTUNE, T2.ARCHMAGES_RING];
+        expect(policy.pickArtifactT2(offered, own)).toBe(T2.ARCHMAGES_RING);
+        expect(v2.pickArtifactT2(offered, own)).toBe(T2.CLOVER_OF_FORTUNE);
+        expect(v2.pickArtifactT2(offered, magic)).toBe(T2.ARCHMAGES_RING);
+    });
+
+    test("recognizes magical breath and reflection despite percentage-based ability configs", () => {
+        expect(tier1ArtifactFitScoreV2(T1.MAGES_RING, [C.BLACK_DRAGON], 50)).toBeGreaterThan(50);
+        expect(tier2ArtifactFitScoreV2(T2.ARCHMAGES_RING, [C.BLACK_DRAGON])).toBeGreaterThan(50);
+        expect(tier2ArtifactFitScore(T2.ARCHMAGES_RING, [C.BLACK_DRAGON])).toBe(0);
+        expect(tier2ArtifactFitScoreV2(T2.AEGIS_OF_THE_ARCANE, ranged, context([C.BLACK_DRAGON]))).toBeGreaterThan(50);
+    });
+
+    test("prices Quiver by the firing stacks' pressure and one additional volley", () => {
+        const weakBattery = [C.TSAR_CANNON, C.GARGANTUAN, C.PEASANT, C.SCAVENGER, C.WOLF];
+        const offered = [T2.QUIVER_OF_ECHOES, T2.CROWN_OF_COMMAND];
+        expect(policy.pickArtifactT2(offered, weakBattery)).toBe(T2.QUIVER_OF_ECHOES);
+        expect(v2.pickArtifactT2(offered, weakBattery)).toBe(T2.CROWN_OF_COMMAND);
+        expect(v2.pickArtifactT2(offered, ranged)).toBe(T2.QUIVER_OF_ECHOES);
+        expect(tier2ArtifactFitScoreV2(T2.QUIVER_OF_ECHOES, [C.GARGANTUAN])).toBe(70);
+        expect(tier2ArtifactFitScoreV2(T2.QUIVER_OF_ECHOES, [C.ARBALESTER])).toBe(90);
+    });
+
+    test("values repeated Rime rolls but never invents guaranteed connected targets for Gravechain", () => {
+        expect(tier1ArtifactFitScoreV2(T1.RIME_CHARM, [C.ELF], 50)).toBeGreaterThan(
+            tier1ArtifactFitScoreV2(T1.RIME_CHARM, [C.ARBALESTER], 50),
+        );
+        expect(tier2ArtifactFitScoreV2(T2.GRAVECHAIN, ranged, context(melee))).toBeGreaterThan(
+            tier2ArtifactFitScoreV2(T2.GRAVECHAIN, ranged, context(ranged)),
+        );
+        expect(tier2ArtifactFitScoreV2(T2.GRAVECHAIN, ranged, context(melee, T1.RIME_CHARM))).toBeLessThan(
+            tier2ArtifactFitScoreV2(T2.GRAVECHAIN, ranged, context(melee)),
+        );
+        expect(v2.pickArtifactT2([T2.GRAVECHAIN, T2.TITAN_PLATE], melee, context(melee))).toBe(T2.TITAN_PLATE);
+    });
+
+    test("Last Fuse needs corpse contact and accounts for native resurrection", () => {
+        expect(
+            tier2ArtifactFitScoreV2(T2.LAST_FUSE, melee, context([...melee, C.BEHEMOTH, C.CHAMPION])),
+        ).toBeGreaterThan(tier2ArtifactFitScoreV2(T2.LAST_FUSE, melee, context([...ranged, C.GARGANTUAN, C.ORC])));
+        expect(tier2ArtifactFitScoreV2(T2.LAST_FUSE, [C.ANGEL])).toBeLessThan(
+            tier2ArtifactFitScoreV2(T2.LAST_FUSE, [C.CHAMPION]),
+        );
+    });
+
+    test("completes the selected Tier-2 plan with the final creature instead of forgetting it", () => {
+        const offered = [C.CHAMPION, C.GARGANTUAN];
+        expect(
+            pickCoherentDraftCreature(offered, () => 1, { ownCreatureIds: [], tier2ArtifactId: T2.QUIVER_OF_ECHOES }),
+        ).toBe(C.GARGANTUAN);
+        expect(pickCoherentDraftCreature(offered, () => 1, { ownCreatureIds: [], tier2ArtifactId: T2.LAST_FUSE })).toBe(
+            C.CHAMPION,
+        );
+        expect(
+            draftCreatureCoherenceAffinity(C.TROLL, { ownCreatureIds: [], tier2ArtifactId: T2.GRAVECHAIN }),
+        ).toBeLessThan(draftCreatureCoherenceAffinity(C.TROLL, { ownCreatureIds: [] }));
+    });
+
+    test("keeps the first-pass policy explicitly replayable and versions the new head", () => {
+        expect(v2.spec).toBe(`${ARTIFACT_FIT_SETUP_PREFIX_V2}${BASE}`);
+        expect(policy.spec).toBe(`${ARTIFACT_FIT_SETUP_PREFIX}${BASE}`);
+        expect(withArtifactFitSetupPolicy(v2, 2)).toBe(v2);
+        expect(v2.pickAugments(7, ranged)).toEqual(policy.pickAugments(7, ranged));
+        expect(v2.pickSynergies(ranged)).toEqual(policy.pickSynergies(ranged));
+        expect(() => resolveSetupPolicy(ARTIFACT_FIT_SETUP_PREFIX_V2)).toThrow();
     });
 });

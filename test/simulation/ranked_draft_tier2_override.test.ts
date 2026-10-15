@@ -99,7 +99,7 @@ describe("ranked draft candidate Tier-2 override", () => {
                 },
                 opponent: plain[game].record.armies!.opponent,
             });
-            expect(plain[game].record.armies!.candidate).not.toHaveProperty("tier2Offers");
+            expect(plain[game].record.armies!.candidate.tier2Offers).toEqual(offers);
         }
     });
 

@@ -130,6 +130,7 @@ export interface ISetupPolicy {
         ownCreatureIds: readonly number[],
         knownOpponentCreatureIds: readonly number[],
         tier1ArtifactId?: number,
+        tier2ArtifactId?: number,
     ): number;
     /** Best Tier-2 artifact id from the offered set. */
     pickArtifactT2(offered: readonly number[]): number;

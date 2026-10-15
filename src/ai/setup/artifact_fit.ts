@@ -1,5 +1,5 @@
 import { ARTIFACT_POWER, TIER2_ARTIFACT_LIST, Tier1Artifact, Tier2Artifact } from "../../artifacts/artifact_properties";
-import { DOUBLE_SHOT_ABILITY_NAMES } from "../../abilities/double_shot_names";
+import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES } from "../../abilities/double_shot_names";
 import { creatureInfo, type ICreatureInfo } from "./creature_score";
 import {
     TIER2_ARTIFACT_SCORE_A19_RANGED,
@@ -10,6 +10,7 @@ import { TIER2_ARTIFACT_WINRATE, type ITier2ArtifactDecisionContext } from "./se
 import type { IResolvedSetupPolicy } from "./setup_ship";
 
 export const ARTIFACT_FIT_SETUP_PREFIX = "artifact-fit-v1:";
+export const ARTIFACT_FIT_SETUP_PREFIX_V2 = "artifact-fit-v2:";
 
 const roster = (ids: readonly number[]): ICreatureInfo[] =>
     [...new Set(ids)].flatMap((id) => {
@@ -19,6 +20,8 @@ const roster = (ids: readonly number[]): ICreatureInfo[] =>
 const average = (units: readonly ICreatureInfo[], value: (unit: ICreatureInfo) => number): number =>
     units.length ? units.reduce((sum, unit) => sum + value(unit), 0) / units.length : 0;
 const magicPressure = (unit: ICreatureInfo): number => Number(unit.rangedSpellDamage || unit.magicAttack);
+const magicPressureV2 = (unit: ICreatureInfo): number =>
+    Number(unit.rangedSpellDamage || unit.magicAttack || unit.magicalSplash);
 const attackChance = (base: number, unit: ICreatureInfo, tier1ArtifactId?: number): number =>
     Math.max(
         0,
@@ -54,6 +57,33 @@ export function tier1ArtifactFitScore(id: number, ownIds: readonly number[], bas
         default:
             return baseline;
     }
+}
+
+const nativeAttacks = (unit: ICreatureInfo): number => {
+    const attacks = (unit.ranged ? DOUBLE_SHOT_ABILITY_NAMES : DOUBLE_PUNCH_ABILITY_NAMES).some((name) =>
+        unit.abilities.includes(name),
+    )
+        ? 2
+        : 1;
+    return unit.ranged ? Math.min(attacks, Math.max(0, unit.shots)) : attacks;
+};
+const procPerTurn = (base: number, unit: ICreatureInfo, tier1?: number): number =>
+    1 - (1 - attackChance(base, unit, tier1)) ** nativeAttacks(unit);
+
+export function tier1ArtifactFitScoreV2(id: number, ownIds: readonly number[], baseline: number): number {
+    const own = roster(ownIds);
+    if (id === Tier1Artifact.MAGES_RING && own.length) {
+        const share = average(own, magicPressureV2);
+        return share > 0 ? 50 + ARTIFACT_POWER.MAGES_RING_MAGIC_PERCENT * share : 0;
+    }
+    if (id !== Tier1Artifact.RIME_CHARM || !own.length) return tier1ArtifactFitScore(id, ownIds, baseline);
+    return (
+        50 +
+        25 *
+            average(own, (unit) =>
+                unit.melee || unit.ranged ? procPerTurn(ARTIFACT_POWER.RIME_PROC_PERCENT, unit) : 0,
+            )
+    );
 }
 
 const FIT_TIER2_IDS: ReadonlySet<number> = new Set([
@@ -127,14 +157,118 @@ export function tier2ArtifactFitScore(
     }
 }
 
+/** Conservative forecasts at pick time. A single scouted caster is not an entire magical enemy army. */
+export function tier2ArtifactFitScoreV2(
+    id: number,
+    ownIds: readonly number[],
+    context?: Readonly<ITier2ArtifactDecisionContext>,
+): number {
+    const own = roster(ownIds);
+    if (!own.length) return 50;
+    const enemy = roster(context?.publicOpponentCreatureIds ?? []);
+    const tier1 = context?.ownArtifactIds?.[0];
+    // Both armies have five drafted identities at this decision; unidentified slots never inherit a revealed
+    // unit's kit. Full-army counts, positions and the final level-4 pick remain unavailable.
+    const knownEnemyShare = (value: (unit: ICreatureInfo) => number): number =>
+        enemy.reduce((sum, unit) => sum + value(unit), 0) / Math.max(5, enemy.length);
+    switch (id) {
+        case Tier2Artifact.ARCHMAGES_RING: {
+            const share = average(own, magicPressureV2);
+            const existing = tier1 === Tier1Artifact.MAGES_RING ? ARTIFACT_POWER.MAGES_RING_MAGIC_PERCENT / 100 : 0;
+            // Anchor to the actual A19 prior instead of treating a damage percentage as win-rate points.
+            // A token caster must not displace a strong whole-army item in an otherwise physical draft.
+            return share > 0
+                ? (TIER2_ARTIFACT_SCORE_A19_RANGED[id] ?? 50) +
+                      (ARTIFACT_POWER.ARCHMAGES_RING_MAGIC_PERCENT * share) / (1 + existing)
+                : 0;
+        }
+        case Tier2Artifact.AEGIS_OF_THE_ARCANE: {
+            const defense = ARTIFACT_POWER.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE / 100;
+            const beneficiaries = average(own, (unit) => Number(!unit.magicImmune));
+            return beneficiaries > 0
+                ? 50 + ((100 * defense) / (1 - defense)) * knownEnemyShare(magicPressureV2) * beneficiaries
+                : 0;
+        }
+        case Tier2Artifact.QUIVER_OF_ECHOES: {
+            // A bonus volley consumes ammunition. A stack that starts with only enough for its native volleys
+            // cannot trigger it. Weight pressure rather than treating one weak archer like an entire battery.
+            const pressure = (unit: ICreatureInfo): number =>
+                unit.melee || unit.ranged || unit.rangedSpellDamage
+                    ? (Math.max(1, unit.maxDamage) / Math.max(1, unit.exp)) * nativeAttacks(unit)
+                    : 0;
+            const total = own.reduce((sum, unit) => sum + pressure(unit), 0);
+            const extra = own.reduce(
+                (sum, unit) =>
+                    sum +
+                    (unit.ranged && unit.shots > nativeAttacks(unit)
+                        ? (pressure(unit) * attackChance(ARTIFACT_POWER.QUIVER_OF_ECHOES_CHANCE, unit, tier1)) /
+                          nativeAttacks(unit)
+                        : 0),
+                0,
+            );
+            return extra > 0 && total > 0 ? 50 + (100 * extra) / total : 0;
+        }
+        case Tier2Artifact.GRAVECHAIN: {
+            const reliance = knownEnemyShare((unit) => Number(unit.melee)) + 0.5 * (1 - Math.min(1, enemy.length / 5));
+            // Contact is an expectation, never knowledge of hidden deployment. Only revealed melee identities
+            // justify additional links; unknown positions do not become a guaranteed four-target cluster.
+            const links =
+                0.5 *
+                Math.min(
+                    ARTIFACT_POWER.GRAVECHAIN_CONNECTIONS,
+                    Math.max(0, enemy.filter((unit) => unit.melee).length - 1),
+                );
+            const slow = average(own, (unit) =>
+                unit.melee || unit.ranged ? procPerTurn(ARTIFACT_POWER.GRAVECHAIN_CHANCE, unit, tier1) : 0,
+            );
+            const cost = average(
+                own,
+                (unit) =>
+                    (ARTIFACT_POWER.GRAVECHAIN_STEPS_PENALTY / Math.max(1, unit.movementSteps ?? 4)) *
+                    (unit.melee ? 1 : 0.25),
+            );
+            // Rime's Hamstrung and Gravebound stack multiplicatively, so the second slow removes fewer steps.
+            const existingSlow =
+                tier1 === Tier1Artifact.RIME_CHARM
+                    ? 1 -
+                      0.25 *
+                          average(own, (unit) =>
+                              unit.melee || unit.ranged ? procPerTurn(ARTIFACT_POWER.RIME_PROC_PERCENT, unit) : 0,
+                          )
+                    : 1;
+            return 50 + 25 * slow * (1 + links) * reliance * existingSlow - 100 * cost;
+        }
+        case Tier2Artifact.LAST_FUSE: {
+            const contact = average(
+                own,
+                (unit) =>
+                    (unit.melee ? 1 : 0.1) *
+                    (unit.abilities.includes("Resurrection") ? 0.5 : 1) *
+                    (unit.footprintWidth * unit.footprintHeight > 1 ? 1.25 : 1),
+            );
+            const enemyContact =
+                knownEnemyShare((unit) => Number(unit.melee)) + 0.5 * (1 - Math.min(1, enemy.length / 5));
+            // Even a frontline body can be killed from range before making contact. No alive-stack penalty is
+            // invented, and resurrection only delays the explosion rather than permanently disabling it.
+            return 40 + ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER * contact * (0.5 + 0.5 * enemyContact);
+        }
+        default:
+            return tier2ArtifactFitScore(id, ownIds, context);
+    }
+}
+
 /** Keep the base policy's ordering of established items; compare only the new items against that incumbent. */
-export function withArtifactFitSetupPolicy(base: Readonly<IResolvedSetupPolicy>): IResolvedSetupPolicy {
-    if (base.spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX)) return base;
+export function withArtifactFitSetupPolicy(
+    base: Readonly<IResolvedSetupPolicy>,
+    version: 1 | 2 = 1,
+): IResolvedSetupPolicy {
+    const prefix = version === 1 ? ARTIFACT_FIT_SETUP_PREFIX : ARTIFACT_FIT_SETUP_PREFIX_V2;
+    if (base.spec.startsWith(prefix)) return base;
     return Object.freeze({
         ...base,
         configured: true,
-        spec: `${ARTIFACT_FIT_SETUP_PREFIX}${base.spec}`,
-        journalVersion: `${ARTIFACT_FIT_SETUP_PREFIX}${base.journalVersion}`,
+        spec: `${prefix}${base.spec}`,
+        journalVersion: `${prefix}${base.journalVersion}`,
         pickArtifactT2: (
             offered: readonly number[],
             ownIds: readonly number[],
@@ -150,7 +284,7 @@ export function withArtifactFitSetupPolicy(base: Readonly<IResolvedSetupPolicy>)
             const table =
                 base.rules.includes("t2a19") && ranged
                     ? TIER2_ARTIFACT_SCORE_A19_RANGED
-                    : base.rules.includes("t2")
+                    : base.rules.includes("t2") || (version === 2 && base.rules.includes("t2a19"))
                       ? ranged
                           ? TIER2_ARTIFACT_WINRATE_RANGED
                           : TIER2_ARTIFACT_WINRATE_MELEE
@@ -159,7 +293,7 @@ export function withArtifactFitSetupPolicy(base: Readonly<IResolvedSetupPolicy>)
             let bestScore = established.length ? (table[best] ?? 50) : -Infinity;
             for (const id of legal) {
                 if (!FIT_TIER2_IDS.has(id)) continue;
-                const score = tier2ArtifactFitScore(id, ownIds, context);
+                const score = (version === 1 ? tier2ArtifactFitScore : tier2ArtifactFitScoreV2)(id, ownIds, context);
                 if (score > bestScore) {
                     best = id;
                     bestScore = score;
