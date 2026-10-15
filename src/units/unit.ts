@@ -20,6 +20,7 @@ import { BORROWED_GRACE_NAME, borrowedGraceChance } from "../abilities/borrowed_
 import { CHAKRAM_ABILITY_NAME, chakramDescription } from "../abilities/chakram_ability";
 import { DOUBLE_SHOT_ABILITY_NAMES, DUAL_STRIKE_CHARM_BUFF } from "../abilities/double_shot_names";
 import { getCraftChances } from "../abilities/craft_ability";
+import { lastFuseDamage } from "../abilities/last_fuse_ability";
 import { ARTIFACT_POWER, BROKEN_AEGIS_MISS_CHANCE } from "../artifacts/artifact_properties";
 import { empowerMultiplier } from "../augments/augment_properties";
 import { getAbilityConfig, getSpellConfig } from "../configuration/config_provider";
@@ -307,6 +308,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     // Water Shield: set once this unit's one-per-battle absorb shield has been consumed, so the seeding
     // refresh (UnitsHolder.refreshWaterShieldForAllUnits) never re-grants it after it breaks.
     protected waterShieldSpent = false;
+    protected lastFuseFatalHit: { damage: number; stackPower: number } | undefined = undefined;
     protected onHourglass = false;
     // True once this unit has moved during its current turn. Reset when its turn completes. Lets the
     // engine tell a real "manual" end-of-turn (it moved, then finished) from a do-nothing turn (e.g. an
@@ -1418,6 +1420,22 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         const power = this.getBuffPower("Gravechain") ?? ARTIFACT_POWER.GRAVECHAIN_CHANCE;
         return Math.max(0, Math.min(100, power + this.getLuck()));
     }
+    public getLastFuseDamage(): number {
+        const percent = this.getBuffPower("Last Fuse");
+        if (percent === undefined) return 0;
+        return lastFuseDamage(
+            this.isDead() ? (this.lastFuseFatalHit?.damage ?? 0) : this.getCumulativeHp(),
+            this.isDead() ? (this.lastFuseFatalHit?.stackPower ?? this.getStackPower()) : this.getStackPower(),
+            percent,
+        );
+    }
+    private refreshLastFuseDescription(): void {
+        const index = this.unitProperties.applied_buffs.indexOf("Last Fuse");
+        if (index < 0) return;
+        const properties = this.unitProperties.applied_buffs_descriptions[index].split(";").slice(1);
+        this.unitProperties.applied_buffs_descriptions[index] =
+            `Artifact. When this stack is destroyed, it explodes. Every adjacent enemy takes ${this.getLastFuseDamage()} damage.;${properties.join(";")}`;
+    }
     private refreshQuiverOfEchoesDescription(): void {
         const index = this.unitProperties.applied_buffs.indexOf("Quiver of Echoes");
         if (index < 0) return;
@@ -1709,6 +1727,8 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
         this.unitProperties.amount_alive += revived;
         this.unitProperties.amount_died -= revived;
+        this.lastFuseFatalHit = undefined;
+        this.refreshLastFuseDescription();
         return revived;
     }
     public getLevel(): number {
@@ -1758,6 +1778,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
     public increaseAmountAlive(increaseBy: number): void {
         if ((!this.isDead() && this.isSummoned()) || (this.isDead() && !this.isSummoned())) {
             this.unitProperties.amount_alive += increaseBy;
+            this.refreshLastFuseDescription();
         }
     }
     public increaseAttackMod(increaseBy: number): void {
@@ -1933,6 +1954,9 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
             this.unitProperties.max_hp = damage.state.maxHp;
             this.unitProperties.amount_alive = damage.state.amountAlive;
             this.unitProperties.amount_died = damage.state.amountDied;
+            if (damage.dead && damage.unitsDied > 0) {
+                this.lastFuseFatalHit = { damage: damage.appliedDamage, stackPower: this.getStackPower() };
+            }
             this.handleDamageAnimation(damage.animationDeaths);
 
             // Apply "Bitter Experience" if available
@@ -1945,6 +1969,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
             return damage.appliedDamage;
         } finally {
+            this.refreshLastFuseDescription();
             observed?.();
         }
     }
@@ -1958,6 +1983,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
         this.unitProperties.amount_alive = Math.floor(amountAlive);
         this.initialUnitProperties.amount_alive = Math.floor(amountAlive);
+        this.refreshLastFuseDescription();
     }
     public increaseMorale(moraleAmount: number, _synergyMoraleIncrease: number): void {
         if (
@@ -2995,6 +3021,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         // Keep the wire/snapshot representation aligned with the AppliedSpell. This matters for buffs whose
         // cast-time power differs from configuration (for example, Tome-amplified castable buffs).
         this.unitProperties.applied_buffs_powers.push(buff.getPower());
+        if (buff.getName() === "Last Fuse") this.refreshLastFuseDescription();
     }
     /** Once-only ammunition; the army marker itself may also land on allies that cannot shoot. */
     private tryGrantRallyingVolleyShots(power: number): void {
@@ -3336,6 +3363,7 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
 
             return healedFor;
         } finally {
+            this.refreshLastFuseDescription();
             observed?.();
         }
     }
@@ -4285,12 +4313,14 @@ export class Unit implements IUnitPropertiesProvider, IDamageable, IDamager, IUn
         }
 
         this.refreshAbilitiesDescriptions(synergyAbilityPowerIncrease);
+        this.refreshLastFuseDescription();
     }
     public setRangeShotDistance(distance: number) {
         this.unitProperties.shot_distance = distance;
     }
     public setStackPower(stackPower: number): void {
         this.unitProperties.stack_power = stackPower;
+        this.refreshLastFuseDescription();
     }
     public attackMeleeAllowed(
         enemyTeam: Unit[],

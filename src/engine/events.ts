@@ -264,6 +264,17 @@ export type GameEvent =
           amount: number;
           unitsDied: number;
       }
+    /**
+     * Pyre Oath: a destroyed stack burst. `position` is the corpse, captured before it left the board.
+     * Each hit's position is the victim at the moment the blast landed, because a victim the blast kills
+     * is gone before the client draws the number.
+     */
+    | {
+          type: "pyre_exploded";
+          unitId: string;
+          position: XY;
+          hits: { unitId: string; position: XY; amount: number; unitsDied: number }[];
+      }
     | { type: "fight_finished"; winningTeam: TeamType };
 
 export function isHeadlessSimulationEvent(event: GameEvent): boolean {

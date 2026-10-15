@@ -18,6 +18,7 @@ import {
 import * as AbilityHelper from "../abilities/ability_helper";
 import { evaluateAffectedUnits } from "../abilities/aoe_range_ability";
 import { processCraftAbility } from "../abilities/craft_ability";
+import { detonateLastFuseChain, explodeLastFuse, type IPyreExplosion } from "../abilities/last_fuse_ability";
 import * as EffectHelper from "../effects/effect_helper";
 import { Tier1Artifact, ARTIFACT_POWER } from "../artifacts/artifact_properties";
 import {
@@ -3567,6 +3568,17 @@ export class GameActionEngine {
         }
         return attributions;
     }
+    private emitPyreExplosion(events: GameEvent[], explosion: IPyreExplosion | undefined): void {
+        if (!explosion || this.headlessEvents) {
+            return;
+        }
+        events.push({
+            type: "pyre_exploded",
+            unitId: explosion.unitId,
+            position: explosion.position,
+            hits: explosion.hits,
+        });
+    }
     private cleanupDeadUnits(unitIdsDied: string[], killAttributions = new Map<string, Unit>()): GameEvent[] {
         const events: GameEvent[] = [];
         const processed = new Set<string>();
@@ -3588,12 +3600,41 @@ export class GameActionEngine {
             const deleted = this.context.unitsHolder.deleteUnitById(unitId, true);
             if (deleted) {
                 events.push({ type: "unit_destroyed", unitId, reason: "dead_cleanup" });
+                const explosion = explodeLastFuse(unit, this.context.unitsHolder, this.context.sceneLog);
+                this.emitPyreExplosion(events, explosion);
                 const killer = killAttributions.get(unitId);
                 if (killer?.hasAbilityActive("Infest")) {
                     const infested = this.spawnInfestedUnit(killer, corpseLevel, corpseCells);
                     if (infested) {
                         events.push(...infested);
                     }
+                }
+                if (explosion) {
+                    detonateLastFuseChain(
+                        explosion.unitIdsDied,
+                        this.context.unitsHolder,
+                        this.context.sceneLog,
+                        (killedId) => {
+                            events.push({ type: "unit_destroyed", unitId: killedId, reason: "dead_cleanup" });
+                        },
+                        (chain) => {
+                            this.emitPyreExplosion(events, chain);
+                        },
+                        (resurrected) => {
+                            if (this.headlessEvents) {
+                                return;
+                            }
+                            this.context.sceneLog.updateLog(`${resurrected.getName()} is resurrecting!`);
+                            events.push({
+                                type: "unit_resurrected",
+                                unitId: resurrected.getId(),
+                                team: resurrected.getTeam(),
+                                amount: resurrected.getAmountAlive(),
+                                hp: resurrected.getHp(),
+                                position: { ...resurrected.getPosition() },
+                            });
+                        },
+                    );
                 }
                 continue;
             }

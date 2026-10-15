@@ -146,7 +146,10 @@ const REPLAY_SEEDS = [2147598935, 2147640168, 2147790257, 2147831490] as const;
 // Two isolated runs are identical with zero rejected actions. A clean d2181a2 archive without Gravechain
 // reproduces 0797770ee08f12bbd08377557149b48c92a8a5181460406b54f0deadab8ca9f5; adding Gravechain changes
 // only the two normal-map fights at seed 2147640168. Previous pinned digest: 8a627bec8c276376a0ad66277c6b7c9acd13d5cc7052680266d97a99e0400729.
-const EXPECTED_REPLAY_SHA256 = "ece87aaa802fd7e723474b9b7e2836b72681e04d8fbee8b997e774c00b834119";
+// Last Fuse joins the live Tier-2 pool (2026-10-14), changing seeded draft offers and combat.
+// Two runs produce identical traces; excluding only Last Fuse from the live pool restores the previous digest.
+// Previous digest: ece87aaa802fd7e723474b9b7e2836b72681e04d8fbee8b997e774c00b834119.
+const EXPECTED_REPLAY_SHA256 = "e5d00e406d52109cfe8da4b4617144290f1db15e5f18aa8c94a1002ed5d1ddc9";
 
 test("the shared production resolver preserves the terminal setup guard's full-trace replay digest", () => {
     const previousGate = process.env.V07_PLACEMENT_REVEAL;

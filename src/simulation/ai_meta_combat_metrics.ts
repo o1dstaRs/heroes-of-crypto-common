@@ -371,6 +371,11 @@ export function summarizePremiumCombatMetrics(fight: Input): IPremiumCombatMetri
                 case "fire_wall_burned":
                     hit(event.unitId, event.amount, event.unitsDied, "environment:fire_wall");
                     break;
+                case "pyre_exploded":
+                    for (const blast of event.hits) {
+                        hit(blast.unitId, blast.amount, blast.unitsDied, "environment:last_fuse", event.unitId);
+                    }
+                    break;
             }
         }
     const stacks = [...rows.values()].sort((a, b) => a.unitId.localeCompare(b.unitId));

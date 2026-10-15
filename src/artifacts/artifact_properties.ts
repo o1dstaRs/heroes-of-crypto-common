@@ -69,6 +69,7 @@ export enum Tier2Artifact {
     GRAVECHAIN = 16,
     AEGIS_OF_THE_ARCANE = 14, // extra magic-defense roll (army-wide), combined, not added
     ARCHMAGES_RING = 13, // +20% magic damage (army-wide); Tier-2 half of the arcane pair
+    LAST_FUSE = 17, // death blast: 20% of actual killing damage, at least 20 per stack power
 }
 
 // Keep retired artifacts addressable for saved games, replays, and balance history, but exclude them from every
@@ -123,6 +124,7 @@ export const ToTier2Artifact: { [key: string]: Tier2Artifact } = {
     "14": Tier2Artifact.AEGIS_OF_THE_ARCANE,
     "15": Tier2Artifact.QUIVER_OF_ECHOES,
     "16": Tier2Artifact.GRAVECHAIN,
+    "17": Tier2Artifact.LAST_FUSE,
 };
 
 // Effect magnitudes. Centralised here so balance tuning happens in one place.
@@ -180,6 +182,8 @@ export const ARTIFACT_POWER = {
     GRAVECHAIN_SLOW_LAPS: 3,
     GRAVECHAIN_CONNECTIONS: 3,
     GRAVECHAIN_STEPS_PENALTY: 1,
+    LAST_FUSE_PERCENT: 20,
+    LAST_FUSE_MIN_DAMAGE_PER_POWER: 20,
 } as const;
 
 export interface ArtifactProperties {
@@ -459,6 +463,13 @@ export const TIER2_ARTIFACTS: { [key in Tier2Artifact]: ArtifactProperties } = {
         "Archmages Ring",
         "Increases all magic damage the army deals by {}%.",
     ),
+    [Tier2Artifact.LAST_FUSE]: t2(
+        Tier2Artifact.LAST_FUSE,
+        "last_fuse",
+        "Last Fuse",
+        "Last Fuse",
+        "When an allied stack is destroyed, it explodes. Adjacent enemies take {}% of the killing blow's actual damage, with a minimum of [] damage per stack power.",
+    ),
 };
 
 export const getTier1ArtifactProperties = (id: Tier1Artifact): ArtifactProperties => TIER1_ARTIFACTS[id];
@@ -497,6 +508,7 @@ const ARTIFACT_DESCRIPTION_VALUES: { readonly [slug: string]: readonly number[] 
     aegis_of_the_arcane: [AP.AEGIS_OF_THE_ARCANE_MAGIC_DEFENSE],
     quiver_of_echoes: [AP.QUIVER_OF_ECHOES_CHANCE],
     gravechain: [AP.GRAVECHAIN_CHANCE, AP.GRAVECHAIN_CONNECTIONS, AP.GRAVECHAIN_SLOW_LAPS, AP.GRAVECHAIN_STEPS_PENALTY],
+    last_fuse: [AP.LAST_FUSE_PERCENT, AP.LAST_FUSE_MIN_DAMAGE_PER_POWER],
 };
 
 // Human-readable effect text with the real numbers substituted in (the raw `description` keeps `{}`/`[]`

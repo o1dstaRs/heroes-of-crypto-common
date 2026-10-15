@@ -784,6 +784,9 @@ export class UnitsHolder {
                     // See Mage's Ring above — read by Unit.getMagicDamageBonusPercentage(), not by a stat hook.
                     applyArtifactBuff("Archmages Ring", AP.ARCHMAGES_RING_MAGIC_PERCENT);
                     break;
+                case Tier2Artifact.LAST_FUSE:
+                    applyArtifactBuff("Last Fuse", AP.LAST_FUSE_PERCENT, AP.LAST_FUSE_MIN_DAMAGE_PER_POWER);
+                    break;
                 default:
                     break;
             }

@@ -105,6 +105,7 @@ const UNIT_FIELDS = [
     "maxRangeShots",
     "responded",
     "waterShieldSpent",
+    "lastFuseFatalHit",
     "onHourglass",
     "movedThisTurn",
     "movedRouteCellsThisTurn",
