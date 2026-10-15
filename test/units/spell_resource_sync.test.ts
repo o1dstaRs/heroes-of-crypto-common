@@ -118,7 +118,9 @@ describe("spell charges restored to a reconstructed caster", () => {
         placeUnit(context.grid, context.unitsHolder, healer, { x: 1, y: 1 });
         placeUnit(context.grid, context.unitsHolder, ally, { x: 3, y: 1 });
         placeUnit(context.grid, context.unitsHolder, enemy, { x: 12, y: 12 });
-        ally.applyDamage(10, 1);
+        // The second argument is a Break chance. Any positive chance can roll Break and then
+        // log it, and this call has no scene log, so the chance stays 0.
+        ally.applyDamage(10, 0);
         const hpBefore = ally.getHp();
         const fightProperties = FightStateManager.getInstance().getFightProperties();
         fightProperties.startFight();
