@@ -106,6 +106,13 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
     } else if (context.tier1ArtifactId === Tier1Artifact.AMULET_OF_RESOLVE && info.abilities.includes("Mechanism")) {
         // Mechanism takes extra status and extra physical area damage. The amulet offsets both.
         affinity += 0.8;
+    } else if (context.tier1ArtifactId === Tier1Artifact.MAGES_RING && (info.rangedSpellDamage || info.magicAttack)) {
+        affinity += 0.8;
+    } else if (context.tier1ArtifactId === Tier1Artifact.TOME_OF_AMPLIFICATION && info.castsAmplifiableBuff) {
+        affinity += 0.8;
+    } else if (context.tier1ArtifactId === Tier1Artifact.RIME_CHARM && (info.melee || info.ranged)) {
+        affinity += 0.3;
+        if (hasMultiHitMeleePressure(creatureId)) affinity += 0.3;
     }
 
     const ownInfos = context.ownCreatureIds.flatMap((id) => {
@@ -220,12 +227,13 @@ export function draftBundleCoherenceAffinity(
 export function pickCoherentDraftBundle(
     bundles: readonly DraftBundle[],
     creatureScore: (creatureId: number) => number,
-    artifactScore: (artifactId: number) => number,
+    artifactScore: (artifactId: number, ownCreatureIds: readonly number[]) => number,
     options: Pick<IDraftCoherenceContext, "draftSpellRangedPolicy" | "draftStrengthPolicy" | "synergyVariants"> = {},
 ): number {
     if (!bundles.length) return 0;
     const baseScores = bundles.map(
-        ([level1, level2, artifactId]) => creatureScore(level1) + creatureScore(level2) + artifactScore(artifactId),
+        ([level1, level2, artifactId]) =>
+            creatureScore(level1) + creatureScore(level2) + artifactScore(artifactId, [level1, level2]),
     );
     const affinities = bundles.map(
         (bundle) =>

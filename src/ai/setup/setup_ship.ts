@@ -13,6 +13,7 @@ import CREATURES_JSON from "../../configuration/creatures.json";
 import { Tier2Artifact } from "../../artifacts/artifact_properties";
 import { PBTypes } from "../../generated/protobuf/v1/types";
 import { creatureInfo } from "./creature_score";
+import { ARTIFACT_FIT_SETUP_PREFIX, withArtifactFitSetupPolicy } from "./artifact_fit";
 import {
     CONDITIONAL_SETUP_RULES,
     KNOWN_CONDITIONAL_SETUP_RULES,
@@ -822,6 +823,11 @@ function compileNonFightAugmentOverridePolicy(spec: string, suffix: string): IRe
 
 export function resolveSetupPolicy(spec: string | undefined): IResolvedSetupPolicy {
     const normalized = (spec ?? "").trim().toLowerCase();
+    if (normalized.startsWith(ARTIFACT_FIT_SETUP_PREFIX)) {
+        const baseSpec = normalized.slice(ARTIFACT_FIT_SETUP_PREFIX.length);
+        if (!baseSpec) throw new Error("Artifact fit setup requires an explicit base policy");
+        return withArtifactFitSetupPolicy(resolveSetupPolicy(baseSpec));
+    }
     if (!normalized || normalized === "off" || normalized === "0" || normalized === SETUP_V0_SPEC) {
         return conditionalPolicy(new Set());
     }

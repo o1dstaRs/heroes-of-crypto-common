@@ -12,6 +12,9 @@
 import type { IAIStrategy } from "./ai_strategy";
 import { withAreaThrow } from "./versions/area_throw_router";
 import { scoreCreature } from "./setup/creature_score";
+import { tier1ArtifactFitScore, withArtifactFitSetupPolicy } from "./setup/artifact_fit";
+import { pickCoherentDraftBundle } from "./setup/draft_coherence";
+import { TIER1_ARTIFACT_WINRATE } from "./setup/setup_strategy";
 import {
     SETUP_POLICY_V0_RESOLVED,
     type ISetupAugmentChoice,
@@ -125,6 +128,16 @@ export const RANKED_SETUP_POLICY_V0: Readonly<IRankedAISetupPolicy> = Object.fre
     bestSynergyForFaction: (faction: number): number => SETUP_POLICY_V0.bestSynergyForFaction(faction),
 });
 
+export const RANKED_SETUP_POLICY_ARTIFACT_FIT_V1: Readonly<IRankedAISetupPolicy> = Object.freeze({
+    ...RANKED_SETUP_POLICY_V0,
+    ...withArtifactFitSetupPolicy(SETUP_POLICY_V0_RESOLVED),
+    version: "setup-v0+artifact-fit-v1",
+    pickBundle: (bundles: readonly (readonly [number, number, number])[]): number =>
+        pickCoherentDraftBundle(bundles, scoreCreature, (id, ownIds) =>
+            tier1ArtifactFitScore(id, ownIds, TIER1_ARTIFACT_WINRATE[id] ?? 50),
+        ),
+});
+
 type StrategyFactory = () => IAIStrategy;
 
 const checkedFactory =
@@ -141,8 +154,8 @@ const rankedProfile = (version: string, factory: StrategyFactory): Readonly<IRan
     const createStrategy = checkedFactory(version, factory);
     return Object.freeze({
         version,
-        setupPolicyVersion: RANKED_SETUP_POLICY_V0.version,
-        setupPolicy: RANKED_SETUP_POLICY_V0,
+        setupPolicyVersion: RANKED_SETUP_POLICY_ARTIFACT_FIT_V1.version,
+        setupPolicy: RANKED_SETUP_POLICY_ARTIFACT_FIT_V1,
         createStrategy,
     });
 };

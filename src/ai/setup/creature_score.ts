@@ -62,6 +62,11 @@ export interface ICreatureInfo {
     hp: number;
     armor: number;
     initiative: number;
+    /** Printed draft-time movement and luck, before artifacts or placement-dependent auras. */
+    movementSteps?: number;
+    luck?: number;
+    magicAttack?: boolean;
+    magicImmune?: boolean;
     abilities: string;
     /** movement_type === "FLY" — the beneficiary signal for Nature's +Fly-Armor synergy. */
     canFly: boolean;
@@ -106,6 +111,8 @@ const CreatureJsonShape = CREATURES_JSON as unknown as Record<
             hp?: number;
             armor?: number;
             initiative?: number;
+            steps?: number;
+            luck?: number;
             level?: number;
             spells?: string[];
             abilities?: string[];
@@ -284,6 +291,24 @@ const buildIndex = (): Map<number, ICreatureInfo> => {
                 hp: cfg.hp ?? 0,
                 armor: cfg.armor ?? 0,
                 initiative: cfg.initiative ?? 0,
+                movementSteps: cfg.steps ?? 0,
+                luck: cfg.luck ?? 0,
+                magicAttack:
+                    cfg.attack_type === "MELEE_MAGIC" ||
+                    abilityList.some((ability) => {
+                        try {
+                            return getAbilityConfig(ability).power_type === AbilityPowerType.MAGIC_DAMAGE;
+                        } catch {
+                            return false;
+                        }
+                    }),
+                magicImmune: abilityList.some((ability) => {
+                    try {
+                        return getAbilityConfig(ability).power_type === AbilityPowerType.MAGIC_RESIST_100;
+                    } catch {
+                        return false;
+                    }
+                }),
                 abilities: abilityList.join(" "),
                 canFly: cfg.movement_type === "FLY",
                 melee: (cfg.attack_type ?? "").includes("MELEE"),

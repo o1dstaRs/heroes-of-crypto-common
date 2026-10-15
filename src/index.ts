@@ -82,6 +82,7 @@ export * as HoCLib from "./utils/lib";
 export * as HoCMath from "./utils/math";
 export * as AI from "./ai/ai";
 export * from "./ai/tactical_split_placement";
+export * from "./ai/setup/artifact_fit";
 export {
     getAIStrategy,
     createAIStrategy,

@@ -32,6 +32,7 @@ import {
     eligibleBacklineProtectorChoices,
 } from "./creature_score";
 import { pickCoherentDraftBundle, pickCoherentDraftCreature, type DraftBundle } from "./draft_coherence";
+import { tier1ArtifactFitScore } from "./artifact_fit";
 import {
     applyRankedDraftRangedFloor,
     isRankedDraftStrengthPolicy,
@@ -410,10 +411,14 @@ export function pickRankedLiveDraftBundle(
     return pickCoherentDraftBundle(
         bundles,
         (creatureId) => draftGenomeCreatureScore(genome, creatureId),
-        (artifactId) =>
-            (rankedDraftUsesCorrectedTier1Table(genome.draftStrengthPolicy)
-                ? TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED
-                : TIER1_ARTIFACT_WINRATE)[artifactId] ?? 50,
+        (artifactId, ownCreatureIds) =>
+            tier1ArtifactFitScore(
+                artifactId,
+                ownCreatureIds,
+                (rankedDraftUsesCorrectedTier1Table(genome.draftStrengthPolicy)
+                    ? TIER1_ARTIFACT_WINRATE_COMPOSITION_CORRECTED
+                    : TIER1_ARTIFACT_WINRATE)[artifactId] ?? 50,
+            ),
         {
             ...(genome.draftSpellRangedPolicy ? { draftSpellRangedPolicy: genome.draftSpellRangedPolicy } : {}),
             ...(genome.draftStrengthPolicy ? { draftStrengthPolicy: genome.draftStrengthPolicy } : {}),
