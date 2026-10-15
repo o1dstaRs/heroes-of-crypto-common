@@ -52,6 +52,7 @@ const ENV_KEYS = [
     "Q2_ORACLE",
     "V08_VISIBLE_EDGE_SCREEN_PRESSURE",
     "SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION",
+    "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
 ] as const;
 const savedEnvironment = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
 
@@ -104,6 +105,7 @@ describe("v0.8+A19 production profile", () => {
             V07_PLACEMENT_REVEAL: "on",
             V08_AGGRESSIVE: "1",
             ...V08_A19_SEARCH_RULES,
+            SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "0",
         });
         for (const value of Object.values(V08_A19_SEARCH_RULES)) expect(value).toBe("1");
         // The re-score bank and the broad Armageddon-defend research arm no longer exist anywhere.
@@ -122,6 +124,7 @@ describe("v0.8+A19 production profile", () => {
                     "SEARCH_MAX_MELEE",
                     "SEARCH_DECISION_DEADLINE_MS",
                     "SEARCH_CIRCUIT_BREAKER_MS",
+                    "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS",
                 ].includes(key)
             ) {
                 continue;
@@ -135,6 +138,20 @@ describe("v0.8+A19 production profile", () => {
         expect(buildV08A19SearchEnvironment().SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION).toBe("0");
         process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "1" });
         expect(buildV08A19SearchEnvironment().SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION).toBe("1");
+    });
+
+    it("seals certified selection bounds off and requires the explicit research override", () => {
+        process.env.SEARCH_A19_CERTIFIED_SELECTION_BOUNDS = "1";
+        const match = { greenVersion: "v0.8", redVersion: "v0.8" };
+        const stock = createV08A19SearchDriver({} as ILookaheadDeps, match);
+        expect((stock as unknown as { certifiedSelectionBounds: boolean }).certifiedSelectionBounds).toBe(false);
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "1" });
+        const research = createV08A19SearchDriver({} as ILookaheadDeps, match);
+        expect((research as unknown as { certifiedSelectionBounds: boolean }).certifiedSelectionBounds).toBe(true);
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "yes" });
+        expect(() => createV08A19SearchDriver({} as ILookaheadDeps, match)).toThrow(
+            "SEARCH_A19_CERTIFIED_SELECTION_BOUNDS must be 0 or 1",
+        );
     });
 
     it("fingerprints its genome and sealed environment", () => {
@@ -158,6 +175,7 @@ describe("v0.8+A19 production profile", () => {
         expect(V08_A19_PROFILE.sourceLedger).toBe(V08_A19_SOURCE_LEDGER);
         expect(V08_A19_SOURCE_LEDGER.map(({ role }) => role)).toEqual([
             "search-driver",
+            "selection-bounds",
             "scored-arbitration",
             "material-arbitration",
             "armageddon-endgame",

@@ -107,7 +107,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "dca5d47276b2ac3fa3020b65f5d4588ce1b0cfc6d71988439c53184cbb8f8cfe" as const;
+    "6db0691c27ecedc377f973c71a9a8f254090bd86ab2c9daa21c39a6ef507faa1" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -139,8 +139,13 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for opt-in barrel ray projection; the released flag remains off.
-        sha256: "67bcb7d22d7de8709990e2f6fdfcc9fac0aa8f43c02c27562ef7effafd698bf9" as const,
+        // Re-pinned for offline selector-aware bounds; the released flag remains off.
+        sha256: "87493733c70e5f85eecf31ba191a3290d8de0e5476ebffefaa8423a26614aae5" as const,
+    }),
+    Object.freeze({
+        role: "selection-bounds" as const,
+        source: "src/simulation/search_selection_bounds.ts" as const,
+        sha256: "74943cac7cc84fc3d7736805bad4fb621b73b9e00ebd0e4906f093a7c541794c" as const,
     }),
     Object.freeze({
         role: "scored-arbitration" as const,
@@ -225,6 +230,8 @@ function buildSealedEnvironment(): Readonly<Record<string, string | undefined>> 
         ...V08_A19_SEARCH_RULES,
         // Only the explicit JSON research override may enable this unqualified candidate.
         SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION: "0",
+        // Selection-aware tail bounds are an offline, measured research arm. Production stays sealed off.
+        SEARCH_A19_CERTIFIED_SELECTION_BOUNDS: "0",
     });
 }
 

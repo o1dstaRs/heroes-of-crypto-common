@@ -17,6 +17,7 @@ import {
 } from "../ai/versions/v0_8_a19_material_arbitration";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
+import { SearchSelectionBounds, type ISearchSelectionBoundPlan } from "./search_selection_bounds";
 
 import {
     enumerateCandidates,
@@ -1435,6 +1436,7 @@ export class SearchDriver {
     private readonly researchHorizonVersions: ReadonlySet<string>;
     private readonly researchHorizonMinRangedTypes: number | null;
     private readonly rollouts: number;
+    private readonly certifiedSelectionBounds: boolean;
     private readonly includeMoves: boolean;
     private readonly maxMoveShotComposites: number;
     private readonly moveShotVersions: ReadonlySet<string>;
@@ -1714,6 +1716,11 @@ export class SearchDriver {
         this.researchHorizonVersions = researchHorizon?.versions ?? new Set();
         this.researchHorizonMinRangedTypes = researchHorizon?.minRangedTypes ?? null;
         this.rollouts = Math.floor(envNum("SEARCH_ROLLOUTS", 3, 1));
+        const rawCertifiedBounds = searchEnv("SEARCH_A19_CERTIFIED_SELECTION_BOUNDS");
+        if (rawCertifiedBounds !== undefined && rawCertifiedBounds !== "0" && rawCertifiedBounds !== "1") {
+            throw new Error("SEARCH_A19_CERTIFIED_SELECTION_BOUNDS must be 0 or 1");
+        }
+        this.certifiedSelectionBounds = rawCertifiedBounds === "1";
         this.includeMoves = searchEnv("SEARCH_INCLUDE_MOVES") === "1";
         const rawMaxMoveShots = searchEnv("SEARCH_MAX_MOVE_SHOTS");
         if (this.mode !== "search" || rawMaxMoveShots === undefined || rawMaxMoveShots === "") {
@@ -3896,14 +3903,24 @@ export class SearchDriver {
                 this.effectiveRollouts(),
                 deadlineAt,
                 turnHorizon,
-                this.canBoundHopelessSearchTails(
-                    deadlineAt,
+                this.certifiedSelectionBoundPlan(
+                    unit,
+                    scoredCandidates,
+                    version,
                     prioritizeProductiveActions,
                     prioritizeDominantFinish,
                     prioritizeV08STargetPressure,
                     prioritizeV08SUrgency,
                     aggressiveWaitComparison,
-                ),
+                ) ||
+                    this.canBoundHopelessSearchTails(
+                        deadlineAt,
+                        prioritizeProductiveActions,
+                        prioritizeDominantFinish,
+                        prioritizeV08STargetPressure,
+                        prioritizeV08SUrgency,
+                        aggressiveWaitComparison,
+                    ),
             );
             this.counters.scoredCandidatesTotal += scoredCandidates.length;
             const legalProductiveIndices = scoredCandidates
@@ -5081,6 +5098,74 @@ export class SearchDriver {
     }
     // ---- rollout scoring --------------------------------------------------------------------------
     /**
+     * Offline research only. Maxima in all active selection pools remain exact; native and deterministic
+     * preferred actions remain exact. Keeping a preference's entire combat fallback set unbounded until
+     * that preference finishes legally prevents a stochastic rejection from changing the policy tier.
+     * Full-score observers and material gates wider than exact primary ties retain every sample.
+     */
+    private certifiedSelectionBoundPlan(
+        unit: Unit,
+        candidates: readonly IEnumeratedCandidate[],
+        version: string,
+        productive: boolean,
+        dominant: boolean,
+        targetPressure: boolean,
+        urgent: boolean,
+        aggressiveWait: boolean,
+    ): ISearchSelectionBoundPlan | false {
+        if (
+            !this.certifiedSelectionBounds ||
+            version !== "v0.8" ||
+            this.match.offlineDeterministicWork !== true ||
+            (this.captureA19Material && this.a19MaterialArbitration !== "ties") ||
+            this.ilPath !== undefined ||
+            this.auditPath !== undefined ||
+            this.scoredDecisionObserver !== undefined ||
+            this.passiveProductiveProbeObserver !== undefined
+        ) {
+            return false;
+        }
+        const combat = candidates.filter(isDirectCombatCandidate);
+        const preferred = new Set(
+            [
+                dominant ? selectV08DirectCombatCandidate(combat) : undefined,
+                targetPressure
+                    ? selectV08STargetPressureCandidate(
+                          unit,
+                          this.deps.unitsHolder,
+                          combat,
+                          this.deps.fightProperties.getCurrentLap(),
+                          this.deps.fightProperties,
+                      )
+                    : undefined,
+            ]
+                .filter((candidate): candidate is IEnumeratedCandidate => candidate !== undefined)
+                .map((candidate) => candidates.indexOf(candidate)),
+        );
+        const protectedIndices = new Set([0, ...preferred]);
+        if (urgent) {
+            candidates.forEach((candidate, index) => {
+                if (
+                    isDirectCombatCandidate(candidate) ||
+                    candidate.actions.some((action) => action.type === "cast_spell")
+                ) {
+                    protectedIndices.add(index);
+                }
+            });
+        }
+        return {
+            pools: candidates.map(
+                (candidate) =>
+                    Number((productive || dominant || urgent) && isForceTierProductiveCandidate(candidate)) |
+                    (Number((dominant || urgent) && isPureMoveCandidate(candidate)) << 1) |
+                    (Number(aggressiveWait && isProductiveCandidate(candidate)) << 2),
+            ),
+            directCombat: candidates.map(isDirectCombatCandidate),
+            protectedIndices,
+            preferredIndices: preferred,
+        };
+    }
+    /**
      * Offline unrestricted search may skip a hopeless tail. Restricted selection (productive repair, dominant
      * finish, target pressure, urgency, aggressive wait) can keep an action that is not the raw best mean, so
      * those decisions stay fully scored. Live and ranked deadlines never take this path.
@@ -5123,7 +5208,7 @@ export class SearchDriver {
         rolloutCount = this.rollouts,
         deadlineAt: number | null = null,
         turnHorizon = this.horizon,
-        boundHopelessTails = false,
+        boundHopelessTails: boolean | ISearchSelectionBoundPlan = false,
     ): number[] {
         this.assertBeforeDecisionDeadline(deadlineAt);
         const journal =
@@ -5137,14 +5222,23 @@ export class SearchDriver {
         this.assertBeforeDecisionDeadline(deadlineAt);
         const means: number[] = [];
         const captureMaterial = this.captureA19Material && horizonMode === "turns";
-        // Partial material counts are stored as -Infinity evidence. Never bound those samples.
-        const boundTails = boundHopelessTails && !captureMaterial;
+        // Partial material totals are ineligible evidence. Exact-primary-tie arbitration cannot select a
+        // certified primary loser, so it may omit that loser's material tail. Wider material gates stay full.
+        const boundTails =
+            boundHopelessTails &&
+            (!captureMaterial || (typeof boundHopelessTails === "object" && this.a19MaterialArbitration === "ties"));
+        const selectionBounds =
+            boundTails && typeof boundHopelessTails === "object"
+                ? new SearchSelectionBounds(boundHopelessTails)
+                : undefined;
         let leafOutsideUnitInterval = false;
         let bestFinishedMean = Number.NEGATIVE_INFINITY;
         const margin = boundTails ? this.hopelessTailMargin() : 0;
         const materials: number[] = [];
         const actingTeam = captureMaterial ? unit.getTeam() : undefined;
-        for (const cand of candidates) {
+        for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+            const cand = candidates[candidateIndex];
+            const referenceMean = selectionBounds?.referenceMean(candidateIndex);
             this.assertBeforeDecisionDeadline(deadlineAt);
             let sum = 0;
             let completed = 0;
@@ -5200,12 +5294,15 @@ export class SearchDriver {
                 } else if (
                     boundTails &&
                     !leafOutsideUnitInterval &&
-                    remainingRolloutsCannotWin(sum, completed, rolloutCount, bestFinishedMean, margin)
+                    remainingRolloutsCannotWin(sum, completed, rolloutCount, referenceMean ?? bestFinishedMean, margin)
                 ) {
                     break;
                 }
             }
             means.push(illegal ? -Infinity : sum / rolloutCount);
+            if (selectionBounds && !illegal && completed === rolloutCount) {
+                selectionBounds.recordFinished(candidateIndex, sum / rolloutCount);
+            }
             if (
                 boundTails &&
                 !leafOutsideUnitInterval &&
