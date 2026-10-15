@@ -679,7 +679,7 @@ describe("GameActionEngine", () => {
         expect(result.events[0]).toMatchObject({
             type: "unit_moved",
             unitId: setup.left.getId(),
-            path: footprint,
+            path: route,
             targetCells: footprint,
         });
     });

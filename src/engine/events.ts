@@ -103,6 +103,8 @@ export type GameEvent =
           attackType: "melee" | "range";
           attackerId: string;
           targetId: string;
+          /** Accepted approach route; absent in stationary attacks and older journals. */
+          approachPath?: XY[];
           unitIdsDied: string[];
           damage: IVisibleDamage;
           animations: IGameAnimationEvent[];
@@ -112,6 +114,8 @@ export type GameEvent =
           attackerId: string;
           targetPosition: XY;
           attackFrom?: XY;
+          /** Accepted approach route; absent in ranged attacks and older journals. */
+          approachPath?: XY[];
           hitsBefore: number;
           hitsAfter: number;
           // Remaining hit points of EACH of the two BLOCK_CENTER mountains after this strike. The total

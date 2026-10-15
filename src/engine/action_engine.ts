@@ -535,6 +535,10 @@ export class GameActionEngine {
         if (knownMoveRoute instanceof Error) {
             return this.reject("invalid_move");
         }
+        const movementRoute = knownMoveRoute?.route ?? (pathIsFootprintOnly ? undefined : action.path);
+        if (movementRoute && this.groundRouteCrossesObstacle(unit, movementRoute)) {
+            return this.reject("move_blocked");
+        }
         // Captured BEFORE the move resolves: the Fire Wall burn below needs the body the unit LEFT, so it
         // can charge only for what the walk moved into. After the move `getCells()` is the destination.
         const startCells = unit.getCells();
@@ -625,7 +629,8 @@ export class GameActionEngine {
                 to: { ...result.newPosition },
                 // Own-property copies of plain cells: what structuredClone produced for these, without its
                 // serialization round-trip (it ran once per rollout move and showed up in the search profile).
-                path: action.path.map((cell) => ({ ...cell })),
+                // Replay the accepted route, including the detour resolved for a footprint-only move.
+                path: (knownMoveRoute?.route ?? action.path).map((cell) => ({ ...cell })),
                 targetCells: targetCells.map((cell) => ({ ...cell })),
             });
         }
@@ -739,6 +744,11 @@ export class GameActionEngine {
             action.hasLavaCell,
             action.hasWaterCell,
         );
+        const approachRoute = knownPaths?.get(this.cellKey(action.attackFrom))?.[0]?.route;
+        const approaching = !this.sameCell(attacker.getBaseCell(), action.attackFrom);
+        if (approaching && approachRoute && this.groundRouteCrossesObstacle(attacker, approachRoute)) {
+            return this.reject("attack_not_available");
+        }
         const cellsBefore = attacker
             .getCells()
             .map((cell) => `${cell.x}:${cell.y}`)
@@ -783,6 +793,7 @@ export class GameActionEngine {
                 attackType: "melee",
                 attackerId: attacker.getId(),
                 targetId: target.getId(),
+                ...(approaching && approachRoute ? { approachPath: approachRoute.map((cell) => ({ ...cell })) } : {}),
                 unitIdsDied,
                 damage: this.cloneVisibleDamage(damage),
                 animations: this.serializeAnimations(result.animationData ?? []),
@@ -1090,6 +1101,16 @@ export class GameActionEngine {
         const knownPaths = action.attackFrom
             ? this.resolveKnownPaths(attacker, action.attackFrom, action.path, action.hasLavaCell, action.hasWaterCell)
             : undefined;
+        const approachRoute = action.attackFrom
+            ? knownPaths?.get(this.cellKey(action.attackFrom))?.[0]?.route
+            : undefined;
+        const approaching =
+            !canLandRangeHit && action.attackFrom && !this.sameCell(attacker.getBaseCell(), action.attackFrom);
+        if (approaching && approachRoute && this.groundRouteCrossesObstacle(attacker, approachRoute)) {
+            return this.reject("attack_not_available");
+        }
+        const approach =
+            approaching && approachRoute ? { approachPath: approachRoute.map((cell) => ({ ...cell })) } : {};
         // A Lightning Spin off the blow hits the enemies around the attacker, so this strike can deal unit damage.
         const damage = this.createVisibleDamage();
         const result = this.context.attackHandler.handleObstacleAttack(
@@ -1193,7 +1214,7 @@ export class GameActionEngine {
                         ...event,
                         attackFrom: action.attackFrom ? { ...action.attackFrom } : undefined,
                         animations: serializedAnimations[index] ? [serializedAnimations[index]] : [],
-                        ...(index === 0 ? unitDamage : {}),
+                        ...(index === 0 ? { ...unitDamage, ...approach } : {}),
                     })),
                 );
             } else {
@@ -1208,6 +1229,7 @@ export class GameActionEngine {
                     hitsAfterRight: this.context.fightProperties.getObstacleHitsLeftRight(),
                     animations: serializedAnimations,
                     ...unitDamage,
+                    ...approach,
                 });
                 events.push(
                     ...this.scatteredObstacleDestroyedEvents(attacker, removedCells),
@@ -3305,6 +3327,17 @@ export class GameActionEngine {
         }
 
         return true;
+    }
+    /** Cached or externally supplied routes must not carry a ground footprint through standing terrain. */
+    private groundRouteCrossesObstacle(unit: Unit, route: readonly XY[]): boolean {
+        return (
+            !unit.canFly() &&
+            route.some((anchor) =>
+                unit
+                    .getFootprintCellsForAnchor(anchor)
+                    .some((cell) => this.context.grid.getOccupantUnitId(cell) === "B"),
+            )
+        );
     }
     private cellsMatchInOrder(left: XY[], right: XY[]): boolean {
         return (
