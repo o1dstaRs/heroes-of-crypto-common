@@ -18,6 +18,7 @@ import {
     scoreCreature,
 } from "./creature_score";
 import { pickCoherentDraftBundle, pickCoherentDraftCreature } from "./draft_coherence";
+import type { ArtifactFitVersion } from "./artifact_fit";
 import {
     AUGMENT_PRIORITY,
     BEST_SYNERGY_BY_FACTION,
@@ -87,7 +88,7 @@ export class SetupPolicyV0 implements ISetupPolicy {
         knownOpponentCreatureIds: readonly number[],
         tier1ArtifactId?: number,
         tier2ArtifactId?: number,
-        artifactFitVersion?: 1 | 2 | 3,
+        artifactFitVersion?: ArtifactFitVersion,
     ): number {
         const eligible = eligibleBacklineProtectorChoices(available, ownCreatureIds, knownOpponentCreatureIds);
         const baseScore = (id: number): number =>

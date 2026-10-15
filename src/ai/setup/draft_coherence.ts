@@ -98,7 +98,7 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
 
     let affinity = 0;
     const ringBeneficiary =
-        context.artifactFitVersion === 3 ? info.dealsMagicDamage : info.rangedSpellDamage || info.magicAttack;
+        (context.artifactFitVersion ?? 1) >= 3 ? info.dealsMagicDamage : info.rangedSpellDamage || info.magicAttack;
     if (context.tier1ArtifactId === Tier1Artifact.HUNTERS_LONGBOW && info.ranged) {
         affinity += 1.2;
     } else if (context.tier1ArtifactId === Tier1Artifact.WINGED_BOOTS && info.canFly) {
@@ -129,7 +129,7 @@ export function draftCreatureCoherenceAffinity(creatureId: number, context: IDra
             if (info.ranged && info.shots > 1) affinity += 0.6;
             break;
         case Tier2Artifact.ARCHMAGES_RING:
-            if (context.artifactFitVersion === 3 ? info.dealsMagicDamage : ringBeneficiary || info.magicalSplash)
+            if ((context.artifactFitVersion ?? 1) >= 3 ? info.dealsMagicDamage : ringBeneficiary || info.magicalSplash)
                 affinity += 0.5;
             break;
         case Tier2Artifact.GRAVECHAIN:

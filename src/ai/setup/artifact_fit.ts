@@ -1,5 +1,6 @@
 import { ARTIFACT_POWER, TIER2_ARTIFACT_LIST, Tier1Artifact, Tier2Artifact } from "../../artifacts/artifact_properties";
 import { DOUBLE_PUNCH_ABILITY_NAMES, DOUBLE_SHOT_ABILITY_NAMES } from "../../abilities/double_shot_names";
+import { LUCK_MAX_VALUE_TOTAL } from "../../constants";
 import { creatureInfo, type ICreatureInfo } from "./creature_score";
 import {
     TIER2_ARTIFACT_SCORE_A19_RANGED,
@@ -12,10 +13,17 @@ import type { IResolvedSetupPolicy } from "./setup_ship";
 export const ARTIFACT_FIT_SETUP_PREFIX = "artifact-fit-v1:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V2 = "artifact-fit-v2:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V3 = "artifact-fit-v3:";
-export type ArtifactFitVersion = 1 | 2 | 3;
+export const ARTIFACT_FIT_SETUP_PREFIX_V4 = "artifact-fit-v4:";
+export type ArtifactFitVersion = 1 | 2 | 3 | 4;
 
 export const artifactFitVersionForSetupSpec = (spec: string): ArtifactFitVersion =>
-    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3) ? 3 : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2) ? 2 : 1;
+    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V4)
+        ? 4
+        : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3)
+          ? 3
+          : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
+            ? 2
+            : 1;
 
 const roster = (ids: readonly number[]): ICreatureInfo[] =>
     [...new Set(ids)].flatMap((id) => {
@@ -27,16 +35,15 @@ const average = (units: readonly ICreatureInfo[], value: (unit: ICreatureInfo) =
 const magicPressure = (unit: ICreatureInfo): number => Number(unit.rangedSpellDamage || unit.magicAttack);
 const magicPressureV2 = (unit: ICreatureInfo): number =>
     Number(unit.rangedSpellDamage || unit.magicAttack || unit.magicalSplash);
-const attackChance = (base: number, unit: ICreatureInfo, tier1ArtifactId?: number): number =>
-    Math.max(
-        0,
-        Math.min(
-            100,
-            base +
-                (unit.luck ?? 0) +
-                (tier1ArtifactId === Tier1Artifact.CURSED_WARD ? ARTIFACT_POWER.CURSED_WARD_LUCK : 0),
-        ),
-    ) / 100;
+const attackChance = (base: number, unit: ICreatureInfo, tier1ArtifactId?: number, useBaseLuck = false): number => {
+    const luck =
+        (useBaseLuck ? (unit.baseLuck ?? 0) : (unit.luck ?? 0)) +
+        (tier1ArtifactId === Tier1Artifact.CURSED_WARD ? ARTIFACT_POWER.CURSED_WARD_LUCK : 0);
+    const currentLuck = useBaseLuck
+        ? Math.max(-LUCK_MAX_VALUE_TOTAL, Math.min(LUCK_MAX_VALUE_TOTAL, Math.round(luck)))
+        : luck;
+    return Math.max(0, Math.min(100, base + currentLuck)) / 100;
+};
 
 /** Mechanics-derived fit scores, not measured win rates. Historical priors remain unchanged for other items. */
 export function tier1ArtifactFitScore(id: number, ownIds: readonly number[], baseline: number): number {
@@ -72,8 +79,8 @@ const nativeAttacks = (unit: ICreatureInfo): number => {
         : 1;
     return unit.ranged ? Math.min(attacks, Math.max(0, unit.shots)) : attacks;
 };
-const procPerTurn = (base: number, unit: ICreatureInfo, tier1?: number): number =>
-    1 - (1 - attackChance(base, unit, tier1)) ** nativeAttacks(unit);
+const procPerTurn = (base: number, unit: ICreatureInfo, tier1?: number, useBaseLuck = false): number =>
+    1 - (1 - attackChance(base, unit, tier1, useBaseLuck)) ** nativeAttacks(unit);
 
 export function tier1ArtifactFitScoreV2(id: number, ownIds: readonly number[], baseline: number): number {
     const own = roster(ownIds);
@@ -96,6 +103,18 @@ export function tier1ArtifactFitScoreV3(id: number, ownIds: readonly number[], b
     if (id !== Tier1Artifact.MAGES_RING || !own.length) return tier1ArtifactFitScoreV2(id, ownIds, baseline);
     const share = average(own, (unit) => Number(unit.dealsMagicDamage));
     return share > 0 ? 50 + ARTIFACT_POWER.MAGES_RING_MAGIC_PERCENT * share : 0;
+}
+
+export function tier1ArtifactFitScoreV4(id: number, ownIds: readonly number[], baseline: number): number {
+    const own = roster(ownIds);
+    if (id !== Tier1Artifact.RIME_CHARM || !own.length) return tier1ArtifactFitScoreV3(id, ownIds, baseline);
+    return (
+        50 +
+        25 *
+            average(own, (unit) =>
+                unit.melee || unit.ranged ? procPerTurn(ARTIFACT_POWER.RIME_PROC_PERCENT, unit, undefined, true) : 0,
+            )
+    );
 }
 
 const FIT_TIER2_IDS: ReadonlySet<number> = new Set([
@@ -186,11 +205,20 @@ export function tier2ArtifactFitScoreV3(
     return tier2ArtifactFitScoreWithMagicPressure(id, ownIds, context, (unit) => Number(unit.dealsMagicDamage));
 }
 
+export function tier2ArtifactFitScoreV4(
+    id: number,
+    ownIds: readonly number[],
+    context?: Readonly<ITier2ArtifactDecisionContext>,
+): number {
+    return tier2ArtifactFitScoreWithMagicPressure(id, ownIds, context, (unit) => Number(unit.dealsMagicDamage), true);
+}
+
 function tier2ArtifactFitScoreWithMagicPressure(
     id: number,
     ownIds: readonly number[],
     context: Readonly<ITier2ArtifactDecisionContext> | undefined,
     magicPressureForUnit: (unit: ICreatureInfo) => number,
+    useBaseLuck = false,
 ): number {
     const own = roster(ownIds);
     if (!own.length) return 50;
@@ -230,7 +258,8 @@ function tier2ArtifactFitScoreWithMagicPressure(
                 (sum, unit) =>
                     sum +
                     (unit.ranged && unit.shots > nativeAttacks(unit)
-                        ? (pressure(unit) * attackChance(ARTIFACT_POWER.QUIVER_OF_ECHOES_CHANCE, unit, tier1)) /
+                        ? (pressure(unit) *
+                              attackChance(ARTIFACT_POWER.QUIVER_OF_ECHOES_CHANCE, unit, tier1, useBaseLuck)) /
                           nativeAttacks(unit)
                         : 0),
                 0,
@@ -248,7 +277,7 @@ function tier2ArtifactFitScoreWithMagicPressure(
                     Math.max(0, enemy.filter((unit) => unit.melee).length - 1),
                 );
             const slow = average(own, (unit) =>
-                unit.melee || unit.ranged ? procPerTurn(ARTIFACT_POWER.GRAVECHAIN_CHANCE, unit, tier1) : 0,
+                unit.melee || unit.ranged ? procPerTurn(ARTIFACT_POWER.GRAVECHAIN_CHANCE, unit, tier1, useBaseLuck) : 0,
             );
             const cost = average(
                 own,
@@ -262,7 +291,9 @@ function tier2ArtifactFitScoreWithMagicPressure(
                     ? 1 -
                       0.25 *
                           average(own, (unit) =>
-                              unit.melee || unit.ranged ? procPerTurn(ARTIFACT_POWER.RIME_PROC_PERCENT, unit) : 0,
+                              unit.melee || unit.ranged
+                                  ? procPerTurn(ARTIFACT_POWER.RIME_PROC_PERCENT, unit, undefined, useBaseLuck)
+                                  : 0,
                           )
                     : 1;
             return 50 + 25 * slow * (1 + links) * reliance * existingSlow - 100 * cost;
@@ -292,11 +323,13 @@ export function withArtifactFitSetupPolicy(
     version: ArtifactFitVersion = 1,
 ): IResolvedSetupPolicy {
     const prefix =
-        version === 1
-            ? ARTIFACT_FIT_SETUP_PREFIX
-            : version === 2
-              ? ARTIFACT_FIT_SETUP_PREFIX_V2
-              : ARTIFACT_FIT_SETUP_PREFIX_V3;
+        version === 4
+            ? ARTIFACT_FIT_SETUP_PREFIX_V4
+            : version === 1
+              ? ARTIFACT_FIT_SETUP_PREFIX
+              : version === 2
+                ? ARTIFACT_FIT_SETUP_PREFIX_V2
+                : ARTIFACT_FIT_SETUP_PREFIX_V3;
     if (base.spec.startsWith(prefix)) return base;
     return Object.freeze({
         ...base,
@@ -332,7 +365,9 @@ export function withArtifactFitSetupPolicy(
                         ? tier2ArtifactFitScore
                         : version === 2
                           ? tier2ArtifactFitScoreV2
-                          : tier2ArtifactFitScoreV3
+                          : version === 3
+                            ? tier2ArtifactFitScoreV3
+                            : tier2ArtifactFitScoreV4
                 )(id, ownIds, context);
                 if (score > bestScore) {
                     best = id;
