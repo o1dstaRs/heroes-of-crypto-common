@@ -18,7 +18,7 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { Unit } from "../units/unit";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
-import type { IAnimationData, ISecondaryDamage } from "../scene/animations";
+import type { IAnimationData, ISecondaryDamage, IVisibleDamage } from "../scene/animations";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
 
@@ -56,6 +56,8 @@ export function processThroughShotAbility(
     decreaseNumberOfShots = true,
     secondaryDamage?: ISecondaryDamage[],
     damageMultiplier = 1,
+    visibleDamage?: IVisibleDamage,
+    hitIndex = 0,
 ): IThroughShotResult {
     const animationData: IAnimationData[] = [];
     const unitIdsDied: string[] = [];
@@ -257,6 +259,8 @@ export function processThroughShotAbility(
                 sceneLog,
                 currentActiveUnit,
                 gravechainTargets,
+                visibleDamage,
+                hitIndex,
             );
         }
         if (unit.isDead()) {

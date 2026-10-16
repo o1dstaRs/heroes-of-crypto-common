@@ -21,6 +21,7 @@ import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import { MoveHandler } from "../../src/handlers/move_handler";
 import { LIVE_TIER2_ARTIFACT_IDS } from "../../src/picks/pick_sim";
 import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import type { IVisibleDamage } from "../../src/scene/animations";
 import { Spell } from "../../src/spells/spell";
 import { beginEffectApplicationCapture, endEffectApplicationCapture } from "../../src/units/effect_application_capture";
 import type { Unit } from "../../src/units/unit";
@@ -62,7 +63,7 @@ function fixture(options: TestUnitOptions = {}, anchor: XY = { x: 3, y: 7 }) {
         context.unitsHolder.applyArtifacts(fight);
         context.unitsHolder.refreshStackPowerForAllUnits();
     };
-    const proc = (target: Unit, active = attacker, attempted?: Set<string>) =>
+    const proc = (target: Unit, active = attacker, attempted?: Set<string>, damage?: IVisibleDamage, hitIndex = 0) =>
         processGravechainAbility(
             attacker,
             target,
@@ -71,6 +72,8 @@ function fixture(options: TestUnitOptions = {}, anchor: XY = { x: 3, y: 7 }) {
             new SceneLogMock(),
             active,
             attempted,
+            damage,
+            hitIndex,
         );
     return { ...context, attacker, fight, add, arm, proc };
 }
@@ -176,6 +179,57 @@ test("independent failures at the first and middle targets never stop the chain;
     f.proc(targets[0]);
     expect(targets.map((unit) => unit.hasDebuffActive("Gravebound"))).toEqual([false, true, false, true, false]);
     expect(count()).toBe(4);
+});
+
+test("presentation preserves each real relay, its hop, and successful binding verdict", () => {
+    const f = fixture();
+    const targets = Array.from({ length: 5 }, (_, i) => f.add(`Target${i}`, { x: 7 + i, y: 7 }));
+    f.arm();
+    rolls([99, 0, 99, 0]);
+    const damage = createVisibleDamage(targets[0]);
+    f.proc(targets[0], f.attacker, undefined, damage, 1);
+    const wave = damage.gravechains![0];
+    expect(wave.sourceUnitId).toBe(f.attacker.getId());
+    expect(wave.rootUnitId).toBe(targets[0].getId());
+    expect(wave.response).toBe(false);
+    expect(wave.hitIndex).toBe(1);
+    expect(wave.links.map((link) => link.unitId)).toEqual(targets.slice(0, 4).map((unit) => unit.getId()));
+    expect(wave.links.map((link) => link.depth)).toEqual([0, 1, 2, 3]);
+    expect(wave.links.map((link) => link.fromUnitId)).toEqual([
+        undefined,
+        targets[0].getId(),
+        targets[1].getId(),
+        targets[2].getId(),
+    ]);
+    expect(wave.links.map((link) => link.applied)).toEqual([false, true, false, true]);
+    expect(wave.links[1].position).toEqual(targets[1].getPosition());
+    expect(wave.links[1].position).not.toBe(targets[1].getPosition());
+});
+
+test("branches retain their common parent instead of drawing a fictitious linear chain", () => {
+    const f = fixture({}, { x: 1, y: 1 });
+    const root = f.add("Root", { x: 7, y: 7 });
+    const upper = f.add("Upper", { x: 7, y: 8 });
+    const lower = f.add("Lower", { x: 7, y: 6 });
+    f.arm();
+    setDeterministicRandomSource(() => 0);
+    const damage = createVisibleDamage(root);
+    f.proc(root, f.attacker, undefined, damage);
+    const branches = damage.gravechains![0].links.filter((link) => link.depth === 1);
+    expect(branches.map((link) => link.unitId).sort()).toEqual([upper.getId(), lower.getId()].sort());
+    expect(branches.every((link) => link.fromUnitId === root.getId())).toBe(true);
+});
+
+test("no wave is announced if every binding fails, or the wielder has no Gravechain", () => {
+    const f = fixture();
+    const root = f.add("Root", { x: 7, y: 7 });
+    const damage = createVisibleDamage(root);
+    f.proc(root, f.attacker, undefined, damage);
+    expect(damage.gravechains).toBeUndefined();
+    f.arm();
+    rolls([99]);
+    f.proc(root, f.attacker, undefined, damage);
+    expect(damage.gravechains).toBeUndefined();
 });
 
 test("branching and cycles roll once per unit, including units with multiple cells", () => {
@@ -286,6 +340,7 @@ for (const ability of ["Area Throw", "Large Caliber", "Chakram", "Through Shot",
         f.arm();
         setDeterministicRandomSource(() => 0);
         const log = new SceneLogMock();
+        const damage = createVisibleDamage(root);
         if (ability === "Through Shot") {
             processThroughShotAbility(
                 f.attacker,
@@ -297,6 +352,10 @@ for (const ability of ["Area Throw", "Large Caliber", "Chakram", "Through Shot",
                 f.grid,
                 log,
                 f.damageStatisticHolder,
+                true,
+                undefined,
+                1,
+                damage,
             );
         } else if (ability === "Lightning Spin") {
             processLightningSpinAbility(
@@ -309,9 +368,25 @@ for (const ability of ["Area Throw", "Large Caliber", "Chakram", "Through Shot",
                 true,
                 undefined,
                 f.grid,
+                f.attacker,
+                undefined,
+                damage,
             );
         } else if (ability === "Skewer Strike") {
-            processSkewerStrikeAbility(f.attacker, root, log, f.unitsHolder, f.grid, f.damageStatisticHolder);
+            processSkewerStrikeAbility(
+                f.attacker,
+                root,
+                log,
+                f.unitsHolder,
+                f.grid,
+                f.damageStatisticHolder,
+                undefined,
+                true,
+                undefined,
+                f.attacker,
+                undefined,
+                damage,
+            );
         } else {
             processRangeAOEAbility(
                 f.attacker,
@@ -322,10 +397,20 @@ for (const ability of ["Area Throw", "Large Caliber", "Chakram", "Through Shot",
                 f.grid,
                 log,
                 f.damageStatisticHolder,
+                true,
+                undefined,
+                undefined,
+                undefined,
+                damage,
             );
         }
         expect(distant.hasDebuffActive("Gravebound")).toBe(true);
         expect(distant.getCumulativeHp()).toBe(distant.getCumulativeMaxHp());
+        expect(
+            damage.gravechains?.some((wave) =>
+                wave.links.some((link) => link.unitId === distant.getId() && link.applied),
+            ),
+        ).toBe(true);
     });
 }
 
@@ -352,10 +437,11 @@ test("melee retaliation extends the active target's duration and records connect
     f.unitsHolder.refreshStackPowerForAllUnits();
     setDeterministicRandomSource(() => 0);
     beginEffectApplicationCapture();
+    const damage = createVisibleDamage(target);
     f.attackHandler.handleMeleeAttack(
         f.unitsHolder,
         new MoveHandler(f.grid.getSettings(), f.grid, f.unitsHolder),
-        createVisibleDamage(target),
+        damage,
         undefined,
         f.attacker,
         target,
@@ -365,6 +451,8 @@ test("melee retaliation extends the active target's duration and records connect
     expect(f.attacker.getDebuff("Gravebound")?.getLaps()).toBe(4);
     expect(neighbor.getDebuff("Gravebound")?.getLaps()).toBe(3);
     expect(effects.filter((effect) => effect.name === "Gravebound")).toHaveLength(2);
+    expect(damage.gravechains![0]).toMatchObject({ sourceUnitId: target.getId(), response: true, hitIndex: 0 });
+    expect(damage.gravechains![0].links.map((link) => link.unitId)).toEqual([f.attacker.getId(), neighbor.getId()]);
 });
 
 test("ranked/replay events and serialized unit state include connected targets", () => {
@@ -396,6 +484,10 @@ test("ranked/replay events and serialized unit state include connected targets",
     ).toEqual([root.getId(), next.getId()].sort());
     expect(next.getUnitProperties().applied_debuffs).toContain("Gravebound");
     expect(next.getUnitProperties().applied_debuffs_powers).toContain(25);
+    const attack = result.events.find((event) => event.type === "unit_attacked");
+    if (attack?.type !== "unit_attacked") throw new Error("Missing attack event");
+    expect(attack.damage.gravechains![0].links.map((link) => link.unitId)).toEqual([root.getId(), next.getId()]);
+    expect(JSON.parse(JSON.stringify(attack)).damage.gravechains).toEqual(attack.damage.gravechains);
 });
 
 for (const melee of [false, true]) {
@@ -431,6 +523,7 @@ for (const melee of [false, true]) {
             expect(result.completed).toBe(true);
             expect(target.hasDebuffActive("Gravebound")).toBe(false);
             expect(neighbor.hasDebuffActive("Gravebound")).toBe(false);
+            expect(damage.gravechains).toBeUndefined();
         });
     }
 }
@@ -466,6 +559,7 @@ for (const melee of [false, true]) {
         expect(result.completed).toBe(true);
         expect(target.isDead()).toBe(true);
         expect(neighbor.hasDebuffActive("Gravebound")).toBe(true);
+        expect(damage.gravechains![0].links.map((link) => link.applied)).toEqual([false, true]);
     });
 }
 
@@ -560,6 +654,8 @@ for (const ability of ["Double Punch", "Double Shot", "Crafted Double Shot", "Do
         expect(target.getCumulativeHp()).toBeLessThan(firstHitHp!);
         expect(target.hasDebuffActive("Gravebound")).toBe(true);
         expect(neighbor.hasDebuffActive("Gravebound")).toBe(true);
+        expect(damage.gravechains?.every((wave) => wave.hitIndex === 1 && !wave.response)).toBe(true);
+        expect(damage.gravechains).toHaveLength(1);
     });
 }
 
@@ -571,11 +667,12 @@ test("a ranged counter-shot chains back onto the active attacker with the extra 
     f.unitsHolder.applyArtifacts(f.fight);
     f.unitsHolder.refreshStackPowerForAllUnits();
     setDeterministicRandomSource(() => 0);
+    const damage = createVisibleDamage(target);
     const result = f.attackHandler.handleRangeAttack(
         f.unitsHolder,
         [1],
         1,
-        createVisibleDamage(target),
+        damage,
         f.attacker,
         [[target]],
         [f.attacker],
@@ -584,4 +681,5 @@ test("a ranged counter-shot chains back onto the active attacker with the extra 
     expect(result.completed).toBe(true);
     expect(f.attacker.getDebuff("Gravebound")?.getLaps()).toBe(4);
     expect(ally.getDebuff("Gravebound")?.getLaps()).toBe(3);
+    expect(damage.gravechains![0]).toMatchObject({ sourceUnitId: target.getId(), response: true, hitIndex: 0 });
 });

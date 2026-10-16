@@ -3,6 +3,7 @@ import { getSpellConfig } from "../configuration/config_provider";
 import { getAuraCells } from "../effects/effect_helper";
 import type { Grid } from "../grid/grid";
 import type { ISceneLog } from "../scene/scene_log_interface";
+import type { IGravechainWave, IVisibleDamage } from "../scene/animations";
 import { Spell } from "../spells/spell";
 import type { Unit } from "../units/unit";
 import type { UnitsHolder } from "../units/units_holder";
@@ -10,7 +11,11 @@ import { getLapString, getRandomInt } from "../utils/lib";
 
 /** Touching footprints, including diagonals, form links. Roll outcomes never change the graph. */
 export function getGravechainTargets(target: Unit, grid: Grid, unitsHolder: UnitsHolder): Unit[] {
-    const targets = [target];
+    return getGravechainLinks(target, grid, unitsHolder).map((link) => link.unit);
+}
+
+function getGravechainLinks(target: Unit, grid: Grid, unitsHolder: UnitsHolder) {
+    const targets: { unit: Unit; fromUnitId?: string; depth: number }[] = [{ unit: target, depth: 0 }];
     const visited = new Set([target.getId()]);
     let layer = [target];
     for (let hop = 0; hop < ARTIFACT_POWER.GRAVECHAIN_CONNECTIONS && layer.length; hop++) {
@@ -23,7 +28,7 @@ export function getGravechainTargets(target: Unit, grid: Grid, unitsHolder: Unit
                     const unit = unitsHolder.getAllUnits().get(id);
                     if (!unit || unit.getTeam() !== target.getTeam() || unit.isDead()) continue;
                     visited.add(id);
-                    targets.push(unit);
+                    targets.push({ unit, fromUnitId: source.getId(), depth: hop + 1 });
                     nextLayer.push(unit);
                 }
             }
@@ -41,11 +46,15 @@ export function processGravechainAbility(
     sceneLog: ISceneLog,
     currentActiveUnit: Unit = attacker,
     attemptedTargets = new Set<string>(),
+    visibleDamage?: IVisibleDamage,
+    hitIndex = 0,
 ): void {
     if (!attacker.hasBuffActive("Gravechain") || attacker.getTeam() === target.getTeam()) return;
     const chance = attacker.getGravechainChance();
     const laps = Number(attacker.getBuffProperties("Gravechain")[1]) || ARTIFACT_POWER.GRAVECHAIN_SLOW_LAPS;
-    for (const enemy of getGravechainTargets(target, grid, unitsHolder)) {
+    const links = getGravechainLinks(target, grid, unitsHolder);
+    const appliedIds = new Set<string>();
+    for (const { unit: enemy } of links) {
         if (attemptedTargets.has(enemy.getId())) continue;
         attemptedTargets.add(enemy.getId());
         if (enemy.isDead() || enemy.getMagicResist() >= 100 || enemy.hasDebuffActive("Gravebound")) continue;
@@ -56,6 +65,23 @@ export function processGravechainAbility(
             undefined,
             enemy.getId() === currentActiveUnit.getId(),
         );
+        appliedIds.add(enemy.getId());
         sceneLog.updateLog(`${attacker.getName()} bound ${enemy.getName()} with Gravechain for ${getLapString(laps)}`);
+    }
+    if (visibleDamage && appliedIds.size) {
+        const wave: IGravechainWave = {
+            sourceUnitId: attacker.getId(),
+            rootUnitId: target.getId(),
+            response: attacker.getId() !== currentActiveUnit.getId(),
+            hitIndex,
+            links: links.map(({ unit, fromUnitId, depth }) => ({
+                unitId: unit.getId(),
+                fromUnitId,
+                position: { ...unit.getPosition() },
+                depth,
+                applied: appliedIds.has(unit.getId()),
+            })),
+        };
+        (visibleDamage.gravechains ??= []).push(wave);
     }
 }

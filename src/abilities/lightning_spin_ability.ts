@@ -21,7 +21,7 @@ import { FightStateManager } from "../fights/fight_state_manager";
 import { UnitsHolder } from "../units/units_holder";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
-import type { ISecondaryDamage } from "../scene/animations";
+import type { ISecondaryDamage, IVisibleDamage } from "../scene/animations";
 
 import { processFireShieldAbility } from "./fire_shield_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
@@ -86,6 +86,8 @@ export function processLightningSpinAbility(
     // landed on it then gets the extra lap every effect landed mid-turn gets.
     currentActiveUnit: Unit = fromUnit,
     gravechainTargets = new Set<string>(),
+    visibleDamage?: IVisibleDamage,
+    hitIndex = 0,
 ): ILightningSpinResult {
     const unitIdsDied: string[] = [];
     let lightningSpinLanded = false;
@@ -274,6 +276,8 @@ export function processLightningSpinAbility(
                     sceneLog,
                     currentActiveUnit,
                     gravechainTargets,
+                    visibleDamage,
+                    hitIndex,
                 );
             }
             if (enemy.isDead()) {

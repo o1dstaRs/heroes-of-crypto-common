@@ -3571,6 +3571,10 @@ export class GameActionEngine {
                 position: { ...entry.position },
                 liftedNames: [...entry.liftedNames],
             })),
+            gravechains: damage.gravechains?.map((wave) => ({
+                ...wave,
+                links: wave.links.map((link) => ({ ...link, position: { ...link.position } })),
+            })),
         };
     }
     private serializeAnimations(animationData: IAnimationData[]): IGameAnimationEvent[] {

@@ -187,6 +187,8 @@ export function processDoubleShotAbility(
         (damageForAnimation.secondary ??= []),
         Object.keys(secondVolleyFactors).length ? secondVolleyFactors : undefined,
         chakramFlight?.missByUnitId,
+        damageForAnimation,
+        1,
     );
     if (chakramFlight) {
         recordChakramFlight(

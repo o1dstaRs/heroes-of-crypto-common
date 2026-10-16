@@ -19,7 +19,7 @@ import type { ISceneLog } from "../scene/scene_log_interface";
 import { UnitsHolder } from "../units/units_holder";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
-import type { ISecondaryDamage } from "../scene/animations";
+import type { ISecondaryDamage, IVisibleDamage } from "../scene/animations";
 
 import { processLuckyStrikeAbility } from "./lucky_strike_ability";
 import { processFleshShieldAura } from "./flesh_shield_aura_ability";
@@ -64,6 +64,8 @@ export function processRangeAOEAbility(
     // (chakram_ability.resolveChakramFlightMisses). Those verdicts are reused here rather than rolled
     // again: a second roll could hand a hit to a victim the disc already stopped short of.
     preRolledMissByUnitId?: Readonly<Record<string, boolean>>,
+    visibleDamage?: IVisibleDamage,
+    hitIndex = 0,
 ): IAOERangeAttackResult {
     const unitIdsDied: string[] = [];
     const perUnitDamage: IAOERangeAttackResult["perUnitDamage"] = [];
@@ -276,6 +278,8 @@ export function processRangeAOEAbility(
                     sceneLog,
                     currentActiveUnit,
                     gravechainTargets,
+                    visibleDamage,
+                    hitIndex,
                 );
             }
             if (unit.isDead()) {

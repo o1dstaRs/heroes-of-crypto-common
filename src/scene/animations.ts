@@ -70,6 +70,21 @@ export interface IChakramFlight {
     splash: NonNullable<IVisibleDamage["splash"]>;
 }
 
+/** A Gravechain's actual footprint graph and successful bindings, owned by one attack impact. */
+export interface IGravechainWave {
+    sourceUnitId: string;
+    rootUnitId: string;
+    response: boolean;
+    hitIndex: number;
+    links: {
+        unitId: string;
+        fromUnitId?: string;
+        position: XY;
+        depth: number;
+        applied: boolean;
+    }[];
+}
+
 export interface IVisibleDamage {
     amount: number;
     render: boolean;
@@ -121,6 +136,8 @@ export interface IVisibleDamage {
     // wounds on both hits produces TWO entries, hence two claws. `power` is the effect's total power at
     // that application (scales the claw). Empty/undefined when no Deep Wounds landed.
     deepWounds?: { unitId: string; power: number }[];
+    /** Includes failed/immune relays so the chain follows the real graph, rather than skipping units. */
+    gravechains?: IGravechainWave[];
     /** Actual Absolving Arrow cleanses, owned by the shot that passed through the ally. */
     absolutions?: {
         sourceUnitId: string;

@@ -990,6 +990,10 @@ export class AttackHandler {
             (damageForAnimation.chakramFlights ??= []).push(
                 ...bonus.chakramFlights.map((flight) => ({ ...flight, hitIndex: flight.hitIndex + initialVolleys })),
             );
+        if (bonus.gravechains?.length)
+            (damageForAnimation.gravechains ??= []).push(
+                ...bonus.gravechains.map((wave) => ({ ...wave, hitIndex: wave.hitIndex + initialVolleys })),
+            );
         if (bonus.absolutions?.length)
             (damageForAnimation.absolutions ??= []).push(
                 ...bonus.absolutions.map((entry) => ({ ...entry, hitIndex: entry.hitIndex + initialVolleys })),
@@ -1179,6 +1183,8 @@ export class AttackHandler {
             this.damageStatisticHolder,
             decreaseNumberOfShots,
             (damageForAnimation.secondary ??= []),
+            1,
+            damageForAnimation,
         );
         for (const uId of throughShotResult.unitIdsDied) {
             unitIdsDied.push(uId);
@@ -1239,6 +1245,8 @@ export class AttackHandler {
                         false, // bonus volley — do not consume another range shot
                         (damageForAnimation.secondary ??= []),
                         secondVolleyMultiplier,
+                        damageForAnimation,
+                        1,
                     );
                     for (const uId of secondThroughShot.unitIdsDied) {
                         if (!unitIdsDied.includes(uId)) {
@@ -1425,6 +1433,7 @@ export class AttackHandler {
             (damageForAnimation.secondary ??= []),
             chakramTrajectory.damageFactorByUnitId,
             chakramFlight?.missByUnitId,
+            damageForAnimation,
         );
         if (chakramFlight) {
             AllAbilities.recordChakramFlight(
@@ -1624,6 +1633,7 @@ export class AttackHandler {
                 (damageForAnimation.secondary ??= []),
                 responseChakramTrajectory.damageFactorByUnitId,
                 responseChakramFlight?.missByUnitId,
+                damageForAnimation,
             );
             if (responseChakramFlight) {
                 AllAbilities.recordChakramFlight(
@@ -1898,6 +1908,8 @@ export class AttackHandler {
                     unitsHolder,
                     this.sceneLog,
                     attackerUnit,
+                    undefined,
+                    damageForAnimation,
                 );
             }
             if (!targetUnit.isDead() && !isAttackMissed && !rangeAttackAbsorbed) {
@@ -1998,6 +2010,8 @@ export class AttackHandler {
                     unitsHolder,
                     this.sceneLog,
                     attackerUnit,
+                    undefined,
+                    damageForAnimation,
                 );
             }
             if (aoeRangeResponseResult?.landed) {
@@ -2249,6 +2263,9 @@ export class AttackHandler {
                     unitsHolder,
                     this.sceneLog,
                     attackerUnit,
+                    undefined,
+                    damageForAnimation,
+                    1,
                 );
             }
             if (!targetUnit.isDead() && secondShotResult.applied && !secondShotResult.waterShieldAbsorbed) {
@@ -2659,6 +2676,7 @@ export class AttackHandler {
             this.grid,
             attackerUnit,
             gravechainAttackTargets,
+            damageForAnimation,
         );
         const hasLightningSpinAttackLanded = lightningSpinAttackResult.landed;
         updateUnitsDied(lightningSpinAttackResult.unitIdsDied);
@@ -2701,6 +2719,7 @@ export class AttackHandler {
             (damageForAnimation.secondary ??= []),
             attackerUnit,
             gravechainAttackTargets,
+            damageForAnimation,
         );
         updateUnitsDied(skewerStrikeAttackResult.unitIdsDied);
         this.updateMoraleDecreaseForTheUnitTeam(
@@ -2852,6 +2871,7 @@ export class AttackHandler {
                     (damageForAnimation.secondary ??= []),
                     attackerUnit,
                     gravechainResponseTargets,
+                    damageForAnimation,
                 );
                 updateUnitsDied(skewerStrikeResponseResult.unitIdsDied);
                 this.updateMoraleDecreaseForTheUnitTeam(
@@ -2881,6 +2901,7 @@ export class AttackHandler {
                     this.grid,
                     attackerUnit,
                     gravechainResponseTargets,
+                    damageForAnimation,
                 );
                 hasLightningSpinResponseLanded = lightningSpinResponseResult.landed;
                 updateUnitsDied(lightningSpinResponseResult.unitIdsDied);
@@ -3096,6 +3117,7 @@ export class AttackHandler {
                             this.sceneLog,
                             attackerUnit,
                             gravechainResponseTargets,
+                            damageForAnimation,
                         );
                         AllAbilities.processBlindnessAbility(targetUnit, attackerUnit, attackerUnit, this.sceneLog);
                         updateUnitsDied(
@@ -3243,6 +3265,7 @@ export class AttackHandler {
                     this.sceneLog,
                     attackerUnit,
                     gravechainAttackTargets,
+                    damageForAnimation,
                 );
                 // Blindness rides the blow the Unicorn strikes as well as the one it answers — it used to
                 // fire only from the response path, so a Unicorn that opened the exchange blinded nobody.
@@ -3398,6 +3421,9 @@ export class AttackHandler {
                     unitsHolder,
                     this.sceneLog,
                     attackerUnit,
+                    undefined,
+                    damageForAnimation,
+                    1,
                 );
                 AllAbilities.processDullingDefenseAblity(attackerUnit, targetUnit, this.sceneLog);
                 AllAbilities.processPetrifyingGazeAbility(
@@ -3684,6 +3710,9 @@ export class AttackHandler {
                 this.damageStatisticHolder,
                 true,
                 secondaryDamage,
+                attackerUnit,
+                undefined,
+                damageForAnimation,
             );
             for (const sd of skewerResult.secondaryDamages) {
                 secondaryDamage.push({
@@ -3762,6 +3791,9 @@ export class AttackHandler {
             true,
             secondaryDamage,
             this.grid,
+            attackerUnit,
+            undefined,
+            damageForAnimation,
         );
         const spunObstacleCells = this.spinScatteredObstaclesAround(attackerUnit, unitsHolder, attackFromCell);
         return { unitIdsDied: spinResult.unitIdsDied, spunObstacleCells };

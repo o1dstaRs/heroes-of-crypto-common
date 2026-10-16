@@ -22,7 +22,7 @@ import { UnitsHolder } from "../units/units_holder";
 import * as AbilityHelper from "./ability_helper";
 import type { IStatisticHolder } from "../scene/statistic_holder_interface";
 import type { IDamageStatistic } from "../scene/scene_stats";
-import type { ISecondaryDamage } from "../scene/animations";
+import type { ISecondaryDamage, IVisibleDamage } from "../scene/animations";
 
 import { processAggrAbility } from "./aggr_ability";
 import { processBlindnessAbility } from "./blindness_ability";
@@ -68,6 +68,8 @@ export function processSkewerStrikeAbility(
     secondaryDamage?: ISecondaryDamage[],
     currentActiveUnit: Unit = fromUnit,
     gravechainTargets = new Set<string>(),
+    visibleDamage?: IVisibleDamage,
+    hitIndex = 0,
 ): ISkewerStrikeResult {
     if (!fromUnit.getAbility("Skewer Strike")) {
         return { increaseMorale: 0, unitIdsDied: [], moraleDecreaseForTheUnitTeam: {}, secondaryDamages: [] };
@@ -93,6 +95,8 @@ export function processSkewerStrikeAbility(
         secondaryDamage,
         currentActiveUnit,
         gravechainTargets,
+        visibleDamage,
+        hitIndex,
     );
 }
 
@@ -112,6 +116,8 @@ export function strikeSkewerTargets(
     secondaryDamage?: ISecondaryDamage[],
     currentActiveUnit: Unit = fromUnit,
     gravechainTargets = new Set<string>(),
+    visibleDamage?: IVisibleDamage,
+    hitIndex = 0,
 ): ISkewerStrikeResult {
     const unitIdsDied: string[] = [];
     const skewerStrikeAbility = fromUnit.getAbility("Skewer Strike");
@@ -240,6 +246,8 @@ export function strikeSkewerTargets(
                 sceneLog,
                 currentActiveUnit,
                 gravechainTargets,
+                visibleDamage,
+                hitIndex,
             );
         }
         if (nextStandingTarget.isDead()) {
