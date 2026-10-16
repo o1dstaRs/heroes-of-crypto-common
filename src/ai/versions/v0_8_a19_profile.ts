@@ -150,7 +150,7 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "gravechain-coverage" as const,
         source: "src/ai/gravechain_shortlist.ts" as const,
-        sha256: "35368d573587aaa1d3d058438740c69db654bf0c9859f71ba7ca10d284cc89de" as const,
+        sha256: "9dc203749776483b504e3aa82fc4d4158ba5d896f1e1c5e85e228cdf1d509c76" as const,
     }),
     Object.freeze({
         role: "last-fuse-trades" as const,

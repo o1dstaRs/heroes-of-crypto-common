@@ -28,7 +28,13 @@ const RIGHT = PBTypes.TeamVals.RIGHT;
 afterEach(() => setDeterministicRandomSource(undefined));
 
 function fixture(
-    options: { team?: typeof LEFT; attacker?: TestUnitOptions; root?: TestUnitOptions; actorCell?: XY } = {},
+    options: {
+        team?: typeof LEFT;
+        attacker?: TestUnitOptions;
+        root?: TestUnitOptions;
+        cluster?: TestUnitOptions;
+        actorCell?: XY;
+    } = {},
 ) {
     const combat = createCombatTestContext();
     const fightProperties = FightStateManager.getInstance().getFightProperties();
@@ -51,11 +57,11 @@ function fixture(
         return unit;
     };
     const isolated = add("Isolated easy damage", { x: 8, y: 3 }, { armor: 0 });
-    const root = add("Cluster root", { x: 8, y: 8 }, options.root);
-    const bridge = add("Diagonal bridge", { x: 9, y: 9 });
-    const end = add("Second link", { x: 10, y: 10 });
-    const third = add("Third link", { x: 11, y: 11 });
-    const outside = add("Beyond three links", { x: 12, y: 12 });
+    const root = add("Cluster root", { x: 8, y: 8 }, { ...options.cluster, ...options.root });
+    const bridge = add("Diagonal bridge", { x: 9, y: 9 }, options.cluster);
+    const end = add("Second link", { x: 10, y: 10 }, options.cluster);
+    const third = add("Third link", { x: 11, y: 11 }, options.cluster);
+    const outside = add("Beyond three links", { x: 12, y: 12 }, options.cluster);
     fightProperties.setArtifactPerTeam(team, 2, Tier2Artifact.GRAVECHAIN);
     combat.unitsHolder.applyArtifacts(fightProperties);
     combat.unitsHolder.refreshStackPowerForAllUnits();
@@ -214,6 +220,58 @@ describe("Gravechain horizon coverage", () => {
         });
     });
 
+    test.each(["Through Shot", "Large Caliber", "Area Throw"])(
+        "real %s search retains lower damage when Gravechain prevents an enemy strike",
+        (ability) => {
+            const environment = {
+                V07_SEARCH: "1",
+                SEARCH_VERSIONS: "v0.8",
+                SEARCH_SHORTLIST: "2",
+                SEARCH_A19_GRAVECHAIN_COVERAGE: "1",
+                SEARCH_ROLLOUTS: "16",
+                SEARCH_HORIZON: "1",
+                SEARCH_GATE: "0",
+                V07_VALUE_WEIGHTS: "material",
+                V07_VALUE_WEIGHTS_V2: undefined,
+            };
+            withSearchEnvironment(environment, () => {
+                const h = fixture({
+                    attacker: { abilities: [ability] },
+                    cluster: { armor: 100 },
+                    root: { damageMin: 100, damageMax: 100 },
+                });
+                h.add("Exposed ally", { x: 4, y: 9 }, { team: h.actor.getTeam(), maxHp: 1000 });
+                const alternate = h.add("Isolated alternate shot", { x: 8, y: 5 }, { armor: 1 });
+                h.fightProperties.setTeamUnitsAlive(h.actor.getTeam(), 2);
+                h.fightProperties.setTeamUnitsAlive(h.root.getTeam(), 7);
+                h.fightProperties.enqueueUpNext(h.root.getId());
+                const { easy, chain } = h.catalog();
+                expect(easy.features.expectedDamage).toBeGreaterThan(chain.features.expectedDamage);
+                const before = JSON.stringify(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties));
+                const choose = () => {
+                    const driver = new SearchDriver(h.deps);
+                    (driver as unknown as { simSeed: () => number }).simSeed = () => 4433;
+                    return driver.chooseDecision(h.actor, "v0.8", easy.actions);
+                };
+                const chosen = choose();
+                expect(chosen).not.toEqual(easy.actions);
+                withSearchEnvironment({ SEARCH_A19_GRAVECHAIN_COVERAGE: "0" }, () => {
+                    const oldStrike = choose().find((action) => action.type === "range_attack");
+                    expect(oldStrike?.type).toBe("range_attack");
+                    expect([h.isolated.getId(), alternate.getId()]).toContain(oldStrike && oldStrike.targetId);
+                });
+                expect(JSON.stringify(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties))).toBe(before);
+                h.fire({ ...chain, actions: chosen });
+                expect(h.root.hasDebuffActive("Gravebound")).toBe(true);
+                h.fightProperties.startTurn(h.root.getTeam(), 2000);
+                const replies = enumerateCandidates(h.root, h.context, [
+                    { type: "defend_turn", unitId: h.root.getId() },
+                ]).candidates;
+                expect(replies.some((candidate) => candidate.kind === "melee")).toBe(false);
+            });
+        },
+    );
+
     test.each([PBTypes.AttackVals.MELEE, PBTypes.AttackVals.MELEE_MAGIC])(
         "also retains and executes legal physical melee chains (type %i)",
         (attackType) => {
@@ -239,6 +297,130 @@ describe("Gravechain horizon coverage", () => {
         h.fire(chain);
         expect(h.third.hasDebuffActive("Gravebound")).toBe(true);
     });
+
+    test.each(["Through Shot", "Large Caliber", "Area Throw"])(
+        "%s retains the union of chains from every impact, including beyond the primary's reach",
+        (ability) => {
+            const h = fixture({ actorCell: { x: 3, y: 3 }, attacker: { abilities: [ability] } });
+            const { candidates, easy, chain } = h.catalog();
+            const before = JSON.stringify(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties));
+            setDeterministicRandomSource(() => {
+                throw new Error("coverage must not roll combat RNG");
+            });
+            expect(h.reserve(candidates, [easy])).toEqual([easy, chain]);
+            expect(JSON.stringify(snapshotBattle(h.unitsHolder, h.grid, h.fightProperties))).toBe(before);
+            const all = enumerateCandidates(h.actor, h.context, easy.actions).candidates;
+            const retained = [chain];
+            expect(h.reserve(all, retained)).toBe(retained);
+            h.fire(chain);
+            expect(h.outside.hasDebuffActive("Gravebound")).toBe(true);
+            expect(h.isolated.hasDebuffActive("Gravebound")).toBe(false);
+        },
+    );
+
+    test("a shielded piercing primary still allows chains from later impacts", () => {
+        const h = fixture({
+            actorCell: { x: 3, y: 3 },
+            attacker: { abilities: ["Through Shot"] },
+            root: { abilities: ["Water Shield"] },
+        });
+        h.root.trySeedWaterShield();
+        const { candidates, easy, chain } = h.catalog();
+        expect(h.reserve(candidates, [easy])).toEqual([easy, chain]);
+        h.fire(chain);
+        expect(h.outside.hasDebuffActive("Gravebound")).toBe(true);
+    });
+
+    test("an empty-cell Area Throw retains control from the actual splash", () => {
+        const h = fixture({ attacker: { abilities: ["Area Throw"] } });
+        const { easy } = h.catalog();
+        const candidates = enumerateCandidates(h.actor, h.context, easy.actions).candidates.filter(
+            (candidate) => candidate.kind === "incumbent" || candidate.kind === "area_throw",
+        );
+        const reserved = h.reserve(candidates, [easy]);
+        expect(reserved).toHaveLength(2);
+        expect(reserved[1]!.kind).toBe("area_throw");
+        h.fire(reserved[1]!);
+        expect(h.outside.hasDebuffActive("Gravebound")).toBe(true);
+    });
+
+    test("an intercepted throw cannot advertise a distant cluster beyond its actual splash", () => {
+        const h = fixture({ actorCell: { x: 3, y: 3 }, attacker: { abilities: ["Area Throw"] } });
+        const distant = h.add("Distant cluster", { x: 14, y: 14 });
+        const farNeighbor = h.add("Distant neighbor", { x: 15, y: 15 });
+        for (const unit of [h.root, h.bridge, h.end, h.third, h.outside]) {
+            unit.applyDebuff(new Spell({ spellProperties: getSpellConfig("Death", "Gravebound", 1), amount: 1 }));
+        }
+        const { candidates, easy, chain } = h.catalog();
+        const intercepted: IEnumeratedCandidate = {
+            ...chain,
+            kind: "area_throw",
+            actions: [{ type: "area_throw_attack", attackerId: h.actor.getId(), targetCell: { x: 13, y: 13 } }],
+        };
+        const retained = [easy];
+        expect(h.reserve([candidates[0]!, easy, intercepted], retained)).toBe(retained);
+        h.fire(intercepted);
+        expect(distant.hasDebuffActive("Gravebound")).toBe(false);
+        expect(farNeighbor.hasDebuffActive("Gravebound")).toBe(false);
+    });
+
+    test.each(["Through Shot", "Large Caliber", "Area Throw"])(
+        "%s respects Wingshield interception instead of inventing downstream roots",
+        (ability) => {
+            const h = fixture({
+                actorCell: { x: 3, y: 3 },
+                attacker: { abilities: [ability] },
+                root: { abilities: ["Arrows Wingshield Blessing"] },
+            });
+            for (const unit of [h.root, h.bridge, h.end]) {
+                unit.applyDebuff(new Spell({ spellProperties: getSpellConfig("Death", "Gravebound", 1), amount: 1 }));
+            }
+            const { candidates, easy, chain } = h.catalog();
+            const retained = [easy];
+            // Only the third link is new; the fifth stack would require another impact beyond the Angel.
+            expect(h.reserve(candidates, retained)).toBe(retained);
+            h.fire(chain);
+            expect(h.third.hasDebuffActive("Gravebound")).toBe(true);
+            expect(h.outside.hasDebuffActive("Gravebound")).toBe(false);
+        },
+    );
+
+    test("a free-aim piercing line is reconstructed from its endpoint", () => {
+        const h = fixture({ actorCell: { x: 3, y: 3 }, attacker: { abilities: ["Through Shot"] } });
+        const { candidates, easy, chain } = h.catalog();
+        const free = {
+            ...chain,
+            actions: chain.actions.map((action) =>
+                action.type === "range_attack"
+                    ? {
+                          type: "range_attack" as const,
+                          attackerId: h.actor.getId(),
+                          targetId: "",
+                          targetPosition: h.root.getPosition(),
+                      }
+                    : action,
+            ),
+        };
+        expect(h.reserve([candidates[0]!, free], [easy])).toEqual([easy, free]);
+        h.fire(free);
+        expect(h.outside.hasDebuffActive("Gravebound")).toBe(true);
+    });
+
+    test.each(["Through Shot", "Large Caliber", "Area Throw", "Chakram"])(
+        "%s does not hide ordinary melee Gravechain opportunities",
+        (ability) => {
+            const h = fixture({ actorCell: { x: 7, y: 7 }, attacker: { abilities: [ability] } });
+            h.actor.refreshPossibleAttackTypes(false);
+            const candidates = enumerateCandidates(h.actor, h.context, [
+                { type: "defend_turn", unitId: h.actor.getId() },
+            ]).candidates;
+            const reserved = h.reserve(candidates, []);
+            expect(reserved).toHaveLength(1);
+            expect(reserved[0]!.actions.some((action) => action.type === "melee_attack")).toBe(true);
+            h.fire(reserved[0]!);
+            expect(h.bridge.hasDebuffActive("Gravebound")).toBe(true);
+        },
+    );
 
     test.each([LEFT, RIGHT])(
         "uses either team's public board without consuming RNG or changing state (seat %i)",
@@ -342,7 +524,7 @@ describe("Gravechain horizon coverage", () => {
         h.fightProperties.setArtifactPerTeam(h.actor.getTeam(), 2, 0);
         h.unitsHolder.applyArtifacts(h.fightProperties);
         expect(h.reserve(candidates, retained)).toBe(retained);
-        const splash = fixture({ attacker: { abilities: ["Large Caliber"] } });
+        const splash = fixture({ attacker: { abilities: ["Chakram"] } });
         const s = splash.catalog();
         const sr = [s.easy];
         expect(splash.reserve(s.candidates, sr)).toBe(sr);
