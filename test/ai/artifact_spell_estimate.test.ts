@@ -1,0 +1,201 @@
+import { afterEach, describe, expect, test } from "bun:test";
+
+import type { IDecisionContext } from "../../src/ai/ai_strategy";
+import { enumerateCandidates, type IEnumeratedCandidate } from "../../src/ai/candidates";
+import { selectV08DamageSpellCandidate } from "../../src/ai/versions/v0_8";
+import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
+import { GameActionEngine } from "../../src/engine/action_engine";
+import { FightStateManager } from "../../src/fights/fight_state_manager";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
+import { PathHelper } from "../../src/grid/path_helper";
+import { MoveHandler } from "../../src/handlers/move_handler";
+import { SceneLogMock } from "../../src/scene/scene_log_mock";
+import { snapshotBattle } from "../../src/simulation/battle_snapshot";
+import { setDeterministicRandomSource } from "../../src/utils/lib";
+import { createCombatTestContext, createTestUnit, placeUnit, type TestUnitOptions } from "../helpers/combat";
+
+const LEFT = PBTypes.TeamVals.LEFT;
+const RIGHT = PBTypes.TeamVals.RIGHT;
+
+function fixture(
+    options: {
+        ring?: "mage" | "archmage";
+        fuse?: boolean;
+        spell?: string;
+        caster?: TestUnitOptions;
+        target?: TestUnitOptions;
+        neighbor?: TestUnitOptions;
+        aegis?: boolean;
+    } = {},
+) {
+    const combat = createCombatTestContext();
+    const fight = FightStateManager.getInstance().getFightProperties();
+    const caster = createTestUnit({
+        name: "Caster",
+        team: LEFT,
+        attackType: PBTypes.AttackVals.MELEE_MAGIC,
+        maxHp: 500,
+        stackPower: 5,
+        spells: [options.spell ?? "Nature:Lightning Strike"],
+        ...options.caster,
+    });
+    const target = createTestUnit({ name: "Fuse", team: RIGHT, maxHp: 10, stackPower: 5, ...options.target });
+    const neighbor = createTestUnit({ name: "Exposed ally", team: LEFT, maxHp: 500, ...options.neighbor });
+    const safe = createTestUnit({ name: "Safe target", team: RIGHT, maxHp: 1000 });
+    placeUnit(combat.grid, combat.unitsHolder, caster, { x: 3, y: 8 });
+    placeUnit(combat.grid, combat.unitsHolder, target, { x: 9, y: 8 });
+    placeUnit(combat.grid, combat.unitsHolder, neighbor, { x: 10, y: 9 });
+    placeUnit(combat.grid, combat.unitsHolder, safe, { x: 9, y: 3 });
+    if (options.fuse !== false) fight.setArtifactPerTeam(RIGHT, 2, Tier2Artifact.LAST_FUSE);
+    if (options.aegis) fight.setArtifactPerTeam(RIGHT, 2, Tier2Artifact.AEGIS_OF_THE_ARCANE);
+    if (options.ring === "mage") fight.setArtifactPerTeam(LEFT, 1, Tier1Artifact.MAGES_RING);
+    if (options.ring === "archmage") fight.setArtifactPerTeam(LEFT, 2, Tier2Artifact.ARCHMAGES_RING);
+    combat.unitsHolder.applyArtifacts(fight);
+    for (const unit of [caster, target, neighbor]) unit.trySeedWaterShield();
+    caster.refreshPossibleAttackTypes(false);
+    fight.startFight();
+    fight.setTeamUnitsAlive(LEFT, 2);
+    fight.setTeamUnitsAlive(RIGHT, 2);
+    fight.startTurn(LEFT, 1000);
+    const context: IDecisionContext = {
+        ...combat,
+        fightProperties: fight,
+        matrix: combat.grid.getMatrix(),
+        pathHelper: new PathHelper(combat.grid.getSettings()),
+    };
+    const catalog = () => {
+        const before = JSON.stringify(snapshotBattle(combat.unitsHolder, combat.grid, fight));
+        setDeterministicRandomSource(() => {
+            throw new Error("Artifact spell estimates must be RNG-free");
+        });
+        const candidates = enumerateCandidates(caster, context, [
+            { type: "defend_turn", unitId: caster.getId() },
+        ]).candidates;
+        expect(JSON.stringify(snapshotBattle(combat.unitsHolder, combat.grid, fight))).toBe(before);
+        return candidates;
+    };
+    const fire = (candidate: IEnumeratedCandidate) => {
+        setDeterministicRandomSource(() => 0);
+        const before = target.getCumulativeHp();
+        const engine = new GameActionEngine({
+            ...combat,
+            fightProperties: fight,
+            sceneLog: new SceneLogMock(),
+            moveHandler: new MoveHandler(combat.grid.getSettings(), combat.grid, combat.unitsHolder),
+            getCurrentActiveUnitId: () => caster.getId(),
+        });
+        const results = candidate.actions.map((action) => engine.apply(action));
+        expect(results.every((result) => result.completed)).toBe(true);
+        const blasts = results.flatMap((result) => result.events).filter((event) => event.type === "pyre_exploded");
+        const friendlyDamage = blasts
+            .flatMap((event) => event.hits)
+            .filter((hit) => [caster.getId(), neighbor.getId()].includes(hit.unitId))
+            .reduce((sum, hit) => sum + hit.amount, 0);
+        return { blasts, friendlyDamage, netDamage: before - target.getCumulativeHp() - friendlyDamage };
+    };
+    return { ...combat, fight, caster, target, neighbor, safe, context, catalog, fire };
+}
+
+afterEach(() => setDeterministicRandomSource(undefined));
+
+describe("artifact spell decisions", () => {
+    test.each([undefined, "mage", "archmage"] as const)(
+        "%s ring does not turn an absorbed spell into damage or a kill",
+        (ring) => {
+            const h = fixture({ ring, fuse: false, target: { abilities: ["Water Shield"] } });
+            const candidates = h.catalog();
+            const cast = candidates.find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
+            expect(cast.features).toMatchObject({ expectedDamage: 0, expectedKill: 0 });
+            expect(selectV08DamageSpellCandidate(h.caster, candidates)?.targetId).toBe(h.safe.getId());
+            expect(h.fire(cast).netDamage).toBe(0);
+        },
+    );
+
+    test.each([undefined, "mage", "archmage"] as const)(
+        "%s ring prices a Last Fuse execution before selecting a spell",
+        (ring) => {
+            const h = fixture({ ring });
+            const candidates = h.catalog();
+            const cast = candidates.find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
+            expect(cast.features).toMatchObject({ expectedDamage: -90, expectedKill: 1 });
+            expect(selectV08DamageSpellCandidate(h.caster, candidates)?.targetId).toBe(h.safe.getId());
+            expect(h.fire(cast)).toMatchObject({ friendlyDamage: 100, netDamage: -90 });
+        },
+    );
+
+    test.each(["Nature:Lightning Strike", "Life:Fire Strike"])(
+        "%s uses actual fatal HP rather than the amplified spell's overkill",
+        (spell) => {
+            const h = fixture({ spell, ring: "archmage", caster: { amountAlive: 200 }, target: { maxHp: 600 } });
+            const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
+            expect(cast.features.expectedDamage).toBe(480);
+            expect(h.fire(cast)).toMatchObject({ friendlyDamage: 120, netDamage: 480 });
+        },
+    );
+
+    test("a neighboring Water Shield absorbs the blast and preserves the safe execution", () => {
+        const h = fixture({ neighbor: { abilities: ["Water Shield"] } });
+        const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
+        expect(cast.features).toMatchObject({ expectedDamage: 10, expectedKill: 1 });
+        expect(h.neighbor.hasBuffActive("Water Shield")).toBe(true);
+        expect(h.fire(cast)).toMatchObject({ friendlyDamage: 0, netDamage: 10 });
+        expect(h.neighbor.hasBuffActive("Water Shield")).toBe(false);
+    });
+
+    test("an absorbed lethal spell does not trigger Last Fuse", () => {
+        const h = fixture({ ring: "archmage", target: { abilities: ["Water Shield"] } });
+        const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
+        expect(cast.features).toMatchObject({ expectedDamage: 0, expectedKill: 0 });
+        expect(h.fire(cast)).toMatchObject({ blasts: [], friendlyDamage: 0, netDamage: 0 });
+    });
+
+    test("Last Fuse only charges the HP a neighboring stack can lose", () => {
+        const h = fixture({ neighbor: { maxHp: 20 } });
+        const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
+        expect(cast.features).toMatchObject({ expectedDamage: -10, expectedKill: 1 });
+        expect(h.fire(cast)).toMatchObject({ friendlyDamage: 20, netDamage: -10 });
+    });
+
+    test("native resurrection is neither a Last Fuse detonation nor a secure spell kill", () => {
+        const h = fixture({ target: { abilities: ["Resurrection"], spells: ["System:Resurrection"] } });
+        const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
+        expect(cast.features).toMatchObject({ expectedDamage: 10, expectedKill: 0 });
+        expect(h.fire(cast).blasts).toHaveLength(0);
+        expect(h.target.isDead()).toBe(false);
+    });
+
+    test.each(["mage", "archmage"] as const)("%s ring and enemy Arcane Aegis use the engine's damage", (ring) => {
+        const h = fixture({ ring, fuse: false, aegis: true, target: { maxHp: 1000 } });
+        h.unitsHolder.refreshStackPowerForAllUnits();
+        const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
+        expect(h.target.getMagicResist()).toBe(18);
+        expect(h.fire(cast).netDamage).toBe(cast.features.expectedDamage);
+    });
+
+    test.each(["Life:Meteorite", "Nature:Meteor Shower"])(
+        "%s with Archmage's Ring avoids a larger shielded cluster",
+        (spell) => {
+            const h = fixture({
+                spell,
+                ring: "archmage",
+                fuse: false,
+                target: { maxHp: 1000, abilities: ["Water Shield"] },
+            });
+            const shielded = createTestUnit({
+                name: "Second shield",
+                team: RIGHT,
+                maxHp: 1000,
+                abilities: ["Water Shield"],
+            });
+            placeUnit(h.grid, h.unitsHolder, shielded, { x: 9, y: 9 });
+            shielded.trySeedWaterShield();
+            const cast = selectV08DamageSpellCandidate(h.caster, h.catalog())!;
+            expect(cast).toBeDefined();
+            const safeHp = h.safe.getCumulativeHp();
+            h.fire(cast);
+            expect(h.safe.getCumulativeHp()).toBe(safeHp - cast.features.expectedDamage);
+            expect(h.target.getCumulativeHp()).toBe(1000);
+            expect(shielded.getCumulativeHp()).toBe(1000);
+        },
+    );
+});

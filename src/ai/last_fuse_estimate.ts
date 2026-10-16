@@ -3,6 +3,9 @@ import { applyAttackDamageChain, resolveAttackDamageChain } from "../damage/dama
 import type { GameAction } from "../engine/actions";
 import { PBTypes } from "../generated/protobuf/v1/types";
 import { canUnitRespondToMelee } from "../handlers/melee_response";
+import type { Spell } from "../spells/spell";
+import { projectSpellDamageAgainstUnit } from "../spells/spell_cast_projection";
+import { mirroredDamageShare } from "../spells/spell_helper";
 import type { Unit } from "../units/unit";
 import type { XY } from "../utils/math";
 import type { IDecisionContext } from "./ai_strategy";
@@ -44,6 +47,42 @@ function enemyBlastDamage(
 }
 
 const SECONDARY_RIDERS = ["Devour Essence", "Petrifying Gaze", "Predatory Assimilation", "Borrowed Grace"];
+
+/** Price one direct spell execution. Reflected casts, area impacts and chained deaths stay with engine search. */
+export function estimateLastFuseSpellDamage(
+    unit: Unit,
+    target: Unit,
+    spell: Spell,
+    context: Pick<IDecisionContext, "unitsHolder">,
+): ILastFuseDamageEstimate | undefined {
+    if (
+        target.isDead() ||
+        target.getTeam() === unit.getTeam() ||
+        !target.hasBuffActive("Last Fuse") ||
+        !["Fire Strike", "Lightning Strike"].includes(spell.getName()) ||
+        mirroredDamageShare(target) > 0
+    )
+        return undefined;
+    const damage = projectSpellDamageAgainstUnit({ spell, caster: unit, target }).damage;
+    const fatal = damage >= target.getCumulativeHp() && !target.canSelfResurrect();
+    let friendlyDamage = 0;
+    if (fatal) {
+        const blast = target.getLastFuseDamage();
+        for (const ally of context.unitsHolder.getAllAllies(unit.getTeam())) {
+            if (ally.isDead() || ally.willWaterShieldAbsorb() || !touches(target.getCells(), ally.getCells())) continue;
+            if (blast >= ally.getCumulativeHp() && ally.hasBuffActive("Last Fuse") && !ally.canSelfResurrect()) {
+                return undefined;
+            }
+            friendlyDamage += Math.min(blast, ally.getCumulativeHp());
+        }
+    }
+    return {
+        expectedNetDamage: Math.min(damage, target.getCumulativeHp()) - friendlyDamage,
+        expectedFriendlyDamage: friendlyDamage,
+        fatalChance: Number(fatal),
+        secureKill: fatal,
+    };
+}
 
 function canProjectMeleeResponse(
     unit: Unit,

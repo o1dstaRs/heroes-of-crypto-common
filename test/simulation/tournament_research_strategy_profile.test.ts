@@ -71,6 +71,8 @@ describe("tournament entrant-A research strategy profile", () => {
             "gravechain-coverage",
             "last-fuse-trades",
             "last-fuse-catalog",
+            "last-fuse-estimates",
+            "ranged-shields",
             "selection-bounds",
             "rollout-allocation",
             "scored-arbitration",

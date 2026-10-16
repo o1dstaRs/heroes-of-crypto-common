@@ -205,6 +205,8 @@ describe("v0.8+A19 production profile", () => {
             "gravechain-coverage",
             "last-fuse-trades",
             "last-fuse-catalog",
+            "last-fuse-estimates",
+            "ranged-shields",
             "selection-bounds",
             "rollout-allocation",
             "scored-arbitration",
