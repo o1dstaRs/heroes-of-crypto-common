@@ -63,6 +63,7 @@ import { decisionFireWalls } from "./decision_fight_state";
 import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
+import { estimateLastFuseMeleeDamage } from "./last_fuse_estimate";
 
 const MELEE = PBTypes.AttackVals.MELEE;
 const MELEE_MAGIC = PBTypes.AttackVals.MELEE_MAGIC;
@@ -159,7 +160,7 @@ export interface ICandidateFeatures {
      * The opportunity cost of casting Resurrection on an ally is losing the Angel's own auto-res.
      */
     burnsResurrectionCharge: 0 | 1;
-    /** Hit-weighted damage estimate using engine miss/AOE modifiers; splash friendly-fire subtracts. */
+    /** Damage estimate using engine modifiers; friendly splash and supported Last Fuse blasts subtract. */
     expectedDamage: number;
     /** 1 when the estimate kills the primary target stack outright. */
     expectedKill: 0 | 1;
@@ -1444,13 +1445,35 @@ class CandidateGenerator {
         }
         const targetViews: IMeleeTarget[] = targets.map((target) => ({ unit: target, cells: target.getCells() }));
         const pairs: IMeleePair[] = [];
+        const actionsFor = (target: Unit, cell: XY, route?: IReadonlyWeightedRoute): GameAction[] => {
+            const actions: GameAction[] = [...prefix];
+            // Keep the measured separate move-and-strike encoding for both valuation and execution.
+            if (route && (cell.x !== base.x || cell.y !== base.y)) actions.push(this.moveAction(route));
+            actions.push({
+                type: "melee_attack",
+                attackerId: this.unit.getId(),
+                targetId: target.getId(),
+                attackFrom: { x: cell.x, y: cell.y },
+            });
+            return actions;
+        };
         const pair = (target: IMeleeTarget, cell: XY, route?: IReadonlyWeightedRoute): IMeleePair => {
             target.damage ??= this.meleeDamage(target.unit);
+            const fuse = target.unit.hasBuffActive("Last Fuse")
+                ? estimateLastFuseMeleeDamage(
+                      this.unit,
+                      target.unit,
+                      this.context,
+                      cell,
+                      actionsFor(target.unit, cell, route),
+                  )
+                : undefined;
             return {
                 target: target.unit,
                 cell,
                 route,
-                ...target.damage,
+                effective: fuse?.expectedNetDamage ?? target.damage.effective,
+                kill: fuse ? (fuse.secureKill ? 1 : 0) : target.damage.kill,
                 sourceIndex: pairs.length,
             };
         };
@@ -1487,22 +1510,7 @@ class CandidateGenerator {
             }
         }
 
-        const actionsOf = (p: IMeleePair): GameAction[] => {
-            const actions: GameAction[] = [...prefix];
-            // Move-and-strike is emitted as a SEPARATE move_unit + stationary melee_attack — the pattern
-            // v0.5 measured ~+2.5pp over folding the path into the melee_attack (the standalone move runs
-            // the full move handler). The ranked client folds the pair back for transport.
-            if (p.route && (p.cell.x !== base.x || p.cell.y !== base.y)) {
-                actions.push(this.moveAction(p.route));
-            }
-            actions.push({
-                type: "melee_attack",
-                attackerId: this.unit.getId(),
-                targetId: p.target.getId(),
-                attackFrom: { x: p.cell.x, y: p.cell.y },
-            });
-            return actions;
-        };
+        const actionsOf = (p: IMeleePair): GameAction[] => actionsFor(p.target, p.cell, p.route);
 
         let reservedRapidChargePair: IMeleePair | undefined;
         if (
