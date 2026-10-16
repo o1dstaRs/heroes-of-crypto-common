@@ -217,7 +217,7 @@ interface IPreparedRangeCandidateDamage {
     secondVolleyMultiplier: number;
     sharedAbilityMultiplier: number;
     bonusVolleyChance: number;
-    spentVolleys: number;
+    shotCostOnHitOnly: boolean;
 }
 
 /** Attacker-only terms shared by every aim considered during one immutable decision. */
@@ -264,7 +264,7 @@ function prepareRangeCandidateDamage(
         secondVolleyMultiplier,
         sharedAbilityMultiplier,
         bonusVolleyChance: unit.getBonusRangedAttackChance() / 100,
-        spentVolleys: throughShotAbility ? 1 : doubleShotAbility ? 2 : 1,
+        shotCostOnHitOnly: !isPhysicalAoe && !unit.hasAbilityActive("Chakram"),
     };
 }
 
@@ -311,6 +311,13 @@ function evaluatePreparedRangeCandidateDamage(
     let aimTargetDamage = 0;
     const counted = new Set<string>();
     const fightProperties = context.fightProperties;
+    // The action spends arrows against its first impact, not independently against every splash victim.
+    // Through Shot spends one arrow for the whole line; its native follow-up does not spend another.
+    const ammunitionTarget = prepared.isThroughShot ? undefined : evaluation.affectedUnits[0]?.[0];
+    const secondVolleyAvailable = unit.projectRangeShotsAfterVolleys(ammunitionTarget) > 0;
+    const secondVolleyMultiplier = secondVolleyAvailable ? prepared.secondVolleyMultiplier : 0;
+    const spentVolleys = prepared.isThroughShot || !secondVolleyMultiplier ? 1 : 2;
+    const bonusVolleyAvailable = unit.projectRangeShotsAfterVolleys(ammunitionTarget, spentVolleys) > 0;
     // Through Shot owns the ranged attack outright when active; Large Caliber / Area Throw use the
     // separate splash tail. Both are physical AOE for damage purposes, but only the latter applies
     // Broken Aegis' incoming-damage reduction. Keep this order identical to the authoritative handlers:
@@ -387,21 +394,49 @@ function evaluatePreparedRangeCandidateDamage(
                 1 - Math.min(100, Math.max(0, unit.calculateMissChance(target, defenderAbilityPower))) / 100;
             const missChance = 1 - hitChance;
             let effective =
-                prepared.secondVolleyMultiplier > 0
+                secondVolleyMultiplier > 0
                     ? hitChance * missChance * Math.min(firstConditionalDamage, hp) +
                       missChance * hitChance * Math.min(secondConditionalDamage, hp) +
                       hitChance * hitChance * Math.min(firstConditionalDamage + secondConditionalDamage, hp)
                     : hitChance * Math.min(firstConditionalDamage, hp);
-            if (
-                prepared.bonusVolleyChance > 0 &&
-                unit.projectRangeShotsAfterVolleys(target, prepared.spentVolleys) > 0
-            ) {
+            if (prepared.shotCostOnHitOnly && (prepared.secondVolleyMultiplier > 0 || prepared.bonusVolleyChance > 0)) {
+                // Ordinary missed arrows do not spend ammunition in the resolver. Keep each native outcome's
+                // budget so a miss can leave enough for a second shot or Echo, while a hit can use the last arrow.
+                effective = 0;
+                for (const [first, firstProbability, firstSpent] of [
+                    [0, missChance, 0],
+                    [firstConditionalDamage, hitChance, 1],
+                ]) {
+                    if (!firstProbability) continue;
+                    const canFollow =
+                        prepared.secondVolleyMultiplier > 0 &&
+                        unit.projectRangeShotsAfterVolleys(ammunitionTarget, firstSpent) > 0;
+                    const secondOutcomes = canFollow
+                        ? [
+                              [0, missChance, firstSpent],
+                              [secondConditionalDamage, hitChance, firstSpent + 1],
+                          ]
+                        : [[0, 1, firstSpent]];
+                    for (const [second, secondProbability, spent] of secondOutcomes) {
+                        if (!secondProbability) continue;
+                        const nativeDamage = Math.min(first + second, hp);
+                        const echoDamage =
+                            prepared.bonusVolleyChance > 0 &&
+                            unit.projectRangeShotsAfterVolleys(ammunitionTarget, spent) > 0
+                                ? prepared.bonusVolleyChance *
+                                  hitChance *
+                                  (Math.min(first + second + firstConditionalDamage, hp) - nativeDamage)
+                                : 0;
+                        effective += firstProbability * secondProbability * (nativeDamage + echoDamage);
+                    }
+                }
+            } else if (prepared.bonusVolleyChance > 0 && bonusVolleyAvailable) {
                 const firstOutcomes = [
                     [0, missChance],
                     [firstConditionalDamage, hitChance],
                 ];
                 const secondOutcomes =
-                    prepared.secondVolleyMultiplier > 0
+                    secondVolleyMultiplier > 0
                         ? [
                               [0, missChance],
                               [secondConditionalDamage, hitChance],
