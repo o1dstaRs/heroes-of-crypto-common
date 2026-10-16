@@ -299,6 +299,22 @@ describe("Last Fuse melee estimates", () => {
         expect(f.fire(() => 0, candidate.actions).friendlyDamage).toBe(estimate.expectedFriendlyDamage);
     });
 
+    test("aura-dependent movement is left to the full combat simulation", () => {
+        const f = board({ attackerCell: { x: 5, y: 8 }, neighbor: { abilities: ["Luck Aura"] }, remainingHp: 10 });
+        expect(f.neighbor.getAuraEffects().length).toBeGreaterThan(0);
+        const candidate = enumerateCandidates(f.attacker, f.context, [
+            { type: "end_turn", unitId: f.attacker.getId(), reason: "manual" },
+        ]).candidates.find(
+            (c) =>
+                c.kind === "melee" &&
+                c.targetId === f.target.getId() &&
+                c.standCell?.x === f.base.x &&
+                c.standCell.y === f.base.y,
+        )!;
+        expect(candidate).toBeDefined();
+        expect(f.project(f.base, candidate.actions)).toBeUndefined();
+    });
+
     test("native resurrection prevents a burst and is not labeled a stack kill", () => {
         const f = board({ target: { abilities: ["Resurrection"], spells: ["System:Resurrection"] }, remainingHp: 10 });
         expect(f.target.canSelfResurrect()).toBe(true);

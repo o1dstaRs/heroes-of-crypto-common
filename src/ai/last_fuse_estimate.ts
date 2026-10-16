@@ -30,9 +30,7 @@ function actorBlastDamage(
     const ordinary = { expected: shield ? 0 : Math.min(blast, hp), minimumHp: hp, mayBeUnshielded: !shield };
     if (!canUnitRespondToMelee(unit, target, context.fightProperties)) return ordinary;
     if (
-        (actions.some((action) => action.type === "move_unit") &&
-            (target.hasAbilityActive("Backstab") ||
-                [...context.unitsHolder.getAllUnits().values()].some((other) => other.getAuraEffects().length > 0))) ||
+        (actions.some((action) => action.type === "move_unit") && target.hasAbilityActive("Backstab")) ||
         target.hasAbilityActive("Rapid Charge") ||
         unit.hasBuffActive("Flesh Shield Aura") ||
         target.hasBuffActive("Fireforged Sword") ||
@@ -95,7 +93,9 @@ export function estimateLastFuseMeleeDamage(
         target.hasAbilityActive("Fire Shield") ||
         unit.hasBuffActive("Fireforged Sword") ||
         SECONDARY_RIDERS.some((name) => unit.hasAbilityActive(name)) ||
-        (actions.some((action) => action.type === "move_unit") && decisionFireWalls(context).size() > 0)
+        (actions.some((action) => action.type === "move_unit") &&
+            (decisionFireWalls(context).size() > 0 ||
+                [...context.unitsHolder.getAllUnits().values()].some((other) => other.getAuraEffects().length > 0)))
     )
         return undefined;
     const resurrects = target.canSelfResurrect();
