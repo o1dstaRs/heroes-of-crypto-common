@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type { IEnumeratedCandidate } from "../../src/ai/candidates";
+import { PBTypes } from "../../src/generated/protobuf/v1/types";
 import type { Unit } from "../../src/units/unit";
 import type { ILookaheadDeps } from "../../src/simulation/lookahead";
 import { SearchDriver, withSearchEnvironment } from "../../src/simulation/search_driver";
@@ -47,7 +48,7 @@ type Probe = {
     ) => number[];
 };
 
-function fixture(mode: string, offline = true) {
+function fixture(mode: string, offline = true, grid = PBTypes.GridVals.NORMAL) {
     const driver = withSearchEnvironment(
         {
             V07_SEARCH: "1",
@@ -55,7 +56,10 @@ function fixture(mode: string, offline = true) {
             SEARCH_A19_MATERIAL_ARBITRATION: "ties",
             SEARCH_A19_ROLLOUT_ALLOCATION: mode,
         },
-        () => new SearchDriver({} as ILookaheadDeps, { offlineDeterministicWork: offline }),
+        () =>
+            new SearchDriver({ grid: { getGridType: () => grid } } as ILookaheadDeps, {
+                offlineDeterministicWork: offline,
+            }),
     );
     const probe = driver as unknown as Probe;
     probe.captureA19Material = true;
@@ -110,6 +114,7 @@ describe("offline root rollout allocation", () => {
     it("validates the explicit switch and preserves the incumbent even when it ranks last", () => {
         expect(parseSearchRolloutAllocation(undefined)).toBe("uniform");
         expect(parseSearchRolloutAllocation("halving")).toBe("halving");
+        expect(parseSearchRolloutAllocation("block-halving")).toBe("block-halving");
         expect(parseSearchRolloutAllocation("validation")).toBe("validation");
         expect(() => parseSearchRolloutAllocation("halve")).toThrow("SEARCH_A19_ROLLOUT_ALLOCATION");
         expect(selectSearchRolloutSurvivors([0, 1, 1, 1, 1, 1], [1, 0.1, 0.2, 0.9, 0.8, 0.3])).toEqual([0, 3, 4]);
@@ -169,6 +174,19 @@ describe("offline root rollout allocation", () => {
             expect(calls[0].rolls).toBe(4);
             expect(calls[0].cache).toBeUndefined();
             expect(calls[0].bounds).toBe(true);
+        }
+    });
+
+    it("applies the Block candidate only on Block and preserves uniform scoring on the other maps", () => {
+        for (const grid of [
+            PBTypes.GridVals.NORMAL,
+            PBTypes.GridVals.WATER_CENTER,
+            PBTypes.GridVals.LAVA_CENTER,
+            PBTypes.GridVals.BLOCK_CENTER,
+        ]) {
+            const { probe, calls } = fixture("block-halving", true, grid);
+            probe.scoreSearchCandidates(unit, candidates, 7, "turns", 4, null, 64, true, "v0.8");
+            expect(calls.map((call) => call.rolls)).toEqual(grid === PBTypes.GridVals.BLOCK_CENTER ? [2, 6] : [4]);
         }
     });
 });

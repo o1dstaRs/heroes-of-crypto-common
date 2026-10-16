@@ -3,12 +3,12 @@
  * Licensed under the MIT license in the root directory of this source tree.
  */
 
-export type SearchRolloutAllocation = "uniform" | "halving" | "validation";
+export type SearchRolloutAllocation = "uniform" | "halving" | "block-halving" | "validation";
 
 export function parseSearchRolloutAllocation(raw: string | undefined): SearchRolloutAllocation {
     if (raw === undefined || raw === "uniform") return "uniform";
-    if (raw === "halving" || raw === "validation") return raw;
-    throw new Error("SEARCH_A19_ROLLOUT_ALLOCATION must be uniform, halving or validation");
+    if (raw === "halving" || raw === "block-halving" || raw === "validation") return raw;
+    throw new Error("SEARCH_A19_ROLLOUT_ALLOCATION must be uniform, halving, block-halving or validation");
 }
 
 /**

@@ -5234,6 +5234,8 @@ export class SearchDriver {
             this.rolloutAllocation === "uniform" ||
             version !== "v0.8" ||
             this.match.offlineDeterministicWork !== true ||
+            (this.rolloutAllocation === "block-halving" &&
+                this.deps.grid.getGridType() !== PBTypes.GridVals.BLOCK_CENTER) ||
             horizonMode !== "turns" ||
             rolloutCount !== 4 ||
             candidates.length < 6 ||
