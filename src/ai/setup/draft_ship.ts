@@ -370,7 +370,7 @@ export function pickRankedLiveDraftCreature(
     revealedGridType?: number,
     synergyVariants?: RankedDraftSynergyVariants,
     tier2ArtifactId?: number,
-    artifactFitVersion: ArtifactFitVersion = 4,
+    artifactFitVersion: ArtifactFitVersion = 5,
 ): number | undefined {
     const eligible = applyRankedDraftRangedFloor(
         genome.draftStrengthPolicy,
@@ -417,7 +417,7 @@ export function pickRankedLiveDraftBundle(
     genome: ILeagueGenome,
     bundles: readonly DraftBundle[],
     synergyVariants?: RankedDraftSynergyVariants,
-    artifactFitVersion: ArtifactFitVersion = 4,
+    artifactFitVersion: ArtifactFitVersion = 5,
 ): number {
     return pickCoherentDraftBundle(
         bundles,

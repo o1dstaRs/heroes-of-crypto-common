@@ -11,6 +11,7 @@
 
 import { friendlyShotBlockingBarrels } from "../ai/artifact_barrel_tactics";
 import { reserveGravechainShortlistCandidate } from "../ai/gravechain_shortlist";
+import { reserveLastFuseShortlistCandidate } from "../ai/last_fuse_tactics";
 import { canWaitOnHourglass } from "../engine/hourglass";
 import {
     selectV08A19MaterialCandidateIndex,
@@ -1420,6 +1421,7 @@ export class SearchDriver {
     private readonly a19MaterialLowEvidenceWinningSamples: number;
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
     private readonly a19GravechainCoverage: boolean;
+    private readonly a19LastFuseTrades: boolean;
     private readonly a19ArtifactBarrelShotProjection: boolean;
     private readonly a19ArtifactBarrelOwnShotProjectionOnly: boolean;
     private captureA19Material = false;
@@ -1712,6 +1714,11 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_GRAVECHAIN_COVERAGE must be 0 or 1");
         }
         this.a19GravechainCoverage = this.mode === "search" && gravechainCoverage === "1";
+        const lastFuseTrades = searchEnv("SEARCH_A19_LAST_FUSE_TRADES");
+        if (lastFuseTrades !== undefined && lastFuseTrades !== "" && lastFuseTrades !== "0" && lastFuseTrades !== "1") {
+            throw new Error("SEARCH_A19_LAST_FUSE_TRADES must be 0 or 1");
+        }
+        this.a19LastFuseTrades = this.mode === "search" && lastFuseTrades === "1";
         const barrelProjection = searchEnv("SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION");
         if (
             barrelProjection !== undefined &&
@@ -2617,6 +2624,7 @@ export class SearchDriver {
                 maxMoveShotComposites: this.moveShotCapForVersion(version),
                 includeMountainAttacks: isV08Search,
                 includeArtifactBarrelAttackCoverage: isV08Search && this.a19ArtifactBarrelAttackCoverage,
+                includeLastFuseCounterTrades: isV08Search && this.a19LastFuseTrades,
                 // v0.8 search rolls out the free Through Shot lines its native policy can take (V08_THROUGH_SHOT_LINE
                 // scopes both together, so a seat A/B compares whole seats); older versions keep their exact catalog.
                 throughShotFreeAim: isV08Search && throughShotLineEnabled(unit),
@@ -2806,6 +2814,7 @@ export class SearchDriver {
                         maxMoveShotComposites: this.moveShotCapForVersion(version),
                         includeMountainAttacks: isV08Search,
                         includeArtifactBarrelAttackCoverage: isV08Search && this.a19ArtifactBarrelAttackCoverage,
+                        includeLastFuseCounterTrades: isV08Search && this.a19LastFuseTrades,
                         enrichIncumbentMetadata:
                             isV08Search || this.ilPath !== undefined || this.scoredDecisionObserver !== undefined,
                         preserveMovePostureDiversity:
@@ -4818,6 +4827,9 @@ export class SearchDriver {
         challengers = reserveResearchRapidChargeShortlist(candidates, challengers);
         if (this.a19GravechainCoverage && V08_AGGRESSIVE_VERSIONS.has(version)) {
             challengers = reserveGravechainShortlistCandidate(unit, this.deps, candidates, challengers);
+        }
+        if (this.a19LastFuseTrades && V08_AGGRESSIVE_VERSIONS.has(version)) {
+            challengers = reserveLastFuseShortlistCandidate(candidates, challengers);
         }
         return [candidates[0], ...challengers];
     }

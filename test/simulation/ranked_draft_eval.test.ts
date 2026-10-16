@@ -14,6 +14,7 @@ import {
     ARTIFACT_FIT_SETUP_PREFIX_V2,
     ARTIFACT_FIT_SETUP_PREFIX_V3,
     ARTIFACT_FIT_SETUP_PREFIX_V4,
+    ARTIFACT_FIT_SETUP_PREFIX_V5,
 } from "../../src/ai/setup/artifact_fit";
 import { resolveSetupPolicy } from "../../src/ai/setup/setup_ship";
 import { Doctrine } from "../../src/doctrines/doctrine_properties";
@@ -205,6 +206,7 @@ describe("exact ranked draft evaluator", () => {
         ARTIFACT_FIT_SETUP_PREFIX_V2,
         ARTIFACT_FIT_SETUP_PREFIX_V3,
         ARTIFACT_FIT_SETUP_PREFIX_V4,
+        ARTIFACT_FIT_SETUP_PREFIX_V5,
     ])("records the ranked artifact decision's public view before the final creature pick for %s", (prefix) => {
         const live = rankedDraftLiveIncumbent();
         const spec = `${prefix}conditional-v1:sniper+t2a19`;

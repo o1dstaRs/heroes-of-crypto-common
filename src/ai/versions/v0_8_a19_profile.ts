@@ -81,6 +81,8 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     SEARCH_A19_ARTIFACT_BARREL_ATTACK_COVERAGE: "1",
     // Keep one broader single-target Gravechain attack for the horizon to price its movement denial.
     SEARCH_A19_GRAVECHAIN_COVERAGE: "1",
+    // Give a wounded Last Fuse stack one supported counter-trade stand for real-engine comparison.
+    SEARCH_A19_LAST_FUSE_TRADES: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -109,7 +111,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "03b2ecef10d73bb68be60930be0a7424bd1c101977d2dfaeae0ac24acb44cd8c" as const;
+    "962a49e4a6252b5ef09f48d10a06594d3b4a93f8abc739c95385897df3d7f3df" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -141,13 +143,23 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for bounded Gravechain control coverage in the production shortlist.
-        sha256: "a911b6b0fe4186787fb095b2fa47bd504d983275dab83b1c2c1b4f084ab82181" as const,
+        // Re-pinned for Last Fuse stand coverage and counter-trade comparison.
+        sha256: "ffc71b7eb69f9f59bf1ef93c5f2d8ea41e6d337d58d1231130ce4a28ca7dc5b2" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
         source: "src/ai/gravechain_shortlist.ts" as const,
         sha256: "35368d573587aaa1d3d058438740c69db654bf0c9859f71ba7ca10d284cc89de" as const,
+    }),
+    Object.freeze({
+        role: "last-fuse-trades" as const,
+        source: "src/ai/last_fuse_tactics.ts" as const,
+        sha256: "124017efb51277d8469db048f1f015153a84e115001e4523f36eb9b861f10962" as const,
+    }),
+    Object.freeze({
+        role: "last-fuse-catalog" as const,
+        source: "src/ai/candidates.ts" as const,
+        sha256: "e299a10bebad84750af12305d6b626b3e8ec06d44d87eeed09430b16f5734032" as const,
     }),
     Object.freeze({
         role: "selection-bounds" as const,

@@ -18,6 +18,7 @@ import {
     ARTIFACT_FIT_SETUP_PREFIX_V2,
     ARTIFACT_FIT_SETUP_PREFIX_V3,
     ARTIFACT_FIT_SETUP_PREFIX_V4,
+    ARTIFACT_FIT_SETUP_PREFIX_V5,
     withArtifactFitSetupPolicy,
 } from "./artifact_fit";
 import {
@@ -829,6 +830,11 @@ function compileNonFightAugmentOverridePolicy(spec: string, suffix: string): IRe
 
 export function resolveSetupPolicy(spec: string | undefined): IResolvedSetupPolicy {
     const normalized = (spec ?? "").trim().toLowerCase();
+    if (normalized.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V5)) {
+        const baseSpec = normalized.slice(ARTIFACT_FIT_SETUP_PREFIX_V5.length);
+        if (!baseSpec) throw new Error("Artifact fit setup requires an explicit base policy");
+        return withArtifactFitSetupPolicy(resolveSetupPolicy(baseSpec), 5);
+    }
     if (normalized.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V4)) {
         const baseSpec = normalized.slice(ARTIFACT_FIT_SETUP_PREFIX_V4.length);
         if (!baseSpec) throw new Error("Artifact fit setup requires an explicit base policy");

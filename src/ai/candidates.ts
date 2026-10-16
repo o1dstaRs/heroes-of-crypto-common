@@ -63,6 +63,7 @@ import { decisionFireWalls } from "./decision_fight_state";
 import { decisionPathSource, type IReadonlyMovePath, type IReadonlyWeightedRoute } from "./decision_path_catalog";
 import { meleeAttackTypeSelectionPrefix } from "./melee_attack_type";
 import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
+import { lastFuseCounterTradePotential } from "./last_fuse_tactics";
 import {
     estimateLastFuseMeleeDamage,
     estimateLastFuseRangedDamage,
@@ -801,10 +802,14 @@ export interface IEnumeratedCandidate {
     shotFeatures?: IShotCandidateFeatures;
     /** Research-only marker for the one exact Rapid Charge challenger retained across a capped melee catalog. */
     researchRapidChargeDifferentTargetReserved?: true;
+    /** One profitable-looking own-Last-Fuse stand retained for authoritative rollout comparison. */
+    lastFuseCounterTradeReserved?: true;
     features: ICandidateFeatures;
 }
 
 export interface IEnumerateOptions {
+    /** Preserve one supported own-Last-Fuse counter trade across the melee cap; off for historical catalogs. */
+    includeLastFuseCounterTrades?: boolean;
     /** Cap on move destinations, kept nearest-to-enemy first (0/undefined = all reachable). */
     maxMoveDestinations?: number;
     /**
@@ -1557,6 +1562,26 @@ class CandidateGenerator {
 
         const actionsOf = (p: IMeleePair): GameAction[] => actionsFor(p.target, p.cell, p.route);
 
+        let reservedLastFusePair: IMeleePair | undefined;
+        if (this.options.includeLastFuseCounterTrades && this.unit.hasBuffActive("Last Fuse")) {
+            let bestPotential = 0;
+            const fatalChanceByTarget = new Map<string, number>();
+            for (const candidate of pairs) {
+                const potential = lastFuseCounterTradePotential(
+                    this.unit,
+                    candidate.target,
+                    this.context,
+                    candidate.cell,
+                    actionsOf(candidate),
+                    fatalChanceByTarget,
+                );
+                if (potential > bestPotential) {
+                    bestPotential = potential;
+                    reservedLastFusePair = candidate;
+                }
+            }
+        }
+
         let reservedRapidChargePair: IMeleePair | undefined;
         if (
             this.options.researchReserveRapidChargeDifferentTarget === true &&
@@ -1632,6 +1657,9 @@ class CandidateGenerator {
             if (reservedRapidChargePair && !kept.includes(reservedRapidChargePair)) {
                 kept = [...kept, reservedRapidChargePair];
             }
+            if (reservedLastFusePair && !kept.includes(reservedLastFusePair)) {
+                kept = [...kept, reservedLastFusePair];
+            }
         }
         const candidateOf = (p: IMeleePair): IEnumeratedCandidate => {
             return {
@@ -1640,6 +1668,7 @@ class CandidateGenerator {
                 targetId: p.target.getId(),
                 standCell: { x: p.cell.x, y: p.cell.y },
                 ...(p === reservedRapidChargePair ? { researchRapidChargeDifferentTargetReserved: true as const } : {}),
+                ...(p === reservedLastFusePair ? { lastFuseCounterTradeReserved: true as const } : {}),
                 features: this.features({ expectedDamage: p.effective, expectedKill: p.kill }),
             };
         };

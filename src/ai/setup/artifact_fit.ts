@@ -9,21 +9,25 @@ import {
 } from "./setup_conditional";
 import { TIER2_ARTIFACT_WINRATE, type ITier2ArtifactDecisionContext } from "./setup_strategy";
 import type { IResolvedSetupPolicy } from "./setup_ship";
+import { lastFuseDraftContact, lastFuseIncomingMeleeShare } from "./last_fuse_fit";
 
 export const ARTIFACT_FIT_SETUP_PREFIX = "artifact-fit-v1:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V2 = "artifact-fit-v2:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V3 = "artifact-fit-v3:";
 export const ARTIFACT_FIT_SETUP_PREFIX_V4 = "artifact-fit-v4:";
-export type ArtifactFitVersion = 1 | 2 | 3 | 4;
+export const ARTIFACT_FIT_SETUP_PREFIX_V5 = "artifact-fit-v5:";
+export type ArtifactFitVersion = 1 | 2 | 3 | 4 | 5;
 
 export const artifactFitVersionForSetupSpec = (spec: string): ArtifactFitVersion =>
-    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V4)
-        ? 4
-        : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3)
-          ? 3
-          : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
-            ? 2
-            : 1;
+    spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V5)
+        ? 5
+        : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V4)
+          ? 4
+          : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V3)
+            ? 3
+            : spec.startsWith(ARTIFACT_FIT_SETUP_PREFIX_V2)
+              ? 2
+              : 1;
 
 const roster = (ids: readonly number[]): ICreatureInfo[] =>
     [...new Set(ids)].flatMap((id) => {
@@ -213,6 +217,23 @@ export function tier2ArtifactFitScoreV4(
     return tier2ArtifactFitScoreWithMagicPressure(id, ownIds, context, (unit) => Number(unit.dealsMagicDamage), true);
 }
 
+/** v5 changes only Last Fuse; every other artifact keeps its exact v4 score. */
+export function tier2ArtifactFitScoreV5(
+    id: number,
+    ownIds: readonly number[],
+    context?: Readonly<ITier2ArtifactDecisionContext>,
+): number {
+    if (id !== Tier2Artifact.LAST_FUSE) return tier2ArtifactFitScoreV4(id, ownIds, context);
+    const own = roster(ownIds);
+    if (!own.length) return 50;
+    const incoming = lastFuseIncomingMeleeShare(roster(context?.publicOpponentCreatureIds ?? []));
+    // Only the guaranteed per-power floor is known before combat. A fatal hit's eventual size is not.
+    return (
+        40 +
+        ARTIFACT_POWER.LAST_FUSE_MIN_DAMAGE_PER_POWER * average(own, (unit) => lastFuseDraftContact(unit, incoming))
+    );
+}
+
 function tier2ArtifactFitScoreWithMagicPressure(
     id: number,
     ownIds: readonly number[],
@@ -323,13 +344,15 @@ export function withArtifactFitSetupPolicy(
     version: ArtifactFitVersion = 1,
 ): IResolvedSetupPolicy {
     const prefix =
-        version === 4
-            ? ARTIFACT_FIT_SETUP_PREFIX_V4
-            : version === 1
-              ? ARTIFACT_FIT_SETUP_PREFIX
-              : version === 2
-                ? ARTIFACT_FIT_SETUP_PREFIX_V2
-                : ARTIFACT_FIT_SETUP_PREFIX_V3;
+        version === 5
+            ? ARTIFACT_FIT_SETUP_PREFIX_V5
+            : version === 4
+              ? ARTIFACT_FIT_SETUP_PREFIX_V4
+              : version === 1
+                ? ARTIFACT_FIT_SETUP_PREFIX
+                : version === 2
+                  ? ARTIFACT_FIT_SETUP_PREFIX_V2
+                  : ARTIFACT_FIT_SETUP_PREFIX_V3;
     if (base.spec.startsWith(prefix)) return base;
     return Object.freeze({
         ...base,
@@ -367,7 +390,9 @@ export function withArtifactFitSetupPolicy(
                           ? tier2ArtifactFitScoreV2
                           : version === 3
                             ? tier2ArtifactFitScoreV3
-                            : tier2ArtifactFitScoreV4
+                            : version === 4
+                              ? tier2ArtifactFitScoreV4
+                              : tier2ArtifactFitScoreV5
                 )(id, ownIds, context);
                 if (score > bestScore) {
                     best = id;
