@@ -160,6 +160,72 @@ function board(
 afterEach(() => setDeterministicRandomSource(undefined));
 
 describe("Last Fuse melee estimates", () => {
+    test.each([
+        ["Fire Element", "Water Element"],
+        ["Water Element", "Fire Element"],
+        ["Wind Element", "Earth Element"],
+        ["Earth Element", "Wind Element"],
+    ])("prices a killing elemental strike: %s against %s", (attackerElement, targetElement) => {
+        const f = board({
+            attacker: { abilities: [attackerElement], damageMin: 20, damageMax: 20 },
+            target: { abilities: [targetElement] },
+            remainingHp: 25,
+        });
+        const safe = createTestUnit({ name: "Safer elemental target", team: RIGHT, maxHp: 1000, armor: 10 });
+        placeUnit(f.grid, f.unitsHolder, safe, { x: 7, y: 8 });
+        f.unitsHolder.applyArtifacts(f.fight);
+        const estimate = f.project()!;
+        expect(estimate).toMatchObject({
+            fatalChance: 1,
+            secureKill: true,
+            expectedNetDamage: -15,
+            expectedFriendlyDamage: 40,
+        });
+        const candidates = enumerateCandidates(f.attacker, f.context, f.actions, {
+            enrichIncumbentMetadata: true,
+        }).candidates;
+        expect(candidates[0].features.expectedDamage).toBe(-15);
+        expect(selectV08DirectCombatCandidate(candidates)?.targetId).toBe(safe.getId());
+        expect(f.fire().friendlyDamage).toBe(40);
+    });
+
+    test("defers an elemental counter that kills the attacker while bypassing Water Shield", () => {
+        const f = board({
+            attacker: { abilities: ["Water Element", "Water Shield"], maxHp: 25 },
+            target: { abilities: ["Fire Element"], damageMin: 20, damageMax: 20 },
+            remainingHp: 10,
+        });
+        expect(f.project()).toBeUndefined();
+        const actual = f.fire();
+        expect(actual.blasts).toHaveLength(1);
+        expect(actual.friendlyDamage).toBe(20);
+        expect(f.attacker.isDead()).toBe(true);
+        expect(f.target.isDead()).toBe(true);
+    });
+
+    test("defers a Fire Shield counter sequence that changes the fatal-hit damage basis", () => {
+        const f = board({
+            attacker: { abilities: ["Fire Element", "Fire Shield"], damageMin: 200, damageMax: 200, stackPower: 5 },
+            target: { abilities: ["Water Element"], maxHp: 200, damageMin: 100, damageMax: 100 },
+        });
+        expect(f.target.getLastFuseDamage()).toBe(40);
+        expect(f.project()).toBeUndefined();
+        const actual = f.fire();
+        expect(actual.blasts).toHaveLength(1);
+        expect(actual.friendlyDamage).toBeGreaterThan(0);
+        expect(actual.friendlyDamage).toBeLessThan(80);
+    });
+
+    test("keeps a Fire Shield wielder's elemental kill supported after the counter is spent", () => {
+        const f = board({
+            attacker: { abilities: ["Fire Element", "Fire Shield"], damageMin: 200, damageMax: 200, stackPower: 5 },
+            target: { abilities: ["Water Element"], maxHp: 200, damageMin: 100, damageMax: 100 },
+        });
+        f.target.setResponded(true);
+        expect(f.project()!.expectedFriendlyDamage).toBe(80);
+        expect(f.fire().friendlyDamage).toBe(80);
+    });
+
     for (const team of [LEFT, RIGHT] as const) {
         test.each([
             { x: 1, y: 0 },

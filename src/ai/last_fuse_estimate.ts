@@ -38,6 +38,7 @@ function actorBlastDamage(
         (actions.some((action) => action.type === "move_unit") && target.hasAbilityActive("Backstab")) ||
         target.hasAbilityActive("Rapid Charge") ||
         unit.hasBuffActive("Flesh Shield Aura") ||
+        unit.hasAbilityActive("Fire Shield") ||
         target.hasBuffActive("Fireforged Sword") ||
         SECONDARY_RIDERS.some((name) => target.hasAbilityActive(name)) ||
         (context.fightProperties?.getBreakChancePerTeam(target.getTeam()) ?? 0) > 0
