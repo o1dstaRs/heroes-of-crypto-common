@@ -209,11 +209,11 @@ export function resolveMoveTraversal(
     const travelledPath = pathIsFootprintOnly
         ? action.path
         : travelledMovePath(unit.getBaseCell(), resolvedRoute?.route ?? action.path);
-    const destination = travelledPath[travelledPath.length - 1];
-    // ActionEngine occupies the destination before MoveHandler applies route
-    // modifiers. MoveHandler therefore strips its new current cell if that is
-    // also route[0] (the historical one-step behavior).
-    const routeModifierPath = !pathIsFootprintOnly && destination ? travelledMovePath(destination, travelledPath) : [];
+    const routeModifierPath = resolvedRoute
+        ? travelledMovePath(unit.getBaseCell(), resolvedRoute.route)
+        : pathIsFootprintOnly
+          ? []
+          : travelledPath;
     return {
         targetCells,
         pathIsFootprintOnly,

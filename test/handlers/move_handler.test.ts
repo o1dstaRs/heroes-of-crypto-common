@@ -181,6 +181,46 @@ describe("MoveHandler", () => {
         expect(unit.getBaseArmor()).toBeCloseTo(armorBefore + expectedIncrease);
     });
 
+    for (const includeOrigin of [true, false]) {
+        it(`counts a completed one-cell move once ${includeOrigin ? "with" : "without"} its origin in the route`, () => {
+            const { grid, unitsHolder } = createCombatTestContext();
+            const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);
+            const unit = createTestUnit({
+                team: PBTypes.TeamVals.LEFT,
+                abilities: ["Crusade"],
+                attack: 10,
+                armor: 10,
+                morale: 0,
+                stackPower: 5,
+            });
+            const enemy = createTestUnit({ team: PBTypes.TeamVals.RIGHT });
+            const origin = { x: 1, y: 1 };
+            const destination = { x: 2, y: 1 };
+            placeUnit(grid, unitsHolder, unit, origin);
+            placeUnit(grid, unitsHolder, enemy, { x: 8, y: 8 });
+            const from = { ...unit.getPosition() };
+            const attackBefore = unit.getBaseAttack();
+            const crusadeBonus = unit.calculateAbilityCount(unit.getAbility("Crusade")!, 0);
+            expect(moveHandler.finishDirectedUnitMove(unit, [destination], cellPos(destination)).deleteUnit).toBe(
+                false,
+            );
+            expect(
+                moveHandler.applyRouteMoveModifiers(
+                    includeOrigin ? [origin, destination] : [destination],
+                    unit,
+                    0,
+                    0,
+                    false,
+                    false,
+                    from,
+                ),
+            ).toBe(true);
+            unit.adjustBaseStats(true, 1, 0, 0, 0, 0, 0);
+            expect(unit.getBaseAttack()).toBeCloseTo(attackBefore + crusadeBonus);
+            expect(unit.getMorale()).toBe(3);
+        });
+    }
+
     it("finishes directed moves with explicit positions and update masks", () => {
         const { grid, unitsHolder } = createCombatTestContext();
         const moveHandler = new MoveHandler(testGridSettings, grid, unitsHolder);

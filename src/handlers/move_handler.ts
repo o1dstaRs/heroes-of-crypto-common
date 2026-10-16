@@ -14,7 +14,12 @@ import { travelledMovePath } from "../engine/post_move_actor_availability";
 import { FightStateManager } from "../fights/fight_state_manager";
 import { Grid } from "../grid/grid";
 import { NO_UPDATE, UPDATE_DOWN, UPDATE_LEFT, UPDATE_RIGHT, UPDATE_UP } from "../grid/grid_constants";
-import { getFootprintAnchorForCells, getPositionForCell, getPositionForCells } from "../grid/grid_math";
+import {
+    getFootprintAnchorForCells,
+    getFootprintAnchorForPosition,
+    getPositionForCell,
+    getPositionForCells,
+} from "../grid/grid_math";
 import { GridSettings } from "../grid/grid_settings";
 import type { IWeightedRoute } from "../grid/path_definitions";
 import { Unit } from "../units/unit";
@@ -274,7 +279,7 @@ export class MoveHandler {
         fromPosition?: XY,
         toPosition?: XY,
     ): boolean {
-        const travelledRoute = this.getTravelledRoute(route, unit);
+        const travelledRoute = this.getTravelledRoute(route, unit, fromPosition);
         if (!travelledRoute.length) {
             return false;
         }
@@ -320,8 +325,16 @@ export class MoveHandler {
         }
         return "SAME";
     }
-    private getTravelledRoute(route: XY[], unit: Unit): XY[] {
-        return travelledMovePath(unit.getBaseCell(), route);
+    private getTravelledRoute(route: XY[], unit: Unit, fromPosition?: XY): XY[] {
+        const origin = fromPosition
+            ? getFootprintAnchorForPosition(
+                  this.gridSettings,
+                  fromPosition,
+                  unit.getFootprintWidth(),
+                  unit.getFootprintHeight(),
+              )
+            : unit.getBaseCell();
+        return travelledMovePath(origin, route);
     }
     public finishDirectedUnitMove(
         unit: Unit,

@@ -545,6 +545,11 @@ export class GameActionEngine {
         const travelledPath = pathIsFootprintOnly
             ? action.path
             : travelledMovePath(unit.getBaseCell(), knownMoveRoute?.route ?? action.path);
+        const routeModifierPath = knownMoveRoute
+            ? travelledMovePath(unit.getBaseCell(), knownMoveRoute.route)
+            : pathIsFootprintOnly
+              ? []
+              : travelledPath;
         // The cell COUNT is a cheap sanity bound on the walk (real reachability is enforced by knownPaths
         // above). It assumed a cell costs at least one step — not true for a vine strider (Trent, "In Its
         // Own World"), who walks a vined cell for free, so no cell count follows from its budget at all: the
@@ -591,15 +596,16 @@ export class GameActionEngine {
             return this.reject("move_blocked", result.log || undefined);
         }
 
-        if (!pathIsFootprintOnly) {
+        if (routeModifierPath.length) {
             this.context.moveHandler.applyRouteMoveModifiers(
-                travelledPath,
+                routeModifierPath,
                 unit,
                 this.context.fightProperties.getAdditionalAbilityPowerPerTeam(unit.getTeam()),
                 this.context.fightProperties.getAdditionalMoralePerTeam(unit.getTeam()),
                 knownMoveRoute?.hasLavaCell ?? action.hasLavaCell ?? false,
                 knownMoveRoute?.hasWaterCell ?? action.hasWaterCell ?? false,
                 from,
+                to,
             );
         } else {
             // Footprint-only large-unit move: there's no ordered step route to derive a travelled
