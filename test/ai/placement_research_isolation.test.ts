@@ -48,6 +48,9 @@ test("the shipped setup policy does not buy the unqualified flyer Placement plan
     const rosters = [
         ["Orc", "Dryad", "Troll", "Elf", "Monk", "Arachna Queen"],
         ["Wandering Mage", "Battle Mage", "Magic Dragon", "Satyr", "Nightmare", "Peasant"],
+        // Mixed armies observed in test games: two or three shooters with supporting melee/casters.
+        ["Dryad", "Wandering Mage", "Pikeman", "Trent", "Cyclops", "Magic Dragon"],
+        ["Wolf", "Fairy", "Medusa", "Battle Mage", "Zena", "Gargantuan"],
     ].map((names) => names.map((name) => creatureIdForName(name)!));
     for (const roster of rosters) {
         expect(roster.every((id) => id !== undefined)).toBe(true);
