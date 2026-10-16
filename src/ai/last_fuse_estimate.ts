@@ -48,7 +48,11 @@ function enemyBlastDamage(
 
 const SECONDARY_RIDERS = ["Devour Essence", "Petrifying Gaze", "Predatory Assimilation", "Borrowed Grace"];
 
-/** Price one direct spell execution. Reflected casts, area impacts and chained deaths stay with engine search. */
+/**
+ * Price one direct spell execution and the enemy corpse's blast. The caster must hold Last Fuse: the
+ * victim's own buff does not explode, and allies beside the corpse are not damaged. A reflected cast, an
+ * area impact, or a blast that would itself destroy another enemy stays with engine search.
+ */
 export function estimateLastFuseSpellDamage(
     unit: Unit,
     target: Unit,
@@ -58,27 +62,21 @@ export function estimateLastFuseSpellDamage(
     if (
         target.isDead() ||
         target.getTeam() === unit.getTeam() ||
-        !target.hasBuffActive("Last Fuse") ||
-        !["Fire Strike", "Lightning Strike"].includes(spell.getName()) ||
+        !unit.hasBuffActive("Last Fuse") ||
         mirroredDamageShare(target) > 0
     )
         return undefined;
-    const damage = projectSpellDamageAgainstUnit({ spell, caster: unit, target }).damage;
-    const fatal = damage >= target.getCumulativeHp() && !target.canSelfResurrect();
-    let friendlyDamage = 0;
-    if (fatal) {
-        const blast = target.getLastFuseDamage();
-        for (const ally of context.unitsHolder.getAllAllies(unit.getTeam())) {
-            if (ally.isDead() || ally.willWaterShieldAbsorb() || !touches(target.getCells(), ally.getCells())) continue;
-            if (blast >= ally.getCumulativeHp() && ally.hasBuffActive("Last Fuse") && !ally.canSelfResurrect()) {
-                return undefined;
-            }
-            friendlyDamage += Math.min(blast, ally.getCumulativeHp());
-        }
+    const projected = projectSpellDamageAgainstUnit({ spell, caster: unit, target });
+    if (projected.absorbedByWaterShield) {
+        return { expectedNetDamage: 0, expectedFriendlyDamage: 0, fatalChance: 0, secureKill: false };
     }
+    const applied = Math.min(projected.damage, target.getCumulativeHp());
+    const fatal = projected.damage >= target.getCumulativeHp() && !target.canSelfResurrect();
+    const splash = fatal ? enemyBlastDamage(unit, target, context) : 0;
+    if (splash === undefined) return undefined;
     return {
-        expectedNetDamage: Math.min(damage, target.getCumulativeHp()) - friendlyDamage,
-        expectedFriendlyDamage: friendlyDamage,
+        expectedNetDamage: applied + splash,
+        expectedFriendlyDamage: 0,
         fatalChance: Number(fatal),
         secureKill: fatal,
     };

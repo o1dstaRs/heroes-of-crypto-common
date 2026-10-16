@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import type { IDecisionContext } from "../../src/ai/ai_strategy";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../../src/ai/candidates";
 import { selectV08DamageSpellCandidate } from "../../src/ai/versions/v0_8";
+import { lastFuseDamage } from "../../src/abilities/last_fuse_ability";
 import { Tier1Artifact, Tier2Artifact } from "../../src/artifacts/artifact_properties";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import { FightStateManager } from "../../src/fights/fight_state_manager";
@@ -40,13 +41,13 @@ function fixture(
         ...options.caster,
     });
     const target = createTestUnit({ name: "Fuse", team: RIGHT, maxHp: 10, stackPower: 5, ...options.target });
-    const neighbor = createTestUnit({ name: "Exposed ally", team: LEFT, maxHp: 500, ...options.neighbor });
+    const neighbor = createTestUnit({ name: "Exposed enemy", team: RIGHT, maxHp: 500, ...options.neighbor });
     const safe = createTestUnit({ name: "Safe target", team: RIGHT, maxHp: 1000 });
     placeUnit(combat.grid, combat.unitsHolder, caster, { x: 3, y: 8 });
     placeUnit(combat.grid, combat.unitsHolder, target, { x: 9, y: 8 });
     placeUnit(combat.grid, combat.unitsHolder, neighbor, { x: 10, y: 9 });
     placeUnit(combat.grid, combat.unitsHolder, safe, { x: 9, y: 3 });
-    if (options.fuse !== false) fight.setArtifactPerTeam(RIGHT, 2, Tier2Artifact.LAST_FUSE);
+    if (options.fuse !== false) fight.setArtifactPerTeam(LEFT, 2, Tier2Artifact.LAST_FUSE);
     if (options.aegis) fight.setArtifactPerTeam(RIGHT, 2, Tier2Artifact.AEGIS_OF_THE_ARCANE);
     if (options.ring === "mage") fight.setArtifactPerTeam(LEFT, 1, Tier1Artifact.MAGES_RING);
     if (options.ring === "archmage") fight.setArtifactPerTeam(LEFT, 2, Tier2Artifact.ARCHMAGES_RING);
@@ -54,8 +55,9 @@ function fixture(
     for (const unit of [caster, target, neighbor]) unit.trySeedWaterShield();
     caster.refreshPossibleAttackTypes(false);
     fight.startFight();
-    fight.setTeamUnitsAlive(LEFT, 2);
-    fight.setTeamUnitsAlive(RIGHT, 2);
+    const placed = [caster, target, neighbor, safe];
+    fight.setTeamUnitsAlive(LEFT, placed.filter((unit) => unit.getTeam() === LEFT).length);
+    fight.setTeamUnitsAlive(RIGHT, placed.filter((unit) => unit.getTeam() === RIGHT).length);
     fight.startTurn(LEFT, 1000);
     const context: IDecisionContext = {
         ...combat,
@@ -76,7 +78,8 @@ function fixture(
     };
     const fire = (candidate: IEnumeratedCandidate) => {
         setDeterministicRandomSource(() => 0);
-        const before = target.getCumulativeHp();
+        const tracked = [caster, target, neighbor, safe];
+        const before = new Map(tracked.map((unit) => [unit.getId(), unit.getCumulativeHp()]));
         const engine = new GameActionEngine({
             ...combat,
             fightProperties: fight,
@@ -87,11 +90,15 @@ function fixture(
         const results = candidate.actions.map((action) => engine.apply(action));
         expect(results.every((result) => result.completed)).toBe(true);
         const blasts = results.flatMap((result) => result.events).filter((event) => event.type === "pyre_exploded");
-        const friendlyDamage = blasts
-            .flatMap((event) => event.hits)
-            .filter((hit) => [caster.getId(), neighbor.getId()].includes(hit.unitId))
-            .reduce((sum, hit) => sum + hit.amount, 0);
-        return { blasts, friendlyDamage, netDamage: before - target.getCumulativeHp() - friendlyDamage };
+        const loss = (unit: (typeof tracked)[number]) => {
+            const hp = before.get(unit.getId()) ?? 0;
+            return combat.unitsHolder.getAllUnits().has(unit.getId()) ? hp - unit.getCumulativeHp() : hp;
+        };
+        const friendlyLoss = tracked
+            .filter((unit) => unit.getTeam() === LEFT)
+            .reduce((sum, unit) => sum + loss(unit), 0);
+        const enemyLoss = tracked.filter((unit) => unit.getTeam() === RIGHT).reduce((sum, unit) => sum + loss(unit), 0);
+        return { blasts, friendlyLoss, enemyLoss, netDamage: loss(target) - friendlyLoss };
     };
     return { ...combat, fight, caster, target, neighbor, safe, context, catalog, fire };
 }
@@ -112,14 +119,29 @@ describe("artifact spell decisions", () => {
     );
 
     test.each([undefined, "mage", "archmage"] as const)(
-        "%s ring prices a Last Fuse execution before selecting a spell",
+        "%s ring prices a Last Fuse execution against a neighboring enemy",
         (ring) => {
             const h = fixture({ ring });
             const candidates = h.catalog();
             const cast = candidates.find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
-            expect(cast.features).toMatchObject({ expectedDamage: -90, expectedKill: 1 });
-            expect(selectV08DamageSpellCandidate(h.caster, candidates)?.targetId).toBe(h.safe.getId());
-            expect(h.fire(cast)).toMatchObject({ friendlyDamage: 100, netDamage: -90 });
+            const blast = lastFuseDamage(
+                h.target.getCumulativeHp(),
+                h.target.getStackPower(),
+                h.caster.getBuffPower("Last Fuse"),
+            );
+            expect(cast.features).toMatchObject({
+                expectedDamage: h.target.getCumulativeHp() + blast,
+                expectedKill: 1,
+            });
+            const selected = selectV08DamageSpellCandidate(h.caster, candidates);
+            const best = candidates
+                .filter((candidate) => candidate.kind === "spell")
+                .reduce((top, candidate) =>
+                    (candidate.features.expectedDamage ?? 0) > (top.features.expectedDamage ?? 0) ? candidate : top,
+                );
+            expect(selected?.targetId).toBe(best.targetId);
+            const priced = h.target.getCumulativeHp() + blast;
+            expect(h.fire(cast)).toMatchObject({ friendlyLoss: 0, enemyLoss: priced });
         },
     );
 
@@ -127,33 +149,45 @@ describe("artifact spell decisions", () => {
         "%s uses actual fatal HP rather than the amplified spell's overkill",
         (spell) => {
             const h = fixture({ spell, ring: "archmage", caster: { amountAlive: 200 }, target: { maxHp: 600 } });
+            const fatalHp = h.target.getCumulativeHp();
+            const blast = lastFuseDamage(fatalHp, h.target.getStackPower(), h.caster.getBuffPower("Last Fuse"));
             const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
-            expect(cast.features.expectedDamage).toBe(480);
-            expect(h.fire(cast)).toMatchObject({ friendlyDamage: 120, netDamage: 480 });
+            expect(blast).toBe(Math.max(h.target.getStackPower() * 20, Math.round(fatalHp * 0.2)));
+            expect(cast.features.expectedDamage).toBe(fatalHp + blast);
+            const result = h.fire(cast);
+            expect(result.friendlyLoss).toBe(0);
+            expect(result.enemyLoss).toBe(fatalHp + blast);
+            expect(result.blasts[0]?.hits).toEqual([
+                expect.objectContaining({ unitId: h.neighbor.getId(), amount: blast }),
+            ]);
         },
     );
 
-    test("a neighboring Water Shield absorbs the blast and preserves the safe execution", () => {
+    test("a neighboring Water Shield absorbs the blast and preserves the execution", () => {
         const h = fixture({ neighbor: { abilities: ["Water Shield"] } });
         const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
-        expect(cast.features).toMatchObject({ expectedDamage: 10, expectedKill: 1 });
+        const priced = h.target.getCumulativeHp();
+        expect(cast.features).toMatchObject({ expectedDamage: priced, expectedKill: 1 });
         expect(h.neighbor.hasBuffActive("Water Shield")).toBe(true);
-        expect(h.fire(cast)).toMatchObject({ friendlyDamage: 0, netDamage: 10 });
+        expect(h.fire(cast)).toMatchObject({ friendlyLoss: 0, enemyLoss: priced });
         expect(h.neighbor.hasBuffActive("Water Shield")).toBe(false);
+        expect(h.neighbor.getCumulativeHp()).toBe(500);
     });
 
     test("an absorbed lethal spell does not trigger Last Fuse", () => {
         const h = fixture({ ring: "archmage", target: { abilities: ["Water Shield"] } });
         const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
         expect(cast.features).toMatchObject({ expectedDamage: 0, expectedKill: 0 });
-        expect(h.fire(cast)).toMatchObject({ blasts: [], friendlyDamage: 0, netDamage: 0 });
+        expect(h.fire(cast)).toMatchObject({ blasts: [], friendlyLoss: 0, netDamage: 0 });
     });
 
-    test("Last Fuse only charges the HP a neighboring stack can lose", () => {
+    test("a blast that would destroy another enemy is left to search", () => {
         const h = fixture({ neighbor: { maxHp: 20 } });
         const cast = h.catalog().find((c) => c.kind === "spell" && c.targetId === h.target.getId())!;
-        expect(cast.features).toMatchObject({ expectedDamage: -10, expectedKill: 1 });
-        expect(h.fire(cast)).toMatchObject({ friendlyDamage: 20, netDamage: -10 });
+        expect(cast.features).toMatchObject({ expectedDamage: h.target.getCumulativeHp(), expectedKill: 1 });
+        const result = h.fire(cast);
+        expect(result.friendlyLoss).toBe(0);
+        expect(result.blasts.some((blast) => blast.unitIdsDied.includes(h.neighbor.getId()))).toBe(true);
     });
 
     test("native resurrection is neither a Last Fuse detonation nor a secure spell kill", () => {
