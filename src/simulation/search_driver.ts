@@ -11,7 +11,7 @@
 
 import { friendlyShotBlockingBarrels } from "../ai/artifact_barrel_tactics";
 import { reserveGravechainShortlistCandidate } from "../ai/gravechain_shortlist";
-import { reserveLastFuseShortlistCandidate } from "../ai/last_fuse_tactics";
+import { includeImprovingLastFuseTrade, reserveLastFuseShortlistCandidate } from "../ai/last_fuse_tactics";
 import { canWaitOnHourglass } from "../engine/hourglass";
 import {
     selectV08A19MaterialCandidateIndex,
@@ -1422,6 +1422,7 @@ export class SearchDriver {
     private readonly a19ArtifactBarrelAttackCoverage: boolean;
     private readonly a19GravechainCoverage: boolean;
     private readonly a19LastFuseTrades: boolean;
+    private readonly a19LastFusePrimaryTrades: boolean;
     private readonly a19ArtifactBarrelShotProjection: boolean;
     private readonly a19ArtifactBarrelOwnShotProjectionOnly: boolean;
     private captureA19Material = false;
@@ -1719,6 +1720,16 @@ export class SearchDriver {
             throw new Error("SEARCH_A19_LAST_FUSE_TRADES must be 0 or 1");
         }
         this.a19LastFuseTrades = this.mode === "search" && lastFuseTrades === "1";
+        const lastFusePrimaryTrades = searchEnv("SEARCH_A19_LAST_FUSE_PRIMARY_TRADES");
+        if (
+            lastFusePrimaryTrades !== undefined &&
+            lastFusePrimaryTrades !== "" &&
+            lastFusePrimaryTrades !== "0" &&
+            lastFusePrimaryTrades !== "1"
+        ) {
+            throw new Error("SEARCH_A19_LAST_FUSE_PRIMARY_TRADES must be 0 or 1");
+        }
+        this.a19LastFusePrimaryTrades = this.mode === "search" && lastFusePrimaryTrades === "1";
         const barrelProjection = searchEnv("SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION");
         if (
             barrelProjection !== undefined &&
@@ -2625,6 +2636,7 @@ export class SearchDriver {
                 includeMountainAttacks: isV08Search,
                 includeArtifactBarrelAttackCoverage: isV08Search && this.a19ArtifactBarrelAttackCoverage,
                 includeLastFuseCounterTrades: isV08Search && this.a19LastFuseTrades,
+                includeLastFusePrimaryTrades: isV08Search && this.a19LastFusePrimaryTrades,
                 // v0.8 search rolls out the free Through Shot lines its native policy can take (V08_THROUGH_SHOT_LINE
                 // scopes both together, so a seat A/B compares whole seats); older versions keep their exact catalog.
                 throughShotFreeAim: isV08Search && throughShotLineEnabled(unit),
@@ -2815,6 +2827,7 @@ export class SearchDriver {
                         includeMountainAttacks: isV08Search,
                         includeArtifactBarrelAttackCoverage: isV08Search && this.a19ArtifactBarrelAttackCoverage,
                         includeLastFuseCounterTrades: isV08Search && this.a19LastFuseTrades,
+                        includeLastFusePrimaryTrades: isV08Search && this.a19LastFusePrimaryTrades,
                         enrichIncumbentMetadata:
                             isV08Search || this.ilPath !== undefined || this.scoredDecisionObserver !== undefined,
                         preserveMovePostureDiversity:
@@ -3338,7 +3351,14 @@ export class SearchDriver {
             if (
                 prioritizeProductiveActions &&
                 productiveFallback &&
-                candidates.filter(isForceTierProductiveCandidate).length === 1
+                candidates.filter(isForceTierProductiveCandidate).length === 1 &&
+                !(
+                    this.a19LastFusePrimaryTrades &&
+                    candidates.some(
+                        (candidate) =>
+                            candidate.lastFuseCounterTradeReserved && !isForceTierProductiveCandidate(candidate),
+                    )
+                )
             ) {
                 this.counters.decisions += 1;
                 this.counters.singleForceTierFastPaths += 1;
@@ -4035,7 +4055,10 @@ export class SearchDriver {
             // In this one environmental-preservation state, ordinary rollout value must arbitrate. The late
             // productive/urgent layers were designed to prevent passive draws and would otherwise discard the
             // very defend action whose H64 terminal result distinguishes a draw from a surviving win.
-            const selectionIndices = policySelectionIndices;
+            const selectionIndices =
+                this.a19LastFusePrimaryTrades && V08_AGGRESSIVE_VERSIONS.has(version)
+                    ? includeImprovingLastFuseTrade(scoredCandidates, means, policySelectionIndices)
+                    : policySelectionIndices;
             bestIdx = selectionIndices[0];
             for (const index of selectionIndices) {
                 if (

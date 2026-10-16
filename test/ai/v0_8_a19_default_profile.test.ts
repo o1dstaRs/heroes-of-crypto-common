@@ -143,6 +143,20 @@ describe("v0.8+A19 production profile", () => {
         expect(buildV08A19SearchEnvironment().SEARCH_A19_ARTIFACT_BARREL_SHOT_PROJECTION).toBe("1");
     });
 
+    it("seals Last Fuse primary trades into A19, retains the older catalog for rollback and validates the override", () => {
+        expect(buildV08A19SearchEnvironment().SEARCH_A19_LAST_FUSE_PRIMARY_TRADES).toBe("1");
+        expect(buildV08A13SearchEnvironment("v0.8").SEARCH_A19_LAST_FUSE_PRIMARY_TRADES).toBeUndefined();
+        const stock = createV08A19SearchDriver({} as ILookaheadDeps, { greenVersion: "v0.8", redVersion: "v0.8" });
+        expect((stock as unknown as { a19LastFusePrimaryTrades: boolean }).a19LastFusePrimaryTrades).toBe(true);
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "0" });
+        const old = createV08A19SearchDriver({} as ILookaheadDeps, { greenVersion: "v0.8", redVersion: "v0.8" });
+        expect((old as unknown as { a19LastFusePrimaryTrades: boolean }).a19LastFusePrimaryTrades).toBe(false);
+        process.env.V08_A19_SEARCH_ENV_OVERRIDES = JSON.stringify({ SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "yes" });
+        expect(() =>
+            createV08A19SearchDriver({} as ILookaheadDeps, { greenVersion: "v0.8", redVersion: "v0.8" }),
+        ).toThrow("SEARCH_A19_LAST_FUSE_PRIMARY_TRADES must be 0 or 1");
+    });
+
     it("seals certified selection bounds off and requires the explicit research override", () => {
         process.env.SEARCH_A19_CERTIFIED_SELECTION_BOUNDS = "1";
         const match = { greenVersion: "v0.8", redVersion: "v0.8" };

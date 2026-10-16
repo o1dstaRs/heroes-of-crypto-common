@@ -9,10 +9,57 @@ import { estimatePrimaryMeleeDamage } from "./melee_damage_estimate";
 
 const COMPLEX_RIDERS = ["Fire Shield", "Devour Essence", "Petrifying Gaze", "Predatory Assimilation", "Borrowed Grace"];
 
+export interface ILastFuseCounterTradeOptions {
+    includePrimaryTarget?: boolean;
+    fatalChanceByTarget?: Map<string, number>;
+    primaryBlastByTarget?: Map<string, number>;
+}
+
+function minimumPrimaryBlastDamage(
+    unit: Unit,
+    target: Unit,
+    context: IDecisionContext,
+    standCell: XY,
+    actions: readonly GameAction[],
+    cache?: Map<string, number>,
+): number {
+    if (target.canSelfResurrect() || unit.getAbility("Crafted Double Punch")) return 0;
+    const cacheable =
+        !unit.getAbility("Rapid Charge") && !unit.getAbility("Backstab") && !unit.getAuraEffect("War Anger");
+    const cached = cacheable ? cache?.get(target.getId()) : undefined;
+    if (cached !== undefined) return cached;
+    const primary = estimatePrimaryMeleeDamage(unit, target, context, standCell, actions);
+    let damage = 0;
+    if (primary) {
+        const blast = unit.getLastFuseDamage();
+        const hp = target.getCumulativeHp();
+        if (target.willWaterShieldAbsorb()) {
+            // Only a certain positive, shield-absorbed opening guarantees the blast sees an unshielded body.
+            // A fire hit bypasses Water Shield without spending it; a zero-damage hit does not spend it either.
+            if (
+                target.willWaterShieldAbsorb(unit) &&
+                primary.hitChance === 1 &&
+                primary.landedOutcomes.every((outcome) => outcome.damage > 0)
+            )
+                damage = Math.min(blast, hp);
+        } else {
+            const maximumOpening =
+                primary.hitChance > 0
+                    ? primary.landedOutcomes.reduce((maximum, outcome) => Math.max(maximum, outcome.damage), 0)
+                    : 0;
+            // Damage already dealt by the opening cannot be bought again by the explosion.
+            damage = Math.min(blast, Math.max(0, hp - maximumOpening));
+        }
+    }
+    if (cacheable) cache?.set(target.getId(), damage);
+    return damage;
+}
+
 /**
  * A bounded opportunity signal for choosing a melee stand, not a prediction of the whole exchange.
- * A supported counter must be able to kill the wielder. Count only additional, unshielded enemy bodies
- * touching the future corpse, and charge the wielder's entire remaining HP before reserving the trade.
+ * A supported counter must be able to kill the wielder. Count additional, unshielded enemy bodies touching
+ * the future corpse, and charge the wielder's entire remaining HP. The primary fallback counts only HP that
+ * remains after every supported opening roll, with a guaranteed shield spend when required.
  * Real-engine search still owns the primary hit, counter rolls, chain explosions, losses and terminal result.
  */
 export function lastFuseCounterTradePotential(
@@ -21,7 +68,7 @@ export function lastFuseCounterTradePotential(
     context: IDecisionContext,
     standCell: XY,
     actions: readonly GameAction[],
-    fatalChanceByTarget?: Map<string, number>,
+    options: ILastFuseCounterTradeOptions = {},
 ): number {
     if (!unit.hasBuffActive("Last Fuse") || unit.isDead() || unit.canSelfResurrect()) return 0;
     if (
@@ -55,7 +102,7 @@ export function lastFuseCounterTradePotential(
     const blast = unit.getLastFuseDamage();
     let additionalDamage = 0;
     for (const enemy of context.unitsHolder.getAllEnemyUnits(unit.getTeam())) {
-        // The primary hit precedes cleanup; its changing HP/shield is deliberately left to the rollout.
+        // The primary hit precedes cleanup; the opt-in fallback projects it separately below.
         if (
             enemy.getId() === target.getId() ||
             enemy.isDead() ||
@@ -67,8 +114,8 @@ export function lastFuseCounterTradePotential(
             additionalDamage += Math.min(blast, enemy.getCumulativeHp());
         }
     }
-    if (additionalDamage <= hp) return 0;
-    let fatalChance = fatalChanceByTarget?.get(target.getId());
+    if (additionalDamage <= hp && !options.includePrimaryTarget) return 0;
+    let fatalChance = options.fatalChanceByTarget?.get(target.getId());
     if (fatalChance === undefined) {
         const response = estimatePrimaryMeleeDamage(target, unit, context, target.getBaseCell(), [
             {
@@ -85,9 +132,20 @@ export function lastFuseCounterTradePotential(
                   0,
               )
             : 0;
-        fatalChanceByTarget?.set(target.getId(), fatalChance);
+        options.fatalChanceByTarget?.set(target.getId(), fatalChance);
     }
-    return fatalChance * (additionalDamage - hp);
+    if (fatalChance <= 0) return 0;
+    if (options.includePrimaryTarget) {
+        additionalDamage += minimumPrimaryBlastDamage(
+            unit,
+            target,
+            context,
+            standCell,
+            actions,
+            options.primaryBlastByTarget,
+        );
+    }
+    return fatalChance * Math.max(0, additionalDamage - hp);
 }
 
 /** Keep the one marked stand in the horizon even when an immediate leaf dislikes the wounded unit's loss. */
@@ -97,4 +155,16 @@ export function reserveLastFuseShortlistCandidate(
 ): readonly IEnumeratedCandidate[] {
     const trade = candidates.find((candidate) => candidate.lastFuseCounterTradeReserved);
     return trade && !challengers.includes(trade) ? [...challengers, trade] : challengers;
+}
+
+/** A reserved blast may cross an activity tier only after a strictly better complete engine comparison. */
+export function includeImprovingLastFuseTrade(
+    candidates: readonly IEnumeratedCandidate[],
+    means: readonly number[],
+    selection: readonly number[],
+): readonly number[] {
+    const index = candidates.findIndex((candidate) => candidate.lastFuseCounterTradeReserved);
+    if (index <= 0 || selection.includes(index) || !Number.isFinite(means[index])) return selection;
+    const baseline = Math.max(means[0], ...selection.map((other) => means[other]));
+    return means[index] > baseline ? [...selection, index] : selection;
 }

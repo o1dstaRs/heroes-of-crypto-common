@@ -4,7 +4,8 @@ import type { IDecisionContext } from "../../src/ai/ai_strategy";
 import { enumerateCandidates, type IEnumeratedCandidate } from "../../src/ai/candidates";
 import { lastFuseCounterTradePotential, reserveLastFuseShortlistCandidate } from "../../src/ai/last_fuse_tactics";
 import { Tier2Artifact } from "../../src/artifacts/artifact_properties";
-import { getSpellConfig } from "../../src/configuration/config_provider";
+import { getEffectConfig, getSpellConfig } from "../../src/configuration/config_provider";
+import { Effect } from "../../src/effects/effect";
 import { GameActionEngine } from "../../src/engine/action_engine";
 import type { GameAction } from "../../src/engine/actions";
 import { TurnEngine } from "../../src/engine/turn_engine";
@@ -16,6 +17,7 @@ import { SceneLogMock } from "../../src/scene/scene_log_mock";
 import { snapshotBattle } from "../../src/simulation/battle_snapshot";
 import type { ILookaheadDeps } from "../../src/simulation/lookahead";
 import { SearchDriver, withSearchEnvironment } from "../../src/simulation/search_driver";
+import { createV08A19SearchDriver } from "../../src/simulation/v0_8_a19_search";
 import { Spell } from "../../src/spells/spell";
 import type { Unit } from "../../src/units/unit";
 import { setDeterministicRandomSource } from "../../src/utils/lib";
@@ -33,7 +35,9 @@ function fixture(
         mirror?: boolean;
         actor?: TestUnitOptions;
         primary?: TestUnitOptions;
+        primaryRooted?: boolean;
         neighbor?: TestUnitOptions;
+        neighborCells?: readonly [XY, XY];
         hp?: number;
         ally?: boolean;
         allyCell?: XY;
@@ -62,8 +66,8 @@ function fixture(
         { team, maxHp: 100, damageMin: 1, damageMax: 1, ...options.actor },
     );
     const primary = add("Lethal responder", { x: 8, y: 7 }, { damageMin: 1000, damageMax: 1000, ...options.primary });
-    const a = add("Blast victim A", { x: 8, y: 9 }, { maxHp: 70, ...options.neighbor });
-    const b = add("Blast victim B", { x: 8, y: 8 }, { maxHp: 70, ...options.neighbor });
+    const a = add("Blast victim A", options.neighborCells?.[0] ?? { x: 8, y: 9 }, { maxHp: 70, ...options.neighbor });
+    const b = add("Blast victim B", options.neighborCells?.[1] ?? { x: 8, y: 8 }, { maxHp: 70, ...options.neighbor });
     const ally =
         options.ally === false
             ? undefined
@@ -72,10 +76,14 @@ function fixture(
     fp.setArtifactPerTeam(team, 2, Tier2Artifact.LAST_FUSE);
     combat.unitsHolder.applyArtifacts(fp);
     combat.unitsHolder.refreshStackPowerForAllUnits();
-    for (const u of [actor, primary, a, b]) u.trySeedWaterShield();
+    for (const u of [actor, primary, a, b]) {
+        u.trySeedWaterShield();
+        u.refreshPossibleAttackTypes(false);
+    }
+    if (options.primaryRooted) primary.applyEffect(new Effect({ ...getEffectConfig("Paralysis"), power: 50, laps: 3 }));
     fp.startFight();
-    fp.setTeamUnitsAlive(team, ally ? 2 : 1);
-    fp.setTeamUnitsAlive(enemy, 3);
+    fp.setTeamUnitsAlive(team, combat.unitsHolder.getAllAllies(team).length);
+    fp.setTeamUnitsAlive(enemy, combat.unitsHolder.getAllEnemyUnits(team).length);
     fp.startTurn(team, 1000);
     const context: IDecisionContext = {
         ...combat,
@@ -93,19 +101,22 @@ function fixture(
     };
     const engine = new GameActionEngine(engineContext);
     const defend: GameAction[] = [{ type: "defend_turn", unitId: actor.getId() }];
-    const catalog = (include = true, cap = 1) =>
+    const catalog = (include = true, cap = 1, primaryTrades = false) =>
         enumerateCandidates(actor, context, defend, {
             maxMeleePairs: cap,
             maxMoveDestinations: 1,
             includeLastFuseCounterTrades: include,
+            includeLastFusePrimaryTrades: primaryTrades,
             enrichIncumbentMetadata: true,
         });
-    const reserved = () => {
-        const c = catalog().candidates.find((candidate) => candidate.lastFuseCounterTradeReserved);
+    const reserved = (primaryTrades = false) => {
+        const c = catalog(true, 1, primaryTrades).candidates.find(
+            (candidate) => candidate.lastFuseCounterTradeReserved,
+        );
         expect(c).toBeDefined();
         return c!;
     };
-    const fire = (candidate: IEnumeratedCandidate) => {
+    const fire = (candidate: Pick<IEnumeratedCandidate, "actions">) => {
         setDeterministicRandomSource(() => 0);
         const events = candidate.actions.flatMap((action) => {
             const r = engine.apply(action);
@@ -152,6 +163,267 @@ function fixture(
 }
 
 describe("own Last Fuse combat trades", () => {
+    test("retains a counter trade that finishes only the armored primary instead of spending the blast twice", () => {
+        const h = fixture({
+            actor: { attackType: PBTypes.AttackVals.RANGE, rangeShots: 0, damageMin: 2, damageMax: 2 },
+            primary: { maxHp: 70, armor: 100 },
+            neighborCells: [
+                { x: 3, y: 7 },
+                { x: 3, y: 8 },
+            ],
+        });
+        const old = h.catalog();
+        expect(old.candidates.some((candidate) => candidate.lastFuseCounterTradeReserved)).toBe(false);
+        expect(old.candidates.some((candidate) => candidate.targetId === h.primary.getId())).toBe(false);
+        const trade = h.reserved(true);
+        expect(trade.targetId).toBe(h.primary.getId());
+        expect(trade.features.expectedDamage).toBe(0);
+        const before = h.a.getCumulativeHp() + h.b.getCumulativeHp();
+        const blast = h.fire(trade);
+        expect(h.actor.isDead()).toBe(true);
+        expect(h.primary.isDead()).toBe(true);
+        expect(blast.flatMap((event) => event.hits)).toEqual([
+            expect.objectContaining({ unitId: h.primary.getId(), amount: 70 }),
+        ]);
+        expect(h.a.getCumulativeHp() + h.b.getCumulativeHp()).toBe(before);
+    });
+
+    test("preserves the existing cluster reservation when the primary fallback is enabled", () => {
+        const h = fixture();
+        expect(h.catalog(true, 1, true)).toEqual(h.catalog());
+        expect(h.catalog(false, 1, true)).toEqual(h.catalog(false));
+    });
+
+    test("spends a primary Water Shield on a certain positive opening before the blast", () => {
+        const h = fixture({
+            primary: { maxHp: 70, abilities: ["Water Shield"] },
+            neighborCells: [
+                { x: 3, y: 7 },
+                { x: 3, y: 8 },
+            ],
+        });
+        const trade = h.reserved(true);
+        expect(trade.targetId).toBe(h.primary.getId());
+        h.fire(trade);
+        expect(h.primary.isDead()).toBe(true);
+        expect(h.primary.hasBuffActive("Water Shield")).toBe(false);
+    });
+
+    test("does not count a primary shield that the opening cannot spend, or a primary already killed by the strike", () => {
+        for (const options of [
+            {
+                actor: { attackType: PBTypes.AttackVals.RANGE, rangeShots: 0, damageMin: 2, damageMax: 2 },
+                primary: { maxHp: 70, armor: 100, abilities: ["Water Shield"] },
+            },
+            { actor: { abilities: ["Fire Element"] }, primary: { maxHp: 70, abilities: ["Water Shield"] } },
+            { primary: { maxHp: 1 } },
+            { primary: { maxHp: 70, abilities: ["Resurrection"], spells: [":Resurrection"] } },
+            { primary: { maxHp: 70, armor: 100 }, hp: 100 },
+            { primary: { maxHp: 70, armor: 100, damageMin: 0, damageMax: 0 } },
+            { primary: { maxHp: 70, armor: 100 }, actor: { abilities: ["Water Shield"] } },
+            { primary: { maxHp: 70, armor: 100 }, actor: { abilities: ["Double Punch"] } },
+            { primary: { maxHp: 70, abilities: ["Water Shield", "Dodge"] } },
+            {
+                primary: { maxHp: 70, abilities: ["Water Shield"] },
+                actor: { attackType: PBTypes.AttackVals.RANGE, rangeShots: 0, damageMin: 0, damageMax: 4 },
+            },
+            { primary: { maxHp: 70 }, actor: { damageMin: 1, damageMax: 100 } },
+        ]) {
+            const h = fixture({
+                ...options,
+                neighborCells: [
+                    { x: 3, y: 7 },
+                    { x: 3, y: 8 },
+                ],
+            });
+            expect(
+                h.catalog(true, 1, true).candidates.some((candidate) => candidate.lastFuseCounterTradeReserved),
+            ).toBe(false);
+        }
+    });
+
+    test("public search can choose the zero-damage primary finisher and leaves the live battle untouched", () => {
+        withSearchEnvironment(
+            {
+                V07_SEARCH: "1",
+                SEARCH_VERSIONS: "v0.8",
+                SEARCH_SHORTLIST: "2",
+                SEARCH_MAX_MELEE: "1",
+                SEARCH_MAX_MOVES: "1",
+                SEARCH_A19_LAST_FUSE_TRADES: "1",
+                SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "1",
+                SEARCH_HORIZON: "1",
+                SEARCH_ROLLOUTS: "1",
+                SEARCH_GATE: "0",
+                V07_VALUE_WEIGHTS: "material",
+                V07_VALUE_WEIGHTS_V2: undefined,
+            },
+            () => {
+                const h = fixture({
+                    actor: { attackType: PBTypes.AttackVals.RANGE, rangeShots: 0, damageMin: 2, damageMax: 2 },
+                    primary: { maxHp: 70, armor: 100 },
+                    primaryRooted: true,
+                    neighborCells: [
+                        { x: 3, y: 7 },
+                        { x: 3, y: 8 },
+                    ],
+                });
+                const trade = h.reserved(true);
+                const before = JSON.stringify(snapshotBattle(h.unitsHolder, h.grid, h.fp));
+                const chosen = new SearchDriver(h.deps).chooseDecision(h.actor, "v0.8", h.defend);
+                expect(chosen).toEqual(trade.actions);
+                expect(JSON.stringify(snapshotBattle(h.unitsHolder, h.grid, h.fp))).toBe(before);
+                expect(h.deps.getActiveUnitId()).toBe(h.actor.getId());
+                expect(h.damageStatisticHolder.get()).toHaveLength(0);
+            },
+        );
+    });
+
+    test("the production A19 profile can set up the primary-only blast on a zero-damage strike", () => {
+        const h = fixture({
+            actor: { attackType: PBTypes.AttackVals.RANGE, rangeShots: 0, damageMin: 2, damageMax: 2 },
+            primary: { maxHp: 70, armor: 100 },
+            primaryRooted: true,
+            neighbor: { team: LEFT },
+            neighborCells: [
+                { x: 3, y: 7 },
+                { x: 3, y: 8 },
+            ],
+        });
+        const before = JSON.stringify(snapshotBattle(h.unitsHolder, h.grid, h.fp));
+        const chosen = createV08A19SearchDriver(h.deps, { greenVersion: "v0.8", redVersion: "v0.8" }).chooseDecision(
+            h.actor,
+            "v0.8",
+            h.defend,
+        );
+        expect(JSON.stringify(snapshotBattle(h.unitsHolder, h.grid, h.fp))).toBe(before);
+        const move = chosen.find((action) => action.type === "move_unit");
+        expect(move).toBeDefined();
+        expect(
+            h.actor
+                .getFootprintCellsForAnchor(move!.targetCells[0]!)
+                .some((a) => h.primary.getCells().some((b) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1)),
+        ).toBe(true);
+        h.fire({ actions: chosen });
+        if (!h.actor.isDead()) {
+            h.fp.startTurn(h.primary.getTeam(), 1000);
+            h.deps.setActiveUnitId(h.primary.getId());
+            expect(
+                h.engine.apply({
+                    type: "melee_attack",
+                    attackerId: h.primary.getId(),
+                    targetId: h.actor.getId(),
+                    attackFrom: h.primary.getBaseCell(),
+                }).completed,
+            ).toBe(true);
+        }
+        expect(h.actor.isDead()).toBe(true);
+        expect(h.primary.isDead()).toBe(true);
+        expect(h.ally?.isDead()).toBe(false);
+    });
+
+    test.each([0, 1, 2, 3])("the primary fallback executes from rotation %i and either mirrored seat", (rotate) => {
+        for (const team of [LEFT, RIGHT]) {
+            const h = fixture({
+                team,
+                rotate,
+                mirror: true,
+                actor: { attackType: PBTypes.AttackVals.RANGE, rangeShots: 0, damageMin: 2, damageMax: 2 },
+                primary: { maxHp: 70, armor: 100 },
+                neighborCells: [
+                    { x: 3, y: 7 },
+                    { x: 3, y: 8 },
+                ],
+            });
+            h.fire(h.reserved(true));
+            expect(h.primary.isDead()).toBe(true);
+            expect(h.actor.isDead()).toBe(true);
+        }
+    });
+
+    test.each([
+        [1, 2],
+        [2, 1],
+        [2, 2],
+    ])("the primary fallback respects a %ix%i enemy body", (width, height) => {
+        const h = fixture({
+            actor: { attackType: PBTypes.AttackVals.RANGE, rangeShots: 0, damageMin: 2, damageMax: 2 },
+            primary: { maxHp: 70, armor: 100, footprintWidth: width, footprintHeight: height },
+            neighborCells: [
+                { x: 3, y: 7 },
+                { x: 3, y: 8 },
+            ],
+        });
+        const blast = h.fire(h.reserved(true));
+        expect(blast.flatMap((event) => event.hits)).toEqual([
+            expect.objectContaining({ unitId: h.primary.getId(), amount: 70 }),
+        ]);
+    });
+
+    test("the primary projection is pure and does not spend live shields or consume RNG while caching", () => {
+        const h = fixture({
+            primary: { maxHp: 70, abilities: ["Water Shield"] },
+            neighborCells: [
+                { x: 3, y: 7 },
+                { x: 3, y: 8 },
+            ],
+        });
+        const trade = h.reserved(true);
+        const before = JSON.stringify(snapshotBattle(h.unitsHolder, h.grid, h.fp));
+        const options = {
+            includePrimaryTarget: true,
+            fatalChanceByTarget: new Map<string, number>(),
+            primaryBlastByTarget: new Map<string, number>(),
+        };
+        setDeterministicRandomSource(() => {
+            throw new Error("Projection consumed combat RNG");
+        });
+        expect(
+            lastFuseCounterTradePotential(h.actor, h.primary, h.context, trade.standCell!, trade.actions, options),
+        ).toBe(60);
+        expect(
+            lastFuseCounterTradePotential(h.actor, h.primary, h.context, trade.standCell!, trade.actions, options),
+        ).toBe(60);
+        expect(JSON.stringify(snapshotBattle(h.unitsHolder, h.grid, h.fp))).toBe(before);
+        expect(h.primary.hasBuffActive("Water Shield")).toBe(true);
+    });
+
+    test("the zero-damage reservation does not force a losing last-stack suicide", () => {
+        withSearchEnvironment(
+            {
+                V07_SEARCH: "1",
+                SEARCH_VERSIONS: "v0.8",
+                SEARCH_SHORTLIST: "2",
+                SEARCH_MAX_MELEE: "1",
+                SEARCH_MAX_MOVES: "1",
+                SEARCH_A19_LAST_FUSE_TRADES: "1",
+                SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "1",
+                SEARCH_A19_EXACT_TERMINAL_RESULTS: "1",
+                SEARCH_HORIZON: "1",
+                SEARCH_ROLLOUTS: "1",
+                SEARCH_GATE: "0",
+                V07_VALUE_WEIGHTS: "material",
+                V07_VALUE_WEIGHTS_V2: undefined,
+            },
+            () => {
+                const h = fixture({
+                    ally: false,
+                    actor: { attackType: PBTypes.AttackVals.RANGE, rangeShots: 0, damageMin: 2, damageMax: 2 },
+                    primary: { maxHp: 70, armor: 100 },
+                    primaryRooted: true,
+                    neighborCells: [
+                        { x: 3, y: 7 },
+                        { x: 3, y: 8 },
+                    ],
+                });
+                const trade = h.reserved(true);
+                const chosen = new SearchDriver(h.deps).chooseDecision(h.actor, "v0.8", h.defend);
+                expect(chosen).not.toEqual(trade.actions);
+                expect(h.actor.isDead()).toBe(false);
+            },
+        );
+    });
+
     test("preserves a stronger explosion stand across a melee cap and hits the real neighboring enemies", () => {
         const h = fixture();
         const old = h.catalog(false),

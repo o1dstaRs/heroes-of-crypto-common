@@ -810,6 +810,7 @@ export interface IEnumeratedCandidate {
 export interface IEnumerateOptions {
     /** Preserve one supported own-Last-Fuse counter trade across the melee cap; off for historical catalogs. */
     includeLastFuseCounterTrades?: boolean;
+    includeLastFusePrimaryTrades?: boolean;
     /** Cap on move destinations, kept nearest-to-enemy first (0/undefined = all reachable). */
     maxMoveDestinations?: number;
     /**
@@ -1573,11 +1574,28 @@ class CandidateGenerator {
                     this.context,
                     candidate.cell,
                     actionsOf(candidate),
-                    fatalChanceByTarget,
+                    { fatalChanceByTarget },
                 );
                 if (potential > bestPotential) {
                     bestPotential = potential;
                     reservedLastFusePair = candidate;
+                }
+            }
+            if (!reservedLastFusePair && this.options.includeLastFusePrimaryTrades) {
+                const primaryBlastByTarget = new Map<string, number>();
+                for (const candidate of pairs) {
+                    const potential = lastFuseCounterTradePotential(
+                        this.unit,
+                        candidate.target,
+                        this.context,
+                        candidate.cell,
+                        actionsOf(candidate),
+                        { includePrimaryTarget: true, fatalChanceByTarget, primaryBlastByTarget },
+                    );
+                    if (potential > bestPotential) {
+                        bestPotential = potential;
+                        reservedLastFusePair = candidate;
+                    }
                 }
             }
         }

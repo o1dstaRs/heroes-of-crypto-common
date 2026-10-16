@@ -83,6 +83,7 @@ export const V08_A19_SEARCH_RULES = Object.freeze({
     SEARCH_A19_GRAVECHAIN_COVERAGE: "1",
     // Give a wounded Last Fuse stack one supported counter-trade stand for real-engine comparison.
     SEARCH_A19_LAST_FUSE_TRADES: "1",
+    SEARCH_A19_LAST_FUSE_PRIMARY_TRADES: "1",
 } as const);
 
 /** Adaptive budget: what a breaker overrun degrades the next decisions to (wall-clock mode only). */
@@ -111,7 +112,7 @@ export const V08_A19_GENOME = Object.freeze({
 });
 export const V08_A19_GENOME_SHA256 = "d7e11ac060707a9b70c2be109534b905f25150fdef593cfcc38ba3d38bfec305" as const;
 export const V08_A19_BEHAVIOR_ENVIRONMENT_SHA256 =
-    "962a49e4a6252b5ef09f48d10a06594d3b4a93f8abc739c95385897df3d7f3df" as const;
+    "766de6b8ef722c9a8ef0bc5aaa99f2f4f61e2ccc937010369b6f24f06b883fe3" as const;
 
 /**
  * Placement: exact production f184 opening (LEFT only) -> Boar/Battle-Mage far flank -> level-4 scoped compact
@@ -143,8 +144,8 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "search-driver" as const,
         source: "src/simulation/search_driver.ts" as const,
-        // Re-pinned for Last Fuse stand coverage and counter-trade comparison.
-        sha256: "ffc71b7eb69f9f59bf1ef93c5f2d8ea41e6d337d58d1231130ce4a28ca7dc5b2" as const,
+        // Re-pinned for primary-only Last Fuse trades and their complete score comparison.
+        sha256: "b17dd60c3a1de2144c66590ec12ce4bbbe0df5705a751aa2435b3e24f7187934" as const,
     }),
     Object.freeze({
         role: "gravechain-coverage" as const,
@@ -154,12 +155,12 @@ export const V08_A19_SOURCE_LEDGER = Object.freeze([
     Object.freeze({
         role: "last-fuse-trades" as const,
         source: "src/ai/last_fuse_tactics.ts" as const,
-        sha256: "124017efb51277d8469db048f1f015153a84e115001e4523f36eb9b861f10962" as const,
+        sha256: "e8e97a5cb3df1a1e9bdbb99687b8107070ee228c840a7878f47bb4a0d2c73cdf" as const,
     }),
     Object.freeze({
         role: "last-fuse-catalog" as const,
         source: "src/ai/candidates.ts" as const,
-        sha256: "e299a10bebad84750af12305d6b626b3e8ec06d44d87eeed09430b16f5734032" as const,
+        sha256: "9e2475d100f3278cb0ca56733668477969c69f461976fc8a5719b53e1ad204c1" as const,
     }),
     Object.freeze({
         role: "selection-bounds" as const,
